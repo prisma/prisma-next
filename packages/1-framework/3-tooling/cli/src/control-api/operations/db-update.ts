@@ -12,42 +12,12 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbUpdateResult, DbUpdateSuccess, OnControlProgress } from '../types';
+import { extractSqlDdl } from './extract-sql-ddl';
 
 // F12: db update uses a lossy policy that allows additive, widening, and destructive operations.
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 } as const;
-
-function isDdlStatement(sqlStatement: string): boolean {
-  const trimmed = sqlStatement.trim().toLowerCase();
-  return (
-    trimmed.startsWith('create ') || trimmed.startsWith('alter ') || trimmed.startsWith('drop ')
-  );
-}
-
-function extractSqlDdl(operations: readonly MigrationPlanOperation[]): string[] {
-  const statements: string[] = [];
-  for (const operation of operations) {
-    const record = operation as unknown as Record<string, unknown>;
-    const execute = record['execute'];
-    if (!Array.isArray(execute)) {
-      continue;
-    }
-    for (const step of execute) {
-      if (typeof step !== 'object' || step === null) {
-        continue;
-      }
-      const sql = (step as Record<string, unknown>)['sql'];
-      if (typeof sql !== 'string') {
-        continue;
-      }
-      if (isDdlStatement(sql)) {
-        statements.push(sql.trim());
-      }
-    }
-  }
-  return statements;
-}
 
 /**
  * Options for the executeDbUpdate operation.
@@ -207,13 +177,10 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 
   // When applying, require explicit acceptance for destructive operations
   if (!options.acceptDataLoss) {
-    const hasDestructive = migrationPlan.operations.some(
-      (op) => op.operationClass === 'destructive',
-    );
-    if (hasDestructive) {
-      const destructiveOps = migrationPlan.operations
-        .filter((op) => op.operationClass === 'destructive')
-        .map((op) => ({ id: op.id, label: op.label }));
+    const destructiveOps = migrationPlan.operations
+      .filter((op) => op.operationClass === 'destructive')
+      .map((op) => ({ id: op.id, label: op.label }));
+    if (destructiveOps.length > 0) {
       return notOk({
         code: 'DESTRUCTIVE_CHANGES' as const,
         summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,

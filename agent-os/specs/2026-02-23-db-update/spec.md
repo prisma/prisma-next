@@ -1,116 +1,93 @@
-# Contract-Driven `db update` (lossy MVP)
+# Summary
 
-Date: 2026-02-23  
-Status: Draft
+Add `prisma-next db update` as the contract-driven reconciliation command for databases already managed by a contract marker. The command plans and applies additive, widening, and destructive schema changes, exposes plan/apply modes with JSON output, and preserves runner safety checks and marker/ledger audit behavior.
 
-## Summary
+# Description
 
-Implement `prisma-next db update` as the migration-style reconciliation command for databases that already have a contract marker.
+This branch implements a new CLI command, `prisma-next db update`, and a matching control API operation to reconcile an existing, marker-managed database to the current emitted contract. The flow requires a contract marker, introspects the live schema, plans a migration using a lossy policy (additive, widening, destructive), and either outputs a dry-run plan or applies the plan via the migration runner. It also adds supporting docs, demos, and end-to-end tests that mirror the scenarios in `DEMO.md`.
 
-This MVP intentionally:
+# Requirements
 
-- does **not** use `@deprecated` / `@deleted` authoring hints,
-- allows lossy operation classes (`additive`, `widening`, `destructive`) where implemented by planner/runner,
-- requires marker presence and fails fast when database adoption has not happened yet.
+## Functional Requirements
 
-`db update` reuses the existing planner/runner pipeline and keeps marker/ledger audit invariants intact.
+- Provide a new CLI command `prisma-next db update` that mirrors `db init` flag surface:
+  - `--db <url>`, `--config <path>`, `--plan`, `--json [format]`, `-q`, `-v`, `-vv`, `--timestamps`, `--color/--no-color`.
+- Load config and resolve the emitted contract JSON from `config.contract.output` or default to `src/prisma/contract.json`.
+- Require a database connection string from `--db` or `config.db.connection`.
+- Reject unsupported JSON format `ndjson` with a structured CLI error.
+- Require a contract marker in the database; if missing, fail with `MARKER_REQUIRED` and guidance to run `db init`.
+- Introspect the live schema and plan reconciliation against the emitted contract using a policy that allows additive, widening, and destructive operations.
+- Attach marker hashes as plan origin before execution to enforce drift safety in the runner.
+- In `--plan` mode, return a deterministic plan summary without applying changes.
+- In `--plan` mode, emit SQL DDL alongside the plan summary when the target belongs to the SQL family.
+- In apply mode, execute with full runner checks enabled and update marker + ledger through the runner.
+- Map planner conflicts and runner failures to structured CLI errors with actionable recovery guidance.
+- Expose a programmatic control API operation (`client.dbUpdate`) that mirrors the CLI behavior.
 
-## Context
+## Non-Functional Requirements
 
-Current CLI support includes `db init`, `db verify`, `db sign`, and related schema commands. `db init` is additive-only and bootstraps unmanaged databases.
-
-For incremental contract evolution, we need a command that:
-
-- starts from managed DB state (marker exists),
-- can reconcile both additive and lossy deltas,
-- remains deterministic and auditable under the migration subsystem rules.
-
-The architecture already has these primitives:
-
-- marker + ledger model,
-- planner policy classes (`additive`, `widening`, `destructive`),
-- runner lock, checks, schema verification, and marker/ledger writes.
-
-## Goals
-
-- Add `prisma-next db update` command with plan/apply modes.
-- Make marker presence mandatory for this command.
-- Plan using live schema + desired contract with lossy-capable policy.
-- Execute with plan origin set from marker to enforce drift safety.
-- Keep full runner checks enabled.
-- Add tests first for CLI surface and planner lossy behavior.
-- Document command semantics and updated architecture guidance.
+- Deterministic planning: operation ordering and IDs are stable for identical inputs.
+- Safety invariants: runner checks, advisory locks, and marker/ledger audit rules remain unchanged from existing migration behavior.
+- CLI output remains stable and machine-readable; JSON output must be consistent with existing migration envelopes.
+- The command must be idempotent when the database already matches the contract (0 operations planned/applied).
 
 ## Non-goals
 
-- No lifecycle-hint planning (`@deprecated`, `@deleted`) in this milestone.
-- No contract-to-contract planner API redesign.
-- No environment promotion policy system.
-- No cross-family implementation.
+- Lifecycle-hint planning (`@deprecated`, `@deleted`).
+- Contract-to-contract planner redesign.
+- Environment promotion or history policies.
+- Non-SQL family or target support beyond existing migrations capability.
 
-## Proposed behavior
+# Acceptance Criteria
 
-### CLI
+- [ ] `prisma-next db update --plan` returns a deterministic plan with operation IDs, labels, classes, and destination hash.
+- [ ] `prisma-next db update --plan` emits SQL DDL when the target is in the SQL family.
+- [ ] `prisma-next db update` applies the planned operations and writes a new marker + ledger entry.
+- [ ] Missing markers fail with a structured `MARKER_REQUIRED` error and a `db init` recovery hint.
+- [ ] Planner conflicts return `PLANNING_FAILED` with conflict details.
+- [ ] Runner failures return `RUNNER_FAILED` with a remediation hint.
+- [ ] `--json` returns an `object` envelope; `--json ndjson` fails with a structured CLI error.
+- [ ] Running `db update` when no changes exist reports 0 operations and leaves the schema unchanged.
+- [ ] Documentation includes `db update` command usage, semantics, and difference from `db init`.
+- [ ] E2E tests cover demo scenarios for plan/apply, missing marker, conflicts, runner failure, and JSON output.
 
-Command:
+# Other Considerations
 
-```bash
-prisma-next db update [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
-```
+## Security
 
-### Flow
+- Database connection strings are treated as sensitive; CLI output should mask credentials where possible.
+- Destructive operations are permitted; operators should run `--plan` first and rely on existing guardrails and backups.
 
-1. Load config and desired `contract.json`.
-2. Connect to DB.
-3. Read marker.
-4. If marker missing: fail with `db init` guidance.
-5. Introspect live schema.
-6. Plan using lossy-capable policy.
-7. Attach plan origin from marker hashes.
-8. In `--plan`: return rendered/JSON plan only.
-9. In apply mode: execute runner with full checks enabled.
-10. On success, runner updates marker and appends ledger entry.
+## Cost
 
-### Safety and determinism
+**Assumption:** Typical usage is developer or CI-driven with small schemas; expected 30-day incremental cost is in the $10s (local or shared Postgres), dominated by normal database operation rather than CLI overhead.
 
-- Origin hash checks remain mandatory (runner behavior).
-- Advisory lock and transaction behavior remain unchanged.
-- Operation ordering and IDs must remain deterministic.
-- Structured errors and stable CLI contract remain in place.
+## Observability
 
-## Design details
+- Progress spans are emitted for read marker, introspection, planning, apply, and per-operation execution to support CLI progress output.
+- JSON output includes `timings.total` and plan metadata suitable for CI logs.
 
-### Planner policy for `db update`
+## Data Protection
 
-Use operation policy:
+- The command can perform destructive schema changes; operators should ensure data backups and retention requirements are met before applying.
+- The marker/ledger audit trail remains the source of truth for applied contract changes.
 
-```ts
-{ allowedOperationClasses: ['additive', 'widening', 'destructive'] }
-```
+## Analytics
 
-Planner changes in Postgres target should cover supported lossy cases and still fail with explicit conflicts when change is not safely expressible.
+**Assumption:** No analytics events are emitted from the CLI in this phase; usage tracking is limited to local logs or CI output.
 
-### Marker semantics
+# References
 
-- `db update` requires marker row.
-- Plan origin is set to marker values before runner execution.
-- Runner remains the single writer for marker and ledger.
+- `agent-os/specs/2026-02-23-db-update/planning/requirements.md`
+- `DEMO.md`
+- `docs/commands/SUMMARY.md`
+- `docs/commands/db-update.md`
+- `packages/1-framework/3-tooling/cli/src/commands/db-update.ts`
+- `packages/1-framework/3-tooling/cli/src/control-api/operations/db-update.ts`
+- `examples/db-update-demo/README.md`
+- `test/integration/test/cli.db-update.e2e.test.ts`
+- `test/integration/test/cli.db-update.e2e.errors.test.ts`
 
-## Implementation plan
+# Open Questions
 
-1. Add failing CLI tests for `db update`.
-2. Add failing planner tests for widening/destructive diffs.
-3. Implement Postgres planner lossy operations.
-4. Add control API `dbUpdate` operation and types.
-5. Add CLI command wiring and output formatters.
-6. Update docs.
-7. Run focused integration and planner tests.
-
-## Acceptance criteria
-
-- `db update --plan` produces deterministic lossy-capable plan output.
-- `db update` apply runs and writes marker+ledger via runner.
-- Missing marker produces clear actionable failure.
-- Existing `db init` behavior remains unchanged.
-- Help snapshots and CLI README include `db update`.
-- Architecture docs reflect this MVP strategy and limitations.
+No open questions at this time.

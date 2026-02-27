@@ -16,7 +16,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
 
         CREATE TABLE "public"."comment" (
           "content" text NOT NULL,
-          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "created_at" timestamptz DEFAULT (now()) NOT NULL,
           "id" SERIAL NOT NULL,
           "postId" int4 NOT NULL,
           "update_at" timestamptz,
@@ -24,7 +24,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
         );
 
         CREATE TABLE "public"."event" (
-          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "created_at" timestamptz DEFAULT (now()) NOT NULL,
           "id" character(36) NOT NULL,
           "name" text NOT NULL,
           "scheduled_at" timestamptz DEFAULT '2024-01-15T10:30:00.000Z' NOT NULL,
@@ -58,7 +58,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
         );
 
         CREATE TABLE "public"."post" (
-          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "created_at" timestamptz DEFAULT (now()) NOT NULL,
           "id" SERIAL NOT NULL,
           "meta" json,
           "published" bool NOT NULL,
@@ -69,7 +69,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
         );
 
         CREATE TABLE "public"."user" (
-          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "created_at" timestamptz DEFAULT (now()) NOT NULL,
           "email" character varying(255) NOT NULL,
           "id" SERIAL NOT NULL,
           "profile" jsonb,

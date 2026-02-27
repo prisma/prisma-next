@@ -800,6 +800,7 @@ Reconcile a **marker-managed** database to the currently emitted contract.
 - Uses a lossy-capable policy (`additive`, `widening`, `destructive`) where supported by planner/runner
 - Anchors plan origin to the marker hashes before runner execution
 - Keeps full runner execution checks enabled
+- In `--plan` mode for SQL targets, prints a DDL preview derived from planned operations
 
 **Command:**
 ```bash

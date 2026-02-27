@@ -87,6 +87,8 @@ This is a dry run. No changes were applied.
 Run without --plan to apply changes.
 ```
 
+For SQL targets, plan mode also prints a DDL preview derived from planned operations.
+
 **Apply mode** (default):
 ```
 ✔ Applied 1 operation(s)

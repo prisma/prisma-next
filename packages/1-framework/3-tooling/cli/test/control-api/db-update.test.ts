@@ -22,6 +22,7 @@ function createMockFamilyInstance(overrides?: {
   introspect?: () => Promise<unknown>;
 }) {
   return {
+    familyId: 'sql',
     readMarker: overrides?.readMarker ?? (async () => null),
     introspect: overrides?.introspect ?? (async () => ({ tables: {}, extensions: [] })),
     validateContractIR: (ir: unknown) => ir as ContractIR,
@@ -152,6 +153,7 @@ describe('executeDbUpdate', () => {
     if (result.ok) {
       expect(result.value.mode).toBe('plan');
       expect(result.value.plan.operations).toHaveLength(1);
+      expect(result.value.plan.sql).toEqual([]);
       expect(result.value.origin.storageHash).toBe('sha256:origin');
       expect(result.value.destination.storageHash).toBe('sha256:dest');
       expect(result.value.execution).toBeUndefined();
@@ -381,6 +383,95 @@ describe('executeDbUpdate', () => {
         }),
       }),
     );
+  });
+
+  describe('destructive changes gate', () => {
+    function createDestructiveMigrations() {
+      return createMockMigrations({
+        planResult: {
+          kind: 'success',
+          plan: {
+            targetId: 'postgres',
+            destination: { storageHash: 'sha256:dest' },
+            operations: [
+              {
+                id: 'dropColumn.user.nickname',
+                label: 'Drop column nickname from user',
+                operationClass: 'destructive',
+              },
+              {
+                id: 'column.user.bio',
+                label: 'Add column bio to user',
+                operationClass: 'additive',
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    it('returns DESTRUCTIVE_CHANGES in apply mode without acceptDataLoss', async () => {
+      const result = await executeDbUpdate({
+        driver: createMockDriver(),
+        familyInstance: createMockFamilyInstance({
+          readMarker: async () => ({ storageHash: 'sha256:origin' }),
+        }),
+        contractIR: dummyContractIR,
+        mode: 'apply',
+        migrations: createDestructiveMigrations(),
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('DESTRUCTIVE_CHANGES');
+        expect(result.failure.summary).toContain('destructive');
+        expect(result.failure.meta).toMatchObject({
+          destructiveOperations: [
+            { id: 'dropColumn.user.nickname', label: 'Drop column nickname from user' },
+          ],
+        });
+      }
+    });
+
+    it('proceeds to runner in apply mode with acceptDataLoss: true', async () => {
+      const result = await executeDbUpdate({
+        driver: createMockDriver(),
+        familyInstance: createMockFamilyInstance({
+          readMarker: async () => ({ storageHash: 'sha256:origin' }),
+        }),
+        contractIR: dummyContractIR,
+        mode: 'apply',
+        acceptDataLoss: true,
+        migrations: createDestructiveMigrations(),
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.mode).toBe('apply');
+        expect(result.value.execution).toBeDefined();
+      }
+    });
+
+    it('returns success in plan mode regardless of destructive operations', async () => {
+      const result = await executeDbUpdate({
+        driver: createMockDriver(),
+        familyInstance: createMockFamilyInstance({
+          readMarker: async () => ({ storageHash: 'sha256:origin' }),
+        }),
+        contractIR: dummyContractIR,
+        mode: 'plan',
+        migrations: createDestructiveMigrations(),
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.mode).toBe('plan');
+        expect(result.value.plan.operations).toHaveLength(2);
+      }
+    });
   });
 
   describe('progress events', () => {

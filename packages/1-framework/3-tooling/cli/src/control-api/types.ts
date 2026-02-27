@@ -299,6 +299,7 @@ export interface DbInitSuccess {
       readonly label: string;
       readonly operationClass: string;
     }>;
+    readonly sql?: ReadonlyArray<string>;
   };
   readonly execution?: {
     readonly operationsPlanned: number;

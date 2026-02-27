@@ -7,9 +7,10 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { OperationClass, PlanningMode, PostgresPlanTargetDetails } from './planner';
+import type { PlanningMode, PostgresPlanTargetDetails } from './planner';
 import {
   buildColumnTypeSql,
+  buildTargetDetails,
   columnExistsCheck,
   columnNullabilityCheck,
   constraintExistsCheck,
@@ -80,7 +81,7 @@ export function buildLossyPlan(options: {
 // Issue Classification
 // ============================================================================
 
-export function isAdditiveIssue(issue: SchemaIssue): boolean {
+function isAdditiveIssue(issue: SchemaIssue): boolean {
   switch (issue.kind) {
     case 'type_missing':
     case 'type_values_mismatch':
@@ -180,20 +181,6 @@ function buildLossyOperationFromIssue(options: {
     default:
       return null;
   }
-}
-
-function buildTargetDetails(
-  objectType: OperationClass,
-  name: string,
-  schema: string,
-  table?: string,
-): PostgresPlanTargetDetails {
-  return {
-    schema,
-    objectType,
-    name,
-    ...ifDefined('table', table),
-  };
 }
 
 function getContractColumn(
