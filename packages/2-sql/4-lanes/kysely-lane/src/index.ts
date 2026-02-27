@@ -6,5 +6,5 @@ export {
   KyselyTransformError,
 } from './transform/errors';
 export { runGuardrails } from './transform/guardrails';
+export type { TransformResult } from './transform/transform';
 export { transformKyselyToPnAst } from './transform/transform';
-export type { TransformResult } from './transform/transform-context';

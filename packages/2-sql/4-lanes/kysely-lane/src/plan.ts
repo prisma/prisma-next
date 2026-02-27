@@ -4,14 +4,8 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { CompiledQuery } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './transform/errors';
 import { runGuardrails } from './transform/guardrails';
+import { isTransformableRootNode } from './transform/kysely-ast-types';
 import { transformKyselyToPnAst } from './transform/transform';
-
-const TRANSFORMABLE_KINDS = new Set([
-  'SelectQueryNode',
-  'InsertQueryNode',
-  'UpdateQueryNode',
-  'DeleteQueryNode',
-]);
 
 export const REDACTED_SQL = '/* redacted by @prisma-next/sql-kysely-lane */';
 
@@ -25,12 +19,15 @@ export function buildKyselyPlan<Row>(
   options: BuildKyselyPlanOptions = {},
 ): SqlQueryPlan<Row> {
   const query = (compiledQuery as { query?: unknown }).query;
-  const kind = (query as { kind?: string })?.kind;
-  if (!query || typeof query !== 'object' || !kind || !TRANSFORMABLE_KINDS.has(kind)) {
+  const kind =
+    query && typeof query === 'object' && 'kind' in query
+      ? String((query as { kind?: unknown }).kind ?? 'unknown')
+      : 'unknown';
+  if (!isTransformableRootNode(query)) {
     throw new KyselyTransformError(
-      `Unsupported query kind: ${kind ?? 'unknown'}`,
+      `Unsupported query kind: ${kind}`,
       KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-      { nodeKind: String(kind ?? 'unknown') },
+      { nodeKind: kind },
     );
   }
 
