@@ -1,6 +1,6 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { demoSchema, demoSql } from '../prisma/context';
 import { collect } from './utils';
 
 /**
@@ -12,9 +12,9 @@ export async function ormGetUsersByIdCursor(
   pageSize: number,
   runtime: Runtime,
 ) {
-  const userTable = db.schema.tables.user;
+  const userTable = demoSchema.tables.user;
 
-  let builder = db.sql
+  let builder = demoSql
     .from(userTable)
     .select({
       id: userTable.columns.id,
@@ -44,9 +44,9 @@ export async function ormGetUsersByTimestampCursor(
   pageSize: number,
   runtime: Runtime,
 ) {
-  const userTable = db.schema.tables.user;
+  const userTable = demoSchema.tables.user;
 
-  let builder = db.sql
+  let builder = demoSql
     .from(userTable)
     .select({
       id: userTable.columns.id,
@@ -72,9 +72,9 @@ export async function ormGetUsersByTimestampCursor(
  * Fetches records before the cursor, useful for "previous page" navigation
  */
 export async function ormGetUsersBackward(cursor: string, pageSize: number, runtime: Runtime) {
-  const userTable = db.schema.tables.user;
+  const userTable = demoSchema.tables.user;
 
-  const plan = db.sql
+  const plan = demoSql
     .from(userTable)
     .where(userTable.columns.id.lt(param('cursor')))
     .select({

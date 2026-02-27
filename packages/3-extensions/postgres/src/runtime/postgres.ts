@@ -152,23 +152,21 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
       throw new Error('Driver descriptor missing from execution stack');
     }
 
-    const connect =
+    const driver = driverDescriptor.create({
+      cursor: { disabled: true },
+    });
+    const runtimeBinding =
       binding.kind === 'url'
-        ? {
+        ? ({
+            kind: 'pgPool',
             pool: new Pool({
               connectionString: binding.url,
               connectionTimeoutMillis: options.poolOptions?.connectionTimeoutMillis ?? 20_000,
               idleTimeoutMillis: options.poolOptions?.idleTimeoutMillis ?? 30_000,
             }),
-          }
-        : binding.kind === 'pgPool'
-          ? { pool: binding.pool }
-          : { client: binding.client };
-
-    const driver = driverDescriptor.create({
-      connect,
-      cursor: { disabled: true },
-    });
+          } as const)
+        : binding;
+    void driver.connect(runtimeBinding);
 
     runtimeInstance = createRuntime({
       stackInstance,

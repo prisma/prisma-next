@@ -1,7 +1,7 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyExpressionSource, AnyOrderBuilder } from '@prisma-next/sql-relational-core/types';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { demoSchema, demoSql } from '../prisma/context';
 import { collect } from './utils';
 
 type VectorDistanceExpression = AnyExpressionSource & {
@@ -26,7 +26,7 @@ function hasVectorOpsColumn(value: unknown): value is VectorOpsColumn {
  * Returns the top N posts ordered by similarity (closest first).
  */
 export async function similaritySearch(queryVector: number[], runtime: Runtime, limit = 10) {
-  const postTable = db.schema.tables.post;
+  const postTable = demoSchema.tables.post;
   if (!postTable) {
     throw new Error('post table not found');
   }
@@ -37,7 +37,7 @@ export async function similaritySearch(queryVector: number[], runtime: Runtime, 
   }
   const distanceExpr = embeddingColumn.cosineDistance(param('queryVector'));
 
-  const plan = db.sql
+  const plan = demoSql
     .from(postTable)
     .select({
       id: postColumns.id,

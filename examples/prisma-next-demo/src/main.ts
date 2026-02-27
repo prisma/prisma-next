@@ -46,7 +46,7 @@
  * - entry.ts: Browser app for visualizing contract.json
  */
 import 'dotenv/config';
-import { type as arktype } from 'arktype';
+import { loadAppConfig } from './app-config';
 import { deleteWithoutWhere } from './kysely/delete-without-where';
 import {
   deleteUser as deleteUserKysely,
@@ -69,7 +69,7 @@ import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { ormClientGetUsers } from './orm-client/get-users';
 import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
 import { ormClientUpsertUser } from './orm-client/upsert-user';
-import { db } from './prisma/db';
+import { createDb } from './prisma/db';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
@@ -78,28 +78,14 @@ import { getUsersWithPosts } from './queries/get-users-with-posts';
 import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination';
 import { similaritySearch } from './queries/similarity-search';
 
-const appConfigSchema = arktype({
-  DATABASE_URL: 'string',
-});
-
-export function loadAppConfig() {
-  const result = appConfigSchema({
-    DATABASE_URL: process.env['DATABASE_URL'],
-  });
-  if (result instanceof arktype.errors) {
-    const message = result.map((p: { message: string }) => p.message).join('; ');
-    throw new Error(`Invalid app configuration: ${message}`);
-  }
-  const parsed = result as { DATABASE_URL: string };
-  return { databaseUrl: parsed.DATABASE_URL };
-}
-
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
 
 async function main() {
-  loadAppConfig();
+  const { databaseUrl } = loadAppConfig();
+  const db = createDb(databaseUrl);
   let runtime: Awaited<ReturnType<typeof db.runtime>> | undefined;
+
   try {
     runtime = await db.runtime();
     if (cmd === 'users') {

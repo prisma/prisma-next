@@ -1,6 +1,6 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { demoSchema, demoSql } from '../prisma/context';
 import { collect } from './utils';
 
 interface UserWithPosts {
@@ -11,10 +11,10 @@ interface UserWithPosts {
 }
 
 export async function ormGetUsersWithPosts(runtime: Runtime) {
-  const userTable = db.schema.tables.user;
-  const postTable = db.schema.tables.post;
+  const userTable = demoSchema.tables.user;
+  const postTable = demoSchema.tables.post;
 
-  const plan = db.sql
+  const plan = demoSql
     .from(userTable)
     .includeMany(
       postTable,
@@ -41,10 +41,10 @@ export async function ormGetUsersWithPosts(runtime: Runtime) {
 }
 
 export async function ormGetUsersWithoutPosts(runtime: Runtime) {
-  const userTable = db.schema.tables.user;
-  const postTable = db.schema.tables.post;
+  const userTable = demoSchema.tables.user;
+  const postTable = demoSchema.tables.post;
 
-  const plan = db.sql
+  const plan = demoSql
     .from(userTable)
     .includeMany(
       postTable,
@@ -71,10 +71,10 @@ export async function ormGetUsersWithoutPosts(runtime: Runtime) {
 }
 
 export async function ormGetUsersWhereAllPostsMatch(runtime: Runtime) {
-  const userTable = db.schema.tables.user;
-  const postTable = db.schema.tables.post;
+  const userTable = demoSchema.tables.user;
+  const postTable = demoSchema.tables.post;
 
-  const plan = db.sql
+  const plan = demoSql
     .from(userTable)
     .includeMany(
       postTable,

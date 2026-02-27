@@ -1,13 +1,13 @@
 import type { ResultType } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { demoSchema, demoSql } from '../prisma/context';
 import { collect } from './utils';
 
 export async function getUserPosts(userId: string, runtime: Runtime) {
-  const postTable = db.schema.tables.post;
+  const postTable = demoSchema.tables.post;
 
-  const plan = db.sql
+  const plan = demoSql
     .from(postTable)
     .where(postTable.columns.userId.eq(param('userId')))
     .select({

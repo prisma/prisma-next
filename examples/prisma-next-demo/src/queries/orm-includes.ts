@@ -1,16 +1,16 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { demoSchema, demoSql } from '../prisma/context';
 import { collect } from './utils';
 
 export async function ormGetUsersWithPosts(
   limit: number,
   runtime: Runtime,
 ): Promise<Record<string, unknown>[]> {
-  const userTable = db.schema.tables.user;
-  const postTable = db.schema.tables.post;
+  const userTable = demoSchema.tables.user;
+  const postTable = demoSchema.tables.post;
 
-  const plan = db.sql
+  const plan = demoSql
     .from(userTable)
     .includeMany(
       postTable,

@@ -21,12 +21,10 @@ import { ormClientGetUsers } from '../src/orm-client/get-users';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
 import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
 import { ormClientUpsertUser } from '../src/orm-client/upsert-user';
-import { db } from '../src/prisma/db';
+import { demoContext as context, demoStack as executionStack } from '../src/prisma/context';
 import { initTestDatabase } from './utils/control-client';
 
-const context = db.context;
 const { contract } = context;
-const executionStack = db.stack;
 
 async function createTestDriver(connectionString: string) {
   const stackInstance = instantiateExecutionStack(executionStack);

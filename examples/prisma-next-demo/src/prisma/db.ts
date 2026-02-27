@@ -4,16 +4,18 @@ import { budgets } from '@prisma-next/sql-runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-export const db = postgres<Contract>({
-  contractJson,
-  url: process.env['DATABASE_URL'] ?? 'postgresql://localhost:5432/prisma_next_demo',
-  extensions: [pgvector],
-  plugins: [
-    budgets({
-      maxRows: 10_000,
-      defaultTableRows: 10_000,
-      tableRows: { user: 10_000, post: 10_000 },
-      maxLatencyMs: 1_000,
-    }),
-  ],
-});
+export function createDb(databaseUrl: string) {
+  return postgres<Contract>({
+    contractJson,
+    url: databaseUrl,
+    extensions: [pgvector],
+    plugins: [
+      budgets({
+        maxRows: 10_000,
+        defaultTableRows: 10_000,
+        tableRows: { user: 10_000, post: 10_000 },
+        maxLatencyMs: 1_000,
+      }),
+    ],
+  });
+}

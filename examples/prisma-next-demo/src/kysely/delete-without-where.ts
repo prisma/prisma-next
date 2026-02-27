@@ -1,5 +1,5 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { createKysely } from '../prisma/context';
 
 /**
  * Guardrail-proving query: DELETE without WHERE.
@@ -7,7 +7,7 @@ import { db } from '../prisma/db';
  * Used to validate that LINT.DELETE_WITHOUT_WHERE is enforced.
  */
 export async function deleteWithoutWhere(runtime: Runtime) {
-  const kysely = db.kysely(runtime);
+  const kysely = createKysely(runtime);
 
   await kysely.deleteFrom('user').execute();
 }

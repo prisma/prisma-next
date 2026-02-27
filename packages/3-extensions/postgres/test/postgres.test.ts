@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
   driverCreate: vi.fn(),
+  driverConnect: vi.fn(),
   validateContract: vi.fn(),
   poolCtor: vi.fn(),
   dialectCtor: vi.fn(),
@@ -107,6 +108,7 @@ describe('postgres', () => {
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
     mocks.driverCreate.mockReset();
+    mocks.driverConnect.mockReset();
     mocks.validateContract.mockReset();
     mocks.poolCtor.mockReset();
     mocks.dialectCtor.mockReset();
@@ -125,7 +127,7 @@ describe('postgres', () => {
       extensionPacks: [],
     });
     mocks.instantiateExecutionStack.mockReturnValue({ adapter: {} });
-    mocks.driverCreate.mockReturnValue({ id: 'driver-instance' });
+    mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
   });
@@ -237,6 +239,10 @@ describe('postgres', () => {
       connectionTimeoutMillis: 20_000,
       idleTimeoutMillis: 30_000,
     });
+    expect(mocks.driverConnect).toHaveBeenCalledWith({
+      kind: 'pgPool',
+      pool: expect.any(Pool),
+    });
   });
 
   it('allows overriding url pool timeout options', () => {
@@ -296,9 +302,9 @@ describe('postgres', () => {
     db.runtime();
 
     expect(mocks.driverCreate).toHaveBeenCalledWith({
-      connect: { pool },
       cursor: { disabled: true },
     });
+    expect(mocks.driverConnect).toHaveBeenCalledWith({ kind: 'pgPool', pool });
   });
 
   it('uses pg client binding', () => {
@@ -311,9 +317,9 @@ describe('postgres', () => {
     db.runtime();
 
     expect(mocks.driverCreate).toHaveBeenCalledWith({
-      connect: { client },
       cursor: { disabled: true },
     });
+    expect(mocks.driverConnect).toHaveBeenCalledWith({ kind: 'pgClient', client });
   });
 
   it('uses explicit binding object', () => {
@@ -326,9 +332,9 @@ describe('postgres', () => {
     db.runtime();
 
     expect(mocks.driverCreate).toHaveBeenCalledWith({
-      connect: { pool },
       cursor: { disabled: true },
     });
+    expect(mocks.driverConnect).toHaveBeenCalledWith({ kind: 'pgPool', pool });
   });
 
   it('throws when pg input is neither Pool nor Client', () => {

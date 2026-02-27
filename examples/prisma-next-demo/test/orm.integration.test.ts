@@ -6,12 +6,10 @@ import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { db } from '../src/prisma/db';
+import { demoContext as context, demoStack as executionStack } from '../src/prisma/context';
 import { initTestDatabase } from './utils/control-client';
 
-const context = db.context;
 const { contract } = context;
-const executionStack = db.stack;
 
 async function createTestDriver(connectionString: string) {
   const stackInstance = instantiateExecutionStack(executionStack);

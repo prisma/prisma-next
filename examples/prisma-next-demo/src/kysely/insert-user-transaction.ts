@@ -1,10 +1,10 @@
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { createKysely } from '../prisma/context';
 
 export async function insertUserTransaction(runtime: Runtime) {
   const userId = generateId({ id: 'uuidv4' });
-  const kysely = db.kysely(runtime);
+  const kysely = createKysely(runtime);
 
   await kysely
     .insertInto('user')

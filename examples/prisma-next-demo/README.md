@@ -147,13 +147,15 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
 - `prisma/contract.ts` - Contract definition (source of truth)
 - `src/prisma/contract.json` - Emitted contract (emit workflow only)
 - `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
-- `src/prisma/db.ts` - One-liner Postgres client + query roots (emit workflow)
+- `src/prisma/db.ts` - Emit-workflow runtime factory (`createDb(databaseUrl)`) with no module-level env reads
+- `src/prisma/context.ts` - Emit-workflow static query surfaces (`demoContext`, `demoStack`, `demoSchema`, `demoSql`, `createKysely`)
+- `src/app-config.ts` - Shared arktype environment loader used by CLI entrypoints and scripts
 - `src/prisma-no-emit/context.ts` - Env-free execution stack/context + query roots (no-emit workflow)
 - `src/prisma-no-emit/runtime.ts` - Runtime factory (no-emit workflow)
 - `src/orm-client/client.ts` - ORM client + custom collection scopes
 - `src/orm-client/*.ts` - End-to-end ORM client query examples
-- `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
-- `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
+- `src/main.ts` - Emit-workflow app entrypoint using shared config loader + explicit db factory input
+- `src/main-no-emit.ts` - No-emit entrypoint using the same shared config loader pattern
 - `scripts/seed.ts` - Database seeding (includes vector embeddings)
 - `src/queries/similarity-search.ts` - Example vector similarity search query
 - `test/` - Integration tests demonstrating Prisma Next usage

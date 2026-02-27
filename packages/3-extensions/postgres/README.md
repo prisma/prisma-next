@@ -33,6 +33,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - Build static schema and ORM roots from the execution context
 - Normalize runtime binding input (`binding`, `url`, `pg`)
 - Lazily instantiate runtime resources on first `db.runtime()` call
+- Connect the internal Postgres driver binding before handing runtime to query surfaces
 - Memoize runtime so repeated `db.runtime()` calls return one instance
 
 ## Dependencies
