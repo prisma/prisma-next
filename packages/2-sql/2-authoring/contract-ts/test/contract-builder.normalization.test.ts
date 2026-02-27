@@ -126,6 +126,81 @@ describe('contract builder normalization', () => {
     expect(contract.storage.tables.user.columns.email.nullable).toBe(false);
   });
 
+  it('passes through BM25 index fields (using, keyField, fieldConfigs)', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('items', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('description', { type: textColumn, nullable: false })
+          .primaryKey(['id'])
+          .bm25Index({
+            fields: [{ column: 'description', tokenizer: 'simple' }],
+            name: 'search_idx',
+          }),
+      )
+      .build();
+
+    const indexes = contract.storage.tables.items.indexes;
+    expect(indexes).toHaveLength(1);
+    expect(indexes[0]).toMatchObject({
+      columns: ['description'],
+      using: 'bm25',
+      keyField: 'id',
+      name: 'search_idx',
+      fieldConfigs: [{ column: 'description', tokenizer: 'simple' }],
+    });
+  });
+
+  it('passes through BM25 index with expression-based fields', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('items', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('description', { type: textColumn, nullable: false })
+          .primaryKey(['id'])
+          .bm25Index({
+            fields: [
+              { column: 'description' },
+              {
+                expression: "description || ' ' || category",
+                alias: 'concat',
+                tokenizer: 'simple',
+              },
+            ],
+          }),
+      )
+      .build();
+
+    const idx = contract.storage.tables.items.indexes[0]!;
+    expect(idx.using).toBe('bm25');
+    expect(idx.fieldConfigs).toHaveLength(2);
+    expect(idx.fieldConfigs![1]).toMatchObject({
+      expression: "description || ' ' || category",
+      alias: 'concat',
+    });
+  });
+
+  it('preserves plain indexes without BM25 fields', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('email', { type: textColumn, nullable: false })
+          .primaryKey(['id'])
+          .index(['email']),
+      )
+      .build();
+
+    const idx = contract.storage.tables.user.indexes[0]!;
+    expect(idx.columns).toEqual(['email']);
+    expect(idx).not.toHaveProperty('using');
+    expect(idx).not.toHaveProperty('keyField');
+    expect(idx).not.toHaveProperty('fieldConfigs');
+  });
+
   it('normalizes contract-level relations to empty object', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
