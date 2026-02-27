@@ -27,6 +27,7 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
+import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { formatCommandHelp, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
@@ -230,13 +231,18 @@ async function executeMigrationPlanCommand(
     extensionPacks: config.extensionPacks ?? [],
   });
   const familyInstance = config.family.create(stack);
+  const frameworkComponents = assertFrameworkComponentsCompatible(
+    config.family.familyId,
+    config.target.targetId,
+    [config.target, config.adapter, ...(config.extensionPacks ?? [])],
+  );
   const planner = migrations.createPlanner(familyInstance);
   const fromSchemaIR = migrations.contractToSchema(fromContract);
   const plannerResult = planner.plan({
     contract: toContractJson,
     schema: fromSchemaIR,
     policy: { allowedOperationClasses: ['additive'] },
-    frameworkComponents: [],
+    frameworkComponents,
   });
 
   if (plannerResult.kind === 'failure') {
