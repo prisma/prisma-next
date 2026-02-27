@@ -124,7 +124,11 @@ function flattenLogical(
       return;
     }
     if (!legacyLogicalNode.left || !legacyLogicalNode.right) {
-      return;
+      throw new KyselyTransformError(
+        `Malformed ${logicalKind} node: missing left or right operand`,
+        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+        { nodeKind: current.kind },
+      );
     }
     flattenLogical(legacyLogicalNode.left, logicalKind, ctx, defaultTable, out);
     flattenLogical(legacyLogicalNode.right, logicalKind, ctx, defaultTable, out);
@@ -141,7 +145,11 @@ function flattenLogical(
       return;
     }
     if (!legacyLogicalNode.left || !legacyLogicalNode.right) {
-      return;
+      throw new KyselyTransformError(
+        `Malformed ${logicalKind} node: missing left or right operand`,
+        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+        { nodeKind: current.kind },
+      );
     }
     flattenLogical(legacyLogicalNode.left, logicalKind, ctx, defaultTable, out);
     flattenLogical(legacyLogicalNode.right, logicalKind, ctx, defaultTable, out);
