@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { TOKENIZER } from '../src/core/constants';
 import { paradedbPackMeta } from '../src/core/descriptor-meta';
 import { bm25 } from '../src/types/index-types';
 
@@ -16,24 +15,6 @@ describe('ParadeDB extension', () => {
       expect(paradedbPackMeta.capabilities).toEqual({
         postgres: { 'paradedb/bm25': true },
       });
-    });
-  });
-
-  describe('TOKENIZER constants', () => {
-    it('defines all 12 tokenizer IDs', () => {
-      expect(Object.keys(TOKENIZER)).toHaveLength(12);
-      expect(TOKENIZER.UNICODE).toBe('unicode');
-      expect(TOKENIZER.SIMPLE).toBe('simple');
-      expect(TOKENIZER.NGRAM).toBe('ngram');
-      expect(TOKENIZER.ICU).toBe('icu');
-      expect(TOKENIZER.REGEX_PATTERN).toBe('regex_pattern');
-      expect(TOKENIZER.SOURCE_CODE).toBe('source_code');
-      expect(TOKENIZER.LITERAL).toBe('literal');
-      expect(TOKENIZER.LITERAL_NORMALIZED).toBe('literal_normalized');
-      expect(TOKENIZER.WHITESPACE).toBe('whitespace');
-      expect(TOKENIZER.CHINESE_COMPATIBLE).toBe('chinese_compatible');
-      expect(TOKENIZER.JIEBA).toBe('jieba');
-      expect(TOKENIZER.LINDERA).toBe('lindera');
     });
   });
 

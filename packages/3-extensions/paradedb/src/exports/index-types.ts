@@ -1,4 +1,4 @@
-export { TOKENIZER, type TokenizerId } from '../core/constants';
+export type { TokenizerId } from '../core/constants';
 export type {
   Bm25ExpressionFieldOptions,
   Bm25JsonFieldOptions,

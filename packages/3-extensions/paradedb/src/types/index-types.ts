@@ -48,7 +48,10 @@ export const bm25 = {
   text(column: string, opts?: Bm25TextFieldOptions): Bm25FieldConfig {
     return {
       column,
-      ...tokenizerFromTextOpts(opts),
+      ...buildTokenizerConfig(opts?.tokenizer, {
+        stemmer: opts?.stemmer,
+        remove_emojis: opts?.remove_emojis,
+      }),
       ...(opts?.alias !== undefined && { alias: opts.alias }),
     };
   },
@@ -67,7 +70,7 @@ export const bm25 = {
   json(column: string, opts?: Bm25JsonFieldOptions): Bm25FieldConfig {
     return {
       column,
-      ...tokenizerFromJsonOpts(opts),
+      ...buildTokenizerConfig(opts?.tokenizer, { min: opts?.min, max: opts?.max }),
       ...(opts?.alias !== undefined && { alias: opts.alias }),
     };
   },
@@ -87,42 +90,28 @@ export const bm25 = {
     return {
       expression: sql,
       alias: opts.alias,
-      ...tokenizerFromExprOpts(opts),
+      ...buildTokenizerConfig(opts.tokenizer, {
+        min: opts.min,
+        max: opts.max,
+        stemmer: opts.stemmer,
+        pattern: opts.pattern,
+      }),
     };
   },
 } as const;
 
-function tokenizerFromTextOpts(opts?: Bm25TextFieldOptions): TokenizerConfig {
-  if (!opts?.tokenizer) return {};
-  const params: Record<string, unknown> = {};
-  if (opts.stemmer !== undefined) params['stemmer'] = opts.stemmer;
-  if (opts.remove_emojis !== undefined) params['remove_emojis'] = opts.remove_emojis;
+/**
+ * Builds `{ tokenizer, tokenizerParams? }` from a tokenizer ID and a bag of params.
+ * Filters out undefined values and omits `tokenizerParams` when empty.
+ */
+function buildTokenizerConfig(
+  tokenizer: string | undefined,
+  params: Record<string, unknown>,
+): TokenizerConfig {
+  if (!tokenizer) return {};
+  const filtered = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined));
   return {
-    tokenizer: opts.tokenizer,
-    ...(Object.keys(params).length > 0 && { tokenizerParams: params }),
-  };
-}
-
-function tokenizerFromJsonOpts(opts?: Bm25JsonFieldOptions): TokenizerConfig {
-  if (!opts?.tokenizer) return {};
-  const params: Record<string, unknown> = {};
-  if (opts.min !== undefined) params['min'] = opts.min;
-  if (opts.max !== undefined) params['max'] = opts.max;
-  return {
-    tokenizer: opts.tokenizer,
-    ...(Object.keys(params).length > 0 && { tokenizerParams: params }),
-  };
-}
-
-function tokenizerFromExprOpts(opts: Bm25ExpressionFieldOptions): TokenizerConfig {
-  if (!opts.tokenizer) return {};
-  const params: Record<string, unknown> = {};
-  if (opts.min !== undefined) params['min'] = opts.min;
-  if (opts.max !== undefined) params['max'] = opts.max;
-  if (opts.stemmer !== undefined) params['stemmer'] = opts.stemmer;
-  if (opts.pattern !== undefined) params['pattern'] = opts.pattern;
-  return {
-    tokenizer: opts.tokenizer,
-    ...(Object.keys(params).length > 0 && { tokenizerParams: params }),
+    tokenizer,
+    ...(Object.keys(filtered).length > 0 && { tokenizerParams: filtered }),
   };
 }
