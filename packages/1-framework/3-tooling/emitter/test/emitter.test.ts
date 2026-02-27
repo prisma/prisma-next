@@ -593,13 +593,12 @@ describe('emitter', () => {
     expect(contractJson).not.toHaveProperty('sources');
   });
 
-  it('strips provenance metadata from emitted contract artifact', async () => {
+  it('rejects provenance metadata in meta', async () => {
     const ir = createContractIR({
       meta: {
         sourceId: 'schema.prisma',
         schemaPath: '/tmp/schema.prisma',
         source: 'psl',
-        keep: 'value',
       },
     });
 
@@ -611,10 +610,40 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    const result = await emit(ir, options, mockSqlHook);
-    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
-    const meta = contractJson['meta'] as Record<string, unknown>;
-    expect(meta).toEqual({ keep: 'value' });
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR contains provenance key "sourceId" at "meta.sourceId"',
+    );
+  });
+
+  it('rejects provenance metadata in canonical sections', async () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+                sourceId: 'schema.prisma',
+              },
+            },
+          },
+        },
+      } as unknown as Record<string, unknown>,
+    });
+
+    const options: EmitOptions = {
+      outputDir: '',
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: [],
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR contains provenance key "sourceId" at "storage.tables.user.columns.id.sourceId"',
+    );
   });
 
   it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {
