@@ -1,8 +1,8 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { createKysely } from '../prisma/context';
+import { db } from '../prisma/db';
 
 export async function getUserById(userId: string, runtime: Runtime) {
-  const kysely = createKysely(runtime);
+  const kysely = db.kysely(runtime);
 
   return kysely
     .selectFrom('user')

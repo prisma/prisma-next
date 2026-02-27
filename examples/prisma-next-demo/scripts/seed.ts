@@ -19,12 +19,11 @@ import 'dotenv/config';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { loadAppConfig } from '../src/app-config';
-import { createDb } from '../src/prisma/db';
+import { db } from '../src/prisma/db';
 
 async function main() {
   const { databaseUrl } = loadAppConfig();
-  const db = createDb(databaseUrl);
-  const runtime = await db.runtime();
+  const runtime = db.connect({ url: databaseUrl });
 
   try {
     const tables = db.schema.tables;

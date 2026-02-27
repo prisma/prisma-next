@@ -1,11 +1,11 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { demoSchema, demoSql } from '../prisma/context';
+import { db } from '../prisma/db';
 import { collect } from './utils';
 
 export async function ormGetUsers(limit: number, runtime: Runtime) {
-  const userTable = demoSchema.tables.user;
+  const userTable = db.schema.tables.user;
 
-  const plan = demoSql
+  const plan = db.sql
     .from(userTable)
     .select({
       id: userTable.columns.id,

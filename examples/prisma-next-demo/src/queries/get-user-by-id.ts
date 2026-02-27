@@ -1,12 +1,12 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { demoSchema, demoSql } from '../prisma/context';
+import { db } from '../prisma/db';
 import { collect } from './utils';
 
 export async function getUserById(userId: string, runtime: Runtime) {
-  const userTable = demoSchema.tables.user;
+  const userTable = db.schema.tables.user;
 
-  const plan = demoSql
+  const plan = db.sql
     .from(userTable)
     .where(userTable.columns.id.eq(param('userId')))
     .select({

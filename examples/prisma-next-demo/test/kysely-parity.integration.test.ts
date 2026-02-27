@@ -14,12 +14,13 @@ import { getUserPosts } from '../src/kysely/get-user-posts';
 import { getUsers } from '../src/kysely/get-users';
 import { getUsersWithPosts } from '../src/kysely/get-users-with-posts';
 import { updateWithoutWhere } from '../src/kysely/update-without-where';
-import { demoStack, demoContext as executionContext } from '../src/prisma/context';
+import { db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
+const executionContext = db.context;
 const { contract } = executionContext;
 
-async function createTestDriver(connectionString: string, executionStack: typeof demoStack) {
+async function createTestDriver(connectionString: string, executionStack: (typeof db)['stack']) {
   const driverDescriptor = executionStack.driver;
   if (!driverDescriptor) {
     throw new Error('Driver descriptor missing from execution stack');
@@ -38,7 +39,7 @@ async function createTestDriver(connectionString: string, executionStack: typeof
 }
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
-  const executionStack = demoStack;
+  const executionStack = db.stack;
   return createRuntime({
     stackInstance: instantiateExecutionStack(executionStack),
     context: executionContext,

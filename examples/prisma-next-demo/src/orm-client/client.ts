@@ -1,9 +1,9 @@
 import { Collection, orm } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { demoContext } from '../prisma/context';
 import type { Contract } from '../prisma/contract.d';
+import { db } from '../prisma/db';
 
-const contract = demoContext.contract as Contract;
+const contract = db.context.contract as Contract;
 
 class UserCollection extends Collection<Contract, 'User'> {
   admins() {

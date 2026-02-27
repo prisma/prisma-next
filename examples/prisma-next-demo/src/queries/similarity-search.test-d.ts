@@ -6,7 +6,7 @@ import type {
   ResultType,
 } from '@prisma-next/sql-relational-core/types';
 import { expectTypeOf, test } from 'vitest';
-import { demoSchema, demoSql } from '../prisma/context';
+import { db } from '../prisma/db';
 
 type VectorDistanceExpression = AnyExpressionSource & {
   asc(): AnyOrderBuilder;
@@ -29,7 +29,7 @@ function hasVectorOpsColumn(value: unknown): value is VectorOpsColumn {
  * Type test to verify ResultType shape for similarity queries.
  */
 test('ResultType exposes projected keys for similarity query result', () => {
-  const postTable = demoSchema.tables.post;
+  const postTable = db.schema.tables.post;
   if (!postTable) throw new Error('post table not found');
   const postColumns = postTable.columns;
   const embeddingColumn = postColumns.embedding;
@@ -38,7 +38,7 @@ test('ResultType exposes projected keys for similarity query result', () => {
   }
   const distanceExpr = embeddingColumn.cosineDistance(param('queryVector'));
 
-  const _plan = demoSql
+  const _plan = db.sql
     .from(postTable)
     .select({
       id: postColumns.id,

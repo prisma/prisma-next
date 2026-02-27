@@ -69,7 +69,7 @@ import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { ormClientGetUsers } from './orm-client/get-users';
 import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
 import { ormClientUpsertUser } from './orm-client/upsert-user';
-import { createDb } from './prisma/db';
+import { db } from './prisma/db';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
@@ -83,11 +83,8 @@ const [cmd, ...args] = argv;
 
 async function main() {
   const { databaseUrl } = loadAppConfig();
-  const db = createDb(databaseUrl);
-  let runtime: Awaited<ReturnType<typeof db.runtime>> | undefined;
-
+  const runtime = db.connect({ url: databaseUrl });
   try {
-    runtime = await db.runtime();
     if (cmd === 'users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await getUsers(runtime, limit);
@@ -337,9 +334,7 @@ async function main() {
     console.error('Error:', error);
     process.exit(1);
   } finally {
-    if (runtime) {
-      await runtime.close();
-    }
+    await runtime.close();
   }
 }
 

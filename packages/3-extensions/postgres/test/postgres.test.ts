@@ -192,15 +192,57 @@ describe('postgres', () => {
     expect(mocks.poolCtor).not.toHaveBeenCalled();
   });
 
-  it('throws for missing binding input during client construction', () => {
-    expect(() =>
-      postgres({
-        contract,
-      } as unknown as Parameters<typeof postgres<typeof contract>>[0]),
-    ).toThrow('Provide one binding input');
-    expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
-    expect(mocks.createRuntime).not.toHaveBeenCalled();
+  it('allows deferred binding during client construction', () => {
+    const db = postgres({
+      contract,
+    } as Parameters<typeof postgres<typeof contract>>[0]);
+
+    db.runtime();
+
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
+  });
+
+  it('connects with explicit binding after construction', () => {
+    const db = postgres({
+      contract,
+    } as Parameters<typeof postgres<typeof contract>>[0]);
+
+    db.connect({
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledWith({
+      kind: 'pgPool',
+      pool: expect.any(Pool),
+    });
+  });
+
+  it('throws when connect is called without configured binding', () => {
+    const db = postgres({
+      contract,
+    } as Parameters<typeof postgres<typeof contract>>[0]);
+
+    expect(() => db.connect()).toThrow('Postgres binding not configured');
+  });
+
+  it('throws when attempting to connect twice', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    db.connect();
+    expect(() => db.connect({ url: 'postgres://localhost:5432/db2' })).toThrow(
+      'Postgres client already connected',
+    );
+
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
   });
 
   it('validates contractJson input', () => {
