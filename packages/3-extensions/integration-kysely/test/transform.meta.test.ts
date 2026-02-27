@@ -21,7 +21,7 @@ describe('transformKyselyToPnAst — paramDescriptors', () => {
 });
 
 describe('transformKyselyToPnAst — param indexing', () => {
-  it('aligns param indices with compiledQuery.parameters order', () => {
+  it('aligns param indices with params array order', () => {
     const query = selectQueryFixture({
       where: binaryWhere('id', 'placeholder'),
       limit: {
