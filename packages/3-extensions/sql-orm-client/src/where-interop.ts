@@ -65,6 +65,7 @@ function assertBoundPayload(bound: BoundWhereExpr): void {
 
   for (let i = 0; i < unique.length; i++) {
     if (unique[i] !== i + 1) {
+      /* c8 ignore next 3 -- redundant safety net after prior min/max/length checks */
       throw new Error(
         `ToWhereExpr payload is invalid: ParamRef indices must be contiguous from 1..${bound.params.length}`,
       );
@@ -91,6 +92,7 @@ function whereExprContainsParamRef(expr: WhereExpr): boolean {
       return expr.exprs.some(whereExprContainsParamRef);
     case 'exists':
       return selectContainsParamRef(expr.subquery);
+    /* c8 ignore next 3 -- exhaustive guard for forward-compat malformed nodes */
     default: {
       const neverExpr: never = expr;
       throw new Error(`Unsupported where expression kind: ${String(neverExpr)}`);
@@ -189,6 +191,7 @@ function replaceBoundParams(expr: WhereExpr, params: readonly unknown[]): WhereE
         ...expr,
         subquery: replaceParamsInSelect(expr.subquery, params),
       };
+    /* c8 ignore next 3 -- exhaustive guard for forward-compat malformed nodes */
     default: {
       const neverExpr: never = expr;
       throw new Error(`Unsupported where expression kind: ${String(neverExpr)}`);
@@ -302,11 +305,13 @@ function paramRefToLiteral(
   params: readonly unknown[],
 ): { kind: 'literal'; value: unknown } {
   const idx = paramRef.index - 1;
+  /* c8 ignore start -- validated in assertBoundPayload before replacement */
   if (idx < 0 || idx >= params.length) {
     throw new Error(
       `ToWhereExpr payload is invalid: ParamRef index ${paramRef.index} is out of bounds for ${params.length} params`,
     );
   }
+  /* c8 ignore stop */
   return {
     kind: 'literal',
     value: params[idx],
