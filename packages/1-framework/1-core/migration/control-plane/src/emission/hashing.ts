@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { canonicalizeContract } from './canonicalization';
 
@@ -34,7 +33,7 @@ export function computeStorageHash(contract: ContractInput): string {
     extensionPacks: {},
     capabilities: {},
     meta: {},
-  } as ContractIR;
+  };
   const canonical = canonicalizeContract(storageContract);
   return computeHash(canonical);
 }
@@ -50,7 +49,7 @@ export function computeProfileHash(contract: ContractInput): string {
     extensionPacks: {},
     capabilities: contract.capabilities,
     meta: {},
-  } as ContractIR;
+  };
   const canonical = canonicalizeContract(profileContract);
   return computeHash(canonical);
 }
@@ -67,7 +66,7 @@ export function computeExecutionHash(contract: ContractInput): string {
     capabilities: {},
     meta: {},
     ...ifDefined('execution', contract.execution),
-  } as ContractIR;
+  };
   const canonical = canonicalizeContract(executionContract);
   return computeHash(canonical);
 }

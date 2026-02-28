@@ -128,15 +128,10 @@ export async function emit(
   // Add _generated metadata to indicate this is a generated artifact
   // This ensures consistency between CLI emit and programmatic emit
   // Always add/update _generated with standard content for consistency
-  const contractJsonObj = JSON.parse(
-    canonicalizeContract(
-      contractWithHashes as ContractIR & {
-        storageHash?: string;
-        executionHash?: string;
-        profileHash?: string;
-      },
-    ),
-  ) as Record<string, unknown>;
+  const contractJsonObj = JSON.parse(canonicalizeContract(contractWithHashes)) as Record<
+    string,
+    unknown
+  >;
   const contractJsonWithMeta = {
     ...contractJsonObj,
     _generated: {

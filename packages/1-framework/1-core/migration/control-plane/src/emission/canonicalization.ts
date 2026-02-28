@@ -1,4 +1,3 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { bigintJsonReplacer } from '@prisma-next/contract/types';
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -17,6 +16,22 @@ type NormalizedContract = {
   extensionPacks: Record<string, unknown>;
   capabilities: Record<string, Record<string, boolean>>;
   meta: Record<string, unknown>;
+};
+
+type CanonicalContractInput = {
+  schemaVersion: string;
+  targetFamily: string;
+  target: string;
+  models: Record<string, unknown>;
+  relations: Record<string, unknown>;
+  storage: Record<string, unknown>;
+  execution?: Record<string, unknown>;
+  extensionPacks: Record<string, unknown>;
+  capabilities: Record<string, Record<string, boolean>>;
+  meta: Record<string, unknown>;
+  storageHash?: string;
+  executionHash?: string;
+  profileHash?: string;
 };
 
 const TOP_LEVEL_ORDER = [
@@ -255,9 +270,7 @@ function orderTopLevel(obj: Record<string, unknown>): Record<string, unknown> {
   return ordered;
 }
 
-export function canonicalizeContract(
-  ir: ContractIR & { storageHash?: string; executionHash?: string; profileHash?: string },
-): string {
+export function canonicalizeContract(ir: CanonicalContractInput): string {
   const normalized: NormalizedContract = {
     schemaVersion: ir.schemaVersion,
     targetFamily: ir.targetFamily,
