@@ -46,6 +46,7 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
 - ORM must be able to consume `WhereArg` without importing Kysely types.
 - Consumers pass `ToWhereExpr` as-is; ORM performs the conversion (no manual `.toWhereExpr()` at call sites).
 - Phase 2 consumption semantics are **literal-normalizing**: ORM validates bound payload invariants, then substitutes `ParamRef` entries with `LiteralExpr` values during normalization. `paramDescriptors` are validated for alignment and indexing integrity but are not propagated into ORM plan metadata in this phase.
+- **Developer experience requirement**: examples must demonstrate this interop using the Kysely lane (not hand-authored PN AST). The intended UX is that users author a filter using Kysely-shaped APIs and pass a lane-produced `ToWhereExpr` into `.where(...)` without writing `{ expr, params, paramDescriptors }` inline.
 
 ### 3) Postgres convenience client exposes build-only Kysely surface
 
@@ -90,6 +91,7 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
 - [x] **ORM consumption**: ORM accepts `WhereArg` and handles:
   - param-free bare `WhereExpr`
   - bound `ToWhereExpr` payloads, including strict payload validation and `ParamRef -> LiteralExpr` normalization
+- [ ] **Interop demo uses Kysely lane authoring**: the demo app shows `.where(...)` using a Kysely-authored filter payload (e.g. `where(kysely.build(kysely.selectFrom(...).where(...)))`, `where(() => /* kysely-authored */)`, or an equivalent helper) rather than constructing PN AST nodes by hand.
 - [x] **SQL redaction (Option A)**: compilation (if reachable) yields a stub SQL string while preserving operation tree and parameter ordering/values; tests confirm this.
 - [x] **Integration re-scope**: `@prisma-next/integration-kysely` no longer owns transformer/guardrail logic (moved to lane or delegated).
 - [x] **Parity preserved**: existing transformer/guardrail tests continue to pass (or are ported to the new lane package without reducing coverage).
