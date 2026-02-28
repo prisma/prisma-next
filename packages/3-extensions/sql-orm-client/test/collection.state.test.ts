@@ -1,4 +1,3 @@
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import {
   baseContract,
@@ -20,27 +19,6 @@ describe('Collection', () => {
     left: userCol(column),
     right,
   });
-  const selectPlan = (
-    where: ReturnType<typeof eq>,
-    params: readonly unknown[],
-    paramDescriptors: Array<{ source: 'lane'; index?: number }>,
-  ): SqlQueryPlan<unknown> =>
-    ({
-      ast: {
-        kind: 'select',
-        from: { kind: 'table', name: 'users' },
-        project: [{ alias: 'id', expr: userCol('id') }],
-        where,
-      },
-      params,
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'kysely',
-        paramDescriptors,
-      },
-    }) as SqlQueryPlan<unknown>;
-
   describe('chain methods', () => {
     it('where() appends a filter and returns new collection', () => {
       const { collection } = createCollection();
@@ -68,15 +46,6 @@ describe('Collection', () => {
           paramDescriptors: [{ source: 'lane' }],
         }),
       }));
-
-      expect(filtered.state.filters).toEqual([eq('name', literal('Alice'))]);
-    });
-
-    it('where() accepts SqlQueryPlan payloads', () => {
-      const { collection } = createCollection();
-      const filtered = collection.where(
-        selectPlan(eq('name', { kind: 'param', index: 1 }), ['Alice'], [{ source: 'lane' }]),
-      );
 
       expect(filtered.state.filters).toEqual([eq('name', literal('Alice'))]);
     });

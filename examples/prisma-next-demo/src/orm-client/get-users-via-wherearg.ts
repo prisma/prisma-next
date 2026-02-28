@@ -11,7 +11,9 @@ export async function ormClientGetUsersViaWhereArg(
   const kysely = db.kysely;
 
   return orm.users
-    .where(kysely.build(kysely.selectFrom('user').select('id').where('kind', '=', kind).limit(1)))
+    .where(
+      kysely.whereExpr(kysely.selectFrom('user').select('id').where('kind', '=', kind).limit(1)),
+    )
     .take(limit)
     .all();
 }

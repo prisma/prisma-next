@@ -1,5 +1,4 @@
 import type { BoundWhereExpr, WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import { normalizeWhereArg } from '../src/where-interop';
 
@@ -34,27 +33,6 @@ const eq = (
   left,
   right,
 });
-const selectPlan = (
-  where: WhereExpr | undefined,
-  params: readonly unknown[],
-  paramDescriptors: Array<{ source: 'lane'; index?: number }>,
-): SqlQueryPlan<unknown> =>
-  ({
-    ast: {
-      kind: 'select',
-      from: { kind: 'table', name: 'users' },
-      project: [{ alias: 'id', expr: col('users', 'id') }],
-      ...(where ? { where } : {}),
-    },
-    params,
-    meta: {
-      target: 'postgres',
-      storageHash: 'sha256:test',
-      lane: 'kysely',
-      paramDescriptors,
-    },
-  }) as SqlQueryPlan<unknown>;
-
 describe('where interop', () => {
   it('normalizes bound params into literals', () => {
     const arg = toWhereExpr({
@@ -271,28 +249,6 @@ describe('where interop', () => {
     });
 
     expect(normalizeWhereArg(arg)).toEqual(eq(col('users', 'kind'), literal('admin')));
-  });
-
-  it('accepts select SqlQueryPlan where payloads directly', () => {
-    const plan = selectPlan(eq(col('users', 'kind'), param(1)), ['admin'], [{ source: 'lane' }]);
-    expect(normalizeWhereArg(plan)).toEqual(eq(col('users', 'kind'), literal('admin')));
-  });
-
-  it('rebinds SqlQueryPlan where params to contiguous indices', () => {
-    const plan = selectPlan(
-      eq(col('users', 'kind'), param(2)),
-      ['unused-before-where', 'admin'],
-      [
-        { source: 'lane', index: 1 },
-        { source: 'lane', index: 2 },
-      ],
-    );
-    expect(normalizeWhereArg(plan)).toEqual(eq(col('users', 'kind'), literal('admin')));
-  });
-
-  it('rejects SqlQueryPlan input without a select where clause', () => {
-    const plan = selectPlan(undefined, [], []);
-    expect(() => normalizeWhereArg(plan)).toThrow(/requires a select plan with a where clause/i);
   });
 
   it('rejects bound payloads with params when expr contains no ParamRef', () => {

@@ -7,11 +7,11 @@ const mocks = vi.hoisted(() => ({
   createRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
+  createBuildOnlyKyselyLane: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
   validateContract: vi.fn(),
   poolCtor: vi.fn(),
-  kyselyCtor: vi.fn(),
 }));
 
 vi.mock('@prisma-next/core-execution-plane/stack', () => ({
@@ -26,6 +26,11 @@ vi.mock('@prisma-next/sql-runtime', () => ({
 
 vi.mock('@prisma-next/sql-contract/validate', () => ({
   validateContract: mocks.validateContract,
+}));
+
+vi.mock('@prisma-next/sql-kysely-lane', () => ({
+  REDACTED_SQL: '/* redacted by @prisma-next/sql-kysely-lane */',
+  createBuildOnlyKyselyLane: mocks.createBuildOnlyKyselyLane,
 }));
 
 vi.mock('@prisma-next/sql-lane', () => ({
@@ -50,21 +55,6 @@ vi.mock('@prisma-next/adapter-postgres/runtime', () => ({
 
 vi.mock('@prisma-next/driver-postgres/runtime', () => ({
   default: { id: 'driver-postgres' },
-}));
-
-vi.mock('kysely', () => ({
-  Kysely: class {
-    constructor(config: unknown) {
-      mocks.kyselyCtor(config);
-    }
-  },
-  PostgresAdapter: class {},
-  PostgresIntrospector: class {},
-  PostgresQueryCompiler: class {
-    compileQuery() {
-      return { query: { kind: 'SelectQueryNode' }, sql: 'select 1', parameters: ['p1', 2] };
-    }
-  },
 }));
 
 vi.mock('pg', () => {
@@ -110,7 +100,7 @@ describe('postgres', () => {
     mocks.driverConnect.mockReset();
     mocks.validateContract.mockReset();
     mocks.poolCtor.mockReset();
-    mocks.kyselyCtor.mockReset();
+    mocks.createBuildOnlyKyselyLane.mockReset();
 
     mocks.createExecutionContext.mockReturnValue({
       contract,
@@ -129,6 +119,11 @@ describe('postgres', () => {
     mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
+    mocks.createBuildOnlyKyselyLane.mockReturnValue({
+      build: vi.fn(),
+      whereExpr: vi.fn(),
+      redactedSql: REDACTED_SQL,
+    });
   });
 
   it('defers stack instantiation runtime creation and pool creation until runtime is called', () => {
@@ -150,46 +145,24 @@ describe('postgres', () => {
     expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
   });
 
-  it('exposes build-only kysely surface', () => {
+  it('exposes lane-owned build-only kysely surface', () => {
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
     });
 
-    expect(mocks.kyselyCtor).toHaveBeenCalledTimes(1);
+    expect(mocks.createBuildOnlyKyselyLane).toHaveBeenCalledTimes(1);
     expect(typeof db.kysely.build).toBe('function');
+    expect(typeof db.kysely.whereExpr).toBe('function');
   });
 
-  it('throws deterministically when execution is attempted on build-only kysely', async () => {
-    postgres({
+  it('exposes lane redacted sql marker', () => {
+    const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
     });
 
-    const config = mocks.kyselyCtor.mock.calls[0]?.[0] as { dialect: { createDriver(): unknown } };
-    const driver = config.dialect.createDriver() as { acquireConnection(): Promise<unknown> };
-    await expect(driver.acquireConnection()).rejects.toThrow(
-      /Kysely execution is disabled for db\.kysely/,
-    );
-  });
-
-  it('redacts compiled SQL and preserves compiled parameters on build-only kysely', () => {
-    postgres({
-      contract,
-      url: 'postgres://localhost:5432/db',
-    });
-
-    const config = mocks.kyselyCtor.mock.calls[0]?.[0] as {
-      dialect: {
-        createQueryCompiler(): {
-          compileQuery(node: unknown): { sql: string; parameters: unknown[] };
-        };
-      };
-    };
-    const compiler = config.dialect.createQueryCompiler();
-    const compiled = compiler.compileQuery({ kind: 'SelectQueryNode' });
-
-    expect(compiled).toMatchObject({ sql: REDACTED_SQL, parameters: ['p1', 2] });
+    expect(db.kysely.redactedSql).toBe(REDACTED_SQL);
   });
 
   it('memoizes runtime instance', () => {

@@ -1,7 +1,6 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ToWhereExpr, WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import {
@@ -91,7 +90,7 @@ import type {
 import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
 
-type WhereDirectInput = WhereArg | SqlQueryPlan<unknown>;
+type WhereDirectInput = WhereArg;
 
 function isWhereExprInput(value: unknown): value is WhereExpr {
   if (typeof value !== 'object' || value === null || !('kind' in value)) {
@@ -112,18 +111,8 @@ function isToWhereExprInput(value: unknown): value is ToWhereExpr {
   );
 }
 
-function isSqlQueryPlanInput(value: unknown): value is SqlQueryPlan<unknown> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'ast' in value &&
-    'params' in value &&
-    'meta' in value
-  );
-}
-
 function isWhereDirectInput(value: unknown): value is WhereDirectInput {
-  return isWhereExprInput(value) || isToWhereExprInput(value) || isSqlQueryPlanInput(value);
+  return isWhereExprInput(value) || isToWhereExprInput(value);
 }
 
 export class Collection<

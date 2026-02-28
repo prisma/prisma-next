@@ -1,6 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { CompiledQuery } from '@prisma-next/sql-kysely-lane';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { CompiledQuery } from 'kysely';
 import postgres from '../src/runtime/postgres';
 
 const contract: SqlContract<SqlStorage> = {
@@ -39,5 +39,9 @@ const plan = db.kysely.build(queryWithCompiledRow);
 const typedPlan: SqlQueryPlan<{ id: string; kind: 'admin' | 'user' }> = plan;
 void typedPlan;
 
+db.kysely.whereExpr(query);
+
+// @ts-expect-error build-only lane must not expose query execution methods
 query.execute();
+// @ts-expect-error build-only lane must not expose transactions
 db.kysely.transaction();
