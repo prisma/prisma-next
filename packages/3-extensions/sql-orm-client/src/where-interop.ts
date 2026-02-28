@@ -1,3 +1,4 @@
+import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type {
   BoundWhereExpr,
   Expression,
@@ -10,14 +11,26 @@ import type {
   WhereArg,
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export function normalizeWhereArg(arg: undefined): undefined;
 export function normalizeWhereArg(arg: WhereArg): WhereExpr;
-export function normalizeWhereArg(arg: WhereArg | undefined): WhereExpr | undefined;
-export function normalizeWhereArg(arg: WhereArg | undefined): WhereExpr | undefined {
+export function normalizeWhereArg(arg: SqlQueryPlan<unknown>): WhereExpr;
+export function normalizeWhereArg(
+  arg: WhereArg | SqlQueryPlan<unknown> | undefined,
+): WhereExpr | undefined;
+export function normalizeWhereArg(
+  arg: WhereArg | SqlQueryPlan<unknown> | undefined,
+): WhereExpr | undefined {
   if (!arg) {
     return undefined;
+  }
+
+  if (isSqlQueryPlan(arg)) {
+    const bound = wherePayloadFromSelectPlan(arg);
+    assertBoundPayload(bound);
+    return replaceBoundParams(bound.expr, bound.params);
   }
 
   if (isToWhereExpr(arg)) {
@@ -32,6 +45,230 @@ export function normalizeWhereArg(arg: WhereArg | undefined): WhereExpr | undefi
 
 function isToWhereExpr(arg: WhereArg): arg is ToWhereExpr {
   return typeof arg === 'object' && arg !== null && 'toWhereExpr' in arg;
+}
+
+function isSqlQueryPlan(value: unknown): value is SqlQueryPlan<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'ast' in value &&
+    'params' in value &&
+    'meta' in value
+  );
+}
+
+function wherePayloadFromSelectPlan(plan: SqlQueryPlan<unknown>): BoundWhereExpr {
+  if (plan.ast.kind !== 'select' || !plan.ast.where) {
+    throw new Error('where(...) with SqlQueryPlan requires a select plan with a where clause');
+  }
+
+  const indexes = [...new Set(collectParamRefIndexes(plan.ast.where))].sort((a, b) => a - b);
+  if (indexes.length === 0) {
+    return {
+      expr: plan.ast.where,
+      params: [],
+      paramDescriptors: [],
+    };
+  }
+
+  const remap = new Map<number, number>(indexes.map((index, i) => [index, i + 1]));
+  const remappedExpr = remapWhereParamIndexes(plan.ast.where, remap);
+  const params = indexes.map((index) => {
+    if (index <= 0 || index > plan.params.length) {
+      throw new Error(
+        `SqlQueryPlan where payload is invalid: missing param value for index ${index}`,
+      );
+    }
+    return plan.params[index - 1];
+  });
+  const paramDescriptors = indexes.map((index, i) => {
+    const descriptor = findDescriptorByIndex(plan.meta.paramDescriptors, index);
+    return {
+      ...descriptor,
+      index: i + 1,
+    };
+  });
+
+  return {
+    expr: remappedExpr,
+    params,
+    paramDescriptors,
+  };
+}
+
+function findDescriptorByIndex(
+  descriptors: readonly ParamDescriptor[],
+  index: number,
+): ParamDescriptor {
+  const byArrayPosition = descriptors[index - 1];
+  if (byArrayPosition) {
+    return byArrayPosition;
+  }
+  const byExplicitIndex = descriptors.find((descriptor) => descriptor.index === index);
+  if (byExplicitIndex) {
+    return byExplicitIndex;
+  }
+  throw new Error(
+    `SqlQueryPlan where payload is invalid: missing param descriptor for index ${index}`,
+  );
+}
+
+function remapParamIndex(index: number, remap: ReadonlyMap<number, number>): number {
+  const remapped = remap.get(index);
+  if (!remapped) {
+    throw new Error(`SqlQueryPlan where payload is invalid: unknown ParamRef index ${index}`);
+  }
+  return remapped;
+}
+
+function remapWhereParamIndexes(expr: WhereExpr, remap: ReadonlyMap<number, number>): WhereExpr {
+  switch (expr.kind) {
+    case 'bin':
+      return {
+        ...expr,
+        left: remapExpressionParamIndexes(expr.left, remap),
+        right: remapComparableParamIndexes(expr.right, remap),
+      };
+    case 'nullCheck':
+      return {
+        ...expr,
+        expr: remapExpressionParamIndexes(expr.expr, remap),
+      };
+    case 'and':
+      return {
+        ...expr,
+        exprs: expr.exprs.map((child) => remapWhereParamIndexes(child, remap)),
+      };
+    case 'or':
+      return {
+        ...expr,
+        exprs: expr.exprs.map((child) => remapWhereParamIndexes(child, remap)),
+      };
+    case 'exists':
+      return {
+        ...expr,
+        subquery: remapSelectParamIndexes(expr.subquery, remap),
+      };
+    default: {
+      const neverExpr: never = expr;
+      throw new Error(`Unsupported where expression kind: ${String(neverExpr)}`);
+    }
+  }
+}
+
+function remapExpressionParamIndexes(
+  expr: Expression,
+  remap: ReadonlyMap<number, number>,
+): Expression {
+  if (expr.kind !== 'operation') {
+    return expr;
+  }
+  return {
+    ...expr,
+    args: expr.args.map((arg) => {
+      if (arg.kind === 'param') {
+        return {
+          ...arg,
+          index: remapParamIndex(arg.index, remap),
+        };
+      }
+      if (arg.kind === 'literal') {
+        return arg;
+      }
+      return remapExpressionParamIndexes(arg, remap);
+    }),
+  } as OperationExpr;
+}
+
+function remapComparableParamIndexes(
+  value: Expression | ParamRef | ListLiteralExpr | { kind: 'literal'; value: unknown },
+  remap: ReadonlyMap<number, number>,
+): Expression | ParamRef | { kind: 'literal'; value: unknown } | ListLiteralExpr {
+  if (value.kind === 'param') {
+    return {
+      ...value,
+      index: remapParamIndex(value.index, remap),
+    };
+  }
+  if (value.kind === 'literal') {
+    return value;
+  }
+  if (value.kind === 'listLiteral') {
+    return {
+      ...value,
+      values: value.values.map((entry) =>
+        entry.kind === 'param' ? { ...entry, index: remapParamIndex(entry.index, remap) } : entry,
+      ),
+    };
+  }
+  return remapExpressionParamIndexes(value, remap);
+}
+
+function remapSelectParamIndexes(ast: SelectAst, remap: ReadonlyMap<number, number>): SelectAst {
+  const joins = ast.joins?.map((join) => ({
+    ...join,
+    on: remapJoinOnParamIndexes(join.on, remap),
+  }));
+  const includes = ast.includes?.map((inc) => {
+    const child = {
+      ...inc.child,
+      ...ifDefined(
+        'where',
+        inc.child.where ? remapWhereParamIndexes(inc.child.where, remap) : undefined,
+      ),
+      ...ifDefined(
+        'orderBy',
+        inc.child.orderBy?.map((order) => ({
+          ...order,
+          expr: remapExpressionParamIndexes(order.expr, remap),
+        })),
+      ),
+      project: inc.child.project.map((projection) => ({
+        ...projection,
+        expr: remapExpressionParamIndexes(projection.expr, remap),
+      })),
+    };
+    return {
+      ...inc,
+      child,
+    };
+  });
+  const project = ast.project.map((projection) => {
+    if (projection.expr.kind === 'includeRef' || projection.expr.kind === 'literal') {
+      return projection;
+    }
+    return {
+      ...projection,
+      expr: remapExpressionParamIndexes(projection.expr, remap),
+    };
+  });
+  const where = ast.where ? remapWhereParamIndexes(ast.where, remap) : undefined;
+  const orderBy = ast.orderBy?.map((order) => ({
+    ...order,
+    expr: remapExpressionParamIndexes(order.expr, remap),
+  }));
+
+  return {
+    kind: ast.kind,
+    from: ast.from,
+    project,
+    ...ifDefined('joins', joins),
+    ...ifDefined('includes', includes),
+    ...ifDefined('where', where),
+    ...ifDefined('orderBy', orderBy),
+    ...ifDefined('limit', ast.limit),
+    ...ifDefined('selectAllIntent', ast.selectAllIntent),
+  };
+}
+
+function remapJoinOnParamIndexes(
+  joinOn: JoinOnExpr,
+  remap: ReadonlyMap<number, number>,
+): JoinOnExpr {
+  if (joinOn.kind === 'eqCol') {
+    return joinOn;
+  }
+  return remapWhereParamIndexes(joinOn, remap);
 }
 
 function assertBoundPayload(bound: BoundWhereExpr): void {

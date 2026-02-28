@@ -1,6 +1,7 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { WhereArg } from '@prisma-next/sql-relational-core/ast';
+import type { ToWhereExpr, WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import {
@@ -90,6 +91,41 @@ import type {
 import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
 
+type WhereDirectInput = WhereArg | SqlQueryPlan<unknown>;
+
+function isWhereExprInput(value: unknown): value is WhereExpr {
+  if (typeof value !== 'object' || value === null || !('kind' in value)) {
+    return false;
+  }
+  const kind = (value as { kind?: unknown }).kind;
+  return (
+    kind === 'bin' || kind === 'exists' || kind === 'nullCheck' || kind === 'and' || kind === 'or'
+  );
+}
+
+function isToWhereExprInput(value: unknown): value is ToWhereExpr {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'toWhereExpr' in value &&
+    typeof (value as { toWhereExpr?: unknown }).toWhereExpr === 'function'
+  );
+}
+
+function isSqlQueryPlanInput(value: unknown): value is SqlQueryPlan<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'ast' in value &&
+    'params' in value &&
+    'meta' in value
+  );
+}
+
+function isWhereDirectInput(value: unknown): value is WhereDirectInput {
+  return isWhereExprInput(value) || isToWhereExprInput(value) || isSqlQueryPlanInput(value);
+}
+
 export class Collection<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
@@ -123,6 +159,10 @@ export class Collection<
   }
 
   where(
+    fn: (model: ModelAccessor<TContract, ModelName>) => WhereDirectInput,
+  ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
+  where(input: WhereDirectInput): Collection<TContract, ModelName, Row, WithWhereState<State>>;
+  where(
     fn: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
@@ -130,13 +170,17 @@ export class Collection<
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
     input:
+      | WhereDirectInput
+      | ((model: ModelAccessor<TContract, ModelName>) => WhereDirectInput)
       | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
       | ShorthandWhereFilter<TContract, ModelName>,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>> {
     const whereArg =
       typeof input === 'function'
         ? input(createModelAccessor(this.ctx.contract, this.modelName))
-        : shorthandToWhereExpr(this.ctx.contract, this.modelName, input);
+        : isWhereDirectInput(input)
+          ? input
+          : shorthandToWhereExpr(this.ctx.contract, this.modelName, input);
     const filter = normalizeWhereArg(whereArg);
 
     if (!filter) {

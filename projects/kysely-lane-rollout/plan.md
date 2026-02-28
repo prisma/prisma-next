@@ -21,11 +21,11 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 
 **Tasks:**
 
-- [ ] Produce a Phase 1 scope boundary doc (allowed vs deferred changes).
-- [ ] Triage current branch deltas into: must-fix now, can-ship, defer-to-phase-2.
-- [ ] Fix blockers (failing tests/type/lint, known correctness bugs).
-- [ ] Run package/integration tests required for confidence.
-- [ ] Merge Phase 1 PR with clear follow-up links to Phase 2.
+- [x] Produce a Phase 1 scope boundary doc (allowed vs deferred changes).
+- [x] Triage current branch deltas into: must-fix now, can-ship, defer-to-phase-2.
+- [x] Fix blockers (failing tests/type/lint, known correctness bugs).
+- [x] Run package/integration tests required for confidence.
+- [x] Merge Phase 1 PR with clear follow-up links to Phase 2.
 
 ### Milestone 2: Architectural extraction to SQL lane (Phase 2)
 
