@@ -1,4 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { CompiledQuery } from 'kysely';
 import postgres from '../src/runtime/postgres';
 
 const contract: SqlContract<SqlStorage> = {
@@ -27,8 +29,15 @@ const db = postgres({
 const query = db.kysely.selectFrom('user').selectAll();
 db.kysely.build(query);
 
-// @ts-expect-error build-only surface does not expose execute on query builders
-query.execute();
+const queryWithCompiledRow = {
+  compile(): CompiledQuery<{ id: string; kind: 'admin' | 'user' }> {
+    return {} as CompiledQuery<{ id: string; kind: 'admin' | 'user' }>;
+  },
+};
 
-// @ts-expect-error build-only surface does not expose transaction on root
+const plan = db.kysely.build(queryWithCompiledRow);
+const typedPlan: SqlQueryPlan<{ id: string; kind: 'admin' | 'user' }> = plan;
+void typedPlan;
+
+query.execute();
 db.kysely.transaction();

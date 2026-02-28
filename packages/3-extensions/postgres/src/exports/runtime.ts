@@ -1,5 +1,6 @@
 export type { PostgresBinding } from '../runtime/binding';
 export type {
+  BuildOnlyKysely,
   PostgresClient,
   PostgresOptions,
   PostgresOptionsBase,

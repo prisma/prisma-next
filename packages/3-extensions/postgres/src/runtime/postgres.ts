@@ -13,6 +13,7 @@ import { buildKyselyPlan, REDACTED_SQL } from '@prisma-next/sql-kysely-lane';
 import type { SelectBuilder } from '@prisma-next/sql-lane';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { SchemaHandle } from '@prisma-next/sql-relational-core/schema';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -62,34 +63,18 @@ type NormalizeOperationTypes<T> = {
 };
 
 type ToSchemaOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationTypes<T>;
+type InferCompiledRow<TCompiled> = TCompiled extends CompiledQuery<infer Row> ? Row : unknown;
+type InferBuildRow<TQuery extends { compile(): unknown }> = InferCompiledRow<
+  ReturnType<TQuery['compile']>
+>;
 
 export type PostgresTargetId = 'postgres';
 type OrmClient<TContract extends SqlContract<SqlStorage>> = ReturnType<
   typeof ormBuilder<TContract>
 >;
 
-type ExecutionMethodName =
-  | `execute${string}`
-  | `stream${string}`
-  | 'transaction'
-  | 'connection'
-  | 'destroy';
-type StripKyselyExecutionMethods<T> = T extends (...args: infer Args) => infer Result
-  ? (...args: Args) => StripKyselyExecutionMethods<Result>
-  : T extends object
-    ? {
-        [K in keyof T as K extends string
-          ? K extends ExecutionMethodName
-            ? never
-            : K
-          : K]: StripKyselyExecutionMethods<T[K]>;
-      }
-    : T;
-
-export type BuildOnlyKysely<DB> = StripKyselyExecutionMethods<Kysely<DB>> & {
-  build<Row>(query: {
-    compile(): unknown;
-  }): import('@prisma-next/sql-relational-core/plan').SqlQueryPlan<Row>;
+export type BuildOnlyKysely<DB> = Kysely<DB> & {
+  build<TQuery extends { compile(): unknown }>(query: TQuery): SqlQueryPlan<InferBuildRow<TQuery>>;
   readonly redactedSql: string;
 };
 
@@ -160,8 +145,10 @@ function createBuildOnlyKysely<TContract extends SqlContract<SqlStorage>>(
   });
   const buildOnly = base as unknown as BuildOnlyKysely<KyselifyContract<TContract>>;
   Object.defineProperty(buildOnly, 'build', {
-    value: <Row>(query: { compile(): unknown }) =>
-      buildKyselyPlan(contract, query.compile() as CompiledQuery<Row>, { lane: 'kysely' }),
+    value: <TQuery extends { compile(): unknown }>(query: TQuery) =>
+      buildKyselyPlan(contract, query.compile() as CompiledQuery<InferBuildRow<TQuery>>, {
+        lane: 'kysely',
+      }),
     enumerable: false,
     configurable: false,
     writable: false,
