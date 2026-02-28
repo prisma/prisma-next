@@ -47,9 +47,7 @@ function resolveSelectAllTable(
   fromTable: string,
 ): string {
   if (SelectAllNode.is(node)) {
-    const explicitSelectAllRef =
-      (node as { table?: unknown; reference?: unknown }).table ??
-      (node as { table?: unknown; reference?: unknown }).reference;
+    const explicitSelectAllRef = getSelectAllReferenceTarget(node);
     if (explicitSelectAllRef) {
       return resolveTable(explicitSelectAllRef, ctx, fromTable);
     }
@@ -62,8 +60,7 @@ function resolveSelectAllTable(
     return fromTable;
   }
 
-  const explicitTableNode =
-    node.table ?? (node as { column?: { table?: unknown } }).column?.table ?? undefined;
+  const explicitTableNode = node.table ?? getSelectAllReferenceTarget(node.column);
   if (!explicitTableNode) {
     if (ctx.multiTableScope) {
       throw new KyselyTransformError(
@@ -75,6 +72,16 @@ function resolveSelectAllTable(
   }
 
   return resolveTable(explicitTableNode, ctx, fromTable);
+}
+
+function getSelectAllReferenceTarget(node: SelectAllNode): unknown {
+  if ('table' in node && node.table !== undefined) {
+    return node.table;
+  }
+  if ('reference' in node && node.reference !== undefined) {
+    return node.reference;
+  }
+  return undefined;
 }
 
 export function transformSelections(
