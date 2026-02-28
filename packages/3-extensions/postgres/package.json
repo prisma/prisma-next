@@ -18,7 +18,6 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/integration-kysely": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-kysely-lane": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",

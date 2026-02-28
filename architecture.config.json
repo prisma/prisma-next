@@ -103,12 +103,6 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/3-extensions/integration-kysely/**",
-      "domain": "extensions",
-      "layer": "integrations",
-      "plane": "runtime"
-    },
-    {
       "glob": "packages/3-extensions/sql-orm-client/**",
       "domain": "extensions",
       "layer": "integrations",

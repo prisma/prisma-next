@@ -24,7 +24,6 @@
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
-    "@prisma-next/integration-kysely": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/postgres": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
