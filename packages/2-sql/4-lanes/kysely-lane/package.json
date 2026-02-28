@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Kysely AST transform and guardrails for Prisma Next SQL lane",
+  "description": "Build-only Kysely lane for authoring Prisma Next SQL plans",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",

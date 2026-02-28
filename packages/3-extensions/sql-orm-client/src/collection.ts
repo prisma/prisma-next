@@ -137,7 +137,7 @@ export class Collection<
       typeof input === 'function'
         ? input(createModelAccessor(this.ctx.contract, this.modelName))
         : shorthandToWhereExpr(this.ctx.contract, this.modelName, input);
-    const filter = whereArg ? normalizeWhereArg(whereArg) : undefined;
+    const filter = normalizeWhereArg(whereArg);
 
     if (!filter) {
       return this as Collection<TContract, ModelName, Row, WithWhereState<State>>;

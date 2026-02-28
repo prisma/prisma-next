@@ -131,5 +131,5 @@ describe('sql-compilation/create', () => {
         },
       ]
     `);
-  }, 500);
+  });
 });

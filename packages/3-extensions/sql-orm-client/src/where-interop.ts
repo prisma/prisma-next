@@ -10,8 +10,16 @@ import type {
   WhereArg,
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 
-export function normalizeWhereArg(arg: WhereArg): WhereExpr {
+export function normalizeWhereArg(arg: undefined): undefined;
+export function normalizeWhereArg(arg: WhereArg): WhereExpr;
+export function normalizeWhereArg(arg: WhereArg | undefined): WhereExpr | undefined;
+export function normalizeWhereArg(arg: WhereArg | undefined): WhereExpr | undefined {
+  if (!arg) {
+    return undefined;
+  }
+
   if (isToWhereExpr(arg)) {
     const bound = arg.toWhereExpr();
     assertBoundPayload(bound);
@@ -207,15 +215,17 @@ function replaceParamsInSelect(ast: SelectAst, params: readonly unknown[]): Sele
   const includes = ast.includes?.map((inc) => {
     const child = {
       ...inc.child,
-      ...(inc.child.where ? { where: replaceBoundParams(inc.child.where, params) } : {}),
-      ...(inc.child.orderBy
-        ? {
-            orderBy: inc.child.orderBy.map((order) => ({
-              ...order,
-              expr: replaceParamsInExpression(order.expr, params),
-            })),
-          }
-        : {}),
+      ...ifDefined(
+        'where',
+        inc.child.where ? replaceBoundParams(inc.child.where, params) : undefined,
+      ),
+      ...ifDefined(
+        'orderBy',
+        inc.child.orderBy?.map((order) => ({
+          ...order,
+          expr: replaceParamsInExpression(order.expr, params),
+        })),
+      ),
       project: inc.child.project.map((projection) => ({
         ...projection,
         expr: replaceParamsInExpression(projection.expr, params),
@@ -245,12 +255,12 @@ function replaceParamsInSelect(ast: SelectAst, params: readonly unknown[]): Sele
     kind: ast.kind,
     from: ast.from,
     project,
-    ...(joins ? { joins } : {}),
-    ...(includes ? { includes } : {}),
-    ...(where ? { where } : {}),
-    ...(orderBy ? { orderBy } : {}),
-    ...(ast.limit !== undefined ? { limit: ast.limit } : {}),
-    ...(ast.selectAllIntent ? { selectAllIntent: ast.selectAllIntent } : {}),
+    ...ifDefined('joins', joins),
+    ...ifDefined('includes', includes),
+    ...ifDefined('where', where),
+    ...ifDefined('orderBy', orderBy),
+    ...ifDefined('limit', ast.limit),
+    ...ifDefined('selectAllIntent', ast.selectAllIntent),
   };
 }
 

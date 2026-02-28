@@ -1452,6 +1452,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../2-sql/5-runtime
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/utils
       kysely:
         specifier: 'catalog:'
         version: 0.28.10
