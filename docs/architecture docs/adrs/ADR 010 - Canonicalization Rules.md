@@ -81,16 +81,12 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 - Keys within extensions follow the same lexicographic ordering
 - Fields that do not alter logical meaning are included in profileHash only per ADR 004
 
-### Meta (non-semantic; no provenance)
+### Meta (tooling-only; excluded from hashes)
 
-If `meta` is present, it must not contain authoring provenance (no schema paths, no `sourceId`s, no spans). Provenance lives in diagnostics only and must not participate in hashing.
+`meta` exists to carry optional, tooling-facing information. It does not change contract meaning and **must not** influence any hash.
 
-Examples of acceptable `meta` fields (non-semantic, tooling-only):
-
-- `emitterVersion`, `adapterVersions`
-- `generatedAt` as ISO string (excluded from all hashes)
-
-`meta` key ordering is lexicographic and appears after core sections as defined above.
+- `meta` is excluded from `storageHash`, `executionHash`, and `profileHash` inputs.
+- `meta` key ordering is lexicographic and appears after core sections (see top-level presentation order above).
 
 ### Hashing
 
