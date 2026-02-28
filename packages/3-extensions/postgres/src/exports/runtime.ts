@@ -1,6 +1,6 @@
+export type { KyselyQueryLane } from '@prisma-next/sql-kysely-lane';
 export type { PostgresBinding } from '../runtime/binding';
 export type {
-  BuildOnlyKysely,
   PostgresClient,
   PostgresOptions,
   PostgresOptionsBase,

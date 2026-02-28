@@ -1,5 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { CompiledQuery } from '@prisma-next/sql-kysely-lane';
+import type { CompiledQuery, KyselyQueryLane } from '@prisma-next/sql-kysely-lane';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import postgres from '../src/runtime/postgres';
 
@@ -25,6 +25,8 @@ const db = postgres({
   contract,
   url: 'postgres://localhost:5432/db',
 });
+const lane: KyselyQueryLane<typeof contract> = db.kysely;
+void lane;
 
 const query = db.kysely.selectFrom('user').selectAll();
 db.kysely.build(query);
@@ -41,7 +43,13 @@ void typedPlan;
 
 db.kysely.whereExpr(query);
 
-// @ts-expect-error build-only lane must not expose query execution methods
-query.execute();
-// @ts-expect-error build-only lane must not expose transactions
-db.kysely.transaction();
+type HasKey<TObject, TKey extends string> = TKey extends keyof TObject ? true : false;
+type AssertFalse<TValue extends false> = TValue;
+
+type KyselyLaneHasExecute = HasKey<typeof db.kysely, 'execute'>;
+type KyselyLaneHasTransaction = HasKey<typeof db.kysely, 'transaction'>;
+
+const assertNoExecuteOnLane: AssertFalse<KyselyLaneHasExecute> = false;
+const assertNoTransactionOnLane: AssertFalse<KyselyLaneHasTransaction> = false;
+void assertNoExecuteOnLane;
+void assertNoTransactionOnLane;

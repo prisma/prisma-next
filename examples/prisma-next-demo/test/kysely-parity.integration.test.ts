@@ -147,8 +147,7 @@ describe('Kysely parity integration', () => {
           });
           const posts = await getUserPosts('user_001', runtime);
           expect(posts).toHaveLength(1);
-          const firstPost = posts[0] as Record<string, unknown> | undefined;
-          expect(firstPost?.['title']).toBe('First Post');
+          expect(posts[0]?.['title']).toBe('First Post');
         } finally {
           await runtime.close();
         }
@@ -196,9 +195,8 @@ describe('Kysely parity integration', () => {
           });
           const users = await getUsersWithPosts(runtime, 10);
           expect(users).toHaveLength(2);
-          const typedUsers = users as Array<Record<string, unknown> & { posts: unknown[] }>;
-          const alice = typedUsers.find((u) => u['email'] === 'alice@example.com')!;
-          const bob = typedUsers.find((u) => u['email'] === 'bob@example.com')!;
+          const alice = users.find((u) => u.email === 'alice@example.com')!;
+          const bob = users.find((u) => u.email === 'bob@example.com')!;
           expect(alice).toMatchObject({ email: 'alice@example.com', posts: expect.any(Array) });
           expect(alice.posts).toHaveLength(2);
           expect(bob).toMatchObject({ email: 'bob@example.com', posts: expect.any(Array) });

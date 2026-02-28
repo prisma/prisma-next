@@ -1,5 +1,5 @@
 export type { CompiledQuery } from 'kysely';
-export type { BuildOnlyKyselyLane } from './client';
+export type { KyselyQueryLane } from './client';
 export { createBuildOnlyKyselyLane } from './client';
 export type { KyselifyContract } from './kyselify';
 export type { BuildKyselyPlanOptions } from './plan';

@@ -8,11 +8,7 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import {
-  type BuildOnlyKyselyLane,
-  createBuildOnlyKyselyLane,
-  type KyselifyContract,
-} from '@prisma-next/sql-kysely-lane';
+import { createBuildOnlyKyselyLane, type KyselyQueryLane } from '@prisma-next/sql-kysely-lane';
 import type { SelectBuilder } from '@prisma-next/sql-lane';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
@@ -59,8 +55,6 @@ type OrmClient<TContract extends SqlContract<SqlStorage>> = ReturnType<
   typeof ormBuilder<TContract>
 >;
 
-export type BuildOnlyKysely<DB> = BuildOnlyKyselyLane<DB>;
-
 export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
   readonly sql: SelectBuilder<
     TContract,
@@ -68,7 +62,7 @@ export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
     ExtractCodecTypes<TContract>,
     ExtractOperationTypes<TContract>
   >;
-  readonly kysely: BuildOnlyKysely<KyselifyContract<TContract>>;
+  readonly kysely: KyselyQueryLane<TContract>;
   readonly schema: SchemaHandle<
     TContract,
     ExtractCodecTypes<TContract>,
