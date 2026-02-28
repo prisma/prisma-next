@@ -6,7 +6,7 @@ import { canonicalizeContract } from './canonicalization';
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { EmitOptions, EmitResult } from './types';
 
-const PROVENANCE_KEYS = new Set(['source', 'sourceId', 'schemaPath', 'sources']);
+const PROVENANCE_KEYS = new Set(['sourceId', 'schemaPath', 'sources']);
 
 function assertNoProvenance(value: unknown, path: string[] = []): void {
   if (Array.isArray(value)) {
@@ -20,7 +20,8 @@ function assertNoProvenance(value: unknown, path: string[] = []): void {
   }
 
   for (const [key, entry] of Object.entries(value)) {
-    if (PROVENANCE_KEYS.has(key)) {
+    const isMetaSourceKey = key === 'source' && path[0] === 'meta';
+    if (PROVENANCE_KEYS.has(key) || isMetaSourceKey) {
       const currentPath = [...path, key].join('.');
       throw new Error(`ContractIR contains provenance key "${key}" at "${currentPath}"`);
     }

@@ -20,7 +20,7 @@ This spec defines the provider interface, config wiring, error behavior, and the
 ## Functional Requirements
 
 - `prisma-next.config.ts` can supply a **contract source provider** instead of a source “kind” union.
-  - **Provider contract**: a provider can be invoked to produce a `Result<ContractIR, Diagnostics>` (sync or async).
+  - **Provider contract**: a provider is always async and can be invoked to produce a `Promise<Result<ContractIR, Diagnostics>>`.
   - Diagnostics are structured (include spans/sourceIds where available) and are intended for CLI/editor rendering.
 - The CLI/control plane remains **source-agnostic**:
   - It calls the provider to obtain `ContractIR`.
@@ -120,6 +120,5 @@ This spec defines the provider interface, config wiring, error behavior, and the
 
 # Open Questions
 
-1. **Async model**: Do we require async providers (always `Promise<Result<ContractIR, Diagnostics>>`), or allow sync as an optimization?
-2. **Test harness location**: Where should the provider conformance suite live so that adding a provider comes with a minimal, obvious parity contract?
+1. **Test harness location**: Where should the provider conformance suite live so that adding a provider comes with a minimal, obvious parity contract?
 
