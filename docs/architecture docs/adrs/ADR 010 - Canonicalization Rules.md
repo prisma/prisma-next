@@ -43,22 +43,12 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 
 - Keys sorted lexicographically by UTF-16 code unit order
 - Sort applied recursively to all objects
-- For top-level sections we enforce an explicit order before lexicographic sort to stabilize human diffs:
+- For top-level sections we enforce a small, explicit *presentation order* before lexicographic sort to stabilize human diffs.
+  - This does not change semantics (the JSON meaning is the same either way).
+  - It only makes reviews easier by keeping “header” fields (identity + hashes) grouped, followed by the large semantic sections, with `meta` last.
+  - Within each section (and for any non-top-level object), standard lexicographic sort applies, except where domain-specific ordering rules are defined below.
 
-1. `schemaVersion`
-2. `canonicalVersion`
-3. `targetFamily`
-4. `target`
-5. `storageHash`
-6. `executionHash`
-7. `profileHash`
-8. `models`
-9. `storage`
-10. `capabilities`
-11. `codecs`
-12. `meta`
-
-Within each of these sections, standard lexicographic sort applies, except where domain-specific ordering rules are defined below.
+**Source of truth:** the exact top-level ordering is defined by the emitter implementation (see `TOP_LEVEL_ORDER` in `packages/1-framework/1-core/migration/control-plane/src/emission/canonicalization.ts`). Any new top-level section that becomes part of the canonical artifact must be added there (and covered by tests) to keep diffs stable.
 
 ### Arrays
 
