@@ -8,15 +8,16 @@ export async function getUsersWithPosts(runtime: Runtime, limit = 10) {
 
   const result = [];
   for (const user of users) {
+    const userRecord = (user ?? {}) as Record<string, unknown>;
     const postsQuery = db.kysely
       .selectFrom('post')
       .select(['id', 'title', 'createdAt'])
-      .where('userId', '=', user.id)
+      .where('userId', '=', userRecord['id'])
       .orderBy('createdAt', 'desc')
       .limit(100);
 
     const posts = await runtime.execute(db.kysely.build(postsQuery)).toArray();
-    result.push({ ...user, posts });
+    result.push({ ...userRecord, posts });
   }
   return result;
 }
