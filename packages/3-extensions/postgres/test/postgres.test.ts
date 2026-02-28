@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   createRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
-  createBuildOnlyKyselyLane: vi.fn(),
+  createKyselyLane: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
   validateContract: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('@prisma-next/sql-contract/validate', () => ({
 
 vi.mock('@prisma-next/sql-kysely-lane', () => ({
   REDACTED_SQL: '/* redacted by @prisma-next/sql-kysely-lane */',
-  createBuildOnlyKyselyLane: mocks.createBuildOnlyKyselyLane,
+  createKyselyLane: mocks.createKyselyLane,
 }));
 
 vi.mock('@prisma-next/sql-lane', () => ({
@@ -100,7 +100,7 @@ describe('postgres', () => {
     mocks.driverConnect.mockReset();
     mocks.validateContract.mockReset();
     mocks.poolCtor.mockReset();
-    mocks.createBuildOnlyKyselyLane.mockReset();
+    mocks.createKyselyLane.mockReset();
 
     mocks.createExecutionContext.mockReturnValue({
       contract,
@@ -119,7 +119,7 @@ describe('postgres', () => {
     mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
-    mocks.createBuildOnlyKyselyLane.mockReturnValue({
+    mocks.createKyselyLane.mockReturnValue({
       build: vi.fn(),
       whereExpr: vi.fn(),
       redactedSql: REDACTED_SQL,
@@ -151,7 +151,7 @@ describe('postgres', () => {
       url: 'postgres://localhost:5432/db',
     });
 
-    expect(mocks.createBuildOnlyKyselyLane).toHaveBeenCalledTimes(1);
+    expect(mocks.createKyselyLane).toHaveBeenCalledTimes(1);
     expect(typeof db.kysely.build).toBe('function');
     expect(typeof db.kysely.whereExpr).toBe('function');
   });

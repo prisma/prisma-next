@@ -27,7 +27,7 @@ Developing this package? See [`DEVELOPING.md`](./DEVELOPING.md).
 ```mermaid
 flowchart LR
   App[Caller] --> PostgresRoot[@prisma-next/postgres]
-  PostgresRoot --> LaneClient[createBuildOnlyKyselyLane]
+  PostgresRoot --> LaneClient[createKyselyLane]
   LaneClient --> QueryAuthoring[Kysely authoring methods]
   QueryAuthoring --> BuildPlan[build(query)]
   QueryAuthoring --> BuildWhere[whereExpr(query)]

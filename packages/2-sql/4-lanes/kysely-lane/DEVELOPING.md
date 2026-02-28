@@ -28,7 +28,7 @@ This package provides the build-only logic for the Kysely lane: transforming Kys
 - `runGuardrails(contract, query)` — Pre-transform validation for SelectQueryNode
 - `buildKyselyPlan(contract, compiledQuery)` — Build-only plan assembly entry point
 - `buildKyselyWhereExpr(contract, compiledQuery)` — Kysely-authored filter interop helper producing `ToWhereExpr`
-- `createBuildOnlyKyselyLane(contract)` — Lane-owned Kysely surface factory for composition roots
+- `createKyselyLane(contract)` — Lane-owned Kysely surface factory for composition roots
 - `REDACTED_SQL` — Canonical SQL redaction marker used by the lane
 - `KyselyTransformError`, `KYSELY_TRANSFORM_ERROR_CODES` — Error types
 - `TransformResult` — Result type (ast + metaAdditions)

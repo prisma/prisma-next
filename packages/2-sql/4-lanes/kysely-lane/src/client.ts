@@ -523,7 +523,7 @@ function callBuilderMethod<TBuilder extends object, TResult>(
   return (maybeMethod as (...methodArgs: unknown[]) => TResult).apply(builder, args);
 }
 
-export function createBuildOnlyKyselyLane<TContract extends SqlContract<SqlStorage>>(
+export function createKyselyLane<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
 ): KyselyQueryLane<TContract> {
   const base = new KyselyClient<KyselifyContract<TContract>>({

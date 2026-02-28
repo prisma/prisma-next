@@ -1,6 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBuildOnlyKyselyLane } from './client';
+import { createKyselyLane } from './client';
 import { REDACTED_SQL } from './plan';
 
 const mocks = vi.hoisted(() => ({
@@ -39,13 +39,13 @@ const contract: SqlContract<SqlStorage> = {
   },
 };
 
-describe('createBuildOnlyKyselyLane', () => {
+describe('createKyselyLane', () => {
   beforeEach(() => {
     mocks.kyselyCtor.mockReset();
   });
 
   it('creates build-only lane surface', () => {
-    const lane = createBuildOnlyKyselyLane(contract);
+    const lane = createKyselyLane(contract);
     expect(mocks.kyselyCtor).toHaveBeenCalledTimes(1);
     expect(typeof lane.build).toBe('function');
     expect(typeof lane.whereExpr).toBe('function');
@@ -53,7 +53,7 @@ describe('createBuildOnlyKyselyLane', () => {
   });
 
   it('throws when execution is attempted', async () => {
-    createBuildOnlyKyselyLane(contract);
+    createKyselyLane(contract);
     const config = mocks.kyselyCtor.mock.calls[0]?.[0] as { dialect: { createDriver(): unknown } };
     const driver = config.dialect.createDriver() as { acquireConnection(): Promise<unknown> };
     await expect(driver.acquireConnection()).rejects.toThrow(
@@ -62,7 +62,7 @@ describe('createBuildOnlyKyselyLane', () => {
   });
 
   it('redacts compiled sql and keeps parameters', () => {
-    createBuildOnlyKyselyLane(contract);
+    createKyselyLane(contract);
     const config = mocks.kyselyCtor.mock.calls[0]?.[0] as {
       dialect: {
         createQueryCompiler(): {

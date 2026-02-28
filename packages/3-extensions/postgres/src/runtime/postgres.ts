@@ -8,7 +8,7 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { createBuildOnlyKyselyLane, type KyselyQueryLane } from '@prisma-next/sql-kysely-lane';
+import { createKyselyLane, type KyselyQueryLane } from '@prisma-next/sql-kysely-lane';
 import type { SelectBuilder } from '@prisma-next/sql-lane';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
@@ -241,7 +241,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
 
   return {
     sql,
-    kysely: createBuildOnlyKyselyLane(contract),
+    kysely: createKyselyLane(contract),
     schema,
     orm,
     context,
