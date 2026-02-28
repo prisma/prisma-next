@@ -187,7 +187,7 @@ describe('postgres', () => {
       };
     };
     const compiler = config.dialect.createQueryCompiler();
-    const compiled = compiler.compileQuery({ kind: 'SelectQueryNode' }, {});
+    const compiled = compiler.compileQuery({ kind: 'SelectQueryNode' });
 
     expect(compiled).toMatchObject({ sql: REDACTED_SQL, parameters: ['p1', 2] });
   });

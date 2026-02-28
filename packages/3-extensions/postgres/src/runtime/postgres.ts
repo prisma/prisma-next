@@ -88,7 +88,7 @@ type StripKyselyExecutionMethods<T> = T extends (...args: infer Args) => infer R
 
 export type BuildOnlyKysely<DB> = StripKyselyExecutionMethods<Kysely<DB>> & {
   build<Row>(query: {
-    compile(): CompiledQuery<Row>;
+    compile(): unknown;
   }): import('@prisma-next/sql-relational-core/plan').SqlQueryPlan<Row>;
   readonly redactedSql: string;
 };
@@ -160,8 +160,8 @@ function createBuildOnlyKysely<TContract extends SqlContract<SqlStorage>>(
   });
   const buildOnly = base as unknown as BuildOnlyKysely<KyselifyContract<TContract>>;
   Object.defineProperty(buildOnly, 'build', {
-    value: <Row>(query: { compile(): CompiledQuery<Row> }) =>
-      buildKyselyPlan(contract, query.compile(), { lane: 'kysely' }),
+    value: <Row>(query: { compile(): unknown }) =>
+      buildKyselyPlan(contract, query.compile() as CompiledQuery<Row>, { lane: 'kysely' }),
     enumerable: false,
     configurable: false,
     writable: false,
