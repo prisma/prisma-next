@@ -1,5 +1,6 @@
 ---
 description: Verify file paths exist before citing them.
+alwaysApply: true
 ---
 
 # Verify paths before citing them
