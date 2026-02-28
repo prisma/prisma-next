@@ -186,7 +186,7 @@ export function unwrapWhereNode(node: unknown): OperationNode | undefined {
   if (!WhereNode.is(node)) {
     return node;
   }
-  return node.where ?? (node as { node?: OperationNode }).node;
+  return node.where ?? getNestedOperationNode(node);
 }
 
 export function unwrapOnNode(node: unknown): OperationNode | undefined {
@@ -196,7 +196,15 @@ export function unwrapOnNode(node: unknown): OperationNode | undefined {
   if (!OnNode.is(node)) {
     return node;
   }
-  return node.on ?? (node as { node?: OperationNode }).node;
+  return node.on ?? getNestedOperationNode(node);
+}
+
+function getNestedOperationNode(node: OperationNode): OperationNode | undefined {
+  if (!('node' in node)) {
+    return undefined;
+  }
+  const maybeNode = (node as { node?: unknown }).node;
+  return isOperationNode(maybeNode) ? maybeNode : undefined;
 }
 
 export function unwrapSelectionNode(node: OperationNode): OperationNode {
