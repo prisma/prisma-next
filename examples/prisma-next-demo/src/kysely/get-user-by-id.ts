@@ -9,5 +9,5 @@ export async function getUserById(userId: string, runtime: Runtime) {
     .where('id', '=', userId)
     .limit(1);
 
-  return firstOrThrow(runtime.execute(db.kysely.build(query)));
+  return firstOrThrow(runtime.execute(db.kysely.build(query)), `User not found for id: ${userId}`);
 }
