@@ -4,6 +4,7 @@ import { db } from '../prisma/db';
 
 export async function insertUserTransaction(runtime: Runtime) {
   const kysely = db.kysely;
+
   const userId = generateId({ id: 'uuidv4' });
   const connection = await runtime.connection();
 
@@ -14,6 +15,7 @@ export async function insertUserTransaction(runtime: Runtime) {
       email: 'jane@doe.com',
       createdAt: new Date().toISOString(),
     });
+
     await connection.execute(kysely.build(query)).toArray();
 
     const transaction = await connection.transaction();
@@ -22,6 +24,7 @@ export async function insertUserTransaction(runtime: Runtime) {
         .updateTable('user')
         .set({ email: 'john@doe.com' })
         .where('id', '=', userId);
+
       await transaction.execute(kysely.build(query)).toArray();
 
       throw new Error('Simulated error to trigger rollback');
@@ -36,6 +39,7 @@ export async function insertUserTransaction(runtime: Runtime) {
   }
 
   const query = kysely.selectFrom('user').selectAll().where('id', '=', userId);
+
   const rows = await runtime.execute(kysely.build(query)).toArray();
   return rows[0] ?? null;
 }

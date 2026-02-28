@@ -4,7 +4,9 @@ import { db } from '../prisma/db';
 
 export async function insertUser(email: string, runtime: Runtime) {
   const kysely = db.kysely;
+
   const userId = generateId({ id: 'uuidv4' });
+
   const query = kysely
     .insertInto('user')
     .values({
@@ -21,6 +23,7 @@ export async function insertUser(email: string, runtime: Runtime) {
 
 export async function updateUser(userId: string, newEmail: string, runtime: Runtime) {
   const kysely = db.kysely;
+
   const query = kysely
     .updateTable('user')
     .set({ email: newEmail })
@@ -33,6 +36,7 @@ export async function updateUser(userId: string, newEmail: string, runtime: Runt
 
 export async function deleteUser(userId: string, runtime: Runtime) {
   const kysely = db.kysely;
+
   const query = kysely.deleteFrom('user').where('id', '=', userId).returning(['id', 'email']);
 
   const rows = await runtime.execute(kysely.build(query)).toArray();

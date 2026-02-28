@@ -8,6 +8,8 @@ import { db } from '../prisma/db';
  */
 export async function updateWithoutWhere(runtime: Runtime) {
   const kysely = db.kysely;
+
   const query = kysely.updateTable('user').set({ email: 'unsafe@example.com' });
+
   await runtime.execute(kysely.build(query)).toArray();
 }

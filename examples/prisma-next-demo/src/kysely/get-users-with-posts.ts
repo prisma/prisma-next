@@ -3,7 +3,9 @@ import { db } from '../prisma/db';
 
 export async function getUsersWithPosts(runtime: Runtime, limit = 10) {
   const kysely = db.kysely;
+
   const usersQuery = kysely.selectFrom('user').select(['id', 'email', 'createdAt']).limit(limit);
+
   const users = await runtime.execute(kysely.build(usersQuery)).toArray();
 
   const result = [];
@@ -14,6 +16,7 @@ export async function getUsersWithPosts(runtime: Runtime, limit = 10) {
       .where('userId', '=', user.id)
       .orderBy('createdAt', 'desc')
       .limit(100);
+
     const posts = await runtime.execute(kysely.build(postsQuery)).toArray();
     result.push({ ...user, posts });
   }

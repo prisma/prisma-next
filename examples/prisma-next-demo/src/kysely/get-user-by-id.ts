@@ -3,6 +3,7 @@ import { db } from '../prisma/db';
 
 export async function getUserById(userId: string, runtime: Runtime) {
   const kysely = db.kysely;
+
   const query = kysely
     .selectFrom('user')
     .select(['id', 'email', 'createdAt'])
