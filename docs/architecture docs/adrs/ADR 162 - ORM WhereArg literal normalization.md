@@ -2,53 +2,86 @@
 
 ## Context
 
-Lane-agnostic ORM filter interop uses `WhereArg = WhereExpr | ToWhereExpr`.
-`ToWhereExpr.toWhereExpr()` returns a bound payload `{ expr, params, paramDescriptors }` that can be produced by non-ORM authoring surfaces (for example, lane-built filters).
+We want different “authoring surfaces” (ORM, Kysely lane, etc.) to be able to pass a filter into the ORM without importing each other’s types.
 
-At this stage, `@prisma-next/sql-orm-client` stores ORM filters as param-free internal AST fragments used for composition and terminal collection operations.
+To do that, the ORM accepts a union:
+
+- `WhereArg = WhereExpr | ToWhereExpr`
+
+Where:
+
+- **`WhereExpr`** is a *parameter-free* filter expression (it contains only literals like `"admin"`, not placeholders).
+- **`ToWhereExpr`** is an object with a method `toWhereExpr()` that returns a *bound* filter payload:
+  - `expr`: a filter expression that may contain **parameter references** (placeholders)
+  - `params`: the values to bind to those placeholders
+  - `paramDescriptors`: metadata about those params (source, type hints, etc.)
+
+Today, `@prisma-next/sql-orm-client` stores its internal filters as **parameter-free** AST fragments. That makes filter composition predictable (merge `and/or/exists`, reuse filters across operations, etc.).
 
 ## Problem
 
-We need stable behavior for consuming `ToWhereExpr` inside ORM:
+When the ORM receives a `ToWhereExpr`, it has to decide what to do with the bound payload.
 
-- preserve interoperability with bound payload producers
-- keep ORM internals predictable and low-risk for this release
-- enforce payload correctness strongly enough to avoid silent misbinding
+We need behavior that:
 
-The alternative is carrying bound params/descriptors through ORM composition and reindexing at plan assembly time. That approach is viable but changes internal semantics more broadly.
+- keeps interop working (so lanes can provide filters)
+- keeps ORM internals low-risk for this release
+- rejects malformed payloads early (no “silently bind the wrong value to the wrong placeholder”)
+
+## Options
+
+### Option A: Normalize to literals (this ADR)
+
+Convert the bound payload into a parameter-free `WhereExpr` immediately by replacing each parameter reference with its corresponding literal value.
+
+### Option B: Preserve bound params through ORM composition (future)
+
+Carry `{ expr, params, paramDescriptors }` through ORM composition, then re-index/re-bind at plan assembly time. This is viable, but it changes internal semantics broadly and raises merge risk.
 
 ## Constraints
 
 - Current scope prioritizes architectural extraction and compatibility stability.
-- Existing ORM internals are designed around param-free `WhereExpr` state.
-- Payloads from lanes must still be validated rigorously.
-- A richer bound-param-preserving model remains desirable for future work, but not at the expense of merge risk.
+- ORM’s internal model is currently parameter-free.
+- Interop payloads must be validated rigorously.
+- Preserving param descriptors through composition is desirable, but not required for this release.
 
 ## Decision
 
-ORM consumes `ToWhereExpr` via **literal normalization**:
+For this release, the ORM consumes `ToWhereExpr` via **literal normalization**.
 
-1. Validate bound payload integrity:
-   - `params.length === paramDescriptors.length`
-   - `ParamRef` indices start at `1`
-   - `ParamRef` indices are contiguous (no gaps)
-   - max `ParamRef` index equals `params.length`
-2. Normalize by substituting `ParamRef(index)` with `LiteralExpr(params[index - 1])`.
-3. Keep ORM internal filter state param-free after normalization.
-4. Do not propagate `paramDescriptors` through ORM plan metadata in the current release.
+### 1) Validate the bound payload
+
+Before doing any conversion, enforce these invariants:
+
+- `params.length === paramDescriptors.length`
+- `ParamRef` indices start at `1`
+- `ParamRef` indices are contiguous (no gaps)
+- the maximum `ParamRef` index equals `params.length`
+
+### 2) Substitute parameters with literals
+
+Replace each `ParamRef(index)` inside `expr` with `LiteralExpr(params[index - 1])`.
+
+### 3) Keep ORM internal state parameter-free
+
+After normalization, the ORM stores the result as a plain `WhereExpr` (no `ParamRef`).
+
+### 4) Do not propagate `paramDescriptors` into ORM plan metadata
+
+Descriptors are validated for alignment/integrity, but not carried through plan metadata in this release.
 
 ## Consequences
 
 ### Positive
 
-- Low-risk alignment with current ORM internal model.
-- Immediate lane-agnostic interop for `ToWhereExpr` producers.
-- Strong payload validation catches malformed bound payloads early.
+- Fits the current ORM model (parameter-free internal filters).
+- Enables lane-agnostic interop immediately.
+- Makes incorrect payloads fail loudly and early.
 
 ### Trade-offs
 
-- Descriptor-rich, bound-param-preserving semantics are deferred.
-- Future prepared/descriptor-aware composition work will require a deliberate design pass.
+- We lose the ability (for now) to preserve descriptor-rich, prepared-statement-like semantics through ORM composition.
+- A future “bound-param-preserving” design will require a deliberate follow-up (carry + reindex).
 
 ## Example
 
@@ -66,10 +99,13 @@ const whereArg = {
   }),
 };
 
-// ORM behavior:
-// right: { kind: 'param', index: 1 } -> { kind: 'literal', value: 'admin' }
+// ORM behavior for this release:
+// { kind: 'param', index: 1 } -> { kind: 'literal', value: 'admin' }
 ```
 
 ## Follow-up
 
-Future work may evaluate a bound-param-preserving ORM composition model (carry/reindex params and descriptors instead of literal normalization) and shared PLAN.UNSUPPORTED envelope helpers.
+Future work may evaluate:
+
+- a bound-param-preserving ORM composition model (carry/reindex `params` + `paramDescriptors` instead of literal normalization)
+- shared helpers for execution-plane PLAN.* error envelopes (for example PLAN.UNSUPPORTED)
