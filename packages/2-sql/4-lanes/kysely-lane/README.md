@@ -10,6 +10,8 @@ This is the “drop down a level” API you use when the high-level **SQL ORM cl
 
 For high-level queries, use `@prisma-next/sql-orm-client`.
 
+Developing this package? See [`DEVELOPING.md`](./DEVELOPING.md).
+
 ## How it works (in one minute)
 
 You:
