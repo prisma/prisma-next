@@ -130,8 +130,12 @@ describe('buildKyselyWhereExpr', () => {
     const bound = whereArg.toWhereExpr();
     expect(bound.params).toEqual(['admin']);
     expect(bound.paramDescriptors).toHaveLength(1);
-    expect(bound.paramDescriptors[0].index).toBe(1);
-    expect(bound.paramDescriptors[0].source).toBe('lane');
+    const descriptor = bound.paramDescriptors[0];
+    if (!descriptor) {
+      throw new Error('expected parameter descriptor');
+    }
+    expect(descriptor.index).toBe(1);
+    expect(descriptor.source).toBe('lane');
   });
 
   it('throws when select query has no where clause', () => {

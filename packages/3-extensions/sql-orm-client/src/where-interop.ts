@@ -3,7 +3,6 @@ import type {
   Expression,
   JoinOnExpr,
   ListLiteralExpr,
-  OperationExpr,
   ParamRef,
   SelectAst,
   ToWhereExpr,
