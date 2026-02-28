@@ -1,7 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import type { KyselifyContract } from '@prisma-next/integration-kysely';
 import type {
   ExtractCodecTypes,
   ExtractOperationTypes,
@@ -9,7 +8,7 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { buildKyselyPlan, REDACTED_SQL } from '@prisma-next/sql-kysely-lane';
+import { buildKyselyPlan, type KyselifyContract, REDACTED_SQL } from '@prisma-next/sql-kysely-lane';
 import type { SelectBuilder } from '@prisma-next/sql-lane';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';

@@ -1,3 +1,4 @@
+export type { KyselifyContract } from './kyselify';
 export type { BuildKyselyPlanOptions } from './plan';
 export { buildKyselyPlan, REDACTED_SQL } from './plan';
 export type { KyselyTransformErrorCode, KyselyTransformErrorDetails } from './transform/errors';
