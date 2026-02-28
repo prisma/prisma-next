@@ -1,9 +1,7 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { kysely } from '../prisma/db';
 
 export async function getUserPosts(userId: string, runtime: Runtime) {
-  const kysely = db.kysely;
-
   const query = kysely
     .selectFrom('post')
     .select(['id', 'title', 'userId', 'createdAt', 'embedding'])

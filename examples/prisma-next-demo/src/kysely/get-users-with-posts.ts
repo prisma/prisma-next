@@ -1,9 +1,7 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { kysely } from '../prisma/db';
 
 export async function getUsersWithPosts(runtime: Runtime, limit = 10) {
-  const kysely = db.kysely;
-
   const usersQuery = kysely.selectFrom('user').select(['id', 'email', 'createdAt']).limit(limit);
 
   const users = await runtime.execute(kysely.build(usersQuery)).toArray();

@@ -1,10 +1,8 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
+import { kysely } from '../prisma/db';
 import { firstOrThrow } from './result-utils';
 
 export async function getUserById(userId: string, runtime: Runtime) {
-  const kysely = db.kysely;
-
   const query = kysely
     .selectFrom('user')
     .select(['id', 'email', 'createdAt'])
