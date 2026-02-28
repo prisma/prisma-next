@@ -56,4 +56,4 @@ const users = await db.orm.users.where(filter).all();
 ## Links
 
 - [Query Lanes](/docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)
-- [ADR 160 - Kysely lane emits PN SQL AST](/docs/architecture%20docs/adrs/ADR%20160%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md)
+- [ADR 162 - Kysely lane emits PN SQL AST](/docs/architecture%20docs/adrs/ADR%20162%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md)
