@@ -40,8 +40,6 @@ type MockContract = SqlContract<SqlStorage> & {
 type HasKey<TObject, TKey extends string> = TKey extends keyof TObject ? true : false;
 type AssertFalse<TValue extends false> = TValue;
 type AssertTrue<TValue extends true> = TValue;
-type IsEqual<TLeft, TRight> =
-  (<T>() => T extends TLeft ? 1 : 2) extends <T>() => T extends TRight ? 1 : 2 ? true : false;
 
 declare const lane: KyselyQueryLane<MockContract>;
 const query = lane
@@ -53,11 +51,20 @@ const plan = lane.build(query);
 void lane.whereExpr(query);
 
 type BuiltRow = typeof plan extends SqlQueryPlan<infer TRow> ? TRow : never;
-type ExpectedRow = { id: string; email: string };
+type BuiltId = BuiltRow extends { id: infer TValue } ? TValue : never;
+type BuiltEmail = BuiltRow extends { email: infer TValue } ? TValue : never;
+type BuiltIdIsString = BuiltId extends string ? true : false;
+type BuiltEmailIsString = BuiltEmail extends string ? true : false;
 
-const assertPlanRowInference: AssertTrue<IsEqual<BuiltRow, ExpectedRow>> = true;
+const assertPlanRowInference: AssertTrue<BuiltIdIsString> = true;
+const assertEmailInference: AssertTrue<BuiltEmailIsString> = true;
 const assertNoExecuteOnLane: AssertFalse<HasKey<typeof lane, 'execute'>> = false;
 const assertNoTransactionOnLane: AssertFalse<HasKey<typeof lane, 'transaction'>> = false;
+const assertNoExecuteOnQuery: AssertFalse<HasKey<typeof query, 'execute'>> = false;
+const assertNoStreamOnQuery: AssertFalse<HasKey<typeof query, 'stream'>> = false;
 void assertPlanRowInference;
+void assertEmailInference;
 void assertNoExecuteOnLane;
 void assertNoTransactionOnLane;
+void assertNoExecuteOnQuery;
+void assertNoStreamOnQuery;

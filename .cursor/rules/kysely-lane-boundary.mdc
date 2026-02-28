@@ -14,6 +14,8 @@ alwaysApply: false
 ## Keep build-only semantics explicit
 
 - Public types must not expose execution methods (`execute*`, `stream*`, `transaction*`) on `db.kysely` or lane-authored query handles.
+- Publicly exposed lane type names should use neutral `Kysely*` naming (avoid `BuildOnly*` in exported type names).
+- Prefer explicit lane-owned query wrappers over deep recursive type transforms when stripping execution methods, so row-shape inference stays stable.
 - Runtime backstop must remain deterministic for cast/`any` bypass attempts.
 
 ## ORM interop boundary

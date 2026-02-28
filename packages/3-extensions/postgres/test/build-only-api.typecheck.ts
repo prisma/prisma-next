@@ -48,8 +48,14 @@ type AssertFalse<TValue extends false> = TValue;
 
 type KyselyLaneHasExecute = HasKey<typeof db.kysely, 'execute'>;
 type KyselyLaneHasTransaction = HasKey<typeof db.kysely, 'transaction'>;
+type KyselyQueryHasExecute = HasKey<typeof query, 'execute'>;
+type KyselyQueryHasStream = HasKey<typeof query, 'stream'>;
 
 const assertNoExecuteOnLane: AssertFalse<KyselyLaneHasExecute> = false;
 const assertNoTransactionOnLane: AssertFalse<KyselyLaneHasTransaction> = false;
+const assertNoExecuteOnQuery: AssertFalse<KyselyQueryHasExecute> = false;
+const assertNoStreamOnQuery: AssertFalse<KyselyQueryHasStream> = false;
 void assertNoExecuteOnLane;
 void assertNoTransactionOnLane;
+void assertNoExecuteOnQuery;
+void assertNoStreamOnQuery;
