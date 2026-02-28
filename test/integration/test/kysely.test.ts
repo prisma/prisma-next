@@ -28,11 +28,12 @@ async function createPostgresClient(
   client: Client,
   options?: { readonly plugins?: readonly Plugin[] },
 ): Promise<{ runtime: Runtime; db: ReturnType<typeof postgres<Contract>> }> {
+  const plugins = options?.plugins;
   const db = postgres<Contract>({
     contract: fixtureContract,
     pg: client,
     verify: { mode: 'onFirstUse', requireMarker: true },
-    ...ifDefined('plugins', options?.plugins),
+    ...ifDefined('plugins', plugins),
   });
   const runtime = await db.connect();
   return { runtime, db };
