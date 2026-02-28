@@ -19,7 +19,8 @@
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/psl-parser": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
-    "@prisma-next/utils": "workspace:*"
+    "@prisma-next/utils": "workspace:*",
+    "pathe": "^2.0.3"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
@@ -34,6 +35,10 @@
   ],
   "exports": {
     ".": "./dist/index.mjs",
+    "./provider": {
+      "types": "./dist/provider.d.mts",
+      "import": "./dist/provider.mjs"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",
