@@ -47,8 +47,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `@prisma-next/adapter-postgres` for adapter descriptor
 - `@prisma-next/driver-postgres` for driver descriptor
 - `@prisma-next/sql-lane` for `sql(...)`
-- `@prisma-next/integration-kysely` for contract-to-Kysely typing
-- `@prisma-next/sql-kysely-lane` for build-only Kysely plan assembly
+- `@prisma-next/sql-kysely-lane` for contract-to-Kysely typing and build-only Kysely plan assembly
 - `@prisma-next/sql-relational-core` for `schema(...)`
 - `@prisma-next/sql-orm-client` for `orm(...)`
 - `@prisma-next/sql-contract` for `validateContract(...)` and contract types

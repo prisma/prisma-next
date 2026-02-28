@@ -47,7 +47,7 @@ The lane package is build-only: it produces AST and plan metadata. SQL lowering 
 
 ## Related Packages
 
-- `@prisma-next/integration-kysely` — Consumes this package for Kysely dialect connection planning
+- `@prisma-next/postgres` — Exposes build-only `db.kysely` and delegates plan assembly to this lane
 - `@prisma-next/sql-relational-core` — Provides AST types used by the transformer
 
 ## Related Subsystems

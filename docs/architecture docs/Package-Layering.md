@@ -117,8 +117,6 @@ The extensions domain (`packages/3-extensions/`) contains ecosystem extensions a
 
 ```
 * 3-extensions
-|-- integration-kysely/ (runtime plane)
-|   |-- → @prisma-next/integration-kysely
 |-- sql-orm-client/ (runtime plane)
 |   |-- → @prisma-next/sql-orm-client
 |-- pgvector/ (multi-plane)
@@ -311,7 +309,6 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/3-targets/3-targets/postgres/` | `@prisma-next/target-postgres` |
 | `packages/3-targets/6-adapters/postgres/` | `@prisma-next/adapter-postgres` |
 | `packages/3-targets/7-drivers/postgres/` | `@prisma-next/driver-postgres` |
-| `packages/3-extensions/integration-kysely/` | `@prisma-next/integration-kysely` |
 | `packages/3-extensions/sql-orm-client/` | `@prisma-next/sql-orm-client` |
 | `packages/3-extensions/pgvector/` | `@prisma-next/extension-pgvector` |
 

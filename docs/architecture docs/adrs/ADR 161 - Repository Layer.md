@@ -36,11 +36,11 @@ The repository layer is **not subject to ADR 003**, which scopes to lanes and Pl
 
 ### 4) Execution model
 
-The repository layer composes and compiles queries, then dispatches compiled queries through `@prisma-next/integration-kysely` as the permanent execution boundary:
+The repository layer composes and compiles queries, then dispatches plans directly through runtime primitives and SQL family lane helpers:
 
-- `createExecutionPlanFromCompiledQuery(...)` — convert Kysely `CompiledQuery` to `ExecutionPlan`
-- `executeCompiledQuery(...)` — dispatch compiled queries through runtime `execute(plan)`
-- `connection()` / `transaction()` runtime primitives — used for scoped multi-query workflows
+- Kysely-authored plans are assembled through `@prisma-next/sql-kysely-lane`
+- Compiled-query dispatch executes through runtime `execute(plan)`
+- `connection()` / `transaction()` runtime primitives are used for scoped multi-query workflows
 
 Repository operations compose these primitives to implement multi-query workflows. The runtime remains unaware of repository-level semantics; it sees individual Plans.
 
