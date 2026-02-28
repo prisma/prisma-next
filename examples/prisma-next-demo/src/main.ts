@@ -134,6 +134,10 @@ async function main() {
         process.exit(1);
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      if (!Number.isInteger(limit) || limit <= 0) {
+        console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [limit>0]');
+        process.exit(1);
+      }
       const users = await ormClientGetUsersViaWhereArg(kind, limit, runtime);
 
       console.log(JSON.stringify(users, null, 2));
