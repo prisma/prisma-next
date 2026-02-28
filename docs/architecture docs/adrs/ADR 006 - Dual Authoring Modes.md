@@ -4,7 +4,7 @@
 
 - Teams want flexibility to author schemas in PSL or in TypeScript for agent and tool ergonomics
 - Having multiple sources of truth creates drift and unclear build boundaries
-- Our safety model depends on a deterministic, hashable contract artifact consumed by queries, runtime, migrations, and PPg
+- Our safety model depends on a deterministic, hashable contract artifact consumed by queries, runtime, and migrations
 - We need great DX in dev (auto emit) and strong determinism in CI
 
 ## Decision
@@ -19,14 +19,19 @@
 
 ### Problem statement
 
-We want dual authoring surfaces without coupling the framework/CLI to every possible input format. The convergence boundary must remain a framework-defined Contract IR and a single canonical artifact (`contract.json`) so parity and determinism are enforceable.
+We want teams to be able to author a schema in **either** PSL **or** TypeScript, while keeping the rest of the system simple.
+
+That means:
+
+- The CLI and core pipeline should not need to “know about” every possible input format.
+- No matter how the schema was authored, we always end up with the same single output artifact (`contract.json`) that the rest of the framework consumes.
 
 ### Constraints (non-negotiables)
 
-- `contract.json` must be deterministic and cross-platform stable.
-- Hashing must only cover canonical contract meaning (no file paths, no source IDs, no spans).
-- The CLI/control plane must be source-agnostic (no `kind` switching on “PSL vs TS vs …”).
-- Providers may produce rich diagnostics (including spans), but those diagnostics must not enter canonical artifacts.
+- `contract.json` must be deterministic and cross-platform stable (same inputs → same output bytes).
+- Hashes must reflect only the *meaning* of the contract (no file paths, no source IDs, no source locations/spans).
+- The CLI/control plane must not branch on “PSL vs TS vs …”. It should follow one flow.
+- We still want good error messages. Source locations are allowed in diagnostics, but **must never** be written into `contract.json` or influence hashing.
 
 ### Authoring modes
 
@@ -46,20 +51,22 @@ We want dual authoring surfaces without coupling the framework/CLI to every poss
 
 ### Responsibility split (how we decouple framework from authoring)
 
-**Contract source provider (authoring-owned):**
+The key move is to separate “how we get a schema” from “how we produce the canonical artifact”.
 
-- Loads input(s) (read files, evaluate TS builder, etc.).
-- Parses/constructs an intermediate representation and returns **framework-defined `ContractIR`**.
-- Returns structured diagnostics on failure (optionally with `sourceId` + span).
+**Contract source provider (owned by the authoring side):**
 
-**Framework emission pipeline (framework-owned):**
+- Does the input-specific work (read PSL files, run a TS builder, etc.).
+- Produces a **contract IR object** (the shared in-memory shape the framework expects).
+- If it can’t, it returns structured diagnostics (optionally with a `sourceId` + span).
 
-- Validates provider-produced IR (structure + invariants).
-- Normalizes IR into the canonical, parity-enforcing boundary (defaulting, stable ordering/identities).
-- Canonicalizes + hashes from normalized IR.
+**Framework emission pipeline (owned by the framework):**
+
+- Validates the returned IR (shape + invariants).
+- Applies the framework’s “make it consistent” rules (defaults, stable ordering, stable identifiers).
+- Computes hashes from that normalized result.
 - Emits `contract.json` + `contract.d.ts` deterministically.
 
-This ensures the framework remains **ignorant of source formats** while still enforcing **shared meaning** and **identical canonical artifacts** across providers.
+This keeps the framework independent of authoring formats, while still ensuring that PSL-first and TS-first converge on the same canonical artifact.
 
 ### Configuration
 
@@ -114,9 +121,9 @@ export default defineConfig({
 
 ### Meta and provenance
 
-- Canonical artifacts exclude provider provenance (no schema paths/sourceIds)
+- Canonical artifacts exclude authoring provenance (no schema paths, no source IDs, no spans)
 - Canonical `contract.json` has no top-level `sources` field
-- Source provenance is diagnostics-only (CLI/editor output), not hash input
+- Source provenance is diagnostics-only (CLI/editor output), and never part of hashing
 
 ### Failure modes
 
