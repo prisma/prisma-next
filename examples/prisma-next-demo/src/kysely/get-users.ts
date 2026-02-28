@@ -5,6 +5,7 @@ export async function getUsers(runtime: Runtime, limit = 10) {
   const query = db.kysely
     .selectFrom('user')
     .select(['id', 'email', 'createdAt', 'kind'])
+    .orderBy('id', 'asc')
     .limit(limit);
 
   return runtime.execute(db.kysely.build(query)).toArray();
