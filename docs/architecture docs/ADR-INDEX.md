@@ -99,7 +99,6 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 118 | Bundle inclusion policy for packs | Establishes bundle inclusion policy and security constraints for packs | [ADR 118 - Bundle inclusion policy for packs.md](adrs/ADR%20118%20-%20Bundle%20inclusion%20policy%20for%20packs.md) |
 | 121 | Contract.d.ts structure and relation typing | Complete specification for Tables, Models, and Relations namespaces with proper relation field typing | [ADR 121 - Contract.d.ts structure and relation typing.md](adrs/ADR%20121%20-%20Contract.d.ts%20structure%20and%20relation%20typing.md) |
 | 126 | PSL top-level block SPI | Defines SPI for packs to register new top-level blocks (views, enums, etc.) with parsing, validation, and deterministic emission | [ADR 126 - PSL top-level block SPI.md](adrs/ADR%20126%20-%20PSL%20top-level%20block%20SPI.md) |
-| 127 | Views as extension-owned read-only sources | Specifies view representation as extension objects with optional read-only sources in contract, migration ops, and runtime enforcement | [ADR 127 - Views as extension-owned read-only sources.md](adrs/ADR%20127%20-%20Views%20as%20extension-owned%20read-only%20sources.md) |
 | 153 | Extension Package Naming Convention | Standardizes on `extension-*` prefix exclusively for extension pack npm names | [ADR 153 - Extension Package Naming Convention.md](adrs/ADR%20153%20-%20Extension%20Package%20Naming%20Convention.md) |
 
 ## Adapters & Targets
