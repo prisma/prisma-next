@@ -40,7 +40,11 @@ describe('prismaContract provider helper', () => {
 
     expect(result.value.targetFamily).toBe('sql');
     expect(result.value.target).toBe('postgres');
-    expect(result.value.storage.tables.user).toBeDefined();
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        user: expect.any(Object),
+      },
+    });
   });
 
   it('returns unsupported construct diagnostics with source span context', async () => {
