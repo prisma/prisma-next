@@ -40,12 +40,6 @@ function assertParamRef(value: ReturnType<typeof transformValue>): ParamRef {
   return value;
 }
 
-function isLegacyValuesPair(
-  entry: unknown,
-): entry is { readonly column: unknown; readonly value: unknown } {
-  return typeof entry === 'object' && entry !== null && 'column' in entry && 'value' in entry;
-}
-
 function transformReturning(
   returningNode: ReturningNode | undefined,
   ctx: TransformContext,
@@ -102,80 +96,63 @@ export function transformInsert(node: InsertQueryNode, ctx: TransformContext): I
 
   const valuesRecord: Record<string, ColumnRef | ParamRef> = {};
   const firstRow = node.values.values[0];
-  const legacyEntries = node.values.values.filter(isLegacyValuesPair);
-  const legacyPairList = legacyEntries.length === node.values.values.length;
+  if (node.values.values.length > 1) {
+    throw new KyselyTransformError(
+      'Multi-row INSERT values are not supported; use single-row INSERT or batch via separate plans',
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { rowCount: node.values.values.length },
+    );
+  }
 
-  if (legacyPairList) {
-    for (const entry of node.values.values) {
-      if (!isLegacyValuesPair(entry)) {
-        continue;
-      }
-      const colRef = resolveColumnRef(entry.column, ctx, tableRef.name);
-      const transformed = transformValue(entry.value, ctx, {
-        table: tableRef.name,
-        column: colRef.column,
-      });
-      valuesRecord[colRef.column] = assertParamRef(transformed);
-    }
-  } else {
-    if (node.values.values.length > 1) {
-      throw new KyselyTransformError(
-        'Multi-row INSERT values are not supported; use single-row INSERT or batch via separate plans',
-        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-        { rowCount: node.values.values.length },
-      );
-    }
+  if (firstRow && (!node.columns || node.columns.length === 0)) {
+    throw new KyselyTransformError(
+      'INSERT query requires column list for VALUES transformation',
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+    );
+  }
 
-    if (firstRow && (!node.columns || node.columns.length === 0)) {
-      throw new KyselyTransformError(
-        'INSERT query requires column list for VALUES transformation',
-        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-      );
-    }
-
-    if (firstRow && node.columns && node.columns.length > 0) {
-      const rowValues = PrimitiveValueListNode.is(firstRow)
+  if (firstRow && node.columns && node.columns.length > 0) {
+    const rowValues = PrimitiveValueListNode.is(firstRow)
+      ? firstRow.values
+      : ValueListNode.is(firstRow)
         ? firstRow.values
-        : ValueListNode.is(firstRow)
-          ? firstRow.values
-          : undefined;
+        : undefined;
 
-      if (!rowValues) {
+    if (!rowValues) {
+      throw new KyselyTransformError(
+        `Unsupported insert row node: ${firstRow.kind}`,
+        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+        { nodeKind: firstRow.kind },
+      );
+    }
+
+    for (let index = 0; index < node.columns.length; index++) {
+      const columnNode = node.columns[index];
+      const columnName = getColumnName(columnNode);
+      if (!columnName) {
         throw new KyselyTransformError(
-          `Unsupported insert row node: ${firstRow.kind}`,
-          KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-          { nodeKind: firstRow.kind },
+          'Could not resolve INSERT column name',
+          KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
         );
       }
 
-      for (let index = 0; index < node.columns.length; index++) {
-        const columnNode = node.columns[index];
-        const columnName = getColumnName(columnNode);
-        if (!columnName) {
-          throw new KyselyTransformError(
-            'Could not resolve INSERT column name',
-            KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
-          );
-        }
-
-        const valueNode = rowValues[index];
-        if (valueNode === undefined) {
-          continue;
-        }
-
-        validateColumn(ctx.contract, tableRef.name, columnName);
-        ctx.refsTables.add(tableRef.name);
-        ctx.refsColumns.set(`${tableRef.name}.${columnName}`, {
-          table: tableRef.name,
-          column: columnName,
-        });
-
-        const transformed = transformValue(valueNode, ctx, {
-          table: tableRef.name,
-          column: columnName,
-        });
-        valuesRecord[columnName] = assertParamRef(transformed);
+      const valueNode = rowValues[index];
+      if (valueNode === undefined) {
+        continue;
       }
+
+      validateColumn(ctx.contract, tableRef.name, columnName);
+      ctx.refsTables.add(tableRef.name);
+      ctx.refsColumns.set(`${tableRef.name}.${columnName}`, {
+        table: tableRef.name,
+        column: columnName,
+      });
+
+      const transformed = transformValue(valueNode, ctx, {
+        table: tableRef.name,
+        column: columnName,
+      });
+      valuesRecord[columnName] = assertParamRef(transformed);
     }
   }
 

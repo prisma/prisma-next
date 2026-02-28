@@ -110,9 +110,7 @@ export function getTableName(node: unknown): string | undefined {
     if (node.table) {
       return getTableName(node.table);
     }
-    // Backward-compatible fallback for legacy compiled-query shapes.
-    const legacyColumnTable = (node as { column?: { table?: OperationNode } }).column?.table;
-    return legacyColumnTable ? getTableName(legacyColumnTable) : undefined;
+    return undefined;
   }
 
   if (TableNode.is(node)) {

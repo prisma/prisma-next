@@ -12,6 +12,7 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import {
   AndNode,
+  BinaryOperationNode,
   type OperationNode,
   OperatorNode,
   OrderByItemNode,
@@ -23,7 +24,7 @@ import {
   ValueNode,
 } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
-import { hasKind, isOperationNode, parseOrderByDirection } from './kysely-ast-types';
+import { isOperationNode, parseOrderByDirection } from './kysely-ast-types';
 import { addParamDescriptor, nextParamIndex, type TransformContext } from './transform-context';
 import { resolveColumnRef } from './transform-validate';
 
@@ -105,54 +106,15 @@ function flattenLogical(
   out: WhereExpr[],
 ): void {
   const current = ParensNode.is(node) ? node.node : node;
-  const getLegacyLogicalSides = (
-    candidate: OperationNode,
-  ): { left?: OperationNode; right?: OperationNode; exprs?: OperationNode[] } =>
-    candidate as {
-      left?: OperationNode;
-      right?: OperationNode;
-      exprs?: OperationNode[];
-    };
-
-  if (logicalKind === 'and' && hasKind(current, 'AndNode')) {
-    const legacyLogicalNode = getLegacyLogicalSides(current);
-    const exprs = legacyLogicalNode.exprs;
-    if (exprs && exprs.length > 0) {
-      for (const expr of exprs) {
-        flattenLogical(expr, logicalKind, ctx, defaultTable, out);
-      }
-      return;
-    }
-    if (!legacyLogicalNode.left || !legacyLogicalNode.right) {
-      throw new KyselyTransformError(
-        `Malformed ${logicalKind} node: missing left or right operand`,
-        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-        { nodeKind: current.kind },
-      );
-    }
-    flattenLogical(legacyLogicalNode.left, logicalKind, ctx, defaultTable, out);
-    flattenLogical(legacyLogicalNode.right, logicalKind, ctx, defaultTable, out);
+  if (logicalKind === 'and' && AndNode.is(current)) {
+    flattenLogical(current.left, logicalKind, ctx, defaultTable, out);
+    flattenLogical(current.right, logicalKind, ctx, defaultTable, out);
     return;
   }
 
-  if (logicalKind === 'or' && hasKind(current, 'OrNode')) {
-    const legacyLogicalNode = getLegacyLogicalSides(current);
-    const exprs = legacyLogicalNode.exprs;
-    if (exprs && exprs.length > 0) {
-      for (const expr of exprs) {
-        flattenLogical(expr, logicalKind, ctx, defaultTable, out);
-      }
-      return;
-    }
-    if (!legacyLogicalNode.left || !legacyLogicalNode.right) {
-      throw new KyselyTransformError(
-        `Malformed ${logicalKind} node: missing left or right operand`,
-        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-        { nodeKind: current.kind },
-      );
-    }
-    flattenLogical(legacyLogicalNode.left, logicalKind, ctx, defaultTable, out);
-    flattenLogical(legacyLogicalNode.right, logicalKind, ctx, defaultTable, out);
+  if (logicalKind === 'or' && OrNode.is(current)) {
+    flattenLogical(current.left, logicalKind, ctx, defaultTable, out);
+    flattenLogical(current.right, logicalKind, ctx, defaultTable, out);
     return;
   }
 
@@ -222,17 +184,11 @@ export function transformWhereExpr(
     return { kind: 'or', exprs };
   }
 
-  if (!hasKind(node, 'BinaryOperationNode')) {
+  if (!BinaryOperationNode.is(node)) {
     return undefined;
   }
 
-  const binaryNode = node as OperationNode & {
-    operator?: unknown;
-    leftOperand?: OperationNode;
-    rightOperand?: OperationNode;
-    left?: OperationNode;
-    right?: OperationNode;
-  };
+  const binaryNode = node;
   const operatorString = getOperatorFromNode(binaryNode.operator);
   const operator = operatorString ? mapOperator(operatorString) : undefined;
   if (!operator) {
@@ -243,12 +199,8 @@ export function transformWhereExpr(
     );
   }
 
-  const leftNode = binaryNode.leftOperand ?? binaryNode.left;
-  const rightNode = binaryNode.rightOperand ?? binaryNode.right;
-
-  if (!leftNode || !rightNode) {
-    return undefined;
-  }
+  const leftNode = binaryNode.leftOperand;
+  const rightNode = binaryNode.rightOperand;
 
   if (!ReferenceNode.is(leftNode)) {
     throw new KyselyTransformError(

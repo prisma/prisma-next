@@ -51,28 +51,34 @@ function createSelectWithWhereCompiledQuery(): CompiledQuery<{ id: string }> {
           kind: 'SelectionNode',
           selection: {
             kind: 'ReferenceNode',
+            table: {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
             column: {
               kind: 'ColumnNode',
               column: { kind: 'IdentifierNode', name: 'id' },
-              table: { kind: 'IdentifierNode', name: 'user' },
             },
           },
         },
       ],
       where: {
         kind: 'WhereNode',
-        node: {
+        where: {
           kind: 'BinaryOperationNode',
-          left: {
+          leftOperand: {
             kind: 'ReferenceNode',
+            table: {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
             column: {
               kind: 'ColumnNode',
               column: { kind: 'IdentifierNode', name: 'kind' },
-              table: { kind: 'IdentifierNode', name: 'user' },
             },
           },
           operator: { kind: 'OperatorNode', operator: '=' },
-          right: { kind: 'ValueNode', value: 'admin' },
+          rightOperand: { kind: 'ValueNode', value: 'admin' },
         },
       },
     },
@@ -100,10 +106,13 @@ function createSelectWithoutWhereCompiledQuery(): CompiledQuery<{ id: string }> 
           kind: 'SelectionNode',
           selection: {
             kind: 'ReferenceNode',
+            table: {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
             column: {
               kind: 'ColumnNode',
               column: { kind: 'IdentifierNode', name: 'id' },
-              table: { kind: 'IdentifierNode', name: 'user' },
             },
           },
         },

@@ -60,10 +60,13 @@ function createSelectCompiledQuery(): CompiledQuery<{ id: string; email: string 
           kind: 'SelectionNode',
           selection: {
             kind: 'ReferenceNode',
+            table: {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
             column: {
               kind: 'ColumnNode',
               column: { kind: 'IdentifierNode', name: 'id' },
-              table: { kind: 'IdentifierNode', name: 'user' },
             },
           },
         },
@@ -71,10 +74,13 @@ function createSelectCompiledQuery(): CompiledQuery<{ id: string; email: string 
           kind: 'SelectionNode',
           selection: {
             kind: 'ReferenceNode',
+            table: {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
             column: {
               kind: 'ColumnNode',
               column: { kind: 'IdentifierNode', name: 'id' },
-              table: { kind: 'IdentifierNode', name: 'user' },
             },
           },
         },
@@ -82,28 +88,34 @@ function createSelectCompiledQuery(): CompiledQuery<{ id: string; email: string 
           kind: 'SelectionNode',
           selection: {
             kind: 'ReferenceNode',
+            table: {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
             column: {
               kind: 'ColumnNode',
               column: { kind: 'IdentifierNode', name: 'email' },
-              table: { kind: 'IdentifierNode', name: 'user' },
             },
           },
         },
       ],
       where: {
         kind: 'WhereNode',
-        node: {
+        where: {
           kind: 'BinaryOperationNode',
-          left: {
+          leftOperand: {
             kind: 'ReferenceNode',
+            table: {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
             column: {
               kind: 'ColumnNode',
               column: { kind: 'IdentifierNode', name: 'id' },
-              table: { kind: 'IdentifierNode', name: 'user' },
             },
           },
           operator: { kind: 'OperatorNode', operator: '=' },
-          right: { kind: 'ValueNode', value: 'u1' },
+          rightOperand: { kind: 'ValueNode', value: 'u1' },
         },
       },
     },
@@ -149,23 +161,29 @@ describe('buildKyselyPlan', () => {
             table: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'post' } },
             on: {
               kind: 'OnNode',
-              node: {
+              on: {
                 kind: 'BinaryOperationNode',
-                left: {
+                leftOperand: {
                   kind: 'ReferenceNode',
+                  table: {
+                    kind: 'TableNode',
+                    table: { kind: 'IdentifierNode', name: 'user' },
+                  },
                   column: {
                     kind: 'ColumnNode',
                     column: { kind: 'IdentifierNode', name: 'id' },
-                    table: { kind: 'IdentifierNode', name: 'user' },
                   },
                 },
                 operator: { kind: 'OperatorNode', operator: '=' },
-                right: {
+                rightOperand: {
                   kind: 'ReferenceNode',
+                  table: {
+                    kind: 'TableNode',
+                    table: { kind: 'IdentifierNode', name: 'post' },
+                  },
                   column: {
                     kind: 'ColumnNode',
                     column: { kind: 'IdentifierNode', name: 'userId' },
-                    table: { kind: 'IdentifierNode', name: 'post' },
                   },
                 },
               },
@@ -177,10 +195,13 @@ describe('buildKyselyPlan', () => {
             kind: 'SelectionNode',
             selection: {
               kind: 'ReferenceNode',
+              table: {
+                kind: 'TableNode',
+                table: { kind: 'IdentifierNode', name: 'user' },
+              },
               column: {
                 kind: 'ColumnNode',
                 column: { kind: 'IdentifierNode', name: 'email' },
-                table: { kind: 'IdentifierNode', name: 'user' },
               },
             },
           },
@@ -188,10 +209,13 @@ describe('buildKyselyPlan', () => {
             kind: 'SelectionNode',
             selection: {
               kind: 'ReferenceNode',
+              table: {
+                kind: 'TableNode',
+                table: { kind: 'IdentifierNode', name: 'post' },
+              },
               column: {
                 kind: 'ColumnNode',
                 column: { kind: 'IdentifierNode', name: 'id' },
-                table: { kind: 'IdentifierNode', name: 'post' },
               },
             },
           },
