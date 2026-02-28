@@ -13,7 +13,7 @@ This package provides the build-only logic for the Kysely lane: transforming Kys
 - **Guardrails**: Pre-transform validation for multi-table scope (qualified refs, unambiguous selectAll)
 - **Plan assembly**: Build `SqlQueryPlan` with stable refs/param descriptors and redacted SQL annotation metadata
 - **Lane client surface**: Build-only Kysely lane (`build`, `whereExpr`, `redactedSql`) plus execution backstop dialect plumbing
-- **Error codes**: Stable `KyselyTransformError` with codes for unsupported nodes, invalid refs, and contract validation
+- **Error codes**: Stable `KyselyTransformError` with codes for unsupported nodes, invalid refs, parameter mismatch, and contract validation
 
 ## Dependencies
 
