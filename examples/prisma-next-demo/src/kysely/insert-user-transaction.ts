@@ -3,32 +3,26 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 
 export async function insertUserTransaction(runtime: Runtime) {
+  const kysely = db.kysely;
   const userId = generateId({ id: 'uuidv4' });
   const connection = await runtime.connection();
 
   try {
-    await connection
-      .execute(
-        db.kysely.build(
-          db.kysely.insertInto('user').values({
-            id: userId,
-            kind: 'user',
-            email: 'jane@doe.com',
-            createdAt: new Date().toISOString(),
-          }),
-        ),
-      )
-      .toArray();
+    const query = kysely.insertInto('user').values({
+      id: userId,
+      kind: 'user',
+      email: 'jane@doe.com',
+      createdAt: new Date().toISOString(),
+    });
+    await connection.execute(kysely.build(query)).toArray();
 
     const transaction = await connection.transaction();
     try {
-      await transaction
-        .execute(
-          db.kysely.build(
-            db.kysely.updateTable('user').set({ email: 'john@doe.com' }).where('id', '=', userId),
-          ),
-        )
-        .toArray();
+      const query = kysely
+        .updateTable('user')
+        .set({ email: 'john@doe.com' })
+        .where('id', '=', userId);
+      await transaction.execute(kysely.build(query)).toArray();
 
       throw new Error('Simulated error to trigger rollback');
     } catch (err: unknown) {
@@ -41,8 +35,7 @@ export async function insertUserTransaction(runtime: Runtime) {
     await connection.release();
   }
 
-  const rows = await runtime
-    .execute(db.kysely.build(db.kysely.selectFrom('user').selectAll().where('id', '=', userId)))
-    .toArray();
+  const query = kysely.selectFrom('user').selectAll().where('id', '=', userId);
+  const rows = await runtime.execute(kysely.build(query)).toArray();
   return rows[0] ?? null;
 }
