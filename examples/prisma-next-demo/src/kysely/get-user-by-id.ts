@@ -1,5 +1,6 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
+import { firstOrThrow } from './result-utils';
 
 export async function getUserById(userId: string, runtime: Runtime) {
   const kysely = db.kysely;
@@ -10,10 +11,5 @@ export async function getUserById(userId: string, runtime: Runtime) {
     .where('id', '=', userId)
     .limit(1);
 
-  const rows = await runtime.execute(kysely.build(query)).toArray();
-  const user = rows[0];
-  if (!user) {
-    throw new Error('Expected at least one row');
-  }
-  return user;
+  return firstOrThrow(runtime.execute(kysely.build(query)));
 }

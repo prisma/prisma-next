@@ -1,6 +1,7 @@
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
+import { firstOrNull } from './result-utils';
 
 export async function insertUserTransaction(runtime: Runtime) {
   const kysely = db.kysely;
@@ -39,7 +40,5 @@ export async function insertUserTransaction(runtime: Runtime) {
   }
 
   const query = kysely.selectFrom('user').selectAll().where('id', '=', userId);
-
-  const rows = await runtime.execute(kysely.build(query)).toArray();
-  return rows[0] ?? null;
+  return firstOrNull(runtime.execute(kysely.build(query)));
 }
