@@ -42,7 +42,7 @@ describe('raw compiled query execution', () => {
     const contract = {
       ...baseContract,
       profileHash: 'profile-hash',
-    } as ContractBase;
+    } as unknown as ContractBase;
 
     executeCompiledQuery(
       executor,
