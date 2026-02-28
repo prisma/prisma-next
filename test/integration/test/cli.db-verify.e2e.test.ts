@@ -3,6 +3,7 @@ import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
+import { typescriptContract } from '@prisma-next/cli/config-types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   ensureSchemaStatement,
@@ -11,7 +12,6 @@ import {
 } from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { ok } from '@prisma-next/utils/result';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   executeCommand,
@@ -438,10 +438,7 @@ withTempDir(({ createTempDir }) => {
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             // driver is missing - this is what we're testing
             extensionPacks: [],
-            contract: {
-              source: async () => ok(contract),
-              output: 'output/contract.json',
-            },
+            contract: typescriptContract(contract, 'output/contract.json'),
             db: {
               connection: connectionString,
             },

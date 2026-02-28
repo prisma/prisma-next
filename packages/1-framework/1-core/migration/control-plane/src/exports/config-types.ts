@@ -5,6 +5,8 @@ export type {
   ContractSourceDiagnosticSpan,
   ContractSourceDiagnostics,
   ContractSourceProvider,
+  PrismaContractResolver,
+  PrismaContractResolverInput,
   PrismaNextConfig,
 } from '../config-types';
-export { defineConfig } from '../config-types';
+export { defineConfig, prismaContract, typescriptContract } from '../config-types';

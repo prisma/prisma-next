@@ -1,9 +1,8 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { defineConfig } from '@prisma-next/cli/config-types';
+import { defineConfig, typescriptContract } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
-import { ok } from '@prisma-next/utils/result';
 import { contract } from './contract';
 
 // This config uses postgres target but we'll manually modify the emitted contract
@@ -14,10 +13,7 @@ export default defineConfig({
   adapter: postgresAdapter,
   driver: postgresDriver,
   extensions: [],
-  contract: {
-    source: async () => ok(contract),
-    output: 'output/contract.json',
-  },
+  contract: typescriptContract(contract, 'output/contract.json'),
   db: {
     connection: '{{DB_URL}}',
   },

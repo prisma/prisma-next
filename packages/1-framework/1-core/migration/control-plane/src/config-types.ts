@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { Result } from '@prisma-next/utils/result';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { type } from 'arktype';
 import type {
   ControlAdapterDescriptor,
@@ -42,6 +44,18 @@ export interface ContractSourceDiagnostics {
 
 export type ContractSourceProvider = () => Promise<Result<ContractIR, ContractSourceDiagnostics>>;
 
+export type PrismaContractResolverInput = {
+  readonly schema: string;
+  readonly schemaPath: string;
+  readonly absoluteSchemaPath: string;
+};
+
+export type PrismaContractResolver = (
+  input: PrismaContractResolverInput,
+) =>
+  | Result<ContractIR, ContractSourceDiagnostics>
+  | Promise<Result<ContractIR, ContractSourceDiagnostics>>;
+
 /**
  * Contract configuration specifying source and artifact locations.
  */
@@ -56,6 +70,48 @@ export interface ContractConfig {
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
    */
   readonly output?: string;
+}
+
+export function typescriptContract(contractIR: ContractIR, output?: string): ContractConfig {
+  return {
+    source: async () => ok(contractIR),
+    ...(output ? { output } : {}),
+  };
+}
+
+export function prismaContract(
+  schemaPath: string,
+  resolver: PrismaContractResolver,
+  output?: string,
+): ContractConfig {
+  return {
+    source: async () => {
+      const absoluteSchemaPath = resolve(schemaPath);
+      let schema: string;
+      try {
+        schema = await readFile(absoluteSchemaPath, 'utf-8');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return notOk({
+          summary: `Failed to read Prisma schema at "${schemaPath}"`,
+          diagnostics: [
+            {
+              code: 'PSL_SCHEMA_READ_FAILED',
+              message,
+              sourceId: schemaPath,
+            },
+          ],
+          meta: { schemaPath, absoluteSchemaPath, cause: message },
+        });
+      }
+      return await resolver({
+        schema,
+        schemaPath,
+        absoluteSchemaPath,
+      });
+    },
+    ...(output ? { output } : {}),
+  };
 }
 
 /**

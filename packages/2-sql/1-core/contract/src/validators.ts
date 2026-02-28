@@ -169,6 +169,7 @@ const SqlContractSchema = type({
   storageHash: 'string',
   'executionHash?': 'string',
   'profileHash?': 'string',
+  '_generated?': 'Record<string, unknown>',
   'capabilities?': 'Record<string, Record<string, boolean>>',
   'extensionPacks?': 'Record<string, unknown>',
   'meta?': ContractMetaSchema,

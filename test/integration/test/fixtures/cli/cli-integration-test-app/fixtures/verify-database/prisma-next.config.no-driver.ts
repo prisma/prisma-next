@@ -1,8 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { defineConfig } from '@prisma-next/cli/config-types';
+import { defineConfig, typescriptContract } from '@prisma-next/cli/config-types';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
-import { ok } from '@prisma-next/utils/result';
 import { contract } from './contract';
 
 // This config includes db.connection and family with readMarker but no driver
@@ -11,10 +10,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   extensions: [],
-  contract: {
-    source: async () => ok(contract),
-    output: 'output/contract.json',
-  },
+  contract: typescriptContract(contract, 'output/contract.json'),
   db: {
     connection: '{{DB_URL}}', // Placeholder to be replaced in tests
   },
