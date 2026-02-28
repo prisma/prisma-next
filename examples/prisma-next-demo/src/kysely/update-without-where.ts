@@ -1,5 +1,5 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { kysely } from '../prisma/db';
+import { db } from '../prisma/db';
 
 /**
  * Guardrail-proving query: UPDATE without WHERE.
@@ -7,7 +7,7 @@ import { kysely } from '../prisma/db';
  * Used to validate that LINT.UPDATE_WITHOUT_WHERE is enforced.
  */
 export async function updateWithoutWhere(runtime: Runtime) {
-  const query = kysely.updateTable('user').set({ email: 'unsafe@example.com' });
+  const query = db.kysely.updateTable('user').set({ email: 'unsafe@example.com' });
 
-  await runtime.execute(kysely.build(query)).toArray();
+  await runtime.execute(db.kysely.build(query)).toArray();
 }
