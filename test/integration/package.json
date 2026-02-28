@@ -26,6 +26,7 @@
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/integration-kysely": "workspace:*",
     "@prisma-next/operations": "workspace:*",
+    "@prisma-next/postgres": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",

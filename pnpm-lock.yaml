@@ -1781,6 +1781,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/shared/operations
+      '@prisma-next/postgres':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/postgres
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../packages/2-sql/1-core/contract
