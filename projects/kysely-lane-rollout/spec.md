@@ -85,8 +85,6 @@ This project coordinates:
 - [x] Public Postgres client surface provides a build-only `db.kysely` (no runtime argument) per the Phase 2 spec.
 - [x] Unsupported Kysely kinds fail fast in runtime attachment paths with a stable structured error envelope (no raw fallback execution).
 - [x] `@prisma-next/postgres` does not expose any execution-capable public Kysely API.
-- [x] Runtime-attached paths fail fast on unsupported Kysely kinds with stable structured errors (no raw fallback).
-- [x] `@prisma-next/postgres` does not expose an execution-capable public Kysely API.
 
 ## Phase 3 (optional)
 

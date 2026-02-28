@@ -145,6 +145,9 @@ function expressionContainsParamRef(expr: Expression): boolean {
   if (expr.kind !== 'operation') {
     return false;
   }
+  if (expressionContainsParamRef(expr.self)) {
+    return true;
+  }
   return expr.args.some((arg) => {
     if (arg.kind === 'param') {
       return true;
@@ -277,6 +280,7 @@ function replaceParamsInExpression(expr: Expression, params: readonly unknown[])
   }
   return {
     ...expr,
+    self: replaceParamsInExpression(expr.self, params),
     args: expr.args.map((arg) => {
       if (arg.kind === 'param') {
         return paramRefToLiteral(arg, params);
@@ -286,7 +290,7 @@ function replaceParamsInExpression(expr: Expression, params: readonly unknown[])
       }
       return replaceParamsInExpression(arg, params);
     }),
-  } as OperationExpr;
+  };
 }
 
 function replaceParamsInComparable(
@@ -356,6 +360,7 @@ function collectParamRefIndexes(expr: WhereExpr): number[] {
     if (value.kind !== 'operation') {
       return;
     }
+    visitExpression(value.self);
     for (const arg of value.args) {
       if (arg.kind === 'param') {
         indexes.push(arg.index);
