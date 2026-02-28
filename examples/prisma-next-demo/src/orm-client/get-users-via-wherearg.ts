@@ -8,10 +8,10 @@ export async function ormClientGetUsersViaWhereArg(
   runtime: Runtime,
 ) {
   const orm = createOrmClient(runtime);
+  const kysely = db.kysely;
+
   return orm.users
-    .where(
-      db.kysely.build(db.kysely.selectFrom('user').select('id').where('kind', '=', kind).limit(1)),
-    )
+    .where(kysely.build(kysely.selectFrom('user').select('id').where('kind', '=', kind).limit(1)))
     .take(limit)
     .all();
 }
