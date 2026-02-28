@@ -1,55 +1,59 @@
 # @prisma-next/sql-kysely-lane
 
-Kysely AST transform and guardrails for the Prisma Next SQL lane.
+The **Prisma Next Kysely lane** lets you write low-level SQL using the **Kysely query DSL**, then have it interpreted and executed by the **Prisma Next runtime**.
 
-## Overview
+This is the “drop down a level” API you use when the high-level **SQL ORM client** isn’t a good fit—e.g. you need to:
 
-This package provides the build-only logic for the Kysely lane: transforming Kysely compiled query AST into Prisma Next SQL `QueryAst`, running pre-transform guardrails, and assembling build-only `SqlQueryPlan` metadata. It does not depend on `@prisma-next/sql-runtime`.
+- performance-tune a query
+- use a SQL feature the ORM client doesn’t expose yet
+- express a shape that’s awkward at the ORM layer
 
-## Responsibilities
+For high-level queries, use `@prisma-next/sql-orm-client`.
 
-- **Transform**: Convert Kysely `compiledQuery` AST (SelectQueryNode, InsertQueryNode, UpdateQueryNode, DeleteQueryNode) into PN SQL AST (`QueryAst`)
-- **Guardrails**: Pre-transform validation for multi-table scope (qualified refs, unambiguous selectAll)
-- **Plan assembly**: Build `SqlQueryPlan` with stable refs/param descriptors and redacted SQL annotation metadata
-- **Error codes**: Stable `KyselyTransformError` with codes for unsupported nodes, invalid refs, and contract validation
+## How it works (in one minute)
 
-## Dependencies
+You:
 
-- `@prisma-next/contract` — PlanRefs, ParamDescriptor
-- `@prisma-next/sql-contract` — SqlContract, SqlStorage
-- `@prisma-next/sql-relational-core` — AST types (SelectAst, InsertAst, etc.)
-- `@prisma-next/utils` — ifDefined
+1. write a query in Kysely
+2. build a Prisma Next plan from that query
+3. execute the plan via runtime
 
-## Exports
+## Examples
 
-- `transformKyselyToPnAst(contract, query, parameters)` — Main transform entry point
-- `runGuardrails(contract, query)` — Pre-transform validation for SelectQueryNode
-- `buildKyselyPlan(contract, compiledQuery)` — Build-only plan assembly entry point
-- `REDACTED_SQL` — Canonical SQL redaction marker used by the lane
-- `KyselyTransformError`, `KYSELY_TRANSFORM_ERROR_CODES` — Error types
-- `TransformResult` — Result type (ast + metaAdditions)
+### Example: select users
 
-## Architecture
+```ts
+const kysely = db.kysely;
 
-```mermaid
-flowchart LR
-  Kysely[Kysely compiledQuery] --> Build[buildKyselyPlan]
-  Build --> Guardrails[runGuardrails]
-  Build --> Transform[transformKyselyToPnAst]
-  Transform --> AST[QueryAst]
-  Build --> Plan[SqlQueryPlan + meta annotations]
-  AST --> Plan
-  Plan --> Consumer[integration-kysely or build-only callers]
+const query = kysely
+  .selectFrom('user')
+  .select(['id', 'email', 'createdAt'])
+  .limit(10);
+
+const rows = await runtime.execute(kysely.build(query));
 ```
 
-The lane package is build-only: it produces AST and plan metadata. SQL lowering and physical execution live in runtime packages.
+### Example: insert + return one row
 
-## Related Packages
+```ts
+import { firstOrNull } from './kysely/result-utils';
 
-- `@prisma-next/integration-kysely` — Consumes this package for Kysely dialect connection planning
-- `@prisma-next/sql-relational-core` — Provides AST types used by the transformer
+const kysely = db.kysely;
 
-## Related Subsystems
+const query = kysely
+  .insertInto('user')
+  .values({
+    id: 'user_001',
+    email: 'alice@example.com',
+    kind: 'user',
+    createdAt: new Date().toISOString(),
+  })
+  .returning(['id', 'email']);
+
+const inserted = await firstOrNull(runtime.execute(kysely.build(query)));
+```
+
+## Links
 
 - [Query Lanes](/docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)
 - [ADR 160 - Kysely lane emits PN SQL AST](/docs/architecture%20docs/adrs/ADR%20160%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md)
