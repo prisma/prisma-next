@@ -154,4 +154,5 @@ Integration tests that depend on both `sql-contract-ts` and `sql-query` are loca
 
 - `@prisma-next/contract-authoring` - Target-agnostic builder core that this package composes
 - `@prisma-next/sql-contract-psl` - PSL parser-output to SQL `ContractIR` interpreter for provider-based flows
+- `@prisma-next/sql-contract-psl/provider` - SQL PSL-first `prismaContract()` helper (read -> parse -> interpret)
 

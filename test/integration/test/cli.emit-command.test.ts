@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
+import { loadConfig } from '@prisma-next/cli/config-loader';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -537,25 +538,57 @@ describe('emit command', () => {
           join(testDirPsl, 'schema.prisma'),
           `model Post {
   id Int @id
+  tags String[]
 }
 `,
           'utf-8',
         );
 
+        const providerConfig = await loadConfig(join(testDirPsl, 'prisma-next.config.ts'));
+        if (!providerConfig.contract) {
+          throw new Error('Config.contract is required for provider diagnostics test');
+        }
+
         const originalCwd = process.cwd();
+        let sourceResult: Awaited<ReturnType<typeof providerConfig.contract.source>>;
+        try {
+          process.chdir(testDirPsl);
+          sourceResult = await providerConfig.contract.source();
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        expect(sourceResult.ok).toBe(false);
+        if (sourceResult.ok) {
+          throw new Error('Expected source provider to fail for unsupported list field');
+        }
+        expect(sourceResult.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+        expect(sourceResult.failure.diagnostics).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              code: 'PSL_UNSUPPORTED_FIELD_LIST',
+              sourceId: './schema.prisma',
+              span: expect.objectContaining({
+                start: expect.objectContaining({ line: 3 }),
+              }),
+            }),
+          ]),
+        );
+
+        const commandCwd = process.cwd();
         try {
           process.chdir(testDirPsl);
           await expect(
             executeCommand(command, ['--config', 'prisma-next.config.ts']),
           ).rejects.toThrow();
         } finally {
-          process.chdir(originalCwd);
+          process.chdir(commandCwd);
         }
 
         const errorOutput = consoleErrors.join('\n');
-        expect(errorOutput).toContain('PSL provider failed');
-        expect(errorOutput).toContain('PSL_INVALID_MODEL');
-        expect(errorOutput).toContain('Expected model User in schema');
+        expect(errorOutput).toContain('PSL to SQL Contract IR normalization failed');
+        expect(errorOutput).toContain('PSL_UNSUPPORTED_FIELD_LIST');
+        expect(errorOutput).toContain('schema.prisma');
       } finally {
         cleanupPsl();
       }
