@@ -1,6 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/provider';
 
@@ -80,6 +81,36 @@ describe('prismaContract provider helper', () => {
         }),
       ]),
     );
+  });
+
+  it('passes explicit target configuration to interpreter', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+    tempDirs.push(tempDir);
+    const schemaPath = join(tempDir, 'schema.prisma');
+    await writeFile(
+      schemaPath,
+      `model User {
+  id Int @id
+  email String
+}
+`,
+      'utf-8',
+    );
+    const target: TargetPackRef<'sql', 'postgres'> = {
+      kind: 'target',
+      familyId: 'sql',
+      targetId: 'postgres',
+      id: 'postgres-custom',
+      version: '1.0.0-test',
+      capabilities: { returning: true },
+    };
+
+    process.chdir(tempDir);
+    const contract = prismaContract('./schema.prisma', { target });
+    const result = await contract.source();
+
+    expect(contract.output).toBeUndefined();
+    expect(result.ok).toBe(true);
   });
 
   it('returns PSL_SCHEMA_READ_FAILED diagnostics when schema file is missing', async () => {

@@ -42,6 +42,122 @@ describe('interpretPslDocumentToSqlContractIR', () => {
     });
   });
 
+  it('maps enums, named types, defaults, indexes, and foreign keys', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Email = String
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id Int @id @default(autoincrement())
+  email Email @unique
+  role Role
+  createdAt DateTime @default(now())
+  isActive Boolean @default(true)
+  nickname String?
+}
+
+model Post {
+  id Int @id
+  userId Int
+  title String
+  author User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: SetNull)
+  @@index([userId])
+  @@unique([title, userId])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      types: {
+        Email: { codecId: 'pg/text@1', nativeType: 'text' },
+        Role: { codecId: 'pg/enum@1', nativeType: 'role' },
+      },
+      tables: {
+        user: {
+          columns: {
+            id: {
+              default: { kind: 'function', expression: 'autoincrement()' },
+            },
+            createdAt: {
+              default: { kind: 'function', expression: 'now()' },
+            },
+            isActive: {
+              default: { kind: 'literal', value: true },
+            },
+            nickname: {
+              nullable: true,
+            },
+          },
+        },
+        post: {
+          uniques: [{ columns: ['title', 'userId'] }],
+          indexes: [{ columns: ['userId'] }],
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              references: {
+                table: 'user',
+                columns: ['id'],
+              },
+              onDelete: 'cascade',
+              onUpdate: 'setNull',
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it('returns diagnostics for unsupported named types, field lists, missing keys, and invalid relation targets', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  DisplayName = String @db.VarChar(191)
+  Weird = Unsupported
+}
+
+model Team {
+  name String
+}
+
+model User {
+  id Int @id
+  tags String[]
+  ghost Ghost @relation(fields: [ghostId], references: [id])
+  ghostId Int
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+      expect.arrayContaining([
+        'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTES',
+        'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
+        'PSL_MISSING_PRIMARY_KEY',
+        'PSL_UNSUPPORTED_FIELD_LIST',
+        'PSL_UNSUPPORTED_FIELD_TYPE',
+        'PSL_INVALID_RELATION_TARGET',
+      ]),
+    );
+  });
+
   it('returns diagnostics for unsupported list fields', () => {
     const document = parsePslDocument({
       schema: `model User {
