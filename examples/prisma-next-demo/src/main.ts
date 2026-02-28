@@ -87,10 +87,12 @@ const [cmd, ...args] = argv;
 async function main() {
   const { databaseUrl } = loadAppConfig();
   const runtime = await db.connect({ url: databaseUrl });
+
   try {
     if (cmd === 'users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await getUsers(runtime, limit);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'user') {
       const [userIdStr] = args;
@@ -99,6 +101,7 @@ async function main() {
         process.exit(1);
       }
       const user = await getUserById(userIdStr, runtime);
+
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'posts') {
       const [userIdStr] = args;
@@ -107,18 +110,22 @@ async function main() {
         process.exit(1);
       }
       const posts = await getUserPosts(userIdStr, runtime);
+
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'users-with-posts') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await getUsersWithPosts(runtime, limit);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await ormClientGetUsers(limit, runtime);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-admins') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await ormClientGetAdminUsers(limit, runtime);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-users-wherearg') {
       const [kind, limitStr] = args;
@@ -128,6 +135,7 @@ async function main() {
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const users = await ormClientGetUsersViaWhereArg(kind, limit, runtime);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-user') {
       const [email] = args;
@@ -136,6 +144,7 @@ async function main() {
         process.exit(1);
       }
       const user = await ormClientFindUserByEmail(email, runtime);
+
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'repo-posts') {
       const [userIdStr, limitStr] = args;
@@ -145,6 +154,7 @@ async function main() {
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const posts = await ormClientGetUserPosts(userIdStr, limit, runtime);
+
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'repo-dashboard') {
       const [emailDomain, postTitleTerm, limitStr, postsPerUserStr] = args;
@@ -163,6 +173,7 @@ async function main() {
         postsPerUser,
         runtime,
       );
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-post-feed') {
       const [postTitleTerm, limitStr] = args;
@@ -172,23 +183,28 @@ async function main() {
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const posts = await ormClientGetPostFeed(postTitleTerm, limit, runtime);
+
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'repo-users-cursor') {
       const [cursorStr, limitStr] = args;
       const cursor = cursorStr ?? null;
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const users = await ormClientGetUsersByIdCursor(cursor, limit, runtime);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-latest-per-kind') {
       const users = await ormClientGetLatestUserPerKind(runtime);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-user-insights') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await ormClientGetUserInsights(limit, runtime);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-kind-breakdown') {
       const minUsers = args[0] ? Number.parseInt(args[0], 10) : 1;
       const rows = await ormClientGetUserKindBreakdown(minUsers, runtime);
+
       console.log(JSON.stringify(rows, null, 2));
     } else if (cmd === 'repo-upsert-user') {
       const [id, email, kind] = args;
@@ -201,6 +217,7 @@ async function main() {
         process.exit(1);
       }
       const user = await ormClientUpsertUser({ id, email, kind }, runtime);
+
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'similarity-search') {
       const [queryVectorStr, limitStr] = args;
@@ -225,12 +242,14 @@ async function main() {
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const results = await similaritySearch(queryVector, runtime, limit);
+
       console.log(JSON.stringify(results, null, 2));
     } else if (cmd === 'users-paginate') {
       const [cursorStr, limitStr] = args;
       const cursor = cursorStr ?? null;
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const users = await ormGetUsersByIdCursor(cursor, limit, runtime);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'users-paginate-back') {
       const [cursorStr, limitStr] = args;
@@ -240,12 +259,15 @@ async function main() {
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const users = await ormGetUsersBackward(cursorStr, limit, runtime);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'budget-violation') {
       console.log('Running unbounded query to demonstrate budget violation...');
+
       console.log('This query has no LIMIT clause and will trigger BUDGET.ROWS_EXCEEDED error.\n');
       try {
         const result = await getAllPostsUnbounded(runtime);
+
         console.log(JSON.stringify(result, null, 2));
       } catch (error) {
         console.error('Budget violation caught:');
@@ -269,6 +291,7 @@ async function main() {
         process.exit(1);
       }
       const user = await getUserByIdKysely(userIdStr, runtime);
+
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'posts-kysely') {
       const [userIdStr] = args;
@@ -277,28 +300,35 @@ async function main() {
         process.exit(1);
       }
       const posts = await getUserPostsKysely(userIdStr, runtime);
+
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'users-kysely') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await getUsersKysely(runtime, limit);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'users-with-posts-kysely') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await getUsersWithPostsKysely(runtime, limit);
+
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'user-transaction-kysely') {
       const newUser = await insertUserTransactionKysely(runtime);
+
       console.log('Inserted user:', JSON.stringify(newUser, null, 2));
     } else if (cmd === 'dml-kysely') {
       const [op, ...opArgs] = args;
       if (op === 'insert' && opArgs[0]) {
         const inserted = await insertUserKysely(opArgs[0], runtime);
+
         console.log('Inserted:', JSON.stringify(inserted, null, 2));
       } else if (op === 'update' && opArgs[0] && opArgs[1]) {
         const updated = await updateUserKysely(opArgs[0], opArgs[1], runtime);
+
         console.log('Updated:', JSON.stringify(updated, null, 2));
       } else if (op === 'delete' && opArgs[0]) {
         const deleted = await deleteUserKysely(opArgs[0], runtime);
+
         console.log('Deleted:', JSON.stringify(deleted, null, 2));
       } else {
         console.error(
