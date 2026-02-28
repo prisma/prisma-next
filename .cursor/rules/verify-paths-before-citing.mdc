@@ -1,0 +1,12 @@
+---
+description: Verify file paths exist before citing them.
+---
+
+# Verify paths before citing them
+
+When writing review artifacts, walkthroughs, or answering “where is this?” questions:
+
+- Verify that a referenced file path actually exists in the current workspace/worktree before asserting it.
+- Prefer citing grep/search results (or a direct file read) over memory of earlier branch states.
+- If a path has moved, update all review artifacts that reference the old location in the same session.
+
