@@ -99,7 +99,7 @@ Provider (TS/PSL) → Contract IR → normalize → validate → canonicalize/ha
   - TS-first provider wraps the existing TS authoring surface.
   - PSL-first provider uses the PSL parser + normalization pipeline.
 - **PSL parsing (reusable package)**: implement PSL parsing as a standalone package so other tools can reuse it (language tooling, external tooling, etc.).
-  - **Decision:** build this in `packages/1-framework/2-authoring/contract-psl` (`@prisma-next/contract-psl`), which already exists as a placeholder.
+  - **Decision:** build this in `packages/1-framework/2-authoring/contract-psl` (`@prisma-next/psl-parser`), which already exists as a placeholder.
   - Output should preserve source spans so we can produce great diagnostics.
 - **Normalization**: convert that AST into the same normalized contract IR that TS-first ultimately produces.
 - **Validation**: reuse existing validators; add PSL-specific validation for mapping PSL concepts onto the existing IR.
@@ -175,7 +175,7 @@ Anything outside the supported set must fail with a strict, targeted error (not 
 Decisions already made:
 
 - **Config direction**: provider-based sources (pluggable providers returning `ContractIR` via `Result<>`), replacing the earlier discriminated union approach.
-- **PSL parser package**: implement as a reusable package (`@prisma-next/contract-psl`).
+- **PSL parser package**: implement as a reusable package (`@prisma-next/psl-parser`).
 - **Parity boundary**: enforce parity at the normalized contract IR boundary (and therefore on emitted `contract.json`).
 - **Both sources present**: allowed; the config chooses the source of truth.
 - **Initial conformance set**: models, scalars, required/optional, `@id`, `@unique`, `@@unique`, `@@index`, relations with `@relation(fields, references)`, referential actions, enums, defaults (`autoincrement()`, `now()`, literals), plus a small set of extension attributes where Prisma Next already has representation.

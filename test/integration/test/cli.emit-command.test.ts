@@ -521,6 +521,48 @@ describe('emit command', () => {
   );
 
   it(
+    'renders provider diagnostics when psl provider fails',
+    { timeout: timeouts.typeScriptCompilation },
+    async () => {
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.psl-source.ts',
+      );
+      const testDirPsl = testSetup.testDir;
+      const cleanupPsl = testSetup.cleanup;
+
+      try {
+        writeFileSync(
+          join(testDirPsl, 'schema.prisma'),
+          `model Post {
+  id Int @id
+}
+`,
+          'utf-8',
+        );
+
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDirPsl);
+          await expect(
+            executeCommand(command, ['--config', 'prisma-next.config.ts']),
+          ).rejects.toThrow();
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        const errorOutput = consoleErrors.join('\n');
+        expect(errorOutput).toContain('PSL provider failed');
+        expect(errorOutput).toContain('PSL_INVALID_MODEL');
+        expect(errorOutput).toContain('Expected model User in schema');
+      } finally {
+        cleanupPsl();
+      }
+    },
+  );
+
+  it(
     'throws error when contract config output is missing',
     { timeout: timeouts.typeScriptCompilation },
     async () => {

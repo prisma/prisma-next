@@ -34,14 +34,34 @@ interface ContractEmitOptions {
   readonly 'no-color'?: boolean;
 }
 
+function mapDiagnosticsToIssues(
+  failure: EmitFailure,
+): ReadonlyArray<{ kind: string; message: string }> {
+  const diagnostics = failure.diagnostics?.diagnostics ?? [];
+  return diagnostics.map((diagnostic) => {
+    const location =
+      diagnostic.sourceId && diagnostic.span
+        ? ` (${diagnostic.sourceId}:${diagnostic.span.start.line}:${diagnostic.span.start.column})`
+        : diagnostic.sourceId
+          ? ` (${diagnostic.sourceId})`
+          : '';
+    return {
+      kind: diagnostic.code,
+      message: `${diagnostic.message}${location}`,
+    };
+  });
+}
+
 /**
  * Maps an EmitFailure to a CliStructuredError for consistent error handling.
  */
 function mapEmitFailure(failure: EmitFailure): CliStructuredError {
   if (failure.code === 'CONTRACT_SOURCE_INVALID') {
+    const issues = mapDiagnosticsToIssues(failure);
     return errorRuntime(failure.summary, {
       why: failure.why ?? 'Contract source provider failed',
       fix: 'Check your contract source provider in prisma-next.config.ts and ensure it returns Result<ContractIR, Diagnostics>',
+      ...(issues.length > 0 ? { meta: { issues } } : {}),
     });
   }
 

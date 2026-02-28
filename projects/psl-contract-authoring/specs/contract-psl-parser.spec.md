@@ -1,6 +1,6 @@
 # Summary
 
-Implement a reusable PSL parser package (`@prisma-next/contract-psl`) that can parse Prisma schema files into an AST with source spans and produce strict, structured diagnostics.
+Implement a reusable PSL parser package (`@prisma-next/psl-parser`) that can parse Prisma schema files into an AST with source spans and produce strict, structured diagnostics.
 
 # Description
 
@@ -12,7 +12,7 @@ This milestone implements the parser API in `packages/1-framework/2-authoring/co
 
 ## Functional Requirements
 
-- Provide a parser API in `@prisma-next/contract-psl` that:
+- Provide a parser API in `@prisma-next/psl-parser` that:
   - Parses a PSL document (string + file path/identifier)
   - Returns an AST that retains source spans for relevant nodes
   - Returns structured diagnostics (stable error code + span + message)

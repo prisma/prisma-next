@@ -2,7 +2,7 @@
 
 ## Summary
 
-Build a reusable PSL parser in `@prisma-next/contract-psl` that parses Prisma schema text into a deterministic AST with source spans and stable diagnostics. This milestone establishes the parser boundary needed by PSL-first emit and future language tooling while enforcing strict errors for unsupported constructs.
+Build a reusable PSL parser in `@prisma-next/psl-parser` that parses Prisma schema text into a deterministic AST with source spans and stable diagnostics. This milestone establishes the parser boundary needed by PSL-first emit and future language tooling while enforcing strict errors for unsupported constructs.
 
 **Spec:** `projects/psl-contract-authoring/specs/contract-psl-parser.spec.md`
 
@@ -22,7 +22,7 @@ Deliver a public parser surface that accepts schema text plus source identifier 
 
 **Tasks:**
 
-- [x] Define parser AST, span, and diagnostic types in `@prisma-next/contract-psl`.
+- [x] Define parser AST, span, and diagnostic types in `@prisma-next/psl-parser`.
 - [x] Implement `parsePslDocument({ schema, sourceId })` returning deterministic node ordering and stable diagnostics ordering.
 - [x] Implement strict error behavior for unsupported constructs (no warning path).
 - [x] Add unit tests for parser success/failure and deterministic ordering.

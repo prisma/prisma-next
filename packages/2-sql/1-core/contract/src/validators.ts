@@ -37,13 +37,16 @@ export const ColumnDefaultFunctionSchema = type.declare<ColumnDefaultFunction>()
 export const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema);
 
 const ExecutionMutationDefaultValueSchema = type({
+  '+': 'reject',
   kind: generatorKindSchema,
   id: generatorIdSchema,
   'params?': 'Record<string, unknown>',
 });
 
 const ExecutionMutationDefaultSchema = type({
+  '+': 'reject',
   ref: {
+    '+': 'reject',
     table: 'string',
     column: 'string',
   },
@@ -52,12 +55,15 @@ const ExecutionMutationDefaultSchema = type({
 });
 
 const ExecutionSchema = type({
+  '+': 'reject',
   mutations: {
+    '+': 'reject',
     defaults: ExecutionMutationDefaultSchema.array().readonly(),
   },
 });
 
 const StorageColumnSchema = type({
+  '+': 'reject',
   nativeType: 'string',
   codecId: 'string',
   nullable: 'boolean',
@@ -112,6 +118,7 @@ export const ForeignKeySchema = type.declare<ForeignKey>().type({
 });
 
 const StorageTableSchema = type({
+  '+': 'reject',
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
   uniques: UniqueConstraintSchema.array().readonly(),
@@ -120,6 +127,7 @@ const StorageTableSchema = type({
 });
 
 const StorageSchema = type({
+  '+': 'reject',
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
@@ -138,17 +146,35 @@ const ModelSchema = type.declare<ModelDefinition>().type({
   relations: type({ '[string]': 'unknown' }),
 });
 
+const MappingsSchema = type({
+  '+': 'reject',
+  'modelToTable?': 'null | Record<string, string>',
+  'tableToModel?': 'null | Record<string, string>',
+  'fieldToColumn?': 'null | Record<string, Record<string, string>>',
+  'columnToField?': 'null | Record<string, Record<string, string>>',
+  'codecTypes?': 'null | Record<string, unknown>',
+  'operationTypes?': 'null | Record<string, Record<string, unknown>>',
+});
+
+const ContractMetaSchema = type({
+  '[string]': 'unknown',
+});
+
 const SqlContractSchema = type({
+  '+': 'reject',
   'schemaVersion?': "'1'",
   target: 'string',
   targetFamily: "'sql'",
+  'coreHash?': 'string',
   storageHash: 'string',
   'executionHash?': 'string',
   'profileHash?': 'string',
   'capabilities?': 'Record<string, Record<string, boolean>>',
   'extensionPacks?': 'Record<string, unknown>',
-  'meta?': 'Record<string, unknown>',
+  'meta?': ContractMetaSchema,
   'sources?': 'Record<string, unknown>',
+  'relations?': type({ '[string]': 'unknown' }),
+  'mappings?': MappingsSchema,
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
   'execution?': ExecutionSchema,

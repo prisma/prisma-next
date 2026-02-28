@@ -37,7 +37,7 @@ Make contract authoring sources pluggable by design. Instead of enumerating sour
   - No source-specific branching is required in the CLI/control plane
   - E2E conformance/parity coverage for provider-based emission boundaries
 
-### Milestone 2: Reusable PSL parser package (`@prisma-next/contract-psl`)
+### Milestone 2: Reusable PSL parser package (`@prisma-next/psl-parser`)
 
 Implement a reusable PSL parser library that can be consumed by emit tooling and other tools (language tooling, external tooling), and that retains source spans for diagnostics.
 

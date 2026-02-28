@@ -1,31 +1,44 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TargetFamilyHook, ValidationContext } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { type } from 'arktype';
 import { format } from 'prettier';
 import { canonicalizeContract } from './canonicalization';
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { EmitOptions, EmitResult } from './types';
 
-const PROVENANCE_KEYS = new Set(['sourceId', 'schemaPath', 'sources']);
+const CanonicalMetaSchema = type({
+  '[string]': 'unknown',
+});
 
-function assertNoProvenance(value: unknown, path: string[] = []): void {
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
-      assertNoProvenance(value[index], [...path, String(index)]);
-    }
-    return;
-  }
-  if (!value || typeof value !== 'object') {
-    return;
-  }
+const CanonicalContractSchema = type({
+  '+': 'reject',
+  schemaVersion: 'string',
+  targetFamily: 'string',
+  target: 'string',
+  models: type({ '[string]': 'unknown' }),
+  relations: type({ '[string]': 'unknown' }),
+  storage: type({ '[string]': 'unknown' }),
+  'execution?': type({ '[string]': 'unknown' }),
+  extensionPacks: type({ '[string]': 'unknown' }),
+  capabilities: type({
+    '[string]': type({
+      '[string]': 'boolean',
+    }),
+  }),
+  meta: CanonicalMetaSchema,
+});
 
-  for (const [key, entry] of Object.entries(value)) {
-    const isMetaSourceKey = key === 'source' && path[0] === 'meta';
-    if (PROVENANCE_KEYS.has(key) || isMetaSourceKey) {
-      const currentPath = [...path, key].join('.');
-      throw new Error(`ContractIR contains provenance key "${key}" at "${currentPath}"`);
-    }
-    assertNoProvenance(entry, [...path, key]);
+function assertCanonicalArtifactShape(value: unknown): void {
+  const result = CanonicalContractSchema(value);
+  if (result instanceof type.errors) {
+    const issues = result
+      .map((error) => {
+        const path = error.path?.toString() ?? '<root>';
+        return `${path}: ${error.message}`;
+      })
+      .join('; ');
+    throw new Error(`ContractIR canonical artifact validation failed: ${issues}`);
   }
 }
 
@@ -97,7 +110,7 @@ export async function emit(
     capabilities: ir.capabilities,
     meta: ir.meta,
   };
-  assertNoProvenance(canonicalContract);
+  assertCanonicalArtifactShape(canonicalContract);
 
   const storageHash = computeStorageHash(canonicalContract);
   const executionHash = canonicalContract.execution

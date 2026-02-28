@@ -593,7 +593,7 @@ describe('emitter', () => {
     expect(contractJson).not.toHaveProperty('sources');
   });
 
-  it('rejects provenance metadata in meta', async () => {
+  it('accepts meta keys when family validation allows them', async () => {
     const ir = createContractIR({
       meta: {
         sourceId: 'schema.prisma',
@@ -610,12 +610,13 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'ContractIR contains provenance key "sourceId" at "meta.sourceId"',
-    );
+    await expect(emit(ir, options, mockSqlHook)).resolves.toMatchObject({
+      contractJson: expect.any(String),
+      contractDts: expect.any(String),
+    });
   });
 
-  it('rejects provenance metadata in canonical sections', async () => {
+  it('accepts canonical section keys when family validation allows them', async () => {
     const ir = createContractIR({
       storage: {
         tables: {
@@ -641,9 +642,10 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'ContractIR contains provenance key "sourceId" at "storage.tables.user.columns.id.sourceId"',
-    );
+    await expect(emit(ir, options, mockSqlHook)).resolves.toMatchObject({
+      contractJson: expect.any(String),
+      contractDts: expect.any(String),
+    });
   });
 
   it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {
