@@ -132,7 +132,7 @@ No product analytics changes required. Development analytics are commit/test/CI 
 
 # Follow-ups (post-Phase-2)
 
-- Standardize execution-plane structured runtime error envelopes (PLAN.* helpers) at a low layer, then migrate `integration-kysely` off ad-hoc envelope construction (start with `PLAN.UNSUPPORTED`).
+- Standardize execution-plane structured runtime error envelopes (PLAN.* helpers) at a low layer, then migrate remaining runtime attachment call sites off ad-hoc envelope construction (start with `PLAN.UNSUPPORTED`).
 
 # Decision Log
 

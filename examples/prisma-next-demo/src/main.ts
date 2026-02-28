@@ -14,7 +14,7 @@
  * - posts <userId>             Get posts for a user
  * - users-with-posts [limit]   Users with nested posts (includeMany)
  * - repo-users [limit]         Users via ORM client API
- * - repo-users-wherearg <kind> [limit]
+ * - repo-users-wherearg <kind> [positive-limit]
  *                              Users via ORM ToWhereExpr filter interop
  * - repo-admins [limit]        Admin users via custom collection scope
  * - repo-user <email>          Find a user by email via ORM client find()
@@ -130,12 +130,12 @@ async function main() {
     } else if (cmd === 'repo-users-wherearg') {
       const [kind, limitStr] = args;
       if (kind !== 'admin' && kind !== 'user') {
-        console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [limit]');
+        console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [positive-limit]');
         process.exit(1);
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       if (!Number.isInteger(limit) || limit <= 0) {
-        console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [limit>0]');
+        console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [positive-limit]');
         process.exit(1);
       }
       const users = await ormClientGetUsersViaWhereArg(kind, limit, runtime);
@@ -363,7 +363,7 @@ async function main() {
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
-          'users-with-posts [limit] | repo-users [limit] | repo-users-wherearg <admin|user> [limit] | repo-admins [limit] | ' +
+          'users-with-posts [limit] | repo-users [limit] | repo-users-wherearg <admin|user> [positive-limit] | repo-admins [limit] | ' +
           'repo-user <email> | repo-posts <userId> [limit] | ' +
           'repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser] | ' +
           'repo-post-feed <postTitleTerm> [limit] | repo-users-cursor [cursor] [limit] | ' +
