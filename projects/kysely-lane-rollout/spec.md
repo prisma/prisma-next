@@ -140,4 +140,6 @@ No product analytics changes required. Development analytics are commit/test/CI 
 
 - Phase 2 unsupported-kinds behavior: **fail fast** with stable structured errors in runtime attachment paths.
 - Phase 2 Postgres API shape: `db.kysely` is **build-only**; no execution-capable public Kysely API.
+- Phase 2 Postgres `.kysely` surface is lane-owned (`@prisma-next/sql-kysely-lane`), not raw Kysely types from the composition root.
+- `@prisma-next/integration-kysely` is removed; lane/runtime responsibilities live in `@prisma-next/sql-kysely-lane` and `@prisma-next/postgres`.
 - Phase 2 ORM interop behavior: `ToWhereExpr` payloads are consumed via strict index/alignment validation and literal normalization (`ParamRef -> LiteralExpr`) at ORM boundaries.

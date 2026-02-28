@@ -36,6 +36,7 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 - [x] Create `@prisma-next/sql-kysely-lane` package in `packages/2-sql/4-lanes/`.
 - [x] Move transformer, guardrails, build-only lane assembly into lane package.
 - [x] Introduce/complete interop contract (`WhereArg`, `ToWhereExpr`) and ORM consumption path.
+- [x] Tighten interop boundary: ORM `.where(...)` accepts only `WhereArg` (no `SqlQueryPlan` shorthand); add a Kysely-lane helper (e.g. `db.kysely.whereExpr(...)`) that returns `ToWhereExpr` for Kysely-authored filters.
 - [x] Update `@prisma-next/postgres` surface to expose build-only `db.kysely` API.
 - [x] Re-scope `@prisma-next/integration-kysely` to runtime attachment responsibilities.
 - [x] Enforce fail-fast behavior for unsupported Kysely kinds in runtime attachment paths (no raw fallback).

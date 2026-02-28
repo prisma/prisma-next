@@ -13,13 +13,13 @@ Composition-root Postgres helper that builds a Prisma Next runtime client and ex
 `@prisma-next/postgres/runtime` exposes a single `postgres(...)` helper that composes the Postgres execution stack and returns query/runtime roots:
 
 - `db.sql`
-- `db.kysely` (build-only Kysely authoring + `build(query)` plan assembly)
+- `db.kysely` (lane-owned build-only authoring surface: `build(query)` + `whereExpr(query)`)
 - `db.schema`
 - `db.orm`
 - `db.context`
 - `db.stack`
 
-`db.kysely.build(query)` infers the plan row type from `query.compile()` so application/demo code can consume `db.kysely` directly without local surface shims.
+`db.kysely` is produced by `@prisma-next/sql-kysely-lane` and intentionally exposes lane behavior, not raw Kysely execution APIs. `build(query)` infers plan row type from `query.compile()`, and `whereExpr(query)` produces `ToWhereExpr` payloads for ORM `.where(...)` interop.
 
 Runtime resources are deferred until `db.runtime()` or `db.connect(...)` is called.
 Connection binding can be provided up front (`url`, `pg`, `binding`) or deferred via `db.connect(...)`.
@@ -51,7 +51,6 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `@prisma-next/sql-relational-core` for `schema(...)`
 - `@prisma-next/sql-orm-client` for `orm(...)`
 - `@prisma-next/sql-contract` for `validateContract(...)` and contract types
-- `kysely` for query-builder API surface
 - `pg` for lazy `Pool` construction when using URL binding
 
 ## Architecture

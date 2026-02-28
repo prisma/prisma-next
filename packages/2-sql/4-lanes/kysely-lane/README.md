@@ -1,58 +1,56 @@
 # @prisma-next/sql-kysely-lane
 
-The **Prisma Next Kysely lane** lets you write low-level SQL using the **Kysely query DSL**, then have it interpreted and executed by the **Prisma Next runtime**.
+Build-only Kysely lane for authoring Prisma Next SQL plans and lane-shaped filter interop payloads.
 
-This is the “drop down a level” API you use when the high-level **SQL ORM client** isn’t a good fit—e.g. you need to:
+## Responsibilities
 
-- performance-tune a query
-- use a SQL feature the ORM client doesn’t expose yet
-- express a shape that’s awkward at the ORM layer
+- Transform Kysely operation trees into Prisma Next SQL AST.
+- Assemble `SqlQueryPlan<Row>` with lane metadata (`refs`, `paramDescriptors`, annotations).
+- Expose build-only Kysely lane surface (`build(query)`, `whereExpr(query)`, `redactedSql`) used by composition roots.
+- Enforce deterministic execution backstop on the lane-owned Kysely dialect/driver.
+- Keep SQL redacted when compilation text is reachable from build-only surfaces.
 
-For high-level queries, use `@prisma-next/sql-orm-client`.
+For high-level query composition, use `@prisma-next/sql-orm-client`.
 
 Developing this package? See [`DEVELOPING.md`](./DEVELOPING.md).
 
-## How it works (in one minute)
+## Dependencies
 
-You:
+- `kysely` for query authoring types and build-only dialect plumbing.
+- `@prisma-next/sql-contract` for contract types.
+- `@prisma-next/sql-relational-core` for AST and plan model types.
+- `@prisma-next/contract` for descriptor/refs metadata types.
+- `@prisma-next/utils` for shared helpers.
 
-1. write a query in Kysely
-2. build a Prisma Next plan from that query
-3. execute the plan via runtime
+## Architecture
+
+```mermaid
+flowchart LR
+  App[Caller] --> PostgresRoot[@prisma-next/postgres]
+  PostgresRoot --> LaneClient[createBuildOnlyKyselyLane]
+  LaneClient --> QueryAuthoring[Kysely authoring methods]
+  QueryAuthoring --> BuildPlan[build(query)]
+  QueryAuthoring --> BuildWhere[whereExpr(query)]
+  BuildPlan --> Transform[transformKyselyToPnAst]
+  Transform --> Plan[SqlQueryPlan]
+  BuildWhere --> ToWhereExpr[ToWhereExpr payload]
+  Plan --> Runtime[@prisma-next/sql-runtime execute]
+  ToWhereExpr --> Orm[@prisma-next/sql-orm-client where]
+```
 
 ## Examples
 
-### Example: select users
-
 ```ts
 const kysely = db.kysely;
-
-const query = kysely
-  .selectFrom('user')
-  .select(['id', 'email', 'createdAt'])
-  .limit(10);
-
-const rows = await runtime.execute(kysely.build(query));
+const query = kysely.selectFrom('user').select(['id', 'email']).limit(10);
+const rows = await runtime.execute(kysely.build(query)).toArray();
 ```
 
-### Example: insert + return one row
-
 ```ts
-import { firstOrNull } from './kysely/result-utils';
-
-const kysely = db.kysely;
-
-const query = kysely
-  .insertInto('user')
-  .values({
-    id: 'user_001',
-    email: 'alice@example.com',
-    kind: 'user',
-    createdAt: new Date().toISOString(),
-  })
-  .returning(['id', 'email']);
-
-const inserted = await firstOrNull(runtime.execute(kysely.build(query)));
+const filter = db.kysely.whereExpr(
+  db.kysely.selectFrom('user').select('id').where('kind', '=', kind).limit(1),
+);
+const users = await db.orm.users.where(filter).all();
 ```
 
 ## Links

@@ -24,6 +24,7 @@ Deliverables:
 - `WhereArg` / `ToWhereExpr` / bound payload types exist in `@prisma-next/sql-relational-core`.
 - ORM can consume `WhereArg` without importing Kysely types.
 - Call sites can pass `ToWhereExpr` directly; ORM performs conversion (no manual `.toWhereExpr()` at call sites).
+- Lane offers an ergonomic helper to create `ToWhereExpr` from Kysely-authored filters (users do not author `{ expr, params, paramDescriptors }` objects).
 
 **Tasks:**
 
@@ -35,6 +36,9 @@ Deliverables:
   - validate payload invariants (`ParamRef` starts at 1, contiguous, max index equals params/descriptors length)
   - normalize `ParamRef` entries into `LiteralExpr` values for ORM-internal param-free filters
 - [x] Add unit tests for `WhereArg` normalization and payload-index invariant enforcement (including nested `and/or/exists` shapes).
+- [x] Add lane helper for filters: `kysely.whereExpr(...) -> ToWhereExpr` built from Kysely-authored where clauses (lane-owned; call sites do not touch `{ expr, params, paramDescriptors }`).
+- [x] Remove `SqlQueryPlan` acceptance from ORM `.where(...)` normalization (keep the public interop surface constrained to `WhereArg`).
+- [x] Update interop demo to use the lane helper (no hand-authored AST, no `.where(plan)`).
 
 ### Milestone 2: Create `@prisma-next/sql-kysely-lane` package
 
@@ -51,9 +55,9 @@ Deliverables:
 - [x] Harden `meta.refs` generation with deterministic ordering + dedup semantics in the extracted transformer path.
 - [x] Implement SQL redaction (Option A): ensure any compiled SQL string exposed by internal compilation is stubbed, while preserving `query` + `parameters`.
 - [x] Implement execution backstop behavior for build-only surface (throws deterministically if execution is attempted via casts).
-- [ ] Expand guardrail traversal to a broader and safer node walk strategy in the extracted lane package.
+- [x] Expand guardrail traversal to a broader and safer node walk strategy in the extracted lane package.
 - [x] Port and/or update tests so transformer + guardrails parity is preserved in the lane package, including the new refs/guardrail hardening behavior.
-- [ ] Add dependency/layering assertions: lane must not import `@prisma-next/sql-runtime` (enforced by `pnpm lint:deps`).
+- [x] Add dependency/layering assertions: lane must not import `@prisma-next/sql-runtime` (enforced by `pnpm lint:deps`).
 
 ### Milestone 3: Re-scope extensions and update Postgres public surface
 
@@ -96,6 +100,8 @@ Deliverables:
 | Execution backstop: `any`/cast execution attempts throw deterministically | Unit | Milestone 2 | Cover at least one blocked execution path |
 | Interop protocol exists: `WhereArg` / zero-arg `ToWhereExpr` with bound payload | Unit | Milestone 1 | Verify `{ expr, params, paramDescriptors }` and local index origin at 1 |
 | ORM consumption handles bare `WhereExpr` + bound `ToWhereExpr` with strict payload validation + literal normalization | Unit + Integration | Milestone 1 | Include nested boolean/exists compositions and descriptor alignment |
+| ORM does not accept `SqlQueryPlan` for `.where(...)` | Unit | Milestone 1 | Ensure `.where(...)` is constrained to `WhereArg` and plan-shorthand is rejected/absent |
+| Lane helper produces `ToWhereExpr` from Kysely-authored filters | Unit + Demo | Milestone 1 | Demo uses `kysely.whereExpr(...)` (or equivalent) with no manual payload construction |
 | SQL redaction (Option A): compiled SQL string is stubbed while params remain intact | Unit | Milestone 2 | Assert SQL is redacted and parameter ordering/values are unchanged |
 | Integration re-scope: `@prisma-next/integration-kysely` no longer owns lane transform/guardrails | Integration | Milestone 3 | Assert runtime-attachment-only boundary |
 | Parity preserved: existing transformer/guardrail coverage is retained after move/port | Unit + Integration | Milestone 2 + 3 | No net coverage loss on supported node kinds |
