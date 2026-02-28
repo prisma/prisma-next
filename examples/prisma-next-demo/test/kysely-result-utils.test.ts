@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstOrNull, firstOrThrow } from '../src/kysely/result-utils';
+import { firstOrNull, firstOrThrow } from '../src/result-utils';
 
 async function* asyncRows<T>(rows: readonly T[]): AsyncGenerator<T, void, unknown> {
   for (const row of rows) {
@@ -7,7 +7,7 @@ async function* asyncRows<T>(rows: readonly T[]): AsyncGenerator<T, void, unknow
   }
 }
 
-describe('kysely result utils', () => {
+describe('result utils', () => {
   it('firstOrNull returns first row', async () => {
     const row = await firstOrNull(asyncRows([{ id: 1 }, { id: 2 }]));
     expect(row).toEqual({ id: 1 });

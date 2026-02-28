@@ -1,7 +1,7 @@
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
-import { firstOrNull } from './result-utils';
+import { firstOrNull } from '../result-utils';
 
 export async function insertUser(email: string, runtime: Runtime) {
   const userId = generateId({ id: 'uuidv4' });
