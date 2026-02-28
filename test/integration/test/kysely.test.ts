@@ -7,6 +7,7 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import { lints, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
 import { teardownTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/contract.js';
@@ -31,7 +32,7 @@ async function createPostgresClient(
     contract: fixtureContract,
     pg: client,
     verify: { mode: 'onFirstUse', requireMarker: true },
-    ...(options?.plugins ? { plugins: options.plugins } : {}),
+    ...ifDefined('plugins', options?.plugins),
   });
   const runtime = await db.connect();
   return { runtime, db };
