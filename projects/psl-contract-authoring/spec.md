@@ -178,7 +178,7 @@ Decisions already made:
 - **PSL parser package**: implement as a reusable package (`@prisma-next/psl-parser`).
 - **Parity boundary**: enforce parity at the normalized contract IR boundary (and therefore on emitted `contract.json`).
 - **Both sources present**: allowed; the config chooses the source of truth.
-- **Initial conformance set**: models, scalars, required/optional, `@id`, `@unique`, `@@unique`, `@@index`, relations with `@relation(fields, references)`, referential actions, enums, defaults (`autoincrement()`, `now()`, literals), plus a small set of extension attributes where Prisma Next already has representation.
+- **Initial conformance set**: models, scalars, required/optional, `@id`, `@unique`, `@@unique`, `@@index`, relations with `@relation(fields, references)`, referential actions, enums, defaults (`autoincrement()`, `now()`, literals), plus only the named-type extension mechanism defined in this spec.
 - **Unsupported feature behavior**: strict errors (no “ignored metadata” warnings).
 - **PSL schema path**: PSL-first requires an explicit schema path (no implicit `schema.prisma` default); this is enforced by the PSL provider’s API/validation.
 - **Canonical artifacts**: `contract.json` contains no provenance and no top-level `sources` field (diagnostics-only).
