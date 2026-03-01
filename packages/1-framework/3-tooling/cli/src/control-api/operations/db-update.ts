@@ -5,7 +5,6 @@ import type {
   ControlFamilyInstance,
   MigrationPlan,
   MigrationPlannerResult,
-  MigrationPlanOperation,
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
@@ -13,6 +12,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbUpdateResult, DbUpdateSuccess, OnControlProgress } from '../types';
 import { extractSqlDdl } from './extract-sql-ddl';
+import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 // F12: db update allows additive, widening, and destructive operations.
 const DB_UPDATE_POLICY = {
@@ -140,15 +140,10 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
   if (mode === 'plan') {
     const planSql =
       familyInstance.familyId === 'sql' ? extractSqlDdl(migrationPlan.operations) : undefined;
-    const strippedOperations = migrationPlan.operations.map((op) => ({
-      id: op.id,
-      label: op.label,
-      operationClass: op.operationClass,
-    }));
     const result: DbUpdateSuccess = {
       mode: 'plan',
       plan: {
-        operations: strippedOperations,
+        operations: stripOperations(migrationPlan.operations),
         ...(planSql !== undefined ? { sql: planSql } : {}),
       },
       ...(marker
@@ -192,27 +187,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     label: 'Applying migration plan',
   });
 
-  const callbacks = onProgress
-    ? {
-        onOperationStart: (op: MigrationPlanOperation) => {
-          onProgress({
-            action: 'dbUpdate',
-            kind: 'spanStart',
-            spanId: `operation:${op.id}`,
-            parentSpanId: applySpanId,
-            label: op.label,
-          });
-        },
-        onOperationComplete: (op: MigrationPlanOperation) => {
-          onProgress({
-            action: 'dbUpdate',
-            kind: 'spanEnd',
-            spanId: `operation:${op.id}`,
-            outcome: 'ok',
-          });
-        },
-      }
-    : undefined;
+  const callbacks = createOperationCallbacks(onProgress, 'dbUpdate', applySpanId);
 
   // db update keeps all execution checks enabled (the runner default). Unlike db init, which
   // disables checks because it plans and applies from a fresh introspection, db update operates
@@ -253,11 +228,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
   const result: DbUpdateSuccess = {
     mode: 'apply',
     plan: {
-      operations: migrationPlan.operations.map((op) => ({
-        id: op.id,
-        label: op.label,
-        operationClass: op.operationClass,
-      })),
+      operations: stripOperations(migrationPlan.operations),
     },
     ...(marker
       ? {
