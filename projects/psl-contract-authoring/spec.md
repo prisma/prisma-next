@@ -56,6 +56,7 @@ Key constraints:
 - Deterministic artifacts: emitting twice from the same inputs produces equivalent output.
 - Clear failure modes: unsupported PSL features fail with a targeted error explaining (a) what’s unsupported and (b) how to express the same intent using supported constructs (when possible).
 - Keep the layering boundaries intact (PSL parsing and normalization lives in authoring/emitter/tooling layers; runtime/query layers should not need to change except to consume the existing artifacts as they already do).
+- Keep framework core packages cohesive: config typing/validation and contract-source provider interfaces used by `prisma-next.config.ts` should not be coupled to migration-plane concerns (see `TML-2018`).
 
 ## Non-goals
 
@@ -205,3 +206,4 @@ Remaining questions:
 - `packages/1-framework/3-tooling/cli/src/commands/contract-emit.ts`
 - `projects/psl-contract-authoring/plans/plan.md`
 - `projects/psl-contract-authoring/references/authoring-surface-gap-inventory.md`
+- Linear: `https://linear.app/prisma-company/issue/TML-2018/optional-split-up-1-coremigration`

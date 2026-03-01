@@ -37,6 +37,19 @@ Make contract authoring sources pluggable by design. Instead of enumerating sour
   - No source-specific branching is required in the CLI/control plane
   - E2E conformance/parity coverage for provider-based emission boundaries
 
+### Addendum 1.1 (Optional): Split up overloaded core migration/control-plane package (TML-2018)
+
+This is an internal maintainability slice: `packages/1-framework/1-core/migration/control-plane` currently hosts both migration-plane domain concerns and config typing/validation used by `prisma-next.config.ts`. The goal is to split out **at least** one focused core package for config types + validation so the provider-based authoring work can evolve without dragging migration-plane dependencies along.
+
+**Spec:** `projects/psl-contract-authoring/specs/optional-split-up-1-core-migration.spec.md`
+
+**Tasks (proposed):**
+
+- Introduce a dedicated package for config types + validation (including `PrismaNextConfig`, `ContractConfig`, `defineConfig()`, `validateConfig()`, and `ContractSourceProvider` + diagnostics types).
+- Update CLI config loading and downstream authoring helpers (e.g. `@prisma-next/contract-ts`) to depend on the new package.
+- Keep the remainder of `@prisma-next/core-control-plane` focused on domain actions (verify/migrations/etc) and remove the moved symbols.
+- Add/adjust tests to ensure there is **no behavior change** in config validation and `contract emit` continues to work.
+
 ### Milestone 2: Reusable PSL parser package (`@prisma-next/psl-parser`)
 
 Implement a reusable PSL parser library that can be consumed by emit tooling and other tools (language tooling, external tooling), and that retains source spans for diagnostics.
