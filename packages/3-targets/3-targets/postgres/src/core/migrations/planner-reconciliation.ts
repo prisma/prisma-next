@@ -541,9 +541,6 @@ function buildConflict(kind: SqlPlannerConflict['kind'], issue: SchemaIssue): Sq
 // ============================================================================
 
 function sortSchemaIssues(issues: readonly SchemaIssue[]): readonly SchemaIssue[] {
-  if (issues.length <= 1) {
-    return issues;
-  }
   return [...issues].sort((a, b) => {
     const kindCompare = a.kind.localeCompare(b.kind);
     if (kindCompare !== 0) {
@@ -562,20 +559,11 @@ function sortSchemaIssues(issues: readonly SchemaIssue[]): readonly SchemaIssue[
 }
 
 function buildConflictLocation(issue: SchemaIssue) {
-  const location: {
-    table?: string;
-    column?: string;
-    constraint?: string;
-  } = {};
-  if (issue.table) {
-    location.table = issue.table;
-  }
-  if (issue.column) {
-    location.column = issue.column;
-  }
-  if (issue.indexOrConstraint) {
-    location.constraint = issue.indexOrConstraint;
-  }
+  const location = {
+    ...ifDefined('table', issue.table),
+    ...ifDefined('column', issue.column),
+    ...ifDefined('constraint', issue.indexOrConstraint),
+  };
   return Object.keys(location).length > 0 ? location : undefined;
 }
 
