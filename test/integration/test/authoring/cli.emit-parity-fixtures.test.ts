@@ -132,7 +132,8 @@ describe('emit parity fixtures', () => {
           const tsExecutionHash = tsContractJson['executionHash'];
           const pslExecutionHash = pslContractJson['executionHash'];
           expect(pslExecutionHash).toBe(tsExecutionHash);
-          if (typeof tsExecutionHash === 'string') {
+          if (tsExecutionHash !== undefined) {
+            expect(typeof tsExecutionHash).toBe('string');
             expect(tsExecutionHash).toMatch(/^sha256:[a-f0-9]{64}$/);
           }
 
@@ -159,6 +160,10 @@ describe('emit parity fixtures', () => {
 describe('emit parity fixture diagnostics', () => {
   let consoleErrors: string[] = [];
   let cleanupMocks: () => void;
+
+  it('discovers at least one diagnostics fixture case', () => {
+    expect(diagnosticsCases.length).toBeGreaterThan(0);
+  });
 
   beforeEach(() => {
     const mocks = setupCommandMocks();
@@ -207,6 +212,7 @@ describe('emit parity fixture diagnostics', () => {
           }
 
           expect(sourceResult.failure.summary).toBe(expectedFixture.failureSummary);
+          expect(sourceResult.failure.diagnostics).toHaveLength(expectedFixture.diagnostics.length);
           expect(sourceResult.failure.diagnostics).toEqual(
             expect.arrayContaining(
               expectedFixture.diagnostics.map((diagnostic) =>
