@@ -200,7 +200,8 @@ export function transformSelect(node: SelectQueryNode, ctx: TransformContext): S
     } else {
       const limitParamIndex = nextParamIndex(ctx);
       addParamDescriptor(ctx, {});
-      const value = ctx.parameters[limitParamIndex - 1];
+      const value = ctx.parameters ? ctx.parameters[limitParamIndex - 1] : node.limit.limit.value;
+      ctx.params.push(value);
       limit = typeof value === 'number' ? value : undefined;
     }
   }

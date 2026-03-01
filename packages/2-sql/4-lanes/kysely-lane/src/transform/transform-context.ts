@@ -15,8 +15,9 @@ export interface TransformResult {
 
 export interface TransformContext {
   contract: SqlContract<SqlStorage>;
-  parameters: readonly unknown[];
+  parameters: readonly unknown[] | undefined;
   paramIndex: number;
+  params: unknown[];
   paramDescriptors: ParamDescriptor[];
   refsTables: Set<string>;
   refsColumns: Map<string, { table: string; column: string }>;
@@ -26,12 +27,13 @@ export interface TransformContext {
 
 export function createContext(
   contract: SqlContract<SqlStorage>,
-  parameters: readonly unknown[],
+  parameters?: readonly unknown[],
 ): TransformContext {
   return {
     contract,
     parameters,
     paramIndex: 0,
+    params: [],
     paramDescriptors: [],
     refsTables: new Set(),
     refsColumns: new Map(),
