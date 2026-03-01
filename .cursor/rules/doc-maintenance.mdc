@@ -8,5 +8,5 @@ alwaysApply: true
 - Whenever you make changes to a package, make sure its docs stay up to date.
   - **User-facing packages**: keep `README.md` focused on what the package does, when to use it, and a few concrete examples. Avoid internal implementation detail unless it materially affects usage.
   - **Contributor details**: put responsibilities/dependencies/architecture diagrams/internal exports in `DEVELOPING.md` (or `CONTRIBUTING.md`) within that package, and add a short link from `README.md`.
-- ADRs must not link to transient project artifacts under `projects/` (link to durable `docs/` or package READMEs instead)
+- Docs must not link to transient project artifacts under `projects/` (link to durable `docs/` or package READMEs instead)
 - If you establish a new design decision, update the architecture docs in `docs/architecture docs`
