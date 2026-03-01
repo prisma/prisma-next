@@ -679,7 +679,7 @@ describe('ControlClient progress emission', () => {
       }
     });
 
-    it('returns MARKER_REQUIRED failure when marker is missing', async () => {
+    it('succeeds without origin when marker is missing', async () => {
       const { mockTargetWithMigrations, mockAdapter, mockDriverDescriptor } =
         createMockComponentsWithMigrations();
 
@@ -711,9 +711,9 @@ describe('ControlClient progress emission', () => {
 
       await client.close();
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.failure.code).toBe('MARKER_REQUIRED');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.origin).toBeUndefined();
       }
     });
 

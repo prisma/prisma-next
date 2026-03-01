@@ -135,7 +135,13 @@ function buildReconciliationOperationFromIssue(options: {
       if (!mode.allowDestructive || !issue.table || !issue.indexOrConstraint) {
         return null;
       }
-      return buildDropConstraintOperation(schemaName, issue.table, issue.indexOrConstraint);
+      const constraintKind = issue.kind === 'extra_foreign_key' ? 'foreignKey' : 'unique';
+      return buildDropConstraintOperation(
+        schemaName,
+        issue.table,
+        issue.indexOrConstraint,
+        constraintKind,
+      );
     }
 
     case 'extra_primary_key': {
@@ -143,7 +149,7 @@ function buildReconciliationOperationFromIssue(options: {
         return null;
       }
       const constraintName = issue.indexOrConstraint ?? `${issue.table}_pkey`;
-      return buildDropConstraintOperation(schemaName, issue.table, constraintName);
+      return buildDropConstraintOperation(schemaName, issue.table, constraintName, 'primaryKey');
     }
 
     case 'nullability_mismatch': {
@@ -308,6 +314,7 @@ function buildDropConstraintOperation(
   schemaName: string,
   tableName: string,
   constraintName: string,
+  constraintKind: 'foreignKey' | 'unique' | 'primaryKey',
 ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
   return {
     id: `dropConstraint.${tableName}.${constraintName}`,
@@ -316,7 +323,7 @@ function buildDropConstraintOperation(
     operationClass: 'destructive',
     target: {
       id: 'postgres',
-      details: buildTargetDetails('foreignKey', constraintName, schemaName, tableName),
+      details: buildTargetDetails(constraintKind, constraintName, schemaName, tableName),
     },
     precheck: [
       {

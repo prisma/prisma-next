@@ -42,26 +42,20 @@ prisma-next db init --db $DATABASE_URL
 
 `prisma-next db update` reconciles a signed (marker-managed) database to the current contract. It reads the database signature, introspects the live schema, plans a migration with additive, widening, and destructive operations, then applies the plan and updates the signature.
 
-## Scenario 1: Database not signed (fails fast)
+## Scenario 1: Database not yet signed
 
-Use this when the database has not been signed.
+Use this when the database has not been signed. `db update` still works — it introspects the live schema and applies the delta without an origin marker.
 
 ```bash
 prisma-next db update --db $DATABASE_URL
 ```
 
-Expected output:
+Example output (when schema already matches the contract):
 
 ```text
-✖ Database must be signed before running db update (PN-RTM-3010)
-  Why: No database signature (marker) found
-  Fix: Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`
+✔ Database already matches contract
+  Signature: sha256:new-hash...
 ```
-
-Recovery:
-
-1. Run `prisma-next db init --db $DATABASE_URL`.
-2. Re-run `prisma-next db update --db $DATABASE_URL`.
 
 ## Scenario 2: Preview a contract change (plan mode)
 
@@ -118,7 +112,7 @@ prisma-next db update --db $DATABASE_URL
 Example output:
 
 ```text
-✔ Applied 0 operation(s)
+✔ Database already matches contract
   Signature: sha256:current-hash...
 ```
 

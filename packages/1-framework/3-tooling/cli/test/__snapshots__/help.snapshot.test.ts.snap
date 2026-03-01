@@ -68,7 +68,7 @@ exports[`help text snapshots > formats db introspect help 1`] = `
 `;
 
 exports[`help text snapshots > formats db update help 1`] = `
-"prisma-next update → Reconcile a marker-managed database to the current contract
+"prisma-next update → Update your database schema to match your contract
 │
 │ --db <url>            Database connection string
 │ --config <path>       Path to prisma-next.config.ts
@@ -86,11 +86,9 @@ exports[`help text snapshots > formats db update help 1`] = `
 │                       includes drops or type changes)
 │                       default: false
 │
-│ Updates a marker-managed database to match your emitted contract using
-│ additive,
-│ widening, and destructive operations when required. Requires a signed
-│ database.
-│ Use --plan to preview operations before applying.
+│ Compares your database schema to the emitted contract and applies the
+│ necessary
+│ changes. Use --plan to preview operations before applying.
 └
 "
 `;

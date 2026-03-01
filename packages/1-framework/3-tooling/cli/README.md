@@ -796,7 +796,6 @@ prisma-next db update [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q]
 ```
 
 **Error codes (additional to shared CLI/runtime codes):**
-- `MARKER_REQUIRED`: marker missing for `db update` (run `prisma-next db init` first)
 - `RUNNER_FAILED`: runner rejected apply (origin mismatch, failed checks, policy failures, or execution errors)
 
 **Config File (`prisma-next.config.ts`):**
@@ -1123,7 +1122,7 @@ try {
 | `schemaVerify(options)` | Verifies database schema satisfies contract |
 | `sign(options)` | Writes contract marker to database |
 | `dbInit(options)` | Initializes database schema from contract |
-| `dbUpdate(options)` | Reconciles marker-managed database to contract |
+| `dbUpdate(options)` | Updates database schema to match contract |
 | `introspect(options)` | Introspects database schema |
 
 ### Result Types

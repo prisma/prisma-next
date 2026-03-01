@@ -52,6 +52,9 @@ export interface MigrationCommandOptions {
 export function maskConnectionUrl(url: string): string {
   try {
     const parsed = new URL(url);
+    if (parsed.username) {
+      parsed.username = '****';
+    }
     if (parsed.password) {
       parsed.password = '****';
     }

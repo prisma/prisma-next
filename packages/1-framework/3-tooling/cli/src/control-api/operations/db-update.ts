@@ -66,21 +66,6 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     label: 'Checking database signature',
   });
   const marker = await familyInstance.readMarker({ driver });
-  if (!marker) {
-    onProgress?.({
-      action: 'dbUpdate',
-      kind: 'spanEnd',
-      spanId: readMarkerSpanId,
-      outcome: 'error',
-    });
-    return notOk({
-      code: 'MARKER_REQUIRED' as const,
-      summary: 'Database must be signed before running db update',
-      why: 'No database signature (marker) found',
-      conflicts: undefined,
-      meta: undefined,
-    });
-  }
   onProgress?.({
     action: 'dbUpdate',
     kind: 'spanEnd',
@@ -142,10 +127,14 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 
   const migrationPlan: MigrationPlan = {
     ...plannerResult.plan,
-    origin: {
-      storageHash: marker.storageHash,
-      profileHash: marker.profileHash,
-    },
+    ...(marker
+      ? {
+          origin: {
+            storageHash: marker.storageHash,
+            profileHash: marker.profileHash,
+          },
+        }
+      : {}),
   };
 
   if (mode === 'plan') {
@@ -162,10 +151,14 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
         operations: strippedOperations,
         ...(planSql !== undefined ? { sql: planSql } : {}),
       },
-      origin: {
-        storageHash: marker.storageHash,
-        ...ifDefined('profileHash', marker.profileHash),
-      },
+      ...(marker
+        ? {
+            origin: {
+              storageHash: marker.storageHash,
+              ...ifDefined('profileHash', marker.profileHash),
+            },
+          }
+        : {}),
       destination: {
         storageHash: migrationPlan.destination.storageHash,
         ...ifDefined('profileHash', migrationPlan.destination.profileHash),
@@ -177,10 +170,10 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 
   // When applying, require explicit acceptance for destructive operations
   if (!options.acceptDataLoss) {
-    if (migrationPlan.operations.some((op) => op.operationClass === 'destructive')) {
-      const destructiveOps = migrationPlan.operations
-        .filter((op) => op.operationClass === 'destructive')
-        .map((op) => ({ id: op.id, label: op.label }));
+    const destructiveOps = migrationPlan.operations
+      .filter((op) => op.operationClass === 'destructive')
+      .map((op) => ({ id: op.id, label: op.label }));
+    if (destructiveOps.length > 0) {
       return notOk({
         code: 'DESTRUCTIVE_CHANGES' as const,
         summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
@@ -266,10 +259,14 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
         operationClass: op.operationClass,
       })),
     },
-    origin: {
-      storageHash: marker.storageHash,
-      ...ifDefined('profileHash', marker.profileHash),
-    },
+    ...(marker
+      ? {
+          origin: {
+            storageHash: marker.storageHash,
+            ...ifDefined('profileHash', marker.profileHash),
+          },
+        }
+      : {}),
     destination: {
       storageHash: migrationPlan.destination.storageHash,
       ...ifDefined('profileHash', migrationPlan.destination.profileHash),
@@ -284,7 +281,10 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
           profileHash: migrationPlan.destination.profileHash,
         }
       : { storageHash: migrationPlan.destination.storageHash },
-    summary: `Applied ${execution.operationsExecuted} operation(s), signature updated`,
+    summary:
+      execution.operationsExecuted === 0
+        ? 'Database already matches contract, signature updated'
+        : `Applied ${execution.operationsExecuted} operation(s), signature updated`,
   };
   return ok(result);
 }
