@@ -102,7 +102,7 @@ describe('sql-compilation/update', () => {
     expect(runtime.executions).toHaveLength(0);
   });
 
-  it('captures updateCount plan snapshots', async () => {
+  it('captures updateCount plan snapshots', { timeout: 1_000 }, async () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[{ id: 1 }, { id: 2 }], []]);
 
