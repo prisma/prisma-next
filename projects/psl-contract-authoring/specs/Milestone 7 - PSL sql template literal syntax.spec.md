@@ -17,8 +17,10 @@ This is intentionally **not** a templating mechanism: interpolation is disallowe
 
 ## Functional Requirements
 
-- Extend `@prisma-next/psl-parser` grammar to parse **single-line** SQL template literals in attribute arguments:
+- Extend `@prisma-next/psl-parser` grammar to parse **single-line** tagged template literals in attribute arguments:
   - Accept `sql\`...\`` as an argument value in `@default(...)` (and generally as a generic argument value).
+  - Keep PSL parser **SQL-agnostic**: the backtick-enclosed content is treated as opaque text.
+  - The set of permitted template tags (e.g. `sql`) is configurable/parameterized at the parser boundary so language tooling can highlight based on the tag without hardcoding SQL into PSL.
   - Disallow interpolation sequences (e.g. `${...}`) and report a targeted syntax/diagnostic error.
   - Define and implement escaping rules for backticks inside the literal (e.g. `\``).
 - Extend `@prisma-next/sql-contract-psl` interpretation to support storage defaults written with `sql\`...\``:

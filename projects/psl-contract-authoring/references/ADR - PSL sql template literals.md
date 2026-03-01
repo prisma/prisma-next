@@ -21,6 +21,10 @@ Add a PSL grammar extension for a SQL template-literal-like syntax:
 
 - `sql\`...\``
 
+Parser boundary:
+- PSL should not become SQL-specific. The parser treats the backtick-enclosed content as **opaque text**.
+- The set of permitted template tags (e.g. `sql`) should be a **parameter/configuration input** to the parser, so tooling can still detect/highlight tagged literals without hardcoding SQL into PSL.
+
 Rules:
 - **Single-line only** (no embedded newlines)
 - **No interpolation**: `${...}` is explicitly rejected (PSL is not a templating language)
