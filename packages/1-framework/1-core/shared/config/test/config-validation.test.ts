@@ -20,6 +20,7 @@ function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextC
       id: 'sql',
       familyId: 'sql',
       version: '0.0.1',
+      manifest: {},
       hook: mockHook,
       create: () => ({ familyId: 'sql' }) as unknown as ControlFamilyInstance<'sql'>,
     },
@@ -29,6 +30,7 @@ function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextC
       targetId: 'postgres',
       id: 'postgres',
       version: '0.0.1',
+      manifest: {},
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     adapter: {
@@ -37,6 +39,7 @@ function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextC
       targetId: 'postgres',
       id: 'postgres',
       version: '0.0.1',
+      manifest: {},
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     driver: {
@@ -45,6 +48,7 @@ function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextC
       targetId: 'postgres',
       id: 'postgres',
       version: '0.0.1',
+      manifest: {},
       create: async () =>
         ({
           familyId: 'sql',
@@ -74,6 +78,7 @@ function createValidRawConfig(overrides: RawConfigOverrides = {}) {
       id: 'sql',
       familyId: 'sql',
       version: '0.0.1',
+      manifest: {},
       hook: {},
       create: vi.fn(),
       ...(family as Record<string, unknown> | undefined),
@@ -84,6 +89,7 @@ function createValidRawConfig(overrides: RawConfigOverrides = {}) {
       targetId: 'postgres',
       id: 'postgres',
       version: '0.0.1',
+      manifest: {},
       create: vi.fn(),
       ...(target as Record<string, unknown> | undefined),
     },
@@ -93,6 +99,7 @@ function createValidRawConfig(overrides: RawConfigOverrides = {}) {
       targetId: 'postgres',
       id: 'postgres',
       version: '0.0.1',
+      manifest: {},
       create: vi.fn(),
       ...(adapter as Record<string, unknown> | undefined),
     },
@@ -102,6 +109,7 @@ function createValidRawConfig(overrides: RawConfigOverrides = {}) {
       targetId: 'postgres',
       id: 'postgres',
       version: '0.0.1',
+      manifest: {},
       create: vi.fn(),
       ...(driver as Record<string, unknown> | undefined),
     },
@@ -138,8 +146,10 @@ describe('validateConfig', () => {
 
   it('validates family descriptor fields', () => {
     expectFieldError(createValidRawConfig({ family: { kind: 'invalid' } }), 'family.kind');
+    expectFieldError(createValidRawConfig({ family: { id: 123 } }), 'family.id');
     expectFieldError(createValidRawConfig({ family: { familyId: 123 } }), 'family.familyId');
     expectFieldError(createValidRawConfig({ family: { version: 123 } }), 'family.version');
+    expectFieldError(createValidRawConfig({ family: { manifest: undefined } }), 'family.manifest');
     expectFieldError(createValidRawConfig({ family: { hook: undefined } }), 'family.hook');
     expectFieldError(createValidRawConfig({ family: { create: 'invalid' } }), 'family.create');
   });
@@ -149,6 +159,7 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ target: { id: 123 } }), 'target.id');
     expectFieldError(createValidRawConfig({ target: { familyId: 123 } }), 'target.familyId');
     expectFieldError(createValidRawConfig({ target: { version: 123 } }), 'target.version');
+    expectFieldError(createValidRawConfig({ target: { manifest: undefined } }), 'target.manifest');
     expectFieldError(createValidRawConfig({ target: { targetId: 123 } }), 'target.targetId');
     expectFieldError(createValidRawConfig({ target: { create: 'invalid' } }), 'target.create');
   });
@@ -168,6 +179,10 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ adapter: { id: 123 } }), 'adapter.id');
     expectFieldError(createValidRawConfig({ adapter: { familyId: 123 } }), 'adapter.familyId');
     expectFieldError(createValidRawConfig({ adapter: { version: 123 } }), 'adapter.version');
+    expectFieldError(
+      createValidRawConfig({ adapter: { manifest: undefined } }),
+      'adapter.manifest',
+    );
     expectFieldError(createValidRawConfig({ adapter: { targetId: 123 } }), 'adapter.targetId');
     expectFieldError(createValidRawConfig({ adapter: { create: 'invalid' } }), 'adapter.create');
   });
@@ -277,6 +292,22 @@ describe('validateConfig', () => {
       }),
       'extensionPacks[].create',
     );
+    expectFieldError(
+      createValidRawConfig({
+        extensionPacks: [
+          {
+            kind: 'extension',
+            id: 'ext',
+            familyId: 'sql',
+            targetId: 'postgres',
+            version: '0.0.1',
+            manifest: undefined,
+            create: vi.fn(),
+          },
+        ],
+      }),
+      'extensionPacks[].manifest',
+    );
   });
 
   it('rejects legacy extensions key', () => {
@@ -292,6 +323,7 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ driver: { kind: 'invalid' } }), 'driver.kind');
     expectFieldError(createValidRawConfig({ driver: { id: 123 } }), 'driver.id');
     expectFieldError(createValidRawConfig({ driver: { version: 123 } }), 'driver.version');
+    expectFieldError(createValidRawConfig({ driver: { manifest: undefined } }), 'driver.manifest');
     expectFieldError(createValidRawConfig({ driver: { familyId: 123 } }), 'driver.familyId');
     expectFieldError(createValidRawConfig({ driver: { familyId: 'document' } }), 'driver.familyId');
     expectFieldError(createValidRawConfig({ driver: { targetId: 123 } }), 'driver.targetId');
@@ -302,6 +334,13 @@ describe('validateConfig', () => {
   it('validates contract shape and source provider', () => {
     expectFieldError(createValidRawConfig({ contract: 'invalid' }), 'contract');
     expectFieldError(createValidRawConfig({ contract: {} }), 'contract.source');
+    const inheritedSourceContract = Object.create({
+      source: async () => ok({ targetFamily: 'sql' } as ContractIR),
+    }) as Record<string, unknown>;
+    expectFieldError(
+      createValidRawConfig({ contract: inheritedSourceContract }),
+      'contract.source',
+    );
     expectFieldError(
       createValidRawConfig({
         contract: { source: { kind: 'psl', schemaPath: './schema.prisma' } },
@@ -328,6 +367,7 @@ describe('validateConfig', () => {
           familyId: 'sql',
           targetId: 'postgres',
           version: '0.0.1',
+          manifest: {},
           create: vi.fn(),
         },
       ],
@@ -412,6 +452,7 @@ describe('defineConfig', () => {
         id: 'sql',
         familyId: 'sql',
         version: '0.0.1',
+        manifest: {},
         hook: mockHook,
         create: vi.fn(),
       },
