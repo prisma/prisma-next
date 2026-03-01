@@ -48,7 +48,9 @@ Steps:
 1. Determine current branch name.
 2. Fetch latest refs from origin.
 3. Resolve base branch:
-   - If a PR exists for the current branch, use its `baseRefName`.
+   - If the user provided a base/parent branch, use it exactly.
+   - If the provided name is ambiguous, resolve to `origin/<base>` when possible and record the resolved range in artifacts.
+   - Otherwise, if a PR exists for the current branch, use its `baseRefName`.
    - Otherwise use the repo default branch (from `origin/HEAD`, typically `main`).
 4. Establish the review range:
    - Topic branch: `origin/<base>...HEAD`

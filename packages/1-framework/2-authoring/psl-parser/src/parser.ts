@@ -1,3 +1,4 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ParsePslDocumentInput,
   ParsePslDocumentResult,
@@ -186,7 +187,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     sourceId: input.sourceId,
     models: normalizedModels,
     enums,
-    ...(typesBlock ? { types: typesBlock } : {}),
+    ...ifDefined('types', typesBlock),
     span: {
       start: createPosition(context, 0, 0),
       end: createPosition(
@@ -521,8 +522,8 @@ function parseRelationAttribute(
     kind: 'relation',
     fields,
     references,
-    ...(onDelete ? { onDelete } : {}),
-    ...(onUpdate ? { onUpdate } : {}),
+    ...ifDefined('onDelete', onDelete),
+    ...ifDefined('onUpdate', onUpdate),
     span: createTrimmedLineSpan(context, lineIndex),
   };
 }
