@@ -29,43 +29,45 @@ describe('executeContractEmit', () => {
   });
 
   it('preserves AbortError from contract source provider', async () => {
-    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig').mockResolvedValue({
-      contract: {
-        source: async () => {
-          throw new DOMException('Aborted by test', 'AbortError');
+    await withMockedConfig(
+      {
+        contract: {
+          source: async () => {
+            throw new DOMException('Aborted by test', 'AbortError');
+          },
+          output: './src/prisma/contract.json',
         },
-        output: './src/prisma/contract.json',
+      } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>,
+      async () => {
+        await expect(
+          executeContractEmit({ configPath: 'prisma-next.config.ts' }),
+        ).rejects.toSatisfy(
+          (error: unknown) => error instanceof Error && error.name === 'AbortError',
+        );
       },
-    } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>);
-
-    try {
-      await expect(executeContractEmit({ configPath: 'prisma-next.config.ts' })).rejects.toSatisfy(
-        (error: unknown) => error instanceof Error && error.name === 'AbortError',
-      );
-    } finally {
-      loadConfigSpy.mockRestore();
-    }
+    );
   });
 
   it('throws when contract source is not callable', async () => {
-    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig').mockResolvedValue({
-      contract: {
-        source: { invalid: true },
-        output: './src/prisma/contract.json',
+    await withMockedConfig(
+      {
+        contract: {
+          source: { invalid: true },
+          output: './src/prisma/contract.json',
+        },
+      } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>,
+      async () => {
+        await expect(
+          executeContractEmit({ configPath: 'prisma-next.config.ts' }),
+        ).rejects.toSatisfy(
+          (error: unknown) =>
+            error instanceof Error &&
+            'why' in error &&
+            typeof error.why === 'string' &&
+            error.why.includes('valid source provider function'),
+        );
       },
-    } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>);
-
-    try {
-      await expect(executeContractEmit({ configPath: 'prisma-next.config.ts' })).rejects.toSatisfy(
-        (error: unknown) =>
-          error instanceof Error &&
-          'why' in error &&
-          typeof error.why === 'string' &&
-          error.why.includes('valid source provider function'),
-      );
-    } finally {
-      loadConfigSpy.mockRestore();
-    }
+    );
   });
 
   it('throws runtime error when contract source provider returns failure result', async () => {
