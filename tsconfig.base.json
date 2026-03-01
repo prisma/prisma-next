@@ -3,6 +3,7 @@
   "extends": ["@prisma-next/tsconfig/base"],
   "references": [
     { "path": "./packages/1-framework/1-core/shared/contract" },
+    { "path": "./packages/1-framework/1-core/shared/config" },
     { "path": "./packages/1-framework/1-core/shared/operations" },
     { "path": "./packages/1-framework/1-core/shared/plan" },
     { "path": "./packages/1-framework/1-core/shared/utils" },
