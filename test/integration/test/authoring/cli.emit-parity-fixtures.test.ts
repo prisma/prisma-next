@@ -6,8 +6,8 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { executeCommand, setupCommandMocks } from '../utils/cli-test-helpers';
 import {
+  listAuthoringDiagnosticsFixtureCases,
   listAuthoringParityFixtureCases,
-  resolveAuthoringDiagnosticsFixtureSchemaPath,
   setupIntegrationTestDirectoryForAuthoringParityCase,
 } from './authoring-parity-test-helpers';
 
@@ -17,7 +17,7 @@ function parseContractJson(contractJson: string): Record<string, unknown> {
   return JSON.parse(contractJson) as Record<string, unknown>;
 }
 
-function assertCanonicalProvenanceInvariants(contractJson: Record<string, unknown>): void {
+function assertContractJsonOmitsSourceProvenance(contractJson: Record<string, unknown>): void {
   expect(contractJson).not.toHaveProperty('sources');
   const meta = contractJson['meta'];
   if (typeof meta === 'object' && meta !== null) {
@@ -27,7 +27,23 @@ function assertCanonicalProvenanceInvariants(contractJson: Record<string, unknow
   }
 }
 
+interface ExpectedDiagnosticsFixture {
+  readonly failureSummary: string;
+  readonly diagnostics: readonly {
+    readonly code: string;
+    readonly sourceId: string;
+    readonly startLine: number;
+  }[];
+}
+
+function parseExpectedDiagnosticsFixture(
+  expectedDiagnosticsJson: string,
+): ExpectedDiagnosticsFixture {
+  return JSON.parse(expectedDiagnosticsJson) as ExpectedDiagnosticsFixture;
+}
+
 const parityCases = listAuthoringParityFixtureCases();
+const diagnosticsCases = listAuthoringDiagnosticsFixtureCases();
 const coreSurfaceCase = parityCases.find((fixtureCase) => fixtureCase.caseName === 'core-surface');
 
 if (!coreSurfaceCase) {
@@ -106,7 +122,7 @@ describe('emit parity fixtures', () => {
           const pslContractJson = parseContractJson(pslEmitFirst.contractJson);
 
           expect(tsContractJson).toEqual(pslContractJson);
-          assertCanonicalProvenanceInvariants(tsContractJson);
+          assertContractJsonOmitsSourceProvenance(tsContractJson);
 
           expect(tsEmitFirst.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
           expect(tsEmitFirst.profileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
@@ -154,70 +170,80 @@ describe('emit parity fixture diagnostics', () => {
     cleanupMocks();
   });
 
-  it(
-    'reports actionable psl diagnostics from fixtureized invalid schema',
-    { timeout: timeouts.typeScriptCompilation },
-    async () => {
-      const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase(coreSurfaceCase);
-      const invalidSchemaPath =
-        resolveAuthoringDiagnosticsFixtureSchemaPath('unsupported-list-field');
-      const command = createContractEmitCommand();
-
-      try {
-        writeFileSync(
-          join(testSetup.testDir, 'schema.prisma'),
-          readFileSync(invalidSchemaPath, 'utf-8'),
-          'utf-8',
+  for (const diagnosticsCase of diagnosticsCases) {
+    it(
+      `reports actionable psl diagnostics for ${diagnosticsCase.caseName}`,
+      { timeout: timeouts.typeScriptCompilation },
+      async () => {
+        const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase(coreSurfaceCase);
+        const command = createContractEmitCommand();
+        const expectedFixture = parseExpectedDiagnosticsFixture(
+          readFileSync(diagnosticsCase.expectedDiagnosticsPath, 'utf-8'),
         );
 
-        const pslConfig = await loadConfig(testSetup.pslConfigPath);
-        if (!pslConfig.contract) {
-          throw new Error('PSL config contract is required for diagnostics fixture test');
-        }
-
-        const originalCwd = process.cwd();
-        let sourceResult: Awaited<ReturnType<typeof pslConfig.contract.source>>;
         try {
-          process.chdir(testSetup.testDir);
-          sourceResult = await pslConfig.contract.source();
+          writeFileSync(
+            join(testSetup.testDir, 'schema.prisma'),
+            readFileSync(diagnosticsCase.schemaPath, 'utf-8'),
+            'utf-8',
+          );
+
+          const pslConfig = await loadConfig(testSetup.pslConfigPath);
+          if (!pslConfig.contract) {
+            throw new Error('PSL config contract is required for diagnostics fixture test');
+          }
+
+          const originalCwd = process.cwd();
+          let sourceResult: Awaited<ReturnType<typeof pslConfig.contract.source>>;
+          try {
+            process.chdir(testSetup.testDir);
+            sourceResult = await pslConfig.contract.source();
+          } finally {
+            process.chdir(originalCwd);
+          }
+          expect(sourceResult.ok).toBe(false);
+          if (sourceResult.ok) {
+            throw new Error(`Expected PSL source provider to fail for ${diagnosticsCase.caseName}`);
+          }
+
+          expect(sourceResult.failure.summary).toBe(expectedFixture.failureSummary);
+          expect(sourceResult.failure.diagnostics).toEqual(
+            expect.arrayContaining(
+              expectedFixture.diagnostics.map((diagnostic) =>
+                expect.objectContaining({
+                  code: diagnostic.code,
+                  sourceId: diagnostic.sourceId,
+                  span: expect.objectContaining({
+                    start: expect.objectContaining({
+                      line: diagnostic.startLine,
+                      column: expect.any(Number),
+                    }),
+                  }),
+                }),
+              ),
+            ),
+          );
+
+          const commandCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await expect(
+              executeCommand(command, ['--config', 'prisma-next.config.parity-psl.ts']),
+            ).rejects.toThrow();
+          } finally {
+            process.chdir(commandCwd);
+          }
+
+          const errorOutput = consoleErrors.join('\n');
+          expect(errorOutput).toContain(expectedFixture.failureSummary);
+          for (const diagnostic of expectedFixture.diagnostics) {
+            expect(errorOutput).toContain(diagnostic.code);
+          }
+          expect(errorOutput).toMatch(/schema\.prisma:\d+:\d+/);
         } finally {
-          process.chdir(originalCwd);
+          testSetup.cleanup();
         }
-        expect(sourceResult.ok).toBe(false);
-        if (sourceResult.ok) {
-          throw new Error('Expected PSL source provider to fail for unsupported list field');
-        }
-
-        expect(sourceResult.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
-        expect(sourceResult.failure.diagnostics).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({
-              code: 'PSL_UNSUPPORTED_FIELD_LIST',
-              sourceId: './schema.prisma',
-              span: expect.objectContaining({
-                start: expect.objectContaining({ line: 3, column: expect.any(Number) }),
-              }),
-            }),
-          ]),
-        );
-
-        const commandCwd = process.cwd();
-        try {
-          process.chdir(testSetup.testDir);
-          await expect(
-            executeCommand(command, ['--config', 'prisma-next.config.parity-psl.ts']),
-          ).rejects.toThrow();
-        } finally {
-          process.chdir(commandCwd);
-        }
-
-        const errorOutput = consoleErrors.join('\n');
-        expect(errorOutput).toContain('PSL to SQL Contract IR normalization failed');
-        expect(errorOutput).toContain('PSL_UNSUPPORTED_FIELD_LIST');
-        expect(errorOutput).toMatch(/schema\.prisma:\d+:\d+/);
-      } finally {
-        testSetup.cleanup();
-      }
-    },
-  );
+      },
+    );
+  }
 });
