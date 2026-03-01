@@ -8,11 +8,12 @@ import {
   errorContractValidationFailed,
   errorJsonFormatNotSupported,
   errorMigrationPlanningFailed,
+  errorRunnerFailed,
   errorRuntime,
   errorUnexpected,
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import { sanitizeErrorMessage, setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   addMigrationCommandOptions,
@@ -75,13 +76,12 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
   }
 
   if (failure.code === 'RUNNER_FAILED') {
-    return errorRuntime(failure.summary, {
+    return errorRunnerFailed(failure.summary, {
       why: failure.why ?? 'Migration runner failed',
       fix: 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`',
-      meta: {
-        code: 'RUNNER_FAILED',
-        ...(failure.meta ?? {}),
-      },
+      ...(failure.meta
+        ? { meta: { code: 'RUNNER_FAILED', ...failure.meta } }
+        : { meta: { code: 'RUNNER_FAILED' } }),
     });
   }
 
@@ -175,9 +175,14 @@ async function executeDbInitCommand(
       );
     }
 
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const safeMessage = sanitizeErrorMessage(
+      rawMessage,
+      typeof dbConnection === 'string' ? dbConnection : undefined,
+    );
     return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Unexpected error during db init: ${error instanceof Error ? error.message : String(error)}`,
+      errorUnexpected(safeMessage, {
+        why: `Unexpected error during db init: ${safeMessage}`,
       }),
     );
   } finally {

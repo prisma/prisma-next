@@ -13,7 +13,7 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import { sanitizeErrorMessage, setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   addMigrationCommandOptions,
@@ -149,9 +149,14 @@ async function executeDbUpdateCommand(
       );
     }
 
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const safeMessage = sanitizeErrorMessage(
+      rawMessage,
+      typeof dbConnection === 'string' ? dbConnection : undefined,
+    );
     return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Unexpected error during db update: ${error instanceof Error ? error.message : String(error)}`,
+      errorUnexpected(safeMessage, {
+        why: `Unexpected error during db update: ${safeMessage}`,
       }),
     );
   } finally {
