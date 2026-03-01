@@ -1,5 +1,7 @@
 import type { Command } from 'commander';
 
+const longDescriptions = new WeakMap<Command, string>();
+
 /**
  * Sets both short and long descriptions for a command.
  * The short description is used in command trees and headers.
@@ -12,8 +14,7 @@ export function setCommandDescriptions(
 ): Command {
   command.description(shortDescription);
   if (longDescription) {
-    // Store long description in a custom property for our formatters to access
-    (command as Command & { _longDescription?: string })._longDescription = longDescription;
+    longDescriptions.set(command, longDescription);
   }
   return command;
 }
@@ -22,7 +23,7 @@ export function setCommandDescriptions(
  * Gets the long description from a command if it was set via setCommandDescriptions.
  */
 export function getLongDescription(command: Command): string | undefined {
-  return (command as Command & { _longDescription?: string })._longDescription;
+  return longDescriptions.get(command);
 }
 
 /**
@@ -46,8 +47,8 @@ export interface MigrationCommandOptions {
 }
 
 /**
- * Masks the password portion of a database connection URL.
- * Handles standard URLs, query-parameter passwords, and libpq-style key=value strings.
+ * Masks credentials in a database connection URL.
+ * Handles standard URLs (username + password + query params) and libpq-style key=value strings.
  */
 export function maskConnectionUrl(url: string): string {
   try {
@@ -58,13 +59,46 @@ export function maskConnectionUrl(url: string): string {
     if (parsed.password) {
       parsed.password = '****';
     }
-    // Also mask password in query parameters (e.g., ?password=secret)
-    if (parsed.searchParams.has('password')) {
-      parsed.searchParams.set('password', '****');
+    // Also mask password in query parameters (e.g., ?password=secret, ?sslpassword=secret)
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (/password/i.test(key)) {
+        parsed.searchParams.set(key, '****');
+      }
     }
     return parsed.toString();
   } catch {
-    // Fallback for libpq-style key=value connection strings (e.g., "host=localhost password=secret")
-    return url.replace(/password\s*=\s*\S+/gi, 'password=****');
+    // Fallback for libpq-style key=value connection strings (e.g., "host=localhost password=secret user=admin")
+    return url
+      .replace(/password\s*=\s*\S+/gi, 'password=****')
+      .replace(/user\s*=\s*\S+/gi, 'user=****');
+  }
+}
+
+/**
+ * Strips raw connection URL fragments from an error message to prevent credential leakage.
+ * Call this before surfacing driver errors to the user.
+ */
+export function sanitizeErrorMessage(message: string, connectionUrl?: string): string {
+  if (!connectionUrl) {
+    return message;
+  }
+  try {
+    const parsed = new URL(connectionUrl);
+    // Replace the full URL (with and without trailing slash)
+    let sanitized = message;
+    sanitized = sanitized.replaceAll(connectionUrl, maskConnectionUrl(connectionUrl));
+    // Also replace the password and username individually if they appear
+    if (parsed.password) {
+      sanitized = sanitized.replaceAll(parsed.password, '****');
+    }
+    if (parsed.username) {
+      sanitized = sanitized.replaceAll(parsed.username, '****');
+    }
+    return sanitized;
+  } catch {
+    // For libpq-style strings, mask password and user values in the message
+    return message
+      .replace(/password\s*=\s*\S+/gi, 'password=****')
+      .replace(/user\s*=\s*\S+/gi, 'user=****');
   }
 }
