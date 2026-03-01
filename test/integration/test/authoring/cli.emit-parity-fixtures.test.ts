@@ -4,13 +4,12 @@ import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-em
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { executeCommand, setupCommandMocks } from '../utils/cli-test-helpers';
 import {
-  executeCommand,
   listAuthoringParityFixtureCases,
   resolveAuthoringDiagnosticsFixtureSchemaPath,
-  setupCommandMocks,
   setupIntegrationTestDirectoryForAuthoringParityCase,
-} from './utils/cli-test-helpers';
+} from './authoring-parity-test-helpers';
 
 const writeExpected = process.env['UPDATE_AUTHORING_PARITY_EXPECTED'] === '1';
 

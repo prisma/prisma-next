@@ -77,7 +77,7 @@ These are features that exist in Prisma ORM’s PSL but are either irrelevant in
 
 ## Milestone 3 fixture-driven parity harness notes
 
-- Harness root: `test/integration/test/fixtures/authoring/parity/<case>/`.
+- Harness root: `test/integration/test/authoring/parity/<case>/`.
 - Initial seeded case (`core-surface`) confirms parity across the currently supported subset (models/scalars/requiredness, `@id`, `@unique`, `@@unique`, `@@index`, enums, defaults, relations with referential actions, named types without parameterized attributes).
 - No new TS↔PSL semantic gaps were discovered while wiring the first fixture case; the unresolved gaps in this file remain the active Milestone 4/5 targets.
 

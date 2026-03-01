@@ -76,7 +76,7 @@ Key constraints:
 ## Parity (the important part)
 
 - [ ] There is a conformance set of schemas that can be expressed in both TS and PSL; for that set, PSL-first emission and TS-first emission produce equivalent canonical `contract.json` (and stable hashes).
-- [ ] The conformance suite is fixture-driven (data-driven): adding a parity case is adding a new fixture directory on disk containing the PSL schema input, the equivalent TS contract input, and an expected canonical `contract.json` snapshot (proposal: `test/integration/test/fixtures/authoring/parity/<case>/`).
+- [ ] The conformance suite is fixture-driven (data-driven): adding a parity case is adding a new fixture directory on disk containing the PSL schema input, the equivalent TS contract input, and an expected canonical `contract.json` snapshot (proposal: `test/integration/test/authoring/parity/<case>/`).
 - [ ] Unsupported PSL constructs are documented as “not representable in Prisma Next contract authoring yet” (or “not representable by design”), with suggested alternatives when applicable.
 
 ## Documentation & tests

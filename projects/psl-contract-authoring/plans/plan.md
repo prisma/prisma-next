@@ -77,7 +77,7 @@ Build the fixture-driven parity harness and expand coverage across the **already
   - an equivalent TS contract authoring fixture
   - a pack composition fixture shared by both sides (so extension namespaces are config-owned)
   - an expected canonical `contract.json` snapshot file
-  - (proposal) root at `test/integration/test/fixtures/authoring/parity/<case>/`
+  - (proposal) root at `test/integration/test/authoring/parity/<case>/`
 - Expand fixtures to cover the PSL features we already support today (no new behavior), including:
   - models + scalar fields + optional/required
   - `@id`, `@unique`, `@@unique`, `@@index`

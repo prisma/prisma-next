@@ -29,7 +29,7 @@ Establish the on-disk fixture contract and a single test runner that discovers c
   - Optional files: `README.md` (case intent), `notes.md` (debug breadcrumbs)
   - Naming and invariants (e.g. packs are config-owned; `expected.contract.json` is provenance-free)
 - Choose and document the fixture root:
-  - Default: `test/integration/test/fixtures/authoring/parity/<case>/`
+  - Default: `test/integration/test/authoring/parity/<case>/`
   - Add a short “how to add a case” section in the harness test file header (and/or a dedicated README under the fixtures root).
 - Implement a discovery helper (single source of truth) that:
   - enumerates `<case>` directories
@@ -98,7 +98,7 @@ Add explicit determinism tests, codify diagnostics expectations, and keep the TS
 
 - Confirm the best “normalized Contract IR” API to use for parity comparisons (direct framework normalization helper vs comparing the IR after `emitContract`’s internal normalization step).
 - Decide where to store `expected.contract.json` snapshots long-term:
-  - alongside cases under `test/integration/test/fixtures/authoring/parity/<case>/expected.contract.json`, or
+  - alongside cases under `test/integration/test/authoring/parity/<case>/expected.contract.json`, or
   - under the integration fixture app’s `fixtures/` subtree for tighter coupling with existing test helpers.
 - Decide whether `.d.ts` determinism should be asserted for Milestone 3 or deferred (it’s valuable, but may add noise if formatting is still in flux).
 
