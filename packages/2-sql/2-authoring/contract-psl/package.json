@@ -34,7 +34,10 @@
     "src"
   ],
   "exports": {
-    ".": "./dist/index.mjs",
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
     "./provider": {
       "types": "./dist/provider.d.mts",
       "import": "./dist/provider.mjs"
