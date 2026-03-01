@@ -123,7 +123,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 `capabilities` records contract requirements. Adapters still negotiate and verify support at connect time; this example only shows required keys captured in the contract.
 
 ```json
-{"schemaVersion":"1","targetFamily":"sql","target":"postgres","storageHash":"sha256:...","profileHash":"sha256:...","models":{"User":{"storage":{"table":"user"},"fields":{"id":{"column":"id"},"email":{"column":"email"}}}},"storage":{"tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"sql":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}}}
+{"schemaVersion":"1","canonicalVersion":1,"targetFamily":"sql","target":"postgres","storageHash":"sha256:...","profileHash":"sha256:...","models":{"User":{"storage":{"table":"user"},"fields":{"id":{"column":"id"},"email":{"column":"email"}}}},"storage":{"tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"sql":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}}}
 ```
 
 ## Alternatives considered
