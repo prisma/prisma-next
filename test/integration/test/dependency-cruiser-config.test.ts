@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import depCruiseConfig from '../../../dependency-cruiser.config.mjs';
+// @ts-expect-error -- JS config module is validated via a narrowed runtime shape in this test.
+import depCruiseConfigUntyped from '../../../dependency-cruiser.config.mjs';
+
+type DependencyCruiseConfig = {
+  forbidden: Array<{
+    from?: { path?: string };
+    to?: { path?: string };
+  }>;
+};
+
+const depCruiseConfig = depCruiseConfigUntyped as DependencyCruiseConfig;
 
 function regexesContaining(fragment: string): RegExp[] {
   const patterns = depCruiseConfig.forbidden
