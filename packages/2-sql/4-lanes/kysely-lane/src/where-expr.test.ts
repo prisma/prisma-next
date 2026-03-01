@@ -1,6 +1,13 @@
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { CompiledQuery } from 'kysely';
+import {
+  type CompiledQuery,
+  DummyDriver,
+  Kysely,
+  PostgresAdapter,
+  PostgresIntrospector,
+  PostgresQueryCompiler,
+} from 'kysely';
 import { describe, expect, it } from 'vitest';
 import { buildKyselyWhereExpr } from './where-expr';
 
@@ -34,95 +41,32 @@ const contract: SqlContract<SqlStorage> = {
   },
 };
 
+type TestDb = {
+  user: {
+    id: string;
+    kind: string;
+  };
+};
+
+const queryCompiler = new Kysely<TestDb>({
+  dialect: {
+    createAdapter: () => new PostgresAdapter(),
+    createDriver: () => new DummyDriver(),
+    createIntrospector: (db) => new PostgresIntrospector(db),
+    createQueryCompiler: () => new PostgresQueryCompiler(),
+  },
+});
+
 function createSelectWithWhereCompiledQuery(): CompiledQuery<{ id: string }> {
-  return {
-    query: {
-      kind: 'SelectQueryNode',
-      from: {
-        kind: 'FromNode',
-        froms: [
-          {
-            kind: 'TableNode',
-            table: { kind: 'IdentifierNode', name: 'user' },
-          },
-        ],
-      },
-      selections: [
-        {
-          kind: 'SelectionNode',
-          selection: {
-            kind: 'ReferenceNode',
-            table: {
-              kind: 'TableNode',
-              table: { kind: 'IdentifierNode', name: 'user' },
-            },
-            column: {
-              kind: 'ColumnNode',
-              column: { kind: 'IdentifierNode', name: 'id' },
-            },
-          },
-        },
-      ],
-      where: {
-        kind: 'WhereNode',
-        where: {
-          kind: 'BinaryOperationNode',
-          leftOperand: {
-            kind: 'ReferenceNode',
-            table: {
-              kind: 'TableNode',
-              table: { kind: 'IdentifierNode', name: 'user' },
-            },
-            column: {
-              kind: 'ColumnNode',
-              column: { kind: 'IdentifierNode', name: 'kind' },
-            },
-          },
-          operator: { kind: 'OperatorNode', operator: '=' },
-          rightOperand: { kind: 'ValueNode', value: 'admin' },
-        },
-      },
-    },
-    queryId: {} as unknown as CompiledQuery<{ id: string }>['queryId'],
-    sql: 'select "id" from "user" where "kind" = $1',
-    parameters: ['admin'],
-  } as unknown as CompiledQuery<{ id: string }>;
+  return queryCompiler
+    .selectFrom('user')
+    .select('id')
+    .where('kind', '=', 'admin')
+    .compile() as CompiledQuery<{ id: string }>;
 }
 
 function createSelectWithoutWhereCompiledQuery(): CompiledQuery<{ id: string }> {
-  return {
-    query: {
-      kind: 'SelectQueryNode',
-      from: {
-        kind: 'FromNode',
-        froms: [
-          {
-            kind: 'TableNode',
-            table: { kind: 'IdentifierNode', name: 'user' },
-          },
-        ],
-      },
-      selections: [
-        {
-          kind: 'SelectionNode',
-          selection: {
-            kind: 'ReferenceNode',
-            table: {
-              kind: 'TableNode',
-              table: { kind: 'IdentifierNode', name: 'user' },
-            },
-            column: {
-              kind: 'ColumnNode',
-              column: { kind: 'IdentifierNode', name: 'id' },
-            },
-          },
-        },
-      ],
-    },
-    queryId: {} as unknown as CompiledQuery<{ id: string }>['queryId'],
-    sql: 'select "id" from "user"',
-    parameters: [],
-  } as unknown as CompiledQuery<{ id: string }>;
+  return queryCompiler.selectFrom('user').select('id').compile() as CompiledQuery<{ id: string }>;
 }
 
 describe('buildKyselyWhereExpr', () => {
