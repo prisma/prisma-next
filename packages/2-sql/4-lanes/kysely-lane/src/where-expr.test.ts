@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CompiledQuery } from 'kysely';
 import { describe, expect, it } from 'vitest';
@@ -7,7 +8,7 @@ const contract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
-  storageHash: 'sha256:test' as never,
+  storageHash: coreHash('sha256:test'),
   models: {},
   relations: {},
   storage: {
@@ -82,7 +83,7 @@ function createSelectWithWhereCompiledQuery(): CompiledQuery<{ id: string }> {
         },
       },
     },
-    queryId: {} as never,
+    queryId: {} as unknown as CompiledQuery<{ id: string }>['queryId'],
     sql: 'select "id" from "user" where "kind" = $1',
     parameters: ['admin'],
   } as unknown as CompiledQuery<{ id: string }>;
@@ -118,7 +119,7 @@ function createSelectWithoutWhereCompiledQuery(): CompiledQuery<{ id: string }> 
         },
       ],
     },
-    queryId: {} as never,
+    queryId: {} as unknown as CompiledQuery<{ id: string }>['queryId'],
     sql: 'select "id" from "user"',
     parameters: [],
   } as unknown as CompiledQuery<{ id: string }>;
