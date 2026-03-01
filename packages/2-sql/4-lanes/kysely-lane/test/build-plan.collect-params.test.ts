@@ -9,6 +9,7 @@ import {
 } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import { buildKyselyPlan } from '../src/internal/build-plan';
+import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from '../src/transform/errors';
 
 function createTestContract(): SqlContract<SqlStorage> {
   return {
@@ -84,5 +85,46 @@ describe('buildKyselyPlan', () => {
     const plan = buildKyselyPlan(contract, opNode);
     expect(plan.params).toEqual(['a', 'b', 'c']);
     expect(plan.meta.paramDescriptors).toHaveLength(3);
+  });
+
+  it('keeps where and limit params aligned in compile-free order', () => {
+    const contract = createTestContract();
+    const opNode = db
+      .selectFrom('user')
+      .selectAll()
+      .where('id', '=', 'u_1')
+      .limit('2' as never)
+      .toOperationNode();
+
+    const plan = buildKyselyPlan(contract, opNode);
+    const ast = plan.ast as SelectAst;
+    const whereExpr = ast.where as { kind: string; right?: { kind: string; index?: number } };
+
+    expect(whereExpr.kind).toBe('bin');
+    expect(whereExpr.right).toMatchObject({ kind: 'param', index: 1 });
+    expect(plan.params).toEqual(['u_1', '2']);
+    expect(plan.meta.paramDescriptors).toHaveLength(2);
+    expect(plan.meta.paramDescriptors[0]).toMatchObject({ index: 1 });
+    expect(plan.meta.paramDescriptors[1]).toMatchObject({ index: 2 });
+  });
+
+  it('runs guardrails on compile-free build path', () => {
+    const contract = createTestContract();
+    const opNode = db
+      .selectFrom('user as u')
+      .innerJoin('user as p', 'u.id', 'p.id')
+      .selectAll('u')
+      .where('id', '=', 'u_1')
+      .toOperationNode();
+
+    try {
+      buildKyselyPlan(contract, opNode);
+      throw new Error('Expected guardrail error');
+    } catch (error) {
+      expect(KyselyTransformError.is(error)).toBe(true);
+      expect((error as KyselyTransformError).code).toBe(
+        KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+      );
+    }
   });
 });
