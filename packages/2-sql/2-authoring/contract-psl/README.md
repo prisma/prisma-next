@@ -15,6 +15,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 
 - Interpret `ParsePslDocumentResult` into SQL `ContractIR`
 - Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
+- Lower supported default functions through a registry boundary (provider-supplied in v1) so parser/interpreter remain generic
 - Support pgvector parity mapping from PSL attributes to existing TS-representable descriptor shape (`codecId`, `nativeType`, `typeParams`)
 - Map PSL relation action tokens to SQL contract referential actions and emit diagnostics for unsupported values
 - Enforce extension composition for supported namespaced attributes (for example `@pgvector.column(...)`)
@@ -35,6 +36,12 @@ The **pure interpreter entrypoint** specifically excludes:
 - CLI or ControlClient orchestration
 
 Current scope is SQL/Postgres-first: scalar and enum mappings resolve to Postgres codec/native type descriptors in v1.
+
+Supported `@default(...)` surface in v1:
+
+- Storage defaults: `autoincrement()`, `now()`, literals, `dbgenerated("...")`
+- Execution defaults: `uuid()`, `uuid(4)`, `uuid(7)`, `ulid()`, `nanoid()`, `nanoid(<2-255>)`
+- Explicitly unsupported in v1: `cuid()` / `cuid(2)` (diagnostic suggests supported alternatives)
 
 ## Public API
 
