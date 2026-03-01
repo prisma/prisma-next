@@ -10,7 +10,7 @@ Anything in `projects/` is **transient**: once the project is complete, migrate 
 - **Project spec** (shaping output): `projects/<project>/spec.md`
 - **Project plan**: `projects/<project>/plan.md`
 - **Task/feature specs**: `projects/<project>/specs/<task>.spec.md`
-- **Task/feature plans**: `projects/<project>/plans/<task>.plan.md`
+- **Task/feature plans**: `projects/<project>/plans/<task>-plan.md`
 - **Reference material / assets**: `projects/<project>/**`
 
 ### Workflow
