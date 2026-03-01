@@ -340,7 +340,7 @@ export interface DbUpdateSuccess {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
-  readonly origin: {
+  readonly origin?: {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
@@ -358,11 +358,7 @@ export interface DbUpdateSuccess {
 /**
  * Failure codes for dbUpdate operation.
  */
-export type DbUpdateFailureCode =
-  | 'PLANNING_FAILED'
-  | 'MARKER_REQUIRED'
-  | 'RUNNER_FAILED'
-  | 'DESTRUCTIVE_CHANGES';
+export type DbUpdateFailureCode = 'PLANNING_FAILED' | 'RUNNER_FAILED' | 'DESTRUCTIVE_CHANGES';
 
 /**
  * Failure details for dbUpdate operation.

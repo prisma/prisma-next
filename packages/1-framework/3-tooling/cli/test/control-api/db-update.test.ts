@@ -64,7 +64,7 @@ function createMockMigrations(overrides?: {
 const dummyContractIR = { schemaVersion: '1', target: 'postgres' } as unknown as ContractIR;
 
 describe('executeDbUpdate', () => {
-  it('returns MARKER_REQUIRED when no marker exists', async () => {
+  it('proceeds without origin when no marker exists', async () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance({ readMarker: async () => null }),
@@ -74,10 +74,9 @@ describe('executeDbUpdate', () => {
       frameworkComponents: [],
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.failure.code).toBe('MARKER_REQUIRED');
-      expect(result.failure.summary).toContain('signed');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.origin).toBeUndefined();
     }
   });
 
@@ -154,7 +153,7 @@ describe('executeDbUpdate', () => {
       expect(result.value.mode).toBe('plan');
       expect(result.value.plan.operations).toHaveLength(1);
       expect(result.value.plan.sql).toEqual([]);
-      expect(result.value.origin.storageHash).toBe('sha256:origin');
+      expect(result.value.origin?.storageHash).toBe('sha256:origin');
       expect(result.value.destination.storageHash).toBe('sha256:dest');
       expect(result.value.execution).toBeUndefined();
       expect(result.value.marker).toBeUndefined();
@@ -216,7 +215,7 @@ describe('executeDbUpdate', () => {
       });
       expect(result.value.marker).toBeDefined();
       expect(result.value.marker?.storageHash).toBe('sha256:new-hash');
-      expect(result.value.origin.storageHash).toBe('sha256:origin');
+      expect(result.value.origin?.storageHash).toBe('sha256:origin');
       expect(result.value.summary).toContain('Applied');
     }
   });
@@ -254,9 +253,9 @@ describe('executeDbUpdate', () => {
         operationsPlanned: 0,
         operationsExecuted: 0,
       });
-      expect(result.value.origin.storageHash).toBe('sha256:current');
+      expect(result.value.origin?.storageHash).toBe('sha256:current');
       expect(result.value.destination.storageHash).toBe('sha256:current');
-      expect(result.value.summary).toContain('Applied 0');
+      expect(result.value.summary).toContain('already matches');
     }
   });
 
@@ -526,7 +525,7 @@ describe('executeDbUpdate', () => {
       expect(applyEnd).toMatchObject({ outcome: 'ok' });
     });
 
-    it('emits error outcome on readMarker span when marker is missing', async () => {
+    it('emits ok outcome on readMarker span when marker is missing', async () => {
       const events: ControlProgressEvent[] = [];
 
       await executeDbUpdate({
@@ -540,7 +539,7 @@ describe('executeDbUpdate', () => {
       });
 
       const readMarkerEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'readMarker');
-      expect(readMarkerEnd).toMatchObject({ outcome: 'error' });
+      expect(readMarkerEnd).toMatchObject({ outcome: 'ok' });
     });
 
     it('emits error outcome on plan span when planning fails', async () => {

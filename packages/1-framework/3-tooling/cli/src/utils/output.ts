@@ -942,7 +942,11 @@ export function formatMigrationApplyOutput(
   if (result.ok) {
     // Success summary
     const executed = result.execution?.operationsExecuted ?? 0;
-    lines.push(`${prefix}${formatGreen('✔')} Applied ${executed} operation(s)`);
+    if (executed === 0) {
+      lines.push(`${prefix}${formatGreen('✔')} Database already matches contract`);
+    } else {
+      lines.push(`${prefix}${formatGreen('✔')} Applied ${executed} operation(s)`);
+    }
 
     // Marker info
     if (result.marker) {

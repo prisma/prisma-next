@@ -197,6 +197,25 @@ describe('formatMigrationApplyOutput', () => {
 
     expect(stripped).toContain('Total time: 100ms');
   });
+
+  it('shows no-op message when zero operations executed', () => {
+    const result = createApplyResult({
+      plan: {
+        targetId: 'postgres',
+        destination: { storageHash: 'sha256:same' },
+        operations: [],
+      },
+      execution: { operationsPlanned: 0, operationsExecuted: 0 },
+      marker: { storageHash: 'sha256:same' },
+      summary: 'Database already matches contract, signature updated',
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationApplyOutput(result, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('Database already matches contract');
+    expect(stripped).not.toContain('Applied 0');
+  });
 });
 
 describe('formatMigrationJson', () => {

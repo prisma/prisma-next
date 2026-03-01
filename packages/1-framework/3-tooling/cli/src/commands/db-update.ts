@@ -8,7 +8,6 @@ import {
   errorContractValidationFailed,
   errorDestructiveChanges,
   errorJsonFormatNotSupported,
-  errorMarkerRequired,
   errorMigrationPlanningFailed,
   errorRunnerFailed,
   errorUnexpected,
@@ -39,13 +38,6 @@ type DbUpdateOptions = MigrationCommandOptions & {
 function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
   if (failure.code === 'PLANNING_FAILED') {
     return errorMigrationPlanningFailed({ conflicts: failure.conflicts ?? [] });
-  }
-
-  if (failure.code === 'MARKER_REQUIRED') {
-    return errorMarkerRequired({
-      why: failure.why ?? 'No database signature (marker) found',
-      fix: 'Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`',
-    });
   }
 
   if (failure.code === 'RUNNER_FAILED') {
@@ -79,7 +71,7 @@ async function executeDbUpdateCommand(
   // Prepare shared migration context (config, contract, connection, client)
   const ctxResult = await prepareMigrationContext(options, flags, {
     commandName: 'db update',
-    description: 'Reconcile a marker-managed database to the current contract',
+    description: 'Update your database schema to match your contract',
     url: 'https://pris.ly/db-update',
   });
   if (!ctxResult.ok) {
@@ -171,10 +163,9 @@ export function createDbUpdateCommand(): Command {
   const command = new Command('update');
   setCommandDescriptions(
     command,
-    'Reconcile a marker-managed database to the current contract',
-    'Updates a marker-managed database to match your emitted contract using additive,\n' +
-      'widening, and destructive operations when required. Requires a signed database.\n' +
-      'Use --plan to preview operations before applying.',
+    'Update your database schema to match your contract',
+    'Compares your database schema to the emitted contract and applies the necessary\n' +
+      'changes. Use --plan to preview operations before applying.',
   );
   addMigrationCommandOptions(command);
   command.option(
