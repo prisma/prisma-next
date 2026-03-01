@@ -145,7 +145,7 @@ model Place {
 
 #### Enforceable coupling (avoid “metadata drift”)
 
-To avoid the “arse-backwards” failure mode where an attribute is applied to an unrelated type, extension attributes are interpreted with strict invariants. Example (pgvector):
+Extension attributes attach **extra meaning** to a field (for example, “this `Bytes` column is a pgvector `vector(1536)`”). If an attribute is applied to an incompatible base type, the schema can look valid at a glance but produce confusing runtime behavior or incorrect storage assumptions. To keep authoring predictable, extension attributes are interpreted with **strict, enforceable invariants**. Example (pgvector):
 
 - `@pgvector.column(...)` is only valid on compatible base types (e.g. `Bytes`) or on named type instances defined in `types { ... }` whose base is compatible.
 - If applied to an incompatible base type, emission fails with a targeted diagnostic.
