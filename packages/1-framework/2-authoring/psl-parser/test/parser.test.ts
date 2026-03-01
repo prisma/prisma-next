@@ -232,6 +232,8 @@ model Post {
     });
 
     expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+
     const postModel = result.ast.models.find((model) => model.name === 'Post');
     expect(postModel?.attributes.find((attribute) => attribute.name === 'index')).toMatchObject({
       kind: 'attribute',
