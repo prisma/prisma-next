@@ -78,6 +78,14 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 - [x] Add tests asserting compile-free path equivalence/invariants (same `QueryAst` + params ordering for representative shapes).
 - [x] Reduce reliance on Kysely internals where it’s practical (avoid kind-string gating; prefer structural guards).
 
+### Milestone 5: Close-out
+
+**Goal:** Remove transient `projects/kysely-lane-rollout/` artifacts once the rollout is complete, migrating any long-lived docs into `docs/`.
+
+**Tasks:**
+
+- [ ] Close out project workspace (Linear: [TML-2022](https://linear.app/prisma-company/issue/TML-2022/close-out-kysely-lane-rollout-project))
+
 ## Test Strategy by Milestone
 
 - **M1:** regression and correctness tests for existing integration behavior.
@@ -86,6 +94,7 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 
 ## Close-out (required)
 
+- Linear tracking: [TML-2022](https://linear.app/prisma-company/issue/TML-2022/close-out-kysely-lane-rollout-project)
 - [ ] Verify all acceptance criteria in `projects/kysely-lane-rollout/spec.md`
 - [ ] Migrate long-lived docs into `docs/`
 - [ ] Delete `projects/kysely-lane-rollout/`
