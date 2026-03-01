@@ -1,7 +1,11 @@
 import { dirname, resolve } from 'node:path';
-import type { PrismaNextConfig } from '@prisma-next/core-control-plane/config-types';
-import { validateConfig } from '@prisma-next/core-control-plane/config-validation';
-import { errorConfigFileNotFound, errorUnexpected } from '@prisma-next/core-control-plane/errors';
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
+import { ConfigValidationError, validateConfig } from '@prisma-next/config/config-validation';
+import {
+  errorConfigFileNotFound,
+  errorConfigValidation,
+  errorUnexpected,
+} from '@prisma-next/core-control-plane/errors';
 import { loadConfig as loadConfigC12 } from 'c12';
 
 /**
@@ -44,6 +48,12 @@ export async function loadConfig(configPath?: string): Promise<PrismaNextConfig>
 
     return result.config;
   } catch (error) {
+    if (error instanceof ConfigValidationError) {
+      throw errorConfigValidation(error.field, {
+        why: error.why,
+      });
+    }
+
     // Re-throw structured errors as-is
     if (
       error instanceof Error &&

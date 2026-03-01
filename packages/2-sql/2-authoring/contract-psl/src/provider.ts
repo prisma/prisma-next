@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import type { ContractConfig } from '@prisma-next/config/config-types';
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
-import type { ContractConfig } from '@prisma-next/core-control-plane/config-types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk } from '@prisma-next/utils/result';

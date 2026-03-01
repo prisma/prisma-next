@@ -21,6 +21,7 @@
     "prisma-next": "./dist/cli.js"
   },
   "dependencies": {
+    "@prisma-next/config": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
