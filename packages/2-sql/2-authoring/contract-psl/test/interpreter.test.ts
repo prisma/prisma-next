@@ -211,29 +211,30 @@ model Member {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const tables = (result.value.storage as Record<string, unknown>)['tables'];
 
-    expect(tables).toMatchObject({
-      org_team: {
-        columns: {
-          team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-        },
-        primaryKey: { columns: ['team_id'] },
-      },
-      team_member: {
-        columns: {
-          member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-          team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
-        },
-        primaryKey: { columns: ['member_id'] },
-        indexes: [{ columns: ['team_ref'] }],
-        uniques: [{ columns: ['team_ref', 'member_id'] }],
-        foreignKeys: [
-          {
-            columns: ['team_ref'],
-            references: { table: 'org_team', columns: ['team_id'] },
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        org_team: {
+          columns: {
+            team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
           },
-        ],
+          primaryKey: { columns: ['team_id'] },
+        },
+        team_member: {
+          columns: {
+            member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+            team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
+          },
+          primaryKey: { columns: ['member_id'] },
+          indexes: [{ columns: ['team_ref'] }],
+          uniques: [{ columns: ['team_ref', 'member_id'] }],
+          foreignKeys: [
+            {
+              columns: ['team_ref'],
+              references: { table: 'org_team', columns: ['team_id'] },
+            },
+          ],
+        },
       },
     });
     expect(result.value.models).toMatchObject({
@@ -445,12 +446,13 @@ model Document {
     });
     expect(namedTypeResult.ok).toBe(true);
     if (!namedTypeResult.ok) return;
-    const types = (namedTypeResult.value.storage as Record<string, unknown>)['types'];
-    expect(types).toMatchObject({
-      Embedding1536: {
-        codecId: 'pg/vector@1',
-        nativeType: 'vector(1536)',
-        typeParams: { length: 1536 },
+    expect(namedTypeResult.value.storage).toMatchObject({
+      types: {
+        Embedding1536: {
+          codecId: 'pg/vector@1',
+          nativeType: 'vector(1536)',
+          typeParams: { length: 1536 },
+        },
       },
     });
 
@@ -468,17 +470,18 @@ model Document {
     });
     expect(fieldResult.ok).toBe(true);
     if (!fieldResult.ok) return;
-    const fieldTables = (fieldResult.value.storage as Record<string, unknown>)['tables'] as Record<
-      string,
-      unknown
-    >;
-    const documentTable = fieldTables['document'] as {
-      readonly columns?: Record<string, unknown>;
-    };
-    expect(documentTable.columns?.['embedding']).toMatchObject({
-      codecId: 'pg/vector@1',
-      nativeType: 'vector(1536)',
-      typeParams: { length: 1536 },
+    expect(fieldResult.value.storage).toMatchObject({
+      tables: {
+        document: {
+          columns: {
+            embedding: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector(1536)',
+              typeParams: { length: 1536 },
+            },
+          },
+        },
+      },
     });
   });
 
@@ -613,13 +616,25 @@ model User {
         ],
       },
     });
-    expect(result.value.storage.tables.defaults.columns.dbExpr.default).toEqual({
-      kind: 'function',
-      expression: 'gen_random_uuid()',
-    });
-    expect(result.value.storage.tables.defaults.columns.createdAt.default).toEqual({
-      kind: 'function',
-      expression: 'now()',
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        defaults: {
+          columns: {
+            dbExpr: {
+              default: {
+                kind: 'function',
+                expression: 'gen_random_uuid()',
+              },
+            },
+            createdAt: {
+              default: {
+                kind: 'function',
+                expression: 'now()',
+              },
+            },
+          },
+        },
+      },
     });
   });
 
