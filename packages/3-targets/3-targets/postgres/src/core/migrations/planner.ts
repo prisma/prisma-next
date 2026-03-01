@@ -776,10 +776,10 @@ function assertSafeNativeType(nativeType: string): void {
  * Not a comprehensive security boundary — the contract is developer-authored.
  */
 function assertSafeDefaultExpression(expression: string): void {
-  if (expression.includes(';') || /--|\/\*|\$\$/.test(expression)) {
+  if (expression.includes(';') || /--|\/\*|\$\$|\bSELECT\b/i.test(expression)) {
     throw new Error(
       `Unsafe default expression in contract: "${expression}". ` +
-        'Default expressions must not contain semicolons, SQL comment tokens, or dollar-quoting.',
+        'Default expressions must not contain semicolons, SQL comment tokens, dollar-quoting, or subqueries.',
     );
   }
 }

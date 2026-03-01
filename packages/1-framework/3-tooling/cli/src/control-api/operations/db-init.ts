@@ -5,13 +5,13 @@ import type {
   ControlFamilyInstance,
   MigrationPlan,
   MigrationPlannerResult,
-  MigrationPlanOperation,
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types';
 import { extractSqlDdl } from './extract-sql-ddl';
+import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 /**
  * Options for executing dbInit operation.
@@ -187,11 +187,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     const result: DbInitSuccess = {
       mode: 'plan',
       plan: {
-        operations: migrationPlan.operations.map((op) => ({
-          id: op.id,
-          label: op.label,
-          operationClass: op.operationClass,
-        })),
+        operations: stripOperations(migrationPlan.operations),
         ...(planSql !== undefined ? { sql: planSql } : {}),
       },
       summary: `Planned ${migrationPlan.operations.length} operation(s)`,
@@ -208,27 +204,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     label: 'Applying migration plan',
   });
 
-  const callbacks = onProgress
-    ? {
-        onOperationStart: (op: MigrationPlanOperation) => {
-          onProgress({
-            action: 'dbInit',
-            kind: 'spanStart',
-            spanId: `operation:${op.id}`,
-            parentSpanId: applySpanId,
-            label: op.label,
-          });
-        },
-        onOperationComplete: (op: MigrationPlanOperation) => {
-          onProgress({
-            action: 'dbInit',
-            kind: 'spanEnd',
-            spanId: `operation:${op.id}`,
-            outcome: 'ok',
-          });
-        },
-      }
-    : undefined;
+  const callbacks = createOperationCallbacks(onProgress, 'dbInit', applySpanId);
 
   const runnerResult: MigrationRunnerResult = await runner.execute({
     plan: migrationPlan,
@@ -275,11 +251,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
   const result: DbInitSuccess = {
     mode: 'apply',
     plan: {
-      operations: migrationPlan.operations.map((op) => ({
-        id: op.id,
-        label: op.label,
-        operationClass: op.operationClass,
-      })),
+      operations: stripOperations(migrationPlan.operations),
     },
     execution: {
       operationsPlanned: execution.operationsPlanned,
