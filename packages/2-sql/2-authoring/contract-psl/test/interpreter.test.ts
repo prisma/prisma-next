@@ -253,7 +253,7 @@ model Member {
   it('maps pgvector attributes on named types and fields to vector descriptor shape', () => {
     const namedTypeDocument = parsePslDocument({
       schema: `types {
-  Embedding1536 = Bytes @pgvector.column(dim: 1536)
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
 }
 
 model Document {

@@ -76,7 +76,7 @@ model Post {
   it('parses field namespaced parameterized attributes', () => {
     const schema = `
 types {
-  Embedding1536 = Bytes @pgvector.column(dim: 1536)
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
 }
 
 model Document {
@@ -110,7 +110,7 @@ model Document {
       kind: 'attribute',
       target: 'namedType',
       name: 'pgvector.column',
-      args: [{ kind: 'named', name: 'dim', value: '1536' }],
+      args: [{ kind: 'named', name: 'length', value: '1536' }],
     });
   });
 
@@ -149,7 +149,7 @@ model Account {
     const schema = `
 model User {
   id Int @id
-  email String @pgvector.column(dim: )
+  email String @pgvector.column(length: )
 }
 `;
 

@@ -131,7 +131,7 @@ describe('prismaContract provider helper', () => {
       await writeFile(
         schemaPath,
         `types {
-  Embedding1536 = Bytes @pgvector.column(dim: 1536)
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
 }
 
 model Document {
