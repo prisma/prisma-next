@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parsePslDocument } from '../src/parser';
 
 describe('parsePslDocument', () => {
-  it('parses representative v1 schema with spans', () => {
+  it('parses representative v1 schema with generic attributes and spans', () => {
     const schema = `
 types {
   Email = String @db.VarChar(191)
@@ -47,31 +47,41 @@ model Post {
     expect(userModel).toBeDefined();
     const emailField = userModel?.fields.find((field) => field.name === 'email');
     expect(emailField?.typeRef).toBe('Email');
+    const namedType = result.ast.types?.declarations[0];
+    expect(namedType?.attributes[0]).toMatchObject({
+      kind: 'attribute',
+      target: 'namedType',
+      name: 'db.VarChar',
+      args: [{ kind: 'positional', value: '191' }],
+    });
 
     const postModel = result.ast.models.find((model) => model.name === 'Post');
     const relationField = postModel?.fields.find((field) => field.name === 'user');
     const relationAttribute = relationField?.attributes.find(
-      (attribute) => attribute.kind === 'relation',
+      (attribute) => attribute.name === 'relation',
     );
     expect(relationAttribute).toMatchObject({
-      kind: 'relation',
-      fields: ['userId'],
-      references: ['id'],
-      onDelete: 'Cascade',
-      onUpdate: 'SetNull',
+      kind: 'attribute',
+      target: 'field',
+      name: 'relation',
+      args: [
+        { kind: 'named', name: 'fields', value: '[userId]' },
+        { kind: 'named', name: 'references', value: '[id]' },
+        { kind: 'named', name: 'onDelete', value: 'Cascade' },
+        { kind: 'named', name: 'onUpdate', value: 'SetNull' },
+      ],
     });
   });
 
-  it('preserves raw referential action tokens in relation attributes', () => {
+  it('parses field namespaced parameterized attributes', () => {
     const schema = `
-model User {
-  id Int @id
+types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
 }
 
-model Post {
+model Document {
   id Int @id
-  userId Int
-  user User @relation(fields: [userId], references: [id], onDelete: WeirdAction)
+  embedding Embedding1536 @pgvector.column(length: 1536)
 }
 `;
 
@@ -81,30 +91,91 @@ model Post {
     });
 
     expect(result.ok).toBe(true);
-    expect(
-      result.diagnostics.some((entry) => entry.code === 'PSL_INVALID_REFERENTIAL_ACTION'),
-    ).toBe(false);
-    const postModel = result.ast.models.find((model) => model.name === 'Post');
-    const relationField = postModel?.fields.find((field) => field.name === 'user');
-    const relationAttribute = relationField?.attributes.find(
-      (attribute) => attribute.kind === 'relation',
+    const documentModel = result.ast.models.find((model) => model.name === 'Document');
+    const embeddingField = documentModel?.fields.find((field) => field.name === 'embedding');
+    const embeddingAttribute = embeddingField?.attributes.find(
+      (attribute) => attribute.name === 'pgvector.column',
     );
-    expect(relationAttribute).toMatchObject({
-      kind: 'relation',
-      onDelete: 'WeirdAction',
+    expect(embeddingAttribute).toMatchObject({
+      kind: 'attribute',
+      target: 'field',
+      name: 'pgvector.column',
+      args: [{ kind: 'named', name: 'length', value: '1536' }],
+    });
+
+    const namedType = result.ast.types?.declarations.find(
+      (entry) => entry.name === 'Embedding1536',
+    );
+    expect(namedType?.attributes[0]).toMatchObject({
+      kind: 'attribute',
+      target: 'namedType',
+      name: 'pgvector.column',
+      args: [{ kind: 'named', name: 'length', value: '1536' }],
     });
   });
 
-  it('returns precise diagnostics for invalid relation attribute', () => {
+  it('parses hyphenated namespace attribute names', () => {
+    const schema = `
+model Document {
+  id Int @id
+  embedding Bytes @my-pack.column(length: 1536)
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    const documentModel = result.ast.models.find((model) => model.name === 'Document');
+    const embeddingField = documentModel?.fields.find((field) => field.name === 'embedding');
+    expect(
+      embeddingField?.attributes.find((attribute) => attribute.name === 'my-pack.column'),
+    ).toMatchObject({
+      kind: 'attribute',
+      target: 'field',
+      name: 'my-pack.column',
+      args: [{ kind: 'named', name: 'length', value: '1536' }],
+    });
+  });
+
+  it('parses @map and @@map through generic attributes', () => {
+    const schema = `
+model Account {
+  id Int @id
+  email String @map("email_address")
+  @@map("app_accounts")
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    const accountModel = result.ast.models.find((model) => model.name === 'Account');
+    const emailField = accountModel?.fields.find((field) => field.name === 'email');
+    expect(emailField?.attributes.find((attribute) => attribute.name === 'map')).toMatchObject({
+      kind: 'attribute',
+      target: 'field',
+      name: 'map',
+      args: [{ kind: 'positional', value: '"email_address"' }],
+    });
+    expect(accountModel?.attributes.find((attribute) => attribute.name === 'map')).toMatchObject({
+      kind: 'attribute',
+      target: 'model',
+      name: 'map',
+      args: [{ kind: 'positional', value: '"app_accounts"' }],
+    });
+  });
+
+  it('returns diagnostics for malformed attribute syntax', () => {
     const schema = `
 model User {
   id Int @id
-}
-
-model Post {
-  id Int @id
-  userId Int
-  user User @relation(fields: [userId])
+  email String @pgvector.column(length: )
 }
 `;
 
@@ -114,17 +185,12 @@ model Post {
     });
 
     expect(result.ok).toBe(false);
-    const diagnostic = result.diagnostics.find(
-      (entry) => entry.code === 'PSL_INVALID_RELATION_ATTRIBUTE',
+    expect(result.diagnostics.some((entry) => entry.code === 'PSL_INVALID_ATTRIBUTE_SYNTAX')).toBe(
+      true,
     );
-    expect(diagnostic).toBeDefined();
-    expect(diagnostic?.message).toContain('fields and references');
-    expect(diagnostic?.sourceId).toBe('schema.prisma');
-    expect(diagnostic?.span.start.line).toBe(9);
-    expect(diagnostic?.span.end.line).toBe(9);
   });
 
-  it('fails strictly for unsupported constructs', () => {
+  it('fails strictly for unsupported top-level constructs', () => {
     const schema = `
 datasource db {
   provider = "postgresql"
@@ -148,10 +214,10 @@ model User {
     ).toBe(true);
     expect(
       result.diagnostics.some((entry) => entry.code === 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE'),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it('returns diagnostic for unsupported trailing model attribute arguments', () => {
+  it('parses trailing model attribute arguments generically', () => {
     const schema = `
 model Post {
   id Int @id
@@ -165,13 +231,17 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    expect(result.ok).toBe(false);
-    const diagnostic = result.diagnostics.find(
-      (entry) =>
-        entry.code === 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE' &&
-        entry.message.includes('Unsupported model attribute arguments'),
-    );
-    expect(diagnostic).toBeDefined();
+    expect(result.ok).toBe(true);
+    const postModel = result.ast.models.find((model) => model.name === 'Post');
+    expect(postModel?.attributes.find((attribute) => attribute.name === 'index')).toMatchObject({
+      kind: 'attribute',
+      target: 'model',
+      name: 'index',
+      args: [
+        { kind: 'positional', value: '[userId]' },
+        { kind: 'named', name: 'map', value: '"post_user_idx"' },
+      ],
+    });
   });
 
   it('is deterministic for identical input', () => {

@@ -114,7 +114,7 @@ Decorations are sorted by the following comparator:
     "pgvector": {
       "decorations": {
         "columns": [
-          { "payload": { "distance": "cosine", "dim": 1536 }, "ref": { "table": "document", "kind": "column", "column": "embedding" } }
+          { "payload": { "distance": "cosine", "length": 1536 }, "ref": { "table": "document", "kind": "column", "column": "embedding" } }
         ]
       },
       "version": "1.2.0",
@@ -136,7 +136,7 @@ Decorations are sorted by the following comparator:
       "decorations": {
         "columns": [
           {
-            "payload": { "dim": 1536, "distance": "cosine" },
+            "payload": { "length": 1536, "distance": "cosine" },
             "ref": { "column": "embedding", "kind": "column", "table": "document" }
           }
         ]

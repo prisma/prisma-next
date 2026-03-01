@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { prismaContract } from '../src/provider';
+import { prismaContract } from '../src/exports/provider';
 
 describe('prismaContract provider helper', () => {
   const originalCwd = process.cwd();
@@ -85,6 +85,78 @@ describe('prismaContract provider helper', () => {
           }),
         ]),
       );
+    });
+  });
+
+  describe('given namespaced extension attributes in schema', () => {
+    it('returns diagnostics when extension namespace is unrecognized', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model Document {
+  id Int @id
+  embedding Bytes @pgvector.column(length: 1536)
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source();
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+
+      expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+            sourceId: './schema.prisma',
+            span: expect.objectContaining({
+              start: expect.objectContaining({ line: 3 }),
+            }),
+          }),
+        ]),
+      );
+    });
+
+    it('interprets namespaced extension attributes when extension is composed', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
+}
+
+model Document {
+  id Int @id
+  embedding Embedding1536
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', {
+        composedExtensionPacks: ['pgvector'],
+      });
+      const result = await contract.source();
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.storage['types']).toMatchObject({
+        Embedding1536: {
+          codecId: 'pg/vector@1',
+          nativeType: 'vector(1536)',
+          typeParams: { length: 1536 },
+        },
+      });
     });
   });
 

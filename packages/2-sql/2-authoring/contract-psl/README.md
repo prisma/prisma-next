@@ -14,7 +14,10 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 ## Responsibilities
 
 - Interpret `ParsePslDocumentResult` into SQL `ContractIR`
+- Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
+- Support pgvector parity mapping from PSL attributes to existing TS-representable descriptor shape (`codecId`, `nativeType`, `typeParams`)
 - Map PSL relation action tokens to SQL contract referential actions and emit diagnostics for unsupported values
+- Enforce extension composition for supported namespaced attributes (for example `@pgvector.column(...)`)
 - Compose provider flow for SQL PSL-first config (`read -> parse -> interpret`)
 - Preserve parser diagnostics and add interpreter diagnostics with stable codes
 - Return `notOk` with structured diagnostics for unsupported constructs
@@ -38,7 +41,10 @@ Current scope is SQL/Postgres-first: scalar and enum mappings resolve to Postgre
 - `@prisma-next/sql-contract-psl`
   - `interpretPslDocumentToSqlContractIR({ document, target? })`
 - `@prisma-next/sql-contract-psl/provider`
-  - `prismaContract(schemaPath, { output?, target? })`
+  - `prismaContract(schemaPath, { output?, target?, composedExtensionPacks? })`
+  - `composedExtensionPacks` is currently a milestone-local string-id hook for namespace
+    availability checks (for example `['pgvector']`); plan to evolve to richer composed pack
+    metadata/manifest inputs before broadening namespaced-attribute validation.
 
 ## Dependencies
 

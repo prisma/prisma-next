@@ -7,23 +7,29 @@ It records two related (but distinct) inventories:
 - **TS surface gaps**: behaviors the TypeScript contract authoring surface can express that PSL cannot yet express (this is the actual “parity gap”).
 - **Prisma ORM PSL surface gaps**: features in the official Prisma Schema Language that we do *not* plan to support (because Prisma Next’s capability ceiling is the TS authoring surface + contract model).
 
-## TS surface gap inventory (not currently possible in PSL v1)
+## TS surface gap inventory (remaining)
 
-- **Parameterized column/storage types (`typeParams`)**
-  - TS can express parameterized native types via descriptors or `typeParams` (e.g. `charColumn(length)`, `varcharColumn(length)`, `numericColumn(precision, scale)`, temporal precision types, etc.).
-  - PSL v1 cannot express or interpret parameterized types (neither for per-field attributes nor in `types { ... }` declarations).
+- **Parameterized native SQL column types beyond pgvector**
+  - ✅ Implemented in Milestone 4: pgvector parity via `@pgvector.column(length|dim: ...)` on fields and `types { ... }`.
+  - ❌ Remaining: native SQL parameterized types still not mapped from PSL into TS-equivalent descriptors.
+  - Follow-on target mappings:
+    - `@db.Char(length: n)` → `charColumn(n)` (codec/native type parity)
+    - `@db.VarChar(length: n)` → `varcharColumn(n)`
+    - `@db.Numeric(precision: p, scale: s)` → `numericColumn(p, s)`
+    - `@db.Time(precision: p)` / `@db.Timestamp(precision: p)` → temporal precision column factories
+    - `@db.Bit(length: n)` / `@db.VarBit(length: n)` → bit/varbit descriptors
+    - typed JSON schema parameters → existing TS `typeParams` JSON schema payload shape
 
-- **Extension packs + namespaced attributes**
-  - TS can compose `extensionPacks` and author columns/types that depend on extension metadata (e.g. pgvector).
-  - PSL v1 does not yet support namespaced attributes like `@pgvector.column(...)` (or any pack-provided validation/encoding).
+- **Extension packs + namespaced attributes (beyond initial pgvector subset)**
+  - ✅ Implemented in Milestone 4: `@pgvector.column(...)` with composition enforcement (`extensionPacks` must include `pgvector`).
+  - ❌ Remaining: broader namespaced attribute surface across other packs/namespaces and richer attribute vocabularies.
 
 - **More default functions**
   - TS can express additional default functions/expressions on columns beyond `autoincrement()` and `now()`.
   - PSL v1 only supports `autoincrement()` and `now()` plus literal defaults.
 
 - **Storage mapping control**
-  - TS can choose table names independently and map models to those table names explicitly.
-  - PSL v1 derives table names from model names (`lowerFirst(model.name)`) and does not support `@@map` / `@map`-style mapping.
+  - ✅ Implemented in Milestone 4: `@@map("...")` (model → table) and `@map("...")` (field → column), including PK/unique/index/FK propagation over storage names.
 
 - **Constraint/index naming and richer FK configuration**
   - TS can name indexes/uniques and provide richer foreign key options (names; constraint/index flags; defaults).
@@ -51,7 +57,7 @@ These are features that exist in Prisma ORM’s PSL but are either irrelevant in
 
 - **Mapping / naming attributes**
   - Prisma PSL supports `@map` (field → column) and `@@map` (model → table), plus `@@schema`.
-  - **Decision:** `@map` and `@@map` are **in scope** (representative + “trivial”); `@@schema` is **out of scope** (not supported in TS surface either).
+  - **Status:** `@map` and `@@map` are implemented in Milestone 4; `@@schema` remains out of scope (not supported in TS surface either).
 
 - **Ignore directives**
   - Prisma PSL supports `@ignore` and `@@ignore`.

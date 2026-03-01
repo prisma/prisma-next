@@ -10,6 +10,16 @@ import { interpretPslDocumentToSqlContractIR } from './interpreter';
 export interface PrismaContractOptions {
   readonly output?: string;
   readonly target?: TargetPackRef<'sql', 'postgres'>;
+  /**
+   * Milestone-local namespace availability hook.
+   *
+   * This currently models composed extension packs by id only (for example `["pgvector"]`),
+   * and is sufficient for namespace presence checks in the PSL interpreter.
+   *
+   * Future milestones can evolve this to richer composed pack metadata/manifests when
+   * attribute-level schema/argument validation needs to move beyond namespace existence.
+   */
+  readonly composedExtensionPacks?: readonly string[];
 }
 
 export function prismaContract(
@@ -23,7 +33,7 @@ export function prismaContract(
       try {
         schema = await readFile(absoluteSchemaPath, 'utf-8');
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = String(error);
         return notOk({
           summary: `Failed to read Prisma schema at "${schemaPath}"`,
           diagnostics: [
@@ -45,6 +55,7 @@ export function prismaContract(
       return interpretPslDocumentToSqlContractIR({
         document,
         ...ifDefined('target', options?.target),
+        ...ifDefined('composedExtensionPacks', options?.composedExtensionPacks),
       });
     },
     ...ifDefined('output', options?.output),

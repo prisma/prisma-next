@@ -15,6 +15,24 @@ In the provider-based authoring model, PSL providers call this parser and then r
 - Preserve raw PSL relation action tokens (for example `Cascade`) without semantic normalization.
 - Return stable diagnostics (`code`, `message`, `span`, `sourceId`) for invalid and unsupported constructs.
 - Enforce strict error behavior for unsupported syntax (no warning or best-effort mode).
+- Parse attributes generically (namespaced or not), including optional argument lists; semantics live downstream.
+- Emit attribute nodes with explicit target (`field` / `model` / `namedType`), attribute name, and parsed argument list with spans.
+
+## Attributes (generic parsing boundary)
+
+`@prisma-next/psl-parser` parses attributes **generically**:
+
+- Attributes may be **non-namespaced** (for example `@id`) or **namespaced** (for example `@pgvector.column`).
+- Attributes may include an **optional argument list**.
+- Arguments are parsed into positional/named entries with preserved raw values and source spans.
+- The parser owns **syntax + structure + spans**, not semantics.
+
+Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is responsible for:
+
+- mapping attributes to existing contract authoring shapes,
+- enforcing strictness (unknown/unsupported attributes are errors),
+- enforcing pack composition (using `@<ns>.*` without composing the pack fails), and
+- ensuring parity with the TS authoring surface.
 
 ## Public API
 

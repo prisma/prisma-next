@@ -100,6 +100,7 @@ Build the fixture-driven parity harness and expand coverage across the **already
 Add the first meaningful new behavior that closes a TS↔PSL gap: support for **parameterized attributes** in PSL interpretation, with a minimum implementation that proves pgvector column typing parity.
 
 **Spec:** `projects/psl-contract-authoring/specs/Milestone 4 - Parameterized attributes and pgvector parity.spec.md`
+**Execution Plan:** `projects/psl-contract-authoring/plans/Milestone 4 - Parameterized attributes and pgvector parity-plan.md`
 
 **Tasks:**
 
@@ -112,7 +113,7 @@ Add the first meaningful new behavior that closes a TS↔PSL gap: support for **
   - named type instances in `types { ... }` (ergonomic upgrade; reads like parameterized types without new type-expression grammar)
 - Minimum supported capability: **pgvector vector column typing** parity with TS.
   - Add at least one parity fixture that proves canonical `contract.json` + hash equality between:
-    - PSL: `@pgvector.column(dim: 1536)` (preferably via a named type in `types { ... }`)
+    - PSL: `@pgvector.column(length: 1536)` (preferably via a named type in `types { ... }`)
     - TS: `vector(1536)` / `vectorColumn` via the pgvector pack surface
 - In the same thematic area, enumerate and plan follow-on parameterized native types to close TS parity gaps (Postgres adapter examples):
   - `charColumn(length)`

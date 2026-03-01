@@ -20,7 +20,7 @@ This is the first “new behavior” milestone after the fixture-driven harness:
   - `@map("...")` for fields
 - Prove extension-pack parity (minimum: pgvector):
   - Add at least one parity fixture asserting canonical `contract.json` + stable hash equality between:
-    - PSL: `@pgvector.column(dim: 1536)` (prefer via `types { ... }`)
+    - PSL: `@pgvector.column(length: 1536)` (prefer via `types { ... }`)
     - TS: pgvector `vector(1536)` / `vectorColumn` through pack composition in config
 - Enforce the composition constraint:
   - packs/namespaces are composed via `prisma-next.config.ts`
@@ -45,7 +45,7 @@ This is the first “new behavior” milestone after the fixture-driven harness:
 
 # Open Questions
 
-- Define the precise mapping for `types { ... }` entries (including extension-pack attributes like `@pgvector.column(dim: 1536)`) to `codecId` / `nativeType` / `typeParams` so it matches the existing SQL TS authoring surface.
+- Define the precise mapping for `types { ... }` entries (including extension-pack attributes like `@pgvector.column(length: 1536)`) to `codecId` / `nativeType` / `typeParams` so it matches the existing SQL TS authoring surface.
 
 # References
 

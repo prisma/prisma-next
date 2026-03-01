@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'pathe';
 import { createIntegrationTestDir } from '../utils/cli-test-helpers';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
