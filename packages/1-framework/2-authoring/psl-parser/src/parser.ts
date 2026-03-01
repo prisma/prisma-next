@@ -482,7 +482,7 @@ function parseAttributeToken(
   }
 
   const name = (openParen >= 0 ? rawBody.slice(0, openParen) : rawBody).trim();
-  if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name)) {
+  if (!/^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*$/.test(name)) {
     pushDiagnostic(context, {
       code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
       message: `Invalid attribute name "${name || input.token}"`,
@@ -744,7 +744,7 @@ function extractAttributeTokensWithSpans(
     }
 
     const nameStart = index;
-    while (index < value.length && /[A-Za-z0-9_.]/.test(value[index] ?? '')) {
+    while (index < value.length && /[A-Za-z0-9_.-]/.test(value[index] ?? '')) {
       index += 1;
     }
 

@@ -114,6 +114,32 @@ model Document {
     });
   });
 
+  it('parses hyphenated namespace attribute names', () => {
+    const schema = `
+model Document {
+  id Int @id
+  embedding Bytes @my-pack.column(length: 1536)
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    const documentModel = result.ast.models.find((model) => model.name === 'Document');
+    const embeddingField = documentModel?.fields.find((field) => field.name === 'embedding');
+    expect(
+      embeddingField?.attributes.find((attribute) => attribute.name === 'my-pack.column'),
+    ).toMatchObject({
+      kind: 'attribute',
+      target: 'field',
+      name: 'my-pack.column',
+      args: [{ kind: 'named', name: 'length', value: '1536' }],
+    });
+  });
+
   it('parses @map and @@map through generic attributes', () => {
     const schema = `
 model Account {

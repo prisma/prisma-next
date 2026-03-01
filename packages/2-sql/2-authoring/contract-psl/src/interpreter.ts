@@ -154,6 +154,15 @@ function unquoteStringLiteral(value: string): string {
   return match[2] ?? '';
 }
 
+function parseQuotedStringLiteral(value: string): string | undefined {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(['"])(.*)\1$/);
+  if (!match) {
+    return undefined;
+  }
+  return match[2] ?? '';
+}
+
 function parseFieldList(value: string): readonly string[] | undefined {
   const trimmed = value.trim();
   if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
@@ -204,13 +213,23 @@ function parseMapName(input: {
   if (!value) {
     input.diagnostics.push({
       code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      message: `${input.entityLabel} @map requires a positional string argument`,
+      message: `${input.entityLabel} @map requires a positional quoted string literal argument`,
       sourceId: input.sourceId,
       span: input.attribute.span,
     });
     return input.defaultValue;
   }
-  return unquoteStringLiteral(value);
+  const parsed = parseQuotedStringLiteral(value);
+  if (parsed === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} @map requires a positional quoted string literal argument`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return input.defaultValue;
+  }
+  return parsed;
 }
 
 function parsePgvectorLength(input: {

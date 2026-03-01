@@ -250,6 +250,33 @@ model Member {
     });
   });
 
+  it('returns diagnostics when @map and @@map arguments are not quoted string literals', () => {
+    const document = parsePslDocument({
+      schema: `model Team {
+  id Int @id @map(team_id)
+  @@map(org_team)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            '@map requires a positional quoted string literal argument',
+          ),
+        }),
+      ]),
+    );
+  });
+
   it('maps pgvector attributes on named types and fields to vector descriptor shape', () => {
     const namedTypeDocument = parsePslDocument({
       schema: `types {
