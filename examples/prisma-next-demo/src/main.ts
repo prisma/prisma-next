@@ -133,8 +133,8 @@ async function main() {
         console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [positive-limit]');
         process.exit(1);
       }
-      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-      if (!Number.isInteger(limit) || limit <= 0) {
+      const limit = limitStr === undefined ? 10 : Number(limitStr);
+      if (!Number.isSafeInteger(limit) || limit <= 0) {
         console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [positive-limit]');
         process.exit(1);
       }
