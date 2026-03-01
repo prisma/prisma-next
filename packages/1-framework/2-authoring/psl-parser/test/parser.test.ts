@@ -191,7 +191,7 @@ model User {
     ).toBe(false);
   });
 
-  it('returns diagnostic for unsupported trailing model attribute arguments', () => {
+  it('parses trailing model attribute arguments generically', () => {
     const schema = `
 model Post {
   id Int @id
@@ -205,13 +205,17 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    expect(result.ok).toBe(false);
-    const diagnostic = result.diagnostics.find(
-      (entry) =>
-        entry.code === 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE' &&
-        entry.message.includes('Unsupported model attribute arguments'),
-    );
-    expect(diagnostic).toBeDefined();
+    expect(result.ok).toBe(true);
+    const postModel = result.ast.models.find((model) => model.name === 'Post');
+    expect(postModel?.attributes.find((attribute) => attribute.name === 'index')).toMatchObject({
+      kind: 'attribute',
+      target: 'model',
+      name: 'index',
+      args: [
+        { kind: 'positional', value: '[userId]' },
+        { kind: 'named', name: 'map', value: '"post_user_idx"' },
+      ],
+    });
   });
 
   it('is deterministic for identical input', () => {

@@ -150,7 +150,7 @@ model Document {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.storage.types).toMatchObject({
+      expect(result.value.storage['types']).toMatchObject({
         Embedding1536: {
           codecId: 'pg/vector@1',
           nativeType: 'vector(1536)',

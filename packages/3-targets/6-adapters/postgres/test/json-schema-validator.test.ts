@@ -96,7 +96,7 @@ describe('json-schema-validator', () => {
       }
     });
 
-    it('validates enum values', () => {
+    it('validates enum values', { timeout: 2000 }, () => {
       const validate = compileJsonSchemaValidator({
         type: 'object',
         properties: {
