@@ -67,5 +67,5 @@ flowchart LR
 
 - `docs/Architecture Overview.md`
 - `docs/architecture docs/subsystems/2. Contract Emitter & Types.md`
-- `docs/architecture docs/adrs/ADR 163 - Provider-invoked source normalization packages.md`
+- `docs/architecture docs/adrs/ADR 163 - Provider-invoked source interpretation packages.md`
 - `projects/psl-contract-authoring/specs/sql-contract-psl.spec.md`

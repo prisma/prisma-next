@@ -143,5 +143,5 @@ Maintain or add an integration test that demonstrates the full flow:
 
 - `projects/psl-contract-authoring/specs/pluggable-contract-sources.spec.md`
 - `projects/psl-contract-authoring/specs/contract-psl-parser.spec.md`
-- ADR: `docs/architecture docs/adrs/ADR 163 - Provider-invoked source normalization packages.md`
+- ADR: `docs/architecture docs/adrs/ADR 163 - Provider-invoked source interpretation packages.md`
 
