@@ -42,6 +42,7 @@ Supported `@default(...)` surface in v1:
 - Storage defaults: `autoincrement()`, `now()`, literals, `dbgenerated("...")`
 - Execution defaults: `uuid()`, `uuid(4)`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(<2-255>)`
 - Explicitly unsupported in v1: `cuid()` (diagnostic suggests `cuid(2)`)
+- `dbgenerated("...")` preserves the parsed PSL string-literal contents as-is (escaped sequences are not normalized in v1).
 
 ## Public API
 
