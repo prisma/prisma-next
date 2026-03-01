@@ -99,10 +99,6 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/capabilities-ownership.mdc` — Capabilities are adapter-reported; contracts declare requirements
 - `.cursor/rules/tsdown-config-package-source-only.mdc` — Keep `@prisma-next/tsdown` exports source-only (no `.js` workaround files)
 
-## Research & docs writing
-- `.cursor/rules/research-comparisons-need-axes.mdc` — Comparisons must state the shared axis (knob/invariant/trade-off)
-- `.cursor/rules/walkthrough-additive-changes.mdc` — Walkthrough wording: phrase additive changes as additions (avoid “no X → Y”)
-
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.
 - Keep `alwaysApply` minimal—default to scoped rules with `globs` in frontmatter.
