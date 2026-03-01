@@ -12,6 +12,7 @@ In the provider-based authoring model, PSL providers call this parser and then r
 
 - Parse PSL source text (`schema` + `sourceId`) with deterministic ordering.
 - Return AST nodes with source spans for models, fields, enums, and `types { ... }`.
+- Preserve raw PSL relation action tokens (for example `Cascade`) without semantic normalization.
 - Return stable diagnostics (`code`, `message`, `span`, `sourceId`) for invalid and unsupported constructs.
 - Enforce strict error behavior for unsupported syntax (no warning or best-effort mode).
 

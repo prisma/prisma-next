@@ -14,6 +14,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 ## Responsibilities
 
 - Interpret `ParsePslDocumentResult` into SQL `ContractIR`
+- Map PSL relation action tokens to SQL contract referential actions and emit diagnostics for unsupported values
 - Compose provider flow for SQL PSL-first config (`read -> parse -> interpret`)
 - Preserve parser diagnostics and add interpreter diagnostics with stable codes
 - Return `notOk` with structured diagnostics for unsupported constructs
