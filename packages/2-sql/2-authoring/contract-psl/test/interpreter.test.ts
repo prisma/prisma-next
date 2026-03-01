@@ -120,6 +120,37 @@ model Post {
     });
   });
 
+  it('returns diagnostics for unsupported referential action tokens', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  author User @relation(fields: [userId], references: [id], onDelete: WeirdAction)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_REFERENTIAL_ACTION',
+          sourceId: 'schema.prisma',
+        }),
+      ]),
+    );
+  });
+
   it('returns diagnostics for unsupported named types, field lists, missing keys, and invalid relation targets', () => {
     const document = parsePslDocument({
       schema: `types {

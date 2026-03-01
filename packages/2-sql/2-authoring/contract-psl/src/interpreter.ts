@@ -48,6 +48,19 @@ const SCALAR_COLUMN_MAP: Record<string, ColumnDescriptor> = {
   Json: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
 };
 
+const REFERENTIAL_ACTION_MAP = {
+  NoAction: 'noAction',
+  Restrict: 'restrict',
+  Cascade: 'cascade',
+  SetNull: 'setNull',
+  SetDefault: 'setDefault',
+  noAction: 'noAction',
+  restrict: 'restrict',
+  cascade: 'cascade',
+  setNull: 'setNull',
+  setDefault: 'setDefault',
+} as const;
+
 type ResolvedField = {
   readonly field: PslField;
   readonly descriptor: ColumnDescriptor;
@@ -210,6 +223,30 @@ function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceD
   }));
 }
 
+function normalizeReferentialAction(input: {
+  readonly modelName: string;
+  readonly fieldName: string;
+  readonly actionName: 'onDelete' | 'onUpdate';
+  readonly actionToken: string;
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): string | undefined {
+  const normalized =
+    REFERENTIAL_ACTION_MAP[input.actionToken as keyof typeof REFERENTIAL_ACTION_MAP];
+  if (normalized) {
+    return normalized;
+  }
+
+  input.diagnostics.push({
+    code: 'PSL_UNSUPPORTED_REFERENTIAL_ACTION',
+    message: `Relation field "${input.modelName}.${input.fieldName}" has unsupported ${input.actionName} action "${input.actionToken}"`,
+    sourceId: input.sourceId,
+    span: input.span,
+  });
+  return undefined;
+}
+
 export function interpretPslDocumentToSqlContractIR(
   input: InterpretPslDocumentToSqlContractIRInput,
 ): Result<ContractIR, ContractSourceDiagnostics> {
@@ -354,6 +391,29 @@ export function interpretPslDocumentToSqlContractIR(
           continue;
         }
 
+        const onDelete = relationAttribute.relation.onDelete
+          ? normalizeReferentialAction({
+              modelName: model.name,
+              fieldName: relationAttribute.field.name,
+              actionName: 'onDelete',
+              actionToken: relationAttribute.relation.onDelete,
+              sourceId,
+              span: relationAttribute.field.span,
+              diagnostics,
+            })
+          : undefined;
+        const onUpdate = relationAttribute.relation.onUpdate
+          ? normalizeReferentialAction({
+              modelName: model.name,
+              fieldName: relationAttribute.field.name,
+              actionName: 'onUpdate',
+              actionToken: relationAttribute.relation.onUpdate,
+              sourceId,
+              span: relationAttribute.field.span,
+              diagnostics,
+            })
+          : undefined;
+
         table = table.foreignKey(
           relationAttribute.relation.fields,
           {
@@ -361,12 +421,8 @@ export function interpretPslDocumentToSqlContractIR(
             columns: relationAttribute.relation.references,
           },
           {
-            ...(relationAttribute.relation.onDelete
-              ? { onDelete: relationAttribute.relation.onDelete }
-              : {}),
-            ...(relationAttribute.relation.onUpdate
-              ? { onUpdate: relationAttribute.relation.onUpdate }
-              : {}),
+            ...(onDelete ? { onDelete } : {}),
+            ...(onUpdate ? { onUpdate } : {}),
           },
         );
       }

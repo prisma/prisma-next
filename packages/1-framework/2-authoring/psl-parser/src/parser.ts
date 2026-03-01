@@ -23,19 +23,6 @@ import type {
   PslUniqueConstraint,
 } from './types';
 
-const REFERENTIAL_ACTION_MAP: Record<string, PslReferentialAction> = {
-  NoAction: 'noAction',
-  Restrict: 'restrict',
-  Cascade: 'cascade',
-  SetNull: 'setNull',
-  SetDefault: 'setDefault',
-  noAction: 'noAction',
-  restrict: 'restrict',
-  cascade: 'cascade',
-  setNull: 'setNull',
-  setDefault: 'setDefault',
-};
-
 const SCALAR_TYPES = new Set([
   'String',
   'Boolean',
@@ -533,13 +520,13 @@ function parseReferentialAction(
   value: string,
   lineIndex: number,
 ): PslReferentialAction | undefined {
-  const action = REFERENTIAL_ACTION_MAP[value];
-  if (action) {
+  const action = value.trim();
+  if (/^[A-Za-z_]\w*$/.test(action)) {
     return action;
   }
   pushDiagnostic(context, {
     code: 'PSL_INVALID_REFERENTIAL_ACTION',
-    message: `Unsupported referential action "${value}"`,
+    message: `Invalid referential action token "${value}"`,
     span: createTrimmedLineSpan(context, lineIndex),
   });
   return undefined;

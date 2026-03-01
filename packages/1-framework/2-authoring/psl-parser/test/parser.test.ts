@@ -57,8 +57,41 @@ model Post {
       kind: 'relation',
       fields: ['userId'],
       references: ['id'],
-      onDelete: 'cascade',
-      onUpdate: 'setNull',
+      onDelete: 'Cascade',
+      onUpdate: 'SetNull',
+    });
+  });
+
+  it('preserves raw referential action tokens in relation attributes', () => {
+    const schema = `
+model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id], onDelete: WeirdAction)
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(
+      result.diagnostics.some((entry) => entry.code === 'PSL_INVALID_REFERENTIAL_ACTION'),
+    ).toBe(false);
+    const postModel = result.ast.models.find((model) => model.name === 'Post');
+    const relationField = postModel?.fields.find((field) => field.name === 'user');
+    const relationAttribute = relationField?.attributes.find(
+      (attribute) => attribute.kind === 'relation',
+    );
+    expect(relationAttribute).toMatchObject({
+      kind: 'relation',
+      onDelete: 'WeirdAction',
     });
   });
 

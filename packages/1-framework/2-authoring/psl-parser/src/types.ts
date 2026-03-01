@@ -65,7 +65,7 @@ export interface PslRelationAttribute {
   readonly span: PslSpan;
 }
 
-export type PslReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+export type PslReferentialAction = string;
 
 export type PslFieldAttribute =
   | PslIdAttribute
