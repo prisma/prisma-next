@@ -151,13 +151,13 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/3-extensions/postgres/src/runtime/**",
+      "glob": "packages/3-extensions/postgres/src/runtime",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "runtime"
     },
     {
-      "glob": "packages/3-extensions/postgres/src/exports/runtime.ts",
+      "glob": "packages/3-extensions/postgres/src/exports",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "runtime"
