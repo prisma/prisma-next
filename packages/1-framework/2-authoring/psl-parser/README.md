@@ -20,6 +20,9 @@ In the provider-based authoring model, PSL providers call this parser and then r
 
 - `parsePslDocument(input)` in `src/parser.ts`
 - Exported AST/diagnostic/span types in `src/types.ts`
+- Subpath exports:
+  - `@prisma-next/psl-parser/parser`
+  - `@prisma-next/psl-parser/types`
 
 ## Dependencies
 

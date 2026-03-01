@@ -30,6 +30,8 @@
   ],
   "exports": {
     ".": "./dist/index.mjs",
+    "./parser": "./dist/parser.mjs",
+    "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",
