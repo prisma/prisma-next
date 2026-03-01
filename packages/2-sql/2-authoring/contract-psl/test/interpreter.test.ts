@@ -437,4 +437,247 @@ model Post {
       ]),
     );
   });
+
+  it('maps pgvector attributes on named types and fields to vector descriptor shape', () => {
+    const namedTypeDocument = parsePslDocument({
+      schema: `types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
+}
+
+model Document {
+  id Int @id
+  embedding Embedding1536
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const namedTypeResult = interpretPslDocumentToSqlContractIR({
+      document: namedTypeDocument,
+      composedExtensionPacks: ['pgvector'],
+    });
+    expect(namedTypeResult.ok).toBe(true);
+    if (!namedTypeResult.ok) return;
+    expect(namedTypeResult.value.storage).toMatchObject({
+      types: {
+        Embedding1536: {
+          codecId: 'pg/vector@1',
+          nativeType: 'vector(1536)',
+          typeParams: { length: 1536 },
+        },
+      },
+    });
+
+    const fieldDocument = parsePslDocument({
+      schema: `model Document {
+  id Int @id
+  embedding Bytes @pgvector.column(length: 1536)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const fieldResult = interpretPslDocumentToSqlContractIR({
+      document: fieldDocument,
+      composedExtensionPacks: ['pgvector'],
+    });
+    expect(fieldResult.ok).toBe(true);
+    if (!fieldResult.ok) return;
+    expect(fieldResult.value.storage).toMatchObject({
+      tables: {
+        document: {
+          columns: {
+            embedding: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector(1536)',
+              typeParams: { length: 1536 },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('returns diagnostics when namespace is unrecognized', () => {
+    const document = parsePslDocument({
+      schema: `model Document {
+  id Int @id
+  embedding Bytes @pgvector.column(length: 1536)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      composedExtensionPacks: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          sourceId: 'schema.prisma',
+          span: expect.objectContaining({
+            start: expect.objectContaining({ line: 3 }),
+          }),
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics for unsupported list fields', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  tags String[]
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_UNSUPPORTED_FIELD_LIST' })]),
+    );
+  });
+
+  it('preserves parser diagnostics with source spans', () => {
+    const document = parsePslDocument({
+      schema: `datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id Int @id
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
+          sourceId: 'schema.prisma',
+          span: expect.objectContaining({
+            start: expect.objectContaining({ line: 1, column: 1 }),
+            end: expect.objectContaining({ line: 1 }),
+          }),
+        }),
+      ]),
+    );
+  });
+
+  it('lowers supported default functions into execution and storage contract shapes', () => {
+    const document = parsePslDocument({
+      schema: `model Defaults {
+  id Int @id
+  idUuidV4 String @default(uuid())
+  idUuidV7 String @default(uuid(7))
+  idUlid String @default(ulid())
+  idNanoidDefault String @default(nanoid())
+  idNanoidSized String @default(nanoid(16))
+  dbExpr String @default(dbgenerated("gen_random_uuid()"))
+  createdAt DateTime @default(now())
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.execution).toMatchObject({
+      mutations: {
+        defaults: [
+          {
+            ref: { table: 'defaults', column: 'idNanoidDefault' },
+            onCreate: { kind: 'generator', id: 'nanoid' },
+          },
+          {
+            ref: { table: 'defaults', column: 'idNanoidSized' },
+            onCreate: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
+          },
+          {
+            ref: { table: 'defaults', column: 'idUlid' },
+            onCreate: { kind: 'generator', id: 'ulid' },
+          },
+          {
+            ref: { table: 'defaults', column: 'idUuidV4' },
+            onCreate: { kind: 'generator', id: 'uuidv4' },
+          },
+          {
+            ref: { table: 'defaults', column: 'idUuidV7' },
+            onCreate: { kind: 'generator', id: 'uuidv7' },
+          },
+        ],
+      },
+    });
+    expect(result.value.storage.tables.defaults.columns.dbExpr.default).toEqual({
+      kind: 'function',
+      expression: 'gen_random_uuid()',
+    });
+    expect(result.value.storage.tables.defaults.columns.createdAt.default).toEqual({
+      kind: 'function',
+      expression: 'now()',
+    });
+  });
+
+  it('returns diagnostics for unsupported default functions and invalid arguments', () => {
+    const document = parsePslDocument({
+      schema: `model InvalidDefaults {
+  id Int @id
+  cuidValue String @default(cuid())
+  badUuid String @default(uuid(5))
+  badNanoid String @default(nanoid(1))
+  emptyDbExpr String @default(dbgenerated(""))
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('cuid'),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('uuid'),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('nanoid'),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('dbgenerated'),
+        }),
+      ]),
+    );
+  });
 });
