@@ -1,5 +1,6 @@
-import { defineConfig, typescriptContract } from '@prisma-next/cli/config-types';
+import { defineConfig } from '@prisma-next/cli/config-types';
 import type { ControlFamilyInstance } from '@prisma-next/core-control-plane/types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import { contract } from './invalid-contract-document';
 
 // Create a config with document family (which doesn't exist, but we'll test the error)

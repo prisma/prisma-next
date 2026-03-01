@@ -43,7 +43,7 @@ Implement a reusable PSL parser library that can be consumed by emit tooling and
 
 **Tasks:**
 
-- Implement a parser API in `packages/1-framework/2-authoring/contract-psl`:
+- Implement a parser API in `packages/1-framework/2-authoring/psl-parser`:
   - Parse a PSL file (string + file path) into an AST with source spans
   - Produce structured, stable diagnostics (error code + span + message)
 - Support v1 PSL constructs needed for conformance:

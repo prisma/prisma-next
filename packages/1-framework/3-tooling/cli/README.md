@@ -65,7 +65,8 @@ prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--timestamps] [-
 The `contract emit` command does not require a `driver` in the config since it doesn't connect to a database:
 
 ```typescript
-import { defineConfig, typescriptContract } from '@prisma-next/cli/config-types';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
@@ -140,7 +141,8 @@ prisma-next db verify -v --timestamps
 The `db verify` command requires a `driver` in the config to connect to the database:
 
 ```typescript
-import { defineConfig, typescriptContract } from '@prisma-next/cli/config-types';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
@@ -296,7 +298,8 @@ prisma-next db introspect -v --timestamps
 The `db introspect` command requires a `driver` in the config to connect to the database:
 
 ```typescript
-import { defineConfig, typescriptContract } from '@prisma-next/cli/config-types';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
@@ -654,7 +657,8 @@ prisma-next db init --json
 The `db init` command requires a `driver` in the config to connect to the database:
 
 ```typescript
-import { defineConfig, typescriptContract } from '@prisma-next/cli/config-types';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
@@ -785,7 +789,8 @@ The CLI uses a config file to specify the target family, target, adapter, extens
 **Note:** The CLI uses `c12` for config loading, but constrains it to the current working directory (no upward search) to match the style guide's discovery precedence.
 
 ```typescript
-import { defineConfig, typescriptContract } from '@prisma-next/cli/config-types';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
@@ -801,7 +806,7 @@ export default defineConfig({
 ```
 
 Prefer helper utilities for authoring mode selection:
-- `typescriptContract(contractIR, outputPath?)` for TS-authored contracts
+- `typescriptContract(contractIR, outputPath?)` from `@prisma-next/sql-contract-ts/config-types` for TS-authored contracts
 - `prismaContract(schemaPath, resolver, outputPath?)` for PSL-authored providers
 - Provider failures are returned as structured diagnostics for CLI rendering
 

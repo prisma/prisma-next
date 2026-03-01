@@ -3,8 +3,8 @@ import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
-import { typescriptContract } from '@prisma-next/cli/config-types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import {
   ensureSchemaStatement,
   ensureTableStatement,

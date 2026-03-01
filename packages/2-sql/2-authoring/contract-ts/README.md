@@ -51,6 +51,7 @@ This package is part of the package layering architecture:
 ## Exports
 
 - `./contract-builder` - Contract builder API (`defineContract`, `ColumnBuilder`)
+- `./config-types` - TypeScript contract config helper (`typescriptContract`)
 - `./schema-sql` - SQL contract JSON schema (`data-contract-sql-v1.json`)
 
 ## Usage
@@ -132,10 +133,26 @@ import type { Contract } from './contract.d';
 const contract = validateContract<Contract>(contractJson);
 ```
 
+### Config Helper
+
+Use `typescriptContract` from this package when wiring TS-authored contracts in `prisma-next.config.ts`.
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
+import { contract } from './src/prisma/contract';
+
+export default defineConfig({
+  // ...
+  contract: typescriptContract(contract, 'src/prisma/contract.json'),
+});
+```
+
 ## Dependencies
 
 - **`@prisma-next/contract-authoring`** - Target-agnostic builder core (builder state types, builder classes, type helpers)
 - **`@prisma-next/contract`** - Core contract types (`ContractBase`)
+- **`@prisma-next/core-control-plane`** - Contract config types used by `typescriptContract`
 - **`@prisma-next/sql-contract`** - SQL contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
 - **`arktype`** - Runtime validation
 - **`ts-toolbelt`** - Type utilities

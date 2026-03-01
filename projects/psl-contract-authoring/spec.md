@@ -99,7 +99,7 @@ Provider (TS/PSL) → Contract IR → normalize → validate → canonicalize/ha
   - TS-first provider wraps the existing TS authoring surface.
   - PSL-first provider uses the PSL parser + normalization pipeline.
 - **PSL parsing (reusable package)**: implement PSL parsing as a standalone package so other tools can reuse it (language tooling, external tooling, etc.).
-  - **Decision:** build this in `packages/1-framework/2-authoring/contract-psl` (`@prisma-next/psl-parser`), which already exists as a placeholder.
+  - **Decision:** build this in `packages/1-framework/2-authoring/psl-parser` (`@prisma-next/psl-parser`), which already exists as a placeholder.
   - Output should preserve source spans so we can produce great diagnostics.
 - **Normalization**: convert that AST into the same normalized contract IR that TS-first ultimately produces.
 - **Validation**: reuse existing validators; add PSL-specific validation for mapping PSL concepts onto the existing IR.

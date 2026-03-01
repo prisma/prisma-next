@@ -8,5 +8,4 @@ export type {
 export {
   defineConfig,
   prismaContract,
-  typescriptContract,
 } from '@prisma-next/core-control-plane/config-types';

@@ -39,7 +39,7 @@ Implement the v1 construct set from the feature spec and verify acceptance crite
 - [x] Parse defaults: `autoincrement()`, `now()`, and supported literal defaults.
 - [x] Parse `types { ... }` declarations and type references.
 - [x] Add diagnostics tests that assert stable code + span + message for invalid/unsupported inputs.
-- [x] Update `packages/1-framework/2-authoring/contract-psl/README.md` with package responsibilities, API, dependencies, architecture diagram, and links.
+- [x] Update `packages/1-framework/2-authoring/psl-parser/README.md` with package responsibilities, API, dependencies, architecture diagram, and links.
 - [x] Verify all acceptance criteria in the feature spec and record follow-up items for downstream normalization milestone.
 
 ## Test Coverage

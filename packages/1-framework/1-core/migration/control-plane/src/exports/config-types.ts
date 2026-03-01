@@ -9,4 +9,4 @@ export type {
   PrismaContractResolverInput,
   PrismaNextConfig,
 } from '../config-types';
-export { defineConfig, prismaContract, typescriptContract } from '../config-types';
+export { defineConfig, prismaContract } from '../config-types';

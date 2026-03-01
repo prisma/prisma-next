@@ -6,7 +6,7 @@ Implement a reusable PSL parser package (`@prisma-next/psl-parser`) that can par
 
 PSL-first contract authoring requires parsing PSL reliably and in a way that can be reused by more than just contract emission (language tooling, external tooling, and other internal tooling).
 
-This milestone implements the parser API in `packages/1-framework/2-authoring/contract-psl` and supports the v1 PSL subset defined by the project spec, including the `types { ... }` block for named type instances. Unsupported PSL constructs are strict errors.
+This milestone implements the parser API in `packages/1-framework/2-authoring/psl-parser` and supports the v1 PSL subset defined by the project spec, including the `types { ... }` block for named type instances. Unsupported PSL constructs are strict errors.
 
 # Requirements
 
@@ -70,7 +70,7 @@ This milestone implements the parser API in `packages/1-framework/2-authoring/co
 - Project spec: `projects/psl-contract-authoring/spec.md`
 - Project plan: `projects/psl-contract-authoring/plans/plan.md`
 - Emission pipeline: `docs/architecture docs/subsystems/2. Contract Emitter & Types.md`
-- Placeholder package: `packages/1-framework/2-authoring/contract-psl/README.md`
+- Placeholder package: `packages/1-framework/2-authoring/psl-parser/README.md`
 
 # Open Questions
 

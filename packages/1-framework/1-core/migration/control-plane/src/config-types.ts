@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { notOk, type Result } from '@prisma-next/utils/result';
 import { type } from 'arktype';
 import type {
   ControlAdapterDescriptor,
@@ -70,13 +70,6 @@ export interface ContractConfig {
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
    */
   readonly output?: string;
-}
-
-export function typescriptContract(contractIR: ContractIR, output?: string): ContractConfig {
-  return {
-    source: async () => ok(contractIR),
-    ...(output ? { output } : {}),
-  };
 }
 
 export function prismaContract(

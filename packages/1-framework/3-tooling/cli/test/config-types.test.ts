@@ -3,11 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { PrismaNextConfig } from '@prisma-next/core-control-plane/config-types';
-import {
-  defineConfig,
-  prismaContract,
-  typescriptContract,
-} from '@prisma-next/core-control-plane/config-types';
+import { defineConfig, prismaContract } from '@prisma-next/core-control-plane/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 
