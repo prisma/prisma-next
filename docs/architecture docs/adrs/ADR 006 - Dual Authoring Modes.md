@@ -75,34 +75,21 @@ This keeps the framework independent of authoring formats, while still ensuring 
 - `contract.source`: an async provider `() => Promise<Result<ContractIR, ContractSourceDiagnostics>>`
 - `contract.output`: path to `contract.json` (types are colocated as `contract.d.ts`)
 
-Example (shape):
+Example (helper-first PSL path):
 
 ```ts
-import { defineConfig } from '@prisma-next/core-control-plane/config-types';
-import { err, ok } from '@prisma-next/utils/result';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 
 export default defineConfig({
   // ... family/target/adapter wiring ...
-  contract: {
+  contract: prismaContract('./schema.prisma', {
     output: 'src/prisma/contract.json',
-    source: async () => {
-      // Provider-owned I/O + parsing/authoring.
-      // Must return framework-defined ContractIR (not JSON).
-      try {
-        const ir = await buildContractIrSomehow();
-        return ok(ir);
-      } catch (e) {
-        return err({
-          summary: 'Failed to build Contract IR',
-          diagnostics: [
-            { code: 'contract_source_error', message: String(e) },
-          ],
-        });
-      }
-    },
-  },
+  }),
 });
 ```
+
+Inline provider functions remain supported for advanced/custom composition, but package helpers are the default expected DX.
 
 ### Dev and CI behavior
 

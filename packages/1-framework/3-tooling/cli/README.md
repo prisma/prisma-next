@@ -807,7 +807,7 @@ export default defineConfig({
 
 Prefer helper utilities for authoring mode selection:
 - `typescriptContract(contractIR, outputPath?)` from `@prisma-next/sql-contract-ts/config-types` for TS-authored contracts
-- `prismaContract(schemaPath, resolver, outputPath?)` for PSL-authored providers
+- `prismaContract(schemaPath, { output?, target? })` from `@prisma-next/sql-contract-psl/provider` for PSL-authored providers
 - Provider failures are returned as structured diagnostics for CLI rendering
 
 The `contract.output` field specifies the path to `contract.json`. This is the canonical location where other CLI commands can find the contract JSON artifact. Defaults to `'src/prisma/contract.json'` if not specified.

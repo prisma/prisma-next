@@ -1,9 +1,6 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { PrismaNextConfig } from '@prisma-next/core-control-plane/config-types';
-import { defineConfig, prismaContract } from '@prisma-next/core-control-plane/config-types';
+import { defineConfig } from '@prisma-next/core-control-plane/config-types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
@@ -194,40 +191,5 @@ describe('defineConfig', () => {
 
     expect(config.output).toBe('output/contract.json');
     expect(result.ok).toBe(true);
-  });
-
-  it('builds Prisma contract config via helper utility', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'prisma-next-config-types-'));
-    const schemaPath = join(dir, 'schema.prisma');
-    writeFileSync(schemaPath, 'model User { id Int @id }', 'utf-8');
-
-    try {
-      const config = prismaContract(
-        schemaPath,
-        async ({ schema, schemaPath: pathFromResolver }) => {
-          expect(schema).toContain('model User');
-          expect(pathFromResolver).toBe(schemaPath);
-          return ok({ targetFamily: 'sql' } as ContractIR);
-        },
-      );
-      const result = await config.source();
-
-      expect(result.ok).toBe(true);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('returns diagnostics when Prisma schema path cannot be read', async () => {
-    const config = prismaContract('/missing/path/schema.prisma', async () =>
-      ok({ targetFamily: 'sql' } as ContractIR),
-    );
-    const result = await config.source();
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.failure.summary).toContain('Failed to read Prisma schema');
-      expect(result.failure.diagnostics[0]?.code).toBe('PSL_SCHEMA_READ_FAILED');
-    }
   });
 });

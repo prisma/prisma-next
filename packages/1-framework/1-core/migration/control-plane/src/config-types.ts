@@ -1,8 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
-import { notOk, type Result } from '@prisma-next/utils/result';
 import { type } from 'arktype';
+import type { ContractSourceProvider } from './contract-source-types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -12,49 +9,19 @@ import type {
   ControlTargetDescriptor,
 } from './types';
 
+export type {
+  ContractSourceDiagnostic,
+  ContractSourceDiagnosticPosition,
+  ContractSourceDiagnosticSpan,
+  ContractSourceDiagnostics,
+  ContractSourceProvider,
+} from './contract-source-types';
+
 /**
  * Type alias for CLI driver instances.
  * Uses string for both family and target IDs for maximum flexibility.
  */
 export type CliDriver = ControlDriverInstance<string, string>;
-
-export interface ContractSourceDiagnosticPosition {
-  readonly offset: number;
-  readonly line: number;
-  readonly column: number;
-}
-
-export interface ContractSourceDiagnosticSpan {
-  readonly start: ContractSourceDiagnosticPosition;
-  readonly end: ContractSourceDiagnosticPosition;
-}
-
-export interface ContractSourceDiagnostic {
-  readonly code: string;
-  readonly message: string;
-  readonly sourceId?: string;
-  readonly span?: ContractSourceDiagnosticSpan;
-}
-
-export interface ContractSourceDiagnostics {
-  readonly summary: string;
-  readonly diagnostics: readonly ContractSourceDiagnostic[];
-  readonly meta?: Record<string, unknown>;
-}
-
-export type ContractSourceProvider = () => Promise<Result<ContractIR, ContractSourceDiagnostics>>;
-
-export type PrismaContractResolverInput = {
-  readonly schema: string;
-  readonly schemaPath: string;
-  readonly absoluteSchemaPath: string;
-};
-
-export type PrismaContractResolver = (
-  input: PrismaContractResolverInput,
-) =>
-  | Result<ContractIR, ContractSourceDiagnostics>
-  | Promise<Result<ContractIR, ContractSourceDiagnostics>>;
 
 /**
  * Contract configuration specifying source and artifact locations.
@@ -70,41 +37,6 @@ export interface ContractConfig {
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
    */
   readonly output?: string;
-}
-
-export function prismaContract(
-  schemaPath: string,
-  resolver: PrismaContractResolver,
-  output?: string,
-): ContractConfig {
-  return {
-    source: async () => {
-      const absoluteSchemaPath = resolve(schemaPath);
-      let schema: string;
-      try {
-        schema = await readFile(absoluteSchemaPath, 'utf-8');
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return notOk({
-          summary: `Failed to read Prisma schema at "${schemaPath}"`,
-          diagnostics: [
-            {
-              code: 'PSL_SCHEMA_READ_FAILED',
-              message,
-              sourceId: schemaPath,
-            },
-          ],
-          meta: { schemaPath, absoluteSchemaPath, cause: message },
-        });
-      }
-      return await resolver({
-        schema,
-        schemaPath,
-        absoluteSchemaPath,
-      });
-    },
-    ...(output ? { output } : {}),
-  };
 }
 
 /**

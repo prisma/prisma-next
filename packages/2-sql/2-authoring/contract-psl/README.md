@@ -30,6 +30,8 @@ The **pure interpreter entrypoint** specifically excludes:
 - Artifact emission (`contract.json`, `contract.d.ts`) and hashing
 - CLI or ControlClient orchestration
 
+Current scope is SQL/Postgres-first: scalar and enum mappings resolve to Postgres codec/native type descriptors in v1.
+
 ## Public API
 
 - `@prisma-next/sql-contract-psl`
