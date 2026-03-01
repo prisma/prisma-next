@@ -111,12 +111,16 @@ describe('emit parity fixtures', () => {
           const pslEmitFirst = await familyInstance.emitContract({ contractIR: normalizedPsl });
           const pslEmitSecond = await familyInstance.emitContract({ contractIR: normalizedPsl });
 
-          expect(tsEmitFirst.contractJson).toBe(tsEmitSecond.contractJson);
-          expect(pslEmitFirst.contractJson).toBe(pslEmitSecond.contractJson);
-          expect(tsEmitFirst.storageHash).toBe(tsEmitSecond.storageHash);
-          expect(pslEmitFirst.storageHash).toBe(pslEmitSecond.storageHash);
-          expect(tsEmitFirst.profileHash).toBe(tsEmitSecond.profileHash);
-          expect(pslEmitFirst.profileHash).toBe(pslEmitSecond.profileHash);
+          expect(tsEmitFirst).toMatchObject({
+            contractJson: tsEmitSecond.contractJson,
+            storageHash: tsEmitSecond.storageHash,
+            profileHash: tsEmitSecond.profileHash,
+          });
+          expect(pslEmitFirst).toMatchObject({
+            contractJson: pslEmitSecond.contractJson,
+            storageHash: pslEmitSecond.storageHash,
+            profileHash: pslEmitSecond.profileHash,
+          });
 
           const tsContractJson = parseContractJson(tsEmitFirst.contractJson);
           const pslContractJson = parseContractJson(pslEmitFirst.contractJson);

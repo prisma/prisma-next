@@ -70,7 +70,7 @@ model Place {
 
 ### Mapping to the data contract
 
-- All extension data is emitted under `contract.extensionPacks.<ns>` and never mixed into core tables unless explicitly mapped by the pack's schema
+- All extension data is emitted under `contract.extensionPacks.<namespace>` and never mixed into core tables unless explicitly mapped by the pack's schema
 - Core storage mapping remains under `tables.*` with standard columns, constraints, and indexes
 - Extension-specific column metadata may be referenced by core nodes via stable references, e.g. a column `meta.ext.pgvector = { dim: 1536, distance: "cosine" }` when the pack declares such links in its schema
 
@@ -123,7 +123,7 @@ model Place {
 
 - Versions are pinned in `prisma-next.config.ts` where packs are composed (e.g. `extensionPacks: [pgvector]`)
 - Attributes omit version for readability and are validated against the composed/pinned pack version
-- The emitter records the resolved version under `contract.extensionPacks.<ns>.version`
+- The emitter records the resolved version under `contract.extensionPacks.<namespace>.version`
 - Version changes are reflected in the contract hash and capability surface
 
 ### Determinism and canonicalization
@@ -202,13 +202,13 @@ export const contract = defineContract<AllCodecTypes>()
 ## Alternatives considered
 
 - **Inline version suffix `@pgvector@1.2.column(…)`**: Rejected for readability and because multiple attributes would repeat versions
-- **Mixing extension payloads directly into core nodes without `extensions.<ns>`**: Rejected due to ambiguity and difficulty for agents to locate extension data
+- **Mixing extension payloads directly into core nodes without a dedicated `contract.extensionPacks.<namespace>` section**: Rejected due to ambiguity and difficulty for agents to locate extension data
 
 ## Consequences
 
 ### Positive
 - Clear, collision-free extension mechanism that maps cleanly to deterministic JSON
-- Agents and tools can rely on `extensions.<ns>` to discover features without executing code
+- Agents and tools can rely on `contract.extensionPacks.<namespace>` to discover features without executing code
 - Capability gating prevents authoring features that cannot run on the selected target
 
 ### Negative
