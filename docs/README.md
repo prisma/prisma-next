@@ -19,4 +19,5 @@ This directory contains the primary documentation for the repository.
 - [Commands](./commands/README.md) — command docs and entry points
 - [Reference docs](./reference/) — conventions and patterns used across the codebase
 - [CLI Style Guide](./CLI%20Style%20Guide.md) — CLI UX conventions
+- [Closeouts](./closeouts/) — durable records for completed transient projects
 
