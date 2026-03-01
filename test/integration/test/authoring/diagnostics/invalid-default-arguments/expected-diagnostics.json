@@ -1,0 +1,20 @@
+{
+  "failureSummary": "PSL to SQL Contract IR normalization failed",
+  "diagnostics": [
+    {
+      "code": "PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT",
+      "sourceId": "./schema.prisma",
+      "startLine": 3
+    },
+    {
+      "code": "PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT",
+      "sourceId": "./schema.prisma",
+      "startLine": 4
+    },
+    {
+      "code": "PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT",
+      "sourceId": "./schema.prisma",
+      "startLine": 5
+    }
+  ]
+}
