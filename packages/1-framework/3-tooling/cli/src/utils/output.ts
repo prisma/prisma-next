@@ -815,9 +815,9 @@ export function formatSignJson(result: SignDatabaseResult): string {
  * Shared CLI output type for migration commands (db init, db update).
  */
 export interface MigrationCommandResult {
-  readonly ok: boolean;
+  readonly ok: true;
   readonly mode: 'plan' | 'apply';
-  readonly plan?: {
+  readonly plan: {
     readonly targetId: string;
     readonly destination: {
       readonly storageHash: string;

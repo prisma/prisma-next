@@ -1,5 +1,13 @@
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 
+/**
+ * Shape of an SQL execute step on SqlMigrationPlanOperation.
+ * Used for runtime type narrowing without importing the concrete SQL type.
+ */
+interface SqlExecuteStep {
+  readonly sql: string;
+}
+
 function isDdlStatement(sqlStatement: string): boolean {
   const trimmed = sqlStatement.trim().toLowerCase();
   return (
@@ -7,24 +15,27 @@ function isDdlStatement(sqlStatement: string): boolean {
   );
 }
 
+function hasExecuteSteps(
+  operation: MigrationPlanOperation,
+): operation is MigrationPlanOperation & { readonly execute: readonly SqlExecuteStep[] } {
+  const candidate = operation as Record<string, unknown>;
+  if (!('execute' in candidate) || !Array.isArray(candidate.execute)) {
+    return false;
+  }
+  return candidate.execute.every(
+    (step: unknown) => typeof step === 'object' && step !== null && 'sql' in step,
+  );
+}
+
 export function extractSqlDdl(operations: readonly MigrationPlanOperation[]): string[] {
   const statements: string[] = [];
   for (const operation of operations) {
-    const record = operation as unknown as Record<string, unknown>;
-    const execute = record['execute'];
-    if (!Array.isArray(execute)) {
+    if (!hasExecuteSteps(operation)) {
       continue;
     }
-    for (const step of execute) {
-      if (typeof step !== 'object' || step === null) {
-        continue;
-      }
-      const sql = (step as Record<string, unknown>)['sql'];
-      if (typeof sql !== 'string') {
-        continue;
-      }
-      if (isDdlStatement(sql)) {
-        statements.push(sql.trim());
+    for (const step of operation.execute) {
+      if (typeof step.sql === 'string' && isDdlStatement(step.sql)) {
+        statements.push(step.sql.trim());
       }
     }
   }
