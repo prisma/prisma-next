@@ -13,7 +13,7 @@ This package owns the shared config contract used by tooling and authoring packa
 
 ## Responsibilities
 
-- Type-safe config composition for `family`, `target`, `adapter`, optional `driver`, and optional `extensionPacks`
+- Type-safe config composition for `family`, `target`, `adapter`, optional `driver`, and optional `extensionPacks` (`extensions` is rejected at runtime)
 - Contract source provider protocol (`contract.source`) and diagnostics shape
 - Pure config validation and normalization with no file system access
 

@@ -190,36 +190,36 @@ describe('validateConfig', () => {
     );
   });
 
-  it('validates extensions collection and extension descriptors', () => {
-    expectFieldError(createValidRawConfig({ extensions: 'invalid' }), 'extensions');
-    expectFieldError(createValidRawConfig({ extensions: ['invalid'] }), 'extensions[]');
+  it('validates extensionPacks collection and extension descriptors', () => {
+    expectFieldError(createValidRawConfig({ extensionPacks: 'invalid' }), 'extensionPacks');
+    expectFieldError(createValidRawConfig({ extensionPacks: ['invalid'] }), 'extensionPacks[]');
     expectFieldError(
       createValidRawConfig({
-        extensions: [{ kind: 'invalid', id: 'ext', familyId: 'sql', targetId: 'postgres' }],
+        extensionPacks: [{ kind: 'invalid', id: 'ext', familyId: 'sql', targetId: 'postgres' }],
       }),
-      'extensions[].kind',
+      'extensionPacks[].kind',
     );
     expectFieldError(
       createValidRawConfig({
-        extensions: [{ kind: 'extension', id: 123, familyId: 'sql', targetId: 'postgres' }],
+        extensionPacks: [{ kind: 'extension', id: 123, familyId: 'sql', targetId: 'postgres' }],
       }),
-      'extensions[].id',
+      'extensionPacks[].id',
     );
     expectFieldError(
       createValidRawConfig({
-        extensions: [{ kind: 'extension', id: 'ext', familyId: 123, targetId: 'postgres' }],
+        extensionPacks: [{ kind: 'extension', id: 'ext', familyId: 123, targetId: 'postgres' }],
       }),
-      'extensions[].familyId',
+      'extensionPacks[].familyId',
     );
     expectFieldError(
       createValidRawConfig({
-        extensions: [{ kind: 'extension', id: 'ext', familyId: 'sql', version: 123 }],
+        extensionPacks: [{ kind: 'extension', id: 'ext', familyId: 'sql', version: 123 }],
       }),
-      'extensions[].version',
+      'extensionPacks[].version',
     );
     expectFieldError(
       createValidRawConfig({
-        extensions: [
+        extensionPacks: [
           {
             kind: 'extension',
             id: 'ext',
@@ -230,11 +230,11 @@ describe('validateConfig', () => {
           },
         ],
       }),
-      'extensions[].familyId',
+      'extensionPacks[].familyId',
     );
     expectFieldError(
       createValidRawConfig({
-        extensions: [
+        extensionPacks: [
           {
             kind: 'extension',
             id: 'ext',
@@ -245,11 +245,11 @@ describe('validateConfig', () => {
           },
         ],
       }),
-      'extensions[].targetId',
+      'extensionPacks[].targetId',
     );
     expectFieldError(
       createValidRawConfig({
-        extensions: [
+        extensionPacks: [
           {
             kind: 'extension',
             id: 'ext',
@@ -260,11 +260,11 @@ describe('validateConfig', () => {
           },
         ],
       }),
-      'extensions[].targetId',
+      'extensionPacks[].targetId',
     );
     expectFieldError(
       createValidRawConfig({
-        extensions: [
+        extensionPacks: [
           {
             kind: 'extension',
             id: 'ext',
@@ -275,7 +275,16 @@ describe('validateConfig', () => {
           },
         ],
       }),
-      'extensions[].create',
+      'extensionPacks[].create',
+    );
+  });
+
+  it('rejects legacy extensions key', () => {
+    expectFieldError(
+      createValidRawConfig({
+        extensions: [],
+      }),
+      'extensions',
     );
   });
 
@@ -312,7 +321,7 @@ describe('validateConfig', () => {
 
   it('accepts valid optional sections', () => {
     const config = createValidRawConfig({
-      extensions: [
+      extensionPacks: [
         {
           kind: 'extension',
           id: 'pgvector',

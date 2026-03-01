@@ -112,59 +112,66 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
     throwValidation('adapter.create', 'Config.adapter must have create: function');
   }
 
-  // Validate extensions array if present
   if (configObj['extensions'] !== undefined) {
-    if (!Array.isArray(configObj['extensions'])) {
-      throwValidation('extensions', 'Config.extensions must be an array');
+    throwValidation('extensions', 'Config.extensions is not supported; use Config.extensionPacks');
+  }
+
+  // Validate extensionPacks array if present
+  if (configObj['extensionPacks'] !== undefined) {
+    if (!Array.isArray(configObj['extensionPacks'])) {
+      throwValidation('extensionPacks', 'Config.extensionPacks must be an array');
     }
-    for (const ext of configObj['extensions']) {
+    for (const ext of configObj['extensionPacks']) {
       if (!ext || typeof ext !== 'object') {
         throwValidation(
-          'extensions[]',
-          'Config.extensions must contain ExtensionDescriptor objects',
+          'extensionPacks[]',
+          'Config.extensionPacks must contain ControlExtensionDescriptor objects',
         );
       }
       const extObj = ext as Record<string, unknown>;
       if (extObj['kind'] !== 'extension') {
-        throwValidation('extensions[].kind', 'Config.extensions items must have kind: "extension"');
+        throwValidation(
+          'extensionPacks[].kind',
+          'Config.extensionPacks items must have kind: "extension"',
+        );
       }
       if (typeof extObj['id'] !== 'string') {
-        throwValidation('extensions[].id', 'Config.extensions items must have id: string');
+        throwValidation('extensionPacks[].id', 'Config.extensionPacks items must have id: string');
       }
       if (typeof extObj['familyId'] !== 'string') {
         throwValidation(
-          'extensions[].familyId',
-          'Config.extensions items must have familyId: string',
+          'extensionPacks[].familyId',
+          'Config.extensionPacks items must have familyId: string',
         );
       }
       if (typeof extObj['version'] !== 'string') {
         throwValidation(
-          'extensions[].version',
-          'Config.extensions items must have version: string',
+          'extensionPacks[].version',
+          'Config.extensionPacks items must have version: string',
         );
       }
       if (extObj['familyId'] !== familyId) {
         throwValidation(
-          'extensions[].familyId',
-          `Config.extensions[].familyId must match Config.family.familyId (expected: ${familyId}, got: ${extObj['familyId']})`,
+          'extensionPacks[].familyId',
+          `Config.extensionPacks[].familyId must match Config.family.familyId (expected: ${familyId}, got: ${extObj['familyId']})`,
         );
       }
       if (typeof extObj['targetId'] !== 'string') {
         throwValidation(
-          'extensions[].targetId',
-          'Config.extensions items must have targetId: string',
+          'extensionPacks[].targetId',
+          'Config.extensionPacks items must have targetId: string',
         );
       }
       if (extObj['targetId'] !== expectedTargetId) {
         throwValidation(
-          'extensions[].targetId',
-          `Config.extensions[].targetId must match Config.target.targetId (expected: ${expectedTargetId}, got: ${extObj['targetId']})`,
+          'extensionPacks[].targetId',
+          `Config.extensionPacks[].targetId must match Config.target.targetId (expected: ${expectedTargetId}, got: ${extObj['targetId']})`,
         );
       }
       if (typeof extObj['create'] !== 'function') {
         throwValidation(
-          'extensions[].create',
-          'Config.extensions items must have create: function',
+          'extensionPacks[].create',
+          'Config.extensionPacks items must have create: function',
         );
       }
     }
