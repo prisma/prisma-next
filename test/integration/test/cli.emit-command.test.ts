@@ -1,10 +1,12 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
+import { loadConfig } from '@prisma-next/cli/config-loader';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
+  integrationFixtureAppDir,
   setupCommandMocks,
   setupIntegrationTestDirectoryFromFixtures,
 } from './utils/cli-test-helpers';
@@ -412,44 +414,203 @@ describe('emit command', () => {
     },
   );
 
+  it('handles provider source function', { timeout: timeouts.typeScriptCompilation }, async () => {
+    const command = createContractEmitCommand();
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.sync-source.ts',
+      { '{{OUTPUT_DIR}}': outputDir },
+    );
+    const testDirSync = testSetup.testDir;
+    const cleanupSync = testSetup.cleanup;
+
+    try {
+      const originalCwd = process.cwd();
+      try {
+        process.chdir(testDirSync);
+        await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'prisma-next.config.ts',
+        ]);
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      const contractJsonPath = join(outputDir, 'contract.json');
+      expect(existsSync(contractJsonPath)).toBe(true);
+    } finally {
+      cleanupSync();
+    }
+  });
+
   it(
-    'handles sync contract source function',
+    'emits equivalent hashes from psl and ts providers',
     { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
         fixtureSubdir,
-        'prisma-next.config.sync-source.ts',
-        { '{{OUTPUT_DIR}}': outputDir },
+        'prisma-next.config.parity-psl.ts',
       );
-      const testDirSync = testSetup.testDir;
-      const cleanupSync = testSetup.cleanup;
+      const testDirPsl = testSetup.testDir;
+      const cleanupPsl = testSetup.cleanup;
 
       try {
         const originalCwd = process.cwd();
+        let tsProviderStorageHash = '';
+        let tsProviderProfileHash = '';
         try {
-          process.chdir(testDirSync);
-          await executeCommand(command, [
-            'node',
-            'cli.js',
-            'emit',
+          process.chdir(testDir);
+          const exitCode = await executeCommand(command, [
             '--config',
-            'prisma-next.config.ts',
+            'prisma-next.config.parity-ts.ts',
+            '--json',
           ]);
+          expect(exitCode).toBe(0);
+          const tsContract = JSON.parse(
+            readFileSync(join(outputDir, 'contract.json'), 'utf-8'),
+          ) as Record<string, unknown>;
+          const storageHash = tsContract['storageHash'];
+          const profileHash = tsContract['profileHash'];
+          expect(storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+          expect(profileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+          tsProviderStorageHash = storageHash as string;
+          tsProviderProfileHash = profileHash as string;
         } finally {
           process.chdir(originalCwd);
         }
 
-        const contractJsonPath = join(outputDir, 'contract.json');
+        writeFileSync(
+          join(testDirPsl, 'schema.prisma'),
+          readFileSync(
+            join(integrationFixtureAppDir, 'fixtures', fixtureSubdir, 'schema.parity.psl'),
+            'utf-8',
+          ),
+          'utf-8',
+        );
+
+        try {
+          process.chdir(testDirPsl);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).toBe(0);
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        const contractJsonPath = join(testDirPsl, 'output/contract.json');
+        const contractDtsPath = join(testDirPsl, 'output/contract.d.ts');
         expect(existsSync(contractJsonPath)).toBe(true);
+        expect(existsSync(contractDtsPath)).toBe(true);
+
+        const emitted = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        const emittedStorageHash = emitted['storageHash'];
+        const emittedProfileHash = emitted['profileHash'];
+
+        expect(emitted).toMatchObject({
+          targetFamily: 'sql',
+        });
+        expect(emittedStorageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(emittedProfileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(emittedStorageHash).toBe(tsProviderStorageHash);
+        expect(emittedProfileHash).toBe(tsProviderProfileHash);
+        expect(emitted).not.toHaveProperty('sources');
+        expect(emitted).toMatchObject({
+          meta: expect.not.objectContaining({
+            source: expect.anything(),
+            sourceId: expect.anything(),
+            schemaPath: expect.anything(),
+          }),
+        });
       } finally {
-        cleanupSync();
+        cleanupPsl();
       }
     },
   );
 
   it(
-    'throws error when contract config missing output or types',
+    'renders provider diagnostics when psl provider fails',
+    { timeout: timeouts.typeScriptCompilation },
+    async () => {
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.parity-psl.ts',
+      );
+      const testDirPsl = testSetup.testDir;
+      const cleanupPsl = testSetup.cleanup;
+
+      try {
+        writeFileSync(
+          join(testDirPsl, 'schema.prisma'),
+          `model Post {
+  id Int @id
+  tags String[]
+}
+`,
+          'utf-8',
+        );
+
+        const providerConfig = await loadConfig(join(testDirPsl, 'prisma-next.config.ts'));
+        const contractConfig = providerConfig.contract;
+        expect(contractConfig).toBeDefined();
+
+        const originalCwd = process.cwd();
+        let sourceResult: Awaited<
+          ReturnType<NonNullable<typeof providerConfig.contract>['source']>
+        >;
+        try {
+          process.chdir(testDirPsl);
+          sourceResult = await contractConfig!.source();
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        expect(sourceResult.ok).toBe(false);
+        if (sourceResult.ok) {
+          throw new Error('Expected source provider to fail for unsupported list field');
+        }
+        expect(sourceResult.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+        expect(sourceResult.failure.diagnostics).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              code: 'PSL_UNSUPPORTED_FIELD_LIST',
+              sourceId: './schema.prisma',
+              span: expect.objectContaining({
+                start: expect.objectContaining({ line: 3 }),
+              }),
+            }),
+          ]),
+        );
+
+        const commandCwd = process.cwd();
+        try {
+          process.chdir(testDirPsl);
+          await expect(
+            executeCommand(command, ['--config', 'prisma-next.config.ts']),
+          ).rejects.toThrow();
+        } finally {
+          process.chdir(commandCwd);
+        }
+
+        const errorOutput = consoleErrors.join('\n');
+        expect(errorOutput).toContain('PSL to SQL Contract IR normalization failed');
+        expect(errorOutput).toContain('PSL_UNSUPPORTED_FIELD_LIST');
+        expect(errorOutput).toContain('schema.prisma');
+      } finally {
+        cleanupPsl();
+      }
+    },
+  );
+
+  it(
+    'throws error when contract config output is missing',
     { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
@@ -464,7 +625,7 @@ describe('emit command', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDirMissing);
-          // Command should throw for missing output or types
+          // Command should throw for missing output
           await expect(
             executeCommand(command, [
               'node',

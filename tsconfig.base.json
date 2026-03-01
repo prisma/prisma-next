@@ -11,7 +11,7 @@
 
     { "path": "./packages/1-framework/2-authoring/contract" },
     { "path": "./packages/1-framework/2-authoring/contract-ts" },
-    { "path": "./packages/1-framework/2-authoring/contract-psl" },
+    { "path": "./packages/1-framework/2-authoring/psl-parser" },
 
     { "path": "./packages/1-framework/3-tooling/cli" },
     { "path": "./packages/1-framework/3-tooling/emitter" },

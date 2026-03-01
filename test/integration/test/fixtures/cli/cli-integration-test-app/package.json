@@ -10,6 +10,7 @@
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "pg": "catalog:"
   }
 }

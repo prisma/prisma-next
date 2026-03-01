@@ -27,7 +27,7 @@ graph TB
         subgraph "Framework Domain - Migration"
             FW_Authoring[1-framework/2-authoring/contract<br/>TS builders, canonicalization]
             FW_Authoring_TS[1-framework/2-authoring/contract-ts<br/>TS authoring]
-            FW_Authoring_PSL[1-framework/2-authoring/contract-psl<br/>PSL parser]
+            FW_Authoring_PSL[1-framework/2-authoring/psl-parser<br/>PSL parser]
             FW_Tooling_CLI[1-framework/3-tooling/cli<br/>Framework CLI]
             FW_Tooling_Emitter[1-framework/3-tooling/emitter<br/>Contract emitter]
         end

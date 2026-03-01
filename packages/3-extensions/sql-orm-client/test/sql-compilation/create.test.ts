@@ -99,19 +99,22 @@ describe('sql-compilation/create', () => {
     ).rejects.toThrow(/did not return a row/);
   });
 
-  it('captures insert plan snapshots for select+include create flow', async () => {
-    const { collection, runtime } = createReturningCollectionFor('User');
-    runtime.setNextResults([
-      [{ id: 1, name: 'Alice' }],
-      [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
-    ]);
+  it(
+    'captures insert plan snapshots for select+include create flow',
+    { timeout: 1_000 },
+    async () => {
+      const { collection, runtime } = createReturningCollectionFor('User');
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice' }],
+        [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
+      ]);
 
-    await collection
-      .select('name')
-      .include('posts')
-      .create({ id: 1, name: 'Alice', email: 'alice@example.com' });
+      await collection
+        .select('name')
+        .include('posts')
+        .create({ id: 1, name: 'Alice', email: 'alice@example.com' });
 
-    expect(serializePlans(runtime)).toMatchInlineSnapshot(`
+      expect(serializePlans(runtime)).toMatchInlineSnapshot(`
       [
         {
           "lane": "orm-client",
@@ -131,5 +134,6 @@ describe('sql-compilation/create', () => {
         },
       ]
     `);
-  });
+    },
+  );
 });

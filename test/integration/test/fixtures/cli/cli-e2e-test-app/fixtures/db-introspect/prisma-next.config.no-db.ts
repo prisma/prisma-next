@@ -13,9 +13,8 @@ export default defineConfig({
   driver: postgresDriver,
   extensions: [],
   contract: {
-    source: contract,
+    source: async () => ({ ok: true, value: contract }),
     output: 'output/contract.json',
-    types: 'output/contract.d.ts',
   },
   // db.connection is missing
 });

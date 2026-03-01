@@ -1,10 +1,46 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TargetFamilyHook, ValidationContext } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { type } from 'arktype';
 import { format } from 'prettier';
 import { canonicalizeContract } from './canonicalization';
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { EmitOptions, EmitResult } from './types';
+
+const CanonicalMetaSchema = type({
+  '[string]': 'unknown',
+});
+
+const CanonicalContractSchema = type({
+  '+': 'reject',
+  schemaVersion: 'string',
+  targetFamily: 'string',
+  target: 'string',
+  models: type({ '[string]': 'unknown' }),
+  relations: type({ '[string]': 'unknown' }),
+  storage: type({ '[string]': 'unknown' }),
+  'execution?': type({ '[string]': 'unknown' }),
+  extensionPacks: type({ '[string]': 'unknown' }),
+  capabilities: type({
+    '[string]': type({
+      '[string]': 'boolean',
+    }),
+  }),
+  meta: CanonicalMetaSchema,
+});
+
+function assertCanonicalArtifactShape(value: unknown): void {
+  const result = CanonicalContractSchema(value);
+  if (result instanceof type.errors) {
+    const issues = result
+      .map((error) => {
+        const path = error.path?.toString() ?? '<root>';
+        return `${path}: ${error.message}`;
+      })
+      .join('; ');
+    throw new Error(`ContractIR canonical artifact validation failed: ${issues}`);
+  }
+}
 
 function validateCoreStructure(ir: ContractIR): void {
   if (!ir.targetFamily) {
@@ -34,9 +70,6 @@ function validateCoreStructure(ir: ContractIR): void {
   if (!ir.meta || typeof ir.meta !== 'object') {
     throw new Error('ContractIR must have meta');
   }
-  if (!ir.sources || typeof ir.sources !== 'object') {
-    throw new Error('ContractIR must have sources');
-  }
 }
 
 export async function emit(
@@ -65,7 +98,7 @@ export async function emit(
 
   targetFamily.validateStructure(ir);
 
-  const contractJson = {
+  const canonicalContract = {
     schemaVersion: ir.schemaVersion,
     targetFamily: ir.targetFamily,
     target: ir.target,
@@ -76,20 +109,17 @@ export async function emit(
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,
-    sources: ir.sources,
-  } as const;
+  };
+  assertCanonicalArtifactShape(canonicalContract);
 
-  const storageHash = computeStorageHash(contractJson);
-  const executionHash = ir.execution ? computeExecutionHash(contractJson) : undefined;
-  const profileHash = computeProfileHash(contractJson);
+  const storageHash = computeStorageHash(canonicalContract);
+  const executionHash = canonicalContract.execution
+    ? computeExecutionHash(canonicalContract)
+    : undefined;
+  const profileHash = computeProfileHash(canonicalContract);
 
-  const contractWithHashes: ContractIR & {
-    storageHash?: string;
-    executionHash?: string;
-    profileHash?: string;
-  } = {
-    ...ir,
-    schemaVersion: contractJson.schemaVersion,
+  const contractWithHashes = {
+    ...canonicalContract,
     storageHash,
     ...ifDefined('executionHash', executionHash),
     profileHash,

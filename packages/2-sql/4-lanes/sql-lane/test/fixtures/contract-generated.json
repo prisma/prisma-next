@@ -1,5 +1,4 @@
 {
-  "$schema": "../../schemas/data-contract-sql-v1.json",
   "schemaVersion": "1",
   "target": "postgres",
   "targetFamily": "sql",
@@ -50,7 +49,6 @@
       ]
     }
   },
-  "extensions": {},
   "capabilities": {
     "postgres": {
       "returning": true

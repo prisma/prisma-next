@@ -572,10 +572,12 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have meta');
   });
 
-  it('throws error when sources is missing', async () => {
+  it('omits sources from emitted contract artifact', async () => {
     const ir = createContractIR({
-      sources: undefined as unknown as Record<string, unknown>,
-    }) as ContractIR;
+      sources: {
+        schema: { sourceId: 'schema.prisma' },
+      },
+    });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -586,24 +588,68 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
+    const result = await emit(ir, options, mockSqlHook);
+    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+    expect(contractJson).not.toHaveProperty('sources');
   });
 
-  it('throws error when sources is not an object', async () => {
+  it('accepts meta keys when family validation allows them', async () => {
     const ir = createContractIR({
-      sources: 'not-an-object' as unknown as Record<string, unknown>,
-    }) as ContractIR;
+      meta: {
+        sourceId: 'schema.prisma',
+        schemaPath: '/tmp/schema.prisma',
+        source: 'psl',
+      },
+    });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
+      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
+    await expect(emit(ir, options, mockSqlHook)).resolves.toMatchObject({
+      contractJson: expect.any(String),
+      contractDts: expect.any(String),
+    });
+  });
+
+  it('accepts canonical section keys when family validation allows them', async () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+                sourceId: 'schema.prisma',
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      } as unknown as Record<string, unknown>,
+    });
+
+    const options: EmitOptions = {
+      outputDir: '',
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: [],
+    };
+
+    await expect(emit(ir, options, mockSqlHook)).resolves.toMatchObject({
+      contractJson: expect.any(String),
+      contractDts: expect.any(String),
+    });
   });
 
   it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {

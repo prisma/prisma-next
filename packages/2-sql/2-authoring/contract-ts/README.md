@@ -36,6 +36,14 @@ This package was created in Phase 1 and refactored in Phase 2. It now composes t
 - **SQL-specific types**: Provides SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) from `@prisma-next/sql-contract/types`
 - **SQL-specific build()**: Implements SQL-specific `build()` method in `SqlContractBuilder` that constructs `SqlContract` instances with SQL-specific structure (uniques, indexes, foreignKeys arrays)
 
+```mermaid
+flowchart LR
+  builderInput[TS builder calls] --> sqlContractTs[@prisma-next/sql-contract-ts]
+  sqlContractTs --> authoringCore[@prisma-next/contract-authoring]
+  sqlContractTs --> sqlTypes[@prisma-next/sql-contract/types]
+  sqlContractTs --> contractIR[SQL ContractIR]
+```
+
 This package is part of the package layering architecture:
 - **Location**: `packages/2-sql/2-authoring/contract-ts` (SQL family namespace)
 - **Ring**: SQL family namespace (can import from core, authoring, targets, and other SQL family packages)
@@ -43,6 +51,7 @@ This package is part of the package layering architecture:
 ## Exports
 
 - `./contract-builder` - Contract builder API (`defineContract`, `ColumnBuilder`)
+- `./config-types` - TypeScript contract config helper (`typescriptContract`)
 - `./schema-sql` - SQL contract JSON schema (`data-contract-sql-v1.json`)
 
 ## Usage
@@ -124,10 +133,26 @@ import type { Contract } from './contract.d';
 const contract = validateContract<Contract>(contractJson);
 ```
 
+### Config Helper
+
+Use `typescriptContract` from this package when wiring TS-authored contracts in `prisma-next.config.ts`.
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
+import { contract } from './src/prisma/contract';
+
+export default defineConfig({
+  // ...
+  contract: typescriptContract(contract, 'src/prisma/contract.json'),
+});
+```
+
 ## Dependencies
 
 - **`@prisma-next/contract-authoring`** - Target-agnostic builder core (builder state types, builder classes, type helpers)
 - **`@prisma-next/contract`** - Core contract types (`ContractBase`)
+- **`@prisma-next/core-control-plane`** - Contract config types used by `typescriptContract`
 - **`@prisma-next/sql-contract`** - SQL contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
 - **`arktype`** - Runtime validation
 - **`ts-toolbelt`** - Type utilities
@@ -145,4 +170,6 @@ Integration tests that depend on both `sql-contract-ts` and `sql-query` are loca
 ## See Also
 
 - `@prisma-next/contract-authoring` - Target-agnostic builder core that this package composes
+- `@prisma-next/sql-contract-psl` - PSL parser-output to SQL `ContractIR` interpreter for provider-based flows
+- `@prisma-next/sql-contract-psl/provider` - SQL PSL-first `prismaContract()` helper (read -> parse -> interpret)
 

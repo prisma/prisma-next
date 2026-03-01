@@ -332,6 +332,103 @@ describe('extensionPacks', () => {
         .extensionPacks({ pgvector: mysqlTargetPack }),
     ).toThrow('builder target is "postgres"');
   });
+
+  it('ignores undefined pack refs in extensionPacks map', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .extensionPacks({
+        missing: undefined as unknown as ExtensionPackRef<'sql', 'postgres'>,
+        pgvector: pgvectorPack,
+      })
+      .build();
+
+    expect(contract.extensionPacks?.['pgvector']).toEqual({});
+  });
+
+  it('preserves pre-populated extension namespace entries', () => {
+    const builder = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .extensionPacks({ pgvector: pgvectorPack });
+
+    (
+      builder as unknown as {
+        state: { extensionPacks?: Record<string, unknown> };
+      }
+    ).state.extensionPacks = { pgvector: { enabled: true } };
+
+    const contract = builder.build();
+    expect(contract.extensionPacks?.['pgvector']).toEqual({ enabled: true });
+  });
+});
+
+describe('builder branch guards', () => {
+  it('ignores sparse model entries and falsy field mappings', () => {
+    const builder = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .model('User', 'user', (m) => m.field('id', 'id'));
+
+    const state = (
+      builder as unknown as {
+        state: {
+          models: Record<string, { fields: Record<string, string> } | undefined>;
+        };
+      }
+    ).state;
+    state.models['Ghost'] = undefined;
+    const userModel = state.models['User'];
+    if (!userModel) {
+      throw new Error('Expected user model state to exist');
+    }
+    userModel.fields['empty'] = '';
+
+    const contract = builder.build();
+    expect(contract.models.User.fields.id).toEqual({ column: 'id' });
+    expect(contract.models.User.fields).not.toHaveProperty('empty');
+  });
+
+  it('skips undefined relation entries during relation map assembly', () => {
+    const builder = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .table('post', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('userId', { type: int4Column })
+          .primaryKey(['id']),
+      )
+      .model('User', 'user', (m) => m.field('id', 'id'))
+      .model('Post', 'post', (m) =>
+        m
+          .field('id', 'id')
+          .field('userId', 'userId')
+          .relation('user', {
+            toModel: 'User',
+            toTable: 'user',
+            cardinality: 'N:1',
+            on: {
+              parentTable: 'post',
+              parentColumns: ['userId'],
+              childTable: 'user',
+              childColumns: ['id'],
+            },
+          }),
+      );
+
+    const state = (
+      builder as unknown as {
+        state: { models: Record<string, { relations: Record<string, unknown> } | undefined> };
+      }
+    ).state;
+    const postModel = state.models['Post'];
+    if (!postModel) {
+      throw new Error('Expected post model state to exist');
+    }
+    postModel.relations = { user: undefined };
+
+    const contract = builder.build();
+    expect(contract.relations.post).toEqual({});
+  });
 });
 
 describe('typeParams', () => {

@@ -506,7 +506,6 @@ class ControlClientImpl implements ControlClient {
       throw new Error('Family instance was not initialized. This is a bug.');
     }
 
-    // Resolve contract source
     let contractRaw: unknown;
     onProgress?.({
       action: 'emit',
@@ -516,14 +515,24 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
-      switch (contractConfig.source.kind) {
-        case 'loader':
-          contractRaw = await contractConfig.source.load();
-          break;
-        case 'value':
-          contractRaw = contractConfig.source.value;
-          break;
+      const providerResult = await contractConfig.sourceProvider();
+      if (!providerResult.ok) {
+        onProgress?.({
+          action: 'emit',
+          kind: 'spanEnd',
+          spanId: 'resolveSource',
+          outcome: 'error',
+        });
+
+        return notOk({
+          code: 'CONTRACT_SOURCE_INVALID',
+          summary: providerResult.failure.summary,
+          why: providerResult.failure.summary,
+          meta: providerResult.failure.meta,
+          diagnostics: providerResult.failure,
+        });
       }
+      contractRaw = providerResult.value;
 
       onProgress?.({
         action: 'emit',
@@ -539,10 +548,20 @@ class ControlClientImpl implements ControlClient {
         outcome: 'error',
       });
 
+      const message = error instanceof Error ? error.message : String(error);
       return notOk({
         code: 'CONTRACT_SOURCE_INVALID',
         summary: 'Failed to resolve contract source',
-        why: error instanceof Error ? error.message : String(error),
+        why: message,
+        diagnostics: {
+          summary: 'Contract source provider threw an exception',
+          diagnostics: [
+            {
+              code: 'PROVIDER_THROW',
+              message,
+            },
+          ],
+        },
         meta: undefined,
       });
     }

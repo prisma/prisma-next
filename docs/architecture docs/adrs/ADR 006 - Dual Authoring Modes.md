@@ -4,18 +4,34 @@
 
 - Teams want flexibility to author schemas in PSL or in TypeScript for agent and tool ergonomics
 - Having multiple sources of truth creates drift and unclear build boundaries
-- Our safety model depends on a deterministic, hashable contract artifact consumed by queries, runtime, migrations, and PPg
+- Our safety model depends on a deterministic, hashable contract artifact consumed by queries, runtime, and migrations
 - We need great DX in dev (auto emit) and strong determinism in CI
 
 ## Decision
 
 - Support two authoring modes per project: PSL-first or TS-first
-- A project declares one authoritative mode in config
+- A project supplies one authoritative **contract source provider** in config
 - Both modes must emit the same canonical artifact: `contract.json` plus `.d.ts` types
 - Only `contract.json` is the system of record for downstream tools and hashing
 - Back-generation of the non-authoritative form is optional and clearly marked as derived
 
 ## Details
+
+### Problem statement
+
+We want teams to be able to author a schema in **either** PSL **or** TypeScript, while keeping the rest of the system simple.
+
+That means:
+
+- The CLI and core pipeline should not need to “know about” every possible input format.
+- No matter how the schema was authored, we always end up with the same single output artifact (`contract.json`) that the rest of the framework consumes.
+
+### Constraints (non-negotiables)
+
+- `contract.json` must be deterministic and cross-platform stable (same inputs → same output bytes).
+- Hashes must reflect only the *meaning* of the contract (no file paths, no source IDs, no source locations/spans).
+- The CLI/control plane must not branch on “PSL vs TS vs …”. It should follow one flow.
+- We still want good error messages. Source locations are allowed in diagnostics, but **must never** be written into `contract.json` or influence hashing.
 
 ### Authoring modes
 
@@ -30,16 +46,50 @@
 ### Canonical artifact
 
 - `contract.json` is canonical, deterministic, and cross-platform stable
-- Hashing follows ADR 004 with coreHash and profileHash
+- Hashing follows ADR 004: meaning hashes (e.g. `storageHash`, optional `executionHash`) plus `profileHash` for pinned capability profile
 - `.d.ts` provides types only, no generated runtime objects
+
+### Responsibility split (how we decouple framework from authoring)
+
+The key move is to separate “how we get a schema” from “how we produce the canonical artifact”.
+
+**Contract source provider (owned by the authoring side):**
+
+- Does the input-specific work (read PSL files, run a TS builder, etc.).
+- Produces a **contract IR object** (the shared in-memory shape the framework expects).
+- If it can’t, it returns structured diagnostics (optionally with a `sourceId` + span).
+
+**Framework emission pipeline (owned by the framework):**
+
+- Validates the returned IR (shape + invariants).
+- Applies the framework’s “make it consistent” rules (defaults, stable ordering, stable identifiers).
+- Computes hashes from that normalized result.
+- Emits `contract.json` + `contract.d.ts` deterministically.
+
+This keeps the framework independent of authoring formats, while still ensuring that PSL-first and TS-first converge on the same canonical artifact.
 
 ### Configuration
 
 `prisma-next.config.ts` declares:
-- `authoring: 'psl' | 'ts'`
-- Schema path for PSL mode or builder entry for TS mode
-- `outDir` for emitted artifacts
-- Target info and naming scheme used for deterministic names
+
+- `contract.source`: an async provider `() => Promise<Result<ContractIR, ContractSourceDiagnostics>>`
+- `contract.output`: path to `contract.json` (types are colocated as `contract.d.ts`)
+
+Example (helper-first PSL path):
+
+```ts
+import { defineConfig } from '@prisma-next/cli/config-types';
+import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
+
+export default defineConfig({
+  // ... family/target/adapter wiring ...
+  contract: prismaContract('./schema.prisma', {
+    output: 'src/prisma/contract.json',
+  }),
+});
+```
+
+Inline provider functions remain supported for advanced/custom composition, but package helpers are the default expected DX.
 
 ### Dev and CI behavior
 
@@ -58,8 +108,9 @@
 
 ### Meta and provenance
 
-- `contract.json.meta.source` records the authoring mode and source path
-- Tooling warns if both PSL and TS sources are present but the config declares a different authoritative mode
+- Canonical artifacts exclude authoring provenance (no schema paths, no source IDs, no spans)
+- Canonical `contract.json` has no top-level `sources` field
+- Source provenance is diagnostics-only (CLI/editor output), and never part of hashing
 
 ### Failure modes
 
@@ -92,7 +143,7 @@
 
 - PSL-first and TS-first emission producing identical `contract.json` for equivalent intent
 - Dev plugins for auto-emit and CI command for explicit emit
-- Provenance metadata in artifacts
+- Provider diagnostics with source spans; no provenance in canonical artifacts
 
 ### Out of scope for MVP
 
@@ -114,5 +165,5 @@
 ## Decision record
 
 - Adopt dual authoring modes with a single canonical artifact
-- Require projects to declare one authoritative mode, enforce determinism, and surface provenance
+- Require projects to declare one authoritative source provider, enforce determinism, and keep provenance diagnostics-only
 - Keep `.d.ts` emission types-only and rely on `makeT(contractJson)` for runtime construction

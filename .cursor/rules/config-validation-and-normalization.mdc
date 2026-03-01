@@ -124,11 +124,9 @@ When normalizing paths, use `join()` and `dirname()` for proper path handling:
 import { join, dirname } from 'node:path';
 
 const output = config.contract.output ?? 'src/prisma/contract.json';
-const types =
-  config.contract.types ??
-  (output.endsWith('.json')
-    ? output.slice(0, -5) + '.d.ts'
-    : join(dirname(output), 'contract.d.ts'));
+const types = output.endsWith('.json')
+  ? output.slice(0, -5) + '.d.ts'
+  : join(dirname(output), 'contract.d.ts');
 ```
 
 **Why?**
@@ -146,7 +144,6 @@ When config has nested structures, validate and normalize each level:
 const NestedConfigSchema = type({
   source: 'unknown',
   'output?': 'string',
-  'types?': 'string',
 });
 
 const ConfigSchema = type({
@@ -167,7 +164,6 @@ export function defineConfig(config: ConfigInput): ConfigOutput {
     const normalizedContract = {
       source: config.contract.source,
       output: config.contract.output ?? 'src/prisma/contract.json',
-      types: config.contract.types ?? /* ... */,
     };
 
     return {

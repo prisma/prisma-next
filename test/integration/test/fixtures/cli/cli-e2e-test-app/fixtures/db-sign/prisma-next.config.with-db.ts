@@ -14,9 +14,8 @@ export default defineConfig({
   driver: postgresDriver,
   extensions: [],
   contract: {
-    source: contract,
+    source: async () => ({ ok: true, value: contract }),
     output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
   },
   db: {
     connection: '{{DB_URL}}', // Placeholder to be replaced in tests

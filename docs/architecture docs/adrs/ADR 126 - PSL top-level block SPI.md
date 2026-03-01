@@ -33,7 +33,7 @@ Top-level blocks remain pack-owned objects and do not enlarge core. Core may ref
 - Each produces a standalone, addressable object with a stable `id`
 - Examples: `pg.view MyActiveUsers { ... }`, `pg.enumType UserStatus { ... }`
 - Emit canonical JSON under `contract.extensionPacks.<namespace>.<kind>[]`
-- May project into `contract.sources` (for queries) or contribute to planning/migrations via pack ops
+- May project into **types-only** surfacing for queries (lane/adapter-owned) or contribute to planning/migrations via pack ops
 - Contribute to contract hash per ADR 106 canonicalization rules
 
 **Decorators/attributes** (also pack-owned)
@@ -57,7 +57,7 @@ interface BlockRegistry {
     emitFn: (ast: BlockAST, context: EmitContext) => {
       json: unknown                 // canonical JSON for contract.extensionPacks.<ns>.<kind>[]
       id: string                    // stable id computed from canonical content + name
-      sourceProjections?: { [logicalName: string]: SourceProjection }  // optional read-only sources
+      typeProjections?: { [logicalName: string]: unknown }  // optional types-only surfacing (non-canonical)
     }
     schema: JSONSchema              // for validation and documentation
   }): void

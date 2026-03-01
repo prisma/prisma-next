@@ -28,7 +28,7 @@ Prisma ORM historically generates a large JavaScript client from PSL. In Prisma 
 #### contract.d.ts
 - Declares `Contract.Tables`, `Contract.Relations`, codecs, branded types
 - Includes extension-branded types and function/operator typings registered by packs (ADR 113, ADR 114)
-- Exposes read-only sources projected from pack-owned blocks alongside tables (ADR 127)
+- Exposes read-only sources projected from pack-owned blocks alongside tables (ADR 126)
 - Drives editor types and inference without shipping JS
 
 ### Runtime construction

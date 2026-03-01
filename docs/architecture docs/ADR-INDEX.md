@@ -26,6 +26,8 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 021 | Contract Marker Storage | Defines database storage for contract identity verification and alignment checks | [ADR 021 - Contract Marker Storage.md](adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md) |
 | 042 | Contract Marker Evolution | Specifies marker table schema evolution and forward-compatible field additions | [ADR 042 - Contract Marker Evolution.md](adrs/ADR%20042%20-%20Contract%20Marker%20Evolution.md) |
 | 156 | Storage sets and check constraints | Adds `storage.sets` and a minimal `checks[]` shape to express “column value is in this set” explicitly in storage | [ADR 156 - Storage sets and check constraints.md](adrs/ADR%20156%20-%20Storage%20sets%20and%20check%20constraints.md) |
+| 162 | Typed default literal pipeline and extensibility | Documents the JSON-first typed-default pipeline (encode → emit → validate → verify → render), its limitations, and outlines a codec-keyed SPI for future extensibility | [ADR 162 - Typed default literal pipeline and extensibility.md](adrs/ADR%20162%20-%20Typed%20default%20literal%20pipeline%20and%20extensibility.md) |
+| 163 | Provider-invoked source interpretation packages | Keeps parsing/interpretation logic in provider-invoked authoring packages so CLI/control plane stay source-agnostic and IO-free | [ADR 163 - Provider-invoked source interpretation packages.md](adrs/ADR%20163%20-%20Provider-invoked%20source%20interpretation%20packages.md) |
 
 ## Query System
 
@@ -99,7 +101,6 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 118 | Bundle inclusion policy for packs | Establishes bundle inclusion policy and security constraints for packs | [ADR 118 - Bundle inclusion policy for packs.md](adrs/ADR%20118%20-%20Bundle%20inclusion%20policy%20for%20packs.md) |
 | 121 | Contract.d.ts structure and relation typing | Complete specification for Tables, Models, and Relations namespaces with proper relation field typing | [ADR 121 - Contract.d.ts structure and relation typing.md](adrs/ADR%20121%20-%20Contract.d.ts%20structure%20and%20relation%20typing.md) |
 | 126 | PSL top-level block SPI | Defines SPI for packs to register new top-level blocks (views, enums, etc.) with parsing, validation, and deterministic emission | [ADR 126 - PSL top-level block SPI.md](adrs/ADR%20126%20-%20PSL%20top-level%20block%20SPI.md) |
-| 127 | Views as extension-owned read-only sources | Specifies view representation as extension objects with optional read-only sources in contract, migration ops, and runtime enforcement | [ADR 127 - Views as extension-owned read-only sources.md](adrs/ADR%20127%20-%20Views%20as%20extension-owned%20read-only%20sources.md) |
 | 153 | Extension Package Naming Convention | Standardizes on `extension-*` prefix exclusively for extension pack npm names | [ADR 153 - Extension Package Naming Convention.md](adrs/ADR%20153%20-%20Extension%20Package%20Naming%20Convention.md) |
 
 ## Adapters & Targets

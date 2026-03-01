@@ -1,4 +1,5 @@
 import { type } from 'arktype';
+import type { ContractSourceProvider } from './contract-source-types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -19,10 +20,10 @@ export type CliDriver = ControlDriverInstance<string, string>;
  */
 export interface ContractConfig {
   /**
-   * Contract source. Can be a value or a function that returns a value (sync or async).
-   * If a function, it will be called to resolve the contract.
+   * Contract source provider. The provider is always async and must return
+   * a Result containing either ContractIR or structured diagnostics.
    */
-  readonly source: unknown | (() => unknown | Promise<unknown>);
+  readonly source: ContractSourceProvider;
   /**
    * Path to contract.json artifact. Defaults to 'src/prisma/contract.json'.
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
@@ -80,10 +81,11 @@ export interface PrismaNextConfig<
 
 /**
  * Arktype schema for ContractConfig validation.
- * Validates that source is present and output/types are strings when provided.
+ * Validates presence/shape only.
+ * contract.source is validated as a provider function at runtime in defineConfig().
  */
 const ContractConfigSchema = type({
-  source: 'unknown', // Can be value or function - runtime check needed
+  source: 'unknown', // Runtime check enforces provider function shape
   'output?': 'string',
 });
 
@@ -124,19 +126,10 @@ export function defineConfig<TFamilyId extends string = string, TTargetId extend
 
   // Normalize contract config if present
   if (config.contract) {
-    // Validate contract.source is a value or function (runtime check)
+    // Validate contract.source provider function shape at runtime.
     const source = config.contract.source;
-    if (
-      source !== null &&
-      typeof source !== 'object' &&
-      typeof source !== 'function' &&
-      typeof source !== 'string' &&
-      typeof source !== 'number' &&
-      typeof source !== 'boolean'
-    ) {
-      throw new Error(
-        'Config.contract.source must be a value (object, string, number, boolean, null) or a function',
-      );
+    if (typeof source !== 'function') {
+      throw new Error('Config.contract.source must be a provider function');
     }
 
     // Apply defaults
