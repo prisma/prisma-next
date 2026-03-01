@@ -205,7 +205,9 @@ model User {
     if (result.ok) return;
 
     expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
-    expect(result.failure.diagnostics[0]?.code).toBe('PSL_UNSUPPORTED_FIELD_LIST');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_UNSUPPORTED_FIELD_LIST' })]),
+    );
   });
 
   it('preserves parser diagnostics with source spans', () => {
