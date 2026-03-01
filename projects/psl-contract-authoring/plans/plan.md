@@ -153,12 +153,19 @@ Add PSL support for the ID-related default functions and variants that already e
 
 - Support TS-aligned default function vocabulary for IDs (and other fields where applicable), including:
   - `uuid()` (and any TS-supported variants)
-  - `cuid()` (and any TS-supported variants)
+  - `cuid(2)` (cuid v2)
   - `ulid()`
   - `nanoid()`
   - `dbgenerated("...")` (where TS authoring already emits it)
 - Add fixture-driven parity cases for each supported default function, asserting canonical `contract.json` + stable hashes vs TS fixtures.
 - Keep Mongo-only ID semantics (for example `@db.ObjectId` + `auto()`) out of scope for this project slice.
+
+### Milestone 7: PSL sql template literal syntax (follow-up)
+
+Introduce a PSL grammar extension for inline SQL literals using backticks (`sql\`...\``), with **no interpolation** and **single-line only** constraints, starting with storage defaults and designed to extend to future SQL embedding surfaces (views, special indexes).
+
+**Spec:** `projects/psl-contract-authoring/specs/Milestone 7 - PSL sql template literal syntax.spec.md`
+**ADR (proposed):** `projects/psl-contract-authoring/references/ADR - PSL sql template literals.md`
 
 ### Milestone 6: Close-out (required)
 

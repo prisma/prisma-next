@@ -12,7 +12,7 @@ The TS authoring surface can express a broader set of default functions/expressi
 
 - Support TS-aligned default function vocabulary (where TS authoring already emits it), including:
   - `uuid()`
-  - `cuid()`
+  - `cuid(2)` (cuid v2)
   - `ulid()`
   - `nanoid()`
   - `dbgenerated("...")`
@@ -22,6 +22,7 @@ The TS authoring surface can express a broader set of default functions/expressi
 
 - Strictly reject defaults that are not representable in the existing TS authoring surface/contract model.
 - Avoid connector-specific expansions (keep aligned to TS parity).
+- In v1, explicitly exclude cuid v1: `cuid()` is not supported; prefer `cuid(2)`.
 
 ## Non-goals
 
