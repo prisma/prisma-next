@@ -8,7 +8,7 @@ import {
   PostgresQueryCompiler,
 } from 'kysely';
 import { describe, expect, it } from 'vitest';
-import { buildKyselyPlan } from '../src';
+import { buildKyselyPlan } from '../src/internal/build-plan';
 
 function createTestContract(): SqlContract<SqlStorage> {
   return {
