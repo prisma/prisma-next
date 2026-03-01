@@ -628,13 +628,25 @@ model User {
         ],
       },
     });
-    expect(result.value.storage.tables.defaults.columns.dbExpr.default).toEqual({
-      kind: 'function',
-      expression: 'gen_random_uuid()',
-    });
-    expect(result.value.storage.tables.defaults.columns.createdAt.default).toEqual({
-      kind: 'function',
-      expression: 'now()',
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        defaults: {
+          columns: {
+            dbExpr: {
+              default: {
+                kind: 'function',
+                expression: 'gen_random_uuid()',
+              },
+            },
+            createdAt: {
+              default: {
+                kind: 'function',
+                expression: 'now()',
+              },
+            },
+          },
+        },
+      },
     });
   });
 
