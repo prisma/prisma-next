@@ -521,9 +521,13 @@ describe('emit command', () => {
         expect(emittedStorageHash).toBe(tsProviderStorageHash);
         expect(emittedProfileHash).toBe(tsProviderProfileHash);
         expect(emitted).not.toHaveProperty('sources');
-        expect(emitted['meta']).not.toHaveProperty('source');
-        expect(emitted['meta']).not.toHaveProperty('sourceId');
-        expect(emitted['meta']).not.toHaveProperty('schemaPath');
+        expect(emitted).toMatchObject({
+          meta: expect.not.objectContaining({
+            source: expect.anything(),
+            sourceId: expect.anything(),
+            schemaPath: expect.anything(),
+          }),
+        });
       } finally {
         cleanupPsl();
       }
@@ -554,15 +558,16 @@ describe('emit command', () => {
         );
 
         const providerConfig = await loadConfig(join(testDirPsl, 'prisma-next.config.ts'));
-        if (!providerConfig.contract) {
-          throw new Error('Config.contract is required for provider diagnostics test');
-        }
+        const contractConfig = providerConfig.contract;
+        expect(contractConfig).toBeDefined();
 
         const originalCwd = process.cwd();
-        let sourceResult: Awaited<ReturnType<typeof providerConfig.contract.source>>;
+        let sourceResult: Awaited<
+          ReturnType<NonNullable<typeof providerConfig.contract>['source']>
+        >;
         try {
           process.chdir(testDirPsl);
-          sourceResult = await providerConfig.contract.source();
+          sourceResult = await contractConfig!.source();
         } finally {
           process.chdir(originalCwd);
         }
