@@ -177,7 +177,10 @@ function invalidArgumentDiagnostic(input: {
   };
 }
 
-function executionGenerator(id: string, params?: Record<string, unknown>): LoweredDefaultResult {
+function executionGenerator(
+  id: ExecutionMutationDefaultValue['id'],
+  params?: Record<string, unknown>,
+): LoweredDefaultResult {
   return {
     ok: true,
     value: {

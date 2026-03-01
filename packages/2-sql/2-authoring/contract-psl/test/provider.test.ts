@@ -150,12 +150,13 @@ model Document {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      const types = (result.value.storage as Record<string, unknown>)['types'];
-      expect(types).toMatchObject({
-        Embedding1536: {
-          codecId: 'pg/vector@1',
-          nativeType: 'vector(1536)',
-          typeParams: { length: 1536 },
+      expect(result.value.storage).toMatchObject({
+        types: {
+          Embedding1536: {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector(1536)',
+            typeParams: { length: 1536 },
+          },
         },
       });
     });
@@ -199,9 +200,19 @@ model Document {
           ],
         },
       });
-      expect(result.value.storage.tables.user.columns.dbExpr.default).toEqual({
-        kind: 'function',
-        expression: 'gen_random_uuid()',
+      expect(result.value.storage).toMatchObject({
+        tables: {
+          user: {
+            columns: {
+              dbExpr: {
+                default: {
+                  kind: 'function',
+                  expression: 'gen_random_uuid()',
+                },
+              },
+            },
+          },
+        },
       });
     });
   });
