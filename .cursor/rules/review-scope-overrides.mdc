@@ -1,5 +1,5 @@
 ---
-title: Review scope overrides
+description: Honor explicitly provided base branches in review artifacts
 alwaysApply: false
 ---
 

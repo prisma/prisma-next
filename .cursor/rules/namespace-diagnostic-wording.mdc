@@ -1,3 +1,8 @@
+---
+description: Prefer clear wording for unrecognized extension namespaces
+alwaysApply: true
+---
+
 # Namespace diagnostic wording
 
 When a PSL namespaced attribute is used but the namespace is unavailable in config, avoid phrasing like "namespace not composed".
