@@ -124,15 +124,14 @@ async function executeDbInitCommand(
     }
 
     // Convert success result to CLI output format
-    const profileHash = result.value.marker?.profileHash;
     const dbInitResult: MigrationCommandResult = {
       ok: true,
       mode: result.value.mode,
       plan: {
         targetId: ctxResult.value.config.target.targetId,
         destination: {
-          storageHash: result.value.marker?.storageHash ?? '',
-          ...ifDefined('profileHash', profileHash),
+          storageHash: result.value.destination.storageHash,
+          ...ifDefined('profileHash', result.value.destination.profileHash),
         },
         operations: result.value.plan.operations.map((op) => ({
           id: op.id,

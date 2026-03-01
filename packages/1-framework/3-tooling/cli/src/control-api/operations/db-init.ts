@@ -135,6 +135,10 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       const result: DbInitSuccess = {
         mode,
         plan: { operations: [] },
+        destination: {
+          storageHash: migrationPlan.destination.storageHash,
+          profileHash: migrationPlan.destination.profileHash,
+        },
         ...(mode === 'apply'
           ? {
               execution: { operationsPlanned: 0, operationsExecuted: 0 },
@@ -189,6 +193,10 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       plan: {
         operations: stripOperations(migrationPlan.operations),
         ...(planSql !== undefined ? { sql: planSql } : {}),
+      },
+      destination: {
+        storageHash: migrationPlan.destination.storageHash,
+        profileHash: migrationPlan.destination.profileHash,
       },
       summary: `Planned ${migrationPlan.operations.length} operation(s)`,
     };
@@ -252,6 +260,10 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     mode: 'apply',
     plan: {
       operations: stripOperations(migrationPlan.operations),
+    },
+    destination: {
+      storageHash: migrationPlan.destination.storageHash,
+      profileHash: migrationPlan.destination.profileHash,
     },
     execution: {
       operationsPlanned: execution.operationsPlanned,

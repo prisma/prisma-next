@@ -282,6 +282,10 @@ export interface DbInitSuccess {
     }>;
     readonly sql?: ReadonlyArray<string>;
   };
+  readonly destination: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
+  };
   readonly execution?: {
     readonly operationsPlanned: number;
     readonly operationsExecuted: number;
