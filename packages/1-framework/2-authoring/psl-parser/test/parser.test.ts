@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePslDocument } from '../src';
+import { parsePslDocument } from '../src/exports/index';
 
 describe('parsePslDocument', () => {
   it('parses representative v1 schema with spans', () => {
