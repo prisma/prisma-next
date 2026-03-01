@@ -13,9 +13,9 @@ This milestone implements the parser API in `packages/1-framework/2-authoring/ps
 ## Functional Requirements
 
 - Provide a parser API in `@prisma-next/psl-parser` that:
-  - Parses a PSL document (string + file path/identifier)
-  - Returns an AST that retains source spans for relevant nodes
-  - Returns structured diagnostics (stable error code + span + message)
+  - parses a PSL document (string + file path/identifier)
+  - returns an AST that retains source spans for relevant nodes
+  - returns structured diagnostics (stable error code + span + message)
 - Parse the v1 supported PSL subset:
   - models + scalar fields, required/optional
   - enums
@@ -33,7 +33,7 @@ This milestone implements the parser API in `packages/1-framework/2-authoring/ps
 
 ## Non-goals
 
-- PSL → normalized contract IR (handled by the normalization/parity milestone).
+- PSL → normalized contract IR (handled outside this milestone).
 - Full PSL compatibility beyond the v1 supported set.
 
 # Acceptance Criteria
@@ -43,35 +43,9 @@ This milestone implements the parser API in `packages/1-framework/2-authoring/ps
 - [ ] Unsupported PSL constructs fail with strict errors.
 - [ ] Unit tests cover success cases and failure diagnostics (including spans).
 
-# Other Considerations
-
-## Security
-
-- Parser is purely syntactic/structural; do not evaluate content.
-
-## Cost
-
-- Offline tooling; negligible operational cost.
-
-## Observability
-
-- Diagnostics must be stable and machine-readable for downstream renderers (CLI/editor integrations).
-
-## Data Protection
-
-- Operates on schema text only.
-
-## Analytics
-
-- None required.
-
 # References
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
 - Project plan: `projects/psl-contract-authoring/plans/plan.md`
-- Emission pipeline: `docs/architecture docs/subsystems/2. Contract Emitter & Types.md`
-- Placeholder package: `packages/1-framework/2-authoring/psl-parser/README.md`
+- Parser package: `packages/1-framework/2-authoring/psl-parser`
 
-# Open Questions
-
-- Where should the TS-authoring referential action set be sourced from so the PSL parser and normalization reuse it (single source of truth)?

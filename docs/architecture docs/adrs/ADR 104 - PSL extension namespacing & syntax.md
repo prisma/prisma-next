@@ -15,7 +15,11 @@ Extensions must be discoverable, versionable, and enforceable across local build
 
 ## Decision
 
-Introduce a namespaced PSL extension syntax and mapping rules that produce deterministic contract JSON under `extensions.<namespace>` and optional capabilities claims. Versions are pinned via a top-level `extensions` block, while field and model attributes stay concise and versionless. The emitter validates extension usage against pack-provided JSON Schemas and capability gates and refuses to emit on violations.
+Introduce a namespaced PSL extension syntax and mapping rules that produce deterministic contract JSON under `contract.extensionPacks.<namespace>` and optional capabilities claims.
+
+**Composition constraint:** PSL does not “activate” extensions. Installed extension packs are a configuration responsibility: `prisma-next.config.ts` declares which packs are present (and therefore which namespaces/attributes are available) and pins their versions. PSL remains versionless and purely declarative.
+
+The emitter validates extension usage against pack-provided (or core-convention) schemas and capability gates and refuses to emit on violations.
 
 ## Details
 
@@ -25,14 +29,7 @@ Introduce a namespaced PSL extension syntax and mapping rules that produce deter
 - A pack owns exactly one namespace and must not collide with core or another pack
 - Field attribute form: `@<ns>.<attr>(args?)`
 - Model attribute form: `@@<ns>.<attr>(args?)`
-- Top-level block for version pinning and pack config:
-
-```prisma
-extensions {
-  pgvector = "1.2.0"
-  postgis  = "3.4.1"
-}
-```
+- **No PSL version pinning block.** Pack versions are pinned via `prisma-next.config.ts` (the same place packs are composed in). The emitted contract records the resolved versions under `contract.extensionPacks.<ns>.version`.
 
 ### Syntax examples
 
@@ -43,6 +40,21 @@ model Document {
   id      Int     @id @default(autoincrement())
   content String
   embedding Bytes  @pgvector.column(dim: 1536, distance: cosine)
+}
+```
+
+#### Named storage type for reuse (avoids per-field attributes)
+
+This pattern keeps the parser simple (no type-parameter syntax) while preserving an enforceable connection between a column’s declared type and its parameters by moving the parameters into a named type instance:
+
+```prisma
+types {
+  Embedding1536 = Bytes @pgvector.column(dim: 1536)
+}
+
+model Document {
+  id        Int            @id @default(autoincrement())
+  embedding Embedding1536?
 }
 ```
 
@@ -110,9 +122,9 @@ model Place {
 
 ### Versioning model
 
-- Versions are pinned in `extensionPacks { <ns> = "<semver>" }`
-- Attributes omit version for readability and are validated against the pinned pack version
-- The emitter records the version under `contract.extensionPacks.<ns>.version`
+- Versions are pinned in `prisma-next.config.ts` where packs are composed (e.g. `extensionPacks: [pgvector]`)
+- Attributes omit version for readability and are validated against the composed/pinned pack version
+- The emitter records the resolved version under `contract.extensionPacks.<ns>.version`
 - Version changes are reflected in the contract hash and capability surface
 
 ### Determinism and canonicalization
@@ -124,13 +136,21 @@ model Place {
 
 ### Validation and capability gating
 
-- The emitter loads pack JSON Schemas for `@<ns>.<attr>` and `@@<ns>.<attr>` and validates argument shapes
+- The emitter validates argument shapes for `@<ns>.<attr>` and `@@<ns>.<attr>` (either via pack-provided schemas or core conventions where applicable)
 - The emitter refuses to emit if:
-  - namespace is unknown or not pinned in extensions
+  - namespace is unknown or the corresponding pack is not composed in config
   - attribute is unknown or deprecated and not allowed
   - schema validation fails
   - target adapter reports missing capabilities required by the extension for the current profile
 - Capability checks use ADR 065 to query adapter and pack capability sets
+
+#### Enforceable coupling (avoid “metadata drift”)
+
+To avoid the “arse-backwards” failure mode where an attribute is applied to an unrelated type, extension attributes are interpreted with strict invariants. Example (pgvector):
+
+- `@pgvector.column(...)` is only valid on compatible base types (e.g. `Bytes`) or on named type instances defined in `types { ... }` whose base is compatible.
+- If applied to an incompatible base type, emission fails with a targeted diagnostic.
+- If the pack is not composed in `prisma-next.config.ts`, the namespace is unknown and emission fails.
 
 ### Error taxonomy
 
@@ -152,7 +172,7 @@ contract
   .table('document', t => t
     .column('embedding', types.bytea().ext('pgvector', { dim: 1536, distance: 'cosine' }))
   )
-  .extensions({ pgvector: '1.2.0' })
+  .extensionPacks({ pgvector })
 ```
 
 - Emitted `contract.json` must be byte-for-byte identical to PSL-first for the same inputs
