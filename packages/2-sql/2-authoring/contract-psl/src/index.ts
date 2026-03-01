@@ -1,4 +1,1 @@
-export {
-  type InterpretPslDocumentToSqlContractIRInput,
-  interpretPslDocumentToSqlContractIR,
-} from './interpreter';
+export * from './exports/index';
