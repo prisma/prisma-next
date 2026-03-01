@@ -1,6 +1,17 @@
 # Schema API (/docs/orm/reference/prisma-schema-reference)
 
+## Prisma Next notes (PSL contract authoring v1)
 
+This file is a copy of / reference to the **Prisma ORM PSL schema reference** for convenience while building Prisma Next’s PSL-first contract authoring.
+
+Prisma Next’s SQL PSL provider v1 intentionally supports only a subset of Prisma ORM PSL. In particular:
+
+- **Top-level blocks are rejected** (for example `datasource { ... }`, `generator { ... }`), because Prisma Next config owns those concerns.
+- **List fields are rejected** (both scalar lists like `String[]` and relation navigation lists like `Post[]`).
+  - This means Prisma Next PSL v1 can express the **foreign-key side** of a relation (`@relation(fields: [...], references: [...])`), but not the “one-to-many” backrelation list field.
+  - Implicit Prisma ORM many-to-many (which relies on list relation fields) is also out of scope; represent many-to-many using an explicit join model (two foreign keys) and omit list navigation fields.
+
+See `projects/psl-contract-authoring/spec.md` for the canonical v1 supported subset and strict-error rules.
 
 datasource [#datasource]
 
