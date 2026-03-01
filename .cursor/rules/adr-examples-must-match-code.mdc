@@ -1,5 +1,5 @@
 ---
-title: ADR examples must match real code
+description: Ensure ADR examples match implemented APIs.
 alwaysApply: false
 globs:
   - "docs/architecture docs/adrs/*.md"
