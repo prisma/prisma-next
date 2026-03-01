@@ -37,6 +37,15 @@ The **pure interpreter entrypoint** specifically excludes:
 
 Current scope is SQL/Postgres-first: scalar and enum mappings resolve to Postgres codec/native type descriptors in v1.
 
+Unsupported PSL constructs in v1 (strict errors):
+
+- **List fields are rejected**:
+  - Scalar lists like `String[]`
+  - Relation navigation lists like `Post[]` (one-to-many backrelation fields)
+  - Implicit Prisma ORM many-to-many (which relies on list relation fields)
+- Relations are modeled via the **foreign key side** only (`@relation(fields: [...], references: [...])`).
+  - Many-to-many can be represented using an explicit join model (two foreign keys), but without list navigation fields.
+
 Supported `@default(...)` surface in v1:
 
 - Storage defaults: `autoincrement()`, `now()`, literals, `dbgenerated("...")`

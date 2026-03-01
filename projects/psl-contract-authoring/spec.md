@@ -169,6 +169,11 @@ These are the v1 supported features. They also form the initial parity/conforman
 
 Anything outside the supported set must fail with a strict, targeted error (not warnings), including (examples; not exhaustive):
 
+- List fields:
+  - Scalar lists like `String[]`
+  - Relation navigation lists like `Post[]` (one-to-many backrelation fields)
+  - Implicit Prisma ORM many-to-many (which relies on list relation fields)
+  - Represent many-to-many using an explicit join model (two foreign keys) and omit list navigation fields.
 - Namespaced extension-pack attributes / blocks (pack-specific syntax; see ADR 104) beyond the initial conformance set (pgvector column typing)
 - Features that require storage primitives Prisma Next doesn’t model today (e.g. dialect-specific index methods/predicates if not representable)
 - PSL constructs whose semantics can’t be expressed in the existing TS authoring surface/contract model without inventing new primitives
