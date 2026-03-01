@@ -156,7 +156,7 @@ describe('defineConfig', () => {
       contract: {
         source: 'invalid' as unknown,
       },
-    } as PrismaNextConfig;
+    } as unknown as PrismaNextConfig;
 
     expect(() => defineConfig(config)).toThrow(
       'Config.contract.source must be a provider function',
@@ -177,7 +177,7 @@ describe('defineConfig', () => {
       contract: {
         source: undefined as unknown,
       },
-    } as PrismaNextConfig;
+    } as unknown as PrismaNextConfig;
 
     expect(() => defineConfig(config)).toThrow(
       'Config.contract.source must be a provider function',
@@ -191,5 +191,6 @@ describe('defineConfig', () => {
 
     expect(config.output).toBe('output/contract.json');
     expect(result.ok).toBe(true);
+    expect(result.assertOk()).toBe(contract);
   });
 });
