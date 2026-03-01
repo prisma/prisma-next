@@ -1,6 +1,6 @@
 # Summary
 
-Add a PSL grammar extension for **inline SQL literals** using JavaScript/TypeScript-style backticks (`sql\`...\``), with **no interpolation** and **single-line** constraints, and use it as the preferred future-facing way to embed SQL snippets in PSL (starting with storage defaults).
+Add a PSL grammar extension for **inline SQL literals** using JavaScript/TypeScript-style backticks (`sql\`...\``), with **no interpolation** and **multiline** support, and use it as the preferred future-facing way to embed SQL snippets in PSL (starting with storage defaults).
 
 # Description
 
@@ -17,7 +17,7 @@ This is intentionally **not** a templating mechanism: interpolation is disallowe
 
 ## Functional Requirements
 
-- Extend `@prisma-next/psl-parser` grammar to parse **single-line** tagged template literals in attribute arguments:
+- Extend `@prisma-next/psl-parser` grammar to parse tagged template literals (including multiline) in attribute arguments:
   - Accept `sql\`...\`` as an argument value in `@default(...)` (and generally as a generic argument value).
   - Keep PSL parser **SQL-agnostic**: the backtick-enclosed content is treated as opaque text.
   - The set of permitted template tags (e.g. `sql`) is configurable/parameterized at the parser boundary so language tooling can highlight based on the tag without hardcoding SQL into PSL.
@@ -34,12 +34,11 @@ This is intentionally **not** a templating mechanism: interpolation is disallowe
 ## Non-Functional Requirements
 
 - **No interpolation**: `sql\`...\`` is a quoting mechanism, not a templating language.
-- **Single-line only**: the literal must not contain newlines (explicitly rejected with a clear diagnostic).
+- **Multiline allowed**: newlines are permitted inside the literal and spans/diagnostics must be correct.
 - **Tooling-friendly**: the token shape should make it easy for a language server/highlighter to highlight backtick regions as SQL.
 
 ## Non-goals
 
-- Multiline SQL literals.
 - `${...}` interpolation semantics.
 - Adding view/index DSL or additional PSL blocks in this milestone (the syntax should enable them later, but this milestone proves the path via storage defaults first).
 - Changing the contract model (this is syntax + lowering only).
