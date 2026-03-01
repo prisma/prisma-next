@@ -10,6 +10,15 @@ import { interpretPslDocumentToSqlContractIR } from './interpreter';
 export interface PrismaContractOptions {
   readonly output?: string;
   readonly target?: TargetPackRef<'sql', 'postgres'>;
+  /**
+   * Milestone-local namespace availability hook.
+   *
+   * This currently models composed extension packs by id only (for example `["pgvector"]`),
+   * and is sufficient for namespace presence checks in the PSL interpreter.
+   *
+   * Future milestones can evolve this to richer composed pack metadata/manifests when
+   * attribute-level schema/argument validation needs to move beyond namespace existence.
+   */
   readonly composedExtensionPacks?: readonly string[];
 }
 

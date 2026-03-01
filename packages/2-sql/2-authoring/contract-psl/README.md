@@ -42,6 +42,9 @@ Current scope is SQL/Postgres-first: scalar and enum mappings resolve to Postgre
   - `interpretPslDocumentToSqlContractIR({ document, target? })`
 - `@prisma-next/sql-contract-psl/provider`
   - `prismaContract(schemaPath, { output?, target?, composedExtensionPacks? })`
+  - `composedExtensionPacks` is currently a milestone-local string-id hook for namespace
+    availability checks (for example `['pgvector']`); plan to evolve to richer composed pack
+    metadata/manifest inputs before broadening namespaced-attribute validation.
 
 ## Dependencies
 
