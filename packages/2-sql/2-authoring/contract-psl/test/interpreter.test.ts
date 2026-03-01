@@ -179,12 +179,153 @@ model User {
 
     expect(result.failure.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
       expect.arrayContaining([
-        'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTES',
         'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
         'PSL_MISSING_PRIMARY_KEY',
         'PSL_UNSUPPORTED_FIELD_LIST',
         'PSL_UNSUPPORTED_FIELD_TYPE',
         'PSL_INVALID_RELATION_TARGET',
+      ]),
+    );
+  });
+
+  it('maps @@map and @map to storage table and column names', () => {
+    const document = parsePslDocument({
+      schema: `model Team {
+  id Int @id @map("team_id")
+  @@map("org_team")
+}
+
+model Member {
+  id Int @id @map("member_id")
+  teamId Int @map("team_ref")
+  team Team @relation(fields: [teamId], references: [id])
+  @@map("team_member")
+  @@index([teamId])
+  @@unique([teamId, id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage.tables).toMatchObject({
+      org_team: {
+        columns: {
+          team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+        },
+        primaryKey: { columns: ['team_id'] },
+      },
+      team_member: {
+        columns: {
+          member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+          team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
+        },
+        primaryKey: { columns: ['member_id'] },
+        indexes: [{ columns: ['team_ref'] }],
+        uniques: [{ columns: ['team_ref', 'member_id'] }],
+        foreignKeys: [
+          {
+            columns: ['team_ref'],
+            references: { table: 'org_team', columns: ['team_id'] },
+          },
+        ],
+      },
+    });
+    expect(result.value.models).toMatchObject({
+      Team: {
+        storage: { table: 'org_team' },
+        fields: { id: { column: 'team_id' } },
+      },
+      Member: {
+        storage: { table: 'team_member' },
+        fields: {
+          id: { column: 'member_id' },
+          teamId: { column: 'team_ref' },
+        },
+      },
+    });
+  });
+
+  it('maps pgvector attributes on named types and fields to vector descriptor shape', () => {
+    const namedTypeDocument = parsePslDocument({
+      schema: `types {
+  Embedding1536 = Bytes @pgvector.column(dim: 1536)
+}
+
+model Document {
+  id Int @id
+  embedding Embedding1536
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const namedTypeResult = interpretPslDocumentToSqlContractIR({
+      document: namedTypeDocument,
+      composedExtensionPacks: ['pgvector'],
+    });
+    expect(namedTypeResult.ok).toBe(true);
+    if (!namedTypeResult.ok) return;
+    expect(namedTypeResult.value.storage.types).toMatchObject({
+      Embedding1536: {
+        codecId: 'pg/vector@1',
+        nativeType: 'vector(1536)',
+        typeParams: { length: 1536 },
+      },
+    });
+
+    const fieldDocument = parsePslDocument({
+      schema: `model Document {
+  id Int @id
+  embedding Bytes @pgvector.column(length: 1536)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const fieldResult = interpretPslDocumentToSqlContractIR({
+      document: fieldDocument,
+      composedExtensionPacks: ['pgvector'],
+    });
+    expect(fieldResult.ok).toBe(true);
+    if (!fieldResult.ok) return;
+    expect(fieldResult.value.storage.tables.document.columns.embedding).toMatchObject({
+      codecId: 'pg/vector@1',
+      nativeType: 'vector(1536)',
+      typeParams: { length: 1536 },
+    });
+  });
+
+  it('returns diagnostics when namespace is unrecognized', () => {
+    const document = parsePslDocument({
+      schema: `model Document {
+  id Int @id
+  embedding Bytes @pgvector.column(length: 1536)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      composedExtensionPacks: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          sourceId: 'schema.prisma',
+          span: expect.objectContaining({
+            start: expect.objectContaining({ line: 3 }),
+          }),
+        }),
       ]),
     );
   });

@@ -8,9 +8,8 @@ import type {
 } from '@prisma-next/core-control-plane/config-types';
 import type {
   ParsePslDocumentResult,
-  PslDefaultValue,
+  PslAttribute,
   PslField,
-  PslFieldAttribute,
   PslModel,
   PslSpan,
 } from '@prisma-next/psl-parser';
@@ -21,11 +20,13 @@ type ColumnDescriptor = {
   readonly codecId: string;
   readonly nativeType: string;
   readonly typeRef?: string;
+  readonly typeParams?: Record<string, unknown>;
 };
 
 export interface InterpretPslDocumentToSqlContractIRInput {
   readonly document: ParsePslDocumentResult;
   readonly target?: TargetPackRef<'sql', 'postgres'>;
+  readonly composedExtensionPacks?: readonly string[];
 }
 
 const DEFAULT_POSTGRES_TARGET: TargetPackRef<'sql', 'postgres'> = {
@@ -46,6 +47,7 @@ const SCALAR_COLUMN_MAP: Record<string, ColumnDescriptor> = {
   Decimal: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
   DateTime: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
   Json: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
+  Bytes: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
 };
 
 const REFERENTIAL_ACTION_MAP = {
@@ -63,10 +65,17 @@ const REFERENTIAL_ACTION_MAP = {
 
 type ResolvedField = {
   readonly field: PslField;
+  readonly columnName: string;
   readonly descriptor: ColumnDescriptor;
   readonly defaultValue?: ColumnDefault;
   readonly isId: boolean;
   readonly isUnique: boolean;
+};
+
+type ModelNameMapping = {
+  readonly model: PslModel;
+  readonly tableName: string;
+  readonly fieldColumns: Map<string, string>;
 };
 
 type DynamicTableBuilder = {
@@ -115,25 +124,124 @@ function lowerFirst(value: string): string {
   return value[0]?.toLowerCase() + value.slice(1);
 }
 
-function getAttribute(
-  attributes: readonly PslFieldAttribute[],
-  kind: PslFieldAttribute['kind'],
-): PslFieldAttribute | undefined {
-  return attributes.find((attribute) => attribute.kind === kind);
+function getAttribute(attributes: readonly PslAttribute[], name: string): PslAttribute | undefined {
+  return attributes.find((attribute) => attribute.name === name);
 }
 
-function toColumnDefault(value: PslDefaultValue): ColumnDefault {
-  if (value.kind === 'function') {
-    if (value.name === 'autoincrement') {
-      return { kind: 'function', expression: 'autoincrement()' };
-    }
+function getNamedArgument(attribute: PslAttribute, name: string): string | undefined {
+  const entry = attribute.args.find((arg) => arg.kind === 'named' && arg.name === name);
+  if (!entry || entry.kind !== 'named') {
+    return undefined;
+  }
+  return entry.value;
+}
+
+function getPositionalArgument(attribute: PslAttribute, index = 0): string | undefined {
+  const entries = attribute.args.filter((arg) => arg.kind === 'positional');
+  const entry = entries[index];
+  if (!entry || entry.kind !== 'positional') {
+    return undefined;
+  }
+  return entry.value;
+}
+
+function unquoteStringLiteral(value: string): string {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(['"])(.*)\1$/);
+  if (!match) {
+    return trimmed;
+  }
+  return match[2] ?? '';
+}
+
+function parseFieldList(value: string): readonly string[] | undefined {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
+    return undefined;
+  }
+  const body = trimmed.slice(1, -1);
+  const parts = body
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  return parts;
+}
+
+function parseDefaultValueExpression(expression: string): ColumnDefault | undefined {
+  const trimmed = expression.trim();
+  if (trimmed === 'autoincrement()') {
+    return { kind: 'function', expression: 'autoincrement()' };
+  }
+  if (trimmed === 'now()') {
     return { kind: 'function', expression: 'now()' };
   }
+  if (trimmed === 'true' || trimmed === 'false') {
+    return { kind: 'literal', value: trimmed === 'true' };
+  }
+  const numericValue = Number(trimmed);
+  if (!Number.isNaN(numericValue) && trimmed.length > 0 && !/^(['"]).*\1$/.test(trimmed)) {
+    return { kind: 'literal', value: numericValue };
+  }
+  if (/^(['"]).*\1$/.test(trimmed)) {
+    return { kind: 'literal', value: unquoteStringLiteral(trimmed) };
+  }
+  return undefined;
+}
 
-  return {
-    kind: 'literal',
-    value: value.value,
-  };
+function parseMapName(input: {
+  readonly attribute: PslAttribute | undefined;
+  readonly defaultValue: string;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly entityLabel: string;
+  readonly span: PslSpan;
+}): string {
+  if (!input.attribute) {
+    return input.defaultValue;
+  }
+
+  const value = getPositionalArgument(input.attribute);
+  if (!value) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} @map requires a positional string argument`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return input.defaultValue;
+  }
+  return unquoteStringLiteral(value);
+}
+
+function parsePgvectorLength(input: {
+  readonly attribute: PslAttribute;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}): number | undefined {
+  const namedLength = getNamedArgument(input.attribute, 'length');
+  const namedDim = getNamedArgument(input.attribute, 'dim');
+  const positional = getPositionalArgument(input.attribute);
+  const raw = namedLength ?? namedDim ?? positional;
+  if (!raw) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: '@pgvector.column requires length/dim argument',
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+  const parsed = Number(unquoteStringLiteral(raw));
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: '@pgvector.column length/dim must be a positive integer',
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+  return parsed;
 }
 
 function resolveColumnDescriptor(
@@ -155,9 +263,12 @@ function resolveColumnDescriptor(
 
 function collectResolvedFields(
   model: PslModel,
+  mapping: ModelNameMapping,
   enumTypeDescriptors: Map<string, ColumnDescriptor>,
   namedTypeDescriptors: Map<string, ColumnDescriptor>,
+  namedTypeBaseTypes: Map<string, string>,
   modelNames: Set<string>,
+  composedExtensions: Set<string>,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
 ): ResolvedField[] {
@@ -174,12 +285,78 @@ function collectResolvedFields(
       continue;
     }
 
+    for (const attribute of field.attributes) {
+      if (
+        attribute.name === 'id' ||
+        attribute.name === 'unique' ||
+        attribute.name === 'default' ||
+        attribute.name === 'relation' ||
+        attribute.name === 'map' ||
+        attribute.name === 'pgvector.column'
+      ) {
+        continue;
+      }
+      if (attribute.name.startsWith('pgvector.') && !composedExtensions.has('pgvector')) {
+        diagnostics.push({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          message: `Attribute "@${attribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
+          sourceId,
+          span: attribute.span,
+        });
+        continue;
+      }
+      diagnostics.push({
+        code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+        message: `Field "${model.name}.${field.name}" uses unsupported attribute "@${attribute.name}"`,
+        sourceId,
+        span: attribute.span,
+      });
+    }
+
     const relationAttribute = getAttribute(field.attributes, 'relation');
     if (relationAttribute && modelNames.has(field.typeName)) {
       continue;
     }
 
-    const descriptor = resolveColumnDescriptor(field, enumTypeDescriptors, namedTypeDescriptors);
+    let descriptor = resolveColumnDescriptor(field, enumTypeDescriptors, namedTypeDescriptors);
+    const pgvectorColumnAttribute = getAttribute(field.attributes, 'pgvector.column');
+    if (pgvectorColumnAttribute) {
+      if (!composedExtensions.has('pgvector')) {
+        diagnostics.push({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          message:
+            'Attribute "@pgvector.column" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.',
+          sourceId,
+          span: pgvectorColumnAttribute.span,
+        });
+      } else {
+        const isBytesBase =
+          field.typeName === 'Bytes' ||
+          namedTypeBaseTypes.get(field.typeRef ?? field.typeName) === 'Bytes';
+        if (!isBytesBase) {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `Field "${model.name}.${field.name}" uses @pgvector.column on unsupported base type "${field.typeName}"`,
+            sourceId,
+            span: pgvectorColumnAttribute.span,
+          });
+        } else {
+          const length = parsePgvectorLength({
+            attribute: pgvectorColumnAttribute,
+            diagnostics,
+            sourceId,
+          });
+          if (length !== undefined) {
+            descriptor = {
+              codecId: 'pg/vector@1',
+              nativeType: `vector(${length})`,
+              typeParams: { length },
+            };
+          }
+        }
+      }
+    }
+
     if (!descriptor) {
       diagnostics.push({
         code: 'PSL_UNSUPPORTED_FIELD_TYPE',
@@ -191,10 +368,20 @@ function collectResolvedFields(
     }
 
     const defaultAttribute = getAttribute(field.attributes, 'default');
-    const defaultValue =
-      defaultAttribute?.kind === 'default' ? toColumnDefault(defaultAttribute.value) : undefined;
+    const defaultValueRaw = defaultAttribute ? getPositionalArgument(defaultAttribute) : undefined;
+    const defaultValue = defaultValueRaw ? parseDefaultValueExpression(defaultValueRaw) : undefined;
+    if (defaultAttribute && defaultValueRaw && !defaultValue) {
+      diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_VALUE',
+        message: `Unsupported default value "${defaultValueRaw}"`,
+        sourceId,
+        span: defaultAttribute.span,
+      });
+    }
+    const mappedColumnName = mapping.fieldColumns.get(field.name) ?? field.name;
     resolvedFields.push({
       field,
+      columnName: mappedColumnName,
       descriptor,
       ...(defaultValue ? { defaultValue } : {}),
       isId: Boolean(getAttribute(field.attributes, 'id')),
@@ -247,18 +434,189 @@ function normalizeReferentialAction(input: {
   return undefined;
 }
 
+function parseAttributeFieldList(input: {
+  readonly attribute: PslAttribute;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly code: string;
+  readonly messagePrefix: string;
+}): readonly string[] | undefined {
+  const raw = getNamedArgument(input.attribute, 'fields') ?? getPositionalArgument(input.attribute);
+  if (!raw) {
+    input.diagnostics.push({
+      code: input.code,
+      message: `${input.messagePrefix} requires fields list argument`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+  const fields = parseFieldList(raw);
+  if (!fields || fields.length === 0) {
+    input.diagnostics.push({
+      code: input.code,
+      message: `${input.messagePrefix} requires bracketed field list argument`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+  return fields;
+}
+
+function mapFieldNamesToColumns(input: {
+  readonly modelName: string;
+  readonly fieldNames: readonly string[];
+  readonly mapping: ModelNameMapping;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly span: PslSpan;
+  readonly contextLabel: string;
+}): readonly string[] | undefined {
+  const columns: string[] = [];
+  for (const fieldName of input.fieldNames) {
+    const columnName = input.mapping.fieldColumns.get(fieldName);
+    if (!columnName) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        message: `${input.contextLabel} references unknown field "${input.modelName}.${fieldName}"`,
+        sourceId: input.sourceId,
+        span: input.span,
+      });
+      return undefined;
+    }
+    columns.push(columnName);
+  }
+  return columns;
+}
+
+function buildModelMappings(
+  models: readonly PslModel[],
+  diagnostics: ContractSourceDiagnostic[],
+  sourceId: string,
+): Map<string, ModelNameMapping> {
+  const result = new Map<string, ModelNameMapping>();
+  for (const model of models) {
+    const mapAttribute = getAttribute(model.attributes, 'map');
+    const tableName = parseMapName({
+      attribute: mapAttribute,
+      defaultValue: lowerFirst(model.name),
+      sourceId,
+      diagnostics,
+      entityLabel: `Model "${model.name}"`,
+      span: model.span,
+    });
+    const fieldColumns = new Map<string, string>();
+    for (const field of model.fields) {
+      const fieldMapAttribute = getAttribute(field.attributes, 'map');
+      const columnName = parseMapName({
+        attribute: fieldMapAttribute,
+        defaultValue: field.name,
+        sourceId,
+        diagnostics,
+        entityLabel: `Field "${model.name}.${field.name}"`,
+        span: field.span,
+      });
+      fieldColumns.set(field.name, columnName);
+    }
+    result.set(model.name, {
+      model,
+      tableName,
+      fieldColumns,
+    });
+  }
+  return result;
+}
+
+function parseRelationAttribute(input: {
+  readonly attribute: PslAttribute;
+  readonly modelName: string;
+  readonly fieldName: string;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}):
+  | {
+      readonly fields: readonly string[];
+      readonly references: readonly string[];
+      readonly onDelete?: string;
+      readonly onUpdate?: string;
+    }
+  | undefined {
+  for (const arg of input.attribute.args) {
+    if (arg.kind === 'positional') {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        message: `Relation field "${input.modelName}.${input.fieldName}" must use named arguments`,
+        sourceId: input.sourceId,
+        span: arg.span,
+      });
+      return undefined;
+    }
+    if (
+      arg.name !== 'fields' &&
+      arg.name !== 'references' &&
+      arg.name !== 'onDelete' &&
+      arg.name !== 'onUpdate'
+    ) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        message: `Relation field "${input.modelName}.${input.fieldName}" has unsupported argument "${arg.name}"`,
+        sourceId: input.sourceId,
+        span: arg.span,
+      });
+      return undefined;
+    }
+  }
+
+  const fieldsRaw = getNamedArgument(input.attribute, 'fields');
+  const referencesRaw = getNamedArgument(input.attribute, 'references');
+  if (!fieldsRaw || !referencesRaw) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+      message: `Relation field "${input.modelName}.${input.fieldName}" requires fields and references arguments`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+  const fields = parseFieldList(fieldsRaw);
+  const references = parseFieldList(referencesRaw);
+  if (!fields || !references || fields.length === 0 || references.length === 0) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+      message: `Relation field "${input.modelName}.${input.fieldName}" requires bracketed fields and references lists`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+
+  return {
+    fields,
+    references,
+    ...(getNamedArgument(input.attribute, 'onDelete')
+      ? { onDelete: unquoteStringLiteral(getNamedArgument(input.attribute, 'onDelete') ?? '') }
+      : {}),
+    ...(getNamedArgument(input.attribute, 'onUpdate')
+      ? { onUpdate: unquoteStringLiteral(getNamedArgument(input.attribute, 'onUpdate') ?? '') }
+      : {}),
+  };
+}
+
 export function interpretPslDocumentToSqlContractIR(
   input: InterpretPslDocumentToSqlContractIRInput,
 ): Result<ContractIR, ContractSourceDiagnostics> {
   const diagnostics: ContractSourceDiagnostic[] = mapParserDiagnostics(input.document);
   const modelNames = new Set(input.document.ast.models.map((model) => model.name));
   const sourceId = input.document.ast.sourceId;
+  const composedExtensions = new Set(input.composedExtensionPacks ?? []);
 
   let builder = defineContract().target(
     input.target ?? DEFAULT_POSTGRES_TARGET,
   ) as unknown as DynamicContractBuilder;
   const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
   const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
+  const namedTypeBaseTypes = new Map<string, string>();
 
   for (const enumDeclaration of input.document.ast.enums) {
     const nativeType = enumDeclaration.name.toLowerCase();
@@ -276,16 +634,6 @@ export function interpretPslDocumentToSqlContractIR(
   }
 
   for (const declaration of input.document.ast.types?.declarations ?? []) {
-    if (declaration.attributes.length > 0) {
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTES',
-        message: `Named type "${declaration.name}" attributes are not supported in SQL PSL provider v1`,
-        sourceId,
-        span: declaration.span,
-      });
-      continue;
-    }
-
     const baseDescriptor =
       enumTypeDescriptors.get(declaration.baseType) ?? SCALAR_COLUMN_MAP[declaration.baseType];
     if (!baseDescriptor) {
@@ -294,6 +642,62 @@ export function interpretPslDocumentToSqlContractIR(
         message: `Named type "${declaration.name}" references unsupported base type "${declaration.baseType}"`,
         sourceId,
         span: declaration.span,
+      });
+      continue;
+    }
+    namedTypeBaseTypes.set(declaration.name, declaration.baseType);
+
+    const pgvectorAttribute = getAttribute(declaration.attributes, 'pgvector.column');
+    const unsupportedNamedTypeAttribute = declaration.attributes.find(
+      (attribute) => attribute.name !== 'pgvector.column',
+    );
+    if (unsupportedNamedTypeAttribute) {
+      diagnostics.push({
+        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
+        message: `Named type "${declaration.name}" uses unsupported attribute "${unsupportedNamedTypeAttribute.name}"`,
+        sourceId,
+        span: unsupportedNamedTypeAttribute.span,
+      });
+      continue;
+    }
+
+    if (pgvectorAttribute) {
+      if (!composedExtensions.has('pgvector')) {
+        diagnostics.push({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          message:
+            'Attribute "@pgvector.column" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.',
+          sourceId,
+          span: pgvectorAttribute.span,
+        });
+        continue;
+      }
+      if (declaration.baseType !== 'Bytes') {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `Named type "${declaration.name}" uses @pgvector.column on unsupported base type "${declaration.baseType}"`,
+          sourceId,
+          span: pgvectorAttribute.span,
+        });
+        continue;
+      }
+      const length = parsePgvectorLength({
+        attribute: pgvectorAttribute,
+        diagnostics,
+        sourceId,
+      });
+      if (length === undefined) {
+        continue;
+      }
+      namedTypeDescriptors.set(declaration.name, {
+        codecId: 'pg/vector@1',
+        nativeType: `vector(${length})`,
+        typeRef: declaration.name,
+      });
+      builder = builder.storageType(declaration.name, {
+        codecId: 'pg/vector@1',
+        nativeType: `vector(${length})`,
+        typeParams: { length },
       });
       continue;
     }
@@ -311,20 +715,29 @@ export function interpretPslDocumentToSqlContractIR(
     });
   }
 
+  const modelMappings = buildModelMappings(input.document.ast.models, diagnostics, sourceId);
+
   for (const model of input.document.ast.models) {
-    const tableName = lowerFirst(model.name);
+    const mapping = modelMappings.get(model.name);
+    if (!mapping) {
+      continue;
+    }
+    const tableName = mapping.tableName;
     const resolvedFields = collectResolvedFields(
       model,
+      mapping,
       enumTypeDescriptors,
       namedTypeDescriptors,
+      namedTypeBaseTypes,
       modelNames,
+      composedExtensions,
       diagnostics,
       sourceId,
     );
 
     const primaryKeyColumns = resolvedFields
       .filter((field) => field.isId)
-      .map((field) => field.field.name);
+      .map((field) => field.columnName);
     if (primaryKeyColumns.length === 0) {
       diagnostics.push({
         code: 'PSL_MISSING_PRIMARY_KEY',
@@ -339,13 +752,8 @@ export function interpretPslDocumentToSqlContractIR(
         field,
         relation: getAttribute(field.attributes, 'relation'),
       }))
-      .filter(
-        (
-          entry,
-        ): entry is {
-          field: PslField;
-          relation: Extract<PslFieldAttribute, { kind: 'relation' }>;
-        } => entry.relation?.kind === 'relation',
+      .filter((entry): entry is { field: PslField; relation: PslAttribute } =>
+        Boolean(entry.relation),
       );
 
     builder = builder.table(tableName, (tableBuilder: DynamicTableBuilder) => {
@@ -361,10 +769,10 @@ export function interpretPslDocumentToSqlContractIR(
           ...(resolvedField.field.optional ? { nullable: true as const } : {}),
           ...(resolvedField.defaultValue ? { default: resolvedField.defaultValue } : {}),
         };
-        table = table.column(resolvedField.field.name, options);
+        table = table.column(resolvedField.columnName, options);
 
         if (resolvedField.isUnique) {
-          table = table.unique([resolvedField.field.name]);
+          table = table.unique([resolvedField.columnName]);
         }
       }
 
@@ -373,11 +781,54 @@ export function interpretPslDocumentToSqlContractIR(
       }
 
       for (const modelAttribute of model.attributes) {
-        if (modelAttribute.kind === 'unique') {
-          table = table.unique(modelAttribute.fields);
-        } else if (modelAttribute.kind === 'index') {
-          table = table.index(modelAttribute.fields);
+        if (modelAttribute.name === 'map') {
+          continue;
         }
+        if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
+          const fieldNames = parseAttributeFieldList({
+            attribute: modelAttribute,
+            sourceId,
+            diagnostics,
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            messagePrefix: `Model "${model.name}" @@${modelAttribute.name}`,
+          });
+          if (!fieldNames) {
+            continue;
+          }
+          const columnNames = mapFieldNamesToColumns({
+            modelName: model.name,
+            fieldNames,
+            mapping,
+            sourceId,
+            diagnostics,
+            span: modelAttribute.span,
+            contextLabel: `Model "${model.name}" @@${modelAttribute.name}`,
+          });
+          if (!columnNames) {
+            continue;
+          }
+          if (modelAttribute.name === 'unique') {
+            table = table.unique(columnNames);
+          } else {
+            table = table.index(columnNames);
+          }
+          continue;
+        }
+        if (modelAttribute.name.startsWith('pgvector.') && !composedExtensions.has('pgvector')) {
+          diagnostics.push({
+            code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+            message: `Attribute "@@${modelAttribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
+            sourceId,
+            span: modelAttribute.span,
+          });
+          continue;
+        }
+        diagnostics.push({
+          code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
+          message: `Model "${model.name}" uses unsupported attribute "@@${modelAttribute.name}"`,
+          sourceId,
+          span: modelAttribute.span,
+        });
       }
 
       for (const relationAttribute of relationAttributes) {
@@ -391,23 +842,70 @@ export function interpretPslDocumentToSqlContractIR(
           continue;
         }
 
-        const onDelete = relationAttribute.relation.onDelete
+        const parsedRelation = parseRelationAttribute({
+          attribute: relationAttribute.relation,
+          modelName: model.name,
+          fieldName: relationAttribute.field.name,
+          sourceId,
+          diagnostics,
+        });
+        if (!parsedRelation) {
+          continue;
+        }
+
+        const targetMapping = modelMappings.get(relationAttribute.field.typeName);
+        if (!targetMapping) {
+          diagnostics.push({
+            code: 'PSL_INVALID_RELATION_TARGET',
+            message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
+            sourceId,
+            span: relationAttribute.field.span,
+          });
+          continue;
+        }
+
+        const localColumns = mapFieldNamesToColumns({
+          modelName: model.name,
+          fieldNames: parsedRelation.fields,
+          mapping,
+          sourceId,
+          diagnostics,
+          span: relationAttribute.relation.span,
+          contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+        });
+        if (!localColumns) {
+          continue;
+        }
+        const referencedColumns = mapFieldNamesToColumns({
+          modelName: targetMapping.model.name,
+          fieldNames: parsedRelation.references,
+          mapping: targetMapping,
+          sourceId,
+          diagnostics,
+          span: relationAttribute.relation.span,
+          contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+        });
+        if (!referencedColumns) {
+          continue;
+        }
+
+        const onDelete = parsedRelation.onDelete
           ? normalizeReferentialAction({
               modelName: model.name,
               fieldName: relationAttribute.field.name,
               actionName: 'onDelete',
-              actionToken: relationAttribute.relation.onDelete,
+              actionToken: parsedRelation.onDelete,
               sourceId,
               span: relationAttribute.field.span,
               diagnostics,
             })
           : undefined;
-        const onUpdate = relationAttribute.relation.onUpdate
+        const onUpdate = parsedRelation.onUpdate
           ? normalizeReferentialAction({
               modelName: model.name,
               fieldName: relationAttribute.field.name,
               actionName: 'onUpdate',
-              actionToken: relationAttribute.relation.onUpdate,
+              actionToken: parsedRelation.onUpdate,
               sourceId,
               span: relationAttribute.field.span,
               diagnostics,
@@ -415,10 +913,10 @@ export function interpretPslDocumentToSqlContractIR(
           : undefined;
 
         table = table.foreignKey(
-          relationAttribute.relation.fields,
+          localColumns,
           {
-            table: lowerFirst(relationAttribute.field.typeName),
-            columns: relationAttribute.relation.references,
+            table: targetMapping.tableName,
+            columns: referencedColumns,
           },
           {
             ...(onDelete ? { onDelete } : {}),
@@ -433,7 +931,7 @@ export function interpretPslDocumentToSqlContractIR(
     builder = builder.model(model.name, tableName, (modelBuilder: DynamicModelBuilder) => {
       let next = modelBuilder;
       for (const resolvedField of resolvedFields) {
-        next = next.field(resolvedField.field.name, resolvedField.field.name);
+        next = next.field(resolvedField.field.name, resolvedField.columnName);
       }
       return next;
     });

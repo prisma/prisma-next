@@ -10,6 +10,7 @@ import { interpretPslDocumentToSqlContractIR } from './interpreter';
 export interface PrismaContractOptions {
   readonly output?: string;
   readonly target?: TargetPackRef<'sql', 'postgres'>;
+  readonly composedExtensionPacks?: readonly string[];
 }
 
 export function prismaContract(
@@ -45,6 +46,7 @@ export function prismaContract(
       return interpretPslDocumentToSqlContractIR({
         document,
         ...ifDefined('target', options?.target),
+        ...ifDefined('composedExtensionPacks', options?.composedExtensionPacks),
       });
     },
     ...ifDefined('output', options?.output),
