@@ -277,6 +277,153 @@ model Member {
     );
   });
 
+  it('returns diagnostics when relation fields reference unknown local fields', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [missingUserId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            'Relation field "Post.user" references unknown field "Post.missingUserId"',
+          ),
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics when relation references target unknown fields', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [missingId])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            'Relation field "Post.user" references unknown field "User.missingId"',
+          ),
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics when relation omits required fields argument', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: 'Relation field "Post.user" requires fields and references arguments',
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics for unsupported model attributes', () => {
+    const document = parsePslDocument({
+      schema: `model Team {
+  id Int @id
+  @@unsupported([id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
+          message: 'Model "Team" uses unsupported attribute "@@unsupported"',
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics for model attributes with unrecognized extension namespace', () => {
+    const document = parsePslDocument({
+      schema: `model Team {
+  id Int @id
+  @@pgvector.index(length: 3)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      composedExtensionPacks: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          message: expect.stringContaining('uses unrecognized namespace "pgvector"'),
+        }),
+      ]),
+    );
+  });
+
   it('maps pgvector attributes on named types and fields to vector descriptor shape', () => {
     const namedTypeDocument = parsePslDocument({
       schema: `types {

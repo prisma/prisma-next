@@ -33,7 +33,7 @@ export function prismaContract(
       try {
         schema = await readFile(absoluteSchemaPath, 'utf-8');
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = String(error);
         return notOk({
           summary: `Failed to read Prisma schema at "${schemaPath}"`,
           diagnostics: [
