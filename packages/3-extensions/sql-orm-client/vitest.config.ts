@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    testTimeout: timeouts.default,
+    testTimeout: timeouts.typeScriptCompilation,
     hookTimeout: timeouts.default,
     coverage: {
       provider: 'v8',

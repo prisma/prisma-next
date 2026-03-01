@@ -1,8 +1,9 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createCollection, createReturningCollectionFor } from '../collection-fixtures';
 import { normalizeSql, serializePlans } from './helpers';
 
-describe('sql-compilation/delete', () => {
+describe('sql-compilation/delete', { timeout: timeouts.typeScriptCompilation }, () => {
   it('delete() returns first deleted row', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
@@ -13,7 +14,7 @@ describe('sql-compilation/delete', () => {
     expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
       'delete from "users" where "users"."id" = $1 returning *',
     );
-  }, 1_000);
+  });
 
   it('deleteAll() returns all deleted rows', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
