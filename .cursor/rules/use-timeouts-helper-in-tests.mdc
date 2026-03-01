@@ -1,6 +1,6 @@
 ---
 description: Use shared timeout helpers in tests
-globs: ["**/*.test.ts", "test/**", "packages/**/test/**", "examples/**/test/**"]
+globs: ["**/*.test.ts", "**/*.spec.ts", "test/**", "packages/**/test/**", "examples/**/test/**"]
 alwaysApply: false
 ---
 
