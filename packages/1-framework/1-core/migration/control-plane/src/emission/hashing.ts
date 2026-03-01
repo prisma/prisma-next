@@ -1,20 +1,7 @@
 import { createHash } from 'node:crypto';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { CanonicalContractInput } from './canonicalization';
 import { canonicalizeContract } from './canonicalization';
-
-type ContractInput = {
-  schemaVersion: string;
-  targetFamily: string;
-  target: string;
-  models: Record<string, unknown>;
-  relations: Record<string, unknown>;
-  storage: Record<string, unknown>;
-  execution?: Record<string, unknown>;
-  extensionPacks: Record<string, unknown>;
-  capabilities: Record<string, Record<string, boolean>>;
-  meta: Record<string, unknown>;
-  [key: string]: unknown;
-};
 
 function computeHash(content: string): string {
   const hash = createHash('sha256');
@@ -22,7 +9,7 @@ function computeHash(content: string): string {
   return `sha256:${hash.digest('hex')}`;
 }
 
-export function computeStorageHash(contract: ContractInput): string {
+export function computeStorageHash(contract: CanonicalContractInput): string {
   const storageContract = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,
@@ -38,7 +25,7 @@ export function computeStorageHash(contract: ContractInput): string {
   return computeHash(canonical);
 }
 
-export function computeProfileHash(contract: ContractInput): string {
+export function computeProfileHash(contract: CanonicalContractInput): string {
   const profileContract = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,
@@ -54,7 +41,7 @@ export function computeProfileHash(contract: ContractInput): string {
   return computeHash(canonical);
 }
 
-export function computeExecutionHash(contract: ContractInput): string {
+export function computeExecutionHash(contract: CanonicalContractInput): string {
   const executionContract = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,

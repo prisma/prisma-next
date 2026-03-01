@@ -18,7 +18,7 @@ type NormalizedContract = {
   meta: Record<string, unknown>;
 };
 
-type CanonicalContractInput = {
+export type CanonicalContractInput = {
   schemaVersion: string;
   targetFamily: string;
   target: string;
