@@ -4,7 +4,7 @@
 **Layer:** Extensions Domain, Integrations Layer, Runtime Plane
 **Status:** Draft
 **Date:** 2026-02-16
-**References:** ADR 161 (Repository Layer), ADR 015 (ORM as Optional Extension), PR #152 (AST expansion)
+**References:** ADR 164 (Repository Layer), ADR 015 (ORM as Optional Extension), PR #152 (AST expansion)
 
 ---
 
@@ -12,7 +12,7 @@
 
 Prisma Next provides several layers for querying databases. At the lowest level, you can write raw SQL. Above that, the DSL lane (`@prisma-next/sql-lane`) gives you a type-safe SQL query builder. But most application developers don't want to think in SQL at all — they want to think in terms of their domain: **users, posts, comments**. They want to filter, include related data, paginate, create, update, and delete records using the vocabulary of their application.
 
-That's what this spec is about: an **ORM Client** that speaks in application terms. It replaces the ORM lane (ADR 015), which was our first attempt at this but was fundamentally limited by the one-query-one-statement rule (ADR 003). The layer introduced in ADR 161 lifts that restriction — it can orchestrate multiple plans when needed (e.g. for nested mutations) while each individual plan still obeys ADR 003.
+That's what this spec is about: an **ORM Client** that speaks in application terms. It replaces the ORM lane (ADR 015), which was our first attempt at this but was fundamentally limited by the one-query-one-statement rule (ADR 003). The layer introduced in ADR 164 lifts that restriction — it can orchestrate multiple plans when needed (e.g. for nested mutations) while each individual plan still obeys ADR 003.
 
 See also [Prisma ORM Comparison](./prisma-orm-comparison.md) for context and code snippets.
 
@@ -143,7 +143,7 @@ The PN AST node type for filter expressions. All filters — whether built by th
 
 ### 3.1 Where It Lives
 
-The ORM client package occupies `packages/3-extensions/sql-orm-client/` in the **runtime plane** (`extensions` domain, `integrations` layer). It sits above lanes and SQL runtime while preserving repository-level orchestration boundaries from ADR 161:
+The ORM client package occupies `packages/3-extensions/sql-orm-client/` in the **runtime plane** (`extensions` domain, `integrations` layer). It sits above lanes and SQL runtime while preserving repository-level orchestration boundaries from ADR 164:
 
 | Direction | Allowed |
 |-----------|---------|
@@ -224,7 +224,7 @@ Currently only Postgres is supported, but the design uses capability inspection 
 
 ### 3.6 Plugin Lifecycle Participation
 
-Each `ExecutionPlan` dispatched by the ORM client passes through the `RuntimeExecutor` plugin lifecycle hooks (`beforeCompile`, `afterExecute`). Plans use `meta.lane = 'orm-client'` to distinguish themselves from direct lane usage. Operation-level telemetry aggregates individual Plan telemetry into a summary (per ADR 161 section 8).
+Each `ExecutionPlan` dispatched by the ORM client passes through the `RuntimeExecutor` plugin lifecycle hooks (`beforeCompile`, `afterExecute`). Plans use `meta.lane = 'orm-client'` to distinguish themselves from direct lane usage. Operation-level telemetry aggregates individual Plan telemetry into a summary (per ADR 164 section 8).
 
 ---
 
@@ -954,7 +954,7 @@ The `criterion` argument to `connect()` and `disconnect()` is an object identify
 
 #### Execution semantics
 
-Nested mutations execute within a **transaction** by default (per ADR 161 section 6). The ORM client orchestrates multiple INSERT/UPDATE statements with propagated generated keys — a parent's auto-generated `id` is captured and used as the FK value in child inserts.
+Nested mutations execute within a **transaction** by default (per ADR 164 section 6). The ORM client orchestrates multiple INSERT/UPDATE statements with propagated generated keys — a parent's auto-generated `id` is captured and used as the FK value in child inserts.
 
 ---
 

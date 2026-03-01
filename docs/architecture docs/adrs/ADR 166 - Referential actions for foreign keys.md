@@ -1,7 +1,6 @@
-# ADR 162 — Referential actions for foreign keys
+# ADR 166 — Referential actions for foreign keys
 
 ## Context
-
 Foreign keys in the contract IR declare structural relationships between tables (columns → referenced table/columns). ADR 161 added explicit knobs for whether FK constraints and supporting indexes are emitted. However, there is no way to express **referential actions** — the database behavior that fires when a referenced row is deleted or updated (`ON DELETE CASCADE`, `ON UPDATE SET NULL`, etc.).
 
 Without referential actions in the contract, the migration planner omits `ON DELETE` and `ON UPDATE` clauses entirely. The database falls back to the SQL standard default (`NO ACTION`), which means any delete or update that would violate the FK constraint simply fails. Users cannot express intent for CASCADE, SET NULL, or other actions through the contract.

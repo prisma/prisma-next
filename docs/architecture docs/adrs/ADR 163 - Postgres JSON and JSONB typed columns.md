@@ -1,4 +1,4 @@
-# ADR 159 — Postgres JSON and JSONB typed columns
+# ADR 163 — Postgres JSON and JSONB typed columns
 
 ## Context
 
