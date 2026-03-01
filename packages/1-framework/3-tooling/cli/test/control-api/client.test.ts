@@ -484,6 +484,15 @@ describe('ControlClient progress emission', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.failure.code).toBe('CONTRACT_SOURCE_INVALID');
+        expect(result.failure.diagnostics).toEqual({
+          summary: 'Contract source provider threw an exception',
+          diagnostics: [
+            {
+              code: 'PROVIDER_THROW',
+              message: 'Source load error',
+            },
+          ],
+        });
       }
 
       // Should emit resolveSource span with error outcome

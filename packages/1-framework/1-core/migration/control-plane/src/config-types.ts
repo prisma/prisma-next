@@ -89,10 +89,11 @@ export interface PrismaNextConfig<
 
 /**
  * Arktype schema for ContractConfig validation.
- * Validates that source is present and output/types are strings when provided.
+ * Validates presence/shape only.
+ * source is validated as a provider function at runtime in defineConfig().
  */
 const ContractConfigSchema = type({
-  source: 'unknown', // Can be value or function - runtime check needed
+  source: 'unknown', // Runtime check enforces provider function
   'output?': 'string',
 });
 

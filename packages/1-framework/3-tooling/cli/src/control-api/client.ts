@@ -548,10 +548,20 @@ class ControlClientImpl implements ControlClient {
         outcome: 'error',
       });
 
+      const message = error instanceof Error ? error.message : String(error);
       return notOk({
         code: 'CONTRACT_SOURCE_INVALID',
         summary: 'Failed to resolve contract source',
-        why: error instanceof Error ? error.message : String(error),
+        why: message,
+        diagnostics: {
+          summary: 'Contract source provider threw an exception',
+          diagnostics: [
+            {
+              code: 'PROVIDER_THROW',
+              message,
+            },
+          ],
+        },
         meta: undefined,
       });
     }
