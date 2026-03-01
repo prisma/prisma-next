@@ -1,11 +1,11 @@
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   ContractSourceDiagnostic,
   ContractSourceDiagnosticSpan,
   ContractSourceDiagnostics,
-} from '@prisma-next/core-control-plane/config-types';
+} from '@prisma-next/config/config-types';
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   ParsePslDocumentResult,
   PslAttribute,

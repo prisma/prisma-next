@@ -1,7 +1,7 @@
 import type {
   ContractSourceDiagnostics,
   ContractSourceProvider,
-} from '@prisma-next/core-control-plane/config-types';
+} from '@prisma-next/config/config-types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,
