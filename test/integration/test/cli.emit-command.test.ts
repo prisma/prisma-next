@@ -453,7 +453,7 @@ describe('emit command', () => {
       const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
         fixtureSubdir,
-        'prisma-next.config.psl-source.ts',
+        'prisma-next.config.parity-psl.ts',
       );
       const testDirPsl = testSetup.testDir;
       const cleanupPsl = testSetup.cleanup;
@@ -466,7 +466,7 @@ describe('emit command', () => {
           process.chdir(testDir);
           const exitCode = await executeCommand(command, [
             '--config',
-            'prisma-next.config.parity.ts',
+            'prisma-next.config.parity-ts.ts',
             '--json',
           ]);
           expect(exitCode).toBe(0);
@@ -537,7 +537,7 @@ describe('emit command', () => {
       const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
         fixtureSubdir,
-        'prisma-next.config.psl-source.ts',
+        'prisma-next.config.parity-psl.ts',
       );
       const testDirPsl = testSetup.testDir;
       const cleanupPsl = testSetup.cleanup;

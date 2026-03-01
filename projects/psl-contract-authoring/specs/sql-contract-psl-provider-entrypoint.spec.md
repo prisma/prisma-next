@@ -91,7 +91,7 @@ Then config can choose `output` separately using existing config helpers.
 
 - `@prisma-next/sql-contract-psl` continues to export `interpretPslDocumentToSqlContractIR` unchanged.
 - New entrypoint exists at `@prisma-next/sql-contract-psl/provider` (or equivalent) providing the composition helper API.
-- Integration fixture `prisma-next.config.psl-source.ts` is updated to use the new helper (removes inline resolver boilerplate).
+- Integration fixture `prisma-next.config.parity-psl.ts` is updated to use the new helper (removes inline resolver boilerplate).
 - The previous `prismaContract(schemaPath, resolver, output?)` helper is no longer the recommended PSL-first composition route for SQL; the extracted `@prisma-next/sql-contract-psl/provider` `prismaContract()` is.
 - Add/adjust integration test coverage that:
   - emits successfully from the PSL provider helper (read → parse → interpret → emit)
