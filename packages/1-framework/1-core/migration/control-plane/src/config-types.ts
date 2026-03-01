@@ -9,14 +9,6 @@ import type {
   ControlTargetDescriptor,
 } from './types';
 
-export type {
-  ContractSourceDiagnostic,
-  ContractSourceDiagnosticPosition,
-  ContractSourceDiagnosticSpan,
-  ContractSourceDiagnostics,
-  ContractSourceProvider,
-} from './contract-source-types';
-
 /**
  * Type alias for CLI driver instances.
  * Uses string for both family and target IDs for maximum flexibility.

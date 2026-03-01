@@ -1,10 +1,12 @@
 export type {
   ContractConfig,
+  PrismaNextConfig,
+} from '../config-types';
+export { defineConfig } from '../config-types';
+export type {
   ContractSourceDiagnostic,
   ContractSourceDiagnosticPosition,
   ContractSourceDiagnosticSpan,
   ContractSourceDiagnostics,
   ContractSourceProvider,
-  PrismaNextConfig,
-} from '../config-types';
-export { defineConfig } from '../config-types';
+} from '../contract-source-types';
