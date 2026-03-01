@@ -34,6 +34,10 @@ const eq = (
   right,
 });
 describe('where interop', () => {
+  it('rejects null where args', () => {
+    expect(() => normalizeWhereArg(null as unknown as WhereArg)).toThrow(/cannot be null/i);
+  });
+
   it('normalizes bound params into literals', () => {
     const arg = toWhereExpr({
       expr: eq(col('users', 'name'), param(1)),

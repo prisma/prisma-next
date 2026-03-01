@@ -15,8 +15,13 @@ export function normalizeWhereArg(arg: undefined): undefined;
 export function normalizeWhereArg(arg: WhereArg): WhereExpr;
 export function normalizeWhereArg(arg: WhereArg | undefined): WhereExpr | undefined;
 export function normalizeWhereArg(arg: WhereArg | undefined): WhereExpr | undefined {
-  if (!arg) {
+  if (arg === undefined) {
     return undefined;
+  }
+  if (arg === null) {
+    throw new Error(
+      'WhereArg cannot be null. Pass undefined or a valid WhereExpr/ToWhereExpr payload.',
+    );
   }
 
   if (isToWhereExpr(arg)) {
