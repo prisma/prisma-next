@@ -150,6 +150,12 @@ describe('CliStructuredError', () => {
 });
 
 describe('Config Errors', () => {
+  it('errorConfigFileNotFound without path omits where', () => {
+    const error = errorConfigFileNotFound();
+    expect(error.code).toBe('4001');
+    expect(error.where).toBeUndefined();
+  });
+
   it('errorConfigFileNotFound creates correct error', () => {
     const error = errorConfigFileNotFound('/path/to/config.ts');
     expect(error.code).toBe('4001');
@@ -383,6 +389,18 @@ describe('Runtime Errors', () => {
   it('errorHashMismatch with expected and actual', () => {
     const error = errorHashMismatch({ expected: 'hash1', actual: 'hash2' });
     expect(error.meta?.['expected']).toBe('hash1');
+    expect(error.meta?.['actual']).toBe('hash2');
+  });
+
+  it('errorHashMismatch with expected only', () => {
+    const error = errorHashMismatch({ expected: 'hash1' });
+    expect(error.meta?.['expected']).toBe('hash1');
+    expect(error.meta?.['actual']).toBeUndefined();
+  });
+
+  it('errorHashMismatch with actual only', () => {
+    const error = errorHashMismatch({ actual: 'hash2' });
+    expect(error.meta?.['expected']).toBeUndefined();
     expect(error.meta?.['actual']).toBe('hash2');
   });
 
