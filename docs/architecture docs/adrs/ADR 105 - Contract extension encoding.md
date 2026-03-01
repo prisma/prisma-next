@@ -75,7 +75,7 @@ Decorations attach metadata to existing core nodes. Each decoration array contai
   "columns": [
     {
       "ref": { "kind": "column", "table": "document", "column": "embedding" },
-      "payload": { "dim": 1536, "distance": "cosine" }
+      "payload": { "length": 1536, "distance": "cosine" }
     }
   ],
   "indexes": [
@@ -177,7 +177,7 @@ New error codes (map to `RuntimeError` per ADR 027 and ADR 068):
       "columns": [
         {
           "ref": { "kind": "column", "table": "document", "column": "embedding" },
-          "payload": { "dim": 1536, "distance": "cosine", "index": "ivfflat", "lists": 100 }
+          "payload": { "length": 1536, "distance": "cosine", "index": "ivfflat", "lists": 100 }
         }
       ]
     }

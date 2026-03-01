@@ -38,7 +38,7 @@ The emitter validates extension usage against pack-provided (or core-convention)
 model Document {
   id      Int     @id @default(autoincrement())
   content String
-  embedding Bytes  @pgvector.column(dim: 1536, distance: cosine)
+  embedding Bytes  @pgvector.column(length: 1536, distance: cosine)
 }
 ```
 
@@ -48,7 +48,7 @@ This pattern keeps the parser simple (no type-parameter syntax) while preserving
 
 ```prisma
 types {
-  Embedding1536 = Bytes @pgvector.column(dim: 1536)
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
 }
 
 model Document {
@@ -72,7 +72,7 @@ model Place {
 
 - All extension data is emitted under `contract.extensionPacks.<namespace>` and never mixed into core tables unless explicitly mapped by the pack's schema
 - Core storage mapping remains under `tables.*` with standard columns, constraints, and indexes
-- Extension-specific column metadata may be referenced by core nodes via stable references, e.g. a column `meta.ext.pgvector = { dim: 1536, distance: "cosine" }` when the pack declares such links in its schema
+- Extension-specific column metadata may be referenced by core nodes via stable references, e.g. a column `meta.ext.pgvector = { length: 1536, distance: "cosine" }` when the pack declares such links in its schema
 
 ### Emitted shape example
 
@@ -90,7 +90,7 @@ model Place {
           "nullable": false,
           "meta": {
             "ext": {
-              "pgvector": { "dim": 1536, "distance": "cosine" }
+              "pgvector": { "length": 1536, "distance": "cosine" }
             }
           }
         }
@@ -101,7 +101,7 @@ model Place {
     "pgvector": {
       "version": "1.2.0",
       "columns": {
-        "document.embedding": { "dim": 1536, "distance": "cosine" }
+        "document.embedding": { "length": 1536, "distance": "cosine" }
       },
       "indexes": []
     },
