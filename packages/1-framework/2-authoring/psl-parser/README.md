@@ -26,6 +26,7 @@ In the provider-based authoring model, PSL providers call this parser and then r
 - Attributes may include an **optional argument list**.
 - Arguments are parsed into positional/named entries with preserved raw values and source spans.
 - The parser owns **syntax + structure + spans**, not semantics.
+- Example: `@default(uuid(7))` is preserved as a positional argument value `uuid(7)`; semantic lowering is handled downstream.
 
 Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is responsible for:
 
