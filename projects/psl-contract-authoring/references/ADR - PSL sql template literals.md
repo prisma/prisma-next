@@ -26,7 +26,7 @@ Parser boundary:
 - The set of permitted template tags (e.g. `sql`) should be a **parameter/configuration input** to the parser, so tooling can still detect/highlight tagged literals without hardcoding SQL into PSL.
 
 Rules:
-- **Single-line only** (no embedded newlines)
+- **Multiline allowed** (embedded newlines are permitted)
 - **No interpolation**: `${...}` is explicitly rejected (PSL is not a templating language)
 - Supports escaping a backtick within the literal (e.g. `\``) per the parser’s defined escaping rules.
 
@@ -50,7 +50,7 @@ Lowering:
   - parser grammar updates
   - diagnostics + spans behavior must be correct and stable
   - downstream consumers should not assume attribute argument values are limited to identifiers, numbers, or quoted strings
-- By choosing **single-line only**, we avoid (for now) complex span/position mapping across multi-line literals.
+- Allowing multiline means diagnostics/spans must correctly map through `\n` inside the literal. This is feasible now that the default-lowering span logic is multiline-aware, but it must be upheld by the parser’s token spans as well.
 
 ## Alternatives considered
 
@@ -71,7 +71,7 @@ Lowering:
 Implement as a follow-up milestone (Milestone 7) after default-function parity is complete.
 
 Initial rollout constraints:
-- single-line only
+- multiline allowed
 - no interpolation
 - only supported inside `@default(...)` lowering for storage defaults
 
