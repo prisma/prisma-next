@@ -53,50 +53,34 @@ Examples:
 
 ### Step 4: Compose the PR Description
 
-Write an approachable narrative that explains:
+Use the walkthrough output as the PR description.
 
-- **Intention**: what the PR is trying to achieve (the “why”).
-- **Semantic/logical change**: what *meaningfully* changed in behavior, layering, boundaries, or guarantees (not a file list).
-- **Mechanics only as needed**: mention “what changed” when it helps the reader understand the semantics.
+1. Run the `.agents/skills/drive-pr-walkthrough/SKILL.md` workflow for the current branch vs base (default: `origin/main...HEAD`) and write `walkthrough.md` to disk.
+2. Use the contents of that `walkthrough.md` as the PR description, with these adjustments:
+   - **Omit** the entire `## Sources` section (it’s great for local review, but it’s noise in a GitHub PR body).
+   - **Prepend** the Linear close line at the very top:
 
-Lead with something visual when possible:
+     ```md
+     closes [$TICKET_ID](https://linear.app/prisma-company/issue/$TICKET_ID/$SLUG)
+     ```
 
-- A **before/after** code snippet that captures the goal of the PR (preferred), or
-- A small **Mermaid diagram** when structure or lifecycle is the point.
+   - **Adjust links for GitHub**:
+     - Keep the link text including the line ranges (e.g. `file.ts (L12–L34)`).
+     - But change the link target to a GitHub-friendly relative path (e.g. `(path/to/file.ts)`), **removing** any local-editor suffixes like `:12-34`.
 
-Avoid “reviewer coaching” language (e.g. don’t write “anchor for the reviewer”). Use a normal, friendly narrative voice similar to existing high-quality PR descriptions in this repo.
+3. Keep the rest of the walkthrough structure as-is (it’s the intended narrative PR shape):
+   - `## Before / After (intention in code)`
+   - `## Intent`
+   - `## Change map`
+   - `## The story`
+   - `## Behavior changes & evidence`
+   - `## Compatibility / migration / risk`
+   - `## Follow-ups / open questions`
+   - `## Non-goals / intentionally out of scope`
 
-#### Suggested outline (not a rigid template)
-
-```markdown
-closes [$TICKET_ID](https://linear.app/prisma-company/issue/$TICKET_ID/$SLUG)
-
-## Goal / purpose
-
-<2–6 sentences: what we’re trying to make true, and why it matters>
-
-## Before / After
-
-```ts
-// BEFORE — smallest snippet that shows the old shape
-```
-
-```ts
-// AFTER — smallest snippet that shows the new shape
-```
-
-<Optional: a small mermaid diagram if lifecycle/composition is the point>
-
-## What changed and why
-
-- <bullet list of the meaningful changes; focus on semantics and rationale>
-```
-
-#### Content rules
-
-- Prefer **short sections** and **concrete claims** (e.g. “imports are side-effect free because X happens only in Y”).
-- Use **before/after** snippets that match real code (pull “before” from `origin/main` when helpful).
-- Include only the sections that improve comprehension; don’t force sections that don’t apply.
+Notes:
+- The walkthrough must stay **intent/behavior-first**, not a file list.
+- Avoid “reviewer coaching” phrases; write like a normal narrative.
 
 ### Step 5: Confirm and Create
 
