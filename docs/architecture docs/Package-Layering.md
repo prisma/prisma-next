@@ -65,7 +65,7 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 |-- 2-authoring (migration plane)
 |   |-- contract/      → @prisma-next/contract-authoring
 |   |-- contract-ts/   → @prisma-next/contract-ts (future)
-|   |-- contract-psl/  → @prisma-next/psl-parser (future)
+|   |-- psl-parser/    → @prisma-next/psl-parser
 |-- 3-tooling (migration plane)
 |   |-- cli/           → @prisma-next/cli
 |   |-- emitter/       → @prisma-next/emitter
