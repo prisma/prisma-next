@@ -25,8 +25,8 @@ It records two related (but distinct) inventories:
   - ❌ Remaining: broader namespaced attribute surface across other packs/namespaces and richer attribute vocabularies.
 
 - **More default functions**
-  - ✅ Implemented in Milestone 5: PSL parity for `uuid()`, `uuid(7)`, `ulid()`, `nanoid()`, `nanoid(n)`, and `dbgenerated("...")` with registry-driven lowering to execution/storage defaults.
-  - ⚠️ Remaining out of scope: `cuid()` / `cuid(2)` (explicitly rejected in v1 with actionable diagnostics) and additional generator vocab beyond the milestone set.
+  - ✅ Implemented in Milestone 5: PSL parity for `uuid()`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(n)`, and `dbgenerated("...")` with registry-driven lowering to execution/storage defaults.
+  - ⚠️ Remaining out of scope: `cuid()` (v1 explicitly rejects cuid v1 with actionable diagnostics) and additional generator vocab beyond the milestone set.
 
 - **Storage mapping control**
   - ✅ Implemented in Milestone 4: `@@map("...")` (model → table) and `@map("...")` (field → column), including PK/unique/index/FK propagation over storage names.

@@ -35,20 +35,51 @@ export type DefaultFunctionLoweringHandler = (input: {
 
 export type DefaultFunctionRegistry = ReadonlyMap<string, DefaultFunctionLoweringHandler>;
 
-function createSpanFromBase(base: PslSpan, startOffset: number, endOffset: number): PslSpan {
-  const safeStart = Math.max(0, startOffset);
-  const safeEnd = Math.max(safeStart, endOffset);
+function resolveSpanPositionFromBase(
+  base: PslSpan,
+  text: string,
+  offset: number,
+): PslSpan['start'] {
+  const safeOffset = Math.min(Math.max(0, offset), text.length);
+  let line = base.start.line;
+  let column = base.start.column;
+
+  for (let index = 0; index < safeOffset; index += 1) {
+    const character = text[index] ?? '';
+    if (character === '\r') {
+      if (text[index + 1] === '\n' && index + 1 < safeOffset) {
+        index += 1;
+      }
+      line += 1;
+      column = 1;
+      continue;
+    }
+    if (character === '\n') {
+      line += 1;
+      column = 1;
+      continue;
+    }
+    column += 1;
+  }
+
   return {
-    start: {
-      offset: base.start.offset + safeStart,
-      line: base.start.line,
-      column: base.start.column + safeStart,
-    },
-    end: {
-      offset: base.start.offset + safeEnd,
-      line: base.start.line,
-      column: base.start.column + safeEnd,
-    },
+    offset: base.start.offset + safeOffset,
+    line,
+    column,
+  };
+}
+
+function createSpanFromBase(
+  base: PslSpan,
+  startOffset: number,
+  endOffset: number,
+  text: string,
+): PslSpan {
+  const safeStart = Math.max(0, Math.min(startOffset, text.length));
+  const safeEnd = Math.max(safeStart, Math.min(endOffset, text.length));
+  return {
+    start: resolveSpanPositionFromBase(base, text, safeStart),
+    end: resolveSpanPositionFromBase(base, text, safeEnd),
   };
 }
 
@@ -146,7 +177,7 @@ export function parseDefaultFunctionCall(
       const argEnd = argStart + raw.length;
       return {
         raw,
-        span: createSpanFromBase(expressionSpan, argStart, argEnd),
+        span: createSpanFromBase(expressionSpan, argStart, argEnd, expression),
       } satisfies DefaultFunctionArgument;
     })
     .filter((arg): arg is DefaultFunctionArgument => Boolean(arg));
@@ -157,7 +188,7 @@ export function parseDefaultFunctionCall(
     name: functionName,
     raw: trimmed,
     args,
-    span: createSpanFromBase(expressionSpan, functionStart, functionEnd),
+    span: createSpanFromBase(expressionSpan, functionStart, functionEnd, expression),
   };
 }
 
@@ -307,6 +338,40 @@ function lowerUuid(input: {
   });
 }
 
+function lowerCuid(input: {
+  readonly call: ParsedDefaultFunctionCall;
+  readonly context: DefaultFunctionLoweringContext;
+}): LoweredDefaultResult {
+  if (input.call.args.length === 0) {
+    return {
+      ok: false,
+      diagnostic: {
+        code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
+        message:
+          'Default function "cuid()" is not supported in SQL PSL provider v1. Use `cuid(2)` instead.',
+        sourceId: input.context.sourceId,
+        span: input.call.span,
+      },
+    };
+  }
+  if (input.call.args.length !== 1) {
+    return invalidArgumentDiagnostic({
+      context: input.context,
+      span: input.call.span,
+      message: 'Default function "cuid" accepts exactly one version argument: `cuid(2)`.',
+    });
+  }
+  const version = parseIntegerArgument(input.call.args[0]?.raw ?? '');
+  if (version === 2) {
+    return executionGenerator('cuid2');
+  }
+  return invalidArgumentDiagnostic({
+    context: input.context,
+    span: input.call.args[0]?.span ?? input.call.span,
+    message: 'Default function "cuid" supports only `cuid(2)` in SQL PSL provider v1.',
+  });
+}
+
 function lowerUlid(input: {
   readonly call: ParsedDefaultFunctionCall;
   readonly context: DefaultFunctionLoweringContext;
@@ -387,11 +452,35 @@ function lowerDbgenerated(input: {
   };
 }
 
+const supportedFunctionUsageByName: Readonly<Record<string, readonly string[]>> = {
+  autoincrement: ['autoincrement()'],
+  now: ['now()'],
+  uuid: ['uuid()', 'uuid(4)', 'uuid(7)'],
+  cuid: ['cuid(2)'],
+  ulid: ['ulid()'],
+  nanoid: ['nanoid()', 'nanoid(n)'],
+  dbgenerated: ['dbgenerated("...")'],
+};
+
+const unknownFunctionSuggestionsByName: Readonly<Record<string, string>> = {
+  cuid2: 'Use `cuid(2)`.',
+  uuidv4: 'Use `uuid()` or `uuid(4)`.',
+  uuidv7: 'Use `uuid(7)`.',
+};
+
+function formatSupportedFunctionList(registry: DefaultFunctionRegistry): string {
+  const signatures = Array.from(registry.keys())
+    .sort()
+    .flatMap((functionName) => supportedFunctionUsageByName[functionName] ?? [`${functionName}()`]);
+  return signatures.length > 0 ? signatures.join(', ') : 'none';
+}
+
 export function createBuiltinDefaultFunctionRegistry(): DefaultFunctionRegistry {
   return new Map<string, DefaultFunctionLoweringHandler>([
     ['autoincrement', lowerAutoincrement],
     ['now', lowerNow],
     ['uuid', lowerUuid],
+    ['cuid', lowerCuid],
     ['ulid', lowerUlid],
     ['nanoid', lowerNanoid],
     ['dbgenerated', lowerDbgenerated],
@@ -407,25 +496,14 @@ export function lowerDefaultFunctionWithRegistry(input: {
   if (handler) {
     return handler({ call: input.call, context: input.context });
   }
-
-  if (input.call.name === 'cuid') {
-    return {
-      ok: false,
-      diagnostic: {
-        code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-        message:
-          'Default function "cuid" is not supported in SQL PSL provider v1. Use `uuid()`, `uuid(7)`, `ulid()`, or `nanoid()` instead.',
-        sourceId: input.context.sourceId,
-        span: input.call.span,
-      },
-    };
-  }
+  const supportedFunctionList = formatSupportedFunctionList(input.registry);
+  const suggestion = unknownFunctionSuggestionsByName[input.call.name];
 
   return {
     ok: false,
     diagnostic: {
       code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-      message: `Default function "${input.call.name}" is not supported in SQL PSL provider v1. Supported functions: autoincrement(), now(), uuid(), uuid(7), ulid(), nanoid(), nanoid(n), dbgenerated("...").`,
+      message: `Default function "${input.call.name}" is not supported in SQL PSL provider v1. Supported functions: ${supportedFunctionList}.${suggestion ? ` ${suggestion}` : ''}`,
       sourceId: input.context.sourceId,
       span: input.call.span,
     },

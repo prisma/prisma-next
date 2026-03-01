@@ -574,6 +574,7 @@ model User {
     const document = parsePslDocument({
       schema: `model Defaults {
   id Int @id
+  idCuid2 String @default(cuid(2))
   idUuidV4 String @default(uuid())
   idUuidV7 String @default(uuid(7))
   idUlid String @default(ulid())
@@ -593,6 +594,10 @@ model User {
     expect(result.value.execution).toMatchObject({
       mutations: {
         defaults: [
+          {
+            ref: { table: 'defaults', column: 'idCuid2' },
+            onCreate: { kind: 'generator', id: 'cuid2' },
+          },
           {
             ref: { table: 'defaults', column: 'idNanoidDefault' },
             onCreate: { kind: 'generator', id: 'nanoid' },
@@ -660,7 +665,7 @@ model User {
         expect.objectContaining({
           code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
           sourceId: 'schema.prisma',
-          message: expect.stringContaining('cuid'),
+          message: expect.stringContaining('cuid(2)'),
         }),
         expect.objectContaining({
           code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
