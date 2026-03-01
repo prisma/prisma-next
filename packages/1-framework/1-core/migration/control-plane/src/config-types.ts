@@ -82,10 +82,10 @@ export interface PrismaNextConfig<
 /**
  * Arktype schema for ContractConfig validation.
  * Validates presence/shape only.
- * source is validated as a provider function at runtime in defineConfig().
+ * contract.source is validated as a provider function at runtime in defineConfig().
  */
 const ContractConfigSchema = type({
-  source: 'unknown', // Runtime check enforces provider function
+  source: 'unknown', // Runtime check enforces provider function shape
   'output?': 'string',
 });
 
@@ -126,12 +126,10 @@ export function defineConfig<TFamilyId extends string = string, TTargetId extend
 
   // Normalize contract config if present
   if (config.contract) {
-    // Validate contract.source is a provider function (runtime check)
+    // Validate contract.source provider function shape at runtime.
     const source = config.contract.source;
     if (typeof source !== 'function') {
-      throw new Error(
-        'Config.contract.source must be a provider function returning Promise<Result<ContractIR, Diagnostics>>',
-      );
+      throw new Error('Config.contract.source must be a provider function');
     }
 
     // Apply defaults

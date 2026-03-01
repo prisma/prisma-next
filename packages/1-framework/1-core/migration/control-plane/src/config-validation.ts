@@ -259,7 +259,7 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
 
     if (typeof contract['source'] !== 'function') {
       throw errorConfigValidation('contract.source', {
-        why: 'Config.contract.source must be a provider function returning Promise<Result<ContractIR, Diagnostics>>',
+        why: 'Config.contract.source must be a provider function',
       });
     }
 
