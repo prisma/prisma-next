@@ -58,25 +58,292 @@ function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextC
   } as PrismaNextConfig;
 }
 
+type RawConfigOverrides = Record<string, unknown> & {
+  family?: Record<string, unknown>;
+  target?: Record<string, unknown>;
+  adapter?: Record<string, unknown>;
+  driver?: Record<string, unknown>;
+};
+
+function createValidRawConfig(overrides: RawConfigOverrides = {}) {
+  const { family, target, adapter, driver, ...rest } = overrides;
+
+  return {
+    family: {
+      kind: 'family',
+      id: 'sql',
+      familyId: 'sql',
+      version: '0.0.1',
+      hook: {},
+      create: vi.fn(),
+      ...(family as Record<string, unknown> | undefined),
+    },
+    target: {
+      kind: 'target',
+      familyId: 'sql',
+      targetId: 'postgres',
+      id: 'postgres',
+      version: '0.0.1',
+      create: vi.fn(),
+      ...(target as Record<string, unknown> | undefined),
+    },
+    adapter: {
+      kind: 'adapter',
+      familyId: 'sql',
+      targetId: 'postgres',
+      id: 'postgres',
+      version: '0.0.1',
+      create: vi.fn(),
+      ...(adapter as Record<string, unknown> | undefined),
+    },
+    driver: {
+      kind: 'driver',
+      familyId: 'sql',
+      targetId: 'postgres',
+      id: 'postgres',
+      version: '0.0.1',
+      create: vi.fn(),
+      ...(driver as Record<string, unknown> | undefined),
+    },
+    ...rest,
+  };
+}
+
+function expectFieldError(config: unknown, field: string) {
+  try {
+    validateConfig(config);
+    throw new Error('expected validateConfig to throw');
+  } catch (error) {
+    expect(error).toBeInstanceOf(ConfigValidationError);
+    expect((error as ConfigValidationError).field).toBe(field);
+  }
+}
+
 describe('validateConfig', () => {
   it('validates valid config', () => {
-    expect(() => validateConfig(createValidConfig())).not.toThrow();
+    expect(() => validateConfig(createValidRawConfig())).not.toThrow();
   });
 
   it('throws for non-object config', () => {
-    expect(() => validateConfig(null)).toThrow(ConfigValidationError);
-    expect(() => validateConfig(undefined)).toThrow(ConfigValidationError);
-    expect(() => validateConfig('invalid')).toThrow(ConfigValidationError);
+    expectFieldError(null, 'object');
+    expectFieldError(undefined, 'object');
+    expectFieldError('invalid', 'object');
   });
 
-  it('throws when contract source is not a provider function', () => {
-    const config = createValidConfig({
+  it('throws when required top-level descriptors are missing', () => {
+    expectFieldError({ target: {}, adapter: {} }, 'family');
+    expectFieldError({ family: {}, adapter: {} }, 'target');
+    expectFieldError({ family: {}, target: {} }, 'adapter');
+  });
+
+  it('validates family descriptor fields', () => {
+    expectFieldError(createValidRawConfig({ family: { kind: 'invalid' } }), 'family.kind');
+    expectFieldError(createValidRawConfig({ family: { familyId: 123 } }), 'family.familyId');
+    expectFieldError(createValidRawConfig({ family: { version: 123 } }), 'family.version');
+    expectFieldError(createValidRawConfig({ family: { hook: undefined } }), 'family.hook');
+    expectFieldError(createValidRawConfig({ family: { create: 'invalid' } }), 'family.create');
+  });
+
+  it('validates target descriptor fields', () => {
+    expectFieldError(createValidRawConfig({ target: { kind: 'invalid' } }), 'target.kind');
+    expectFieldError(createValidRawConfig({ target: { id: 123 } }), 'target.id');
+    expectFieldError(createValidRawConfig({ target: { familyId: 123 } }), 'target.familyId');
+    expectFieldError(createValidRawConfig({ target: { version: 123 } }), 'target.version');
+    expectFieldError(createValidRawConfig({ target: { targetId: 123 } }), 'target.targetId');
+    expectFieldError(createValidRawConfig({ target: { create: 'invalid' } }), 'target.create');
+  });
+
+  it('validates target family compatibility', () => {
+    expectFieldError(
+      createValidRawConfig({
+        family: { familyId: 'sql' },
+        target: { familyId: 'document' },
+      }),
+      'target.familyId',
+    );
+  });
+
+  it('validates adapter descriptor fields', () => {
+    expectFieldError(createValidRawConfig({ adapter: { kind: 'invalid' } }), 'adapter.kind');
+    expectFieldError(createValidRawConfig({ adapter: { id: 123 } }), 'adapter.id');
+    expectFieldError(createValidRawConfig({ adapter: { familyId: 123 } }), 'adapter.familyId');
+    expectFieldError(createValidRawConfig({ adapter: { version: 123 } }), 'adapter.version');
+    expectFieldError(createValidRawConfig({ adapter: { targetId: 123 } }), 'adapter.targetId');
+    expectFieldError(createValidRawConfig({ adapter: { create: 'invalid' } }), 'adapter.create');
+  });
+
+  it('validates adapter family and target compatibility', () => {
+    expectFieldError(
+      createValidRawConfig({
+        family: { familyId: 'sql' },
+        adapter: { familyId: 'document' },
+      }),
+      'adapter.familyId',
+    );
+
+    expectFieldError(
+      createValidRawConfig({
+        target: { targetId: 'postgres' },
+        adapter: { targetId: 'mysql' },
+      }),
+      'adapter.targetId',
+    );
+  });
+
+  it('validates extensions collection and extension descriptors', () => {
+    expectFieldError(createValidRawConfig({ extensions: 'invalid' }), 'extensions');
+    expectFieldError(createValidRawConfig({ extensions: ['invalid'] }), 'extensions[]');
+    expectFieldError(
+      createValidRawConfig({
+        extensions: [{ kind: 'invalid', id: 'ext', familyId: 'sql', targetId: 'postgres' }],
+      }),
+      'extensions[].kind',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        extensions: [{ kind: 'extension', id: 123, familyId: 'sql', targetId: 'postgres' }],
+      }),
+      'extensions[].id',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        extensions: [{ kind: 'extension', id: 'ext', familyId: 123, targetId: 'postgres' }],
+      }),
+      'extensions[].familyId',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        extensions: [{ kind: 'extension', id: 'ext', familyId: 'sql', version: 123 }],
+      }),
+      'extensions[].version',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        extensions: [
+          {
+            kind: 'extension',
+            id: 'ext',
+            familyId: 'document',
+            targetId: 'postgres',
+            version: '0.0.1',
+            create: vi.fn(),
+          },
+        ],
+      }),
+      'extensions[].familyId',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        extensions: [
+          {
+            kind: 'extension',
+            id: 'ext',
+            familyId: 'sql',
+            targetId: 123,
+            version: '0.0.1',
+            create: vi.fn(),
+          },
+        ],
+      }),
+      'extensions[].targetId',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        extensions: [
+          {
+            kind: 'extension',
+            id: 'ext',
+            familyId: 'sql',
+            targetId: 'mysql',
+            version: '0.0.1',
+            create: vi.fn(),
+          },
+        ],
+      }),
+      'extensions[].targetId',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        extensions: [
+          {
+            kind: 'extension',
+            id: 'ext',
+            familyId: 'sql',
+            targetId: 'postgres',
+            version: '0.0.1',
+            create: 'invalid',
+          },
+        ],
+      }),
+      'extensions[].create',
+    );
+  });
+
+  it('validates driver descriptor fields and compatibility', () => {
+    expectFieldError(createValidRawConfig({ driver: { kind: 'invalid' } }), 'driver.kind');
+    expectFieldError(createValidRawConfig({ driver: { id: 123 } }), 'driver.id');
+    expectFieldError(createValidRawConfig({ driver: { version: 123 } }), 'driver.version');
+    expectFieldError(createValidRawConfig({ driver: { familyId: 123 } }), 'driver.familyId');
+    expectFieldError(createValidRawConfig({ driver: { familyId: 'document' } }), 'driver.familyId');
+    expectFieldError(createValidRawConfig({ driver: { targetId: 123 } }), 'driver.targetId');
+    expectFieldError(createValidRawConfig({ driver: { targetId: 'mysql' } }), 'driver.targetId');
+    expectFieldError(createValidRawConfig({ driver: { create: 'invalid' } }), 'driver.create');
+  });
+
+  it('validates contract shape and source provider', () => {
+    expectFieldError(createValidRawConfig({ contract: 'invalid' }), 'contract');
+    expectFieldError(createValidRawConfig({ contract: {} }), 'contract.source');
+    expectFieldError(
+      createValidRawConfig({
+        contract: { source: { kind: 'psl', schemaPath: './schema.prisma' } },
+      }),
+      'contract.source',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: async () => ok({ targetFamily: 'sql' } as ContractIR),
+          output: 123,
+        },
+      }),
+      'contract.output',
+    );
+  });
+
+  it('accepts valid optional sections', () => {
+    const config = createValidRawConfig({
+      extensions: [
+        {
+          kind: 'extension',
+          id: 'pgvector',
+          familyId: 'sql',
+          targetId: 'postgres',
+          version: '0.0.1',
+          create: vi.fn(),
+        },
+      ],
       contract: {
-        source: { kind: 'psl', schemaPath: './schema.prisma' },
+        source: async () => ok({ targetFamily: 'sql' } as ContractIR),
+        output: 'src/prisma/contract.json',
       },
     });
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+});
 
-    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+describe('ConfigValidationError', () => {
+  it('uses default message when why is omitted', () => {
+    const error = new ConfigValidationError('family');
+    expect(error.field).toBe('family');
+    expect(error.why).toBe('Config must have a "family" field');
+    expect(error.message).toBe('Config must have a "family" field');
+  });
+
+  it('uses explicit why when provided', () => {
+    const error = new ConfigValidationError('family', 'Custom reason');
+    expect(error.field).toBe('family');
+    expect(error.why).toBe('Custom reason');
+    expect(error.message).toBe('Custom reason');
   });
 });
 
