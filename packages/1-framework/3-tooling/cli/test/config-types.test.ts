@@ -159,7 +159,7 @@ describe('defineConfig', () => {
     } as PrismaNextConfig;
 
     expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source must be a provider function returning Promise<Result<ContractIR, Diagnostics>>',
+      'Config.contract.source must be a provider function',
     );
   });
 
@@ -180,7 +180,7 @@ describe('defineConfig', () => {
     } as PrismaNextConfig;
 
     expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source must be a provider function returning Promise<Result<ContractIR, Diagnostics>>',
+      'Config.contract.source must be a provider function',
     );
   });
 
