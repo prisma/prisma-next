@@ -17,7 +17,7 @@ Extensions must be discoverable, versionable, and enforceable across local build
 
 Introduce a namespaced PSL extension syntax and mapping rules that produce deterministic contract JSON under `contract.extensionPacks.<namespace>` and optional capabilities claims.
 
-**Composition constraint:** PSL does not “activate” extensions. Installed extension packs are a configuration responsibility: `prisma-next.config.ts` declares which packs are present (and therefore which namespaces/attributes are available) and pins their versions. PSL remains versionless and purely declarative.
+**Composition constraint:** PSL does not “activate” extensions or carry extension configuration. Extension packs are composed via `prisma-next.config.ts`, which determines which namespaces/attributes exist. The emitter/interpreter then **infers** the PSL authoring surface (valid namespaces, attributes, and argument schemas) from the composed pack’s existing manifest/metadata. PSL remains versionless and purely declarative.
 
 The emitter validates extension usage against pack-provided (or core-convention) schemas and capability gates and refuses to emit on violations.
 
@@ -29,7 +29,6 @@ The emitter validates extension usage against pack-provided (or core-convention)
 - A pack owns exactly one namespace and must not collide with core or another pack
 - Field attribute form: `@<ns>.<attr>(args?)`
 - Model attribute form: `@@<ns>.<attr>(args?)`
-- **No PSL version pinning block.** Pack versions are pinned via `prisma-next.config.ts` (the same place packs are composed in). The emitted contract records the resolved versions under `contract.extensionPacks.<ns>.version`.
 
 ### Syntax examples
 
@@ -165,14 +164,29 @@ Errors map to `RuntimeError` codes per ADR 027 and ADR 068.
 
 ### TS-first parity
 
-The TS builder exposes the same namespace and attribute vocabulary via typed helpers:
+The TS builder exposes the same namespace vocabulary via pack refs, and extension-specific column/type helpers are provided by the corresponding extension package.
 
 ```typescript
-contract
-  .table('document', t => t
-    .column('embedding', types.bytea().ext('pgvector', { dim: 1536, distance: 'cosine' }))
-  )
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { int4Column } from '@prisma-next/adapter-postgres/column-types';
+import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
+import { vector } from '@prisma-next/extension-pgvector/column-types';
+import pgvector from '@prisma-next/extension-pgvector/pack';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgres from '@prisma-next/target-postgres/pack';
+
+type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
+
+export const contract = defineContract<AllCodecTypes>()
+  .target(postgres)
   .extensionPacks({ pgvector })
+  .table('document', (t) =>
+    t
+      .column('id', { type: int4Column, nullable: false })
+      .column('embedding', { type: vector(1536), nullable: false })
+      .primaryKey(['id']),
+  )
+  .build();
 ```
 
 - Emitted `contract.json` must be byte-for-byte identical to PSL-first for the same inputs
@@ -199,7 +213,7 @@ contract
 
 ### Negative
 - Requires packs to ship schemas and maintain stable attribute vocabularies
-- Slight verbosity with the top-level extensions version pinning block
+- Slight verbosity from explicit namespace + argument syntax in PSL
 - Adds validation complexity to the emitter
 
 ## Open questions

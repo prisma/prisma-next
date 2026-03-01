@@ -90,6 +90,8 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/adr-writing.mdc` — ADR writing guidelines (clarity, flow, examples)
+- `.cursor/rules/extension-packs-do-not-add-psl-config.mdc` — Packs are composed in config; PSL surface inferred from pack metadata
+- `.cursor/rules/adr-examples-must-match-code.mdc` — ADR examples should be copy/pasteable and reflect real APIs
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Contract normalization responsibilities
 - `.cursor/rules/contract-default-values.mdc` — Validate emitted column defaults
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype

@@ -1,0 +1,15 @@
+---
+title: ADR examples must match real code
+alwaysApply: false
+globs:
+  - "docs/architecture docs/adrs/*.md"
+---
+
+# ADR examples must match real code
+
+When adding or editing ADR examples:
+
+- Prefer examples that are **copy/pasteable** and reflect the current API.
+- Avoid inventing fluent helper syntax unless it already exists in the codebase.
+- If you’re unsure, quickly search for the symbol/method before documenting it.
+
