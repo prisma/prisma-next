@@ -287,7 +287,7 @@ describe('@prisma-next/driver-postgres', () => {
     expect(driver.state).toBe('closed');
   });
 
-  it('constructs and closes url-bound driver', async () => {
+  it('constructs and closes url-bound driver', { timeout: 1_000 }, async () => {
     const driver = createBoundDriverFromBinding(
       { kind: 'url', url: 'postgresql://127.0.0.1:65432/unused' },
       undefined,
