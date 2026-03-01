@@ -18,6 +18,7 @@ export type {
   PslModelAttribute,
   PslNamedTypeDeclaration,
   PslPosition,
+  PslReferentialAction,
   PslRelationAttribute,
   PslSpan,
   PslTypesBlock,
