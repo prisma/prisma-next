@@ -6,6 +6,7 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
+  integrationFixtureAppDir,
   setupCommandMocks,
   setupIntegrationTestDirectoryFromFixtures,
 } from './utils/cli-test-helpers';
@@ -446,7 +447,7 @@ describe('emit command', () => {
   });
 
   it(
-    'emits from psl provider and matches ts provider hashes',
+    'emits equivalent hashes from psl and ts providers',
     { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
@@ -465,26 +466,29 @@ describe('emit command', () => {
           process.chdir(testDir);
           const exitCode = await executeCommand(command, [
             '--config',
-            'prisma-next.config.ts',
+            'prisma-next.config.parity.ts',
             '--json',
           ]);
           expect(exitCode).toBe(0);
           const tsContract = JSON.parse(
             readFileSync(join(outputDir, 'contract.json'), 'utf-8'),
           ) as Record<string, unknown>;
-          tsProviderStorageHash = tsContract['storageHash'] as string;
-          tsProviderProfileHash = tsContract['profileHash'] as string;
+          const storageHash = tsContract['storageHash'];
+          const profileHash = tsContract['profileHash'];
+          expect(storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+          expect(profileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+          tsProviderStorageHash = storageHash as string;
+          tsProviderProfileHash = profileHash as string;
         } finally {
           process.chdir(originalCwd);
         }
 
         writeFileSync(
           join(testDirPsl, 'schema.prisma'),
-          `model User {
-  id Int @id
-  email String
-}
-`,
+          readFileSync(
+            join(integrationFixtureAppDir, 'fixtures', fixtureSubdir, 'schema.parity.psl'),
+            'utf-8',
+          ),
           'utf-8',
         );
 
@@ -506,11 +510,16 @@ describe('emit command', () => {
         expect(existsSync(contractDtsPath)).toBe(true);
 
         const emitted = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        const emittedStorageHash = emitted['storageHash'];
+        const emittedProfileHash = emitted['profileHash'];
+
         expect(emitted).toMatchObject({
           targetFamily: 'sql',
-          storageHash: tsProviderStorageHash,
-          profileHash: tsProviderProfileHash,
         });
+        expect(emittedStorageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(emittedProfileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(emittedStorageHash).toBe(tsProviderStorageHash);
+        expect(emittedProfileHash).toBe(tsProviderProfileHash);
         expect(emitted).not.toHaveProperty('sources');
         expect(emitted['meta']).not.toHaveProperty('source');
         expect(emitted['meta']).not.toHaveProperty('sourceId');
