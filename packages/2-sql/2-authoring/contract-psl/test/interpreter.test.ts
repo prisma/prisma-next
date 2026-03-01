@@ -211,8 +211,9 @@ model Member {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    const tables = (result.value.storage as Record<string, unknown>)['tables'];
 
-    expect(result.value.storage['tables']).toMatchObject({
+    expect(tables).toMatchObject({
       org_team: {
         columns: {
           team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
@@ -444,7 +445,8 @@ model Document {
     });
     expect(namedTypeResult.ok).toBe(true);
     if (!namedTypeResult.ok) return;
-    expect(namedTypeResult.value.storage['types']).toMatchObject({
+    const types = (namedTypeResult.value.storage as Record<string, unknown>)['types'];
+    expect(types).toMatchObject({
       Embedding1536: {
         codecId: 'pg/vector@1',
         nativeType: 'vector(1536)',
@@ -466,11 +468,14 @@ model Document {
     });
     expect(fieldResult.ok).toBe(true);
     if (!fieldResult.ok) return;
-    const fieldTables = fieldResult.value.storage['tables'] as Record<string, unknown>;
+    const fieldTables = (fieldResult.value.storage as Record<string, unknown>)['tables'] as Record<
+      string,
+      unknown
+    >;
     const documentTable = fieldTables['document'] as {
-      columns: Record<string, unknown>;
+      readonly columns?: Record<string, unknown>;
     };
-    expect(documentTable.columns['embedding']).toMatchObject({
+    expect(documentTable.columns?.['embedding']).toMatchObject({
       codecId: 'pg/vector@1',
       nativeType: 'vector(1536)',
       typeParams: { length: 1536 },
