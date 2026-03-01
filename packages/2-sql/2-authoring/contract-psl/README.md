@@ -40,8 +40,8 @@ Current scope is SQL/Postgres-first: scalar and enum mappings resolve to Postgre
 Supported `@default(...)` surface in v1:
 
 - Storage defaults: `autoincrement()`, `now()`, literals, `dbgenerated("...")`
-- Execution defaults: `uuid()`, `uuid(4)`, `uuid(7)`, `ulid()`, `nanoid()`, `nanoid(<2-255>)`
-- Explicitly unsupported in v1: `cuid()` / `cuid(2)` (diagnostic suggests supported alternatives)
+- Execution defaults: `uuid()`, `uuid(4)`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(<2-255>)`
+- Explicitly unsupported in v1: `cuid()` (diagnostic suggests `cuid(2)`)
 
 ## Public API
 

@@ -171,6 +171,7 @@ model Document {
         schemaPath,
         `model User {
   id Int @id
+  cuid2 String @default(cuid(2))
   uuidV7 String @default(uuid(7))
   nanoid16 String @default(nanoid(16))
   dbExpr String @default(dbgenerated("gen_random_uuid()"))
@@ -189,6 +190,10 @@ model Document {
       expect(result.value.execution).toMatchObject({
         mutations: {
           defaults: [
+            {
+              ref: { table: 'user', column: 'cuid2' },
+              onCreate: { kind: 'generator', id: 'cuid2' },
+            },
             {
               ref: { table: 'user', column: 'nanoid16' },
               onCreate: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
@@ -245,7 +250,7 @@ model Document {
           expect.objectContaining({
             code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
             sourceId: './schema.prisma',
-            message: expect.stringContaining('uuid()'),
+            message: expect.stringContaining('cuid(2)'),
             span: expect.objectContaining({
               start: expect.objectContaining({ line: 3 }),
             }),
