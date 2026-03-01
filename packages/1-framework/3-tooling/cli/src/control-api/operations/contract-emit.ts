@@ -7,6 +7,26 @@ import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
+interface ProviderFailureLike {
+  readonly summary: string;
+  readonly diagnostics: readonly unknown[];
+  readonly meta?: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isAbortError(error: unknown): boolean {
+  return isRecord(error) && typeof error['name'] === 'string' && error['name'] === 'AbortError';
+}
+
+function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
+  return (
+    isRecord(value) && typeof value['summary'] === 'string' && Array.isArray(value['diagnostics'])
+  );
+}
+
 /**
  * Executes the contract emit operation.
  *
@@ -74,9 +94,33 @@ export async function executeContractEmit(
   try {
     providerResult = await unlessAborted(contractConfig.source());
   } catch (error) {
+    if (signal.aborted || isAbortError(error)) {
+      throw error;
+    }
     throw errorRuntime('Failed to resolve contract source', {
       why: error instanceof Error ? error.message : String(error),
       fix: 'Ensure contract.source resolves to ok(contractIR) or returns structured diagnostics.',
+    });
+  }
+
+  if (!isRecord(providerResult) || typeof providerResult.ok !== 'boolean') {
+    throw errorRuntime('Failed to resolve contract source', {
+      why: 'Contract source provider returned malformed result shape.',
+      fix: 'Ensure contract.source resolves to ok(contractIR) or notOk({ summary, diagnostics }).',
+    });
+  }
+
+  if (providerResult.ok && !('value' in providerResult)) {
+    throw errorRuntime('Failed to resolve contract source', {
+      why: 'Contract source provider returned malformed success result: missing value.',
+      fix: 'Ensure contract.source success payload is ok(contractIR).',
+    });
+  }
+
+  if (!providerResult.ok && !isProviderFailureLike(providerResult.failure)) {
+    throw errorRuntime('Failed to resolve contract source', {
+      why: 'Contract source provider returned malformed failure result: expected summary and diagnostics.',
+      fix: 'Ensure contract.source failure payload is notOk({ summary, diagnostics, meta? }).',
     });
   }
 
