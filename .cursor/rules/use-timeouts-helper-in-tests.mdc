@@ -1,0 +1,19 @@
+---
+description: Use shared timeout helpers in tests
+globs: ["**/*.test.ts", "test/**", "packages/**/test/**", "examples/**/test/**"]
+alwaysApply: false
+---
+
+# Use Timeouts Helper In Tests
+
+When a test needs an explicit timeout, use a shared helper from `@prisma-next/test-utils` (for example `timeouts.spinUpPpgDev`).
+
+## Do
+
+- Use `timeouts.*` constants instead of raw numbers.
+- Keep timeout values centralized in `@prisma-next/test-utils`.
+
+## Don't
+
+- Don't write raw numeric timeout values in test bodies (for example `{ timeout: 1_000 }`).
+

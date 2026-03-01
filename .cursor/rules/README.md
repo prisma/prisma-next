@@ -49,6 +49,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/cli-test-fixture-cleanup.mdc` — Avoid committing generated CLI test fixtures
 - `.cursor/rules/cli-package-exports.mdc` — CLI package export structure and auto-generated export patterns
 - `.cursor/rules/tsdown-dist-layout-in-tests.mdc` — Use tsdown `dist/*.d.mts` paths in test tsconfig mappings
+- `.cursor/rules/use-timeouts-helper-in-tests.mdc` — Use shared `timeouts` helpers instead of raw timeout numbers
 
 ## Imports & Layering
 - `.cursor/rules/import-validation.mdc` — Layering rules and exceptions
