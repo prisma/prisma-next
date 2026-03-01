@@ -113,4 +113,31 @@ describe('default function registry', () => {
     expect(loweredUnknown.diagnostic.message).toContain('Supported functions: custom().');
     expect(loweredUnknown.diagnostic.message).not.toContain('autoincrement()');
   });
+
+  it('preserves escaped dbgenerated string content', () => {
+    const registry = createBuiltinDefaultFunctionRegistry();
+    const call = parseDefaultFunctionCall(
+      String.raw`dbgenerated("nextval(\"public\".\"user_id_seq\")")`,
+      createSpan(),
+    );
+
+    expect(call).toBeDefined();
+    if (!call) return;
+
+    const lowered = lowerDefaultFunctionWithRegistry({
+      call,
+      registry,
+      context: loweringContext,
+    });
+    expect(lowered.ok).toBe(true);
+    if (!lowered.ok) return;
+
+    expect(lowered.value).toMatchObject({
+      kind: 'storage',
+      defaultValue: {
+        kind: 'function',
+        expression: String.raw`nextval(\"public\".\"user_id_seq\")`,
+      },
+    });
+  });
 });
