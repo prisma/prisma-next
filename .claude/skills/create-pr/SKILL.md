@@ -56,7 +56,7 @@ Examples:
 Use the walkthrough output as the PR description.
 
 1. Run the `.agents/skills/drive-pr-walkthrough/SKILL.md` workflow for the current branch vs base (default: `origin/main...HEAD`) and write `walkthrough.md` to disk.
-2. Use the contents of that `walkthrough.md` as the PR description, with these adjustments:
+2. Apply adjustments directly to that same `walkthrough.md` file on disk, then use the adjusted file contents as the PR description in Step 5:
    - **Omit** the entire `## Sources` section (it’s great for local review, but it’s noise in a GitHub PR body).
    - **Prepend** the Linear close line at the very top:
 
@@ -67,6 +67,9 @@ Use the walkthrough output as the PR description.
    - **Adjust links for GitHub**:
      - Keep the link text including the line ranges (e.g. `file.ts (L12–L34)`).
      - But change the link target to a GitHub-friendly relative path (e.g. `(path/to/file.ts)`), **removing** any local-editor suffixes like `:12-34`.
+
+   - Do **not** create a second adjusted file unless the user explicitly asks for one.
+   - In Step 5, the heredoc body should come from this adjusted `walkthrough.md` content.
 
 3. Keep the rest of the walkthrough structure as-is (it’s the intended narrative PR shape), with one exception:
    - `## Before / After (intention in code)` is **optional**.
