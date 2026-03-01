@@ -12,6 +12,8 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 - Phase 1 plan: `projects/kysely-lane-rollout/plans/01-kysely-integration-merge.plan.md`
 - Phase 2 spec: `projects/kysely-lane-rollout/specs/02-kysely-lane-build-only.spec.md`
 - Phase 2 plan: `projects/kysely-lane-rollout/plans/02-kysely-lane-build-only.plan.md`
+- Phase 3 spec: `projects/kysely-lane-rollout/specs/03-compile-free-kysely-plan-assembly.spec.md`
+- Phase 3 plan: `projects/kysely-lane-rollout/plans/03-compile-free-kysely-plan-assembly.plan.md`
 
 ## Milestones
 
@@ -35,12 +37,12 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 
 - [x] Create `@prisma-next/sql-kysely-lane` package in `packages/2-sql/4-lanes/`.
 - [x] Move transformer, guardrails, build-only lane assembly into lane package.
-- [x] Introduce/complete interop contract (`WhereArg`, `ToWhereExpr`) and ORM consumption path.
-- [x] Tighten interop boundary: ORM `.where(...)` accepts only `WhereArg` (no `SqlQueryPlan` shorthand); add a Kysely-lane helper (e.g. `db.kysely.whereExpr(...)`) that returns `ToWhereExpr` for Kysely-authored filters.
-- [x] Update `@prisma-next/postgres` surface to expose build-only `db.kysely` API.
-- [x] Re-scope `@prisma-next/integration-kysely` to runtime attachment responsibilities.
-- [x] Enforce fail-fast behavior for unsupported Kysely kinds in runtime attachment paths (no raw fallback).
-- [x] Keep Postgres public Kysely API build-only for this phase (no execution-capable public Kysely API).
+- [ ] Introduce/complete interop contract (`WhereArg`, `ToWhereExpr`) and ORM consumption path.
+- [ ] Tighten interop boundary: ORM `.where(...)` accepts only `WhereArg` (no `SqlQueryPlan` shorthand); add a Kysely-lane helper (e.g. `db.kysely.whereExpr(...)`) that returns `ToWhereExpr` for Kysely-authored filters.
+- [ ] Update `@prisma-next/postgres` surface to expose build-only `db.kysely` API.
+- [ ] Re-scope `@prisma-next/integration-kysely` to runtime attachment responsibilities.
+- [ ] Enforce fail-fast behavior for unsupported Kysely kinds in runtime attachment paths (no raw fallback).
+- [ ] Keep Postgres public Kysely API build-only for this phase (no execution-capable public Kysely API).
 - [x] Update READMEs and architecture docs for touched packages and decisions.
 - [x] Pass `pnpm lint:deps` and targeted test suites.
 
@@ -67,16 +69,22 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 
 **Tasks:**
 
-- [ ] Define go/no-go criteria for compile-free plan assembly (performance wins vs maintenance/coupling costs).
-- [ ] Investigate/implement a compile-free extraction path for:
-  - `compiled.query` (Kysely op tree root)
-  - `compiled.parameters` (ordering + values) without building `compiled.sql`
-- [ ] Preserve Phase 2 invariants:
+- [x] Define go/no-go criteria for compile-free plan assembly (performance wins vs maintenance/coupling costs).
+- [x] Implement compile-free plan assembly using `.toOperationNode()` for supported shapes (build-only lane).
+- [x] Preserve Phase 2 invariants:
   - stable param ordering/indexing and descriptor alignment
   - deterministic `meta.refs`
   - guardrails run on supported query shapes
-- [ ] Add tests asserting compile-free path equivalence (same `QueryAst` + params ordering as the current compiled path for representative shapes).
-- [ ] (Optional) Reduce reliance on Kysely internal node shapes where it’s practical (but only if it doesn’t jeopardize the primary goal above).
+- [x] Add tests asserting compile-free path equivalence/invariants (same `QueryAst` + params ordering for representative shapes).
+- [x] Reduce reliance on Kysely internals where it’s practical (avoid kind-string gating; prefer structural guards).
+
+### Milestone 5: Close-out
+
+**Goal:** Remove transient `projects/kysely-lane-rollout/` artifacts once the rollout is complete, migrating any long-lived docs into `docs/`.
+
+**Tasks:**
+
+- [ ] Close out project workspace (Linear: [TML-2022](https://linear.app/prisma-company/issue/TML-2022/close-out-kysely-lane-rollout-project))
 
 ## Test Strategy by Milestone
 
@@ -86,6 +94,7 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 
 ## Close-out (required)
 
+- Linear tracking: [TML-2022](https://linear.app/prisma-company/issue/TML-2022/close-out-kysely-lane-rollout-project)
 - [ ] Verify all acceptance criteria in `projects/kysely-lane-rollout/spec.md`
 - [ ] Migrate long-lived docs into `docs/`
 - [ ] Delete `projects/kysely-lane-rollout/`

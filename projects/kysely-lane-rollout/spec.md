@@ -41,6 +41,11 @@ This project coordinates:
    - Primary win: compile-free plan assembly that preserves param ordering/indexing invariants and existing transformer/guardrail behavior.
    - Secondary win: reduce reliance on Kysely internals when it doesn’t compromise the primary goal.
 
+Phase 3 is specified in:
+
+- Phase 3 spec: `projects/kysely-lane-rollout/specs/03-compile-free-kysely-plan-assembly.spec.md`
+- Phase 3 plan: `projects/kysely-lane-rollout/plans/03-compile-free-kysely-plan-assembly.plan.md`
+
 # Requirements
 
 ## Functional Requirements
@@ -50,8 +55,6 @@ This project coordinates:
 - Runtime plugins/guardrails can inspect Kysely-authored plans by relying on the AST-backed plan shape.
 - Phase 2 produces a build-only lane package (`@prisma-next/sql-kysely-lane`) in `packages/2-sql/4-lanes/` and moves lane responsibilities there, keeping runtime attachment (dialect/driver/connection) separate.
 - Postgres public surface exposes a build-only `db.kysely` authoring API (no runtime argument) per the Phase 2 spec.
-- In Phase 2, unsupported Kysely kinds fail fast with a stable structured error in runtime attachment paths (no raw fallback).
-- In Phase 2, no execution-capable public Kysely API is exposed from `@prisma-next/postgres`.
 
 ## Non-Functional Requirements
 
@@ -81,14 +84,12 @@ This project coordinates:
 
 - [x] `@prisma-next/sql-kysely-lane` exists under `packages/2-sql/4-lanes/` and owns build-only Kysely authoring + transform + guardrails.
 - [x] `@prisma-next/sql-kysely-lane` does **not** depend on `@prisma-next/sql-runtime` and passes `pnpm lint:deps`.
-- [x] Any runtime-attached Kysely execution surface is clearly separated (kept in extensions) and delegates lane responsibilities to the lane package.
-- [x] Public Postgres client surface provides a build-only `db.kysely` (no runtime argument) per the Phase 2 spec.
-- [x] Unsupported Kysely kinds fail fast in runtime attachment paths with a stable structured error envelope (no raw fallback execution).
-- [x] `@prisma-next/postgres` does not expose any execution-capable public Kysely API.
+- [ ] Any runtime-attached Kysely execution surface is clearly separated (kept in extensions) and delegates lane responsibilities to the lane package.
+- [ ] Public Postgres client surface provides a build-only `db.kysely` (no runtime argument) per the Phase 2 spec.
 
 ## Phase 3 (optional)
 
-- [ ] A decision is recorded: implement compile-free plan assembly now, or explicitly defer with rationale + a tracked follow-up.
+- [x] A decision is recorded: implement compile-free plan assembly now (build-only lane), and explicitly defer runtime compiler replacement.
 
 # Other Considerations
 
@@ -136,8 +137,5 @@ No product analytics changes required. Development analytics are commit/test/CI 
 
 # Decision Log
 
-- Phase 2 unsupported-kinds behavior: **fail fast** with stable structured errors in runtime attachment paths.
-- Phase 2 Postgres API shape: `db.kysely` is **build-only**; no execution-capable public Kysely API.
-- Phase 2 Postgres `.kysely` surface is lane-owned (`@prisma-next/sql-kysely-lane`), not raw Kysely types from the composition root.
-- `@prisma-next/integration-kysely` is removed; lane/runtime responsibilities live in `@prisma-next/sql-kysely-lane` and `@prisma-next/postgres`.
-- Phase 2 ORM interop behavior: `ToWhereExpr` payloads are consumed via strict index/alignment validation and literal normalization (`ParamRef -> LiteralExpr`) at ORM boundaries.
+- Phase 3 compile-free planning: **go** for build-only lane plan assembly from `.toOperationNode()`; **no-go (for now)** on runtime compiler replacement.
+- Phase 3 scope: **no new public authoring API** is introduced as part of compile-free planning; helpers remain internal until adopted explicitly by the public surface work.

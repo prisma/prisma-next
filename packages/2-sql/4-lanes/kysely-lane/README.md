@@ -2,6 +2,11 @@
 
 Build-only Kysely lane for authoring Prisma Next SQL plans and lane-shaped filter interop payloads.
 
+## Runtime support
+
+> [!IMPORTANT]
+> `@prisma-next/sql-kysely-lane` is currently Postgres-coupled. Use it through the Postgres composition root (`@prisma-next/postgres`) and assume Postgres runtime semantics for generated plans and where-expression payloads.
+
 ## Responsibilities
 
 - Transform Kysely operation trees into Prisma Next SQL AST.

@@ -46,13 +46,21 @@ export function transformValue(
   };
 
   if (!isOperationNode(node)) {
-    const nextCompiledParam = ctx.parameters[ctx.paramIndex];
-    if (ctx.paramIndex < ctx.parameters.length && Object.is(nextCompiledParam, node)) {
-      const index = nextParamIndex(ctx);
-      addDescriptorForCurrentParam();
-      return { kind: 'param', index };
+    if (ctx.parameters) {
+      const nextCompiledParam = ctx.parameters[ctx.paramIndex];
+      if (ctx.paramIndex < ctx.parameters.length && Object.is(nextCompiledParam, node)) {
+        const index = nextParamIndex(ctx);
+        ctx.params.push(node);
+        addDescriptorForCurrentParam();
+        return { kind: 'param', index };
+      }
+      return { kind: 'literal', value: node };
     }
-    return { kind: 'literal', value: node };
+
+    const index = nextParamIndex(ctx);
+    ctx.params.push(node);
+    addDescriptorForCurrentParam();
+    return { kind: 'param', index };
   }
 
   if (ValueNode.is(node)) {
@@ -60,6 +68,7 @@ export function transformValue(
       return { kind: 'literal', value: node.value };
     }
     const index = nextParamIndex(ctx);
+    ctx.params.push(node.value);
     addDescriptorForCurrentParam();
     return { kind: 'param', index };
   }
