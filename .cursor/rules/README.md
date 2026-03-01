@@ -75,6 +75,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/type-predicates.mdc` — Replace blind casts with type predicates
 - `.cursor/rules/test-mocking-patterns.mdc` — Test-only assertions and mocking patterns
 - `.cursor/rules/arktype-usage.mdc` — Arktype usage guidelines
+- `.cursor/rules/use-pathe-for-paths.mdc` — Prefer `pathe` over `node:path` in TypeScript files
 - `.cursor/rules/type-extraction-from-contract.mdc` — Extracting types from contracts
 - `.cursor/rules/validate-contract-usage.mdc` — validateContract usage pattern (requires fully-typed contract type)
 - `.cursor/rules/no-inline-imports.mdc` — Prohibit inline type imports in source files
