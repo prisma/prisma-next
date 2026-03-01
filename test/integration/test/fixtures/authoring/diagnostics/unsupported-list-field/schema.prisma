@@ -1,0 +1,4 @@
+model Post {
+  id Int @id
+  tags String[]
+}
