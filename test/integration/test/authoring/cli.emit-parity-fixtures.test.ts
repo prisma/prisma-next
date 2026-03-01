@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import { timeouts } from '@prisma-next/test-utils';
+import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { executeCommand, setupCommandMocks } from '../utils/cli-test-helpers';
 import {

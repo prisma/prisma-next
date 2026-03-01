@@ -1798,6 +1798,9 @@ importers:
       kysely:
         specifier: 'catalog:'
         version: 0.28.10
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       pg:
         specifier: 'catalog:'
         version: 8.16.3

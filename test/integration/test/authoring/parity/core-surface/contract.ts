@@ -12,12 +12,6 @@ import {
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-const emailColumn = {
-  codecId: 'pg/text@1',
-  nativeType: 'text',
-  typeRef: 'Email',
-} as const;
-
 export const contract = defineContract<CodecTypes>()
   .target(postgresPack)
   .storageType('Email', {
@@ -33,7 +27,14 @@ export const contract = defineContract<CodecTypes>()
         nullable: false,
         default: { kind: 'function', expression: 'autoincrement()' },
       })
-      .column('email', { type: emailColumn, nullable: false })
+      .column('email', {
+        type: {
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          typeRef: 'Email',
+        },
+        nullable: false,
+      })
       .unique(['email'])
       .column('role', { type: enumColumn('Role', 'role'), nullable: false })
       .column('createdAt', {
