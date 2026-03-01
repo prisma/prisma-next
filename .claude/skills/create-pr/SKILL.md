@@ -68,8 +68,12 @@ Use the walkthrough output as the PR description.
      - Keep the link text including the line ranges (e.g. `file.ts (L12–L34)`).
      - But change the link target to a GitHub-friendly relative path (e.g. `(path/to/file.ts)`), **removing** any local-editor suffixes like `:12-34`.
 
-3. Keep the rest of the walkthrough structure as-is (it’s the intended narrative PR shape):
-   - `## Before / After (intention in code)`
+3. Keep the rest of the walkthrough structure as-is (it’s the intended narrative PR shape), with one exception:
+   - `## Before / After (intention in code)` is **optional**.
+   - Only include it when you can show a *real, minimal* “before” vs “after” snippet taken from actual code in `origin/<base>` and `HEAD` (e.g. a function signature, a call-site, or a plan shape), not comment-only placeholders.
+   - If you can’t produce a meaningful snippet, **omit the section entirely** and begin at `## Intent`.
+
+   Recommended section order (when “Before / After” is omitted):
    - `## Intent`
    - `## Change map`
    - `## The story`
