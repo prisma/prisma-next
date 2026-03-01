@@ -24,14 +24,46 @@ describe('executeContractEmit', () => {
       },
     } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>);
 
-    await expect(executeContractEmit({ configPath: 'prisma-next.config.ts' })).rejects.toSatisfy(
-      (error: unknown) =>
-        error instanceof Error &&
-        'why' in error &&
-        typeof error.why === 'string' &&
-        error.why.includes('valid source provider function'),
-    );
+    try {
+      await expect(executeContractEmit({ configPath: 'prisma-next.config.ts' })).rejects.toSatisfy(
+        (error: unknown) =>
+          error instanceof Error &&
+          'why' in error &&
+          typeof error.why === 'string' &&
+          error.why.includes('valid source provider function'),
+      );
+    } finally {
+      loadConfigSpy.mockRestore();
+    }
+  });
 
-    loadConfigSpy.mockRestore();
+  it('throws runtime error when contract source provider returns failure result', async () => {
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig').mockResolvedValue({
+      contract: {
+        source: async () => ({
+          ok: false,
+          failure: {
+            summary: 'Provider parse failed',
+            diagnostics: [{ code: 'PSL_PARSE_ERROR', message: 'Unexpected token' }],
+            meta: { sourceId: 'schema.prisma' },
+          },
+        }),
+        output: './src/prisma/contract.json',
+      },
+    } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>);
+
+    try {
+      await expect(executeContractEmit({ configPath: 'prisma-next.config.ts' })).rejects.toSatisfy(
+        (error: unknown) =>
+          error instanceof Error &&
+          'code' in error &&
+          error.code === '3000' &&
+          'why' in error &&
+          typeof error.why === 'string' &&
+          error.why.includes('Provider parse failed'),
+      );
+    } finally {
+      loadConfigSpy.mockRestore();
+    }
   });
 });

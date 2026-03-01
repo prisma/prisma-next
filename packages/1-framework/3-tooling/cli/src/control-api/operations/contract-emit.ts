@@ -4,7 +4,7 @@ import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
-import { errorContractConfigMissing } from '../../utils/cli-errors';
+import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
 /**
@@ -70,16 +70,30 @@ export async function executeContractEmit(
   // Colocate .d.ts with .json (contract.json → contract.d.ts)
   const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
+  let providerResult: Awaited<ReturnType<typeof contractConfig.source>>;
+  try {
+    providerResult = await unlessAborted(contractConfig.source());
+  } catch (error) {
+    throw errorRuntime('Failed to resolve contract source', {
+      why: error instanceof Error ? error.message : String(error),
+      fix: 'Ensure contract.source resolves to ok(contractIR) or returns structured diagnostics.',
+    });
+  }
+
+  if (!providerResult.ok) {
+    throw errorRuntime('Failed to resolve contract source', {
+      why: providerResult.failure.summary,
+      fix: 'Fix contract source diagnostics and return ok(contractIR).',
+      meta: {
+        diagnostics: providerResult.failure.diagnostics,
+        ...ifDefined('providerMeta', providerResult.failure.meta),
+      },
+    });
+  }
+
   // Create control plane stack from config
   const stack = createControlPlaneStack(config);
   const familyInstance = config.family.create(stack);
-
-  const providerResult = await unlessAborted(contractConfig.source());
-  if (!providerResult.ok) {
-    throw errorContractConfigMissing({
-      why: providerResult.failure.summary,
-    });
-  }
 
   // Emit contract via family instance
   const emitResult = await unlessAborted(
