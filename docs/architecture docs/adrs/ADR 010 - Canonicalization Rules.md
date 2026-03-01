@@ -11,7 +11,7 @@
 
 - Define a strict canonical JSON format for `contract.json`
 - Apply canonicalization in the emitter after validation and normalization and before hashing
-- Compute `storageHash` (and optional `executionHash`) plus `profileHash` over canonical bytes
+- Compute `storageHash` plus `profileHash` over canonical bytes, and include `executionHash` only when execution defaults are emitted in the canonical artifact
 - Treat any divergence from these rules as an emitter bug
 - Define a `canonicalVersion` field and require it to be embedded in every stored contract blob and DB marker
 - State that TS-first and PSL-first must canonicalize to the identical JSON and `storageHash` for equivalent intent
@@ -77,7 +77,8 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 
 ### Target extensions
 
-- Target-specific sections live under `capabilities.<target>` and `storage.extensions.<target>`
+- Capability requirement keys live under `capabilities.<key>` and storage extensions under `storage.extensions.<target>`
+- Use shared `capabilities.sql.*` keys for family-wide SQL features, and use target brand keys only for target-specific capabilities
 - Keys within extensions follow the same lexicographic ordering
 - Fields that do not alter logical meaning are included in profileHash only per ADR 004
 
@@ -91,6 +92,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 ### Hashing
 
 - `storageHash` is computed over canonical JSON for storage meaning (profile-only fields stripped)
+- `executionHash` is emitted only when execution-plane defaults are present in the emitted contract artifact
 - `profileHash` is computed over canonical JSON including profile fields
 - Hash algorithm: SHA-256, represented as `sha256:<hex>`
 
@@ -121,7 +123,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 `capabilities` records contract requirements. Adapters still negotiate and verify support at connect time; this example only shows required keys captured in the contract.
 
 ```json
-{"schemaVersion":"1","targetFamily":"sql","target":"postgres","storageHash":"sha256:...","profileHash":"sha256:...","models":{"User":{"storage":{"table":"user"},"fields":{"id":{"column":"id"},"email":{"column":"email"}}}},"storage":{"tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"postgres":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}}}
+{"schemaVersion":"1","targetFamily":"sql","target":"postgres","storageHash":"sha256:...","profileHash":"sha256:...","models":{"User":{"storage":{"table":"user"},"fields":{"id":{"column":"id"},"email":{"column":"email"}}}},"storage":{"tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"sql":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}}}
 ```
 
 ## Alternatives considered
