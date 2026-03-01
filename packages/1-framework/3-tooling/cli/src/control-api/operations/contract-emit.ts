@@ -54,10 +54,10 @@ export async function executeContractEmit(
     });
   }
 
-  // Validate source exists
-  if (contractConfig.source === undefined) {
+  // Validate source exists and is callable
+  if (typeof contractConfig.source !== 'function') {
     throw errorContractConfigMissing({
-      why: 'Contract config must include a valid source',
+      why: 'Contract config must include a valid source provider function',
     });
   }
 
