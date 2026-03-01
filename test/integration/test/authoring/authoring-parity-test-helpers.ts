@@ -64,21 +64,15 @@ export function resolveAuthoringDiagnosticsFixtureSchemaPath(caseName: string): 
   return schemaPath;
 }
 
-export function setupIntegrationTestDirectoryForAuthoringParityCase(caseName: string): {
+export function setupIntegrationTestDirectoryForAuthoringParityCase(
+  fixtureCase: AuthoringParityFixtureCase,
+): {
   testDir: string;
   outputDir: string;
   cleanup: () => void;
   tsConfigPath: string;
   pslConfigPath: string;
-  expectedContractPath: string;
 } {
-  const fixtureCase = listAuthoringParityFixtureCases().find(
-    (candidate) => candidate.caseName === caseName,
-  );
-  if (!fixtureCase) {
-    throw new Error(`Unknown authoring parity fixture case: ${caseName}`);
-  }
-
   const testDir = createIntegrationTestDir();
   const outputDir = join(testDir, 'output');
   mkdirSync(outputDir, { recursive: true });
@@ -86,7 +80,6 @@ export function setupIntegrationTestDirectoryForAuthoringParityCase(caseName: st
   copyFileSync(fixtureCase.contractPath, join(testDir, 'contract.ts'));
   copyFileSync(fixtureCase.schemaPath, join(testDir, 'schema.prisma'));
   copyFileSync(fixtureCase.packsPath, join(testDir, 'packs.ts'));
-  copyFileSync(fixtureCase.expectedContractPath, join(testDir, 'expected.contract.json'));
 
   const tsConfigPath = join(testDir, 'prisma-next.config.parity-ts.ts');
   const pslConfigPath = join(testDir, 'prisma-next.config.parity-psl.ts');
@@ -148,6 +141,5 @@ export default defineConfig({
     cleanup,
     tsConfigPath,
     pslConfigPath,
-    expectedContractPath: fixtureCase.expectedContractPath,
   };
 }

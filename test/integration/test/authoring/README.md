@@ -37,10 +37,12 @@ The test runner uses helpers in `authoring-parity-test-helpers.ts` to:
 1. discover parity cases from `parity/*`
 2. validate required files exist
 3. create a temporary integration fixture app test directory
-4. copy case files into the temp directory
+4. copy case runtime inputs (`schema.prisma`, `contract.ts`, `packs.ts`) into the temp directory
 5. generate TS + PSL config files used by the emit flow
 
 This keeps fixture data colocated with the runner while still using the existing integration fixture app runtime resolution model.
+
+`expected.contract.json` remains source-of-truth in the fixture directory and is read/written directly there (it is not copied into temp dirs).
 
 ## Commands
 

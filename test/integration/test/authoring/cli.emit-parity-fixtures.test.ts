@@ -28,6 +28,11 @@ function assertCanonicalProvenanceInvariants(contractJson: Record<string, unknow
 }
 
 const parityCases = listAuthoringParityFixtureCases();
+const coreSurfaceCase = parityCases.find((fixtureCase) => fixtureCase.caseName === 'core-surface');
+
+if (!coreSurfaceCase) {
+  throw new Error('Required parity fixture case "core-surface" not found');
+}
 
 describe('emit parity fixtures', () => {
   it('discovers at least one parity fixture case', () => {
@@ -39,7 +44,7 @@ describe('emit parity fixtures', () => {
       `matches ts and psl emission for ${fixtureCase.caseName}`,
       { timeout: timeouts.typeScriptCompilation },
       async () => {
-        const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase(fixtureCase.caseName);
+        const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase(fixtureCase);
 
         try {
           const tsConfig = await loadConfig(testSetup.tsConfigPath);
@@ -50,21 +55,28 @@ describe('emit parity fixtures', () => {
           }
 
           const originalCwd = process.cwd();
-          let tsProviderResult: Awaited<ReturnType<typeof tsConfig.contract.source>>;
-          let pslProviderResult: Awaited<ReturnType<typeof pslConfig.contract.source>>;
+          let tsProviderResultFirst: Awaited<ReturnType<typeof tsConfig.contract.source>>;
+          let tsProviderResultSecond: Awaited<ReturnType<typeof tsConfig.contract.source>>;
+          let pslProviderResultFirst: Awaited<ReturnType<typeof pslConfig.contract.source>>;
+          let pslProviderResultSecond: Awaited<ReturnType<typeof pslConfig.contract.source>>;
           try {
             process.chdir(testSetup.testDir);
-            tsProviderResult = await tsConfig.contract.source();
-            pslProviderResult = await pslConfig.contract.source();
+            tsProviderResultFirst = await tsConfig.contract.source();
+            tsProviderResultSecond = await tsConfig.contract.source();
+            pslProviderResultFirst = await pslConfig.contract.source();
+            pslProviderResultSecond = await pslConfig.contract.source();
           } finally {
             process.chdir(originalCwd);
           }
 
-          if (!tsProviderResult.ok) {
-            throw new Error(`TS provider failed: ${tsProviderResult.failure.summary}`);
+          expect(tsProviderResultSecond).toEqual(tsProviderResultFirst);
+          expect(pslProviderResultSecond).toEqual(pslProviderResultFirst);
+
+          if (!tsProviderResultFirst.ok) {
+            throw new Error(`TS provider failed: ${tsProviderResultFirst.failure.summary}`);
           }
-          if (!pslProviderResult.ok) {
-            throw new Error(`PSL provider failed: ${pslProviderResult.failure.summary}`);
+          if (!pslProviderResultFirst.ok) {
+            throw new Error(`PSL provider failed: ${pslProviderResultFirst.failure.summary}`);
           }
 
           const familyInstance = tsConfig.family.create({
@@ -74,8 +86,8 @@ describe('emit parity fixtures', () => {
             extensionPacks: tsConfig.extensionPacks ?? [],
           });
 
-          const normalizedTs = familyInstance.validateContractIR(tsProviderResult.value);
-          const normalizedPsl = familyInstance.validateContractIR(pslProviderResult.value);
+          const normalizedTs = familyInstance.validateContractIR(tsProviderResultFirst.value);
+          const normalizedPsl = familyInstance.validateContractIR(pslProviderResultFirst.value);
           expect(normalizedTs).toEqual(normalizedPsl);
 
           const tsEmitFirst = await familyInstance.emitContract({ contractIR: normalizedTs });
@@ -146,7 +158,7 @@ describe('emit parity fixture diagnostics', () => {
     'reports actionable psl diagnostics from fixtureized invalid schema',
     { timeout: timeouts.typeScriptCompilation },
     async () => {
-      const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase('core-surface');
+      const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase(coreSurfaceCase);
       const invalidSchemaPath =
         resolveAuthoringDiagnosticsFixtureSchemaPath('unsupported-list-field');
       const command = createContractEmitCommand();
