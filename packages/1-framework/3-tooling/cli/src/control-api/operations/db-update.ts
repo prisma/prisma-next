@@ -54,10 +54,10 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
   const planner = migrations.createPlanner(familyInstance);
   const runner = migrations.createRunner(familyInstance);
 
-  // readMarker and introspect are sequential by design:
-  // 1. readMarker failure (no marker) triggers an early return, avoiding unnecessary introspection.
-  // 2. The Postgres driver serializes queries on a single connection, so Promise.all
-  //    would not yield actual I/O parallelism with the current driver architecture.
+  // readMarker and introspect are sequential by design: the Postgres driver serializes
+  // queries on a single connection, so Promise.all would not yield actual I/O parallelism
+  // with the current driver architecture. A missing marker is non-fatal — the operation
+  // proceeds without an origin, and the runner treats it as "no marker present".
   const readMarkerSpanId = 'readMarker';
   onProgress?.({
     action: 'dbUpdate',
@@ -111,7 +111,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
       outcome: 'error',
     });
     return notOk({
-      code: 'PLANNING_FAILED' as const,
+      code: 'PLANNING_FAILED',
       summary: 'Migration planning failed due to conflicts',
       conflicts: plannerResult.conflicts,
       why: undefined,
@@ -175,7 +175,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
       .map((op) => ({ id: op.id, label: op.label }));
     if (destructiveOps.length > 0) {
       return notOk({
-        code: 'DESTRUCTIVE_CHANGES' as const,
+        code: 'DESTRUCTIVE_CHANGES',
         summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
         why: 'Use --plan to preview destructive operations, then re-run with --accept-data-loss to apply',
         conflicts: undefined,
@@ -234,7 +234,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
       outcome: 'error',
     });
     return notOk({
-      code: 'RUNNER_FAILED' as const,
+      code: 'RUNNER_FAILED',
       summary: runnerResult.failure.summary,
       why: runnerResult.failure.why,
       meta: runnerResult.failure.meta,
