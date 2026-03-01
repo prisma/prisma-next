@@ -2,8 +2,9 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ParsePslDocumentInput,
   ParsePslDocumentResult,
-  PslDefaultAttribute,
-  PslDefaultValue,
+  PslAttribute,
+  PslAttributeArgument,
+  PslAttributeTarget,
   PslDiagnostic,
   PslDiagnosticCode,
   PslDocumentAst,
@@ -11,16 +12,12 @@ import type {
   PslEnumValue,
   PslField,
   PslFieldAttribute,
-  PslIndexConstraint,
   PslModel,
   PslModelAttribute,
   PslNamedTypeDeclaration,
   PslPosition,
-  PslReferentialAction,
-  PslRelationAttribute,
   PslSpan,
   PslTypesBlock,
-  PslUniqueConstraint,
 } from './types';
 
 const SCALAR_TYPES = new Set([
@@ -165,7 +162,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
         return field;
       }
       const hasRelationAttribute = field.attributes.some(
-        (attribute) => attribute.kind === 'relation',
+        (attribute) => attribute.name === 'relation',
       );
       if (
         hasRelationAttribute ||
@@ -279,7 +276,8 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
 
   for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; lineIndex += 1) {
     const raw = context.lines[lineIndex] ?? '';
-    const line = stripInlineComment(raw).trim();
+    const lineWithoutComment = stripInlineComment(raw);
+    const line = lineWithoutComment.trim();
     if (line.length === 0) {
       continue;
     }
@@ -297,15 +295,29 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
     const declarationName = declarationMatch[1] ?? '';
     const baseType = declarationMatch[2] ?? '';
     const attributePart = declarationMatch[3] ?? '';
-    const attributes = extractAttributeTokens(attributePart.trim());
-    if (attributePart.trim().length > 0 && attributes.length === 0) {
-      pushDiagnostic(context, {
-        code: 'PSL_INVALID_TYPES_MEMBER',
-        message: `Invalid type attributes in declaration "${line}"`,
-        span: createTrimmedLineSpan(context, lineIndex),
-      });
+    const trimmedStartColumn = firstNonWhitespaceColumn(raw);
+    const attributeOffset = line.length - attributePart.length;
+    const attributeSource = attributePart.trimStart();
+    const leadingAttributeWhitespace = attributePart.length - attributeSource.length;
+    const attributeParse = extractAttributeTokensWithSpans(
+      context,
+      lineIndex,
+      attributeSource,
+      trimmedStartColumn + attributeOffset + leadingAttributeWhitespace,
+    );
+    if (!attributeParse.ok) {
       continue;
     }
+    const attributes = attributeParse.tokens
+      .map((token) =>
+        parseAttributeToken(context, {
+          token: token.text,
+          target: 'namedType',
+          lineIndex,
+          span: token.span,
+        }),
+      )
+      .filter((attribute): attribute is PslAttribute => Boolean(attribute));
 
     declarations.push({
       kind: 'namedType',
@@ -327,57 +339,32 @@ function parseModelAttribute(
   context: ParserContext,
   line: string,
   lineIndex: number,
-): PslUniqueConstraint | PslIndexConstraint | undefined {
-  const attributeMatch = line.match(/^@@(unique|index)\s*\((.*)\)\s*$/);
-  if (!attributeMatch) {
+): PslModelAttribute | undefined {
+  const rawLine = context.lines[lineIndex] ?? '';
+  const tokenParse = extractAttributeTokensWithSpans(
+    context,
+    lineIndex,
+    line,
+    firstNonWhitespaceColumn(rawLine),
+  );
+  if (!tokenParse.ok || tokenParse.tokens.length !== 1) {
     pushDiagnostic(context, {
-      code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
-      message: `Unsupported model attribute "${line}"`,
+      code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+      message: `Invalid model attribute syntax "${line}"`,
       span: createTrimmedLineSpan(context, lineIndex),
     });
     return undefined;
   }
-
-  const attributeKind = attributeMatch[1] ?? '';
-  const argsRaw = attributeMatch[2] ?? '';
-  const args = splitTopLevel(argsRaw, ',');
-  const fieldsArg = args[0]?.trim() ?? '';
-  const trailingArgs = args
-    .slice(1)
-    .map((arg) => arg.trim())
-    .filter((arg) => arg.length > 0);
-  if (trailingArgs.length > 0) {
-    pushDiagnostic(context, {
-      code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
-      message: `Unsupported model attribute arguments in "${line}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
+  const token = tokenParse.tokens[0];
+  if (!token) {
     return undefined;
   }
-
-  if (!fieldsArg.startsWith('[') || !fieldsArg.endsWith(']')) {
-    pushDiagnostic(context, {
-      code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
-      message: `Model attribute "${line}" must provide field list in brackets`,
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-    return undefined;
-  }
-
-  const fields = parseBracketList(fieldsArg);
-  if (attributeKind === 'unique') {
-    return {
-      kind: 'unique',
-      fields,
-      span: createTrimmedLineSpan(context, lineIndex),
-    };
-  }
-
-  return {
-    kind: 'index',
-    fields,
-    span: createTrimmedLineSpan(context, lineIndex),
-  };
+  return parseAttributeToken(context, {
+    token: token.text,
+    target: 'model',
+    lineIndex,
+    span: token.span,
+  });
 }
 
 function parseField(context: ParserContext, line: string, lineIndex: number): PslField | undefined {
@@ -400,47 +387,39 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
   const optional = optionalMarker === '?';
 
   const attributes: PslFieldAttribute[] = [];
-  const tokens = extractAttributeTokens(attributePart.trim());
-  if (attributePart.trim().length > 0 && tokens.length === 0) {
-    pushDiagnostic(context, {
-      code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
-      message: `Unsupported field attributes in "${line}"`,
+  const rawLine = context.lines[lineIndex] ?? '';
+  const trimmedStartColumn = firstNonWhitespaceColumn(rawLine);
+  const attributeOffset = line.length - attributePart.length;
+  const attributeSource = attributePart.trimStart();
+  const leadingAttributeWhitespace = attributePart.length - attributeSource.length;
+  const tokenParse = extractAttributeTokensWithSpans(
+    context,
+    lineIndex,
+    attributeSource,
+    trimmedStartColumn + attributeOffset + leadingAttributeWhitespace,
+  );
+  if (!tokenParse.ok) {
+    return {
+      kind: 'field',
+      name: fieldName,
+      typeName,
+      optional,
+      list,
+      attributes,
       span: createTrimmedLineSpan(context, lineIndex),
-    });
+    };
   }
 
-  for (const token of tokens) {
-    if (token === '@id') {
-      attributes.push({ kind: 'id', span: createTrimmedLineSpan(context, lineIndex) });
-      continue;
-    }
-
-    if (token === '@unique') {
-      attributes.push({ kind: 'unique', span: createTrimmedLineSpan(context, lineIndex) });
-      continue;
-    }
-
-    if (token.startsWith('@default(') && token.endsWith(')')) {
-      const defaultAttribute = parseDefaultAttribute(context, token, lineIndex);
-      if (defaultAttribute) {
-        attributes.push(defaultAttribute);
-      }
-      continue;
-    }
-
-    if (token.startsWith('@relation(') && token.endsWith(')')) {
-      const relationAttribute = parseRelationAttribute(context, token, lineIndex);
-      if (relationAttribute) {
-        attributes.push(relationAttribute);
-      }
-      continue;
-    }
-
-    pushDiagnostic(context, {
-      code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
-      message: `Unsupported field attribute "${token}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
+  for (const token of tokenParse.tokens) {
+    const parsed = parseAttributeToken(context, {
+      token: token.text,
+      target: 'field',
+      lineIndex,
+      span: token.span,
     });
+    if (parsed) {
+      attributes.push(parsed);
+    }
   }
 
   return {
@@ -454,158 +433,174 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
   };
 }
 
-function parseRelationAttribute(
+function parseAttributeToken(
   context: ParserContext,
-  token: string,
-  lineIndex: number,
-): PslRelationAttribute | undefined {
-  const argsRaw = token.slice('@relation('.length, -1).trim();
-  const parts = splitTopLevel(argsRaw, ',');
-  const fields: string[] = [];
-  const references: string[] = [];
-  let onDelete: PslReferentialAction | undefined;
-  let onUpdate: PslReferentialAction | undefined;
+  input: {
+    readonly token: string;
+    readonly target: PslAttributeTarget;
+    readonly lineIndex: number;
+    readonly span: PslSpan;
+  },
+): PslAttribute | undefined {
+  const expectsModelPrefix = input.target === 'model';
+  if (expectsModelPrefix && !input.token.startsWith('@@')) {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+      message: `Model attribute "${input.token}" must use @@ prefix`,
+      span: input.span,
+    });
+    return undefined;
+  }
+  if (!expectsModelPrefix && !input.token.startsWith('@')) {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+      message: `Attribute "${input.token}" must use @ prefix`,
+      span: input.span,
+    });
+    return undefined;
+  }
+  if (!expectsModelPrefix && input.token.startsWith('@@')) {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+      message: `Attribute "${input.token}" is not valid in ${input.target} context`,
+      span: input.span,
+    });
+    return undefined;
+  }
+
+  const rawBody = expectsModelPrefix ? input.token.slice(2) : input.token.slice(1);
+  const openParen = rawBody.indexOf('(');
+  const closeParen = rawBody.lastIndexOf(')');
+  const hasArgs = openParen >= 0 || closeParen >= 0;
+  if ((openParen >= 0 && closeParen === -1) || (openParen === -1 && closeParen >= 0)) {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+      message: `Invalid attribute syntax "${input.token}"`,
+      span: input.span,
+    });
+    return undefined;
+  }
+
+  const name = (openParen >= 0 ? rawBody.slice(0, openParen) : rawBody).trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name)) {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+      message: `Invalid attribute name "${name || input.token}"`,
+      span: input.span,
+    });
+    return undefined;
+  }
+
+  let args: readonly PslAttributeArgument[] = [];
+  if (hasArgs && openParen >= 0 && closeParen >= openParen) {
+    if (closeParen !== rawBody.length - 1) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: `Invalid trailing syntax in attribute "${input.token}"`,
+        span: input.span,
+      });
+      return undefined;
+    }
+    const argsRaw = rawBody.slice(openParen + 1, closeParen);
+    const parsedArgs = parseAttributeArguments(context, {
+      argsRaw,
+      argsOffset: input.span.start.column - 1 + (expectsModelPrefix ? 2 : 1) + openParen + 1,
+      lineIndex: input.lineIndex,
+      token: input.token,
+      span: input.span,
+    });
+    if (!parsedArgs) {
+      return undefined;
+    }
+    args = parsedArgs;
+  }
+
+  return {
+    kind: 'attribute',
+    target: input.target,
+    name,
+    args,
+    span: input.span,
+  };
+}
+
+function parseAttributeArguments(
+  context: ParserContext,
+  input: {
+    readonly argsRaw: string;
+    readonly argsOffset: number;
+    readonly lineIndex: number;
+    readonly token: string;
+    readonly span: PslSpan;
+  },
+): readonly PslAttributeArgument[] | undefined {
+  const trimmed = input.argsRaw.trim();
+  if (trimmed.length === 0) {
+    return [];
+  }
+
+  const parts = splitTopLevelSegments(input.argsRaw, ',');
+  const args: PslAttributeArgument[] = [];
 
   for (const part of parts) {
-    const [keyRaw, ...valueParts] = part.split(':');
-    if (!keyRaw || valueParts.length === 0) {
+    const original = part.value;
+    const trimmedPart = original.trim();
+    if (trimmedPart.length === 0) {
       pushDiagnostic(context, {
-        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-        message: `Invalid relation argument "${part.trim()}"`,
-        span: createTrimmedLineSpan(context, lineIndex),
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: `Invalid empty argument in attribute "${input.token}"`,
+        span: input.span,
+      });
+      return undefined;
+    }
+
+    const leadingWhitespace = original.length - original.trimStart().length;
+    const partStart = input.argsOffset + part.start + leadingWhitespace;
+    const partEnd = partStart + trimmedPart.length;
+    const partSpan = createInlineSpan(context, input.lineIndex, partStart, partEnd);
+
+    const namedSplit = splitTopLevelSegments(trimmedPart, ':');
+    if (namedSplit.length > 1) {
+      const first = namedSplit[0];
+      if (!first) {
+        pushDiagnostic(context, {
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: `Invalid named argument syntax "${trimmedPart}"`,
+          span: partSpan,
+        });
+        return undefined;
+      }
+      const name = first.value.trim();
+      const rawValue = trimmedPart.slice(first.end + 1).trim();
+      if (!name || rawValue.length === 0) {
+        pushDiagnostic(context, {
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: `Invalid named argument syntax "${trimmedPart}"`,
+          span: partSpan,
+        });
+        return undefined;
+      }
+      args.push({
+        kind: 'named',
+        name,
+        value: normalizeAttributeArgumentValue(rawValue),
+        span: partSpan,
       });
       continue;
     }
 
-    const key = keyRaw.trim();
-    const value = valueParts.join(':').trim();
-    if (key === 'fields') {
-      fields.push(...parseBracketList(value));
-      continue;
-    }
-    if (key === 'references') {
-      references.push(...parseBracketList(value));
-      continue;
-    }
-    if (key === 'onDelete') {
-      const action = parseReferentialAction(context, value, lineIndex);
-      if (action) {
-        onDelete = action;
-      }
-      continue;
-    }
-    if (key === 'onUpdate') {
-      const action = parseReferentialAction(context, value, lineIndex);
-      if (action) {
-        onUpdate = action;
-      }
-      continue;
-    }
-
-    pushDiagnostic(context, {
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Unsupported relation argument "${key}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
+    args.push({
+      kind: 'positional',
+      value: normalizeAttributeArgumentValue(trimmedPart),
+      span: partSpan,
     });
   }
 
-  if (fields.length === 0 || references.length === 0) {
-    pushDiagnostic(context, {
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: '@relation requires both fields and references arrays',
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-    return undefined;
-  }
-
-  return {
-    kind: 'relation',
-    fields,
-    references,
-    ...ifDefined('onDelete', onDelete),
-    ...ifDefined('onUpdate', onUpdate),
-    span: createTrimmedLineSpan(context, lineIndex),
-  };
+  return args;
 }
 
-function parseReferentialAction(
-  context: ParserContext,
-  value: string,
-  lineIndex: number,
-): PslReferentialAction | undefined {
-  const action = value.trim();
-  if (/^[A-Za-z_]\w*$/.test(action)) {
-    return action;
-  }
-  pushDiagnostic(context, {
-    code: 'PSL_INVALID_REFERENTIAL_ACTION',
-    message: `Invalid referential action token "${value}"`,
-    span: createTrimmedLineSpan(context, lineIndex),
-  });
-  return undefined;
-}
-
-function parseDefaultAttribute(
-  context: ParserContext,
-  token: string,
-  lineIndex: number,
-): PslDefaultAttribute | undefined {
-  const valueExpression = token.slice('@default('.length, -1).trim();
-  const value = parseDefaultValue(valueExpression);
-  if (!value) {
-    pushDiagnostic(context, {
-      code: 'PSL_INVALID_DEFAULT_VALUE',
-      message: `Unsupported default value "${valueExpression}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-    return undefined;
-  }
-  return {
-    kind: 'default',
-    value,
-    span: createTrimmedLineSpan(context, lineIndex),
-  };
-}
-
-function parseDefaultValue(valueExpression: string): PslDefaultValue | undefined {
-  if (valueExpression === 'autoincrement()') {
-    return {
-      kind: 'function',
-      name: 'autoincrement',
-    };
-  }
-
-  if (valueExpression === 'now()') {
-    return {
-      kind: 'function',
-      name: 'now',
-    };
-  }
-
-  const stringMatch = valueExpression.match(/^(['"])(.*)\1$/);
-  if (stringMatch) {
-    return {
-      kind: 'literal',
-      value: stringMatch[2] ?? '',
-    };
-  }
-
-  const numberValue = Number(valueExpression);
-  if (!Number.isNaN(numberValue) && valueExpression.length > 0) {
-    return {
-      kind: 'literal',
-      value: numberValue,
-    };
-  }
-
-  if (valueExpression === 'true' || valueExpression === 'false') {
-    return {
-      kind: 'literal',
-      value: valueExpression === 'true',
-    };
-  }
-
-  return undefined;
+function normalizeAttributeArgumentValue(value: string): string {
+  return value.trim();
 }
 
 function findBlockBounds(context: ParserContext, startLine: number): BlockBounds {
@@ -655,19 +650,14 @@ function findBlockBounds(context: ParserContext, startLine: number): BlockBounds
   };
 }
 
-function parseBracketList(value: string): string[] {
-  const trimmed = value.trim();
-  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
-    return [];
-  }
-  const body = trimmed.slice(1, -1);
-  return splitTopLevel(body, ',')
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
+interface TopLevelSegment {
+  readonly value: string;
+  readonly start: number;
+  readonly end: number;
 }
 
-function splitTopLevel(value: string, separator: ',' | ':' = ','): string[] {
-  const parts: string[] = [];
+function splitTopLevelSegments(value: string, separator: ',' | ':'): TopLevelSegment[] {
+  const parts: TopLevelSegment[] = [];
   let depthParen = 0;
   let depthBracket = 0;
   let quote: '"' | "'" | null = null;
@@ -705,17 +695,30 @@ function splitTopLevel(value: string, separator: ',' | ':' = ','): string[] {
     }
 
     if (character === separator && depthParen === 0 && depthBracket === 0) {
-      parts.push(value.slice(start, index));
+      parts.push({
+        value: value.slice(start, index),
+        start,
+        end: index,
+      });
       start = index + 1;
     }
   }
 
-  parts.push(value.slice(start));
+  parts.push({
+    value: value.slice(start),
+    start,
+    end: value.length,
+  });
   return parts;
 }
 
-function extractAttributeTokens(value: string): string[] {
-  const tokens: string[] = [];
+function extractAttributeTokensWithSpans(
+  context: ParserContext,
+  lineIndex: number,
+  value: string,
+  startColumn: number,
+): { readonly ok: boolean; readonly tokens: readonly { text: string; span: PslSpan }[] } {
+  const tokens: { text: string; span: PslSpan }[] = [];
   let index = 0;
   while (index < value.length) {
     while (index < value.length && /\s/.test(value[index] ?? '')) {
@@ -726,7 +729,12 @@ function extractAttributeTokens(value: string): string[] {
     }
 
     if (value[index] !== '@') {
-      break;
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: `Invalid attribute syntax "${value.trim()}"`,
+        span: createInlineSpan(context, lineIndex, startColumn + index, startColumn + value.length),
+      });
+      return { ok: false, tokens };
     }
 
     const start = index;
@@ -735,8 +743,18 @@ function extractAttributeTokens(value: string): string[] {
       index += 1;
     }
 
+    const nameStart = index;
     while (index < value.length && /[A-Za-z0-9_.]/.test(value[index] ?? '')) {
       index += 1;
+    }
+
+    if (index === nameStart) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: `Invalid attribute syntax "${value.slice(start).trim()}"`,
+        span: createInlineSpan(context, lineIndex, startColumn + start, startColumn + value.length),
+      });
+      return { ok: false, tokens };
     }
 
     if (value[index] === '(') {
@@ -769,12 +787,46 @@ function extractAttributeTokens(value: string): string[] {
         }
         index += 1;
       }
+      if (depth !== 0) {
+        pushDiagnostic(context, {
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: `Unterminated attribute argument list in "${value.slice(start).trim()}"`,
+          span: createInlineSpan(
+            context,
+            lineIndex,
+            startColumn + start,
+            startColumn + value.length,
+          ),
+        });
+        return { ok: false, tokens };
+      }
     }
 
-    tokens.push(value.slice(start, index).trim());
+    const tokenText = value.slice(start, index).trim();
+    tokens.push({
+      text: tokenText,
+      span: createInlineSpan(context, lineIndex, startColumn + start, startColumn + index),
+    });
+
+    while (index < value.length && /\s/.test(value[index] ?? '')) {
+      index += 1;
+    }
+
+    if (index < value.length && value[index] !== '@') {
+      break;
+    }
   }
 
-  return tokens;
+  if (index < value.length && value[index] !== '@') {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+      message: `Invalid attribute syntax "${value.trim()}"`,
+      span: createInlineSpan(context, lineIndex, startColumn + index, startColumn + value.length),
+    });
+    return { ok: false, tokens };
+  }
+
+  return { ok: true, tokens };
 }
 
 function stripInlineComment(line: string): string {
@@ -813,10 +865,26 @@ function computeLineOffsets(schema: string): number[] {
   return offsets;
 }
 
+function firstNonWhitespaceColumn(line: string): number {
+  const first = line.search(/\S/);
+  return first === -1 ? 0 : first;
+}
+
+function createInlineSpan(
+  context: ParserContext,
+  lineIndex: number,
+  startColumn: number,
+  endColumn: number,
+): PslSpan {
+  return {
+    start: createPosition(context, lineIndex, startColumn),
+    end: createPosition(context, lineIndex, endColumn),
+  };
+}
+
 function createTrimmedLineSpan(context: ParserContext, lineIndex: number): PslSpan {
   const line = context.lines[lineIndex] ?? '';
-  const firstNonWhitespace = line.search(/\S/);
-  const startColumn = firstNonWhitespace === -1 ? 0 : firstNonWhitespace;
+  const startColumn = firstNonWhitespaceColumn(line);
   return {
     start: createPosition(context, lineIndex, startColumn),
     end: createPosition(context, lineIndex, line.length),
@@ -826,8 +894,7 @@ function createTrimmedLineSpan(context: ParserContext, lineIndex: number): PslSp
 function createLineRangeSpan(context: ParserContext, startLine: number, endLine: number): PslSpan {
   const startLineText = context.lines[startLine] ?? '';
   const endLineText = context.lines[endLine] ?? '';
-  const firstNonWhitespace = startLineText.search(/\S/);
-  const startColumn = firstNonWhitespace === -1 ? 0 : firstNonWhitespace;
+  const startColumn = firstNonWhitespaceColumn(startLineText);
   return {
     start: createPosition(context, startLine, startColumn),
     end: createPosition(context, endLine, endLineText.length),

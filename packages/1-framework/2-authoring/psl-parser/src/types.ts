@@ -12,6 +12,7 @@ export interface PslSpan {
 export type PslDiagnosticCode =
   | 'PSL_UNTERMINATED_BLOCK'
   | 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK'
+  | 'PSL_INVALID_ATTRIBUTE_SYNTAX'
   | 'PSL_INVALID_MODEL_MEMBER'
   | 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE'
   | 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE'
@@ -40,38 +41,34 @@ export interface PslDefaultLiteralValue {
 
 export type PslDefaultValue = PslDefaultFunctionValue | PslDefaultLiteralValue;
 
-export interface PslIdAttribute {
-  readonly kind: 'id';
+export type PslAttributeTarget = 'field' | 'model' | 'namedType';
+
+export interface PslAttributePositionalArgument {
+  readonly kind: 'positional';
+  readonly value: string;
   readonly span: PslSpan;
 }
 
-export interface PslUniqueAttribute {
-  readonly kind: 'unique';
+export interface PslAttributeNamedArgument {
+  readonly kind: 'named';
+  readonly name: string;
+  readonly value: string;
   readonly span: PslSpan;
 }
 
-export interface PslDefaultAttribute {
-  readonly kind: 'default';
-  readonly value: PslDefaultValue;
-  readonly span: PslSpan;
-}
+export type PslAttributeArgument = PslAttributePositionalArgument | PslAttributeNamedArgument;
 
-export interface PslRelationAttribute {
-  readonly kind: 'relation';
-  readonly fields: readonly string[];
-  readonly references: readonly string[];
-  readonly onDelete?: PslReferentialAction;
-  readonly onUpdate?: PslReferentialAction;
+export interface PslAttribute {
+  readonly kind: 'attribute';
+  readonly target: PslAttributeTarget;
+  readonly name: string;
+  readonly args: readonly PslAttributeArgument[];
   readonly span: PslSpan;
 }
 
 export type PslReferentialAction = string;
 
-export type PslFieldAttribute =
-  | PslIdAttribute
-  | PslUniqueAttribute
-  | PslDefaultAttribute
-  | PslRelationAttribute;
+export type PslFieldAttribute = PslAttribute;
 
 export interface PslField {
   readonly kind: 'field';
@@ -96,7 +93,7 @@ export interface PslIndexConstraint {
   readonly span: PslSpan;
 }
 
-export type PslModelAttribute = PslUniqueConstraint | PslIndexConstraint;
+export type PslModelAttribute = PslAttribute;
 
 export interface PslModel {
   readonly kind: 'model';
@@ -123,7 +120,7 @@ export interface PslNamedTypeDeclaration {
   readonly kind: 'namedType';
   readonly name: string;
   readonly baseType: string;
-  readonly attributes: readonly string[];
+  readonly attributes: readonly PslAttribute[];
   readonly span: PslSpan;
 }
 
