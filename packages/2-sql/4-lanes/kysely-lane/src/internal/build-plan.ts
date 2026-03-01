@@ -66,11 +66,10 @@ export function buildKyselyPlan<Row>(
       },
     );
   }
-  const planParams = params.slice(0, paramDescriptors.length);
 
   return {
     ast,
-    params: planParams,
+    params,
     meta: buildMeta(contract, metaAdditions),
   };
 }
