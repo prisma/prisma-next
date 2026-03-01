@@ -39,11 +39,18 @@ Defaults:
 - Review the **current branch**.
 - Base is the PR base branch when a GitHub PR exists; otherwise the repo default branch (typically `main`).
 
+Explicit override rule:
+- If the user specifies a base/parent branch, honor it exactly for the review range.
+- Do not substitute `origin/HEAD` or `origin/main` when an explicit base is provided.
+- If the provided name is ambiguous, resolve to `origin/<base>` when possible and record the resolved range in artifacts.
+
 Steps:
 1. Determine current branch name.
 2. Fetch latest refs from origin.
 3. Resolve base branch:
-   - If a PR exists for the current branch, use its `baseRefName`.
+   - If the user provided a base/parent branch, use it exactly.
+   - If the provided name is ambiguous, resolve to `origin/<base>` when possible and record the resolved range in artifacts.
+   - Otherwise, if a PR exists for the current branch, use its `baseRefName`.
    - Otherwise use the repo default branch (from `origin/HEAD`, typically `main`).
 4. Establish the review range:
    - Topic branch: `origin/<base>...HEAD`

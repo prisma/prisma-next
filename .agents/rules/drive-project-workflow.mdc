@@ -56,7 +56,7 @@ Keep Linear up to date throughout execution:
 - Canonical project spec: `projects/<project>/spec.md`
 - Task/feature specs: `projects/<project>/specs/<task>.spec.md`
 - Project plan: `projects/<project>/plan.md`
-- Task/feature plans: `projects/<project>/plans/<task>.plan.md`
+- Task/feature plans: `projects/<project>/plans/<task>-plan.md`
 - Project-specific reference material/assets: `projects/<project>/**`
 
 When starting work on a **task** from a project, ensure its spec is recorded under `projects/<project>/specs/` before implementation.

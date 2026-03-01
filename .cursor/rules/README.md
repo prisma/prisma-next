@@ -75,6 +75,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/type-predicates.mdc` — Replace blind casts with type predicates
 - `.cursor/rules/test-mocking-patterns.mdc` — Test-only assertions and mocking patterns
 - `.cursor/rules/arktype-usage.mdc` — Arktype usage guidelines
+- `.cursor/rules/use-pathe-for-paths.mdc` — Prefer `pathe` over `node:path` in TypeScript files
 - `.cursor/rules/type-extraction-from-contract.mdc` — Extracting types from contracts
 - `.cursor/rules/validate-contract-usage.mdc` — validateContract usage pattern (requires fully-typed contract type)
 - `.cursor/rules/no-inline-imports.mdc` — Prohibit inline type imports in source files
@@ -90,6 +91,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/adr-writing.mdc` — ADR writing guidelines (clarity, flow, examples)
+- `.cursor/rules/adr-examples-must-match-code.mdc` — ADR examples should be copy/pasteable and reflect real APIs
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Contract normalization responsibilities
 - `.cursor/rules/contract-default-values.mdc` — Validate emitted column defaults
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
@@ -98,6 +100,11 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/storage-type-hooks.mdc` — Codec-owned storage type hooks (avoid enum fields in shared IR)
 - `.cursor/rules/capabilities-ownership.mdc` — Capabilities are adapter-reported; contracts declare requirements
 - `.cursor/rules/tsdown-config-package-source-only.mdc` — Keep `@prisma-next/tsdown` exports source-only (no `.js` workaround files)
+
+## Research & docs writing
+- `.cursor/rules/research-comparisons-need-axes.mdc` — Comparisons must state the shared axis (knob/invariant/trade-off)
+- `.cursor/rules/walkthrough-additive-changes.mdc` — Walkthrough wording: phrase additive changes as additions (avoid “no X → Y”)
+- `.cursor/rules/review-scope-overrides.mdc` — When writing review artifacts, honor user-specified base branches
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.

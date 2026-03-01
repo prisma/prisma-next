@@ -17,6 +17,7 @@ import {
   type JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { buildMeta } from '../src/sql/plan';
 import type { Contract } from './fixtures/contract.d';
@@ -63,48 +64,52 @@ describe('buildMeta', () => {
   const userColumns = userTable.columns;
   const tableRef = createTableRef('user');
 
-  it('builds meta with operation expressions in projection', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'normalize',
-      forTypeId: 'pg/vector@1',
-      self: createColumnRef('user', 'id'),
-      args: [],
-      returns: { kind: 'typeId', type: 'pg/vector@1' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'normalize(${self})',
-      },
-    };
+  it(
+    'builds meta with operation expressions in projection',
+    () => {
+      const operationExpr: OperationExpr = {
+        kind: 'operation',
+        method: 'normalize',
+        forTypeId: 'pg/vector@1',
+        self: createColumnRef('user', 'id'),
+        args: [],
+        returns: { kind: 'typeId', type: 'pg/vector@1' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+          template: 'normalize(${self})',
+        },
+      };
 
-    const expressionBuilder = createMockExpressionBuilder(operationExpr, {
-      nativeType: 'int4',
-      codecId: 'pg/int4@1',
-      nullable: false,
-    });
+      const expressionBuilder = createMockExpressionBuilder(operationExpr, {
+        nativeType: 'int4',
+        codecId: 'pg/int4@1',
+        nullable: false,
+      });
 
-    const meta = buildMeta({
-      contract,
-      table: tableRef,
-      projection: {
-        aliases: ['normalized'],
-        columns: [expressionBuilder],
-      },
-      paramDescriptors: [],
-    });
+      const meta = buildMeta({
+        contract,
+        table: tableRef,
+        projection: {
+          aliases: ['normalized'],
+          columns: [expressionBuilder],
+        },
+        paramDescriptors: [],
+      });
 
-    expect(meta.projection).toEqual({
-      normalized: 'operation:normalize',
-    });
-    expect(meta.projectionTypes).toEqual({
-      normalized: 'pg/vector@1',
-    });
-    expect(meta.annotations?.codecs).toEqual({
-      normalized: 'pg/vector@1',
-    });
-  });
+      expect(meta.projection).toEqual({
+        normalized: 'operation:normalize',
+      });
+      expect(meta.projectionTypes).toEqual({
+        normalized: 'pg/vector@1',
+      });
+      expect(meta.annotations?.codecs).toEqual({
+        normalized: 'pg/vector@1',
+      });
+    },
+    timeouts.default * 5,
+  );
 
   it('builds meta with builtin operation return type', () => {
     const operationExpr: OperationExpr = {

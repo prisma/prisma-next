@@ -4,7 +4,7 @@
 
 Decouple contract input loading/parsing from the framework by introducing a provider boundary that returns `ContractIR` plus structured diagnostics, while keeping the framework responsible for validation, normalization, canonicalization, hashing, and artifact emission. Success means `contract emit` no longer branches on source kinds, canonical artifacts remain provenance-free (including no top-level `sources` field), and TS-first/PSL-first providers can be compared in a conformance harness at normalized IR and emitted artifact boundaries.
 
-**Spec:** `projects/psl-contract-authoring/specs/pluggable-contract-sources.spec.md`
+**Spec:** `projects/psl-contract-authoring/specs/Milestone 1 - Pluggable contract sources.spec.md`
 
 ## Collaborators
 

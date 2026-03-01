@@ -4,7 +4,7 @@
 
 Build a reusable PSL parser in `@prisma-next/psl-parser` that parses Prisma schema text into a deterministic AST with source spans and stable diagnostics. This milestone establishes the parser boundary needed by PSL-first emit and future language tooling while enforcing strict errors for unsupported constructs.
 
-**Spec:** `projects/psl-contract-authoring/specs/contract-psl-parser.spec.md`
+**Spec:** `projects/psl-contract-authoring/specs/Milestone 2 - PSL parser.spec.md`
 
 ## Collaborators
 

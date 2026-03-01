@@ -33,34 +33,9 @@ This spec defines the close-out deliverable: verification, doc migration, and de
 - [ ] Any long-lived docs are migrated into `docs/` with working links.
 - [ ] `projects/psl-contract-authoring/` is deleted.
 
-# Other Considerations
-
-## Security
-
-- Ensure no sensitive scratch notes are migrated unintentionally.
-
-## Cost
-
-- None.
-
-## Observability
-
-- Keep a short final summary in the migrated docs describing where to find the project spec/plan history (or confirm they were intentionally deleted).
-
-## Data Protection
-
-- N/A.
-
-## Analytics
-
-- None.
-
 # References
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
 - Project plan: `projects/psl-contract-authoring/plans/plan.md`
 - Workspace rules: `.cursor/rules/doc-maintenance.mdc`
 
-# Open Questions
-
-- None.

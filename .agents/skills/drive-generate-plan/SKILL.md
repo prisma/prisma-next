@@ -14,8 +14,9 @@ Transform a spec into an execution plan by structuring milestones, decomposing t
 ## File Naming
 
 - **Project plan (from `projects/{project}/spec.md`)**: `projects/{project}/plan.md`
-- **Task/feature plan (from `projects/{project}/specs/{name}.spec.md`)**: `projects/{project}/plans/{name}.plan.md`
-- The plan name `{name}` matches the spec name (e.g. `pdf-export.spec.md` → `pdf-export.plan.md`).
+- **Task/feature plan (from `projects/{project}/specs/{name}.spec.md`)**: `projects/{project}/plans/{name}-plan.md`
+- The plan name `{name}` matches the spec name (e.g. `pdf-export.spec.md` → `pdf-export-plan.md`).
+- Avoid filenames containing `.plan.` (Cursor treats them specially).
 
 ## Entry Points
 
@@ -91,7 +92,7 @@ After writing the initial plan, enter a refinement loop:
 1. **Present gaps and assumptions in the chat window.** Format as a numbered list. Example:
 
    ```
-   I've drafted the plan at projects/my-proj/plans/feature-x.plan.md. A few things to resolve:
+   I've drafted the plan at projects/my-proj/plans/feature-x-plan.md. A few things to resolve:
 
    1. The spec mentions "admin approval flow" but doesn't detail the approval states. I assumed: pending -> approved/rejected. Does this need a more complex state machine?
    2. I've listed the Platform team as a collaborator since the spec references their auth service. Should anyone specific from that team be named?

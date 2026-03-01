@@ -76,6 +76,7 @@ Key constraints:
 ## Parity (the important part)
 
 - [ ] There is a conformance set of schemas that can be expressed in both TS and PSL; for that set, PSL-first emission and TS-first emission produce equivalent canonical `contract.json` (and stable hashes).
+- [ ] The conformance suite is fixture-driven (data-driven): adding a parity case is adding a new fixture directory on disk containing the PSL schema input, the equivalent TS contract input, and an expected canonical `contract.json` snapshot (proposal: `test/integration/test/authoring/parity/<case>/`).
 - [ ] Unsupported PSL constructs are documented as “not representable in Prisma Next contract authoring yet” (or “not representable by design”), with suggested alternatives when applicable.
 
 ## Documentation & tests
@@ -113,6 +114,8 @@ When PSL has features that Prisma Next’s contract model doesn’t represent (y
 1. Reject with a targeted error (“not supported in Prisma Next contract yet”).
 2. Encode via an existing extension mechanism (namespaced attributes / blocks) **only if** there is already a corresponding representation in the current TS authoring surface and contract model.
 
+**Design constraint (composition):** packs and extensions are composed via `prisma-next.config.ts`. PSL does not activate or pin packs. If an extension namespace is used in PSL but the pack is not composed in config, emission fails.
+
 # PSL coverage plan (v1)
 
 We’re intentionally making this **simple, not perfect**. v1 supports a clear subset that we can map to the existing Prisma Next contract IR without adding new primitives.
@@ -141,8 +144,8 @@ These are the v1 supported features. They also form the initial parity/conforman
     - Example:
       ```prisma
       types {
-        Email = String @db.VarChar(191)
-        Money = Decimal @db.Decimal(10, 2)
+        Email = String
+        Money = Decimal
       }
 
       model User {
@@ -155,11 +158,17 @@ These are the v1 supported features. They also form the initial parity/conforman
       - `types { ... }` entries become `storage.types.<Name> = { codecId, nativeType, typeParams }`
       - A field using a named type (e.g. `email Email`) becomes a column with `typeRef: "Email"` (not inlined `typeParams`)
 
+- Extension-pack column typing for the initial conformance set (pgvector)
+  - v1 supports a minimal subset of ADR 104: namespaced attributes sufficient to express a pgvector column and its parameters, producing the same contract as TS-first authoring.
+  - Packs are composed via `prisma-next.config.ts` (e.g. `extensionPacks: [pgvector]`); PSL does not include a pack version pinning block.
+  - Parity fixtures must include at least one pgvector case (Milestone 4).
+  - Ergonomic upgrade: prefer declaring dimensioned vectors as named type instances via `types { ... }` and referencing them from fields (no new type-parameter syntax in PSL).
+
 ## Explicitly unsupported in v1 (strict errors)
 
 Anything outside the supported set must fail with a strict, targeted error (not warnings), including (examples; not exhaustive):
 
-- Namespaced extension attributes / blocks (pack-specific syntax) beyond what is required for named type extensions
+- Namespaced extension-pack attributes / blocks (pack-specific syntax; see ADR 104) beyond the initial conformance set (pgvector column typing)
 - Features that require storage primitives Prisma Next doesn’t model today (e.g. dialect-specific index methods/predicates if not representable)
 - PSL constructs whose semantics can’t be expressed in the existing TS authoring surface/contract model without inventing new primitives
 
@@ -185,7 +194,7 @@ Decisions already made:
 
 Remaining questions:
 
-None.
+- None.
 
 # References
 
@@ -194,3 +203,5 @@ None.
 - `docs/architecture docs/subsystems/1. Data Contract.md`
 - `docs/architecture docs/adrs/ADR 006 - Dual Authoring Modes.md`
 - `packages/1-framework/3-tooling/cli/src/commands/contract-emit.ts`
+- `projects/psl-contract-authoring/plans/plan.md`
+- `projects/psl-contract-authoring/references/authoring-surface-gap-inventory.md`
