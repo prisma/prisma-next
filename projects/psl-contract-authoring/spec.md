@@ -192,5 +192,5 @@ None.
 - `docs/Architecture Overview.md`
 - `docs/architecture docs/subsystems/2. Contract Emitter & Types.md`
 - `docs/architecture docs/subsystems/1. Data Contract.md`
-- `docs/architecture docs/adrs/ADR 006 - Dual Authoring Modes (PSL-first and TS-first) with a Single Canonical Artifact.md`
+- `docs/architecture docs/adrs/ADR 006 - Dual Authoring Modes.md`
 - `packages/1-framework/3-tooling/cli/src/commands/contract-emit.ts`
