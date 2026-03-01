@@ -1,5 +1,8 @@
 import { defineConfig } from '@prisma-next/tsdown';
 
 export default defineConfig({
-  entry: ['src/exports/index.ts', 'src/exports/provider.ts'],
+  entry: {
+    index: 'src/exports/index.ts',
+    provider: 'src/exports/provider.ts',
+  },
 });
