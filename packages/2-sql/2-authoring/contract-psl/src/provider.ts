@@ -5,6 +5,7 @@ import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
+import { createBuiltinDefaultFunctionRegistry } from './default-function-registry';
 import { interpretPslDocumentToSqlContractIR } from './interpreter';
 
 export interface PrismaContractOptions {
@@ -56,6 +57,7 @@ export function prismaContract(
         document,
         ...ifDefined('target', options?.target),
         ...ifDefined('composedExtensionPacks', options?.composedExtensionPacks),
+        defaultFunctionRegistry: createBuiltinDefaultFunctionRegistry(),
       });
     },
     ...ifDefined('output', options?.output),

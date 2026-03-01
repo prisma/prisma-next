@@ -1,11 +1,11 @@
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
   ContractSourceDiagnostic,
   ContractSourceDiagnosticSpan,
   ContractSourceDiagnostics,
-} from '@prisma-next/config/config-types';
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ColumnDefault } from '@prisma-next/contract/types';
+} from '@prisma-next/core-control-plane/config-types';
 import type {
   ParsePslDocumentResult,
   PslAttribute,
@@ -15,6 +15,12 @@ import type {
 } from '@prisma-next/psl-parser';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import {
+  createBuiltinDefaultFunctionRegistry,
+  type DefaultFunctionRegistry,
+  lowerDefaultFunctionWithRegistry,
+  parseDefaultFunctionCall,
+} from './default-function-registry';
 
 type ColumnDescriptor = {
   readonly codecId: string;
@@ -27,6 +33,7 @@ export interface InterpretPslDocumentToSqlContractIRInput {
   readonly document: ParsePslDocumentResult;
   readonly target?: TargetPackRef<'sql', 'postgres'>;
   readonly composedExtensionPacks?: readonly string[];
+  readonly defaultFunctionRegistry?: DefaultFunctionRegistry;
 }
 
 const DEFAULT_POSTGRES_TARGET: TargetPackRef<'sql', 'postgres'> = {
@@ -68,6 +75,7 @@ type ResolvedField = {
   readonly columnName: string;
   readonly descriptor: ColumnDescriptor;
   readonly defaultValue?: ColumnDefault;
+  readonly executionDefault?: ExecutionMutationDefaultValue;
   readonly isId: boolean;
   readonly isUnique: boolean;
 };
@@ -82,6 +90,10 @@ type DynamicTableBuilder = {
   column(
     name: string,
     options: { type: ColumnDescriptor; nullable?: true; default?: ColumnDefault },
+  ): DynamicTableBuilder;
+  generated(
+    name: string,
+    options: { type: ColumnDescriptor; generated: ExecutionMutationDefaultValue },
   ): DynamicTableBuilder;
   unique(columns: readonly string[]): DynamicTableBuilder;
   primaryKey(columns: readonly string[]): DynamicTableBuilder;
@@ -145,6 +157,21 @@ function getPositionalArgument(attribute: PslAttribute, index = 0): string | und
   return entry.value;
 }
 
+function getPositionalArgumentEntry(
+  attribute: PslAttribute,
+  index = 0,
+): { value: string; span: PslSpan } | undefined {
+  const entries = attribute.args.filter((arg) => arg.kind === 'positional');
+  const entry = entries[index];
+  if (!entry || entry.kind !== 'positional') {
+    return undefined;
+  }
+  return {
+    value: entry.value,
+    span: entry.span,
+  };
+}
+
 function unquoteStringLiteral(value: string): string {
   const trimmed = value.trim();
   const match = trimmed.match(/^(['"])(.*)\1$/);
@@ -176,14 +203,8 @@ function parseFieldList(value: string): readonly string[] | undefined {
   return parts;
 }
 
-function parseDefaultValueExpression(expression: string): ColumnDefault | undefined {
+function parseDefaultLiteralValue(expression: string): ColumnDefault | undefined {
   const trimmed = expression.trim();
-  if (trimmed === 'autoincrement()') {
-    return { kind: 'function', expression: 'autoincrement()' };
-  }
-  if (trimmed === 'now()') {
-    return { kind: 'function', expression: 'now()' };
-  }
   if (trimmed === 'true' || trimmed === 'false') {
     return { kind: 'literal', value: trimmed === 'true' };
   }
@@ -195,6 +216,78 @@ function parseDefaultValueExpression(expression: string): ColumnDefault | undefi
     return { kind: 'literal', value: unquoteStringLiteral(trimmed) };
   }
   return undefined;
+}
+
+function lowerDefaultForField(input: {
+  readonly modelName: string;
+  readonly fieldName: string;
+  readonly defaultAttribute: PslAttribute;
+  readonly sourceId: string;
+  readonly defaultFunctionRegistry: DefaultFunctionRegistry;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): {
+  readonly defaultValue?: ColumnDefault;
+  readonly executionDefault?: ExecutionMutationDefaultValue;
+} {
+  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
+  const namedEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'named');
+
+  if (namedEntries.length > 0 || positionalEntries.length !== 1) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+      message: `Field "${input.modelName}.${input.fieldName}" requires exactly one positional @default(...) expression.`,
+      sourceId: input.sourceId,
+      span: input.defaultAttribute.span,
+    });
+    return {};
+  }
+
+  const expressionEntry = getPositionalArgumentEntry(input.defaultAttribute);
+  if (!expressionEntry) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+      message: `Field "${input.modelName}.${input.fieldName}" requires a positional @default(...) expression.`,
+      sourceId: input.sourceId,
+      span: input.defaultAttribute.span,
+    });
+    return {};
+  }
+
+  const literalDefault = parseDefaultLiteralValue(expressionEntry.value);
+  if (literalDefault) {
+    return { defaultValue: literalDefault };
+  }
+
+  const defaultFunctionCall = parseDefaultFunctionCall(expressionEntry.value, expressionEntry.span);
+  if (!defaultFunctionCall) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_VALUE',
+      message: `Unsupported default value "${expressionEntry.value}"`,
+      sourceId: input.sourceId,
+      span: input.defaultAttribute.span,
+    });
+    return {};
+  }
+
+  const lowered = lowerDefaultFunctionWithRegistry({
+    call: defaultFunctionCall,
+    registry: input.defaultFunctionRegistry,
+    context: {
+      sourceId: input.sourceId,
+      modelName: input.modelName,
+      fieldName: input.fieldName,
+    },
+  });
+
+  if (!lowered.ok) {
+    input.diagnostics.push(lowered.diagnostic);
+    return {};
+  }
+
+  if (lowered.value.kind === 'storage') {
+    return { defaultValue: lowered.value.defaultValue };
+  }
+  return { executionDefault: lowered.value.generated };
 }
 
 function parseMapName(input: {
@@ -288,6 +381,7 @@ function collectResolvedFields(
   namedTypeBaseTypes: Map<string, string>,
   modelNames: Set<string>,
   composedExtensions: Set<string>,
+  defaultFunctionRegistry: DefaultFunctionRegistry,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
 ): ResolvedField[] {
@@ -387,22 +481,25 @@ function collectResolvedFields(
     }
 
     const defaultAttribute = getAttribute(field.attributes, 'default');
-    const defaultValueRaw = defaultAttribute ? getPositionalArgument(defaultAttribute) : undefined;
-    const defaultValue = defaultValueRaw ? parseDefaultValueExpression(defaultValueRaw) : undefined;
-    if (defaultAttribute && defaultValueRaw && !defaultValue) {
-      diagnostics.push({
-        code: 'PSL_INVALID_DEFAULT_VALUE',
-        message: `Unsupported default value "${defaultValueRaw}"`,
-        sourceId,
-        span: defaultAttribute.span,
-      });
-    }
+    const loweredDefault = defaultAttribute
+      ? lowerDefaultForField({
+          modelName: model.name,
+          fieldName: field.name,
+          defaultAttribute,
+          sourceId,
+          defaultFunctionRegistry,
+          diagnostics,
+        })
+      : {};
     const mappedColumnName = mapping.fieldColumns.get(field.name) ?? field.name;
     resolvedFields.push({
       field,
       columnName: mappedColumnName,
       descriptor,
-      ...(defaultValue ? { defaultValue } : {}),
+      ...(loweredDefault.defaultValue ? { defaultValue: loweredDefault.defaultValue } : {}),
+      ...(loweredDefault.executionDefault
+        ? { executionDefault: loweredDefault.executionDefault }
+        : {}),
       isId: Boolean(getAttribute(field.attributes, 'id')),
       isUnique: Boolean(getAttribute(field.attributes, 'unique')),
     });
@@ -629,6 +726,8 @@ export function interpretPslDocumentToSqlContractIR(
   const modelNames = new Set(input.document.ast.models.map((model) => model.name));
   const sourceId = input.document.ast.sourceId;
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
+  const defaultFunctionRegistry =
+    input.defaultFunctionRegistry ?? createBuiltinDefaultFunctionRegistry();
 
   let builder = defineContract().target(
     input.target ?? DEFAULT_POSTGRES_TARGET,
@@ -750,6 +849,7 @@ export function interpretPslDocumentToSqlContractIR(
       namedTypeBaseTypes,
       modelNames,
       composedExtensions,
+      defaultFunctionRegistry,
       diagnostics,
       sourceId,
     );
@@ -779,16 +879,23 @@ export function interpretPslDocumentToSqlContractIR(
       let table = tableBuilder;
 
       for (const resolvedField of resolvedFields) {
-        const options: {
-          type: ColumnDescriptor;
-          nullable?: true;
-          default?: ColumnDefault;
-        } = {
-          type: resolvedField.descriptor,
-          ...(resolvedField.field.optional ? { nullable: true as const } : {}),
-          ...(resolvedField.defaultValue ? { default: resolvedField.defaultValue } : {}),
-        };
-        table = table.column(resolvedField.columnName, options);
+        if (resolvedField.executionDefault) {
+          table = table.generated(resolvedField.columnName, {
+            type: resolvedField.descriptor,
+            generated: resolvedField.executionDefault,
+          });
+        } else {
+          const options: {
+            type: ColumnDescriptor;
+            nullable?: true;
+            default?: ColumnDefault;
+          } = {
+            type: resolvedField.descriptor,
+            ...(resolvedField.field.optional ? { nullable: true as const } : {}),
+            ...(resolvedField.defaultValue ? { default: resolvedField.defaultValue } : {}),
+          };
+          table = table.column(resolvedField.columnName, options);
+        }
 
         if (resolvedField.isUnique) {
           table = table.unique([resolvedField.columnName]);

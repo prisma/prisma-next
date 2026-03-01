@@ -161,6 +161,89 @@ model Document {
     });
   });
 
+  describe('given supported default functions in schema', () => {
+    it('maps function defaults to execution or storage defaults', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  uuidV7 String @default(uuid(7))
+  nanoid16 String @default(nanoid(16))
+  dbExpr String @default(dbgenerated("gen_random_uuid()"))
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source();
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value.execution).toMatchObject({
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'nanoid16' },
+              onCreate: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
+            },
+            {
+              ref: { table: 'user', column: 'uuidV7' },
+              onCreate: { kind: 'generator', id: 'uuidv7' },
+            },
+          ],
+        },
+      });
+      expect(result.value.storage.tables.user.columns.dbExpr.default).toEqual({
+        kind: 'function',
+        expression: 'gen_random_uuid()',
+      });
+    });
+  });
+
+  describe('given unsupported default functions', () => {
+    it('returns actionable default function diagnostics with spans', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  cuidValue String @default(cuid())
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source();
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+
+      expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
+            sourceId: './schema.prisma',
+            message: expect.stringContaining('uuid()'),
+            span: expect.objectContaining({
+              start: expect.objectContaining({ line: 3 }),
+            }),
+          }),
+        ]),
+      );
+    });
+  });
+
   describe('given a missing schema file', () => {
     it('returns PSL_SCHEMA_READ_FAILED diagnostics when schema file is missing', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
