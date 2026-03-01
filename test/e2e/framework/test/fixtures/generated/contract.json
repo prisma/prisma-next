@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:b922c09c275ff8f659dc6ab91cd859a46a7e659870d47028dc7389f1330c43da",
+  "storageHash": "sha256:065e445e4b728f3825cd85e4a492e187aef68f257eaec630d0170e27eb41b313",
   "executionHash": "sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
@@ -145,8 +145,7 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz",
-            "nullable": false
+            "nativeType": "timestamptz"
           },
           "id": {
             "codecId": "pg/int4@1",
@@ -154,8 +153,7 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4",
-            "nullable": false
+            "nativeType": "int4"
           },
           "postId": {
             "codecId": "pg/int4@1",
@@ -184,8 +182,7 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz",
-            "nullable": false
+            "nativeType": "timestamptz"
           },
           "id": {
             "codecId": "sql/char@1",
@@ -204,8 +201,7 @@
               "kind": "literal",
               "value": "2024-01-15T10:30:00.000Z"
             },
-            "nativeType": "timestamptz",
-            "nullable": false
+            "nativeType": "timestamptz"
           }
         },
         "foreignKeys": [],
@@ -225,8 +221,7 @@
               "kind": "literal",
               "value": true
             },
-            "nativeType": "bool",
-            "nullable": false
+            "nativeType": "bool"
           },
           "big_count": {
             "codecId": "pg/int8@1",
@@ -237,8 +232,7 @@
                 "value": "9007199254740993"
               }
             },
-            "nativeType": "int8",
-            "nullable": false
+            "nativeType": "int8"
           },
           "id": {
             "codecId": "pg/int4@1",
@@ -246,8 +240,7 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4",
-            "nullable": false
+            "nativeType": "int4"
           },
           "label": {
             "codecId": "pg/text@1",
@@ -255,8 +248,7 @@
               "kind": "literal",
               "value": "draft"
             },
-            "nativeType": "text",
-            "nullable": false
+            "nativeType": "text"
           },
           "metadata": {
             "codecId": "pg/jsonb@1",
@@ -266,8 +258,7 @@
                 "key": "default"
               }
             },
-            "nativeType": "jsonb",
-            "nullable": false
+            "nativeType": "jsonb"
           },
           "rating": {
             "codecId": "pg/float8@1",
@@ -275,8 +266,7 @@
               "kind": "literal",
               "value": 3.14
             },
-            "nativeType": "float8",
-            "nullable": false
+            "nativeType": "float8"
           },
           "score": {
             "codecId": "pg/int4@1",
@@ -284,8 +274,7 @@
               "kind": "literal",
               "value": 0
             },
-            "nativeType": "int4",
-            "nullable": false
+            "nativeType": "int4"
           },
           "tags": {
             "codecId": "pg/jsonb@1",
@@ -296,8 +285,7 @@
                 "beta"
               ]
             },
-            "nativeType": "jsonb",
-            "nullable": false
+            "nativeType": "jsonb"
           }
         },
         "foreignKeys": [],
@@ -357,8 +345,7 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4",
-            "nullable": false
+            "nativeType": "int4"
           },
           "name": {
             "codecId": "sql/varchar@1",
@@ -411,8 +398,7 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz",
-            "nullable": false
+            "nativeType": "timestamptz"
           },
           "id": {
             "codecId": "pg/int4@1",
@@ -420,8 +406,7 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4",
-            "nullable": false
+            "nativeType": "int4"
           },
           "meta": {
             "codecId": "pg/json@1",
@@ -486,8 +471,7 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz",
-            "nullable": false
+            "nativeType": "timestamptz"
           },
           "email": {
             "codecId": "sql/varchar@1",
@@ -502,8 +486,7 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4",
-            "nullable": false
+            "nativeType": "int4"
           },
           "profile": {
             "codecId": "pg/jsonb@1",

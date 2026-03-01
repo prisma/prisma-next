@@ -6,7 +6,7 @@ Concretely:
 
 - **Phase 1 (merge what we have):** keep the current runtime-attached integration, but make it *usable as Prisma Next* by producing **Prisma Next `QueryAst`** in query plans (not just SQL strings) so adapters/plugins/guardrails can inspect and enforce behavior.
 - **Phase 2 (make it a lane):** move Kysely authoring + transform + guardrails into `packages/2-sql/4-lanes/` as `@prisma-next/sql-kysely-lane` (build-only; no runtime dependency).
-- **Phase 3 (optional):** narrow reliance on Kysely compilation / operation internals, and construct PN AST more directly where it’s beneficial/feasible.
+- **Phase 3 (optional):** avoid compiling a SQL string that we discard (compile-free plan assembly), and reduce reliance on Kysely internals where it’s practical.
 
 # Description
 
@@ -36,8 +36,10 @@ This project coordinates:
 2. **Phase 2 (architecture, “make it a lane”):**
    - Implement the intended design from `projects/kysely-lane-rollout/specs/02-kysely-lane-build-only.spec.md`.
    - Create `@prisma-next/sql-kysely-lane` in the SQL domain lanes layer, move transform/guardrails/build-only semantics there, and keep runtime attachment (if needed) in extensions.
-3. **Phase 3 (optional, “make it simpler/stronger”):**
-   - Where useful, narrow reliance on Kysely internals (for example compilation-derived artifacts) and construct PN AST more directly where feasible.
+3. **Phase 3 (optional, “avoid wasted compilation”):**
+   - Avoid compiling SQL text purely to obtain `{ query, parameters }`.
+   - Primary win: compile-free plan assembly that preserves param ordering/indexing invariants and existing transformer/guardrail behavior.
+   - Secondary win: reduce reliance on Kysely internals when it doesn’t compromise the primary goal.
 
 # Requirements
 
@@ -48,6 +50,8 @@ This project coordinates:
 - Runtime plugins/guardrails can inspect Kysely-authored plans by relying on the AST-backed plan shape.
 - Phase 2 produces a build-only lane package (`@prisma-next/sql-kysely-lane`) in `packages/2-sql/4-lanes/` and moves lane responsibilities there, keeping runtime attachment (dialect/driver/connection) separate.
 - Postgres public surface exposes a build-only `db.kysely` authoring API (no runtime argument) per the Phase 2 spec.
+- In Phase 2, unsupported Kysely kinds fail fast with a stable structured error in runtime attachment paths (no raw fallback).
+- In Phase 2, no execution-capable public Kysely API is exposed from `@prisma-next/postgres`.
 
 ## Non-Functional Requirements
 
@@ -75,14 +79,16 @@ This project coordinates:
 
 ## Phase 2 (architectural lane extraction)
 
-- [ ] `@prisma-next/sql-kysely-lane` exists under `packages/2-sql/4-lanes/` and owns build-only Kysely authoring + transform + guardrails.
-- [ ] `@prisma-next/sql-kysely-lane` does **not** depend on `@prisma-next/sql-runtime` and passes `pnpm lint:deps`.
-- [ ] Any runtime-attached Kysely execution surface is clearly separated (kept in extensions) and delegates lane responsibilities to the lane package.
-- [ ] Public Postgres client surface provides a build-only `db.kysely` (no runtime argument) per the Phase 2 spec.
+- [x] `@prisma-next/sql-kysely-lane` exists under `packages/2-sql/4-lanes/` and owns build-only Kysely authoring + transform + guardrails.
+- [x] `@prisma-next/sql-kysely-lane` does **not** depend on `@prisma-next/sql-runtime` and passes `pnpm lint:deps`.
+- [x] Any runtime-attached Kysely execution surface is clearly separated (kept in extensions) and delegates lane responsibilities to the lane package.
+- [x] Public Postgres client surface provides a build-only `db.kysely` (no runtime argument) per the Phase 2 spec.
+- [x] Unsupported Kysely kinds fail fast in runtime attachment paths with a stable structured error envelope (no raw fallback execution).
+- [x] `@prisma-next/postgres` does not expose any execution-capable public Kysely API.
 
 ## Phase 3 (optional)
 
-- [ ] A decision is recorded: implement direct PN AST construction now, or explicitly defer with rationale + a tracked follow-up.
+- [ ] A decision is recorded: implement compile-free plan assembly now, or explicitly defer with rationale + a tracked follow-up.
 
 # Other Considerations
 
@@ -122,5 +128,16 @@ No product analytics changes required. Development analytics are commit/test/CI 
 # Open Questions
 
 1. For Phase 1, what’s the merge gate beyond “tests/typecheck/lint green” (if anything)?
-2. In Phase 2, for unsupported Kysely node kinds in runtime attachment: keep raw fallback, or fail fast with a stable, structured error?
-3. What would trigger Phase 3 work now (vs later): performance ceiling, correctness gap, Kysely internals churn, or maintenance burden?
+2. What would trigger Phase 3 work now (vs later): compilation cost/p95 planning latency, Kysely internals churn, correctness gaps, or maintenance burden?
+
+# Follow-ups (post-Phase-2)
+
+- Standardize execution-plane structured runtime error envelopes (PLAN.* helpers) at a low layer, then migrate remaining runtime attachment call sites off ad-hoc envelope construction (start with `PLAN.UNSUPPORTED`).
+
+# Decision Log
+
+- Phase 2 unsupported-kinds behavior: **fail fast** with stable structured errors in runtime attachment paths.
+- Phase 2 Postgres API shape: `db.kysely` is **build-only**; no execution-capable public Kysely API.
+- Phase 2 Postgres `.kysely` surface is lane-owned (`@prisma-next/sql-kysely-lane`), not raw Kysely types from the composition root.
+- `@prisma-next/integration-kysely` is removed; lane/runtime responsibilities live in `@prisma-next/sql-kysely-lane` and `@prisma-next/postgres`.
+- Phase 2 ORM interop behavior: `ToWhereExpr` payloads are consumed via strict index/alignment validation and literal normalization (`ParamRef -> LiteralExpr`) at ORM boundaries.

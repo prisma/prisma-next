@@ -95,6 +95,7 @@ flowchart TD
 - Query roots: `SelectAst`, `InsertAst`, `UpdateAst`, `DeleteAst`
 - Expressions: `ColumnRef`, `ParamRef`, `LiteralExpr`, `OperationExpr`, `ListLiteralExpr`
 - Predicates: `BinaryExpr` (ops: `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `like`, `ilike`, `in`, `notIn`), `AndExpr`, `OrExpr`, `ExistsExpr`, `NullCheckExpr`
+- Lane-agnostic filter interop: `WhereArg`, `ToWhereExpr`, and `BoundWhereExpr` for passing pre-bound filter payloads without lane-specific types
 - Joins: `JoinAst`, `JoinOnExpr` (eqCol or WhereExpr)
 - `SelectAst.selectAllIntent` — preserves select-all intent when normalized to explicit columns
 - `DeleteAst.where` and `UpdateAst.where` optional for mutation-without-WHERE lint support

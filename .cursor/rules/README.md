@@ -62,6 +62,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 
 ## SQL & Query Patterns
 - `.cursor/rules/query-patterns.mdc` — Query DSL patterns
+- `.cursor/rules/kysely-lane-boundary.mdc` — Kysely lane ownership and build-only interop boundaries
 - `.cursor/rules/postgres-lateral-patterns.mdc` — LATERAL/json_agg patterns
 - `.cursor/rules/include-many-patterns.mdc` — includeMany type inference
 - `.cursor/rules/sql-types-imports.mdc` — SQL types import path (use @prisma-next/sql-contract/types)

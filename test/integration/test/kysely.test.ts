@@ -2,16 +2,16 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
+import postgres from '@prisma-next/postgres/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { lints, type Plugin } from '@prisma-next/sql-runtime';
+import { lints, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
 import { teardownTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
-import { Kysely, sql } from 'kysely';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/contract.js';
-import { createTestRuntimeFromClient, setupE2EDatabase } from './utils.js';
+import { setupE2EDatabase } from './utils.js';
 
 function createPlanCapturePlugin(captured: ExecutionPlan[]): Plugin {
   return {
@@ -22,14 +22,26 @@ function createPlanCapturePlugin(captured: ExecutionPlan[]): Plugin {
   };
 }
 
-// Load contract fixture from the integration test fixtures
 const fixtureContract = loadContractFixture();
 
-describe('Kysely integration', () => {
+async function createPostgresClient(
+  client: Client,
+  options?: { readonly plugins?: readonly Plugin[] },
+): Promise<{ runtime: Runtime; db: ReturnType<typeof postgres<Contract>> }> {
+  const plugins = options?.plugins;
+  const db = postgres<Contract>({
+    contract: fixtureContract,
+    pg: client,
+    verify: { mode: 'onFirstUse', requireMarker: true },
+    ...ifDefined('plugins', plugins),
+  });
+  const runtime = await db.connect();
+  return { runtime, db };
+}
+
+describe('Kysely build-only lane', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
-  /** Raw Postgres client for direct interaction with the database */
   let client: Client;
-  /** Test data IDs for cleanup */
   let userId: number;
   const testTimeout = timeouts.spinUpPpgDev;
 
@@ -37,9 +49,7 @@ describe('Kysely integration', () => {
     database = await createDevDatabase();
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-
-    // Generate unique IDs for test data
-    userId = Math.floor(Math.random() * 1000000);
+    userId = Math.floor(Math.random() * 1_000_000);
   }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
@@ -47,16 +57,13 @@ describe('Kysely integration', () => {
       await client.end();
       await database.close();
     } catch {
-      // Ignore cleanup errors
+      // Ignore cleanup errors.
     }
   });
 
   beforeEach(async () => {
     await setupE2EDatabase(client, fixtureContract, async (c) => {
-      // Drop tables if they exist
       await c.query('drop table if exists "user" cascade');
-
-      // Create user table (matches the fixture contract)
       await c.query(`
         create table "user" (
           id serial primary key,
@@ -65,7 +72,6 @@ describe('Kysely integration', () => {
         )
       `);
 
-      // Insert some seed data
       await c.query('insert into "user" (email, "createdAt") values ($1, $2), ($3, $4), ($5, $6)', [
         'ada@example.com',
         new Date(),
@@ -81,426 +87,214 @@ describe('Kysely integration', () => {
     await teardownTestDatabase(client, ['user']);
   }, timeouts.spinUpPpgDev);
 
-  describe('CRUD operations', () => {
-    it(
-      'creates a user successfully',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        });
+  it(
+    'creates reads updates and deletes rows through runtime.execute',
+    async () => {
+      const { runtime, db } = await createPostgresClient(client);
 
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        const newUser = {
-          id: userId,
-          email: 'test@example.com',
-          createdAt: new Date().toISOString(),
-        };
-
-        const result = await kysely.insertInto('user').values(newUser).returningAll().execute();
-
-        expect(result).toHaveLength(1);
-        expect(result[0]?.id).toBe(userId);
-        expect(result[0]?.email).toBe('test@example.com');
-        expect(result[0]?.createdAt).toBeDefined();
-      },
-      testTimeout,
-    );
-
-    it(
-      'reads users with select queries',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        // Read existing seed data
-        const users = await kysely
-          .selectFrom('user')
-          .selectAll()
-          .where('email', 'like', '%@example.com')
-          .orderBy('id')
-          .execute();
-
-        expect(users.length).toBeGreaterThan(0);
-        expect(users.map((u) => u.email)).toContain('ada@example.com');
-      },
-      testTimeout,
-    );
-
-    it(
-      'updates a user email',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        // First create a user
-        const createResult = await kysely
-          .insertInto('user')
-          .values({
-            id: userId,
-            email: 'old@example.com',
-            createdAt: new Date().toISOString(),
-          })
-          .returningAll()
-          .execute();
-
-        expect(createResult).toHaveLength(1);
-
-        // Update email
-        const updateResult = await kysely
-          .updateTable('user')
-          .set({ email: 'new@example.com' })
-          .where('id', '=', userId)
-          .returningAll()
-          .execute();
-
-        expect(updateResult).toHaveLength(1);
-        expect(updateResult[0]?.email).toBe('new@example.com');
-      },
-      testTimeout,
-    );
-
-    it(
-      'deletes a user',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        // Create user first
-        await kysely
-          .insertInto('user')
-          .values({
-            id: userId,
-            email: 'delete@example.com',
-            createdAt: new Date().toISOString(),
-          })
-          .execute();
-
-        // Delete user
-        const deleteResult = await kysely
-          .deleteFrom('user')
-          .where('id', '=', userId)
-          .returningAll()
-          .execute();
-
-        expect(deleteResult).toHaveLength(1);
-        expect(deleteResult[0]?.id).toBe(userId);
-
-        // Verify deletion
-        const user = await kysely
-          .selectFrom('user')
-          .selectAll()
-          .where('id', '=', userId)
-          .executeTakeFirst();
-
-        expect(user).toBeUndefined();
-      },
-      testTimeout,
-    );
-  });
-
-  describe('transaction functionality', () => {
-    it(
-      'commits transaction successfully',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        await kysely.transaction().execute(async (trx) => {
-          await trx
-            .insertInto('user')
-            .values({
-              id: userId,
-              email: 'transaction@example.com',
-              createdAt: new Date().toISOString(),
-            })
-            .execute();
-
-          await trx
-            .insertInto('user')
-            .values({
-              id: userId + 1,
-              email: 'transaction2@example.com',
-              createdAt: new Date().toISOString(),
-            })
-            .execute();
-        });
-
-        // Verify both records were committed
-        const users = await kysely
-          .selectFrom('user')
-          .selectAll()
-          .where('id', 'in', [userId, userId + 1])
-          .execute();
-
-        expect(users).toHaveLength(2);
-        expect(users.some((u) => u.email === 'transaction@example.com')).toBe(true);
-        expect(users.some((u) => u.email === 'transaction2@example.com')).toBe(true);
-      },
-      testTimeout,
-    );
-
-    it(
-      'rolls back transaction on error',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        await expect(
-          kysely.transaction().execute(async (trx) => {
-            await trx
+      const created = await runtime
+        .execute(
+          db.kysely.build(
+            db.kysely
               .insertInto('user')
               .values({
                 id: userId,
-                email: 'rollback@example.com',
+                email: 'test@example.com',
                 createdAt: new Date().toISOString(),
               })
-              .execute();
+              .returningAll(),
+          ),
+        )
+        .toArray();
+      expect(created).toHaveLength(1);
+      expect(created[0]?.['id']).toBe(userId);
+      expect(created[0]?.['email']).toBe('test@example.com');
 
-            await trx
-              .insertInto('user')
-              .values({
-                id: userId + 1,
-                email: 'rollback2@example.com',
-                createdAt: new Date().toISOString(),
-              })
-              .execute();
+      const selectQuery = db.kysely
+        .selectFrom('user')
+        .selectAll()
+        .where('email', 'like', '%@example.com')
+        .orderBy('id')
+        .limit(10);
+      const selected = await runtime.execute(db.kysely.build(selectQuery)).toArray();
+      expect(selected.length).toBeGreaterThan(0);
 
-            // Simulate error
+      const updated = await runtime
+        .execute(
+          db.kysely.build(
+            db.kysely
+              .updateTable('user')
+              .set({ email: 'updated@example.com' })
+              .where('id', '=', userId)
+              .returningAll(),
+          ),
+        )
+        .toArray();
+      expect(updated).toHaveLength(1);
+      expect(updated[0]?.['email']).toBe('updated@example.com');
+
+      const deleted = await runtime
+        .execute(
+          db.kysely.build(db.kysely.deleteFrom('user').where('id', '=', userId).returningAll()),
+        )
+        .toArray();
+      expect(deleted).toHaveLength(1);
+      expect(deleted[0]?.['id']).toBe(userId);
+    },
+    testTimeout,
+  );
+
+  it(
+    'commits transaction via runtime connection',
+    async () => {
+      const { runtime, db } = await createPostgresClient(client);
+      const connection = await runtime.connection();
+
+      try {
+        const transaction = await connection.transaction();
+        try {
+          await transaction
+            .execute(
+              db.kysely.build(
+                db.kysely.insertInto('user').values({
+                  id: userId,
+                  email: 'transaction@example.com',
+                  createdAt: new Date().toISOString(),
+                }),
+              ),
+            )
+            .toArray();
+          await transaction.commit();
+        } catch (error) {
+          await transaction.rollback();
+          throw error;
+        }
+      } finally {
+        await connection.release();
+      }
+
+      const users = await runtime
+        .execute(db.kysely.build(db.kysely.selectFrom('user').selectAll().where('id', '=', userId)))
+        .toArray();
+      expect(users).toHaveLength(1);
+      expect(users[0]?.['email']).toBe('transaction@example.com');
+    },
+    testTimeout,
+  );
+
+  it(
+    'rolls back transaction on error',
+    async () => {
+      const { runtime, db } = await createPostgresClient(client);
+      const connection = await runtime.connection();
+
+      await expect(async () => {
+        try {
+          const transaction = await connection.transaction();
+          try {
+            await transaction
+              .execute(
+                db.kysely.build(
+                  db.kysely.insertInto('user').values({
+                    id: userId,
+                    email: 'rollback@example.com',
+                    createdAt: new Date().toISOString(),
+                  }),
+                ),
+              )
+              .toArray();
             throw new Error('Simulated transaction error');
-          }),
-        ).rejects.toThrow('Simulated transaction error');
+          } catch (error) {
+            await transaction.rollback();
+            throw error;
+          }
+        } finally {
+          await connection.release();
+        }
+      }).rejects.toThrow('Simulated transaction error');
 
-        // Verify rollback - no records should exist
-        const users = await kysely
-          .selectFrom('user')
-          .selectAll()
-          .where('id', 'in', [userId, userId + 1])
-          .execute();
+      const users = await runtime
+        .execute(db.kysely.build(db.kysely.selectFrom('user').selectAll().where('id', '=', userId)))
+        .toArray();
+      expect(users).toHaveLength(0);
+    },
+    testTimeout,
+  );
 
-        expect(users).toHaveLength(0);
-      },
-      testTimeout,
-    );
-  });
+  it(
+    'captures ast and lane metadata for built plans',
+    async () => {
+      const captured: ExecutionPlan[] = [];
+      const { runtime, db } = await createPostgresClient(client, {
+        plugins: [createPlanCapturePlugin(captured)],
+      });
 
-  describe('plan structure (Phase 5)', () => {
-    it(
-      'attaches plan.ast, meta.lane, meta.refs, paramDescriptors for Kysely select',
-      async () => {
-        const captured: ExecutionPlan[] = [];
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-          plugins: [createPlanCapturePlugin(captured)],
-        });
+      await runtime
+        .execute(
+          db.kysely.build(
+            db.kysely
+              .selectFrom('user')
+              .select(['id', 'email'])
+              .where('email', 'like', '%@example.com')
+              .limit(5),
+          ),
+        )
+        .toArray();
 
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        await kysely
-          .selectFrom('user')
-          .select(['id', 'email'])
-          .where('email', 'like', '%@example.com')
-          .limit(5)
-          .execute();
-
-        expect(captured).toHaveLength(1);
-        const plan = captured[0]!;
-        expect(plan).toMatchObject({
-          ast: { kind: 'select' },
-          meta: {
-            lane: 'kysely',
-            refs: {
-              tables: expect.arrayContaining(['user']),
-              columns: expect.any(Array),
-            },
-            paramDescriptors: expect.any(Array),
-            projection: expect.any(Object),
-            projectionTypes: expect.any(Object),
-            annotations: { codecs: expect.any(Object) },
+      expect(captured).toHaveLength(1);
+      const plan = captured[0]!;
+      expect(plan).toMatchObject({
+        ast: { kind: 'select' },
+        meta: {
+          lane: 'kysely',
+          refs: {
+            tables: expect.arrayContaining(['user']),
+            columns: expect.any(Array),
           },
-        });
-        expect(plan.meta.refs?.columns?.length ?? 0).toBeGreaterThan(0);
-      },
-      testTimeout,
-    );
+          paramDescriptors: expect.any(Array),
+          projection: expect.any(Object),
+          projectionTypes: expect.any(Object),
+          annotations: { codecs: expect.any(Object) },
+        },
+      });
+      expect(plan.meta.refs?.columns?.length ?? 0).toBeGreaterThan(0);
+    },
+    testTimeout,
+  );
 
-    it(
-      'AST-first lints block Kysely DELETE without WHERE',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-          plugins: [lints()],
-        });
+  it(
+    'blocks delete without where with lint error',
+    async () => {
+      const { runtime, db } = await createPostgresClient(client, { plugins: [lints()] });
 
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
+      await expect(
+        runtime.execute(db.kysely.build(db.kysely.deleteFrom('user'))).toArray(),
+      ).rejects.toMatchObject({
+        code: 'LINT.DELETE_WITHOUT_WHERE',
+        category: 'LINT',
+      });
+    },
+    testTimeout,
+  );
 
-        await expect(kysely.deleteFrom('user').execute()).rejects.toMatchObject({
-          code: 'LINT.DELETE_WITHOUT_WHERE',
-          category: 'LINT',
-        });
-      },
-      testTimeout,
-    );
+  it(
+    'blocks update without where with lint error',
+    async () => {
+      const { runtime, db } = await createPostgresClient(client, { plugins: [lints()] });
 
-    it(
-      'AST-first lints block Kysely UPDATE without WHERE',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-          plugins: [lints()],
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        await expect(
-          kysely.updateTable('user').set({ email: 'unsafe@example.com' }).execute(),
-        ).rejects.toMatchObject({
-          code: 'LINT.UPDATE_WITHOUT_WHERE',
-          category: 'LINT',
-        });
-      },
-      testTimeout,
-    );
-
-    it(
-      'fails unsupported Kysely query kinds with PLAN.UNSUPPORTED envelope',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        await expect(
-          kysely
-            .insertInto('user')
-            .values([
-              {
-                id: userId,
-                email: 'unsupported-1@example.com',
-                createdAt: new Date().toISOString(),
-              },
-              {
-                id: userId + 1,
-                email: 'unsupported-2@example.com',
-                createdAt: new Date().toISOString(),
-              },
-            ])
-            .execute(),
-        ).rejects.toMatchObject({
-          code: 'PLAN.UNSUPPORTED',
-          category: 'PLAN',
-          details: {
-            lane: 'kysely',
-            kyselyKind: 'InsertQueryNode',
-          },
-        });
-      },
-      testTimeout,
-    );
-
-    it(
-      'uses lane raw and no ast for raw sql queries',
-      async () => {
-        const captured: ExecutionPlan[] = [];
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-          plugins: [createPlanCapturePlugin(captured)],
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        await sql<{ id: number; email: string }>`
-          SELECT id, email FROM "user" WHERE email = ${'ada@example.com'}
-        `.execute(kysely);
-
-        expect(captured).toHaveLength(1);
-        const plan = captured[0]!;
-        expect(plan.ast).toBeUndefined();
-        expect(plan.meta.lane).toBe('raw');
-        expect(plan.meta.paramDescriptors).toEqual([]);
-      },
-      testTimeout,
-    );
-  });
-
-  describe('dialect functionality', () => {
-    it(
-      'creates dialect instance successfully',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        expect(kysely).toBeDefined();
-        expect(kysely.isTransaction).toBe(false);
-      },
-      testTimeout,
-    );
-
-    it(
-      'executes raw SQL queries',
-      async () => {
-        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        });
-
-        const kysely = new Kysely<KyselifyContract<Contract>>({
-          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
-        });
-
-        // Use existing seed data
-        const result = await sql<{ id: number; email: string; createdAt: string }>`
-        SELECT * FROM "user" WHERE email = ${'ada@example.com'}
-      `.execute(kysely);
-
-        expect(result.rows).toHaveLength(1);
-        expect(result.rows[0]?.email).toBe('ada@example.com');
-      },
-      testTimeout,
-    );
-  });
+      await expect(
+        runtime
+          .execute(
+            db.kysely.build(db.kysely.updateTable('user').set({ email: 'unsafe@example.com' })),
+          )
+          .toArray(),
+      ).rejects.toMatchObject({
+        code: 'LINT.UPDATE_WITHOUT_WHERE',
+        category: 'LINT',
+      });
+    },
+    testTimeout,
+  );
 });
 
 function loadContractFixture(): Contract {

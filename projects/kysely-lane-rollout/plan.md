@@ -21,11 +21,11 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 
 **Tasks:**
 
-- [ ] Produce a Phase 1 scope boundary doc (allowed vs deferred changes).
-- [ ] Triage current branch deltas into: must-fix now, can-ship, defer-to-phase-2.
-- [ ] Fix blockers (failing tests/type/lint, known correctness bugs).
-- [ ] Run package/integration tests required for confidence.
-- [ ] Merge Phase 1 PR with clear follow-up links to Phase 2.
+- [x] Produce a Phase 1 scope boundary doc (allowed vs deferred changes).
+- [x] Triage current branch deltas into: must-fix now, can-ship, defer-to-phase-2.
+- [x] Fix blockers (failing tests/type/lint, known correctness bugs).
+- [x] Run package/integration tests required for confidence.
+- [x] Merge Phase 1 PR with clear follow-up links to Phase 2.
 
 ### Milestone 2: Architectural extraction to SQL lane (Phase 2)
 
@@ -33,29 +33,56 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 
 **Tasks:**
 
-- [ ] Create `@prisma-next/sql-kysely-lane` package in `packages/2-sql/4-lanes/`.
-- [ ] Move transformer, guardrails, build-only lane assembly into lane package.
-- [ ] Introduce/complete interop contract (`WhereArg`, `ToWhereExpr`) and ORM consumption path.
-- [ ] Update `@prisma-next/postgres` surface to expose build-only `db.kysely` API.
-- [ ] Re-scope `@prisma-next/integration-kysely` to runtime attachment responsibilities.
-- [ ] Update READMEs and architecture docs for touched packages and decisions.
-- [ ] Pass `pnpm lint:deps` and targeted test suites.
+- [x] Create `@prisma-next/sql-kysely-lane` package in `packages/2-sql/4-lanes/`.
+- [x] Move transformer, guardrails, build-only lane assembly into lane package.
+- [x] Introduce/complete interop contract (`WhereArg`, `ToWhereExpr`) and ORM consumption path.
+- [x] Tighten interop boundary: ORM `.where(...)` accepts only `WhereArg` (no `SqlQueryPlan` shorthand); add a Kysely-lane helper (e.g. `db.kysely.whereExpr(...)`) that returns `ToWhereExpr` for Kysely-authored filters.
+- [x] Update `@prisma-next/postgres` surface to expose build-only `db.kysely` API.
+- [x] Re-scope `@prisma-next/integration-kysely` to runtime attachment responsibilities.
+- [x] Enforce fail-fast behavior for unsupported Kysely kinds in runtime attachment paths (no raw fallback).
+- [x] Keep Postgres public Kysely API build-only for this phase (no execution-capable public Kysely API).
+- [x] Update READMEs and architecture docs for touched packages and decisions.
+- [x] Pass `pnpm lint:deps` and targeted test suites.
 
-### Milestone 3: Direct PN AST construction (Phase 3, optional)
+### Milestone 3: Post-Phase-2 follow-ups (tracked, separate ticket)
 
-**Goal:** Decide and implement direct PN AST construction only if justified.
+**Goal:** Capture and complete follow-up work that’s explicitly **out of Phase 2 scope**, but discovered during Phase 2 review/hardening.
 
 **Tasks:**
 
-- [ ] Define go/no-go criteria for direct PN AST (maintainability/performance/correctness).
-- [ ] If go: implement direct construction path and update tests/docs.
-- [ ] If no-go: document deferral rationale and create a tracked follow-up item.
+- [ ] Follow-up (separate Linear ticket): standardize execution-plane structured runtime error envelopes (PLAN.* helpers) at a low layer, then migrate `integration-kysely` off ad-hoc envelope construction.
+  - Ticket: `TML-XXXX` (create)
+  - Draft title: `Execution-plane structured runtime error envelopes (PLAN.* helpers)`
+  - Draft description:
+    - Context: runtime-side PLAN.UNSUPPORTED envelopes are currently constructed ad-hoc in extensions (e.g. `integration-kysely` mutates an Error with `code/category/severity/details`).
+    - Goal: define a single source of truth for runtime error envelopes on the execution plane (likely in a low SQL family/shared layer), starting with `PLAN.UNSUPPORTED`.
+    - Acceptance criteria:
+      - [ ] Canonical helper exists for PLAN.UNSUPPORTED (and any related PLAN errors as needed).
+      - [ ] `integration-kysely` uses the helper (no hand-rolled envelope).
+      - [ ] Tests cover the helper + at least one migrated call site.
+
+### Milestone 4: Prevent SQL compilation (Phase 3, optional)
+
+**Goal:** Avoid compiling a SQL string that we immediately discard, while keeping the Phase 2 “AST-first plan” shape and reducing reliance on Kysely internals where feasible.
+
+**Tasks:**
+
+- [ ] Define go/no-go criteria for compile-free plan assembly (performance wins vs maintenance/coupling costs).
+- [ ] Investigate/implement a compile-free extraction path for:
+  - `compiled.query` (Kysely op tree root)
+  - `compiled.parameters` (ordering + values) without building `compiled.sql`
+- [ ] Preserve Phase 2 invariants:
+  - stable param ordering/indexing and descriptor alignment
+  - deterministic `meta.refs`
+  - guardrails run on supported query shapes
+- [ ] Add tests asserting compile-free path equivalence (same `QueryAst` + params ordering as the current compiled path for representative shapes).
+- [ ] (Optional) Reduce reliance on Kysely internal node shapes where it’s practical (but only if it doesn’t jeopardize the primary goal above).
 
 ## Test Strategy by Milestone
 
 - **M1:** regression and correctness tests for existing integration behavior.
 - **M2:** lane package unit tests, integration parity tests, and layering validation.
-- **M3 (if implemented):** parity + performance/correctness comparisons against previous flow.
+- **M4 (if implemented):** parity + performance/correctness comparisons against the compiled flow (and confirm SQL string construction is avoided).
 
 ## Close-out (required)
 

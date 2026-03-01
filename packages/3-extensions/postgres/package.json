@@ -18,14 +18,13 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/integration-kysely": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-kysely-lane": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/sql-orm-client": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
-    "kysely": "catalog:",
     "pg": "catalog:"
   },
   "devDependencies": {

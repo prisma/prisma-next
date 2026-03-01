@@ -1,4 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { REDACTED_SQL } from '@prisma-next/sql-kysely-lane';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -6,12 +7,11 @@ const mocks = vi.hoisted(() => ({
   createRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
+  createKyselyLane: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
   validateContract: vi.fn(),
   poolCtor: vi.fn(),
-  dialectCtor: vi.fn(),
-  kyselyCtor: vi.fn(),
 }));
 
 vi.mock('@prisma-next/core-execution-plane/stack', () => ({
@@ -26,6 +26,11 @@ vi.mock('@prisma-next/sql-runtime', () => ({
 
 vi.mock('@prisma-next/sql-contract/validate', () => ({
   validateContract: mocks.validateContract,
+}));
+
+vi.mock('@prisma-next/sql-kysely-lane', () => ({
+  REDACTED_SQL: '/* redacted by @prisma-next/sql-kysely-lane */',
+  createKyselyLane: mocks.createKyselyLane,
 }));
 
 vi.mock('@prisma-next/sql-lane', () => ({
@@ -50,22 +55,6 @@ vi.mock('@prisma-next/adapter-postgres/runtime', () => ({
 
 vi.mock('@prisma-next/driver-postgres/runtime', () => ({
   default: { id: 'driver-postgres' },
-}));
-
-vi.mock('@prisma-next/integration-kysely', () => ({
-  KyselyPrismaDialect: class {
-    constructor(options: unknown) {
-      mocks.dialectCtor(options);
-    }
-  },
-}));
-
-vi.mock('kysely', () => ({
-  Kysely: class {
-    constructor(config: unknown) {
-      mocks.kyselyCtor(config);
-    }
-  },
 }));
 
 vi.mock('pg', () => {
@@ -111,8 +100,7 @@ describe('postgres', () => {
     mocks.driverConnect.mockReset();
     mocks.validateContract.mockReset();
     mocks.poolCtor.mockReset();
-    mocks.dialectCtor.mockReset();
-    mocks.kyselyCtor.mockReset();
+    mocks.createKyselyLane.mockReset();
 
     mocks.createExecutionContext.mockReturnValue({
       contract,
@@ -131,6 +119,11 @@ describe('postgres', () => {
     mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
+    mocks.createKyselyLane.mockReturnValue({
+      build: vi.fn(),
+      whereExpr: vi.fn(),
+      redactedSql: REDACTED_SQL,
+    });
   });
 
   it('defers stack instantiation runtime creation and pool creation until runtime is called', () => {
@@ -152,18 +145,24 @@ describe('postgres', () => {
     expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
   });
 
-  it('creates kysely lane from runtime and contract', () => {
+  it('exposes lane-owned build-only kysely surface', () => {
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
     });
-    const runtime = db.runtime();
 
-    db.kysely(runtime);
+    expect(mocks.createKyselyLane).toHaveBeenCalledTimes(1);
+    expect(typeof db.kysely.build).toBe('function');
+    expect(typeof db.kysely.whereExpr).toBe('function');
+  });
 
-    expect(mocks.dialectCtor).toHaveBeenCalledTimes(1);
-    expect(mocks.dialectCtor).toHaveBeenCalledWith({ runtime, contract });
-    expect(mocks.kyselyCtor).toHaveBeenCalledTimes(1);
+  it('exposes lane redacted sql marker', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(db.kysely.redactedSql).toBe(REDACTED_SQL);
   });
 
   it('memoizes runtime instance', () => {

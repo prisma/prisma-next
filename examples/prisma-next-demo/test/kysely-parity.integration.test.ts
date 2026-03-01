@@ -147,7 +147,7 @@ describe('Kysely parity integration', () => {
           });
           const posts = await getUserPosts('user_001', runtime);
           expect(posts).toHaveLength(1);
-          expect(posts[0]!.title).toBe('First Post');
+          expect(posts[0]?.['title']).toBe('First Post');
         } finally {
           await runtime.close();
         }

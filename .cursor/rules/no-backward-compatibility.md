@@ -23,6 +23,7 @@ alwaysApply: false
 - Update design docs to reflect the current state (not the transition)
 - Update tests to only test the current approach
 - Delete obsolete examples or fixtures
+- In Kysely lane transforms, support only the current Kysely AST node shapes
 
 ## Rationale
 

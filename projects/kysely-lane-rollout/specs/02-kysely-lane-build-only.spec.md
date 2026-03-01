@@ -45,16 +45,20 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
     - `paramDescriptors: ReadonlyArray<ParamDescriptor>` aligned to those indices
 - ORM must be able to consume `WhereArg` without importing Kysely types.
 - Consumers pass `ToWhereExpr` as-is; ORM performs the conversion (no manual `.toWhereExpr()` at call sites).
+- Phase 2 consumption semantics are **literal-normalizing**: ORM validates bound payload invariants, then substitutes `ParamRef` entries with `LiteralExpr` values during normalization. `paramDescriptors` are validated for alignment and indexing integrity but are not propagated into ORM plan metadata in this phase.
+- **Developer experience requirement**: examples must demonstrate this interop using the Kysely lane (not hand-authored PN AST). The intended UX is that users author a filter using Kysely-shaped APIs and pass a lane-produced `ToWhereExpr` into `.where(...)` without writing `{ expr, params, paramDescriptors }` inline.
+- **Important boundary**: the ORM client must not accept a full `SqlQueryPlan` as a shorthand for filters. Passing plans into ORM widens the interop surface beyond the intended `WhereArg` protocol. Instead, the lane should offer an ergonomic helper that returns `ToWhereExpr` from Kysely-authored filters (e.g. `db.kysely.whereExpr(...)`).
 
 ### 3) Postgres convenience client exposes build-only Kysely surface
 
 - Update `@prisma-next/postgres` to expose `db.kysely` as a **build-only** authoring surface (no runtime argument).
-- If an execution-capable Kysely attachment is still required for migration, expose it as a **separate, clearly named** API so `db.kysely` remains build-only (example name: `db.kyselyRuntime(runtime)`).
+- In this phase, do **not** expose a public execution-capable Kysely API from `@prisma-next/postgres`.
 
-### 4) Re-scope `@prisma-next/integration-kysely`
+### 4) Remove vestigial `@prisma-next/integration-kysely`
 
-- `@prisma-next/integration-kysely` becomes “runtime attachment only” (dialect/driver/connection).
-- It must delegate transformer/guardrails/lane planning responsibilities to `@prisma-next/sql-kysely-lane` (or stop exposing them).
+- Remove `@prisma-next/integration-kysely` from the workspace for Phase 2.
+- Move/retain all useful lane responsibilities in `@prisma-next/sql-kysely-lane` and Postgres composition-root wiring in `@prisma-next/postgres`.
+- For unsupported Kysely kinds in build paths, fail fast with stable structured errors (no raw SQL fallback behavior in Phase 2).
 
 ### 5) Preserve behavior (no coverage regressions)
 
@@ -80,19 +84,22 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
 
 # Acceptance Criteria
 
-- [ ] **Lane exists**: `@prisma-next/sql-kysely-lane` is present in `packages/2-sql/4-lanes/` with a clear public API for building `SqlQueryPlan<Row>` from build-only Kysely-authored queries.
-- [ ] **No runtime dependency**: `@prisma-next/sql-kysely-lane` does not depend on `@prisma-next/sql-runtime`; `pnpm lint:deps` passes.
-- [ ] **Build-only types**: `db.kysely` (and any exported build-only lane types) do not expose execution entrypoints in their public TypeScript types.
-- [ ] **Execution backstop**: runtime execution via `any` casts throws deterministically (tests cover at least one blocked path).
-- [ ] **Interop protocol**: `WhereArg`/`ToWhereExpr` exist in `@prisma-next/sql-relational-core`; `ToWhereExpr.toWhereExpr()` is zero-arg and returns `{expr, params, paramDescriptors}` with local param indices starting at 1.
-- [ ] **ORM consumption**: ORM accepts `WhereArg` and handles:
+- [x] **Lane exists**: `@prisma-next/sql-kysely-lane` is present in `packages/2-sql/4-lanes/` with a clear public API for building `SqlQueryPlan<Row>` from build-only Kysely-authored queries.
+- [x] **No runtime dependency**: `@prisma-next/sql-kysely-lane` does not depend on `@prisma-next/sql-runtime`; `pnpm lint:deps` passes.
+- [x] **Build-only types**: `db.kysely` (and any exported build-only lane types) do not expose execution entrypoints in their public TypeScript types.
+- [x] **Execution backstop**: runtime execution via `any` casts throws deterministically (tests cover at least one blocked path).
+- [x] **Interop protocol**: `WhereArg`/`ToWhereExpr` exist in `@prisma-next/sql-relational-core`; `ToWhereExpr.toWhereExpr()` is zero-arg and returns `{expr, params, paramDescriptors}` with local param indices starting at 1.
+- [x] **ORM consumption**: ORM accepts `WhereArg` and handles:
   - param-free bare `WhereExpr`
-  - bound `ToWhereExpr` payloads, including param reindexing when composing into a plan
-- [ ] **SQL redaction (Option A)**: compilation (if reachable) yields a stub SQL string while preserving operation tree and parameter ordering/values; tests confirm this.
-- [ ] **Integration re-scope**: `@prisma-next/integration-kysely` no longer owns transformer/guardrail logic (moved to lane or delegated).
-- [ ] **Parity preserved**: existing transformer/guardrail tests continue to pass (or are ported to the new lane package without reducing coverage).
-- [ ] **Refs determinism**: extracted lane emits `meta.refs` deterministically with dedup semantics (tests cover stability across equivalent query shapes).
-- [ ] **Guardrail breadth**: extracted guardrail traversal handles broader supported-node coverage with explicit tests for previously narrow traversal paths.
+  - bound `ToWhereExpr` payloads, including strict payload validation and `ParamRef -> LiteralExpr` normalization
+- [x] **Interop demo uses Kysely lane authoring (via `ToWhereExpr`)**: the demo app shows `.where(...)` consuming a Kysely-authored filter via a lane helper that returns `ToWhereExpr` (e.g. `where(kysely.whereExpr(kysely.selectFrom(...).where(...)))` or an equivalent helper), rather than:
+  - constructing PN AST nodes by hand, or
+  - passing a full `SqlQueryPlan` into `.where(...)`.
+- [x] **SQL redaction (Option A)**: compilation (if reachable) yields a stub SQL string while preserving operation tree and parameter ordering/values; tests confirm this.
+- [x] **Integration re-scope**: `@prisma-next/integration-kysely` no longer owns transformer/guardrail logic (moved to lane or delegated).
+- [x] **Parity preserved**: existing transformer/guardrail tests continue to pass (or are ported to the new lane package without reducing coverage).
+- [x] **Refs determinism**: extracted lane emits `meta.refs` deterministically with dedup semantics (tests cover stability across equivalent query shapes).
+- [x] **Guardrail breadth**: extracted guardrail traversal handles broader supported-node coverage with explicit tests for previously narrow traversal paths.
 
 # Other Considerations
 
@@ -123,8 +130,13 @@ No new data handling is expected. Ensure parameter descriptor and param handling
 
 # Open Questions
 
-1. **Unsupported Kysely kinds** in runtime attachment: keep raw fallback behavior or fail fast with stable error codes?
-2. **Public surface naming**: keep `db.kysely` build-only and introduce `db.kyselyRuntime(runtime)` (or similar) for execution-capable attachment—what name best avoids confusion?
-3. **Interop strictness**: should ORM reject paramful bare `WhereExpr` immediately (as proposed) or allow it and normalize later?
-4. **Minimum supported Kysely subset** for the build-only surface in Phase 2: exactly “what exists today”, or do we need to prune/clarify support before extraction?
+1. **Phase 3 interop shape**: should ORM evolve from literal-normalizing `ToWhereExpr` consumption to a bound-param-preserving composition model with descriptor propagation?
+2. **Minimum supported Kysely subset** for the build-only surface in Phase 2: exactly “what exists today”, or do we need to prune/clarify support before extraction?
+
+# Decision Log
+
+- Unsupported Kysely kinds in runtime attachment paths: **fail fast** with stable structured errors (no raw fallback).
+- Postgres public API for this phase: `db.kysely` remains **build-only only**; no execution-capable public Kysely API is introduced.
+- `db.kysely` in `@prisma-next/postgres` exports the **lane-owned** build-only surface from `@prisma-next/sql-kysely-lane` (not raw Kysely types).
+- ORM `WhereArg` handling in this phase uses **literal-normalizing** consumption for `ToWhereExpr` payloads (strictly validated, then normalized to param-free `WhereExpr`).
 

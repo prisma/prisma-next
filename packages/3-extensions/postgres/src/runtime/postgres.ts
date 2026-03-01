@@ -1,7 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import type {
   ExtractCodecTypes,
   ExtractOperationTypes,
@@ -9,6 +8,7 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import { createKyselyLane, type KyselyQueryLane } from '@prisma-next/sql-kysely-lane';
 import type { SelectBuilder } from '@prisma-next/sql-lane';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
@@ -32,7 +32,6 @@ import {
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import { Kysely } from 'kysely';
 import { type Client, Pool } from 'pg';
 import {
   type PostgresBinding,
@@ -63,7 +62,7 @@ export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
     ExtractCodecTypes<TContract>,
     ExtractOperationTypes<TContract>
   >;
-  kysely(runtime: Runtime): Kysely<KyselifyContract<TContract>>;
+  readonly kysely: KyselyQueryLane<TContract>;
   readonly schema: SchemaHandle<
     TContract,
     ExtractCodecTypes<TContract>,
@@ -242,11 +241,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
 
   return {
     sql,
-    kysely(runtime: Runtime) {
-      return new Kysely<KyselifyContract<TContract>>({
-        dialect: new KyselyPrismaDialect({ runtime, contract }),
-      });
-    },
+    kysely: createKyselyLane(contract),
     schema,
     orm,
     context,
