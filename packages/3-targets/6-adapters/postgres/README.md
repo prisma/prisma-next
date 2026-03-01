@@ -156,7 +156,7 @@ flowchart TD
 - [ADR 068 - Error mapping to RuntimeError](../../../../docs/architecture%20docs/adrs/ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md)
 - [ADR 112 - Target Extension Packs](../../../../docs/architecture%20docs/adrs/ADR%20112%20-%20Target%20Extension%20Packs.md)
 - [ADR 114 - Extension codecs & branded types](../../../../docs/architecture%20docs/adrs/ADR%20114%20-%20Extension%20codecs%20&%20branded%20types.md)
-- [ADR 159 - Postgres JSON and JSONB typed columns](../../../../docs/architecture%20docs/adrs/ADR%20159%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md)
+- [ADR 163 - Postgres JSON and JSONB typed columns](../../../../docs/architecture%20docs/adrs/ADR%20163%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md)
 
 ## Usage
 

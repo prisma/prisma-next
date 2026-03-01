@@ -4,7 +4,7 @@ description: >
   Create a new transient project workspace under projects/<project>/ (folders + optional stub docs),
   then hand off to drive-create-spec / drive-generate-plan.
 metadata:
-  version: "2026.2.24"
+  version: "2026.3.1"
 ---
 
 # Create Project Workspace
@@ -39,6 +39,7 @@ Create (if missing):
 Notes:
 
 - `projects/{project}/` is **transient**. At close-out: verify acceptance criteria, migrate long-lived docs (incl. ADRs for system changes) into `docs/`, then delete `projects/{project}/`.
+- Because `projects/{project}/` is deleted, close-out must also **strip repo-wide references** to transient project docs (e.g. links in `docs/**`, READMEs, scripts) by replacing them with canonical `docs/` links or removing them.
 - Project-level artifacts live at the project root:
   - Spec: `projects/{project}/spec.md`
   - Plan: `projects/{project}/plan.md`
@@ -103,6 +104,7 @@ _Drafted via drive-generate-plan. Replace this placeholder._
 
 - [ ] Verify all acceptance criteria in `projects/{project}/spec.md`
 - [ ] Migrate long-lived docs into `docs/`
+- [ ] Strip repo-wide references to `projects/{project}/**` (replace with canonical `docs/` links or remove)
 - [ ] Delete `projects/{project}/`
 ```
 

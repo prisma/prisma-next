@@ -4,7 +4,7 @@ description: Generate an execution plan from a spec, with milestones, tasks, and
   acceptance criteria. Use when the user wants to plan a project, break a spec into milestones,
   generate tasks from a spec, or create an execution plan. Optionally creates a Linear project.
 metadata:
-  version: "2026.2.23"
+  version: "2026.3.1"
 ---
 
 # Generate Plan
@@ -76,6 +76,7 @@ Given a spec, generate the full plan:
 6. **Add a close-out task (required).** The final milestone (or final tasks) must include:
    - Verify all acceptance criteria are met (and link to the tests/manual checks)
    - Finalize ADRs / long-lived documentation and migrate it into `docs/`
+   - Strip repo-wide references to `projects/{project}/**` (replace with canonical `docs/` links or remove)
    - Delete `projects/{project}/` (everything under it is transient)
    - If the project spec was merged, the close-out work is often done as a final PR that performs the doc migration + deletion
 

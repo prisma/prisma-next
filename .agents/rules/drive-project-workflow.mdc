@@ -32,7 +32,7 @@ The lifecycle for a project is:
 
 3. **Stakeholder verification**: Verify with the stakeholder (PM / requester) that the objectives and acceptance criteria in the spec were met.
 
-4. **Close-out (final PR)**: Migrate long-lived docs into `docs/`, then delete `projects/<project>/` (the close-out PR removes the transient project directory).
+4. **Close-out (final PR)**: Migrate long-lived docs into `docs/`, strip repo-wide references to `projects/<project>/**` (replace with canonical `docs/` links or remove), then delete `projects/<project>/` (the close-out PR removes the transient project directory).
 
 ## Keep project docs current during execution
 
@@ -69,6 +69,7 @@ Anything under `projects/` is **temporary** and should be deleted when the work 
   - Verify all acceptance criteria are met
   - Finalize ADRs and any long-lived documentation
   - Migrate finalized ADRs/docs into `docs/` (e.g. `docs/architecture docs/adrs/` or relevant subsystem docs)
+  - Strip repo-wide references to `projects/<project>/**` (replace with canonical `docs/` links or remove)
   - Delete `projects/<project>/` (specs, plans, notes, assets)
 
 ## Collaboration + PR expectations

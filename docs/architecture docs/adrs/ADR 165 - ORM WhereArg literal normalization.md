@@ -1,4 +1,4 @@
-# ADR 162 — ORM `WhereArg` literal normalization
+# ADR 165 — ORM `WhereArg` literal normalization
 
 ## Context
 

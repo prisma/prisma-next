@@ -76,7 +76,7 @@ Contract artifacts are `contract.json` and `contract.d.ts`. Static roots are `sq
 
 - **[Query Lanes](../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)** — DSL and ORM authoring surfaces
 - **[Runtime & Plugin Framework](../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)** — Runtime execution pipeline
-- **[ADR 161 - Repository Layer](../../docs/architecture%20docs/adrs/ADR%20161%20-%20Repository%20Layer.md)** — Multi-query repository orchestration layer
+- **[ADR 164 - Repository Layer](../../docs/architecture%20docs/adrs/ADR%20164%20-%20Repository%20Layer.md)** — Multi-query repository orchestration layer
 
 ## ORM Client Examples
 

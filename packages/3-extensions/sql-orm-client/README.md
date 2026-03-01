@@ -52,5 +52,5 @@ const posts = await db.posts
 ## Related Docs
 
 - [Architecture Overview](../../../docs/Architecture%20Overview.md)
-- [ADR 161 - Repository Layer](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Repository%20Layer.md)
+- [ADR 164 - Repository Layer](../../../docs/architecture%20docs/adrs/ADR%20164%20-%20Repository%20Layer.md)
 - [Query Lanes Subsystem](../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)

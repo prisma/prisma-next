@@ -1,7 +1,6 @@
-# ADR 162 — Typed default literal pipeline and extensibility
+# ADR 167 — Typed default literal pipeline and extensibility
 
 ## Context
-
 PR #167 introduced strictly-typed literal defaults for SQL columns, replacing opaque `expression` strings with typed `value` payloads. The pipeline now encodes, serializes, validates, verifies, and renders literal defaults as typed values end-to-end.
 
 This ADR documents the current design, its JSON-first limitation, and outlines what would be needed for future extensibility.

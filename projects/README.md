@@ -23,5 +23,5 @@ Anything in `projects/` is **transient**: once the project is complete, migrate 
    - Validate the spec with the PM/stakeholders and the plan with the team.
 2. **Execution**: Implement tasks via as many follow-on branches/PRs as needed. Keep project docs and Linear up to date.
 3. **Stakeholder verification**: Confirm objectives/acceptance criteria are met.
-4. **Close-out**: Finalize long-lived docs into `docs/`, then the last PR deletes `projects/<project>/`.
+4. **Close-out**: Finalize long-lived docs into `docs/`, strip repo-wide references to `projects/<project>/**` (replace with canonical `docs/` links or remove), then the last PR deletes `projects/<project>/`.
 
