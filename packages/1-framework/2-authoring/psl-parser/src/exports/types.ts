@@ -16,10 +16,13 @@ export type {
   PslEnumValue,
   PslField,
   PslFieldAttribute,
+  PslIndexConstraint,
   PslModel,
   PslModelAttribute,
   PslNamedTypeDeclaration,
   PslPosition,
+  PslReferentialAction,
   PslSpan,
   PslTypesBlock,
+  PslUniqueConstraint,
 } from '../types';
