@@ -68,6 +68,7 @@ Implement a reusable PSL parser library that can be consumed by emit tooling and
 Build the fixture-driven parity harness and expand coverage across the **already-supported PSL surface**, without adding new interpretation behavior yet. In the same milestone, produce an explicit inventory of TS-authoring behaviors that PSL cannot yet express (to guide the next milestone slices).
 
 **Spec:** `projects/psl-contract-authoring/specs/Milestone 3 - Fixture-driven parity harness.spec.md`
+**Execution Plan:** `projects/psl-contract-authoring/plans/Milestone 3 - Fixture-driven parity harness.plan.md`
 
 **Tasks:**
 
