@@ -151,6 +151,29 @@ model User {
     ).toBe(true);
   });
 
+  it('returns diagnostic for unsupported trailing model attribute arguments', () => {
+    const schema = `
+model Post {
+  id Int @id
+  userId Int
+  @@index([userId], map: "post_user_idx")
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(false);
+    const diagnostic = result.diagnostics.find(
+      (entry) =>
+        entry.code === 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE' &&
+        entry.message.includes('Unsupported model attribute arguments'),
+    );
+    expect(diagnostic).toBeDefined();
+  });
+
   it('is deterministic for identical input', () => {
     const schema = `
 model User {

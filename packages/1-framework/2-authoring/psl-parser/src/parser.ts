@@ -342,6 +342,19 @@ function parseModelAttribute(
   const argsRaw = attributeMatch[2] ?? '';
   const args = splitTopLevel(argsRaw, ',');
   const fieldsArg = args[0]?.trim() ?? '';
+  const trailingArgs = args
+    .slice(1)
+    .map((arg) => arg.trim())
+    .filter((arg) => arg.length > 0);
+  if (trailingArgs.length > 0) {
+    pushDiagnostic(context, {
+      code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
+      message: `Unsupported model attribute arguments in "${line}"`,
+      span: createTrimmedLineSpan(context, lineIndex),
+    });
+    return undefined;
+  }
+
   if (!fieldsArg.startsWith('[') || !fieldsArg.endsWith(']')) {
     pushDiagnostic(context, {
       code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
