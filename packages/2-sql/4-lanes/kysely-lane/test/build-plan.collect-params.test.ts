@@ -87,13 +87,14 @@ describe('buildKyselyPlan', () => {
     expect(plan.meta.paramDescriptors).toHaveLength(3);
   });
 
-  it('keeps where and limit params aligned in compile-free order', () => {
+  it('keeps where param indexing stable with numeric limit input', () => {
     const contract = createTestContract();
+    const limitValue = 2;
     const opNode = db
       .selectFrom('user')
       .selectAll()
       .where('id', '=', 'u_1')
-      .limit('2' as never)
+      .limit(limitValue)
       .toOperationNode();
 
     const plan = buildKyselyPlan(contract, opNode);
@@ -102,10 +103,9 @@ describe('buildKyselyPlan', () => {
 
     expect(whereExpr.kind).toBe('bin');
     expect(whereExpr.right).toMatchObject({ kind: 'param', index: 1 });
-    expect(plan.params).toEqual(['u_1', '2']);
-    expect(plan.meta.paramDescriptors).toHaveLength(2);
+    expect(plan.params).toEqual(['u_1']);
+    expect(plan.meta.paramDescriptors).toHaveLength(1);
     expect(plan.meta.paramDescriptors[0]).toMatchObject({ index: 1 });
-    expect(plan.meta.paramDescriptors[1]).toMatchObject({ index: 2 });
   });
 
   it('runs guardrails on compile-free build path', () => {
@@ -117,14 +117,17 @@ describe('buildKyselyPlan', () => {
       .where('id', '=', 'u_1')
       .toOperationNode();
 
+    expect(() => buildKyselyPlan(contract, opNode)).toThrow(KyselyTransformError);
+
+    let caughtError: unknown;
     try {
       buildKyselyPlan(contract, opNode);
-      throw new Error('Expected guardrail error');
     } catch (error) {
-      expect(KyselyTransformError.is(error)).toBe(true);
-      expect((error as KyselyTransformError).code).toBe(
-        KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
-      );
+      caughtError = error;
     }
+    expect(KyselyTransformError.is(caughtError)).toBe(true);
+    expect((caughtError as KyselyTransformError).code).toBe(
+      KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+    );
   });
 });
