@@ -38,11 +38,13 @@ describe('prismaContract provider helper', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.targetFamily).toBe('sql');
-    expect(result.value.target).toBe('postgres');
-    expect(result.value.storage).toMatchObject({
-      tables: {
-        user: expect.any(Object),
+    expect(result.value).toMatchObject({
+      targetFamily: 'sql',
+      target: 'postgres',
+      storage: {
+        tables: {
+          user: expect.any(Object),
+        },
       },
     });
   });
