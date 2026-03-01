@@ -342,7 +342,7 @@ describe('extensionPacks', () => {
       })
       .build();
 
-    expect(contract.extensionPacks?.pgvector).toEqual({});
+    expect(contract.extensionPacks?.['pgvector']).toEqual({});
   });
 
   it('preserves pre-populated extension namespace entries', () => {
@@ -357,7 +357,7 @@ describe('extensionPacks', () => {
     ).state.extensionPacks = { pgvector: { enabled: true } };
 
     const contract = builder.build();
-    expect(contract.extensionPacks?.pgvector).toEqual({ enabled: true });
+    expect(contract.extensionPacks?.['pgvector']).toEqual({ enabled: true });
   });
 });
 
@@ -375,12 +375,12 @@ describe('builder branch guards', () => {
         };
       }
     ).state;
-    state.models.Ghost = undefined;
-    const userModel = state.models.User;
+    state.models['Ghost'] = undefined;
+    const userModel = state.models['User'];
     if (!userModel) {
       throw new Error('Expected user model state to exist');
     }
-    userModel.fields.empty = '';
+    userModel.fields['empty'] = '';
 
     const contract = builder.build();
     expect(contract.models.User.fields.id).toEqual({ column: 'id' });
@@ -415,11 +415,16 @@ describe('builder branch guards', () => {
           }),
       );
 
-    (
+    const state = (
       builder as unknown as {
-        state: { models: Record<string, { relations: Record<string, unknown> }> };
+        state: { models: Record<string, { relations: Record<string, unknown> } | undefined> };
       }
-    ).state.models.Post.relations = { user: undefined };
+    ).state;
+    const postModel = state.models['Post'];
+    if (!postModel) {
+      throw new Error('Expected post model state to exist');
+    }
+    postModel.relations = { user: undefined };
 
     const contract = builder.build();
     expect(contract.relations.post).toEqual({});
