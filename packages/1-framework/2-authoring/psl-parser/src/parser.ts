@@ -1,3 +1,4 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ParsePslDocumentInput,
   ParsePslDocumentResult,
@@ -144,6 +145,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     (typesBlock?.declarations ?? []).map((declaration) => declaration.name),
   );
   const modelNames = new Set(models.map((model) => model.name));
+  const enumNames = new Set(enums.map((enumBlock) => enumBlock.name));
   for (const declaration of typesBlock?.declarations ?? []) {
     if (SCALAR_TYPES.has(declaration.name)) {
       pushDiagnostic(context, {
@@ -157,6 +159,14 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       pushDiagnostic(context, {
         code: 'PSL_INVALID_TYPES_MEMBER',
         message: `Named type "${declaration.name}" conflicts with model name "${declaration.name}"`,
+        span: declaration.span,
+      });
+      continue;
+    }
+    if (enumNames.has(declaration.name)) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_TYPES_MEMBER',
+        message: `Named type "${declaration.name}" conflicts with enum name "${declaration.name}"`,
         span: declaration.span,
       });
     }
@@ -173,6 +183,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       if (
         hasRelationAttribute ||
         modelNames.has(field.typeName) ||
+        enumNames.has(field.typeName) ||
         SCALAR_TYPES.has(field.typeName)
       ) {
         return field;
@@ -189,7 +200,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     sourceId: input.sourceId,
     models: normalizedModels,
     enums,
-    ...(typesBlock ? { types: typesBlock } : {}),
+    ...ifDefined('types', typesBlock),
     span: {
       start: createPosition(context, 0, 0),
       end: createPosition(
@@ -511,8 +522,8 @@ function parseRelationAttribute(
     kind: 'relation',
     fields,
     references,
-    ...(onDelete ? { onDelete } : {}),
-    ...(onUpdate ? { onUpdate } : {}),
+    ...ifDefined('onDelete', onDelete),
+    ...ifDefined('onUpdate', onUpdate),
     span: createTrimmedLineSpan(context, lineIndex),
   };
 }

@@ -188,4 +188,40 @@ model User {
       ]),
     );
   });
+
+  it('returns diagnostics when named types collide with enum names', () => {
+    const schema = `
+types {
+  Role = String
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id Int @id
+  role Role
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(false);
+    const messages = result.diagnostics
+      .filter((entry) => entry.code === 'PSL_INVALID_TYPES_MEMBER')
+      .map((entry) => entry.message);
+    expect(messages).toEqual(
+      expect.arrayContaining([expect.stringContaining('conflicts with enum name "Role"')]),
+    );
+
+    const userModel = result.ast.models.find((model) => model.name === 'User');
+    const roleField = userModel?.fields.find((field) => field.name === 'role');
+    expect(roleField?.typeName).toBe('Role');
+    expect(roleField?.typeRef).toBeUndefined();
+  });
 });

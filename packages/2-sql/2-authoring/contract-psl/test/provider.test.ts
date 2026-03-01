@@ -2,8 +2,17 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as interpreter from '../src/interpreter';
 import { prismaContract } from '../src/provider';
+
+vi.mock('../src/interpreter', async () => {
+  const actual = await vi.importActual<typeof import('../src/interpreter')>('../src/interpreter');
+  return {
+    ...actual,
+    interpretPslDocumentToSqlContractIR: vi.fn(actual.interpretPslDocumentToSqlContractIR),
+  };
+});
 
 describe('prismaContract provider helper', () => {
   const originalCwd = process.cwd();
@@ -107,10 +116,16 @@ describe('prismaContract provider helper', () => {
 
     process.chdir(tempDir);
     const contract = prismaContract('./schema.prisma', { target });
+    vi.mocked(interpreter.interpretPslDocumentToSqlContractIR).mockClear();
     const result = await contract.source();
 
     expect(contract.output).toBeUndefined();
     expect(result.ok).toBe(true);
+    expect(interpreter.interpretPslDocumentToSqlContractIR).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target,
+      }),
+    );
   });
 
   it('returns PSL_SCHEMA_READ_FAILED diagnostics when schema file is missing', async () => {

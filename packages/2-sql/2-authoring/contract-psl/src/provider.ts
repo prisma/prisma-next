@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import type { ContractConfig } from '@prisma-next/core-control-plane/config-types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
 import { interpretPslDocumentToSqlContractIR } from './interpreter';
@@ -43,9 +44,9 @@ export function prismaContract(
 
       return interpretPslDocumentToSqlContractIR({
         document,
-        ...(options?.target ? { target: options.target } : {}),
+        ...ifDefined('target', options?.target),
       });
     },
-    ...(options?.output ? { output: options.output } : {}),
+    ...ifDefined('output', options?.output),
   };
 }

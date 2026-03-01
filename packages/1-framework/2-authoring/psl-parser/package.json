@@ -14,7 +14,9 @@
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@prisma-next/utils": "workspace:*"
+  },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
