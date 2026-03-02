@@ -52,7 +52,7 @@ function convertColumn(
   const nativeType = expandNativeType
     ? expandNativeType({
         nativeType: column.nativeType,
-        ...ifDefined('codecId', column.codecId),
+        codecId: column.codecId,
         ...ifDefined('typeParams', column.typeParams),
       })
     : column.nativeType;
