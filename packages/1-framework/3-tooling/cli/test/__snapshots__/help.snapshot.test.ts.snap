@@ -88,7 +88,8 @@ exports[`help text snapshots > formats db update help 1`] = `
 │
 │ Compares your database schema to the emitted contract and applies the
 │ necessary
-│ changes. Your database must be signed first (run \`prisma-next db init\`).
+│ changes. Works on any database, whether or not it has been initialized with
+│ \`db init\`.
 │ Use --plan to preview operations before applying.
 └
 "

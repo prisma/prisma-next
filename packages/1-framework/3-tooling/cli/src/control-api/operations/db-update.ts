@@ -1,10 +1,8 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import { errorMarkerRequired } from '@prisma-next/core-control-plane/errors';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
-  MigrationPlan,
   MigrationPlannerResult,
   MigrationRunnerResult,
   TargetMigrationsCapability,
@@ -41,10 +39,12 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
 }
 
 /**
- * Executes the db update operation: readMarker → introspect → plan → (optionally) apply → marker.
+ * Executes the db update operation: introspect → plan → (optionally) apply → marker.
  *
- * Unlike db init, db update requires an existing marker and keeps all runner execution checks
- * enabled because the database may have drifted since the last marker write.
+ * db update is a pure reconciliation command: it introspects the live schema, plans the diff
+ * to the destination contract, and applies operations. The marker is bookkeeping only — written
+ * after apply so that `verify` and `db init` can reference it, but never read or validated
+ * by db update itself. The runner creates the marker table if it does not exist.
  */
 export async function executeDbUpdate<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbUpdateOptions<TFamilyId, TTargetId>,
@@ -54,36 +54,6 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 
   const planner = migrations.createPlanner(familyInstance);
   const runner = migrations.createRunner(familyInstance);
-
-  // readMarker and introspect are sequential by design: the Postgres driver serializes
-  // queries on a single connection, so Promise.all would not yield actual I/O parallelism
-  // with the current driver architecture. A missing marker is fatal for db update — the
-  // user must run `prisma-next db init` first.
-  const readMarkerSpanId = 'readMarker';
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanStart',
-    spanId: readMarkerSpanId,
-    label: 'Checking database signature',
-  });
-  const marker = await familyInstance.readMarker({ driver });
-
-  if (!marker) {
-    onProgress?.({
-      action: 'dbUpdate',
-      kind: 'spanEnd',
-      spanId: readMarkerSpanId,
-      outcome: 'error',
-    });
-    throw errorMarkerRequired();
-  }
-
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanEnd',
-    spanId: readMarkerSpanId,
-    outcome: 'ok',
-  });
 
   const introspectSpanId = 'introspect';
   onProgress?.({
@@ -137,17 +107,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     outcome: 'ok',
   });
 
-  const migrationPlan: MigrationPlan = {
-    ...plannerResult.plan,
-    ...(marker
-      ? {
-          origin: {
-            storageHash: marker.storageHash,
-            profileHash: marker.profileHash,
-          },
-        }
-      : {}),
-  };
+  const migrationPlan = plannerResult.plan;
 
   if (mode === 'plan') {
     const planSql =
@@ -158,14 +118,6 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
         operations: stripOperations(migrationPlan.operations),
         ...(planSql !== undefined ? { sql: planSql } : {}),
       },
-      ...(marker
-        ? {
-            origin: {
-              storageHash: marker.storageHash,
-              ...ifDefined('profileHash', marker.profileHash),
-            },
-          }
-        : {}),
       destination: {
         storageHash: migrationPlan.destination.storageHash,
         ...ifDefined('profileHash', migrationPlan.destination.profileHash),
@@ -203,7 +155,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 
   // db update keeps all execution checks enabled (the runner default). Unlike db init, which
   // disables checks because it plans and applies from a fresh introspection, db update operates
-  // on existing databases that may have drifted since the last marker write.
+  // on databases that may have drifted since the last marker write.
   const runnerResult: MigrationRunnerResult = await runner.execute({
     plan: migrationPlan,
     driver,
@@ -242,14 +194,6 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     plan: {
       operations: stripOperations(migrationPlan.operations),
     },
-    ...(marker
-      ? {
-          origin: {
-            storageHash: marker.storageHash,
-            ...ifDefined('profileHash', marker.profileHash),
-          },
-        }
-      : {}),
     destination: {
       storageHash: migrationPlan.destination.storageHash,
       ...ifDefined('profileHash', migrationPlan.destination.profileHash),

@@ -1,10 +1,10 @@
 # Summary
 
-Add `prisma-next db update` as the contract-driven reconciliation command for databases already managed by a contract marker. The command plans and applies additive, widening, and destructive schema changes, exposes plan/apply modes with JSON output, and preserves runner safety checks and marker/ledger audit behavior.
+Add `prisma-next db update` as the contract-driven reconciliation command for existing databases. The command plans and applies additive, widening, and destructive schema changes, exposes plan/apply modes with JSON output, and preserves runner safety checks and marker/ledger audit behavior. Works on any database, whether or not it has been initialized with `db init`.
 
 # Description
 
-This branch implements a new CLI command, `prisma-next db update`, and a matching control API operation to reconcile an existing, signed (marker-managed) database to the current emitted contract. The flow requires a contract marker, introspects the live schema, plans a migration allowing additive, widening, and destructive operation classes, and either outputs a dry-run plan or applies the plan via the migration runner. It also adds supporting docs, demos, and end-to-end tests that mirror the scenarios in `DEMO.md`.
+This branch implements a new CLI command, `prisma-next db update`, and a matching control API operation to update a database schema to match the current emitted contract. The command introspects the live schema, plans a migration allowing additive, widening, and destructive operation classes, and either outputs a dry-run plan or applies the plan via the migration runner. The marker table is created if missing and updated regardless of prior content. It also adds supporting docs, demos, and end-to-end tests that mirror the scenarios in `DEMO.md`.
 
 # Requirements
 
@@ -15,9 +15,8 @@ This branch implements a new CLI command, `prisma-next db update`, and a matchin
 - Load config and resolve the emitted contract JSON from `config.contract.output` or default to `src/prisma/contract.json`.
 - Require a database connection string from `--db` or `config.db.connection`.
 - Reject unsupported JSON format `ndjson` with a structured CLI error.
-- Require a contract marker in the database; if missing, fail with `MARKER_REQUIRED` and guidance to run `db init`.
+- Create the contract marker table if missing; update the marker regardless of prior content. No preconditions required.
 - Introspect the live schema and plan reconciliation against the emitted contract using a policy that allows additive, widening, and destructive operations.
-- Attach marker hashes as plan origin before execution to enforce drift safety in the runner.
 - In `--plan` mode, return a deterministic plan summary without applying changes.
 - In `--plan` mode, emit SQL DDL alongside the plan summary when the target belongs to the SQL family.
 - In apply mode, execute with full runner checks enabled and update marker + ledger through the runner.
@@ -43,7 +42,7 @@ This branch implements a new CLI command, `prisma-next db update`, and a matchin
 - [ ] `prisma-next db update --plan` returns a deterministic plan with operation IDs, labels, classes, and destination hash.
 - [ ] `prisma-next db update --plan` emits SQL DDL when the target is in the SQL family.
 - [ ] `prisma-next db update` applies the planned operations and writes a new marker + ledger entry.
-- [ ] Missing markers fail with a structured `MARKER_REQUIRED` error and a `db init` recovery hint.
+- [ ] Missing markers are handled transparently (marker table created automatically, no precondition error).
 - [ ] Planner conflicts return `PLANNING_FAILED` with conflict details.
 - [ ] Runner failures return `RUNNER_FAILED` with a remediation hint.
 - [ ] `--json` returns an `object` envelope; `--json ndjson` fails with a structured CLI error.
@@ -64,7 +63,7 @@ This branch implements a new CLI command, `prisma-next db update`, and a matchin
 
 ## Observability
 
-- Progress spans are emitted for read marker, introspection, planning, apply, and per-operation execution to support CLI progress output.
+- Progress spans are emitted for introspection, planning, apply, and per-operation execution to support CLI progress output.
 - JSON output includes `timings.total` and plan metadata suitable for CI logs.
 
 ## Data Protection

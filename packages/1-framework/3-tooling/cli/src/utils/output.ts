@@ -830,11 +830,6 @@ export interface MigrationCommandResult {
     }[];
     readonly sql?: readonly string[];
   };
-  /** Origin contract identity (present in db-update results, absent in db-init). */
-  readonly origin?: {
-    readonly storageHash: string;
-    readonly profileHash?: string;
-  };
   readonly execution?: {
     readonly operationsPlanned: number;
     readonly operationsExecuted: number;

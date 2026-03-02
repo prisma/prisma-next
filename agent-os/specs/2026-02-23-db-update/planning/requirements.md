@@ -2,11 +2,11 @@
 
 ### Summary
 
-Add `prisma-next db update` as the contract-driven schema reconciliation command for already signed (marker-managed) databases.
+Add `prisma-next db update` as the contract-driven schema reconciliation command for existing databases.
 
 The command must:
 
-- Require an existing DB marker (missing marker fails with clear `db init` guidance).
+- Work on any database, whether or not it has been initialized with `db init`. Create the marker table if missing; update the marker regardless of prior content.
 - Plan from live schema + desired contract, not from authoring lifecycle hints.
 - Allow additive, widening, and destructive operation classes where supported.
 - Reuse existing migration runner safety and audit semantics (lock, checks, marker, ledger).
@@ -18,9 +18,9 @@ The command must:
    - Support `--db`, `--config`, `--plan`, `--json [format]`, `-q`, `-v`, `-vv`, `--timestamps`, `--color/--no-color`.
    - Reject `--json ndjson` (object-only output, same as `db init`).
 
-2. **Marker-gated behavior**
-   - If marker is missing, fail with actionable fix: run `prisma-next db init`.
-   - If marker exists, use marker `{storageHash, profileHash, contractJson}` as origin source of truth.
+2. **Marker behavior**
+   - Marker is optional; create if missing, update regardless of content.
+   - The marker is bookkeeping only — not a precondition for `db update`.
 
 3. **Planning behavior**
    - Input:
@@ -31,24 +31,23 @@ The command must:
    - No reliance on `@deprecated`/`@deleted` hints in this iteration.
 
 4. **Execution behavior**
-   - In apply mode, attach plan origin from marker to enforce marker-origin compatibility in runner.
-   - Keep runner execution checks enabled (precheck/postcheck/idempotency).
+   - In apply mode, keep runner execution checks enabled (precheck/postcheck/idempotency).
    - Preserve runner lock/transaction/verification semantics.
    - On success, marker and ledger are written through existing runner behavior.
 
 5. **Output and errors**
    - Match existing CLI style and structured error envelope conventions.
    - Provide clear error mapping for:
-     - missing marker,
      - planning conflicts,
-     - runner failures (including marker-origin mismatch and policy violations).
+     - runner failures (including policy violations),
+     - destructive changes requiring explicit confirmation.
 
 ### Tests
 
 - Add failing-first CLI integration tests for:
   - help/registration,
   - plan and apply happy paths,
-  - missing marker failure,
+  - fresh database without prior db init,
   - JSON output shape,
   - unsupported JSON format (`ndjson`).
 - Add failing-first planner tests for widening/destructive scenarios and policy gating.

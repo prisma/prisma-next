@@ -25,7 +25,7 @@ withTempDir(({ createTempDir }) => {
     });
 
     it(
-      'fails when marker is missing',
+      'succeeds on a fresh database without prior db init',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const { testSetup, configPath } = await setupDbUpdateFixture(
@@ -34,13 +34,11 @@ withTempDir(({ createTempDir }) => {
             fixtureSubdir,
           );
 
-          await expect(
-            runDbUpdate(testSetup, ['--config', configPath, '--no-color']),
-          ).rejects.toThrow();
-
-          const errorText = consoleErrors.join('\n');
-          expect(errorText).toContain('db init');
-          expect(errorText).toContain('marker');
+          // db update should work on a fresh database without db init
+          consoleOutput.length = 0;
+          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          const planOutput = stripAnsi(consoleOutput.join('\n'));
+          expect(planOutput).toContain('Planned');
         });
       },
       timeouts.spinUpPpgDev,
