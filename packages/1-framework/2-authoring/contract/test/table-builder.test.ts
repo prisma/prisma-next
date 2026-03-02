@@ -335,6 +335,51 @@ describe('TableBuilder', () => {
       ]);
     });
 
+    it('stores index using options with only access method (no name or config)', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('description', { type: textColumn })
+        .index(['description'], { using: 'gin' })
+        .build();
+
+      expect(table.indexes).toEqual([
+        {
+          columns: ['description'],
+          using: 'gin',
+        },
+      ]);
+    });
+
+    it('stores index using options with only name (no using or config)', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('description', { type: textColumn })
+        .index(['description'], { name: 'desc_idx' })
+        .build();
+
+      expect(table.indexes).toEqual([
+        {
+          columns: ['description'],
+          name: 'desc_idx',
+        },
+      ]);
+    });
+
+    it('stores index using options with only config (no name or using)', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('description', { type: textColumn })
+        .index(['description'], { config: { weight: 1 } })
+        .build();
+
+      expect(table.indexes).toEqual([
+        {
+          columns: ['description'],
+          config: { weight: 1 },
+        },
+      ]);
+    });
+
     it('stores index from full index definition object', () => {
       const table = createTable('items')
         .column('id', { type: intColumn, nullable: false })
