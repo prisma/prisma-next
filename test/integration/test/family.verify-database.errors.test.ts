@@ -167,7 +167,7 @@ describe('family instance verify - errors', () => {
           expect(result).toMatchObject({
             ok: false,
             code: 'PN-RTM-3001',
-            summary: 'Database not signed',
+            summary: 'Marker missing',
             contract: expectedContract,
           });
           expect(result.marker).toBeUndefined();

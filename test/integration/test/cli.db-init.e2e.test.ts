@@ -227,8 +227,8 @@ withTempDir(({ createTempDir }) => {
             const output = consoleOutput.join('\n');
             const stripped = stripAnsi(output);
 
-            // Verify noop - shows "Applied 0 operation(s)" indicating nothing to do
-            expect(stripped).toContain('Applied 0 operation');
+            // Verify noop - shows "Database already matches contract" indicating nothing to do
+            expect(stripped).toContain('Database already matches contract');
           });
         },
         timeouts.spinUpPpgDev,

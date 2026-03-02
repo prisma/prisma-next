@@ -1,5 +1,6 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import { errorMarkerRequired } from '@prisma-next/core-control-plane/errors';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
@@ -56,8 +57,8 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 
   // readMarker and introspect are sequential by design: the Postgres driver serializes
   // queries on a single connection, so Promise.all would not yield actual I/O parallelism
-  // with the current driver architecture. A missing marker is non-fatal — the operation
-  // proceeds without an origin, and the runner treats it as "no marker present".
+  // with the current driver architecture. A missing marker is fatal for db update — the
+  // user must run `prisma-next db init` first.
   const readMarkerSpanId = 'readMarker';
   onProgress?.({
     action: 'dbUpdate',
@@ -66,6 +67,17 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     label: 'Checking database signature',
   });
   const marker = await familyInstance.readMarker({ driver });
+
+  if (!marker) {
+    onProgress?.({
+      action: 'dbUpdate',
+      kind: 'spanEnd',
+      spanId: readMarkerSpanId,
+      outcome: 'error',
+    });
+    throw errorMarkerRequired();
+  }
+
   onProgress?.({
     action: 'dbUpdate',
     kind: 'spanEnd',
