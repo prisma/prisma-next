@@ -1,4 +1,5 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
