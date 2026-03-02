@@ -145,7 +145,7 @@ async function executeMigrationApplyCommand(
   let packages: readonly MigrationPackage[];
   try {
     const allPackages = await readMigrationsDir(migrationsDir);
-    packages = allPackages.filter((p) => p.manifest.edgeId !== null);
+    packages = allPackages.filter((p) => typeof p.manifest.edgeId === 'string');
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -154,6 +154,29 @@ async function executeMigrationApplyCommand(
   }
 
   if (packages.length === 0) {
+    const client = createControlClient({
+      family: config.family,
+      target: config.target,
+      adapter: config.adapter,
+      driver: config.driver,
+      extensionPacks: config.extensionPacks ?? [],
+    });
+    try {
+      await client.connect(dbConnection);
+      const marker = await client.readMarker();
+      const markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH;
+      if (markerHash !== EMPTY_CONTRACT_HASH) {
+        return notOk(
+          errorRuntime('Database has state but no migrations exist', {
+            why: `The database marker hash "${markerHash}" exists but no attested migrations were found in ${migrationsRelative}`,
+            fix: 'Ensure the migrations directory is correct, or reset the database with `prisma-next db init`.',
+            meta: { markerHash, migrationsDir: migrationsRelative },
+          }),
+        );
+      }
+    } finally {
+      await client.close();
+    }
     return ok({
       ok: true,
       migrationsApplied: 0,

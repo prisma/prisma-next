@@ -102,6 +102,33 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
+  it('errors when edgeId is missing from manifest', async () => {
+    const dir = join(tmpDir, '20260225T1430_no_edgeid');
+    const manifest = createTestManifest();
+    const { edgeId: _, ...manifestWithoutEdgeId } = manifest;
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifestWithoutEdgeId));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('errors when edgeId has wrong type', async () => {
+    const dir = join(tmpDir, '20260225T1430_bad_edgeid');
+    const manifest = { ...createTestManifest(), edgeId: 123 };
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifest));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
   it('errors when writing to existing directory with code MIGRATION.DIR_EXISTS', async () => {
     const dir = join(tmpDir, '20260225T1430_exists');
     await mkdir(dir, { recursive: true });

@@ -170,7 +170,7 @@ async function executeMigrationPlanCommand(
 
   try {
     const allPackages = await readMigrationsDir(migrationsDir);
-    const packages = allPackages.filter((p) => p.manifest.edgeId !== null);
+    const packages = allPackages.filter((p) => typeof p.manifest.edgeId === 'string');
     const graph = reconstructGraph(packages);
     const leafHash = findLeaf(graph);
 

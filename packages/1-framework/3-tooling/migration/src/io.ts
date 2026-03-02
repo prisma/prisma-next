@@ -101,6 +101,15 @@ function validateManifest(
   if (m['kind'] !== 'regular' && m['kind'] !== 'baseline') {
     throw errorInvalidManifest(filePath, '"kind" must be "regular" or "baseline"');
   }
+  if (!('edgeId' in m)) {
+    throw errorInvalidManifest(filePath, '"edgeId" is missing (must be a string or null)');
+  }
+  if (m['edgeId'] !== null && typeof m['edgeId'] !== 'string') {
+    throw errorInvalidManifest(
+      filePath,
+      `"edgeId" must be a string or null, got ${typeof m['edgeId']} (${JSON.stringify(m['edgeId'])})`,
+    );
+  }
 }
 
 export async function readMigrationsDir(
