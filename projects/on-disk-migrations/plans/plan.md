@@ -152,8 +152,8 @@ Build a `migration apply` command that reads on-disk migration packages and exec
 | `edgeId` correctly computed via content-addressed hashing | Unit | M2 | ✅ |
 | `migration plan` writes valid package | E2E | M2 | ✅ |
 | `migration plan` reports no-op when no changes detected | E2E | M2 | ✅ |
-| `migration plan` rejects destructive changes | E2E | M2 | ✅ |
-| `migration new` scaffolds empty Draft package | Unit | M2 | ✅ |
+| `migration plan` handles destructive changes | E2E | M2 | ✅ |
+| ~`migration new` scaffolds empty Draft package~ | ~Unit~ | ~M2~ | Removed |
 | `migration verify` recomputes and validates edgeId | Unit | M2 | ✅ |
 | DAG reconstructed from on-disk packages | Unit | M2 | ✅ |
 | Path resolution finds correct edge sequence | Unit | M2 | ✅ |

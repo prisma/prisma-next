@@ -131,7 +131,7 @@ Two user flows are in scope:
 ## CLI commands
 - [x] `prisma-next migration plan` writes a valid migration package to `migrations/` with correct `migration.json` and `ops.json`
 - [x] `prisma-next migration plan` fails clearly when no changes are detected between contracts
-- [x] `prisma-next migration new` scaffolds an empty migration package in Draft state
+- [x] ~`prisma-next migration new` scaffolds an empty migration package in Draft state~ (removed — command required users to provide derived values they can't realistically produce)
 - [x] `prisma-next migration verify` recomputes and validates `edgeId` for an existing migration package
 - [x] `prisma-next migration apply` reads on-disk migrations and executes SQL against a live database
 - [x] `prisma-next migration apply` updates the marker and ledger after each successful migration

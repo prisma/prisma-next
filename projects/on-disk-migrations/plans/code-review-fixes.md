@@ -21,14 +21,14 @@ These two issues weaken the trust boundary between on-disk artifacts and runtime
 
 **Tasks:**
 
-- [ ] **F01 — marker reconciliation when no attested migrations exist**
+- [x] **F01 — marker reconciliation when no attested migrations exist**
   - In `migration-apply.ts`, before the `packages.length === 0` early-return, connect to the DB and read the marker
   - If the marker is non-empty (`storageHash !== EMPTY_CONTRACT_HASH`), return an error: the DB has state that no known migration can explain
   - If the marker is empty, return the current no-op success
   - Add unit test: no attested migrations + non-empty DB marker → error
   - Add e2e test: `db init` → delete migrations dir → `migration apply` → expect error (not silent success)
 
-- [ ] **F02 — harden `edgeId` validation and attested filtering**
+- [x] **F02 — harden `edgeId` validation and attested filtering**
   - In `validateManifest()` (`migration/src/io.ts`), validate `edgeId` is present and is `string | null` — reject `undefined` or other types
   - In `migration-apply.ts` and `migration-plan.ts`, change attested filtering from `p.manifest.edgeId !== null` to `typeof p.manifest.edgeId === 'string'`
   - Add unit test in `io.test.ts`: manifest with missing `edgeId` → throws
@@ -41,17 +41,17 @@ Documentation drift and edge-case UX improvements. Lower priority but should be 
 
 **Tasks:**
 
-- [ ] **F03 — fix `migration verify` remediation text**
+- [x] **F03 — fix `migration verify` remediation text**
   - Change the fix text from `'Re-attest with \`migration verify\`...'` to guidance that actually works: `'Set edgeId to null in migration.json, then rerun \`migration verify\` to re-attest.'`
   - `migration verify` only auto-attests drafts (`edgeId: null`); the current text suggests re-running verify will fix a mismatch, but it won't — it will just report the same mismatch again
 
-- [ ] **F04 — update project docs to reflect destructive behavior**
+- [x] **F04 — update project docs to reflect destructive behavior**
   - Update `spec.md` non-goals section (line 109): remove "MVP is additive-only" language, note that `migration plan` now accepts all operation classes the planner can produce
   - Update `spec.md` RD-17: remove references to hardcoded additive-only policy in `migration plan`
   - Update `user-stories.md`: mark `migration apply` as implemented, remove "does not exist yet" language
   - Update `plan.md` open items: remove "currently hardcoded to additive only" note
 
-- [ ] **F05 — remove `migration new` command**
+- [x] **F05 — remove `migration new` command**
   - Delete `packages/1-framework/3-tooling/cli/src/commands/migration-new.ts`
   - Remove CLI registration from `cli.ts`
   - Remove `tsdown.config.ts` entry and `package.json` exports
@@ -64,9 +64,9 @@ Documentation drift and edge-case UX improvements. Lower priority but should be 
 
 **Tasks:**
 
-- [ ] Run `pnpm test:packages` and `pnpm lint:deps` — all pass
-- [ ] Verify the two blocking fixes have test coverage
-- [ ] Update `plan.md` to reflect completed review fixes
+- [x] Run `pnpm test:packages` and `pnpm lint:deps` — all pass
+- [x] Verify the two blocking fixes have test coverage
+- [x] Update `plan.md` to reflect completed review fixes
 
 ## Test Coverage
 
