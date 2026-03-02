@@ -12,8 +12,7 @@
 | `db introspect` | ✅ | Yes | Inspect live DB schema |
 | `migration plan` | ✅ | No | Diff contracts, write migration package to disk |
 | `migration verify` | ✅ | No | Verify migration package integrity (edgeId) |
-| `migration new` | ✅ | No | Scaffold empty draft migration |
-| `migration apply` | ❌ | Yes | Execute on-disk migrations against live DB |
+| `migration apply` | ✅ | Yes | Execute on-disk migrations against live DB |
 
 ## User story 1: New project, no database
 
@@ -45,13 +44,8 @@ This introspects the (empty) database, plans additive operations, executes them,
 prisma-next migration plan --name initial
 
 # 5. Apply it to the database
-# ⚠ NOT YET AVAILABLE — use `db init` for now
-# prisma-next migration apply --url $DATABASE_URL
+prisma-next migration apply --db $DATABASE_URL
 ```
-
-### Gap
-
-`migration apply` does not exist yet. After planning, you must use `db init` to actually create the schema. The on-disk migration is created for record-keeping but cannot be executed via the migration system.
 
 ## User story 2: Existing project, existing database
 
@@ -98,35 +92,28 @@ prisma-next migration plan --name add-posts
 #    - ops.json: SQL operations
 
 # 5. Apply to database
-# ⚠ NOT YET AVAILABLE — use `db init` for now
-# prisma-next migration apply --url $DATABASE_URL
-prisma-next db init --db $DATABASE_URL
+prisma-next migration apply --db $DATABASE_URL
 ```
-
-### Note
-
-`db init` does not consume on-disk migrations. It plans from a live introspection, so it works as a workaround, but the on-disk migration files are not the execution path.
 
 ## User story 4: Destructive change (column/table removal)
 
 **As a** developer removing a column or table,
-**I want to** be told that this is unsupported,
-**so that** I don't accidentally lose data.
+**I want to** plan and apply the destructive change,
+**so that** my migration history reflects the full schema evolution.
 
 ```bash
 # 1. Remove a column from the contract
 # 2. Re-emit
 prisma-next contract emit
 
-# 3. Plan — gets a conflict error
-prisma-next migration plan
-# Error: Column "User"."name" was removed
-#        Destructive changes are not supported by the additive-only planner.
+# 3. Plan — generates a destructive migration
+prisma-next migration plan --name drop-name
+# ✔ Planned 1 operation(s)
+# └─ dropColumn.user.name [Drop column name from user]
+
+# 4. Apply to database
+prisma-next migration apply --db $DATABASE_URL
 ```
-
-### Gap
-
-There is no `--allow-destructive` flag or destructive operation support. The planner reports the conflict and stops.
 
 ## User story 5: Verifying migration integrity
 
@@ -144,22 +131,4 @@ prisma-next migration verify --dir migrations/20260225_100000_add_posts
 
 ## User story 6: Manual migration (escape hatch)
 
-**As a** developer needing a custom SQL migration,
-**I want to** scaffold an empty migration and fill in the SQL myself,
-**so that** I can handle cases the planner doesn't support.
-
-```bash
-# Scaffold a draft migration
-prisma-next migration new --name manual-fix
-
-# Edit the files:
-#   migrations/<timestamp>_manual_fix/ops.json — add your SQL operations
-#   migrations/<timestamp>_manual_fix/migration.json — update from/to hashes
-
-# Attest the migration (computes edgeId)
-prisma-next migration verify --dir migrations/<timestamp>_manual_fix
-```
-
-### Gap
-
-The draft migration's `from`/`to` hashes default to `sha256:empty` → `sha256:empty`. You must manually set them to integrate into the DAG chain.
+Manual migration scaffolding (`migration new`) has been removed. The scaffolded drafts required users to manually fill in correct `from`/`to` hashes, a valid `toContract`, and correct operations — making the command unusable in practice. A future version will scaffold from real inputs (e.g. default `to` to the current emitted contract and generate ops via planning).

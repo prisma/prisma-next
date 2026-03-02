@@ -106,7 +106,7 @@ Two user flows are in scope:
 
 - **`db update`**: Applying additive changes to a live DB and updating the marker without writing migration files. Deferred to a later project.
 - **Production-ready apply**: Dry-run, rollback, multi-step orchestration, partial apply, apply-to-specific-hash.
-- **Destructive operations**: Drops, renames, type narrowing. MVP is additive-only. See RD-17 for the policy architecture — `migration apply` is already policy-agnostic, but the planner and `migration plan` policy gate are additive-only.
+- **Destructive operations (production-ready)**: The planner and `migration plan` now support destructive operations (drops, type changes). However, production safeguards (confirmation prompts, `--allow-destructive` flags, dry-run) are deferred. See RD-17 for the policy architecture.
 - **Squash/baseline tooling**: Creating baselines from paths, archiving edges. Infrastructure is designed for it but tooling is deferred.
 - **Preflight commands**: `prisma-next preflight` (shadow or PPg). Deferred.
 - **Graph visualization**: Rendering the DAG for human review. Deferred.
@@ -286,10 +286,8 @@ Terminology note: "attestation" (hashing migration content → `edgeId`), "signi
 **Rationale:** The policy gate belongs at planning time (`migration plan`), not at apply time. The planner currently only emits additive operations and treats destructive changes as conflicts, so today `migration apply` will only ever see additive ops. But if the planner gains support for destructive or widening operations in the future, `migration apply` will work without changes — it derives `allowedOperationClasses` from the `operationClass` field on each operation in the migration package.
 
 **Where the policy lives:**
-- `migration plan` (planner call): hardcodes `{ allowedOperationClasses: ['additive'] }` — this is the policy gate where we decide what the planner is allowed to produce.
+- `migration plan` (planner call): passes `{ allowedOperationClasses: ['additive', 'widening', 'destructive'] }` — the planner is allowed to produce any operation class it supports.
 - `migration apply` (runner call): derives `allowedOperationClasses` from the operations in each edge via `deriveAllowedClasses()`. If an edge has no operations, defaults to `['additive']`.
-
-**Implication:** To support destructive operations end-to-end, two things need to change: (1) the planner must learn to generate destructive SQL instead of emitting conflicts, and (2) `migration plan` must relax its policy to allow the planner to emit those operations. `migration apply` requires no changes.
 
 ## RD-16: Structured errors with MIGRATION.* stable codes
 
