@@ -13,7 +13,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   contract: typescriptContract(contract, 'output/contract.json'),
   db: {
     connection: '{{DB_URL}}',

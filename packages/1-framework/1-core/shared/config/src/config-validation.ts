@@ -45,9 +45,6 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
   if (typeof family['version'] !== 'string') {
     throwValidation('family.version', 'Config.family must have version: string');
   }
-  if (!family['manifest'] || typeof family['manifest'] !== 'object') {
-    throwValidation('family.manifest', 'Config.family must have manifest: ExtensionPackManifest');
-  }
   if (!family['hook'] || typeof family['hook'] !== 'object') {
     throwValidation('family.hook', 'Config.family must have hook: TargetFamilyHook');
   }
@@ -70,9 +67,6 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
   }
   if (typeof target['version'] !== 'string') {
     throwValidation('target.version', 'Config.target must have version: string');
-  }
-  if (!target['manifest'] || typeof target['manifest'] !== 'object') {
-    throwValidation('target.manifest', 'Config.target must have manifest: ExtensionPackManifest');
   }
   if (target['familyId'] !== familyId) {
     throwValidation(
@@ -101,9 +95,6 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
   }
   if (typeof adapter['version'] !== 'string') {
     throwValidation('adapter.version', 'Config.adapter must have version: string');
-  }
-  if (!adapter['manifest'] || typeof adapter['manifest'] !== 'object') {
-    throwValidation('adapter.manifest', 'Config.adapter must have manifest: ExtensionPackManifest');
   }
   if (adapter['familyId'] !== familyId) {
     throwValidation(
@@ -186,12 +177,6 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
           'Config.extensionPacks items must have create: function',
         );
       }
-      if (!extObj['manifest'] || typeof extObj['manifest'] !== 'object') {
-        throwValidation(
-          'extensionPacks[].manifest',
-          'Config.extensionPacks items must have manifest: ExtensionPackManifest',
-        );
-      }
     }
   }
 
@@ -206,9 +191,6 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
     }
     if (typeof driver['version'] !== 'string') {
       throwValidation('driver.version', 'Config.driver must have version: string');
-    }
-    if (!driver['manifest'] || typeof driver['manifest'] !== 'object') {
-      throwValidation('driver.manifest', 'Config.driver must have manifest: ExtensionPackManifest');
     }
     if (typeof driver['familyId'] !== 'string') {
       throwValidation('driver.familyId', 'Config.driver must have familyId: string');

@@ -23,7 +23,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   db: {
     connection: '{{DB_URL}}',
   },
