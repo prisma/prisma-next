@@ -13,8 +13,18 @@ describe('integration/create', () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createReturningUsersCollection(runtime);
 
-        const created = await users.create({ id: 9, name: 'Neo', email: 'neo@example.com' });
-        expect(created).toEqual({ id: 9, name: 'Neo', email: 'neo@example.com' });
+        const created = await users.create({
+          id: 9,
+          name: 'Neo',
+          email: 'neo@example.com',
+          invitedById: null,
+        });
+        expect(created).toEqual({
+          id: 9,
+          name: 'Neo',
+          email: 'neo@example.com',
+          invitedById: null,
+        });
 
         const rows = await runtime.query<{ id: number; name: string }>(
           'select id, name from users where id = $1',
@@ -33,13 +43,13 @@ describe('integration/create', () => {
         const users = createReturningUsersCollection(runtime);
 
         const created = await users.createAll([
-          { id: 10, name: 'Alice', email: 'alice@example.com' },
-          { id: 11, name: 'Bob', email: 'bob@example.com' },
+          { id: 10, name: 'Alice', email: 'alice@example.com', invitedById: null },
+          { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null },
         ]);
 
         expect(created).toEqual([
-          { id: 10, name: 'Alice', email: 'alice@example.com' },
-          { id: 11, name: 'Bob', email: 'bob@example.com' },
+          { id: 10, name: 'Alice', email: 'alice@example.com', invitedById: null },
+          { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null },
         ]);
 
         const rows = await runtime.query<{ id: number; name: string; email: string }>(
@@ -61,8 +71,8 @@ describe('integration/create', () => {
         const users = createUsersCollection(runtime);
 
         const count = await users.createCount([
-          { id: 20, name: 'Cara', email: 'cara@example.com' },
-          { id: 21, name: 'Dan', email: 'dan@example.com' },
+          { id: 20, name: 'Cara', email: 'cara@example.com', invitedById: null },
+          { id: 21, name: 'Dan', email: 'dan@example.com', invitedById: null },
         ]);
         expect(count).toBe(2);
 

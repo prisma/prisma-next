@@ -59,12 +59,14 @@ describe('integration/orm', () => {
             id: 1,
             name: 'Alice',
             email: 'alice@example.com',
+            invitedById: null,
             posts: [{ id: 11, title: 'Published A', userId: 1, views: 250 }],
           },
           {
             id: 2,
             name: 'Bob',
             email: 'bob@example.com',
+            invitedById: null,
             posts: [{ id: 12, title: 'Published B', userId: 2, views: 300 }],
           },
         ]);
@@ -117,6 +119,7 @@ describe('integration/orm', () => {
             id: 1,
             name: 'Alice',
             email: 'alice@example.com',
+            invitedById: null,
             posts: [
               {
                 id: 11,
@@ -131,6 +134,7 @@ describe('integration/orm', () => {
             id: 2,
             name: 'Bob',
             email: 'bob@example.com',
+            invitedById: null,
             posts: [
               {
                 id: 12,

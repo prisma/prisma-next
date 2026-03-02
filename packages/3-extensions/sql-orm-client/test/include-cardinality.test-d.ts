@@ -69,5 +69,7 @@ export type IncludeCardinalityTypeAssertions = [
       false
     >
   >,
-  Assert<Equal<keyof NonNullable<PostsWithAuthorRow['author']>, 'id' | 'name' | 'email'>>,
+  Assert<
+    Equal<keyof NonNullable<PostsWithAuthorRow['author']>, 'id' | 'name' | 'email' | 'invitedById'>
+  >,
 ];

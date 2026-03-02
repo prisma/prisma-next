@@ -52,8 +52,8 @@ describe('integration/update', () => {
         expect(updated).toHaveLength(2);
         expect(updated).toEqual(
           expect.arrayContaining([
-            { id: 1, name: 'Ready', email: 'a@example.com' },
-            { id: 2, name: 'Ready', email: 'b@example.com' },
+            { id: 1, name: 'Ready', email: 'a@example.com', invitedById: null },
+            { id: 2, name: 'Ready', email: 'b@example.com', invitedById: null },
           ]),
         );
 

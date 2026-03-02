@@ -12,7 +12,7 @@ describe('integration/upsert', () => {
         await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
 
         const upserted = await users.upsert({
-          create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+          create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
           update: { name: 'Alice Updated' },
         });
 
@@ -20,6 +20,7 @@ describe('integration/upsert', () => {
           id: 1,
           name: 'Alice Updated',
           email: 'alice@example.com',
+          invitedById: null,
         });
       });
     },
