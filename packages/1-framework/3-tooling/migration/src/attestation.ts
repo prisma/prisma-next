@@ -29,7 +29,12 @@ export function computeEdgeId(manifest: MigrationManifest, ops: MigrationOps): s
     manifest.fromContract !== null ? canonicalizeContract(manifest.fromContract) : 'null';
   const canonicalToContract = canonicalizeContract(manifest.toContract);
 
-  const combined = canonicalManifest + canonicalOps + canonicalFromContract + canonicalToContract;
+  const combined = [
+    canonicalManifest,
+    canonicalOps,
+    canonicalFromContract,
+    canonicalToContract,
+  ].join(':');
   const hash = createHash('sha256').update(combined).digest('hex');
 
   return `sha256:${hash}`;
