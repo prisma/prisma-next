@@ -74,7 +74,7 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
 
   toSchemaView?(schema: TSchemaIR): CoreSchemaView;
 
-  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
+  emitContract(options: { readonly contractIR: unknown }): Promise<EmitContractResult>;
 }
 
 export interface ControlTargetInstance<TFamilyId extends string, TTargetId extends string>
