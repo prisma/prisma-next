@@ -839,6 +839,41 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain("readonly alias: 'concat'");
   });
 
+  it('quotes non-identifier keys in extension index config', () => {
+    const ir = createContractIR({
+      targetFamily: 'sql',
+      target: 'test-db',
+      storage: {
+        tables: {
+          items: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [
+              {
+                columns: ['description'],
+                using: 'bm25',
+                config: {
+                  keyField: 'id',
+                  'min-token-size': 2,
+                  fields: [{ column: 'description', tokenizerParams: { 'max-ngram': 5 } }],
+                },
+              },
+            ],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    expect(types).toContain("readonly 'min-token-size': 2");
+    expect(types).toContain("readonly 'max-ngram': 5");
+  });
+
   it('serializes empty typeParams to Record<string, never>', () => {
     const result = sqlTargetFamilyHook.serializeTypeParamsLiteral({});
     expect(result).toBe('Record<string, never>');

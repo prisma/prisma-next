@@ -55,6 +55,10 @@ type IndexOptions = {
   readonly config?: Record<string, unknown>;
 };
 
+function isIndexDef(value: readonly string[] | IndexDef): value is IndexDef {
+  return !Array.isArray(value);
+}
+
 interface TableBuilderInternalState<
   Name extends string,
   Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
@@ -259,8 +263,9 @@ export class TableBuilder<
     columnsOrIndexDef: readonly string[] | IndexDef,
     nameOrOptions?: string | IndexOptions,
   ): TableBuilder<Name, Columns, PrimaryKey> {
-    const indexDef: IndexDef = Array.isArray(columnsOrIndexDef)
-      ? {
+    const indexDef: IndexDef = isIndexDef(columnsOrIndexDef)
+      ? columnsOrIndexDef
+      : {
           columns: columnsOrIndexDef,
           ...(typeof nameOrOptions === 'string' ? { name: nameOrOptions } : {}),
           ...(typeof nameOrOptions === 'object' && nameOrOptions !== null
@@ -270,8 +275,7 @@ export class TableBuilder<
                 ...(nameOrOptions.config !== undefined ? { config: nameOrOptions.config } : {}),
               }
             : {}),
-        }
-      : columnsOrIndexDef;
+        };
 
     return new TableBuilder(
       this._state.name,
