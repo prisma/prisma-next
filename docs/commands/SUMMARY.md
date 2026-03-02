@@ -7,11 +7,11 @@ Two complementary commands for managing database schema lifecycle.
 | Command | Purpose | Marker required? | Policy |
 |---------|---------|-----------------|--------|
 | `db init` | Sign an existing database under contract management | No (creates one) | Additive only |
-| `db update` | Update your database schema to match your contract | No (reads if present) | Additive + widening + destructive |
+| `db update` | Update your database schema to match your contract | Yes (run `db init` first) | Additive + widening + destructive |
 
 **`db init`** is run once per database to sign it under contract management. It introspects the live schema, plans additive operations to fill any gaps, executes them, and writes a contract marker (signature).
 
-**`db update`** is run after every contract change. It introspects the live schema, plans a full reconciliation (including destructive operations like dropping extra columns/tables), executes the plan, and writes the marker. If a marker already exists, it is used as the plan origin for drift detection.
+**`db update`** is run after every contract change. It introspects the live schema, plans a full reconciliation (including destructive operations like dropping extra columns/tables), executes the plan, and writes the marker. It requires a signed database. During apply, the runner checks that the database signature did not change after planning.
 
 ## Typical workflow
 
@@ -93,7 +93,7 @@ This happens when:
 
 **Recovery**: Inspect the conflict, reconcile the schema drift manually or update the contract to match reality, then re-run `db update`.
 
-If the runner detects that the marker has drifted since planning (origin mismatch), it fails with `RUNNER_FAILED`:
+If the runner detects that the database signature changed between planning and apply (origin mismatch), it fails with `RUNNER_FAILED`:
 
 ```
 ✖ Origin mismatch (RUNNER_FAILED)
@@ -105,11 +105,11 @@ If the runner detects that the marker has drifted since planning (origin mismatc
 
 | Aspect | `db init` | `db update` |
 |--------|-----------|-------------|
-| Requires marker | No | No (reads if present) |
+| Requires marker | No | Yes |
 | Creates marker | Yes (on apply) | Writes/updates marker (on apply) |
 | Operation policy | Additive only | Additive + widening + destructive |
 | Execution checks | Disabled (fresh introspection) | Enabled (database may have drifted) |
-| Existing marker handling | Idempotent if hash matches; error if mismatched | Reads marker as origin for drift detection (optional) |
+| Existing marker handling | Idempotent if hash matches; error if mismatched | Reads signature during planning and fails apply if signature changed before execution |
 | Use case | First-time signing | Ongoing schema evolution |
 
 ## Flags
