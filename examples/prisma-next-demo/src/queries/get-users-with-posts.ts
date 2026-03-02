@@ -1,3 +1,4 @@
+import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 import { collect } from './utils';
@@ -10,8 +11,8 @@ export async function getUsersWithPosts(runtime: Runtime, limit = 10) {
     .from(userTable)
     .includeMany(
       postTable,
-      (on) => on.eqCol(userTable.columns.id, postTable.columns.userId),
-      (child) =>
+      (on: JoinOnBuilder) => on.eqCol(userTable.columns.id, postTable.columns.userId),
+      (child: IncludeChildBuilder) =>
         child
           .select({
             id: postTable.columns.id,

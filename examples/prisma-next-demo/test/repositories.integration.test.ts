@@ -1,8 +1,9 @@
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { sql } from '@prisma-next/sql-lane';
+import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import { createRuntime, type Runtime } from '@prisma-next/sql-runtime';
+import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -30,8 +31,10 @@ const { contract } = context;
 const executionStack = db.stack;
 
 async function createTestDriver(connectionString: string) {
-  const stackInstance = instantiateExecutionStack(executionStack);
-  const driver = stackInstance.driver;
+  const stackInstance = instantiateExecutionStack(
+    executionStack,
+  ) as CreateRuntimeOptions['stackInstance'];
+  const driver = stackInstance.driver as unknown as SqlDriver<unknown>;
   if (!driver) {
     throw new Error('Driver descriptor missing from execution stack');
   }
