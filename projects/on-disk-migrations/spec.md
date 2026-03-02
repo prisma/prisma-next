@@ -289,7 +289,7 @@ Terminology note: "attestation" (hashing migration content → `edgeId`), "signi
 
 **Where the policy lives:**
 - `migration plan` (planner call): passes `{ allowedOperationClasses: ['additive', 'widening', 'destructive'] }` — the planner is allowed to produce any operation class it supports.
-- `migration apply` (runner call): derives `allowedOperationClasses` from the operations in each edge via `deriveAllowedClasses()`. If an edge has no operations, defaults to `['additive']`.
+- `migration apply` (runner call): passes all operation classes (`additive`, `widening`, `destructive`). The policy gate belongs at plan time, not apply time — apply trusts whatever the planner emitted.
 
 ## RD-16: Structured errors with MIGRATION.* stable codes
 

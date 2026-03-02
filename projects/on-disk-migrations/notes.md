@@ -37,7 +37,7 @@ There is no code path to generate `DROP TABLE`, `DROP COLUMN`, `ALTER COLUMN SET
 
 ### What `migration apply` does
 
-`migration apply` is already policy-agnostic — it derives its `allowedOperationClasses` from the operations present in the on-disk `ops.json` (see RD-17 in spec.md). It does not need changes to support destructive operations.
+`migration apply` is policy-agnostic — it passes all operation classes to the runner (see RD-17 in spec.md). The policy gate belongs at plan time, not apply time.
 
 ### Path to supporting destructive operations
 

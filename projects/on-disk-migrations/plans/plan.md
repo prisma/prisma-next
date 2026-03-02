@@ -173,5 +173,5 @@ Build a `migration apply` command that reads on-disk migration packages and exec
 ## Open Items
 
 - The on-disk `MigrationOps` type is `readonly MigrationPlanOperation[]` (framework-level), but at runtime the serialized ops are `SqlMigrationPlanOperation[]` (with `precheck`, `execute`, `postcheck` arrays). The runner expects `SqlMigrationPlanOperation[]`. Since we JSON.stringify/parse, the SQL-specific fields are preserved. A type assertion is needed when constructing the `SqlMigrationPlan` from disk — this is a known type boundary documented in the implementation comments.
-- Policy for `migration apply`: derives `allowedOperationClasses` from the operations present in each edge's `ops.json`. `migration plan` now allows all operation classes (`additive`, `widening`, `destructive`).
+- Policy for `migration apply`: passes all operation classes to the runner. The policy gate belongs at plan time (`migration plan` allows `additive`, `widening`, `destructive`), not apply time.
 - Partial-failure E2E test (migration 2 of 3 fails, migration 1 preserved) is deferred — requires crafting a fixture that produces invalid SQL ops, which is fragile. The resume semantics are implicitly tested by the idempotency test (re-run is no-op after success).

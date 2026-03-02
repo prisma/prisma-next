@@ -4,7 +4,6 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
-  MigrationOperationClass,
   MigrationPlanOperation,
   MigrationRunnerResult,
   TargetMigrationsCapability,
@@ -58,12 +57,11 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
 
     const operations = edge.operations as readonly MigrationPlanOperation[];
 
-    // Derive the policy from the operations themselves. The planner already
-    // decided what operation classes to emit at plan time — apply trusts that
-    // decision rather than hardcoding additive-only. This means if the planner
-    // gains support for destructive/widening ops, apply works without changes.
+    // Allow all operation classes. The policy gate belongs at plan time, not
+    // apply time — the planner already decided what to emit. Restricting here
+    // would be a tautology (the allowed set would just mirror what's in ops).
     const policy = {
-      allowedOperationClasses: deriveAllowedClasses(operations),
+      allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
     };
 
     // EMPTY_CONTRACT_HASH means "no prior state" — the runner expects origin: null
@@ -134,17 +132,4 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     applied,
     summary: `Applied ${applied.length} migration(s) (${totalOps} operation(s)), marker at ${finalHash}`,
   });
-}
-
-function deriveAllowedClasses(
-  operations: readonly MigrationPlanOperation[],
-): readonly MigrationOperationClass[] {
-  const classes = new Set<MigrationOperationClass>();
-  for (const op of operations) {
-    classes.add(op.operationClass);
-  }
-  if (classes.size === 0) {
-    classes.add('additive');
-  }
-  return [...classes];
 }
