@@ -26,7 +26,7 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import { resolveContractPath, setCommandDescriptions } from '../utils/command-helpers';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { formatCommandHelp, formatStyledHeader } from '../utils/output';
@@ -94,9 +94,7 @@ async function executeMigrationPlanCommand(
   );
   const migrationsRelative = relative(process.cwd(), migrationsDir);
 
-  const contractPathAbsolute = config.contract?.output
-    ? resolve(config.contract.output)
-    : resolve('src/prisma/contract.json');
+  const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
   if (flags.json !== 'object' && !flags.quiet) {

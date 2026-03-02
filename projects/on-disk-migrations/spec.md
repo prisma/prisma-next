@@ -81,6 +81,7 @@ Two user flows are in scope:
 - Error when no pending migrations exist (no-op with informational message)
 - Requires a database connection (`--db <url>` or `config.db.connection`)
 - Enable runner execution checks (prechecks, postchecks, idempotency probes) — unlike `db init` which disables them
+- Stale-plan detection: when `contract.json` is present and its `storageHash` differs from the DAG leaf, emit a warning advising the user to run `migration plan`. Silently skipped when `contract.json` is absent (CI/pinned-migrations use case)
 - Limited scope: no dry-run, no rollback, no partial apply, no apply-to-specific-hash. Simple sequential execution of all pending migrations to reach the DAG leaf
 
 ## Non-Functional Requirements
@@ -136,6 +137,7 @@ Two user flows are in scope:
 - [x] `prisma-next migration apply` updates the marker and ledger after each successful migration
 - [x] `prisma-next migration apply` resumes from last successful migration on re-run after failure
 - [x] `prisma-next migration apply` errors when DB marker doesn't match any known migration hash
+- [x] `prisma-next migration apply` warns when contract.json storageHash differs from DAG leaf (stale plan detection)
 
 ## DAG
 - [x] DAG can be reconstructed from on-disk migration packages (reading all `migration.json` files)

@@ -81,7 +81,7 @@ Build a `migration apply` command that reads on-disk migration packages and exec
 - **One transaction per migration**: If migration N fails, migrations 1..N-1 are already committed. Re-running `apply` resumes from the last successful state (the marker reflects progress).
 - **Enable execution checks**: Unlike `db init` (which disables pre/postchecks since it just introspected), `migration apply` runs from potentially stale on-disk ops, so all checks are enabled by default (prechecks, postchecks, idempotency probes).
 - **Constructing `SqlMigrationPlan` from disk**: On-disk `ops.json` contains `SqlMigrationPlanOperation[]` (the planner serializes the full SQL-specific type). The manifest provides `from`/`to` hashes and contracts. These are assembled into a `SqlMigrationPlan` with `origin` and `destination` for the runner.
-- **No `ControlClient`**: `migration apply` uses the driver directly instead of `ControlClient`, since it needs fine-grained control over the runner lifecycle.
+- **Uses `ControlClient`**: `migration apply` routes all DB operations through `ControlClient`, consistent with `db init` and `db update`.
 - **`origin: null` for first migration**: The runner expects `origin: null` when there's no existing marker (fresh DB). `EMPTY_CONTRACT_HASH` is a DAG convention, not a runner convention.
 - **Contract validation required**: Destination contracts from on-disk manifests must be validated via `familyInstance.validateContractIR()` for proper schema verification.
 - **Framework components required**: The runner's schema verification needs framework components (target, adapter, extensions) built via `assertFrameworkComponentsCompatible()`.

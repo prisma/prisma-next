@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
@@ -18,7 +19,11 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { maskConnectionUrl, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  maskConnectionUrl,
+  resolveContractPath,
+  setCommandDescriptions,
+} from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { formatCommandHelp, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
@@ -133,7 +138,7 @@ async function executeMigrationApplyCommand(
     }
     const header = formatStyledHeader({
       command: 'migration apply',
-      description: 'Apply pending migrations to the database',
+      description: 'Apply planned migrations to the database',
       url: 'https://pris.ly/migration-apply',
       details,
       flags,
@@ -198,6 +203,26 @@ async function executeMigrationApplyCommand(
       return notOk(mapMigrationToolsError(error));
     }
     throw error;
+  }
+
+  // Stale-plan detection: warn if contract.json exists and its hash differs from DAG leaf
+  if (!flags.quiet && flags.json !== 'object') {
+    try {
+      const contractPathAbsolute = resolveContractPath(config);
+      const contractRaw = JSON.parse(await readFile(contractPathAbsolute, 'utf-8')) as Record<
+        string,
+        unknown
+      >;
+      const contractHash = contractRaw['storageHash'];
+      if (typeof contractHash === 'string' && contractHash !== leafHash) {
+        console.warn(
+          `\n⚠  Warning: contract.json storageHash (${contractHash}) does not match the latest planned migration (${leafHash}).` +
+            '\n   Run `prisma-next migration plan` to plan a migration for the current contract.\n',
+        );
+      }
+    } catch {
+      // contract.json missing or unreadable — skip (e.g. CI with pinned migrations)
+    }
   }
 
   // Create control client for all DB operations
@@ -305,10 +330,11 @@ export function createMigrationApplyCommand(): Command {
   const command = new Command('apply');
   setCommandDescriptions(
     command,
-    'Apply pending migrations to the database',
-    'Reads on-disk migration packages, determines which are pending by comparing\n' +
-      'the database marker against the migration DAG, and executes each pending\n' +
-      'migration sequentially. Each migration runs in its own transaction.',
+    'Apply planned migrations to the database',
+    'Applies previously planned migrations (created by `migration plan`) to a live database.\n' +
+      'Compares the database marker against the migration DAG to determine which\n' +
+      'migrations are pending, then executes them sequentially. Each migration runs\n' +
+      'in its own transaction. Does not plan new migrations — run `migration plan` first.',
   );
   command
     .configureHelp({

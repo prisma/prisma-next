@@ -99,6 +99,7 @@ If any step fails, the runner rolls back the current transaction. Previously com
 - [x] `migration apply` executes multiple migrations in correct DAG order
 - [x] `migration apply` enables execution checks (prechecks, postchecks, idempotency)
 - [x] `migration apply` skips draft migrations (edgeId === null)
+- [x] `migration apply` warns when contract.json storageHash differs from DAG leaf (stale plan detection)
 
 ### Implementation notes
 

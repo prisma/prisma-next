@@ -860,7 +860,7 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>]
 
 ### `prisma-next migration apply`
 
-Apply pending migrations to the database. Reads on-disk migration packages, determines which are pending by comparing the database marker against the migration DAG, and executes each pending migration sequentially in its own transaction.
+Apply planned migrations to the database. Executes previously planned migrations (created by `migration plan`). Compares the database marker against the migration DAG to determine which migrations are pending, then executes them sequentially. Each migration runs in its own transaction. Does not plan new migrations — run `migration plan` first.
 
 ```bash
 prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
@@ -885,6 +885,8 @@ prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [-
 **Config requirements:** Requires `driver`, `db.connection` (or `--db`), and `migrations.dir` in the config.
 
 **Resume semantics:** If a migration fails, previously applied migrations are preserved. Re-running `migration apply` resumes from the last successful migration.
+
+**Stale-plan detection:** If `contract.json` is present and its `storageHash` differs from the DAG leaf, a warning is emitted advising you to run `migration plan`. This is silently skipped when `contract.json` is absent (e.g. CI with pinned migrations).
 
 ### `prisma-next migration verify`
 
