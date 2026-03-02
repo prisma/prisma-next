@@ -754,7 +754,7 @@ describe('sql-target-family-hook', () => {
     expect(types).not.toContain('export type OperationTypes = TestOps & Other');
   });
 
-  it('generates contract types with BM25 index in storage', () => {
+  it('generates contract types with extension-owned index config in storage', () => {
     const ir = createContractIR({
       targetFamily: 'sql',
       target: 'test-db',
@@ -771,15 +771,17 @@ describe('sql-target-family-hook', () => {
               {
                 columns: ['description'],
                 using: 'bm25',
-                keyField: 'id',
                 name: 'search_idx',
-                fieldConfigs: [
-                  {
-                    column: 'description',
-                    tokenizer: 'simple',
-                    tokenizerParams: { stemmer: 'english' },
-                  },
-                ],
+                config: {
+                  keyField: 'id',
+                  fields: [
+                    {
+                      column: 'description',
+                      tokenizer: 'simple',
+                      tokenizerParams: { stemmer: 'english' },
+                    },
+                  ],
+                },
               },
             ],
             foreignKeys: [],
@@ -790,14 +792,14 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain("readonly using: 'bm25'");
-    expect(types).toContain("readonly keyField: 'id'");
+    expect(types).toContain("readonly config: { readonly keyField: 'id'");
     expect(types).toContain("readonly name: 'search_idx'");
     expect(types).toContain("readonly column: 'description'");
     expect(types).toContain("readonly tokenizer: 'simple'");
     expect(types).toContain("readonly stemmer: 'english'");
   });
 
-  it('generates contract types with BM25 expression field', () => {
+  it('generates contract types with expression entries in extension config', () => {
     const ir = createContractIR({
       targetFamily: 'sql',
       target: 'test-db',
@@ -812,16 +814,18 @@ describe('sql-target-family-hook', () => {
             uniques: [],
             indexes: [
               {
-                columns: ['concat'],
+                columns: ['description'],
                 using: 'bm25',
-                keyField: 'id',
-                fieldConfigs: [
-                  {
-                    expression: "description || ' ' || category",
-                    alias: 'concat',
-                    tokenizer: 'simple',
-                  },
-                ],
+                config: {
+                  keyField: 'id',
+                  fields: [
+                    {
+                      expression: "description || ' ' || category",
+                      alias: 'concat',
+                      tokenizer: 'simple',
+                    },
+                  ],
+                },
               },
             ],
             foreignKeys: [],

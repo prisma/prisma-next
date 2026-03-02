@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { paradedbPackMeta } from '../src/core/descriptor-meta';
-import { bm25 } from '../src/types/index-types';
+import { bm25, bm25Index } from '../src/types/index-types';
 
 describe('ParadeDB extension', () => {
   describe('paradedbPackMeta', () => {
@@ -131,6 +131,45 @@ describe('ParadeDB extension', () => {
           expression: 'rating + 1',
           alias: 'rating_plus',
         });
+      });
+    });
+  });
+
+  describe('bm25Index', () => {
+    it('creates index definition with extension config payload', () => {
+      const indexDef = bm25Index({
+        keyField: 'id',
+        name: 'search_idx',
+        fields: [bm25.text('description', { tokenizer: 'simple' })],
+      });
+
+      expect(indexDef).toEqual({
+        columns: ['description'],
+        name: 'search_idx',
+        using: 'bm25',
+        config: {
+          keyField: 'id',
+          fields: [{ column: 'description', tokenizer: 'simple' }],
+        },
+      });
+    });
+
+    it('keeps expression fields in config while preserving core-safe columns', () => {
+      const indexDef = bm25Index({
+        keyField: 'id',
+        fields: [
+          bm25.text('description'),
+          bm25.expression("description || ' ' || category", { alias: 'concat' }),
+        ],
+      });
+
+      expect(indexDef.columns).toEqual(['description']);
+      expect(indexDef.config).toEqual({
+        keyField: 'id',
+        fields: [
+          { column: 'description' },
+          { expression: "description || ' ' || category", alias: 'concat' },
+        ],
       });
     });
   });

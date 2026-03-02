@@ -46,54 +46,19 @@ export type UniqueConstraint = {
   readonly name?: string;
 };
 
-/**
- * Supported index access methods.
- * Only includes methods with deliberate IR support — each access method
- * may carry its own config shape (e.g., BM25 needs `keyField` + `fieldConfigs`).
- */
-export type IndexAccessMethod = 'btree' | 'bm25';
-
-/**
- * BM25 field config for a column reference.
- */
-export type Bm25ColumnFieldConfig = {
-  readonly column: string;
-  readonly expression?: never;
-  readonly tokenizer?: string;
-  readonly tokenizerParams?: Record<string, unknown>;
-  readonly alias?: string;
-};
-
-/**
- * BM25 field config for a raw SQL expression.
- * `alias` is required (the expression has no column name to derive one from).
- */
-export type Bm25ExpressionFieldConfig = {
-  readonly expression: string;
-  readonly column?: never;
-  readonly alias: string;
-  readonly tokenizer?: string;
-  readonly tokenizerParams?: Record<string, unknown>;
-};
-
-/**
- * Per-field configuration for a BM25 full-text search index.
- * Each entry describes one indexed field and its tokenizer settings.
- *
- * Discriminated union: either `column` (for table columns) or `expression`
- * (for raw SQL) must be set, but not both. Enforced at the type level.
- */
-export type Bm25FieldConfig = Bm25ColumnFieldConfig | Bm25ExpressionFieldConfig;
-
 export type Index = {
   readonly columns: readonly string[];
   readonly name?: string;
-  /** Access method. Defaults to 'btree' when omitted. */
-  readonly using?: IndexAccessMethod;
-  /** BM25-specific: unique column used as the document key. */
-  readonly keyField?: string;
-  /** BM25-specific: per-field tokenizer configuration. */
-  readonly fieldConfigs?: readonly Bm25FieldConfig[];
+  /**
+   * Optional access method identifier.
+   * Extension-specific methods are represented as strings and interpreted
+   * by the owning extension package.
+   */
+  readonly using?: string;
+  /**
+   * Optional extension-owned index configuration payload.
+   */
+  readonly config?: Record<string, unknown>;
 };
 
 export type ForeignKeyReferences = {

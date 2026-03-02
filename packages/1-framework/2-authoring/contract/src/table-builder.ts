@@ -1,7 +1,6 @@
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
-  Bm25FieldConfigDef,
   ColumnBuilderState,
   ColumnTypeDescriptor,
   ForeignKeyDef,
@@ -50,6 +49,11 @@ type ColumnOptions<Descriptor extends ColumnTypeDescriptor> =
   | NonNullableColumnOptions<Descriptor>;
 
 type NullableFromOptions<TOptions> = TOptions extends { nullable: true } ? true : false;
+type IndexOptions = {
+  readonly name?: string;
+  readonly using?: string;
+  readonly config?: Record<string, unknown>;
+};
 
 interface TableBuilderInternalState<
   Name extends string,
@@ -245,38 +249,30 @@ export class TableBuilder<
     );
   }
 
-  index(columns: readonly string[], name?: string): TableBuilder<Name, Columns, PrimaryKey> {
-    const indexDef: IndexDef = name ? { columns, name } : { columns };
-    return new TableBuilder(
-      this._state.name,
-      this._state.columns,
-      this._state.primaryKey,
-      this._state.primaryKeyName,
-      this._state.uniques,
-      [...this._state.indexes, indexDef],
-      this._state.foreignKeys,
-    );
-  }
+  index(columns: readonly string[], name?: string): TableBuilder<Name, Columns, PrimaryKey>;
+  index(
+    columns: readonly string[],
+    options?: IndexOptions,
+  ): TableBuilder<Name, Columns, PrimaryKey>;
+  index(indexDef: IndexDef): TableBuilder<Name, Columns, PrimaryKey>;
+  index(
+    columnsOrIndexDef: readonly string[] | IndexDef,
+    nameOrOptions?: string | IndexOptions,
+  ): TableBuilder<Name, Columns, PrimaryKey> {
+    const indexDef: IndexDef = Array.isArray(columnsOrIndexDef)
+      ? {
+          columns: columnsOrIndexDef,
+          ...(typeof nameOrOptions === 'string' ? { name: nameOrOptions } : {}),
+          ...(typeof nameOrOptions === 'object' && nameOrOptions !== null
+            ? {
+                ...(nameOrOptions.name !== undefined ? { name: nameOrOptions.name } : {}),
+                ...(nameOrOptions.using !== undefined ? { using: nameOrOptions.using } : {}),
+                ...(nameOrOptions.config !== undefined ? { config: nameOrOptions.config } : {}),
+              }
+            : {}),
+        }
+      : columnsOrIndexDef;
 
-  /**
-   * Add a BM25 full-text search index (ParadeDB).
-   *
-   * When `keyField` is omitted, it is auto-inferred from a single-column primary key
-   * at `build()` time.
-   */
-  bm25Index(opts: {
-    fields: readonly Bm25FieldConfigDef[];
-    keyField?: string;
-    name?: string;
-  }): TableBuilder<Name, Columns, PrimaryKey> {
-    const columns = opts.fields.map((f) => f.alias ?? f.column ?? '');
-    const indexDef: IndexDef = {
-      columns,
-      using: 'bm25',
-      fieldConfigs: opts.fields,
-      ...(opts.keyField !== undefined && { keyField: opts.keyField }),
-      ...(opts.name !== undefined && { name: opts.name }),
-    };
     return new TableBuilder(
       this._state.name,
       this._state.columns,
@@ -315,20 +311,6 @@ export class TableBuilder<
   }
 
   build(): TableBuilderState<Name, Columns, PrimaryKey> {
-    // Resolve keyField for BM25 indexes that omit it
-    const indexes = this._state.indexes.map((idx) => {
-      if (idx.using !== 'bm25' || idx.keyField !== undefined) return idx;
-
-      // Auto-infer keyField from single-column PK
-      const pk = this._primaryKey;
-      if (!pk || pk.length !== 1) {
-        throw new Error(
-          `Table "${this._name}": bm25Index() requires an explicit keyField when the table has no single-column primary key.`,
-        );
-      }
-      return { ...idx, keyField: pk[0] };
-    });
-
     return {
       name: this._name,
       columns: this._columns,
@@ -337,7 +319,7 @@ export class TableBuilder<
         ? { primaryKeyName: this._state.primaryKeyName }
         : {}),
       uniques: this._state.uniques,
-      indexes,
+      indexes: this._state.indexes,
       foreignKeys: this._state.foreignKeys,
     } as TableBuilderState<Name, Columns, PrimaryKey>;
   }

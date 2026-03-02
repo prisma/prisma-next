@@ -800,7 +800,7 @@ describe('sql-target-family-hook', () => {
     }).not.toThrow();
   });
 
-  it('validates BM25 index with valid keyField referencing PK', () => {
+  it('accepts extension-owned index config payloads without core-specific validation', () => {
     const ir = createContractIR({
       storage: {
         tables: {
@@ -815,8 +815,10 @@ describe('sql-target-family-hook', () => {
               {
                 columns: ['description'],
                 using: 'bm25',
-                keyField: 'id',
-                fieldConfigs: [{ column: 'description', tokenizer: 'simple' }],
+                config: {
+                  keyField: 'id',
+                  fields: [{ column: 'description', tokenizer: 'simple' }],
+                },
               },
             ],
             foreignKeys: [],
@@ -830,7 +832,7 @@ describe('sql-target-family-hook', () => {
     }).not.toThrow();
   });
 
-  it('validates BM25 index rejects keyField not in PK or unique', () => {
+  it('still validates index column references independent of extension config', () => {
     const ir = createContractIR({
       storage: {
         tables: {
@@ -838,66 +840,6 @@ describe('sql-target-family-hook', () => {
             columns: {
               id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [
-              {
-                columns: ['description'],
-                using: 'bm25',
-                keyField: 'description',
-                fieldConfigs: [{ column: 'description' }],
-              },
-            ],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
-    }).toThrow('must reference a primary key or unique column');
-  });
-
-  it('validates BM25 index allows keyField referencing unique column', () => {
-    const ir = createContractIR({
-      storage: {
-        tables: {
-          items: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              uuid: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['uuid'] }],
-            indexes: [
-              {
-                columns: ['description'],
-                using: 'bm25',
-                keyField: 'uuid',
-                fieldConfigs: [{ column: 'description' }],
-              },
-            ],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
-    }).not.toThrow();
-  });
-
-  it('validates BM25 index rejects non-existent column in fieldConfigs', () => {
-    const ir = createContractIR({
-      storage: {
-        tables: {
-          items: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -905,8 +847,10 @@ describe('sql-target-family-hook', () => {
               {
                 columns: ['nonexistent'],
                 using: 'bm25',
-                keyField: 'id',
-                fieldConfigs: [{ column: 'nonexistent' }],
+                config: {
+                  keyField: 'id',
+                  fields: [{ expression: "description || ' ' || category", tokenizer: 'simple' }],
+                },
               },
             ],
             foreignKeys: [],
@@ -917,73 +861,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
-    }).toThrow('BM25 index references non-existent column');
-  });
-
-  it('validates BM25 index expression field requires alias', () => {
-    const ir = createContractIR({
-      storage: {
-        tables: {
-          items: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [
-              {
-                columns: ['concat'],
-                using: 'bm25',
-                keyField: 'id',
-                fieldConfigs: [{ expression: "description || ' ' || category" }],
-              },
-            ],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
-    }).toThrow('expression field must have an alias');
-  });
-
-  it('validates BM25 index expression field with alias passes', () => {
-    const ir = createContractIR({
-      storage: {
-        tables: {
-          items: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [
-              {
-                columns: ['concat'],
-                using: 'bm25',
-                keyField: 'id',
-                fieldConfigs: [
-                  {
-                    expression: "description || ' ' || category",
-                    alias: 'concat',
-                    tokenizer: 'simple',
-                  },
-                ],
-              },
-            ],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
-    }).not.toThrow();
+    }).toThrow('index references non-existent column');
   });
 
   it('validates structure with complex valid contract', () => {

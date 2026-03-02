@@ -422,8 +422,7 @@ class SqlContractBuilder<
         columns: i.columns,
         ...(i.name ? { name: i.name } : {}),
         ...(i.using ? { using: i.using } : {}),
-        ...(i.keyField ? { keyField: i.keyField } : {}),
-        ...(i.fieldConfigs ? { fieldConfigs: i.fieldConfigs } : {}),
+        ...(i.config ? { config: i.config } : {}),
       }));
 
       // Build foreign keys from table state, materializing defaults

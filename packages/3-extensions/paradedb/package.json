@@ -15,8 +15,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/contract-authoring": "workspace:*",
-    "@prisma-next/sql-contract": "workspace:*"
+    "@prisma-next/contract-authoring": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",

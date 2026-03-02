@@ -126,7 +126,7 @@ describe('contract builder normalization', () => {
     expect(contract.storage.tables.user.columns.email.nullable).toBe(false);
   });
 
-  it('passes through BM25 index fields (using, keyField, fieldConfigs)', () => {
+  it('passes through extension-owned index fields (using, config)', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
       .table('items', (t) =>
@@ -134,9 +134,13 @@ describe('contract builder normalization', () => {
           .column('id', { type: int4Column, nullable: false })
           .column('description', { type: textColumn, nullable: false })
           .primaryKey(['id'])
-          .bm25Index({
-            fields: [{ column: 'description', tokenizer: 'simple' }],
+          .index(['description'], {
             name: 'search_idx',
+            using: 'bm25',
+            config: {
+              keyField: 'id',
+              fields: [{ column: 'description', tokenizer: 'simple' }],
+            },
           }),
       )
       .build();
@@ -146,13 +150,15 @@ describe('contract builder normalization', () => {
     expect(indexes[0]).toMatchObject({
       columns: ['description'],
       using: 'bm25',
-      keyField: 'id',
       name: 'search_idx',
-      fieldConfigs: [{ column: 'description', tokenizer: 'simple' }],
+      config: {
+        keyField: 'id',
+        fields: [{ column: 'description', tokenizer: 'simple' }],
+      },
     });
   });
 
-  it('passes through BM25 index with expression-based fields', () => {
+  it('passes through extension index config with expression fields', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
       .table('items', (t) =>
@@ -160,29 +166,33 @@ describe('contract builder normalization', () => {
           .column('id', { type: int4Column, nullable: false })
           .column('description', { type: textColumn, nullable: false })
           .primaryKey(['id'])
-          .bm25Index({
-            fields: [
-              { column: 'description' },
-              {
-                expression: "description || ' ' || category",
-                alias: 'concat',
-                tokenizer: 'simple',
-              },
-            ],
+          .index(['description'], {
+            using: 'bm25',
+            config: {
+              keyField: 'id',
+              fields: [
+                { column: 'description' },
+                {
+                  expression: "description || ' ' || category",
+                  alias: 'concat',
+                  tokenizer: 'simple',
+                },
+              ],
+            },
           }),
       )
       .build();
 
     const idx = contract.storage.tables.items.indexes[0]!;
     expect(idx.using).toBe('bm25');
-    expect(idx.fieldConfigs).toHaveLength(2);
-    expect(idx.fieldConfigs![1]).toMatchObject({
+    expect((idx.config as { fields: readonly unknown[] }).fields).toHaveLength(2);
+    expect((idx.config as { fields: readonly unknown[] }).fields[1]).toMatchObject({
       expression: "description || ' ' || category",
       alias: 'concat',
     });
   });
 
-  it('preserves plain indexes without BM25 fields', () => {
+  it('preserves plain indexes without extension config', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
       .table('user', (t) =>
@@ -197,8 +207,7 @@ describe('contract builder normalization', () => {
     const idx = contract.storage.tables.user.indexes[0]!;
     expect(idx.columns).toEqual(['email']);
     expect(idx).not.toHaveProperty('using');
-    expect(idx).not.toHaveProperty('keyField');
-    expect(idx).not.toHaveProperty('fieldConfigs');
+    expect(idx).not.toHaveProperty('config');
   });
 
   it('normalizes contract-level relations to empty object', () => {

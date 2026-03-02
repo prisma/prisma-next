@@ -1283,9 +1283,6 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:*
         version: link:../../1-framework/2-authoring/contract
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../../2-sql/1-core/contract
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*

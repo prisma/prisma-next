@@ -1,5 +1,40 @@
-import type { Bm25FieldConfig } from '@prisma-next/sql-contract/types';
+import type { IndexDef } from '@prisma-next/contract-authoring';
 import type { TokenizerId } from '../core/constants';
+
+/**
+ * BM25 field config for a table column.
+ */
+export type Bm25ColumnFieldConfig = {
+  readonly column: string;
+  readonly expression?: never;
+  readonly tokenizer?: string;
+  readonly tokenizerParams?: Record<string, unknown>;
+  readonly alias?: string;
+};
+
+/**
+ * BM25 field config for a SQL expression.
+ */
+export type Bm25ExpressionFieldConfig = {
+  readonly expression: string;
+  readonly column?: never;
+  readonly alias: string;
+  readonly tokenizer?: string;
+  readonly tokenizerParams?: Record<string, unknown>;
+};
+
+/**
+ * BM25 field config union.
+ */
+export type Bm25FieldConfig = Bm25ColumnFieldConfig | Bm25ExpressionFieldConfig;
+
+/**
+ * BM25 index configuration payload stored in `IndexDef.config`.
+ */
+export type Bm25IndexConfig = {
+  readonly keyField: string;
+  readonly fields: readonly Bm25FieldConfig[];
+};
 
 /**
  * Options for a BM25 text field (text, varchar columns).
@@ -37,6 +72,15 @@ export type Bm25ExpressionFieldOptions = {
 type TokenizerConfig = {
   readonly tokenizer?: string;
   readonly tokenizerParams?: Record<string, unknown>;
+};
+
+/**
+ * Options for constructing a BM25 index definition.
+ */
+export type Bm25IndexOptions = {
+  readonly keyField: string;
+  readonly fields: readonly Bm25FieldConfig[];
+  readonly name?: string;
 };
 
 /**
@@ -99,6 +143,24 @@ export const bm25 = {
     };
   },
 } as const;
+
+/**
+ * Creates a generic index definition with a ParadeDB BM25 payload.
+ *
+ * `columns` only includes real table columns so core index validation remains
+ * target-agnostic. Expression fields stay in extension-owned `config.fields`.
+ */
+export function bm25Index(opts: Bm25IndexOptions): IndexDef {
+  return {
+    columns: opts.fields.flatMap((field) => ('column' in field ? [field.column] : [])),
+    ...(opts.name !== undefined && { name: opts.name }),
+    using: 'bm25',
+    config: {
+      keyField: opts.keyField,
+      fields: opts.fields,
+    } satisfies Bm25IndexConfig,
+  };
+}
 
 /**
  * Builds `{ tokenizer, tokenizerParams? }` from a tokenizer ID and a bag of params.

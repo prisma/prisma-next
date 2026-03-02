@@ -65,50 +65,20 @@ export interface UniqueConstraintDef {
 }
 
 /**
- * Supported index access methods.
- * Duplicated from sql-contract to avoid cross-layer dependency.
- */
-export type IndexAccessMethod = 'btree' | 'bm25';
-
-/**
- * BM25 field config for a column reference.
- * Duplicated from sql-contract to avoid cross-layer dependency.
- */
-export interface Bm25ColumnFieldConfigDef {
-  readonly column: string;
-  readonly expression?: never;
-  readonly tokenizer?: string;
-  readonly tokenizerParams?: Record<string, unknown>;
-  readonly alias?: string;
-}
-
-/**
- * BM25 field config for a raw SQL expression.
- * Duplicated from sql-contract to avoid cross-layer dependency.
- */
-export interface Bm25ExpressionFieldConfigDef {
-  readonly expression: string;
-  readonly column?: never;
-  readonly alias: string;
-  readonly tokenizer?: string;
-  readonly tokenizerParams?: Record<string, unknown>;
-}
-
-/**
- * Per-field configuration for a BM25 full-text search index.
- * Duplicated from sql-contract to avoid cross-layer dependency.
- */
-export type Bm25FieldConfigDef = Bm25ColumnFieldConfigDef | Bm25ExpressionFieldConfigDef;
-
-/**
  * Index definition for table builder.
  */
 export interface IndexDef {
   readonly columns: readonly string[];
   readonly name?: string;
-  readonly using?: IndexAccessMethod;
-  readonly keyField?: string;
-  readonly fieldConfigs?: readonly Bm25FieldConfigDef[];
+  /**
+   * Optional index access method. Extension-specific methods are represented
+   * as strings and interpreted by the owning extension package.
+   */
+  readonly using?: string;
+  /**
+   * Optional extension-owned index configuration payload.
+   */
+  readonly config?: Record<string, unknown>;
 }
 
 /**
