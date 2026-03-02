@@ -204,7 +204,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
               nativeType: 'text',
               codecId: 'pg/text@1',
               nullable: false,
-              default: { kind: 'literal', value: "'active'" },
+              default: { kind: 'literal', value: 'active' },
             },
             createdAt: {
               nativeType: 'timestamptz',

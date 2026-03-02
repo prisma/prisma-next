@@ -92,7 +92,7 @@ describe('contractToSchemaIR', () => {
           columns: {
             status: col({
               nativeType: 'text',
-              default: { kind: 'literal', value: "'active'" },
+              default: { kind: 'literal', value: 'active' },
             }),
           },
         }),

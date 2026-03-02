@@ -21,6 +21,9 @@ function convertDefault(def: ColumnDefault): string {
   if (def.kind === 'function') {
     return def.expression;
   }
+  if (typeof def.value === 'string') {
+    return `'${def.value}'`;
+  }
   return String(def.value);
 }
 
