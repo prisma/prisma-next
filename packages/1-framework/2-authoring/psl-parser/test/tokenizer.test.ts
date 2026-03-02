@@ -222,6 +222,25 @@ describe('Tokenizer', () => {
       `);
     });
 
+    it('handles negative number literals', () => {
+      expect(tokenize('-1')).toMatchInlineSnapshot(`
+        "NumberLiteral  "-1"
+        Eof            """
+      `);
+      expect(tokenize('-3.14')).toMatchInlineSnapshot(`
+        "NumberLiteral  "-3.14"
+        Eof            """
+      `);
+      expect(tokenize('@default(-1)')).toMatchInlineSnapshot(`
+        "At             "@"
+        Ident          "default"
+        LParen         "("
+        NumberLiteral  "-1"
+        RParen         ")"
+        Eof            """
+      `);
+    });
+
     it('handles string escapes and unterminated strings', () => {
       expect(tokenize('"hello \\"world\\""')).toMatchInlineSnapshot(`
         "StringLiteral  "\\"hello \\\\\\"world\\\\\\"\\""
