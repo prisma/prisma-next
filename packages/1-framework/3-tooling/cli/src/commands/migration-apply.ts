@@ -18,7 +18,7 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import { maskConnectionUrl, setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { formatCommandHelp, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
@@ -36,10 +36,6 @@ interface MigrationApplyCommandOptions {
   readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
-}
-
-function maskDatabaseUrl(value: string): string {
-  return value.replace(/:([^:@]+)@/, ':****@');
 }
 
 export interface MigrationApplyResult {
@@ -133,7 +129,7 @@ async function executeMigrationApplyCommand(
       { label: 'migrations', value: migrationsRelative },
     ];
     if (typeof dbConnection === 'string') {
-      details.push({ label: 'database', value: maskDatabaseUrl(dbConnection) });
+      details.push({ label: 'database', value: maskConnectionUrl(dbConnection) });
     }
     const header = formatStyledHeader({
       command: 'migration apply',
