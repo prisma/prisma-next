@@ -11,7 +11,7 @@
 
     { "path": "./packages/1-framework/2-authoring/contract" },
     { "path": "./packages/1-framework/2-authoring/contract-ts" },
-    { "path": "./packages/1-framework/2-authoring/contract-psl" },
+    { "path": "./packages/1-framework/2-authoring/psl-parser" },
 
     { "path": "./packages/1-framework/3-tooling/cli" },
     { "path": "./packages/1-framework/3-tooling/emitter" },
@@ -40,6 +40,6 @@
     { "path": "./packages/3-targets/3-targets/postgres" },
     { "path": "./packages/3-targets/6-adapters/postgres" },
     { "path": "./packages/3-targets/7-drivers/postgres" },
-    { "path": "./packages/3-targets/8-clients/postgres" }
+    { "path": "./packages/3-extensions/postgres" }
   ]
 }

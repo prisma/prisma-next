@@ -17,6 +17,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/contract-authoring": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "arktype": "^2.1.25",
@@ -45,6 +46,10 @@
     "./contract-builder": {
       "types": "./dist/contract-builder.d.mts",
       "import": "./dist/contract-builder.mjs"
+    },
+    "./config-types": {
+      "types": "./dist/config-types.d.mts",
+      "import": "./dist/config-types.mjs"
     },
     "./schema-sql": "./schemas/data-contract-sql-v1.json",
     "./package.json": "./package.json"

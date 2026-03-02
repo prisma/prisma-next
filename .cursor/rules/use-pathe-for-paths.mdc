@@ -1,8 +1,13 @@
 ---
-description: Use pathe for path operations
+description: Prefer pathe over node:path in TypeScript files.
 alwaysApply: false
+globs:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.mts"
+  - "**/*.cts"
 ---
-# Use pathe for Path Operations
+# Use pathe for path operations
 
 Use `pathe` instead of `node:path` for path manipulation:
 
@@ -17,5 +22,3 @@ import { dirname, join, resolve } from 'pathe';
 // Avoid
 import { dirname, join, resolve } from 'node:path';
 ```
-
-Note: Test files may still use `node:path` since they run in Node.

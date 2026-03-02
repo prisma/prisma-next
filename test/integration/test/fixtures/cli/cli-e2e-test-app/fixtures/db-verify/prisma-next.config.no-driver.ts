@@ -12,9 +12,8 @@ export default {
   // driver is missing - this is what we're testing
   extensions: [],
   contract: {
-    source: contract,
+    source: async () => ({ ok: true, value: contract }),
     output: 'output/contract.json',
-    types: 'output/contract.d.ts',
   },
   db: {
     connection: '{{DB_URL}}', // Placeholder to be replaced in tests

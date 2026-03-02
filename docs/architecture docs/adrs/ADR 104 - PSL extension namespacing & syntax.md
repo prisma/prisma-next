@@ -15,7 +15,11 @@ Extensions must be discoverable, versionable, and enforceable across local build
 
 ## Decision
 
-Introduce a namespaced PSL extension syntax and mapping rules that produce deterministic contract JSON under `extensions.<namespace>` and optional capabilities claims. Versions are pinned via a top-level `extensions` block, while field and model attributes stay concise and versionless. The emitter validates extension usage against pack-provided JSON Schemas and capability gates and refuses to emit on violations.
+Introduce a namespaced PSL extension syntax and mapping rules that produce deterministic contract JSON under `contract.extensionPacks.<namespace>` and optional capabilities claims.
+
+**Composition constraint:** PSL does not “activate” extensions or carry extension configuration. Extension packs are composed via `prisma-next.config.ts`, which determines which namespaces/attributes exist. The emitter/interpreter then **infers** the PSL authoring surface (valid namespaces, attributes, and argument schemas) from the composed pack’s existing manifest/metadata. PSL remains versionless and purely declarative.
+
+The emitter validates extension usage against pack-provided (or core-convention) schemas and capability gates and refuses to emit on violations.
 
 ## Details
 
@@ -25,14 +29,6 @@ Introduce a namespaced PSL extension syntax and mapping rules that produce deter
 - A pack owns exactly one namespace and must not collide with core or another pack
 - Field attribute form: `@<ns>.<attr>(args?)`
 - Model attribute form: `@@<ns>.<attr>(args?)`
-- Top-level block for version pinning and pack config:
-
-```prisma
-extensions {
-  pgvector = "1.2.0"
-  postgis  = "3.4.1"
-}
-```
 
 ### Syntax examples
 
@@ -42,7 +38,22 @@ extensions {
 model Document {
   id      Int     @id @default(autoincrement())
   content String
-  embedding Bytes  @pgvector.column(dim: 1536, distance: cosine)
+  embedding Bytes  @pgvector.column(length: 1536, distance: cosine)
+}
+```
+
+#### Named storage type for reuse (avoids per-field attributes)
+
+This pattern keeps the parser simple (no type-parameter syntax) while preserving an enforceable connection between a column’s declared type and its parameters by moving the parameters into a named type instance:
+
+```prisma
+types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
+}
+
+model Document {
+  id        Int            @id @default(autoincrement())
+  embedding Embedding1536?
 }
 ```
 
@@ -59,9 +70,9 @@ model Place {
 
 ### Mapping to the data contract
 
-- All extension data is emitted under `contract.extensionPacks.<ns>` and never mixed into core tables unless explicitly mapped by the pack's schema
+- All extension data is emitted under `contract.extensionPacks.<namespace>` and never mixed into core tables unless explicitly mapped by the pack's schema
 - Core storage mapping remains under `tables.*` with standard columns, constraints, and indexes
-- Extension-specific column metadata may be referenced by core nodes via stable references, e.g. a column `meta.ext.pgvector = { dim: 1536, distance: "cosine" }` when the pack declares such links in its schema
+- Extension-specific column metadata may be referenced by core nodes via stable references, e.g. a column `meta.ext.pgvector = { length: 1536, distance: "cosine" }` when the pack declares such links in its schema
 
 ### Emitted shape example
 
@@ -79,7 +90,7 @@ model Place {
           "nullable": false,
           "meta": {
             "ext": {
-              "pgvector": { "dim": 1536, "distance": "cosine" }
+              "pgvector": { "length": 1536, "distance": "cosine" }
             }
           }
         }
@@ -90,7 +101,7 @@ model Place {
     "pgvector": {
       "version": "1.2.0",
       "columns": {
-        "document.embedding": { "dim": 1536, "distance": "cosine" }
+        "document.embedding": { "length": 1536, "distance": "cosine" }
       },
       "indexes": []
     },
@@ -110,9 +121,9 @@ model Place {
 
 ### Versioning model
 
-- Versions are pinned in `extensionPacks { <ns> = "<semver>" }`
-- Attributes omit version for readability and are validated against the pinned pack version
-- The emitter records the version under `contract.extensionPacks.<ns>.version`
+- Versions are pinned in `prisma-next.config.ts` where packs are composed (e.g. `extensionPacks: [pgvector]`)
+- Attributes omit version for readability and are validated against the composed/pinned pack version
+- The emitter records the resolved version under `contract.extensionPacks.<namespace>.version`
 - Version changes are reflected in the contract hash and capability surface
 
 ### Determinism and canonicalization
@@ -124,13 +135,21 @@ model Place {
 
 ### Validation and capability gating
 
-- The emitter loads pack JSON Schemas for `@<ns>.<attr>` and `@@<ns>.<attr>` and validates argument shapes
+- The emitter validates argument shapes for `@<ns>.<attr>` and `@@<ns>.<attr>` (either via pack-provided schemas or core conventions where applicable)
 - The emitter refuses to emit if:
-  - namespace is unknown or not pinned in extensions
+  - namespace is unknown or the corresponding pack is not composed in config
   - attribute is unknown or deprecated and not allowed
   - schema validation fails
   - target adapter reports missing capabilities required by the extension for the current profile
 - Capability checks use ADR 065 to query adapter and pack capability sets
+
+#### Enforceable coupling (avoid “metadata drift”)
+
+Extension attributes attach **extra meaning** to a field (for example, “this `Bytes` column is a pgvector `vector(1536)`”). If an attribute is applied to an incompatible base type, the schema can look valid at a glance but produce confusing runtime behavior or incorrect storage assumptions. To keep authoring predictable, extension attributes are interpreted with **strict, enforceable invariants**. Example (pgvector):
+
+- `@pgvector.column(...)` is only valid on compatible base types (e.g. `Bytes`) or on named type instances defined in `types { ... }` whose base is compatible.
+- If applied to an incompatible base type, emission fails with a targeted diagnostic.
+- If the pack is not composed in `prisma-next.config.ts`, the namespace is unknown and emission fails.
 
 ### Error taxonomy
 
@@ -145,14 +164,29 @@ Errors map to `RuntimeError` codes per ADR 027 and ADR 068.
 
 ### TS-first parity
 
-The TS builder exposes the same namespace and attribute vocabulary via typed helpers:
+The TS builder exposes the same namespace vocabulary via pack refs, and extension-specific column/type helpers are provided by the corresponding extension package.
 
 ```typescript
-contract
-  .table('document', t => t
-    .column('embedding', types.bytea().ext('pgvector', { dim: 1536, distance: 'cosine' }))
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { int4Column } from '@prisma-next/adapter-postgres/column-types';
+import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
+import { vector } from '@prisma-next/extension-pgvector/column-types';
+import pgvector from '@prisma-next/extension-pgvector/pack';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgres from '@prisma-next/target-postgres/pack';
+
+type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
+
+export const contract = defineContract<AllCodecTypes>()
+  .target(postgres)
+  .extensionPacks({ pgvector })
+  .table('document', (t) =>
+    t
+      .column('id', { type: int4Column, nullable: false })
+      .column('embedding', { type: vector(1536), nullable: false })
+      .primaryKey(['id']),
   )
-  .extensions({ pgvector: '1.2.0' })
+  .build();
 ```
 
 - Emitted `contract.json` must be byte-for-byte identical to PSL-first for the same inputs
@@ -168,18 +202,18 @@ contract
 ## Alternatives considered
 
 - **Inline version suffix `@pgvector@1.2.column(…)`**: Rejected for readability and because multiple attributes would repeat versions
-- **Mixing extension payloads directly into core nodes without `extensions.<ns>`**: Rejected due to ambiguity and difficulty for agents to locate extension data
+- **Mixing extension payloads directly into core nodes without a dedicated `contract.extensionPacks.<namespace>` section**: Rejected due to ambiguity and difficulty for agents to locate extension data
 
 ## Consequences
 
 ### Positive
 - Clear, collision-free extension mechanism that maps cleanly to deterministic JSON
-- Agents and tools can rely on `extensions.<ns>` to discover features without executing code
+- Agents and tools can rely on `contract.extensionPacks.<namespace>` to discover features without executing code
 - Capability gating prevents authoring features that cannot run on the selected target
 
 ### Negative
 - Requires packs to ship schemas and maintain stable attribute vocabularies
-- Slight verbosity with the top-level extensions version pinning block
+- Slight verbosity from explicit namespace + argument syntax in PSL
 - Adds validation complexity to the emitter
 
 ## Open questions

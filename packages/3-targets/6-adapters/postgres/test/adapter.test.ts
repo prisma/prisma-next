@@ -6,6 +6,11 @@ import type {
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import {
+  createParamRef,
+  createTableRef,
+  createUpdateAst,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '../src/core/adapter';
@@ -631,6 +636,24 @@ describe('createPostgresAdapter', () => {
           adapter.lower(ast, { contract, params: ['test@example.com'] });
         }).toThrow('Unsupported value kind in UPDATE');
       });
+
+      it('lowers update AST without where clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast = createUpdateAst({
+          table: createTableRef('user'),
+          set: {
+            email: createParamRef(1, 'newEmail'),
+          },
+        });
+
+        const lowered = adapter.lower(ast, { contract, params: ['updated@example.com'] });
+
+        expect(lowered.body).toMatchObject({
+          sql: 'UPDATE "user" SET "email" = $1',
+          params: ['updated@example.com'],
+        });
+      });
     });
 
     describe('delete', () => {
@@ -680,6 +703,20 @@ describe('createPostgresAdapter', () => {
           sql: 'DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id", "user"."email"',
           params: [1],
         });
+      });
+
+      it('lowers delete AST without where clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: DeleteAst = {
+          kind: 'delete',
+          table: { kind: 'table', name: 'user' },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [] });
+
+        expect(lowered.body.sql).toBe('DELETE FROM "user"');
+        expect(lowered.body.params).toEqual([]);
       });
     });
 
@@ -758,6 +795,209 @@ describe('createPostgresAdapter', () => {
         expect(lowered.body.sql).toContain('NOT EXISTS');
         expect(lowered.body.sql).toContain('SELECT "post"."id" AS "id" FROM "post"');
         expect(lowered.body.sql).toContain('WHERE "post"."userId" = $1');
+      });
+
+      it('lowers SELECT with AND expression in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'and',
+            exprs: [
+              {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'id' },
+                right: { kind: 'param', index: 1, name: 'id' },
+              },
+              {
+                kind: 'bin',
+                op: 'neq',
+                left: { kind: 'col', table: 'user', column: 'email' },
+                right: { kind: 'literal', value: '' },
+              },
+            ],
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [42] });
+
+        expect(lowered.body.sql).toContain('AND');
+        expect(lowered.body.sql).toContain('"user"."id" = $1');
+        expect(lowered.body.sql).toContain('"user"."email"');
+      });
+
+      it('lowers SELECT with OR expression in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'or',
+            exprs: [
+              {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'id' },
+                right: { kind: 'param', index: 1, name: 'id1' },
+              },
+              {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'id' },
+                right: { kind: 'param', index: 2, name: 'id2' },
+              },
+            ],
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [1, 2] });
+
+        expect(lowered.body.sql).toContain('OR');
+        expect(lowered.body.sql).toContain('$1');
+        expect(lowered.body.sql).toContain('$2');
+      });
+
+      it('lowers SELECT with like operator in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'bin',
+            op: 'like',
+            left: { kind: 'col', table: 'user', column: 'email' },
+            right: { kind: 'param', index: 1, name: 'pattern' },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: ['%@example.com'] });
+
+        expect(lowered.body.sql).toContain('LIKE');
+        expect(lowered.body.sql).toContain('$1');
+      });
+
+      it('lowers SELECT with ilike operator in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'bin',
+            op: 'ilike',
+            left: { kind: 'col', table: 'user', column: 'email' },
+            right: { kind: 'param', index: 1, name: 'pattern' },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: ['%@example.com'] });
+
+        expect(lowered.body.sql).toContain('ILIKE');
+      });
+
+      it('lowers SELECT with in operator and list literal in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'bin',
+            op: 'in',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: {
+              kind: 'listLiteral',
+              values: [
+                { kind: 'param', index: 1, name: 'id1' },
+                { kind: 'param', index: 2, name: 'id2' },
+              ],
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [1, 2] });
+
+        expect(lowered.body.sql).toContain('IN');
+        expect(lowered.body.sql).toContain('$1');
+        expect(lowered.body.sql).toContain('$2');
+      });
+
+      it('lowers SELECT with notIn operator and literal list in WHERE clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'bin',
+            op: 'notIn',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: {
+              kind: 'listLiteral',
+              values: [{ kind: 'literal', value: 0 }],
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [] });
+
+        expect(lowered.body.sql).toContain('NOT IN');
+        expect(lowered.body.sql).toContain('0');
+      });
+
+      it('lowers SELECT with in operator and empty list to FALSE', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'bin',
+            op: 'in',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: {
+              kind: 'listLiteral',
+              values: [],
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [] });
+        expect(lowered.body.sql).toContain('WHERE FALSE');
+      });
+
+      it('lowers SELECT with notIn operator and empty list to TRUE', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'bin',
+            op: 'notIn',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: {
+              kind: 'listLiteral',
+              values: [],
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [] });
+        expect(lowered.body.sql).toContain('WHERE TRUE');
       });
     });
 

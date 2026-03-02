@@ -8,18 +8,23 @@ import {
 
 describe('Collection', () => {
   const contract = baseContract;
-
+  const userCol = (column: string) => ({ kind: 'col' as const, table: 'users', column });
+  const literal = (value: unknown) => ({ kind: 'literal' as const, value });
+  const eq = (
+    column: string,
+    right: { kind: 'literal'; value: unknown } | { kind: 'param'; index: number },
+  ) => ({
+    kind: 'bin' as const,
+    op: 'eq' as const,
+    left: userCol(column),
+    right,
+  });
   describe('chain methods', () => {
     it('where() appends a filter and returns new collection', () => {
       const { collection } = createCollection();
       const filtered = collection.where((u) => u.name.eq('Alice'));
       expect(filtered.state.filters).toHaveLength(1);
-      expect(filtered.state.filters[0]).toEqual({
-        kind: 'bin',
-        op: 'eq',
-        left: { kind: 'col', table: 'users', column: 'name' },
-        right: { kind: 'literal', value: 'Alice' },
-      });
+      expect(filtered.state.filters[0]).toEqual(eq('name', literal('Alice')));
       // Original is not mutated
       expect(collection.state.filters).toHaveLength(0);
     });
@@ -32,26 +37,33 @@ describe('Collection', () => {
       expect(filtered.state.filters).toHaveLength(2);
     });
 
+    it('where() accepts ToWhereExpr payloads', () => {
+      const { collection } = createCollection();
+      const filtered = collection.where(() => ({
+        toWhereExpr: () => ({
+          expr: eq('name', { kind: 'param', index: 1 }),
+          params: ['Alice'],
+          paramDescriptors: [{ source: 'lane' }],
+        }),
+      }));
+
+      expect(filtered.state.filters).toEqual([eq('name', literal('Alice'))]);
+    });
+
+    it('where() rejects bare WhereExpr with ParamRef', () => {
+      const { collection } = createCollection();
+      expect(() => collection.where(() => eq('id', { kind: 'param', index: 1 }))).toThrow(
+        /bare WhereExpr.*ParamRef/i,
+      );
+    });
+
     it('where() accepts shorthand object filters', () => {
       const { collection } = createCollection();
       const filtered = collection.where({ name: 'Alice', email: 'alice@example.com' });
       expect(filtered.state.filters).toHaveLength(1);
       expect(filtered.state.filters[0]).toEqual({
         kind: 'and',
-        exprs: [
-          {
-            kind: 'bin',
-            op: 'eq',
-            left: { kind: 'col', table: 'users', column: 'name' },
-            right: { kind: 'literal', value: 'Alice' },
-          },
-          {
-            kind: 'bin',
-            op: 'eq',
-            left: { kind: 'col', table: 'users', column: 'email' },
-            right: { kind: 'literal', value: 'alice@example.com' },
-          },
-        ],
+        exprs: [eq('name', literal('Alice')), eq('email', literal('alice@example.com'))],
       });
     });
 
@@ -337,7 +349,7 @@ describe('Collection', () => {
             ]),
         } as never),
       ).rejects.toThrow(/did not return a row/);
-    });
+    }, 500);
 
     it('update() returns null when nested mutation target is missing', async () => {
       const { collection, runtime } = createReturningCollectionFor('User');

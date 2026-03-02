@@ -1,1 +1,0 @@
-# @prisma-next/integration-kysely

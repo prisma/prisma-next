@@ -64,7 +64,7 @@ const core = createRuntimeCore({
   driver,
   verify: { mode: 'onFirstUse', requireMarker: false },
   operationRegistry,
-  plugins: [budgets(), lints()],
+  plugins: [budgets()],
 });
 ```
 
@@ -73,10 +73,12 @@ const core = createRuntimeCore({
 - `createRuntimeCore` - Create a target-neutral runtime instance
 - `RuntimeFamilyAdapter` - Interface for family runtimes
 - `MarkerReader` - Interface for marker reading
-- `budgets`, `lints` - Target-neutral plugins
+- `budgets` - Target-neutral budgets plugin
 - `runtimeError` - Error envelope utilities
 - `computeSqlFingerprint` - SQL fingerprint computation
 - `parseContractMarkerRow` - Marker parsing utilities
+
+**Note:** The `lints` plugin has been migrated to the SQL domain. Import `lints` and `LintsOptions` from `@prisma-next/sql-runtime` instead. See [ADR 162](../../../docs/architecture docs/adrs/ADR 162 - Kysely lane emits PN SQL AST.md) for rationale.
 
 ## Testing
 

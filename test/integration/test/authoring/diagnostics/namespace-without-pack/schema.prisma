@@ -1,0 +1,4 @@
+model Document {
+  id Int @id
+  embedding Bytes @pgvector.column(length: 1536)
+}

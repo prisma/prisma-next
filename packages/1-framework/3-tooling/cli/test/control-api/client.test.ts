@@ -10,6 +10,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 import { createControlClient } from '../../src/control-api/client';
 import type { ControlProgressEvent } from '../../src/control-api/types';
@@ -393,7 +394,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: { kind: 'value', value: { test: true } },
+          sourceProvider: async () => ok({ test: true } as unknown as ContractIR),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -437,7 +438,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: { kind: 'loader', load: async () => ({ test: true }) },
+          sourceProvider: async () => ok({ test: true } as unknown as ContractIR),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -470,11 +471,8 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: {
-            kind: 'loader',
-            load: async () => {
-              throw new Error('Source load error');
-            },
+          sourceProvider: async () => {
+            throw new Error('Source load error');
           },
           output: '/tmp/contract.json',
         },
@@ -486,6 +484,15 @@ describe('ControlClient progress emission', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.failure.code).toBe('CONTRACT_SOURCE_INVALID');
+        expect(result.failure.diagnostics).toEqual({
+          summary: 'Contract source provider threw an exception',
+          diagnostics: [
+            {
+              code: 'PROVIDER_THROW',
+              message: 'Source load error',
+            },
+          ],
+        });
       }
 
       // Should emit resolveSource span with error outcome
@@ -493,6 +500,41 @@ describe('ControlClient progress emission', () => {
         (e) => e.kind === 'spanEnd' && e.spanId === 'resolveSource',
       );
       expect(resolveSourceEnd).toMatchObject({ outcome: 'error' });
+    });
+
+    it('returns provider diagnostics when source provider fails', async () => {
+      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      const result = await client.emit({
+        contractConfig: {
+          sourceProvider: async () =>
+            notOk({
+              summary: 'Provider failed',
+              diagnostics: [
+                {
+                  code: 'PSL_INVALID_MODEL',
+                  message: 'Model declaration is invalid',
+                  sourceId: 'schema.prisma',
+                },
+              ],
+            }),
+          output: '/tmp/contract.json',
+        },
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('CONTRACT_SOURCE_INVALID');
+        expect(result.failure.diagnostics?.summary).toBe('Provider failed');
+        expect(result.failure.diagnostics?.diagnostics).toHaveLength(1);
+      }
     });
 
     it('emits error outcome when emitContract throws', async () => {
@@ -512,7 +554,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: { kind: 'value', value: { test: true } },
+          sourceProvider: async () => ok({ test: true } as unknown as ContractIR),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -622,7 +664,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: { kind: 'value', value: { test: true } },
+          sourceProvider: async () => ok({ test: true } as unknown as ContractIR),
           output: '/tmp/contract.json',
         },
       });

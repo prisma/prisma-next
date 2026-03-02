@@ -76,7 +76,7 @@ Contract artifacts are `contract.json` and `contract.d.ts`. Static roots are `sq
 
 - **[Query Lanes](../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)** — DSL and ORM authoring surfaces
 - **[Runtime & Plugin Framework](../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)** — Runtime execution pipeline
-- **[ADR 161 - Repository Layer](../../docs/architecture%20docs/adrs/ADR%20161%20-%20Repository%20Layer.md)** — Multi-query repository orchestration layer
+- **[ADR 164 - Repository Layer](../../docs/architecture%20docs/adrs/ADR%20164%20-%20Repository%20Layer.md)** — Multi-query repository orchestration layer
 
 ## ORM Client Examples
 
@@ -162,3 +162,22 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
 
 - **Vector Similarity Search**: The demo includes a `similarity-search.ts` query that demonstrates cosine distance operations using the pgvector extension pack.
 - **Extension Packs**: Shows how to configure and use extension packs (pgvector) in `prisma-next.config.ts`.
+- **Kysely Lane Parity**: `src/kysely/` contains Kysely equivalents for demo queries:
+  - `get-user-by-id.ts`
+  - `get-user-posts.ts`
+  - `get-users.ts`
+  - `get-users-with-posts.ts`
+  - `dml-operations.ts`
+  - `insert-user-transaction.ts`
+  - `delete-without-where.ts`
+  - `get-all-posts-unbounded.ts`
+  - `update-without-where.ts`
+  - Run commands:
+    - `pnpm start -- user-kysely <id>`
+    - `pnpm start -- posts-kysely <userId>`
+    - `pnpm start -- users-kysely`
+    - `pnpm start -- users-with-posts-kysely`
+    - `pnpm start -- dml-kysely`
+    - `pnpm start -- user-transaction-kysely`
+    - `pnpm start -- guardrail-delete-kysely`
+  - Additional guardrail examples (`update-without-where.ts`, `get-all-posts-unbounded.ts`) are available in `src/kysely/` for direct invocation from tests or scripts.

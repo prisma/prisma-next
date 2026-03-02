@@ -65,7 +65,7 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 |-- 2-authoring (migration plane)
 |   |-- contract/      → @prisma-next/contract-authoring
 |   |-- contract-ts/   → @prisma-next/contract-ts (future)
-|   |-- contract-psl/  → @prisma-next/contract-psl (future)
+|   |-- psl-parser/    → @prisma-next/psl-parser
 |-- 3-tooling (migration plane)
 |   |-- cli/           → @prisma-next/cli
 |   |-- emitter/       → @prisma-next/emitter
@@ -117,8 +117,6 @@ The extensions domain (`packages/3-extensions/`) contains ecosystem extensions a
 
 ```
 * 3-extensions
-|-- integration-kysely/ (runtime plane)
-|   |-- → @prisma-next/integration-kysely
 |-- sql-orm-client/ (runtime plane)
 |   |-- → @prisma-next/sql-orm-client
 |-- pgvector/ (multi-plane)
@@ -215,7 +213,7 @@ Contract authoring surfaces for creating contracts programmatically.
 **Framework Domain (Migration Plane):**
 - `packages/1-framework/2-authoring/contract/` → `@prisma-next/contract-authoring` - TS builders, canonicalization, schema DSL
 - `packages/1-framework/2-authoring/contract-ts/` → `@prisma-next/contract-ts` - TS authoring surface (future)
-- `packages/1-framework/2-authoring/contract-psl/` → `@prisma-next/contract-psl` - PSL parser + IR (future)
+- `packages/1-framework/2-authoring/psl-parser/` → `@prisma-next/psl-parser` - PSL parser + IR (future)
 
 **SQL Domain (Migration Plane):**
 - `packages/2-sql/2-authoring/contract-ts/` → `@prisma-next/sql-contract-ts` - SQL TS authoring surface wraps `@prisma-next/contract-authoring`
@@ -293,7 +291,7 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/1-framework/1-core/runtime/execution-plane/` | `@prisma-next/core-execution-plane` |
 | `packages/1-framework/2-authoring/contract/` | `@prisma-next/contract-authoring` |
 | `packages/1-framework/2-authoring/contract-ts/` | `@prisma-next/contract-ts` |
-| `packages/1-framework/2-authoring/contract-psl/` | `@prisma-next/contract-psl` |
+| `packages/1-framework/2-authoring/psl-parser/` | `@prisma-next/psl-parser` |
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
 | `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |
 | `packages/1-framework/4-runtime-executor/` | `@prisma-next/runtime-executor` |
@@ -311,7 +309,6 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/3-targets/3-targets/postgres/` | `@prisma-next/target-postgres` |
 | `packages/3-targets/6-adapters/postgres/` | `@prisma-next/adapter-postgres` |
 | `packages/3-targets/7-drivers/postgres/` | `@prisma-next/driver-postgres` |
-| `packages/3-extensions/integration-kysely/` | `@prisma-next/integration-kysely` |
 | `packages/3-extensions/sql-orm-client/` | `@prisma-next/sql-orm-client` |
 | `packages/3-extensions/pgvector/` | `@prisma-next/extension-pgvector` |
 

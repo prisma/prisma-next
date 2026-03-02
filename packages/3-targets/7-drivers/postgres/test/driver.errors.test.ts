@@ -3,17 +3,15 @@ import { timeouts } from '@prisma-next/test-utils';
 import type { Client, Pool } from 'pg';
 import { newDb } from 'pg-mem';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import postgresRuntimeDriverDescriptor from '../src/exports/runtime';
-import { createBoundDriverFromBinding, type PostgresBinding } from '../src/postgres-driver';
+import { createBoundDriverFromBinding } from '../src/postgres-driver';
 
 describe('@prisma-next/driver-postgres', () => {
-  let cleanup: (() => Promise<void>) | undefined;
+  const cleanups: Array<() => Promise<void>> = [];
 
   afterEach(async () => {
-    if (cleanup) {
-      await cleanup();
-      cleanup = undefined;
+    while (cleanups.length > 0) {
+      await cleanups.pop()?.();
     }
   }, timeouts.spinUpPpgDev);
 
@@ -23,474 +21,343 @@ describe('@prisma-next/driver-postgres', () => {
       const db = newDb();
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
-
       const driver = postgresRuntimeDriverDescriptor.create();
-
-      cleanup = async () => {
+      cleanups.push(async () => {
         await driver.close();
-      };
-
+      });
       await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
-
       await expect(driver.query('select * from nonexistent_table')).rejects.toThrow();
     },
     timeouts.spinUpPpgDev,
   );
 
-  it(
-    'falls back to buffered mode when cursor execution fails',
-    async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create({
-        cursor: { batchSize: 1 },
-      });
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
-      await driver.query('create table items(id serial primary key, name text)');
-      await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
-
-      // Force cursor to fail by using invalid SQL that pg-mem might handle differently
-      // The driver should fall back to buffered mode
-      const rows: Array<{ id: number; name: string }> = [];
-      for await (const row of driver.execute<{ id: number; name: string }>({
-        sql: 'select id, name from items order by id asc',
-      })) {
-        rows.push(row);
-      }
-
-      // Should still get results via buffered fallback
-      expect(rows.length).toBeGreaterThan(0);
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
-    'handles non-Error exceptions in cursor path',
-    async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create({
-        cursor: { batchSize: 1 },
-      });
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
-      await driver.query('create table items(id serial primary key, name text)');
-      await driver.query('insert into items(name) values ($1)', ['test']);
-
-      // The cursor path should handle non-Error exceptions and fall back to buffered
-      const rows: Array<{ id: number; name: string }> = [];
-      for await (const row of driver.execute<{ id: number; name: string }>({
-        sql: 'select id, name from items',
-      })) {
-        rows.push(row);
-      }
-
-      expect(rows.length).toBeGreaterThan(0);
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it('throws error when client connection fails with non-already-connected error', async () => {
-    const db = newDb();
-    const { Client } = db.adapters.createPg();
-    const client = new Client();
-
-    const driver = postgresRuntimeDriverDescriptor.create();
-
-    cleanup = async () => {
-      await driver.close();
-    };
-
-    await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
-    // Mock client.connect to throw a non-"already connected" error
-    // connect() is a no-op, so we test acquireClient indirectly through query()
-    const originalConnect = client.connect.bind(client);
-    client.connect = async () => {
-      const error = new Error('Connection failed: network error');
-      throw error;
-    };
-
-    await expect(driver.query('select 1')).rejects.toThrow('Connection failed');
-
-    // Restore original connect for cleanup
-    client.connect = originalConnect;
-  });
-
-  it('handles non-Error exceptions in acquireClient', async () => {
-    const db = newDb();
-    const { Client } = db.adapters.createPg();
-    const client = new Client();
-
-    const driver = postgresRuntimeDriverDescriptor.create();
-
-    cleanup = async () => {
-      await driver.close();
-    };
-
-    await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
-    // Mock client.connect to throw a non-Error exception
-    // connect() is a no-op, so we test acquireClient indirectly through query()
-    const originalConnect = client.connect.bind(client);
-    client.connect = async () => {
-      throw 'string error';
-    };
-
-    await expect(driver.query('select 1')).rejects.toBe('string error');
-
-    // Restore original connect for cleanup
-    client.connect = originalConnect;
-  });
-
-  it(
-    'handles cursor read errors',
-    async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create({
-        cursor: { batchSize: 1 },
-      });
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
-      await driver.query('create table items(id serial primary key, name text)');
-      await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
-
-      // Cursor read errors should be caught and handled by the execute method
-      // The driver should fall back to buffered mode if cursor fails
-      const rows: Array<{ id: number; name: string }> = [];
-      for await (const row of driver.execute<{ id: number; name: string }>({
-        sql: 'select id, name from items order by id asc',
-      })) {
-        rows.push(row);
-      }
-
-      // Should get results even if cursor read had issues (fallback to buffered)
-      expect(rows.length).toBeGreaterThan(0);
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
-    'handles cursor close errors',
-    async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create({
-        cursor: { batchSize: 1 },
-      });
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
-      await driver.query('create table items(id serial primary key, name text)');
-      await driver.query('insert into items(name) values ($1)', ['test']);
-
-      // Cursor close errors should be caught in the finally block
-      // The driver should still complete execution successfully
-      const rows: Array<{ id: number; name: string }> = [];
-      for await (const row of driver.execute<{ id: number; name: string }>({
-        sql: 'select id, name from items',
-      })) {
-        rows.push(row);
-      }
-
-      // Should get results even if cursor close had issues
-      expect(rows.length).toBeGreaterThan(0);
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it('accepts already connected errors from direct client connect', async () => {
-    const client = {
-      connect: vi.fn(async () => {
-        throw new Error('Client is already connected');
-      }),
-      query: vi.fn(async () => ({ rows: [] })),
-      end: vi.fn(async () => {}),
-    } as unknown as Client;
-
-    const driver = postgresRuntimeDriverDescriptor.create();
-
-    await driver.connect({ kind: 'pgClient', client });
-    await driver.query('select 1');
-
-    expect(client.connect).toHaveBeenCalledTimes(1);
-    expect(client.query).toHaveBeenCalled();
-  });
-
-  it('shares in-flight direct client connect across concurrent queries', async () => {
-    let resolveConnect: (() => void) | undefined;
-    const connectPending = new Promise<void>((resolve) => {
-      resolveConnect = resolve;
-    });
-
-    const client = {
-      connect: vi.fn(async () => {
-        await connectPending;
-      }),
-      query: vi.fn(async () => ({ rows: [] })),
-      end: vi.fn(async () => {}),
-    } as unknown as Client;
-
-    const driver = postgresRuntimeDriverDescriptor.create();
-    await driver.connect({ kind: 'pgClient', client });
-
-    const first = driver.query('select 1');
-    const second = driver.query('select 1');
-
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(client.connect).toHaveBeenCalledTimes(1);
-
-    resolveConnect?.();
-    await Promise.all([first, second]);
-  });
-
-  it('releases direct-connection lease when initial acquireConnection fails', async () => {
-    const connect = vi
-      .fn<() => Promise<void>>()
-      .mockRejectedValueOnce(new Error('connect failed'))
-      .mockResolvedValue(undefined);
-
-    const client = {
-      connect,
-      query: vi.fn(async () => ({ rows: [] })),
-      end: vi.fn(async () => {}),
-    } as unknown as Client;
-
-    const driver = postgresRuntimeDriverDescriptor.create();
-    await driver.connect({ kind: 'pgClient', client });
-
-    await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
-
-    const connection = await driver.acquireConnection();
-    await connection.release();
-
-    expect(connect).toHaveBeenCalledTimes(2);
-  });
-
-  it('calls client.end when closing direct client', async () => {
+  it('normalizes non-Error cursor failures from execute()', async () => {
     const mockClient = {
-      connect: vi.fn(async () => {}),
-      query: vi.fn(async () => ({ rows: [] })),
-      end: vi.fn(async () => {}),
-    };
-    const client = mockClient as unknown as Client;
-
-    const driver = postgresRuntimeDriverDescriptor.create();
-
-    await driver.connect({ kind: 'pgClient', client });
-    await driver.close();
-
-    expect(mockClient.end).toHaveBeenCalled();
-  });
-
-  it('normalizes non-Error cursor failures from read callbacks', async () => {
-    const client = {
+      _connection: {},
+      _ending: false,
       connect: vi.fn(async () => {}),
       end: vi.fn(async () => {}),
-      query: vi.fn((queryArg: unknown) => {
-        if (typeof queryArg === 'string') {
+      query: vi.fn((statement: unknown) => {
+        if (typeof statement === 'string') {
           return Promise.resolve({ rows: [] });
         }
         return {
-          read: (_size: number, cb: (err: unknown, rows: unknown[] | undefined) => void) => {
-            cb('cursor read failed', undefined);
-          },
-          close: (cb: (err: unknown) => void) => cb(null),
+          read: (_size: number, cb: (err: unknown, rows: unknown[]) => void) =>
+            cb('cursor failed with string', []),
+          close: (cb: (err?: unknown) => void) => cb(),
         };
       }),
-    } as unknown as Client;
-
+    };
     const driver = createBoundDriverFromBinding(
-      { kind: 'pgClient', client },
-      { batchSize: 1, disabled: false },
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      { batchSize: 1 },
     );
+    cleanups.push(async () => {
+      await driver.close();
+    });
 
-    await expect(
-      (async () => {
-        for await (const _row of driver.execute({ sql: 'select 1' })) {
+    const consume = async () => {
+      for await (const _row of driver.execute({ sql: 'select 1' })) {
+        // consume stream
+      }
+    };
+
+    await expect(consume()).rejects.toThrow('cursor failed with string');
+  });
+
+  it('falls back to buffered mode when cursor throws non-postgres Error', async () => {
+    const mockClient = {
+      _connection: {},
+      _ending: false,
+      connect: vi.fn(async () => {}),
+      end: vi.fn(async () => {}),
+      query: vi.fn((statement: unknown) => {
+        if (typeof statement === 'string') {
+          return Promise.resolve({ rows: [{ id: 1, name: 'fallback' }] });
         }
-      })(),
-    ).rejects.toThrow('cursor read failed');
+        return {
+          read: (_size: number, cb: (err: unknown, rows: unknown[]) => void) =>
+            cb(new Error('cursor unavailable'), []),
+          close: (cb: (err?: unknown) => void) => cb(),
+        };
+      }),
+    };
+    const driver = createBoundDriverFromBinding(
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      { batchSize: 1 },
+    );
+    cleanups.push(async () => {
+      await driver.close();
+    });
+
+    const rows: Array<{ id: number; name: string }> = [];
+    for await (const row of driver.execute<{ id: number; name: string }>({
+      sql: 'select id, name from items',
+    })) {
+      rows.push(row);
+    }
+
+    expect(rows).toEqual([{ id: 1, name: 'fallback' }]);
   });
 
   it('normalizes postgres cursor failures as SqlQueryError', async () => {
-    const postgresError = Object.assign(
-      new Error('duplicate key value violates unique constraint'),
-      {
-        code: '23505',
-      },
-    );
-    const client = {
+    const pgCursorError = Object.assign(new Error('duplicate key'), { code: '23505' });
+    const mockClient = {
+      _connection: {},
+      _ending: false,
       connect: vi.fn(async () => {}),
       end: vi.fn(async () => {}),
-      query: vi.fn((queryArg: unknown) => {
-        if (typeof queryArg === 'string') {
+      query: vi.fn((statement: unknown) => {
+        if (typeof statement === 'string') {
           return Promise.resolve({ rows: [] });
         }
         return {
-          read: (_size: number, cb: (err: unknown, rows: unknown[] | undefined) => void) => {
-            cb(postgresError, undefined);
-          },
-          close: (cb: (err: unknown) => void) => cb(null),
+          read: (_size: number, cb: (err: unknown, rows: unknown[]) => void) =>
+            cb(pgCursorError, []),
+          close: (cb: (err?: unknown) => void) => cb(),
         };
       }),
-    } as unknown as Client;
-
+    };
     const driver = createBoundDriverFromBinding(
-      { kind: 'pgClient', client },
-      { batchSize: 1, disabled: false },
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      { batchSize: 1 },
     );
+    cleanups.push(async () => {
+      await driver.close();
+    });
 
-    await expect(
-      (async () => {
-        for await (const _row of driver.execute({ sql: 'select 1' })) {
-        }
-      })(),
-    ).rejects.toBeInstanceOf(SqlQueryError);
+    const consume = async () => {
+      for await (const _row of driver.execute({ sql: 'select 1' })) {
+        // consume stream
+      }
+    };
+
+    await expect(consume()).rejects.toBeInstanceOf(SqlQueryError);
   });
 
-  it('supports no-op connect on pool and direct bound drivers', async () => {
-    const pool = {
-      connect: vi.fn(async () => ({
-        release: vi.fn(),
-      })),
+  it('rethrows non already-connected client connect errors', async () => {
+    const mockClient = {
+      _connection: undefined,
+      _ending: false,
+      connect: vi.fn(async () => {
+        throw new Error('Connection failed: network error');
+      }),
+      query: vi.fn(async () => ({ rows: [] })),
       end: vi.fn(async () => {}),
-    } as unknown as Pool;
+    };
+    const driver = createBoundDriverFromBinding(
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      undefined,
+    );
+    cleanups.push(async () => {
+      await driver.close();
+    });
 
-    const directClient = {
+    await expect(driver.query('select 1')).rejects.toThrow('Connection failed');
+  });
+
+  it('closes pool driver once when close called multiple times', async () => {
+    const pool = {
+      end: vi.fn(async () => {}),
+      connect: vi.fn(async () => ({ release: vi.fn() })),
+    } as unknown as Pool;
+    const driver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, undefined);
+
+    await driver.close();
+    await driver.close();
+
+    expect(pool.end).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports connected state for bound pool driver', async () => {
+    const pool = {
+      end: vi.fn(async () => {}),
+      connect: vi.fn(async () => ({ release: vi.fn() })),
+    } as unknown as Pool;
+    const driver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, undefined);
+    cleanups.push(async () => {
+      await driver.close();
+    });
+
+    expect(driver.state).toBe('connected');
+  });
+
+  it('reports closed state for pool driver after close', async () => {
+    const pool = {
+      end: vi.fn(async () => {}),
+      connect: vi.fn(async () => ({ release: vi.fn() })),
+    } as unknown as Pool;
+    const driver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, undefined);
+
+    await driver.close();
+
+    expect(driver.state).toBe('closed');
+  });
+
+  it('ignores already-connected errors while acquiring direct client', async () => {
+    const alreadyConnectedError = new Error('Client has already been connected');
+    const mockClient = {
+      _connection: undefined,
+      _ending: false,
+      connect: vi.fn(async () => {
+        throw alreadyConnectedError;
+      }),
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    };
+    const driver = createBoundDriverFromBinding(
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      undefined,
+    );
+    cleanups.push(async () => {
+      await driver.close();
+    });
+
+    const result = await driver.query('select 1');
+
+    expect(result.rows).toEqual([]);
+    expect(mockClient.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses in-flight connect promise for concurrent queries', async () => {
+    let resolveConnect: (() => void) | undefined;
+    const connectPromise = new Promise<void>((resolve) => {
+      resolveConnect = resolve;
+    });
+    const mockClient = {
+      _connection: undefined,
+      _ending: false,
+      connect: vi.fn(async () => {
+        await connectPromise;
+      }),
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    };
+    const driver = createBoundDriverFromBinding(
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      undefined,
+    );
+    cleanups.push(async () => {
+      await driver.close();
+    });
+
+    const first = driver.query('select 1');
+    const second = driver.query('select 1');
+    resolveConnect?.();
+    await Promise.all([first, second]);
+
+    expect(mockClient.connect).toHaveBeenCalledTimes(1);
+    expect(mockClient.query).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports connected state for bound direct driver', async () => {
+    const mockClient = {
+      _connection: {},
+      _ending: false,
       connect: vi.fn(async () => {}),
       query: vi.fn(async () => ({ rows: [] })),
       end: vi.fn(async () => {}),
-    } as unknown as Client;
-
-    const poolDriver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, { disabled: true });
-    const directDriver = createBoundDriverFromBinding(
-      { kind: 'pgClient', client: directClient },
-      { disabled: true },
+    };
+    const driver = createBoundDriverFromBinding(
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      undefined,
     );
+    cleanups.push(async () => {
+      await driver.close();
+    });
 
-    await expect(
-      poolDriver.connect({
-        kind: 'pgPool',
-        pool,
-      } satisfies PostgresBinding),
-    ).resolves.toBeUndefined();
-    await expect(
-      directDriver.connect({
-        kind: 'pgClient',
-        client: directClient,
-      } satisfies PostgresBinding),
-    ).resolves.toBeUndefined();
+    expect(driver.state).toBe('connected');
   });
 
-  it('releases direct-connection handles without pool release function', async () => {
-    const directClient = {
+  it('reports closed state for direct driver after close', async () => {
+    const mockClient = {
+      _connection: {},
+      _ending: false,
       connect: vi.fn(async () => {}),
-      query: vi.fn(async (sql: string) => {
-        if (sql === 'BEGIN') {
-          return { rows: [] };
-        }
-        return { rows: [] };
-      }),
+      query: vi.fn(async () => ({ rows: [] })),
       end: vi.fn(async () => {}),
-    } as unknown as Client;
-
+    };
     const driver = createBoundDriverFromBinding(
-      { kind: 'pgClient', client: directClient },
-      { disabled: true },
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      undefined,
     );
-    const connection = await driver.acquireConnection();
 
+    await driver.close();
+
+    expect(driver.state).toBe('closed');
+  });
+
+  it(
+    'constructs and closes url-bound driver',
+    async () => {
+      const driver = createBoundDriverFromBinding(
+        { kind: 'url', url: 'postgresql://127.0.0.1:65432/unused' },
+        undefined,
+      );
+      await driver.close();
+      expect(driver).toBeDefined();
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it('closes direct client once when close called multiple times', async () => {
+    const mockClient = {
+      _connection: {},
+      _ending: false,
+      connect: vi.fn(async () => {}),
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    };
+    const driver = createBoundDriverFromBinding(
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      undefined,
+    );
+
+    await driver.close();
+    await driver.close();
+
+    expect(mockClient.end).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases direct connection without release method', async () => {
+    const mockClient = {
+      _connection: {},
+      _ending: false,
+      connect: vi.fn(async () => {}),
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    };
+    const driver = createBoundDriverFromBinding(
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      undefined,
+    );
+    cleanups.push(async () => {
+      await driver.close();
+    });
+
+    const connection = await driver.acquireConnection();
     await expect(connection.release()).resolves.toBeUndefined();
   });
 
-  it('closes pool once when close is called repeatedly', async () => {
-    const pool = {
-      connect: vi.fn(async () => ({
-        query: vi.fn(async () => ({ rows: [] })),
-        release: vi.fn(),
-      })),
-      end: vi.fn(async () => {}),
-    } as unknown as Pool;
-
-    const driver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, { disabled: true });
-    await driver.close();
-    await driver.close();
-
-    expect((pool as unknown as { end: ReturnType<typeof vi.fn> }).end).toHaveBeenCalledTimes(1);
-  });
-
-  it('closes direct client once when close is called repeatedly', async () => {
-    const directClient = {
-      connect: vi.fn(async () => {}),
+  it('releases lease when direct acquireConnection fails', async () => {
+    const mockClient = {
+      _connection: undefined,
+      _ending: false,
+      connect: vi.fn(async () => {
+        throw new Error('connect failed');
+      }),
       query: vi.fn(async () => ({ rows: [] })),
       end: vi.fn(async () => {}),
-    } as unknown as Client;
-
+    };
     const driver = createBoundDriverFromBinding(
-      { kind: 'pgClient', client: directClient },
-      { disabled: true },
+      { kind: 'pgClient', client: mockClient as unknown as Client },
+      undefined,
     );
-    await driver.close();
-    await driver.close();
+    cleanups.push(async () => {
+      await driver.close();
+    });
 
-    expect(
-      (directClient as unknown as { end: ReturnType<typeof vi.fn> }).end,
-    ).toHaveBeenCalledTimes(1);
-  });
-
-  it('exposes bound driver state transitions for pool and direct client', async () => {
-    const pool = {
-      connect: vi.fn(async () => ({
-        query: vi.fn(async () => ({ rows: [] })),
-        release: vi.fn(),
-      })),
-      end: vi.fn(async () => {}),
-    } as unknown as Pool;
-
-    const directClient = {
-      connect: vi.fn(async () => {}),
-      query: vi.fn(async () => ({ rows: [] })),
-      end: vi.fn(async () => {}),
-    } as unknown as Client;
-
-    const poolDriver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, { disabled: true });
-    const directDriver = createBoundDriverFromBinding(
-      { kind: 'pgClient', client: directClient },
-      { disabled: true },
-    );
-
-    expect(poolDriver.state).toBe('connected');
-    expect(directDriver.state).toBe('connected');
-
-    await poolDriver.close();
-    await directDriver.close();
-
-    expect(poolDriver.state).toBe('closed');
-    expect(directDriver.state).toBe('closed');
+    await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
+    await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
   });
 });

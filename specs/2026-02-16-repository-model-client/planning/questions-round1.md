@@ -6,7 +6,7 @@ Based on your idea for a **Model Client / Repository Pattern** and the extensive
 
 **1. Scope boundary -- read-only vs. mutations in this spec**
 
-The current implementation covers the read path: `findMany()`, `findFirst()`, `where()`, `include()`, `orderBy()`, `take()`, `skip()`. The `new-api.md` sketches also show mutations (`.create()`, nested mutations like `.findUnique().comments.create(commentInput)`), and ADR 161 explicitly discusses CREATE without RETURNING and nested creates.
+The current implementation covers the read path: `findMany()`, `findFirst()`, `where()`, `include()`, `orderBy()`, `take()`, `skip()`. The `new-api.md` sketches also show mutations (`.create()`, nested mutations like `.findUnique().comments.create(commentInput)`), and ADR 164 explicitly discusses CREATE without RETURNING and nested creates.
 
 I am assuming this spec should focus on **solidifying and completing the read API** (including any gaps like `findUnique()`, `count()`, `exists()`, `select()` for field projection, and `distinct()`) and then separately tackle **basic single-model mutations** (`create`, `update`, `delete`). Is that correct, or should mutations be deferred entirely to a follow-up spec? Alternatively, should nested mutations (parent + children) also be in scope here?
 
@@ -79,7 +79,7 @@ Should the custom repository constructor be simplified in this spec, or is the c
 
 **7. Transaction support at the repository level**
 
-ADR 161 mentions `transaction(fn)` as a runtime primitive the repository layer uses. The `RuntimeQueryable` interface already has `transaction?(): Promise<RuntimeTransaction>`. However, there is no user-facing transaction API on the `orm()` client yet (like `db.$transaction(async (tx) => { ... })`).
+ADR 164 mentions `transaction(fn)` as a runtime primitive the repository layer uses. The `RuntimeQueryable` interface already has `transaction?(): Promise<RuntimeTransaction>`. However, there is no user-facing transaction API on the `orm()` client yet (like `db.$transaction(async (tx) => { ... })`).
 
 I am assuming this spec should at minimum define how users wrap multiple repository operations in a transaction. Is a `db.$transaction()` pattern the right approach, or should transaction scoping be handled differently (for example, passing a transaction context to individual repository methods)?
 
@@ -122,7 +122,7 @@ Are there other features or concerns I should explicitly exclude, or should any 
 
 Are there existing features in your codebase with similar patterns we should reference? For example:
 - The `sql-lane` package has a composable query DSL -- should the repository layer internally delegate to it for building Plans, or continue using Kysely directly as it does now?
-- The `sql-orm-lane` package (`@prisma-next/sql-orm-lane`) appears to be the ORM lane that ADR 161 says will be superseded -- should we reference its patterns or deliberately diverge?
+- The `sql-orm-lane` package (`@prisma-next/sql-orm-lane`) appears to be the ORM lane that ADR 164 says will be superseded -- should we reference its patterns or deliberately diverge?
 - The `RuntimeExecutor` plugin lifecycle (hooks like `beforeCompile`, `afterExecute`) -- should repository operations participate in these hooks at the operation level?
 
 Please provide file/folder paths or names of these features if there are specific patterns to follow or avoid.

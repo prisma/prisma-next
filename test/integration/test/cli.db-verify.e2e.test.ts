@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -437,11 +438,7 @@ withTempDir(({ createTempDir }) => {
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             // driver is missing - this is what we're testing
             extensionPacks: [],
-            contract: {
-              source: contract,
-              output: 'output/contract.json',
-              types: 'output/contract.d.ts',
-            },
+            contract: typescriptContract(contract, 'output/contract.json'),
             db: {
               connection: connectionString,
             },

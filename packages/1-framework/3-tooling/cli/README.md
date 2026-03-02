@@ -66,6 +66,7 @@ The `contract emit` command does not require a `driver` in the config since it d
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
@@ -76,11 +77,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   extensionPacks: [],
-  contract: {
-    source: contract,
-    output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
-  },
+  contract: typescriptContract(contract, 'src/prisma/contract.json'),
 });
 ```
 
@@ -145,6 +142,7 @@ The `db verify` command requires a `driver` in the config to connect to the data
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
@@ -157,11 +155,7 @@ export default defineConfig({
   adapter: postgresAdapter,
   driver: postgresDriver,
   extensionPacks: [],
-  contract: {
-    source: contract,
-    output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
-  },
+  contract: typescriptContract(contract, 'src/prisma/contract.json'),
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
@@ -305,6 +299,7 @@ The `db introspect` command requires a `driver` in the config to connect to the 
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
@@ -468,11 +463,7 @@ export default defineConfig({
   adapter: postgresAdapter,
   driver: postgresDriver,
   extensionPacks: [],
-  contract: {
-    source: contract,
-    output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
-  },
+  contract: typescriptContract(contract, 'src/prisma/contract.json'),
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
@@ -667,6 +658,7 @@ The `db init` command requires a `driver` in the config to connect to the databa
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
@@ -679,11 +671,7 @@ export default defineConfig({
   adapter: postgresAdapter,
   driver: postgresDriver,
   extensionPacks: [],
-  contract: {
-    source: contract,
-    output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
-  },
+  contract: typescriptContract(contract, 'src/prisma/contract.json'),
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
@@ -802,6 +790,7 @@ The CLI uses a config file to specify the target family, target, adapter, extens
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
+import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
@@ -812,22 +801,18 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   extensionPacks: [],
-  contract: {
-    source: contract, // Can be a value or a function: () => import('./contract').then(m => m.contract)
-    output: 'src/prisma/contract.json', // Optional: defaults to 'src/prisma/contract.json'
-    types: 'src/prisma/contract.d.ts', // Optional: defaults to output with .d.ts extension
-  },
+  contract: typescriptContract(contract, 'src/prisma/contract.json'),
 });
 ```
 
-The `contract.source` field can be:
-- A direct value: `source: contract`
-- A synchronous function: `source: () => contract`
-- An asynchronous function: `source: () => import('./contract').then(m => m.contract)`
+Prefer helper utilities for authoring mode selection:
+- `typescriptContract(contractIR, outputPath?)` from `@prisma-next/sql-contract-ts/config-types` for TS-authored contracts
+- `prismaContract(schemaPath, { output?, target? })` from `@prisma-next/sql-contract-psl/provider` for PSL-authored providers
+- Provider failures are returned as structured diagnostics for CLI rendering
 
 The `contract.output` field specifies the path to `contract.json`. This is the canonical location where other CLI commands can find the contract JSON artifact. Defaults to `'src/prisma/contract.json'` if not specified.
 
-The `contract.types` field specifies the path to `contract.d.ts`. Defaults to `output` with `.d.ts` extension (replaces `.json` with `.d.ts` if output ends with `.json`, otherwise appends `contract.d.ts` to the directory containing output).
+`contract.d.ts` is always colocated with `contract.json` and derived from `contract.output` (`contract.json` → `contract.d.ts`).
 
 **Output:**
 - `contract.json`: Includes `_generated` metadata field indicating it's a generated artifact (excluded from canonicalization/hashing)
@@ -877,11 +862,12 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - Supports global flags (JSON, verbosity, color, timestamps)
 - **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern (`performAction`), and `process.exit()`. Commands wrap logic in `performAction()`, process results with `handleResult()`, and call `process.exit(exitCode)` directly. See `.cursor/rules/cli-error-handling.mdc` for details.
 - Loads the user's config module (`prisma-next.config.ts`)
-- Resolves contract from config:
-  - Uses `config.contract.source` (supports sync and async functions)
-  - User's config is responsible for loading the contract (can use `loadContractFromTs` or any other method)
+- Resolves contract from provider:
+  - Calls `config.contract.source()` and expects `Result<ContractIR, Diagnostics>`
+  - Source-specific parsing/loading stays inside providers
+  - Provider diagnostics are surfaced as actionable CLI failures
   - Throws error if `config.contract` is missing
-- Uses artifact paths from `config.contract.output/types` (already normalized by `defineConfig()` with defaults applied)
+- Uses artifact path from `config.contract.output` (already normalized by `defineConfig()` with defaults applied)
 - Creates family instance via `config.family.create()` (assembles operation registry, type imports, extension IDs)
 - Calls `familyInstance.emitContract()` with raw contract (instance handles stripping mappings and validation internally)
 - Outputs human-readable or JSON format based on flags

@@ -165,95 +165,99 @@ describe('emitter → lanes integration', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('emits contract with nullable fields and infers types correctly', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      extensionPacks: {
-        postgres: { version: '0.0.1' },
-      },
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
-            name: { column: 'name' },
-          },
-          relations: {},
+  it(
+    'emits contract with nullable fields and infers types correctly',
+    async () => {
+      const ir: ContractIR = {
+        schemaVersion: '1',
+        targetFamily: 'sql',
+        target: 'postgres',
+        extensionPacks: {
+          postgres: { version: '0.0.1' },
         },
-      },
-      relations: {},
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              name: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'email' },
+              name: { column: 'name' },
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+            relations: {},
           },
         },
-      },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+        relations: {},
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                name: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        capabilities: {},
+        meta: {},
+        sources: {},
+      };
 
-    const {
-      adapter: adapterDescriptor,
-      target: targetDescriptor,
-      extensions: extensionDescriptors,
-      descriptors,
-    } = getSqlDescriptorBundle();
-    const operationRegistry = assembleOperationRegistry(descriptors);
-    const codecTypeImports = extractCodecTypeImports(descriptors);
-    const operationTypeImports = extractOperationTypeImports(descriptors);
-    const extensionIds = extractExtensionIds(
-      adapterDescriptor,
-      targetDescriptor,
-      extensionDescriptors,
-    );
-    const options: EmitOptions = {
-      outputDir: testDir,
-      operationRegistry,
-      codecTypeImports,
-      operationTypeImports,
-      extensionIds,
-    };
+      const {
+        adapter: adapterDescriptor,
+        target: targetDescriptor,
+        extensions: extensionDescriptors,
+        descriptors,
+      } = getSqlDescriptorBundle();
+      const operationRegistry = assembleOperationRegistry(descriptors);
+      const codecTypeImports = extractCodecTypeImports(descriptors);
+      const operationTypeImports = extractOperationTypeImports(descriptors);
+      const extensionIds = extractExtensionIds(
+        adapterDescriptor,
+        targetDescriptor,
+        extensionDescriptors,
+      );
+      const options: EmitOptions = {
+        outputDir: testDir,
+        operationRegistry,
+        codecTypeImports,
+        operationTypeImports,
+        extensionIds,
+      };
 
-    const result = await emit(ir, options, sqlTargetFamilyHook);
-    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
-    const contract = validateContract(contractJson);
+      const result = await emit(ir, options, sqlTargetFamilyHook);
+      const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+      const contract = validateContract(contractJson);
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
-    const tables = schema(context).tables;
-    const userTable = tables['user'];
-    if (!userTable) throw new Error('user table not found');
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user'];
+      if (!userTable) throw new Error('user table not found');
 
-    const plan = sql({ context })
-      .from(userTable)
-      .select({
-        id: userTable.columns['id']!,
-        email: userTable.columns['email']!,
-        name: userTable.columns['name']!,
-      })
-      .build();
+      const plan = sql({ context })
+        .from(userTable)
+        .select({
+          id: userTable.columns['id']!,
+          email: userTable.columns['email']!,
+          name: userTable.columns['name']!,
+        })
+        .build();
 
-    // SqlQueryPlan doesn't have sql property - lowering happens in runtime
-    expect(plan.ast).toBeDefined();
+      // SqlQueryPlan doesn't have sql property - lowering happens in runtime
+      expect(plan.ast).toBeDefined();
 
-    type UserRow = ResultType<typeof plan>;
-    expectTypeOf<UserRow>().toHaveProperty('id');
-    expectTypeOf<UserRow>().toHaveProperty('email');
-    expectTypeOf<UserRow>().toHaveProperty('name');
-  });
+      type UserRow = ResultType<typeof plan>;
+      expectTypeOf<UserRow>().toHaveProperty('id');
+      expectTypeOf<UserRow>().toHaveProperty('email');
+      expectTypeOf<UserRow>().toHaveProperty('name');
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('round-trip: IR → JSON → lanes → plan', async () => {
     const ir: ContractIR = {

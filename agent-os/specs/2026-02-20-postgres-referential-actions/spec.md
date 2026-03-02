@@ -131,7 +131,7 @@ ON UPDATE NO ACTION
 ### Post-check / Verification
 
 - Extend `foreignKeyMatches` post-check (or equivalent) to include `onDelete` and `onUpdate` in the params when present.
-- Schema verification (`verify-helpers.ts`) compares introspected referential actions against contract when the contract **explicitly specifies** `onDelete`/`onUpdate`. When omitted (`undefined`), verification skips the comparison — omission means "don't care", not "assert NO ACTION" (see ADR 162, section 7).
+- Schema verification (`verify-helpers.ts`) compares introspected referential actions against contract when the contract **explicitly specifies** `onDelete`/`onUpdate`. When omitted (`undefined`), verification skips the comparison — omission means "don't care", not "assert NO ACTION" (see ADR 166, section 7).
 - `noAction` in the contract is normalized to `undefined` before comparison, so explicit `noAction` passes against a database using the default `NO ACTION`.
 
 ### Introspection

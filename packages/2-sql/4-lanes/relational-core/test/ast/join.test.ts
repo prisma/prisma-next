@@ -166,8 +166,11 @@ describe('ast/join', () => {
 
       const joinOnExpr = createJoinOnExpr(left, right);
 
-      expect(joinOnExpr.left).toBe(left);
-      expect(joinOnExpr.right).toBe(right);
+      expect(joinOnExpr.kind).toBe('eqCol');
+      if (joinOnExpr.kind === 'eqCol') {
+        expect(joinOnExpr.left).toBe(left);
+        expect(joinOnExpr.right).toBe(right);
+      }
     });
   });
 

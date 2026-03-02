@@ -1,3 +1,7 @@
+import type {
+  ContractSourceDiagnostics,
+  ContractSourceProvider,
+} from '@prisma-next/core-control-plane/config-types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,
@@ -204,36 +208,13 @@ export interface IntrospectOptions {
 }
 
 /**
- * Contract source as a raw value (any JSON-serializable value).
- */
-export interface ContractSourceValue {
-  readonly kind: 'value';
-  readonly value: unknown;
-}
-
-/**
- * Contract source as a lazy loader function.
- */
-export interface ContractSourceLoader {
-  readonly kind: 'loader';
-  readonly load: () => unknown | Promise<unknown>;
-}
-
-/**
- * Discriminated union for contract source.
- * Use `kind` to determine how to resolve the contract.
- */
-export type EmitContractSource = ContractSourceValue | ContractSourceLoader;
-
-/**
  * Contract configuration for emit operation.
  */
 export interface EmitContractConfig {
   /**
-   * Contract source - either a raw value or a loader function.
-   * Switch on `source.kind` to determine how to resolve.
+   * Contract source provider.
    */
-  readonly source: EmitContractSource;
+  readonly sourceProvider: ContractSourceProvider;
   /**
    * Output path for contract.json.
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
@@ -340,6 +321,7 @@ export interface EmitFailure {
   readonly summary: string;
   readonly why: string | undefined;
   readonly meta: Record<string, unknown> | undefined;
+  readonly diagnostics?: ContractSourceDiagnostics;
 }
 
 /**

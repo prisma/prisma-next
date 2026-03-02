@@ -19,8 +19,22 @@ const {
 } = config;
 
 const normalizeGlob = (glob) => {
-  let pattern = glob.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
-  if (!pattern.endsWith('.*') && !pattern.endsWith('/')) {
+  const DOUBLE_WILDCARD = '__DOUBLE_WILDCARD__';
+  const SINGLE_WILDCARD = '__SINGLE_WILDCARD__';
+  const hasWildcard = glob.includes('*');
+  const lastPathSegment = glob.split('/').pop() ?? '';
+  const isFileLikePattern = !hasWildcard && lastPathSegment.includes('.');
+
+  let pattern = glob
+    .replace(/\*\*/g, DOUBLE_WILDCARD)
+    .replace(/\*/g, SINGLE_WILDCARD)
+    .replaceAll(DOUBLE_WILDCARD, '.*')
+    .replaceAll(SINGLE_WILDCARD, '[^/]*');
+
+  if (isFileLikePattern) {
+    return `^${pattern}$`;
+  }
+  if (!hasWildcard && !pattern.endsWith('/')) {
     pattern += '/.*';
   }
   return `^${pattern}`;

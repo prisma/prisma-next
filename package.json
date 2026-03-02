@@ -28,7 +28,7 @@
     "rules:footprint": "node scripts/rules-footprint.mjs",
     "lint:docs": "node scripts/validate-package-readmes.mjs",
     "typecheck": "turbo run typecheck",
-    "typecheck:all": "turbo run typecheck --include-examples",
+    "typecheck:all": "pnpm typecheck && pnpm typecheck:examples",
     "typecheck:packages": "turbo run typecheck --filter='!./examples/**'",
     "typecheck:examples": "turbo run typecheck --filter='./examples/**'",
     "clean": "turbo run clean",

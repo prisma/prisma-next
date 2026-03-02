@@ -1,3 +1,4 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import { orm } from '../src/orm';
@@ -272,22 +273,26 @@ describe('orm()', () => {
     type _UnknownCollection = DbClient['unknown'];
   });
 
-  it('uses registered collection classes in include refinements', () => {
-    const runtime = createMockRuntime();
-    const db = orm({
-      contract,
-      runtime,
-      collections: { posts: PostCollection },
-    });
+  it(
+    'uses registered collection classes in include refinements',
+    { timeout: timeouts.typeScriptCompilation },
+    () => {
+      const runtime = createMockRuntime();
+      const db = orm({
+        contract,
+        runtime,
+        collections: { posts: PostCollection },
+      });
 
-    const withPosts = db.users.include('posts', (posts) => {
-      expectPostCollection(posts);
-      return posts.popular();
-    });
+      const withPosts = db.users.include('posts', (posts) => {
+        expectPostCollection(posts);
+        return posts.popular();
+      });
 
-    const include = withPosts.state.includes[0]!;
-    expect(include.nested.filters).toHaveLength(1);
-  });
+      const include = withPosts.state.includes[0]!;
+      expect(include.nested.filters).toHaveLength(1);
+    },
+  );
 
   it('propagates registered collection classes through nested include refinements', () => {
     const runtime = createMockRuntime();

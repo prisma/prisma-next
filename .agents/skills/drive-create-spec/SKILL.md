@@ -1,11 +1,10 @@
 ---
 name: drive-create-spec
-description: >
-  Generate and iteratively refine engineering specs from a description, conversation summary,
+description: Generate and iteratively refine engineering specs from a description, conversation summary,
   or blank template. Use when the user wants to create a spec, PRD, product requirements document,
   write up requirements, or spec out a feature. Also use when summarising a conversation into a spec.
 metadata:
-  version: "2026.2.23"
+  version: "2026.3.1"
 ---
 
 # Generate Spec
@@ -18,6 +17,7 @@ Produce a complete engineering spec by combining an engineer's input with senior
 - **Task/feature spec (within a project)**: `projects/{project}/specs/{name}.spec.md` where `{name}` is kebab-case (e.g. `pdf-export.spec.md`, `webhook-retry.spec.md`)
 - If the engineer does not specify a project, ask for a `{project}` slug (kebab-case) and create the directory structure under `projects/{project}/`.
 - Note: `projects/{project}/` is **transient**. At project close-out, long-lived docs (ADRs, subsystem docs) should be migrated into `docs/` and the `projects/{project}/` folder deleted.
+- Avoid creating **durable repo docs** (e.g. `docs/**`, READMEs) that link into `projects/{project}/**`. If such links are temporarily useful during execution, the project close-out must remove/replace them with canonical `docs/` links before deleting `projects/{project}/`.
 
 ## Entry Points
 

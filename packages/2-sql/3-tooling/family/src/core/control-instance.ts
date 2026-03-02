@@ -317,6 +317,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     return contract;
   }
 
+  function normalizeProviderContractIR(contract: unknown): ContractIR {
+    const contractWithoutMappings = stripMappings(contract);
+    const validated = validateContract<SqlContract<SqlStorage>>(contractWithoutMappings);
+    const { mappings: _mappings, ...contractIR } = validated;
+    return contractIR as ContractIR;
+  }
+
   return {
     familyId: 'sql',
     operationRegistry,
@@ -326,9 +333,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     typeMetadataRegistry,
 
     validateContractIR(contractJson: unknown): ContractIR {
-      const validated = validateContract<SqlContract<SqlStorage>>(contractJson);
-      const { mappings: _mappings, ...contractIR } = validated;
-      return contractIR as ContractIR;
+      return normalizeProviderContractIR(contractJson);
     },
 
     async verify(verifyOptions: {
@@ -721,11 +726,10 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
 
     async emitContract({ contractIR }): Promise<EmitContractResult> {
-      const contractWithoutMappings = stripMappings(contractIR);
-      const validatedIR = this.validateContractIR(contractWithoutMappings);
+      const normalizedIR = normalizeProviderContractIR(contractIR);
 
       const result = await emit(
-        validatedIR,
+        normalizedIR,
         {
           outputDir: '',
           operationRegistry,

@@ -8,6 +8,7 @@ This package provides a high-level ORM client surface on top of the runtime that
 
 - Expose typed `Collection` primitives for model-level data access
 - Build filter/order/include state from fluent APIs (`where`, `include`, `orderBy`, `take`, `skip`)
+- Accept lane-agnostic `WhereArg` filter inputs (`WhereExpr` or `ToWhereExpr`) and normalize bound payloads inside ORM (Phase 2: strict payload validation + `ParamRef -> LiteralExpr` normalization)
 - Compile collection state into executable SQL plans using Kysely compilation
 - Execute and stitch include trees across multiple plan executions
 - Map storage-column rows back to model-field row shapes
@@ -51,5 +52,5 @@ const posts = await db.posts
 ## Related Docs
 
 - [Architecture Overview](../../../docs/Architecture%20Overview.md)
-- [ADR 161 - Repository Layer](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Repository%20Layer.md)
+- [ADR 164 - Repository Layer](../../../docs/architecture%20docs/adrs/ADR%20164%20-%20Repository%20Layer.md)
 - [Query Lanes Subsystem](../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)

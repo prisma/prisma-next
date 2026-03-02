@@ -1,18 +1,13 @@
-import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { Kysely } from 'kysely';
 import { db } from '../prisma/db';
+import { firstOrThrow } from '../result-utils';
 
 export async function getUserById(userId: string, runtime: Runtime) {
-  const contract = db.context.contract;
-  const kysely = new Kysely<KyselifyContract<typeof contract>>({
-    dialect: new KyselyPrismaDialect({ runtime, contract }),
-  });
-
-  return kysely
+  const query = db.kysely
     .selectFrom('user')
-    .selectAll()
+    .select(['id', 'email', 'createdAt'])
     .where('id', '=', userId)
-    .limit(1)
-    .executeTakeFirstOrThrow();
+    .limit(1);
+
+  return firstOrThrow(runtime.execute(db.kysely.build(query)), `User not found for id: ${userId}`);
 }

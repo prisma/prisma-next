@@ -365,7 +365,7 @@ describe('validateConfig', () => {
   it('validates contract config when present', () => {
     const config = createValidConfig({
       contract: {
-        source: 'src/prisma/contract.ts',
+        source: async () => ({ ok: true, value: {} }),
         output: 'src/prisma/contract.json',
       },
     });
@@ -391,7 +391,7 @@ describe('validateConfig', () => {
   it('throws error when contract.output is not a string', () => {
     const config = createValidConfig({
       contract: {
-        source: 'src/prisma/contract.ts',
+        source: async () => ({ ok: true, value: {} }),
         output: 123,
       },
     });
@@ -401,10 +401,30 @@ describe('validateConfig', () => {
   it('allows contract.output to be undefined', () => {
     const config = createValidConfig({
       contract: {
-        source: 'src/prisma/contract.ts',
+        source: async () => ({ ok: true, value: {} }),
       },
     });
     expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('validates contract source provider', () => {
+    const config = createValidConfig({
+      contract: {
+        source: async () => ({ ok: true, value: {} }),
+        output: 'src/prisma/contract.json',
+      },
+    });
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('throws when contract source is not a provider function', () => {
+    const config = createValidConfig({
+      contract: {
+        source: { kind: 'psl', schemaPath: './schema.prisma' },
+        output: 'src/prisma/contract.json',
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when family.version is missing', () => {

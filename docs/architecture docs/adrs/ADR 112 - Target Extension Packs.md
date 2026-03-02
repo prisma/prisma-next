@@ -63,7 +63,7 @@ export interface ContractSPI {
 
 ### PSL SPI (optional)
 
-- Maps PSL attributes like `@pgvector(dim: 1536, distance: "cosine")` to contract decorations
+- Maps PSL attributes like `@pgvector.column(length: 1536, distance: "cosine")` to contract decorations
 - Validates attribute usage and emits deterministic errors
 
 ```typescript

@@ -5,11 +5,8 @@ alwaysApply: true
 ---
 
 - Whenever you receive a correction or correct a mistake, make sure it's documented in .cursor/rules either by updating an existing doc or adding a new one
-- Whenever you make changes to a package, make sure its README stays up to date. READMEs should include:
-  - A description of the package
-  - Its responsibilities
-  - Dependencies it has on other packages, or other packages on it
-  - An architecture mermaid diagram
-  - Links to relevant subsystem docs or ADRs
-  - Any other context a developer needs when working in that package
+- Whenever you make changes to a package, make sure its docs stay up to date.
+  - **User-facing packages**: keep `README.md` focused on what the package does, when to use it, and a few concrete examples. Avoid internal implementation detail unless it materially affects usage.
+  - **Contributor details**: put responsibilities/dependencies/architecture diagrams/internal exports in `DEVELOPING.md` (or `CONTRIBUTING.md`) within that package, and add a short link from `README.md`.
+- Docs must not link to transient project artifacts under `projects/` (link to durable `docs/` or package READMEs instead)
 - If you establish a new design decision, update the architecture docs in `docs/architecture docs`

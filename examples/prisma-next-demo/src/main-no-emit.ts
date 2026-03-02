@@ -23,28 +23,12 @@
  * - entry.ts: Browser app for visualizing contract.json
  */
 import 'dotenv/config';
-import { type as arktype } from 'arktype';
+import { loadAppConfig } from './app-config';
 import { getRuntime } from './prisma-no-emit/runtime';
 import { getUserById } from './queries/get-user-by-id-no-emit';
 import { getUserPosts } from './queries/get-user-posts-no-emit';
 import { getUsers } from './queries/get-users-no-emit';
 import { getUsersWithPosts } from './queries/get-users-with-posts-no-emit';
-
-const appConfigSchema = arktype({
-  DATABASE_URL: 'string',
-});
-
-function loadAppConfig() {
-  const result = appConfigSchema({
-    DATABASE_URL: process.env['DATABASE_URL'],
-  });
-  if (result instanceof arktype.errors) {
-    const message = result.map((p: { message: string }) => p.message).join('; ');
-    throw new Error(`Invalid app configuration: ${message}`);
-  }
-  const parsed = result as { DATABASE_URL: string };
-  return { databaseUrl: parsed.DATABASE_URL };
-}
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;

@@ -26,3 +26,5 @@ agent-os/specs/**/review-targets.json
 agent-os/specs/**/review-actions.json
 agent-os/specs/**/review-actions.md
 agent-os/specs/**/summary.txt
+# Review framework artifacts
+agent-os/specs/review-framework/reviews/

@@ -40,7 +40,7 @@ Introduce a first-class Extension Codec model that packs register for specific c
 
 Extension types are named in the contract under a pack namespace:
 
-- `pgvector/vector(dim=1536)`
+- `pgvector/vector(length=1536)`
 - `postgis/geometry(srid=4326)`
 - `pg/range(int4)`
 - `pg/hstore`
@@ -131,7 +131,7 @@ Plan hashing (ADR 013) must not include the implementation identity of a codec. 
   "tables": {
     "item": {
       "columns": {
-        "embedding": { "type": "pgvector/vector", "attrs": { "dim": 1536 }, "nullable": false }
+        "embedding": { "type": "pgvector/vector", "attrs": { "length": 1536 }, "nullable": false }
       }
     }
   }

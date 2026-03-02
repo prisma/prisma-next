@@ -1,11 +1,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { dirname, isAbsolute, join, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
-import type { EmitContractSource, EmitFailure } from '../control-api/types';
+import type { EmitFailure } from '../control-api/types';
 import { CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
@@ -34,14 +34,34 @@ interface ContractEmitOptions {
   readonly 'no-color'?: boolean;
 }
 
+function mapDiagnosticsToIssues(
+  failure: EmitFailure,
+): ReadonlyArray<{ kind: string; message: string }> {
+  const diagnostics = failure.diagnostics?.diagnostics ?? [];
+  return diagnostics.map((diagnostic) => {
+    const location =
+      diagnostic.sourceId && diagnostic.span
+        ? ` (${diagnostic.sourceId}:${diagnostic.span.start.line}:${diagnostic.span.start.column})`
+        : diagnostic.sourceId
+          ? ` (${diagnostic.sourceId})`
+          : '';
+    return {
+      kind: diagnostic.code,
+      message: `${diagnostic.message}${location}`,
+    };
+  });
+}
+
 /**
  * Maps an EmitFailure to a CliStructuredError for consistent error handling.
  */
 function mapEmitFailure(failure: EmitFailure): CliStructuredError {
   if (failure.code === 'CONTRACT_SOURCE_INVALID') {
+    const issues = mapDiagnosticsToIssues(failure);
     return errorRuntime(failure.summary, {
-      why: failure.why ?? 'Contract source is invalid',
-      fix: 'Check your contract source configuration in prisma-next.config.ts',
+      why: failure.why ?? 'Contract source provider failed',
+      fix: 'Check your contract source provider in prisma-next.config.ts and ensure it returns Result<ContractIR, Diagnostics>',
+      ...(issues.length > 0 ? { meta: { issues } } : {}),
     });
   }
 
@@ -85,7 +105,7 @@ async function executeContractEmitCommand(
   if (!config.contract) {
     return notOk(
       errorContractConfigMissing({
-        why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ..., types: ... }',
+        why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ... }',
       }),
     );
   }
@@ -108,7 +128,10 @@ async function executeContractEmitCommand(
       }),
     );
   }
-  const outputJsonPath = resolve(contractConfig.output);
+  const configDir = options.config ? dirname(resolve(options.config)) : process.cwd();
+  const outputJsonPath = isAbsolute(contractConfig.output)
+    ? contractConfig.output
+    : join(configDir, contractConfig.output);
   // Colocate .d.ts with .json (contract.json → contract.d.ts)
   const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
@@ -123,7 +146,7 @@ async function executeContractEmitCommand(
     const typesPath = relative(process.cwd(), outputDtsPath);
     const header = formatStyledHeader({
       command: 'contract emit',
-      description: 'Write your contract to JSON and sign it',
+      description: 'Emit your contract artifacts',
       url: 'https://pris.ly/contract-emit',
       details: [
         { label: 'config', value: configPath },
@@ -147,17 +170,10 @@ async function executeContractEmitCommand(
   const onProgress = createProgressAdapter({ flags });
 
   try {
-    // Convert user config source to discriminated union
-    // Type assertion is safe: we check typeof to determine if it's a function
-    const source: EmitContractSource =
-      typeof contractConfig.source === 'function'
-        ? { kind: 'loader', load: contractConfig.source as () => unknown | Promise<unknown> }
-        : { kind: 'value', value: contractConfig.source };
-
     // Call emit with progress callback
     const result = await client.emit({
       contractConfig: {
-        source,
+        sourceProvider: contractConfig.source,
         output: outputJsonPath,
       },
       onProgress,
@@ -216,7 +232,7 @@ export function createContractEmitCommand(): Command {
   const command = new Command('emit');
   setCommandDescriptions(
     command,
-    'Write your contract to JSON and sign it',
+    'Emit your contract artifacts',
     'Reads your contract source (TypeScript or Prisma schema) and emits contract.json and\n' +
       'contract.d.ts. The contract.json contains the canonical contract structure, and\n' +
       'contract.d.ts provides TypeScript types for type-safe query building.',

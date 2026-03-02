@@ -3,6 +3,7 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
+import { ok } from '@prisma-next/utils/result';
 
 export default defineConfig({
   family: sql,
@@ -13,9 +14,8 @@ export default defineConfig({
   contract: {
     source: async () => {
       const { contract } = await import('./contract');
-      return contract;
+      return ok(contract);
     },
     output: '{{OUTPUT_DIR}}/contract.json',
-    types: '{{OUTPUT_DIR}}/contract.d.ts',
   },
 });

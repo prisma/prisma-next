@@ -1,22 +1,7 @@
 import { createHash } from 'node:crypto';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { CanonicalContractInput } from './canonicalization';
 import { canonicalizeContract } from './canonicalization';
-
-type ContractInput = {
-  schemaVersion: string;
-  targetFamily: string;
-  target: string;
-  models: Record<string, unknown>;
-  relations: Record<string, unknown>;
-  storage: Record<string, unknown>;
-  execution?: Record<string, unknown>;
-  extensionPacks: Record<string, unknown>;
-  sources: Record<string, unknown>;
-  capabilities: Record<string, Record<string, boolean>>;
-  meta: Record<string, unknown>;
-  [key: string]: unknown;
-};
 
 function computeHash(content: string): string {
   const hash = createHash('sha256');
@@ -24,8 +9,8 @@ function computeHash(content: string): string {
   return `sha256:${hash.digest('hex')}`;
 }
 
-export function computeStorageHash(contract: ContractInput): string {
-  const storageContract: ContractIR = {
+export function computeStorageHash(contract: CanonicalContractInput): string {
+  const storageContract = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,
     target: contract.target,
@@ -33,7 +18,6 @@ export function computeStorageHash(contract: ContractInput): string {
     models: {},
     relations: {},
     extensionPacks: {},
-    sources: {},
     capabilities: {},
     meta: {},
   };
@@ -41,8 +25,8 @@ export function computeStorageHash(contract: ContractInput): string {
   return computeHash(canonical);
 }
 
-export function computeProfileHash(contract: ContractInput): string {
-  const profileContract: ContractIR = {
+export function computeProfileHash(contract: CanonicalContractInput): string {
+  const profileContract = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,
     target: contract.target,
@@ -52,14 +36,13 @@ export function computeProfileHash(contract: ContractInput): string {
     extensionPacks: {},
     capabilities: contract.capabilities,
     meta: {},
-    sources: {},
   };
   const canonical = canonicalizeContract(profileContract);
   return computeHash(canonical);
 }
 
-export function computeExecutionHash(contract: ContractInput): string {
-  const executionContract: ContractIR = {
+export function computeExecutionHash(contract: CanonicalContractInput): string {
+  const executionContract = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,
     target: contract.target,
@@ -67,7 +50,6 @@ export function computeExecutionHash(contract: ContractInput): string {
     relations: {},
     storage: {},
     extensionPacks: {},
-    sources: {},
     capabilities: {},
     meta: {},
     ...ifDefined('execution', contract.execution),

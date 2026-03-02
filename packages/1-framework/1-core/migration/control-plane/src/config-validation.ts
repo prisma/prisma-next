@@ -256,6 +256,13 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
         why: 'Config.contract.source is required when contract is provided',
       });
     }
+
+    if (typeof contract['source'] !== 'function') {
+      throw errorConfigValidation('contract.source', {
+        why: 'Config.contract.source must be a provider function',
+      });
+    }
+
     if (contract['output'] !== undefined && typeof contract['output'] !== 'string') {
       throw errorConfigValidation('contract.output', {
         why: 'Config.contract.output must be a string when provided',

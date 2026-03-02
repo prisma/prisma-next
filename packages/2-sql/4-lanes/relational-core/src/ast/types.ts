@@ -1,3 +1,4 @@
+import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { ReturnSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
@@ -68,16 +69,26 @@ export type BinaryOp =
   | 'in'
   | 'notIn';
 
-export interface ListLiteralExpr {
-  readonly kind: 'listLiteral';
-  readonly values: ReadonlyArray<ParamRef | LiteralExpr>;
-}
-
 export interface BinaryExpr {
   readonly kind: 'bin';
   readonly op: BinaryOp;
   readonly left: Expression;
   readonly right: Expression | ParamRef | LiteralExpr | ListLiteralExpr;
+}
+
+export interface ListLiteralExpr {
+  readonly kind: 'listLiteral';
+  readonly values: ReadonlyArray<ParamRef | LiteralExpr>;
+}
+
+export interface AndExpr {
+  readonly kind: 'and';
+  readonly exprs: ReadonlyArray<WhereExpr>;
+}
+
+export interface OrExpr {
+  readonly kind: 'or';
+  readonly exprs: ReadonlyArray<WhereExpr>;
 }
 
 export interface ExistsExpr {
@@ -96,26 +107,30 @@ export interface NullCheckExpr {
   readonly isNull: boolean;
 }
 
-export interface AndExpr {
-  readonly kind: 'and';
-  readonly exprs: ReadonlyArray<WhereExpr>;
-}
-
-export interface OrExpr {
-  readonly kind: 'or';
-  readonly exprs: ReadonlyArray<WhereExpr>;
-}
-
 /**
  * Union type for WHERE clause expressions.
  */
 export type WhereExpr = BinaryExpr | ExistsExpr | NullCheckExpr | AndExpr | OrExpr;
 
-export type JoinOnExpr = {
-  readonly kind: 'eqCol';
-  readonly left: ColumnRef;
-  readonly right: ColumnRef;
-};
+export interface BoundWhereExpr {
+  readonly expr: WhereExpr;
+  readonly params: readonly unknown[];
+  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
+}
+
+export interface ToWhereExpr {
+  toWhereExpr(): BoundWhereExpr;
+}
+
+export type WhereArg = WhereExpr | ToWhereExpr;
+
+export type JoinOnExpr =
+  | {
+      readonly kind: 'eqCol';
+      readonly left: ColumnRef;
+      readonly right: ColumnRef;
+    }
+  | WhereExpr;
 
 export interface JoinAst {
   readonly kind: 'join';
@@ -154,6 +169,7 @@ export interface SelectAst {
   readonly where?: WhereExpr;
   readonly orderBy?: ReadonlyArray<{ expr: Expression; dir: Direction }>;
   readonly limit?: number;
+  readonly selectAllIntent?: { table?: string };
 }
 
 export interface InsertAst {
@@ -167,14 +183,14 @@ export interface UpdateAst {
   readonly kind: 'update';
   readonly table: TableRef;
   readonly set: Record<string, ColumnRef | ParamRef>;
-  readonly where: WhereExpr;
+  readonly where?: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 
 export interface DeleteAst {
   readonly kind: 'delete';
   readonly table: TableRef;
-  readonly where: WhereExpr;
+  readonly where?: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 

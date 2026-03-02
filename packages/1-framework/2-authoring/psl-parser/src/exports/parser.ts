@@ -1,0 +1,1 @@
+export { parsePslDocument } from '../parser';

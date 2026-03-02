@@ -29,9 +29,9 @@ import type {
 export type StorageHash =
   StorageHashBase<'sha256:065e445e4b728f3825cd85e4a492e187aef68f257eaec630d0170e27eb41b313'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589'>;
+  ExecutionHashBase<'sha256:0d75086cec931f0f10206995ebf8b463195be5630e546061d54d17cfc6cd2ba4'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61'>;
+  ProfileHashBase<'sha256:81fc13e821d3b7ae2947058ca08ba6786b4121d1b06a4710368c1458252a04e4'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;

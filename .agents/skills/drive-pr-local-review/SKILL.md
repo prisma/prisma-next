@@ -1,7 +1,6 @@
 ---
 name: drive-pr-local-review
-description: >
-  Generate local PR/branch review artifacts for the current branch vs its base: an in-repo canonical
+description: Generate local PR/branch review artifacts for the current branch vs its base - an in-repo canonical
   spec (if present) or an inferred review `spec.md`, plus `system-design-review.md`, `code-review.md`,
   and `walkthrough.md` (via `.agents/skills/drive-pr-walkthrough/SKILL.md`). Writes artifacts to disk
   (next to the in-repo spec when present, otherwise under `wip/`). Use when the user asks for a local
@@ -40,11 +39,18 @@ Defaults:
 - Review the **current branch**.
 - Base is the PR base branch when a GitHub PR exists; otherwise the repo default branch (typically `main`).
 
+Explicit override rule:
+- If the user specifies a base/parent branch, honor it exactly for the review range.
+- Do not substitute `origin/HEAD` or `origin/main` when an explicit base is provided.
+- If the provided name is ambiguous, resolve to `origin/<base>` when possible and record the resolved range in artifacts.
+
 Steps:
 1. Determine current branch name.
 2. Fetch latest refs from origin.
 3. Resolve base branch:
-   - If a PR exists for the current branch, use its `baseRefName`.
+   - If the user provided a base/parent branch, use it exactly.
+   - If the provided name is ambiguous, resolve to `origin/<base>` when possible and record the resolved range in artifacts.
+   - Otherwise, if a PR exists for the current branch, use its `baseRefName`.
    - Otherwise use the repo default branch (from `origin/HEAD`, typically `main`).
 4. Establish the review range:
    - Topic branch: `origin/<base>...HEAD`
@@ -175,6 +181,13 @@ Guidance:
 Prioritize findings by impact: security > correctness > performance > maintainability > style.
 
 ### 4.3) Finding format (required)
+
+#### 4.3.1) Finding IDs (required)
+
+All findings must have a **unique, unambiguous ID** so they can be referenced from other places (follow-up docs, comments, issue trackers).
+
+- Use a single, globally unique sequence across the entire `code-review.md` (do not restart numbering per section).
+- Preferred format: `F<NN>` (e.g. `F01`, `F02`, …), optionally with a section prefix for readability (e.g. `BLOCK-F01`, `NB-F02`, `NIT-F03`), but keep IDs globally unique.
 
 For each finding, include:
 - **Location**: repo-relative path + line range

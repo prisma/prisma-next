@@ -26,7 +26,8 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 021 | Contract Marker Storage | Defines database storage for contract identity verification and alignment checks | [ADR 021 - Contract Marker Storage.md](adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md) |
 | 042 | Contract Marker Evolution | Specifies marker table schema evolution and forward-compatible field additions | [ADR 042 - Contract Marker Evolution.md](adrs/ADR%20042%20-%20Contract%20Marker%20Evolution.md) |
 | 156 | Storage sets and check constraints | Adds `storage.sets` and a minimal `checks[]` shape to express “column value is in this set” explicitly in storage | [ADR 156 - Storage sets and check constraints.md](adrs/ADR%20156%20-%20Storage%20sets%20and%20check%20constraints.md) |
-| 162 | Typed default literal pipeline and extensibility | Documents the JSON-first typed-default pipeline (encode → emit → validate → verify → render), its limitations, and outlines a codec-keyed SPI for future extensibility | [ADR 162 - Typed default literal pipeline and extensibility.md](adrs/ADR%20162%20-%20Typed%20default%20literal%20pipeline%20and%20extensibility.md) |
+| 163 | Provider-invoked source interpretation packages | Keeps parsing/interpretation logic in provider-invoked authoring packages so CLI/control plane stay source-agnostic and IO-free | [ADR 163 - Provider-invoked source interpretation packages.md](adrs/ADR%20163%20-%20Provider-invoked%20source%20interpretation%20packages.md) |
+| 167 | Typed default literal pipeline and extensibility | Documents typed literal default flow across authoring/emission/verification/rendering and records deferred codec-keyed SPI follow-up | [ADR 167 - Typed default literal pipeline and extensibility.md](adrs/ADR%20167%20-%20Typed%20default%20literal%20pipeline%20and%20extensibility.md) |
 
 ## Query System
 
@@ -35,6 +36,8 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 011 | Unified Plan Model | Establishes common Plan structure across all query lanes with AST, SQL, and metadata | [ADR 011 - Unified Plan Model.md](adrs/ADR%20011%20-%20Unified%20Plan%20Model.md) |
 | 012 | Raw SQL Escape Hatch | Provides safe raw SQL execution with required annotations and verification | [ADR 012 - Raw SQL Escape Hatch.md](adrs/ADR%20012%20-%20Raw%20SQL%20Escape%20Hatch.md) |
 | 013 | Lane Agnostic Plan Identity | Ensures Plan identity and hashing work consistently across all query lanes | [ADR 013 - Lane Agnostic Plan Identity.md](adrs/ADR%20013%20-%20Lane%20Agnostic%20Plan%20Identity.md) |
+| 162 | Kysely lane emits PN SQL AST | Kysely authoring compiles to plans with PN-native QueryAst + refs so runtime plugins can inspect structure lane-agnostically | [ADR 162 - Kysely lane emits PN SQL AST.md](adrs/ADR%20162%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) |
+| 165 | ORM WhereArg literal normalization | Records Phase 2 decision to validate bound ToWhereExpr payloads then normalize ParamRef values into literals at ORM boundaries | [ADR 165 - ORM WhereArg literal normalization.md](adrs/ADR%20165%20-%20ORM%20WhereArg%20literal%20normalization.md) |
 | 018 | Plan Annotations Schema | Defines canonical JSON schema for Plan annotations and validation rules | [ADR 018 - Plan Annotations Schema.md](adrs/ADR%20018%20-%20Plan%20Annotations%20Schema.md) |
 | 019 | TypedSQL as Separate CLI | Establishes TypedSQL as out-of-tree tool that emits Plan factories | [ADR 019 - TypedSQL as Separate CLI.md](adrs/ADR%20019%20-%20TypedSQL%20as%20Separate%20CLI.md) |
 | 020 | Result Typing Rules | Defines how DSL and ORM compute result types from projections and joins | [ADR 020 - Result Typing Rules.md](adrs/ADR%20020%20-%20Result%20Typing%20Rules.md) |
@@ -52,9 +55,9 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 155 | Driver/Codec boundary and lowering responsibilities | Separates lowering vs codec encoding/decoding vs driver transport; standardizes codec↔driver boundary values as `string \| Uint8Array \| null` | [ADR 155 - Driver Codec Boundary and Lowering Responsibilities.md](adrs/ADR%20155%20-%20Driver%20Codec%20Boundary%20and%20Lowering%20Responsibilities.md) |
 | 157 | Execution enums | Defines execution-plane enum behavior derived from explicit storage enforcement; builds on ADR 155 and ADR 156 | [ADR 157 - Execution enums.md](adrs/ADR%20157%20-%20Execution%20enums.md) |
 | 158 | Execution mutation defaults | Defines execution-plane mutation defaults (`execution.mutations.defaults`) and a section-owned hashing model to avoid marker churn | [ADR 158 - Execution mutation defaults.md](adrs/ADR%20158%20-%20Execution%20mutation%20defaults.md) |
-| 159 | Postgres JSON and JSONB typed columns | Adds first-class PostgreSQL `json`/`jsonb` codec and column support with Standard Schema-based typed emission in `contract.d.ts` | [ADR 159 - Postgres JSON and JSONB typed columns.md](adrs/ADR%20159%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md) |
+| 168 | Postgres JSON and JSONB typed columns | Adds first-class PostgreSQL `json`/`jsonb` codec and column support with Standard Schema-based typed emission in `contract.d.ts` | [ADR 168 - Postgres JSON and JSONB typed columns.md](adrs/ADR%20168%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md) |
 | 160 | Plan grouping keys for multi-statement orchestration | Adds `meta.groupingKey` to correlate multiple statement executions that serve one higher-level operation | [ADR 160 - Plan grouping keys for multi-statement orchestration.md](adrs/ADR%20160%20-%20Plan%20grouping%20keys%20for%20multi-statement%20orchestration.md) |
-| 161 | Repository Layer | Defines `@prisma-next/sql-orm-client` as a multi-query orchestration surface in the extensions integrations layer | [ADR 161 - Repository Layer.md](adrs/ADR%20161%20-%20Repository%20Layer.md) |
+| 164 | Repository Layer | Defines `@prisma-next/sql-orm-client` as a multi-query orchestration surface in the extensions integrations layer | [ADR 164 - Repository Layer.md](adrs/ADR%20164%20-%20Repository%20Layer.md) |
 
 ## Migration System
 
@@ -70,6 +73,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 044 | Pre & post check vocabulary v1 | Establishes vocabulary and patterns for migration operation pre/post checks | [ADR 044 - Pre & post check vocabulary v1.md](adrs/ADR%20044%20-%20Pre%20&%20post%20check%20vocabulary%20v1.md) |
 | 154 | Component-owned database dependencies | Models database-side prerequisites as component-owned dependencies with pure schema-IR verification hooks (no fuzzy matching) | [ADR 154 - Component-owned database dependencies.md](adrs/ADR%20154%20-%20Component-owned%20database%20dependencies.md) |
 | 161 | Explicit foreign key constraint and index configuration | Adds two independent knobs (`foreignKeys.constraints`, `foreignKeys.indexes`) to control FK constraint and FK-backing index emission in migration DDL | [ADR 161 - Explicit foreign key constraint and index configuration.md](adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md) |
+| 166 | Referential actions for foreign keys | Adds optional `onDelete` / `onUpdate` action semantics to foreign keys and Postgres planner DDL emission (`ON DELETE` / `ON UPDATE`) | [ADR 166 - Referential actions for foreign keys.md](adrs/ADR%20166%20-%20Referential%20actions%20for%20foreign%20keys.md) |
 
 ## Preflight & CI
 
@@ -98,7 +102,6 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 118 | Bundle inclusion policy for packs | Establishes bundle inclusion policy and security constraints for packs | [ADR 118 - Bundle inclusion policy for packs.md](adrs/ADR%20118%20-%20Bundle%20inclusion%20policy%20for%20packs.md) |
 | 121 | Contract.d.ts structure and relation typing | Complete specification for Tables, Models, and Relations namespaces with proper relation field typing | [ADR 121 - Contract.d.ts structure and relation typing.md](adrs/ADR%20121%20-%20Contract.d.ts%20structure%20and%20relation%20typing.md) |
 | 126 | PSL top-level block SPI | Defines SPI for packs to register new top-level blocks (views, enums, etc.) with parsing, validation, and deterministic emission | [ADR 126 - PSL top-level block SPI.md](adrs/ADR%20126%20-%20PSL%20top-level%20block%20SPI.md) |
-| 127 | Views as extension-owned read-only sources | Specifies view representation as extension objects with optional read-only sources in contract, migration ops, and runtime enforcement | [ADR 127 - Views as extension-owned read-only sources.md](adrs/ADR%20127%20-%20Views%20as%20extension-owned%20read-only%20sources.md) |
 | 153 | Extension Package Naming Convention | Standardizes on `extension-*` prefix exclusively for extension pack npm names | [ADR 153 - Extension Package Naming Convention.md](adrs/ADR%20153%20-%20Extension%20Package%20Naming%20Convention.md) |
 
 ## Adapters & Targets

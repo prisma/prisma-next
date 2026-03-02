@@ -33,7 +33,7 @@ Behavior comes from adapters, extension packs, and runtime plugins, not global f
 All packages are modular and composable with strict tree‑shakability: only imported components end up in the bundle. Exports are curated and side‑effect free with named, per‑module entry points. We ship ESM‑compatible packages and TypeScript source to maximize modern bundler support and DX.
 
 ### Feedback before execution
-Fast, targeted feedback at authoring, planning, and execution time. Lints and budgets, preflight in CI, and marker checks catch risks early and explain what to fix, with stricter defaults in staging and production (ADR 022, ADR 029, ADR 051, ADR 021, ADR 115)
+Fast, targeted feedback at authoring, planning, and execution time. AST-first lints (SQL domain) and budgets inspect `plan.ast` when present; preflight in CI and marker checks catch risks early and explain what to fix, with stricter defaults in staging and production (ADR 022, ADR 029, ADR 051, ADR 021, ADR 115, ADR 162)
 
 ## Architecture at a Glance
 
@@ -46,7 +46,7 @@ Both planes operate on the same shared artifacts (produced and consumed via a sm
 
 - **Data Contract:** Generated from PSL + TypeScript builders + extension manifests and distributed as JSON alongside TypeScript definitions, including `storageHash` and optional `executionHash` for execution defaults
 - **Capability profile:** The contract declares required capabilities (and optional adapter pins) and emits a pinned `profileHash`. The runner verifies the database satisfies the contract and writes the same `profileHash` to the marker (ADR 117, ADR 021)
-- **Plan Factories:** Compile declarative inputs into deterministic plans with hash-stamped metadata
+- **Plan Factories:** Compile declarative inputs into deterministic plans with hash-stamped metadata (DSL, ORM, Raw SQL, TypedSQL, Kysely)
 - **Guardrail Plugins:** Applied during plan creation, preflight, and runtime execution
 - **Marker and ledger:** Database marker storing `storageHash` and `profileHash` plus an append-only ledger of applied edges for verification and audit (ADR 021, ADR 001)
 
@@ -74,7 +74,7 @@ flowchart LR
 
   subgraph "Execution Plane"
     QF["Plan Factories
-    DSL | TypedSQL | Raw"]
+    DSL | ORM | Raw | TypedSQL | Kysely"]
     RT[Runtime
     hooks + lints + budgets]
     Adp[Adapter

@@ -1,11 +1,10 @@
 ---
 name: drive-generate-plan
-description: >
-  Generate an execution plan from a spec, with milestones, tasks, and test coverage for all
+description: Generate an execution plan from a spec, with milestones, tasks, and test coverage for all
   acceptance criteria. Use when the user wants to plan a project, break a spec into milestones,
   generate tasks from a spec, or create an execution plan. Optionally creates a Linear project.
 metadata:
-  version: "2026.2.23"
+  version: "2026.3.1"
 ---
 
 # Generate Plan
@@ -15,8 +14,9 @@ Transform a spec into an execution plan by structuring milestones, decomposing t
 ## File Naming
 
 - **Project plan (from `projects/{project}/spec.md`)**: `projects/{project}/plan.md`
-- **Task/feature plan (from `projects/{project}/specs/{name}.spec.md`)**: `projects/{project}/plans/{name}.plan.md`
-- The plan name `{name}` matches the spec name (e.g. `pdf-export.spec.md` → `pdf-export.plan.md`).
+- **Task/feature plan (from `projects/{project}/specs/{name}.spec.md`)**: `projects/{project}/plans/{name}-plan.md`
+- The plan name `{name}` matches the spec name (e.g. `pdf-export.spec.md` → `pdf-export-plan.md`).
+- Avoid filenames containing `.plan.` (Cursor treats them specially).
 
 ## Entry Points
 
@@ -77,6 +77,7 @@ Given a spec, generate the full plan:
 6. **Add a close-out task (required).** The final milestone (or final tasks) must include:
    - Verify all acceptance criteria are met (and link to the tests/manual checks)
    - Finalize ADRs / long-lived documentation and migrate it into `docs/`
+   - Strip repo-wide references to `projects/{project}/**` (replace with canonical `docs/` links or remove)
    - Delete `projects/{project}/` (everything under it is transient)
    - If the project spec was merged, the close-out work is often done as a final PR that performs the doc migration + deletion
 
@@ -91,7 +92,7 @@ After writing the initial plan, enter a refinement loop:
 1. **Present gaps and assumptions in the chat window.** Format as a numbered list. Example:
 
    ```
-   I've drafted the plan at projects/my-proj/plans/feature-x.plan.md. A few things to resolve:
+   I've drafted the plan at projects/my-proj/plans/feature-x-plan.md. A few things to resolve:
 
    1. The spec mentions "admin approval flow" but doesn't detail the approval states. I assumed: pending -> approved/rejected. Does this need a more complex state machine?
    2. I've listed the Platform team as a collaborator since the spec references their auth service. Should anyone specific from that team be named?

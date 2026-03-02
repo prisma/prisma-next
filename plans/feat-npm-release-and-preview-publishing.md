@@ -87,7 +87,7 @@ All 33 packages need this:
 | `@prisma-next/plan` | `packages/1-framework/1-core/shared/plan` |
 | `@prisma-next/utils` | `packages/1-framework/1-core/shared/utils` |
 | `@prisma-next/contract-authoring` | `packages/1-framework/2-authoring/contract` |
-| `@prisma-next/contract-psl` | `packages/1-framework/2-authoring/contract-psl` |
+| `@prisma-next/psl-parser` | `packages/1-framework/2-authoring/psl-parser` |
 | `@prisma-next/contract-ts` | `packages/1-framework/2-authoring/contract-ts` |
 | `@prisma-next/ids` | `packages/1-framework/2-authoring/ids` |
 | `@prisma-next/cli` | `packages/1-framework/3-tooling/cli` |

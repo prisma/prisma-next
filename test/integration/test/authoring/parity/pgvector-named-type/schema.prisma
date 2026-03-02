@@ -1,0 +1,8 @@
+types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
+}
+
+model Document {
+  id Int @id @default(autoincrement())
+  embedding Embedding1536
+}

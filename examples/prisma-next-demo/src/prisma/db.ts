@@ -1,12 +1,11 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import postgres from '@prisma-next/postgres';
+import postgres from '@prisma-next/postgres/runtime';
 import { budgets } from '@prisma-next/sql-runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 export const db = postgres<Contract>({
   contractJson,
-  url: process.env['DATABASE_URL'] ?? 'postgresql://localhost:5432/prisma_next_demo',
   extensions: [pgvector],
   plugins: [
     budgets({

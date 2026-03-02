@@ -74,7 +74,7 @@ type ForeignKey = {
 };
 ```
 
-When omitted, the database applies its default behavior (Postgres: `NO ACTION`). See [ADR 162](../../../docs/architecture%20docs/adrs/ADR%20162%20-%20Referential%20actions%20for%20foreign%20keys.md) for design rationale.
+When omitted, the database applies its default behavior (Postgres: `NO ACTION`). See [ADR 166](../../../docs/architecture%20docs/adrs/ADR%20166%20-%20Referential%20actions%20for%20foreign%20keys.md) for design rationale.
 
 The `fk()` factory accepts referential actions via an options object:
 
