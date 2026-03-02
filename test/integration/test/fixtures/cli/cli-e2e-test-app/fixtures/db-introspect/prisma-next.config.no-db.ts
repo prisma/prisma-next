@@ -11,7 +11,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   contract: {
     source: async () => ({ ok: true, value: contract }),
     output: 'output/contract.json',

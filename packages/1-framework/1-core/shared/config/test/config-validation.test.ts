@@ -149,7 +149,6 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ family: { id: 123 } }), 'family.id');
     expectFieldError(createValidRawConfig({ family: { familyId: 123 } }), 'family.familyId');
     expectFieldError(createValidRawConfig({ family: { version: 123 } }), 'family.version');
-    expectFieldError(createValidRawConfig({ family: { manifest: undefined } }), 'family.manifest');
     expectFieldError(createValidRawConfig({ family: { hook: undefined } }), 'family.hook');
     expectFieldError(createValidRawConfig({ family: { create: 'invalid' } }), 'family.create');
   });
@@ -159,7 +158,6 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ target: { id: 123 } }), 'target.id');
     expectFieldError(createValidRawConfig({ target: { familyId: 123 } }), 'target.familyId');
     expectFieldError(createValidRawConfig({ target: { version: 123 } }), 'target.version');
-    expectFieldError(createValidRawConfig({ target: { manifest: undefined } }), 'target.manifest');
     expectFieldError(createValidRawConfig({ target: { targetId: 123 } }), 'target.targetId');
     expectFieldError(createValidRawConfig({ target: { create: 'invalid' } }), 'target.create');
   });
@@ -179,10 +177,6 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ adapter: { id: 123 } }), 'adapter.id');
     expectFieldError(createValidRawConfig({ adapter: { familyId: 123 } }), 'adapter.familyId');
     expectFieldError(createValidRawConfig({ adapter: { version: 123 } }), 'adapter.version');
-    expectFieldError(
-      createValidRawConfig({ adapter: { manifest: undefined } }),
-      'adapter.manifest',
-    );
     expectFieldError(createValidRawConfig({ adapter: { targetId: 123 } }), 'adapter.targetId');
     expectFieldError(createValidRawConfig({ adapter: { create: 'invalid' } }), 'adapter.create');
   });
@@ -292,22 +286,6 @@ describe('validateConfig', () => {
       }),
       'extensionPacks[].create',
     );
-    expectFieldError(
-      createValidRawConfig({
-        extensionPacks: [
-          {
-            kind: 'extension',
-            id: 'ext',
-            familyId: 'sql',
-            targetId: 'postgres',
-            version: '0.0.1',
-            manifest: undefined,
-            create: vi.fn(),
-          },
-        ],
-      }),
-      'extensionPacks[].manifest',
-    );
   });
 
   it('rejects legacy extensions key', () => {
@@ -323,7 +301,6 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ driver: { kind: 'invalid' } }), 'driver.kind');
     expectFieldError(createValidRawConfig({ driver: { id: 123 } }), 'driver.id');
     expectFieldError(createValidRawConfig({ driver: { version: 123 } }), 'driver.version');
-    expectFieldError(createValidRawConfig({ driver: { manifest: undefined } }), 'driver.manifest');
     expectFieldError(createValidRawConfig({ driver: { familyId: 123 } }), 'driver.familyId');
     expectFieldError(createValidRawConfig({ driver: { familyId: 'document' } }), 'driver.familyId');
     expectFieldError(createValidRawConfig({ driver: { targetId: 123 } }), 'driver.targetId');
@@ -376,6 +353,28 @@ describe('validateConfig', () => {
         output: 'src/prisma/contract.json',
       },
     });
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('accepts descriptors without manifest fields', () => {
+    const config = createValidRawConfig({
+      family: { manifest: undefined },
+      target: { manifest: undefined },
+      adapter: { manifest: undefined },
+      driver: { manifest: undefined },
+      extensionPacks: [
+        {
+          kind: 'extension',
+          id: 'pgvector',
+          familyId: 'sql',
+          targetId: 'postgres',
+          version: '0.0.1',
+          manifest: undefined,
+          create: vi.fn(),
+        },
+      ],
+    });
+
     expect(() => validateConfig(config)).not.toThrow();
   });
 });
