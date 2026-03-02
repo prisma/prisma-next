@@ -66,7 +66,7 @@ withTempDir(({ createTempDir }) => {
           consoleOutput.length = 0;
           await runDbUpdate(testSetup, ['--config', configPath, '--no-color']);
           const applyOutput = stripAnsi(consoleOutput.join('\n'));
-          expect(applyOutput).toContain('Applied 0 operation(s)');
+          expect(applyOutput).toContain('Database already matches contract');
         });
       },
       timeouts.spinUpPpgDev,
@@ -328,7 +328,7 @@ withTempDir(({ createTempDir }) => {
           await runDbUpdate(testSetup, ['--config', configPath, '--no-color']);
           const applyOutput = stripAnsi(consoleOutput.join('\n'));
 
-          expect(applyOutput).toContain('Applied 0 operation(s)');
+          expect(applyOutput).toContain('Database already matches contract');
         });
       },
       timeouts.spinUpPpgDev,

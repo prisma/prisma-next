@@ -4,7 +4,7 @@ exports[`db introspect command (e2e) > outputs JSON envelope with real database 
 {
   "meta": {
     "configPath": "prisma-next.config.ts",
-    "dbUrl": "postgres://postgres:****@127.0.0.1:XXXXX/template1?sslmode=disable",
+    "dbUrl": "postgres://****:****@127.0.0.1:XXXXX/template1?sslmode=disable",
   },
   "ok": true,
   "schema": {
@@ -60,7 +60,7 @@ exports[`db introspect command (e2e) > outputs tree structure with real database
 "prisma-next db introspect → Inspect the database schema
 │
 │ config:               prisma-next.config.ts
-│ database:             postgres://postgres:****@127.0.0.1:XXXXX/template1?sslmode=disable
+│ database:             postgres://****:****@127.0.0.1:XXXXX/template1?sslmode=disable
 │
 │ Read more             https://pris.ly/db-introspect
 └

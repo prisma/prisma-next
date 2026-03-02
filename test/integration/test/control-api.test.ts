@@ -152,8 +152,8 @@ describe('control-api', () => {
               });
 
               expect(result.ok).toBe(false);
-              // Summary contains "Database not signed"
-              expect(result.summary.toLowerCase()).toContain('not signed');
+              // Summary contains "Marker missing"
+              expect(result.summary.toLowerCase()).toContain('marker missing');
             } finally {
               await client.close();
             }

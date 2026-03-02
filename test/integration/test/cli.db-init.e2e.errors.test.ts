@@ -51,7 +51,7 @@ withTempDir(({ createTempDir }) => {
             ).rejects.toThrow();
 
             const errorText = stripAnsi(consoleErrors.join('\n'));
-            expect(errorText).toContain('PN-RTM-3000');
+            expect(errorText).toContain('PN-RTM-3020');
             expect(errorText).toContain('Issues');
             expect(errorText).toContain('Extra column "user"."name"');
           });
