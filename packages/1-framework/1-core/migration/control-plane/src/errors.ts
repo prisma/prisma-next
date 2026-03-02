@@ -407,7 +407,8 @@ export function errorTargetMismatch(
 }
 
 /**
- * Database marker is required but not found (db update precondition).
+ * Database marker is required but not found.
+ * Used by commands that require a pre-existing marker as a precondition.
  */
 export function errorMarkerRequired(options?: {
   readonly why?: string;

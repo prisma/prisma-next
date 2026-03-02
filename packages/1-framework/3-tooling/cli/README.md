@@ -780,13 +780,12 @@ Applying migration plan and verifying schema...
 
 ### `prisma-next db update`
 
-Reconcile a **marker-managed** database to the currently emitted contract.
+Update your database schema to match the currently emitted contract.
 
 `db update` differs from `db init`:
 
-- Requires an existing marker (fails fast with guidance to run `db init` when missing)
+- Works on any database, whether or not it has been initialized with `db init` (creates the signature table if missing)
 - Allows `additive`, `widening`, and `destructive` operation classes where supported by planner/runner
-- Anchors plan origin to the marker hashes before runner execution
 - Keeps full runner execution checks enabled
 - In `--plan` mode for SQL targets, prints a DDL preview derived from planned operations
 

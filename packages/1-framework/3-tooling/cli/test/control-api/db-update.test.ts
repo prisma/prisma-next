@@ -64,17 +64,21 @@ function createMockMigrations(overrides?: {
 const dummyContractIR = { schemaVersion: '1', target: 'postgres' } as unknown as ContractIR;
 
 describe('executeDbUpdate', () => {
-  it('throws errorMarkerRequired when no marker exists', async () => {
-    await expect(
-      executeDbUpdate({
-        driver: createMockDriver(),
-        familyInstance: createMockFamilyInstance({ readMarker: async () => null }),
-        contractIR: dummyContractIR,
-        mode: 'apply',
-        migrations: createMockMigrations(),
-        frameworkComponents: [],
-      }),
-    ).rejects.toThrow('Database must be signed first');
+  it('succeeds on a fresh database without marker', async () => {
+    const result = await executeDbUpdate({
+      driver: createMockDriver(),
+      familyInstance: createMockFamilyInstance(),
+      contractIR: dummyContractIR,
+      mode: 'plan',
+      migrations: createMockMigrations(),
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.mode).toBe('plan');
+      expect(result.value.plan.operations).toHaveLength(1);
+    }
   });
 
   it('returns PLANNING_FAILED when planner reports conflicts', async () => {
@@ -150,7 +154,6 @@ describe('executeDbUpdate', () => {
       expect(result.value.mode).toBe('plan');
       expect(result.value.plan.operations).toHaveLength(1);
       expect(result.value.plan.sql).toEqual([]);
-      expect(result.value.origin?.storageHash).toBe('sha256:origin');
       expect(result.value.destination.storageHash).toBe('sha256:dest');
       expect(result.value.execution).toBeUndefined();
       expect(result.value.marker).toBeUndefined();
@@ -212,7 +215,6 @@ describe('executeDbUpdate', () => {
       });
       expect(result.value.marker).toBeDefined();
       expect(result.value.marker?.storageHash).toBe('sha256:new-hash');
-      expect(result.value.origin?.storageHash).toBe('sha256:origin');
       expect(result.value.summary).toContain('Applied');
     }
   });
@@ -250,7 +252,6 @@ describe('executeDbUpdate', () => {
         operationsPlanned: 0,
         operationsExecuted: 0,
       });
-      expect(result.value.origin?.storageHash).toBe('sha256:current');
       expect(result.value.destination.storageHash).toBe('sha256:current');
       expect(result.value.summary).toContain('already matches');
     }
@@ -326,57 +327,6 @@ describe('executeDbUpdate', () => {
     expect(planFn).toHaveBeenCalledWith(
       expect.objectContaining({
         policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-      }),
-    );
-  });
-
-  it('attaches marker hashes as plan origin before runner execution', async () => {
-    const runnerExecute = vi
-      .fn()
-      .mockResolvedValue(ok({ operationsPlanned: 1, operationsExecuted: 1 }));
-
-    const migrations = {
-      createPlanner: () => ({
-        plan: vi.fn().mockReturnValue({
-          kind: 'success',
-          plan: {
-            targetId: 'postgres',
-            destination: { storageHash: 'sha256:dest', profileHash: 'sha256:dest-profile' },
-            operations: [
-              {
-                id: 'op1',
-                label: 'Test op',
-                operationClass: 'additive',
-              },
-            ],
-          },
-        }),
-      }),
-      createRunner: () => ({ execute: runnerExecute }),
-    } as unknown as TargetMigrationsCapability<'sql', 'postgres', ControlFamilyInstance<'sql'>>;
-
-    await executeDbUpdate({
-      driver: createMockDriver(),
-      familyInstance: createMockFamilyInstance({
-        readMarker: async () => ({
-          storageHash: 'sha256:marker-origin',
-          profileHash: 'sha256:marker-profile',
-        }),
-      }),
-      contractIR: dummyContractIR,
-      mode: 'apply',
-      migrations,
-      frameworkComponents: [],
-    });
-
-    expect(runnerExecute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        plan: expect.objectContaining({
-          origin: {
-            storageHash: 'sha256:marker-origin',
-            profileHash: 'sha256:marker-profile',
-          },
-        }),
       }),
     );
   });
@@ -471,14 +421,12 @@ describe('executeDbUpdate', () => {
   });
 
   describe('progress events', () => {
-    it('emits readMarker, introspect, plan spans in plan mode', async () => {
+    it('emits introspect and plan spans in plan mode', async () => {
       const events: ControlProgressEvent[] = [];
 
       await executeDbUpdate({
         driver: createMockDriver(),
-        familyInstance: createMockFamilyInstance({
-          readMarker: async () => ({ storageHash: 'sha256:origin' }),
-        }),
+        familyInstance: createMockFamilyInstance(),
         contractIR: dummyContractIR,
         mode: 'plan',
         migrations: createMockMigrations(),
@@ -487,7 +435,7 @@ describe('executeDbUpdate', () => {
       });
 
       const spanIds = events.map((e) => e.spanId);
-      expect(spanIds).toContain('readMarker');
+      expect(spanIds).not.toContain('readMarker');
       expect(spanIds).toContain('introspect');
       expect(spanIds).toContain('plan');
       expect(spanIds).not.toContain('apply');
@@ -497,14 +445,12 @@ describe('executeDbUpdate', () => {
       }
     });
 
-    it('emits apply and operation-level spans in apply mode', async () => {
+    it('emits introspect, plan, and apply spans in apply mode', async () => {
       const events: ControlProgressEvent[] = [];
 
       await executeDbUpdate({
         driver: createMockDriver(),
-        familyInstance: createMockFamilyInstance({
-          readMarker: async () => ({ storageHash: 'sha256:origin' }),
-        }),
+        familyInstance: createMockFamilyInstance(),
         contractIR: dummyContractIR,
         mode: 'apply',
         migrations: createMockMigrations(),
@@ -514,7 +460,7 @@ describe('executeDbUpdate', () => {
 
       const spanIds = events.map((e) => e.spanId);
       expect(spanIds).toContain('apply');
-      expect(spanIds).toContain('readMarker');
+      expect(spanIds).not.toContain('readMarker');
       expect(spanIds).toContain('introspect');
       expect(spanIds).toContain('plan');
 
@@ -522,33 +468,12 @@ describe('executeDbUpdate', () => {
       expect(applyEnd).toMatchObject({ outcome: 'ok' });
     });
 
-    it('emits error outcome on readMarker span when marker is missing', async () => {
-      const events: ControlProgressEvent[] = [];
-
-      await expect(
-        executeDbUpdate({
-          driver: createMockDriver(),
-          familyInstance: createMockFamilyInstance({ readMarker: async () => null }),
-          contractIR: dummyContractIR,
-          mode: 'apply',
-          migrations: createMockMigrations(),
-          frameworkComponents: [],
-          onProgress: (event) => events.push(event),
-        }),
-      ).rejects.toThrow('Database must be signed first');
-
-      const readMarkerEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'readMarker');
-      expect(readMarkerEnd).toMatchObject({ outcome: 'error' });
-    });
-
     it('emits error outcome on plan span when planning fails', async () => {
       const events: ControlProgressEvent[] = [];
 
       await executeDbUpdate({
         driver: createMockDriver(),
-        familyInstance: createMockFamilyInstance({
-          readMarker: async () => ({ storageHash: 'sha256:origin' }),
-        }),
+        familyInstance: createMockFamilyInstance(),
         contractIR: dummyContractIR,
         mode: 'plan',
         migrations: createMockMigrations({
@@ -567,9 +492,7 @@ describe('executeDbUpdate', () => {
 
       await executeDbUpdate({
         driver: createMockDriver(),
-        familyInstance: createMockFamilyInstance({
-          readMarker: async () => ({ storageHash: 'sha256:origin' }),
-        }),
+        familyInstance: createMockFamilyInstance(),
         contractIR: dummyContractIR,
         mode: 'apply',
         migrations: createMockMigrations({
@@ -586,9 +509,7 @@ describe('executeDbUpdate', () => {
     it('does not throw when onProgress is omitted', async () => {
       const result = await executeDbUpdate({
         driver: createMockDriver(),
-        familyInstance: createMockFamilyInstance({
-          readMarker: async () => ({ storageHash: 'sha256:origin' }),
-        }),
+        familyInstance: createMockFamilyInstance(),
         contractIR: dummyContractIR,
         mode: 'plan',
         migrations: createMockMigrations(),

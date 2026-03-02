@@ -111,14 +111,6 @@ async function executeDbUpdateCommand(
         })),
         ...(result.value.plan.sql !== undefined ? { sql: result.value.plan.sql } : {}),
       },
-      ...(result.value.origin
-        ? {
-            origin: {
-              storageHash: result.value.origin.storageHash,
-              ...ifDefined('profileHash', result.value.origin.profileHash),
-            },
-          }
-        : {}),
       ...(result.value.execution
         ? {
             execution: {
@@ -174,7 +166,7 @@ export function createDbUpdateCommand(): Command {
     command,
     'Update your database schema to match your contract',
     'Compares your database schema to the emitted contract and applies the necessary\n' +
-      'changes. Your database must be signed first (run `prisma-next db init`).\n' +
+      'changes. Works on any database, whether or not it has been initialized with `db init`.\n' +
       'Use --plan to preview operations before applying.',
   );
   addMigrationCommandOptions(command);

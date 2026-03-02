@@ -40,25 +40,11 @@ prisma-next db init --db $DATABASE_URL
 
 ## What db update does
 
-`prisma-next db update` reconciles a signed database to the current contract. It reads the database signature, introspects the live schema, plans a migration with additive, widening, and destructive operations, then applies the plan and updates the signature.
+`prisma-next db update` updates your database schema to match the current contract. It introspects the live schema, plans a migration with additive, widening, and destructive operations, then applies the plan and writes the signature. It works on any database, whether or not it has been initialized with `db init`.
 
-## Scenario 1: Database not yet signed (expected failure)
+## Scenario 1: Preview a contract change (plan mode)
 
-Use this when the database has not been signed. `db update` fails fast and tells you to run `db init` first.
-
-```bash
-prisma-next db update --db $DATABASE_URL
-```
-
-Example output:
-
-```text
-✖ Database must be signed first (PN-RTM-3010)
-  Why: No database signature (marker) found
-  Fix: Run `prisma-next db init` first to sign the database
-```
-
-## Scenario 2: Preview a contract change (plan mode)
+> **Note:** If the database has not been initialized with `db init`, `db update` will create the signature table automatically.
 
 Use this after changing the schema and re-emitting the contract.
 
@@ -87,7 +73,7 @@ This is a dry run. No changes were applied.
 Run without --plan to apply changes.
 ```
 
-## Scenario 3: Apply the update
+## Scenario 2: Apply the update
 
 Use this after a successful plan.
 
@@ -102,7 +88,7 @@ Example output:
   Signature: sha256:new-hash...
 ```
 
-## Scenario 4: No-op update
+## Scenario 3: No-op update
 
 Use this when the database already matches the contract. This is common right after `db init` or after a previous `db update`.
 
@@ -117,7 +103,7 @@ Example output:
   Signature: sha256:current-hash...
 ```
 
-## Scenario 5: Destructive changes with a safety review
+## Scenario 4: Destructive changes with a safety review
 
 Use this when you remove tables or columns. Plan mode shows destructive operations before apply.
 
@@ -139,7 +125,7 @@ This is a dry run. No changes were applied.
 Run without --plan to apply changes.
 ```
 
-## Scenario 6: Planning conflicts
+## Scenario 5: Planning conflicts
 
 This happens when the live database diverges from the contract and the planner cannot reconcile the difference.
 
@@ -161,7 +147,7 @@ Recovery:
 2. Fix schema drift or update the contract to match reality.
 3. Re-run `prisma-next db update --db $DATABASE_URL`.
 
-## Scenario 7: Runner failure after planning
+## Scenario 6: Runner failure after planning
 
 This happens when the runner rejects the apply phase. A common cause is signature drift between plan and apply.
 
@@ -183,7 +169,7 @@ Recovery:
 2. Reconcile schema drift or re-apply the intended change.
 3. Re-run `prisma-next db update --db $DATABASE_URL`.
 
-## Scenario 8: JSON output for tooling
+## Scenario 7: JSON output for tooling
 
 Use JSON output for CI or scripts. Only `object` format is supported.
 
@@ -222,7 +208,7 @@ Example output:
 
 `--json ndjson` is not supported and exits with an error.
 
-## Scenario 9: Use config connection or override it
+## Scenario 8: Use config connection or override it
 
 Use the config default:
 

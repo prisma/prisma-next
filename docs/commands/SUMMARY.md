@@ -7,11 +7,11 @@ Two complementary commands for managing database schema lifecycle.
 | Command | Purpose | Marker required? | Policy |
 |---------|---------|-----------------|--------|
 | `db init` | Sign an existing database under contract management | No (creates one) | Additive only |
-| `db update` | Update your database schema to match your contract | Yes (run `db init` first) | Additive + widening + destructive |
+| `db update` | Update your database schema to match your contract | No (creates if missing) | Additive + widening + destructive |
 
 **`db init`** is run once per database to sign it under contract management. It introspects the live schema, plans additive operations to fill any gaps, executes them, and writes a contract marker (signature).
 
-**`db update`** is run after every contract change. It introspects the live schema, plans a full reconciliation (including destructive operations like dropping extra columns/tables), executes the plan, and writes the marker. It requires a signed database. During apply, the runner checks that the database signature did not change after planning.
+**`db update`** is run after every contract change. It introspects the live schema, plans a full reconciliation (including destructive operations like dropping extra columns/tables), executes the plan, and writes the marker. It works on any database, whether or not it has been initialized with `db init`.
 
 ## Typical workflow
 
@@ -93,11 +93,11 @@ This happens when:
 
 **Recovery**: Inspect the conflict, reconcile the schema drift manually or update the contract to match reality, then re-run `db update`.
 
-If the runner detects that the database signature changed between planning and apply (origin mismatch), it fails with `RUNNER_FAILED`:
+If the runner detects that the resulting schema does not match the contract, it fails with `RUNNER_FAILED`:
 
 ```
-✖ Origin mismatch (RUNNER_FAILED)
-  Why: Marker drifted
+✖ Schema verify failed (RUNNER_FAILED)
+  Why: The resulting database schema does not satisfy the destination contract.
   Fix: Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`
 ```
 
@@ -105,12 +105,12 @@ If the runner detects that the database signature changed between planning and a
 
 | Aspect | `db init` | `db update` |
 |--------|-----------|-------------|
-| Requires marker | No | Yes |
-| Creates marker | Yes (on apply) | Writes/updates marker (on apply) |
+| Requires marker | No | No |
+| Creates marker | Yes (on apply) | Creates or updates marker (on apply) |
 | Operation policy | Additive only | Additive + widening + destructive |
 | Execution checks | Disabled (fresh introspection) | Enabled (database may have drifted) |
-| Existing marker handling | Idempotent if hash matches; error if mismatched | Reads signature during planning and fails apply if signature changed before execution |
-| Use case | First-time signing | Ongoing schema evolution |
+| Existing marker handling | Idempotent if hash matches; error if mismatched | Ignored; marker is bookkeeping only |
+| Use case | Conservative first-time signing (additive only) | General-purpose schema evolution |
 
 ## Flags
 

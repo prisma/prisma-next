@@ -58,7 +58,7 @@ export interface MigrationPlan {
   readonly targetId: string;
   /**
    * Origin contract identity that the plan expects the database to currently be at.
-   * If omitted, the runner treats the origin as "no marker present" (empty database).
+   * If omitted or null, the runner skips origin validation entirely.
    */
   readonly origin?: {
     readonly storageHash: string;

@@ -31,10 +31,6 @@ function createPlanResult(overrides?: Partial<MigrationCommandResult>): Migratio
         },
       ],
     },
-    origin: {
-      storageHash: 'sha256:origin-hash',
-      profileHash: 'sha256:origin-profile',
-    },
     summary: 'Planned 2 operation(s)',
     timings: { total: 42 },
     ...overrides,
@@ -57,9 +53,6 @@ function createApplyResult(overrides?: Partial<MigrationCommandResult>): Migrati
           operationClass: 'additive',
         },
       ],
-    },
-    origin: {
-      storageHash: 'sha256:origin-hash',
     },
     execution: {
       operationsPlanned: 1,
@@ -245,17 +238,12 @@ describe('formatMigrationJson', () => {
     });
   });
 
-  it('includes origin in JSON output', () => {
+  it('does not include origin in JSON output', () => {
     const result = createPlanResult();
     const output = formatMigrationJson(result);
-    const parsed = JSON.parse(output) as MigrationCommandResult;
+    const parsed = JSON.parse(output) as Record<string, unknown>;
 
-    expect(parsed).toMatchObject({
-      origin: {
-        storageHash: 'sha256:origin-hash',
-        profileHash: 'sha256:origin-profile',
-      },
-    });
+    expect(parsed).not.toHaveProperty('origin');
   });
 
   it('includes execution and marker fields in apply JSON output', () => {

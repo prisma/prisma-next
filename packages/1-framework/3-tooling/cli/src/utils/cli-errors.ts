@@ -18,7 +18,6 @@ export {
   errorHashMismatch,
   errorJsonFormatNotSupported,
   errorMarkerMissing,
-  errorMarkerRequired,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
   errorRunnerFailed,

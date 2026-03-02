@@ -73,7 +73,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'plans and applies contract changes from marker-managed state',
+      'plans and applies contract changes from signed state',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const { testSetup, configPath } = await setupDbUpdateFixture(
@@ -210,9 +210,9 @@ withTempDir(({ createTempDir }) => {
       cleanupMocks();
     });
 
-    // Scenario 1: Missing marker (fails fast)
+    // Scenario 1: Fresh database without prior db init
     it(
-      'fails with MARKER_REQUIRED when database has no marker',
+      'succeeds on a fresh database without prior db init',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const { testSetup, configPath } = await setupDbUpdateFixture(
@@ -221,16 +221,11 @@ withTempDir(({ createTempDir }) => {
             scenarioFixtureSubdir,
           );
 
-          const exitCode = await runDbUpdateAllowFailure(testSetup, [
-            '--config',
-            configPath,
-            '--no-color',
-          ]);
-
-          expect(exitCode).not.toBe(0);
-          const errorText = consoleErrors.join('\n');
-          expect(errorText).toContain('marker');
-          expect(errorText).toContain('db init');
+          // db update should work on a fresh database without db init
+          consoleOutput.length = 0;
+          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          const planOutput = stripAnsi(consoleOutput.join('\n'));
+          expect(planOutput).toContain('Planned');
         });
       },
       timeouts.spinUpPpgDev,
@@ -503,14 +498,12 @@ withTempDir(({ createTempDir }) => {
               destination: { storageHash: expect.any(String) },
               operations: expect.any(Array),
             },
-            origin: {
-              storageHash: expect.any(String),
-            },
             summary: expect.any(String),
             timings: {
               total: expect.any(Number),
             },
           });
+          expect(payload).not.toHaveProperty('origin');
 
           const operations = (payload as { plan: { operations: unknown[] } }).plan.operations;
           expect(operations.length).toBeGreaterThan(0);

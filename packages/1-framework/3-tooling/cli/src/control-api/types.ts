@@ -344,10 +344,6 @@ export interface DbUpdateSuccess {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
-  readonly origin?: {
-    readonly storageHash: string;
-    readonly profileHash?: string;
-  };
   readonly execution?: {
     readonly operationsPlanned: number;
     readonly operationsExecuted: number;
@@ -541,8 +537,9 @@ export interface ControlClient {
   dbInit(options: DbInitOptions): Promise<DbInitResult>;
 
   /**
-   * Reconciles a signed (marker-managed) database to match the current contract.
-   * Requires an existing marker and allows additive, widening, and destructive operation classes.
+   * Updates a database schema to match the current contract.
+   * Creates the signature table if it does not exist. No preconditions required.
+   * Allows additive, widening, and destructive operation classes.
    *
    * @param options.mode - 'plan' to preview, 'apply' to execute
    * @returns Result pattern: Ok with planned/executed operations, NotOk with failure details

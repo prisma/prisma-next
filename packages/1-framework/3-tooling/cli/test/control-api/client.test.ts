@@ -577,7 +577,7 @@ describe('ControlClient progress emission', () => {
     function createMockComponentsWithMigrations() {
       const { mockDriver, mockAdapter, mockDriverDescriptor } = createMockComponents();
 
-      // Override family instance to return a marker (required by executeDbUpdate)
+      // Override family instance to return a marker (db update works with or without one)
       const mockFamilyInstance = {
         introspect: async () => ({ tables: {}, extensions: [] }),
         validateContractIR: (ir: unknown) => ir as ContractIR,
@@ -635,7 +635,7 @@ describe('ControlClient progress emission', () => {
       };
     }
 
-    it('emits connect, readMarker, introspect, plan, apply spans when connection provided', async () => {
+    it('emits connect, introspect, plan, apply spans when connection provided', async () => {
       const events: ControlProgressEvent[] = [];
       const { mockFamilyWithMarker, mockTargetWithMigrations, mockAdapter, mockDriverDescriptor } =
         createMockComponentsWithMigrations();
@@ -666,7 +666,7 @@ describe('ControlClient progress emission', () => {
       const readMarkerStart = events.find(
         (e) => e.kind === 'spanStart' && e.spanId === 'readMarker',
       );
-      expect(readMarkerStart).toBeDefined();
+      expect(readMarkerStart).toBeUndefined();
 
       const planStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'plan');
       expect(planStart).toBeDefined();
@@ -679,11 +679,11 @@ describe('ControlClient progress emission', () => {
       }
     });
 
-    it('throws errorMarkerRequired when marker is missing', async () => {
+    it('does not fail when marker is missing', async () => {
       const { mockTargetWithMigrations, mockAdapter, mockDriverDescriptor } =
         createMockComponentsWithMigrations();
 
-      // Override to return null marker
+      // Override to return null marker — db update no longer requires a marker
       const noMarkerFamilyInstance = {
         introspect: async () => ({ tables: {}, extensions: [] }),
         validateContractIR: (ir: unknown) => ir as ContractIR,
@@ -703,13 +703,13 @@ describe('ControlClient progress emission', () => {
         driver: mockDriverDescriptor,
       });
 
-      await expect(
-        client.dbUpdate({
-          contractIR: {},
-          mode: 'apply',
-          connection: 'postgres://test',
-        }),
-      ).rejects.toThrow('Database must be signed first');
+      const result = await client.dbUpdate({
+        contractIR: {},
+        mode: 'plan',
+        connection: 'postgres://test',
+      });
+
+      expect(result.ok).toBe(true);
 
       await client.close();
     });
