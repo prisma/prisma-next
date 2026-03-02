@@ -140,8 +140,14 @@ function scanIdent(source: string, pos: number): Token | undefined {
 }
 
 function scanNumber(source: string, pos: number): Token | undefined {
-  if (!isDigit(source.charAt(pos))) return undefined;
-  let end = pos + 1;
+  let end = pos;
+  if (source.charAt(end) === '-') {
+    if (end + 1 >= source.length || !isDigit(source.charAt(end + 1))) return undefined;
+    end++;
+  } else if (!isDigit(source.charAt(end))) {
+    return undefined;
+  }
+  end++;
   while (end < source.length && isDigit(source.charAt(end))) {
     end++;
   }
