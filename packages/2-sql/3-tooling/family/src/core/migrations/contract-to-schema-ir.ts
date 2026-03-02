@@ -16,6 +16,7 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 function convertDefault(def: ColumnDefault): string {
   if (def.kind === 'function') {
@@ -51,8 +52,8 @@ function convertColumn(
   const nativeType = expandNativeType
     ? expandNativeType({
         nativeType: column.nativeType,
-        codecId: column.codecId,
-        typeParams: column.typeParams,
+        ...ifDefined('codecId', column.codecId),
+        ...ifDefined('typeParams', column.typeParams),
       })
     : column.nativeType;
   return {
