@@ -241,9 +241,7 @@ async function executeMigrationPlanCommand(
   const plannerResult = planner.plan({
     contract: toContractJson,
     schema: fromSchemaIR,
-    // Offline migration planning is additive-only by design. Widening and destructive
-    // operations are supported by `db update` (which introspects the live database).
-    policy: { allowedOperationClasses: ['additive'] },
+    policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     frameworkComponents,
   });
 
@@ -287,9 +285,9 @@ async function executeMigrationPlanCommand(
     toContract: toContractJson,
     hints: {
       used: [],
-      applied: ['additive_only'],
+      applied: [],
       plannerVersion: '1.0.0',
-      planningStrategy: 'additive',
+      planningStrategy: 'diff',
     },
     labels: [],
     createdAt: timestamp.toISOString(),
