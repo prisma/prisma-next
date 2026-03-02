@@ -679,7 +679,7 @@ describe('ControlClient progress emission', () => {
       }
     });
 
-    it('succeeds without origin when marker is missing', async () => {
+    it('throws errorMarkerRequired when marker is missing', async () => {
       const { mockTargetWithMigrations, mockAdapter, mockDriverDescriptor } =
         createMockComponentsWithMigrations();
 
@@ -703,18 +703,15 @@ describe('ControlClient progress emission', () => {
         driver: mockDriverDescriptor,
       });
 
-      const result = await client.dbUpdate({
-        contractIR: {},
-        mode: 'apply',
-        connection: 'postgres://test',
-      });
+      await expect(
+        client.dbUpdate({
+          contractIR: {},
+          mode: 'apply',
+          connection: 'postgres://test',
+        }),
+      ).rejects.toThrow('Database must be signed first');
 
       await client.close();
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.origin).toBeUndefined();
-      }
     });
 
     it('does not throw when onProgress is omitted from dbUpdate', async () => {

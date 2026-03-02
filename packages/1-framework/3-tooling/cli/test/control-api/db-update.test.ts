@@ -64,20 +64,17 @@ function createMockMigrations(overrides?: {
 const dummyContractIR = { schemaVersion: '1', target: 'postgres' } as unknown as ContractIR;
 
 describe('executeDbUpdate', () => {
-  it('proceeds without origin when no marker exists', async () => {
-    const result = await executeDbUpdate({
-      driver: createMockDriver(),
-      familyInstance: createMockFamilyInstance({ readMarker: async () => null }),
-      contractIR: dummyContractIR,
-      mode: 'apply',
-      migrations: createMockMigrations(),
-      frameworkComponents: [],
-    });
-
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.origin).toBeUndefined();
-    }
+  it('throws errorMarkerRequired when no marker exists', async () => {
+    await expect(
+      executeDbUpdate({
+        driver: createMockDriver(),
+        familyInstance: createMockFamilyInstance({ readMarker: async () => null }),
+        contractIR: dummyContractIR,
+        mode: 'apply',
+        migrations: createMockMigrations(),
+        frameworkComponents: [],
+      }),
+    ).rejects.toThrow('Database must be signed first');
   });
 
   it('returns PLANNING_FAILED when planner reports conflicts', async () => {
@@ -525,21 +522,23 @@ describe('executeDbUpdate', () => {
       expect(applyEnd).toMatchObject({ outcome: 'ok' });
     });
 
-    it('emits ok outcome on readMarker span when marker is missing', async () => {
+    it('emits error outcome on readMarker span when marker is missing', async () => {
       const events: ControlProgressEvent[] = [];
 
-      await executeDbUpdate({
-        driver: createMockDriver(),
-        familyInstance: createMockFamilyInstance({ readMarker: async () => null }),
-        contractIR: dummyContractIR,
-        mode: 'apply',
-        migrations: createMockMigrations(),
-        frameworkComponents: [],
-        onProgress: (event) => events.push(event),
-      });
+      await expect(
+        executeDbUpdate({
+          driver: createMockDriver(),
+          familyInstance: createMockFamilyInstance({ readMarker: async () => null }),
+          contractIR: dummyContractIR,
+          mode: 'apply',
+          migrations: createMockMigrations(),
+          frameworkComponents: [],
+          onProgress: (event) => events.push(event),
+        }),
+      ).rejects.toThrow('Database must be signed first');
 
       const readMarkerEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'readMarker');
-      expect(readMarkerEnd).toMatchObject({ outcome: 'ok' });
+      expect(readMarkerEnd).toMatchObject({ outcome: 'error' });
     });
 
     it('emits error outcome on plan span when planning fails', async () => {
