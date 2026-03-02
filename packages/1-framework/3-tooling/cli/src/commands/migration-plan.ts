@@ -241,6 +241,8 @@ async function executeMigrationPlanCommand(
   const plannerResult = planner.plan({
     contract: toContractJson,
     schema: fromSchemaIR,
+    // Offline migration planning is additive-only by design. Widening and destructive
+    // operations are supported by `db update` (which introspects the live database).
     policy: { allowedOperationClasses: ['additive'] },
     frameworkComponents,
   });
@@ -256,18 +258,14 @@ async function executeMigrationPlanCommand(
   const ops: readonly MigrationPlanOperation[] = plannerResult.plan.operations;
 
   if (ops.length === 0) {
-    // The hashes differ (we returned early for hash equality above) but the additive-only
-    // planner produced no operations. This means the contract changed in ways the
-    // planner silently ignores — e.g. table/column removals. Destructive operations
-    // are not yet supported, so we report an error rather than a misleading no-op.
     return notOk(
       errorMigrationPlanningFailed({
         conflicts: [
           {
             kind: 'unsupportedChange',
             summary:
-              'Contract changed but no additive operations were produced. ' +
-              'This usually means destructive changes (table/column removal) which are not yet supported.',
+              'Contract changed but planner produced no operations. ' +
+              'This indicates unsupported or ignored changes (e.g. removals, type changes, or a planner/contract mismatch).',
           },
         ],
       }),

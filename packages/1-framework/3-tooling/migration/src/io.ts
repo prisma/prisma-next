@@ -76,6 +76,8 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
   };
 }
 
+// Validates only the fields needed for DAG reconstruction and apply. Intentionally
+// minimal — the runner and planner perform deeper validation at execution time.
 function validateManifest(
   manifest: unknown,
   filePath: string,
