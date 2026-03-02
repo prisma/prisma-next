@@ -53,7 +53,7 @@ describe('sql-compilation/upsert', () => {
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
     const upserted = await collection.upsert({
-      create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+      create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
       update: {},
     });
 
@@ -66,8 +66,9 @@ describe('sql-compilation/upsert', () => {
             1,
             "Alice",
             "alice@example.com",
+            null,
           ],
-          "sql": "insert into "users" ("id", "name", "email") values ($1, $2, $3) on conflict ("id") do nothing returning *",
+          "sql": "insert into "users" ("id", "name", "email", "invited_by_id") values ($1, $2, $3, $4) on conflict ("id") do nothing returning *",
         },
       ]
     `);
@@ -78,19 +79,19 @@ describe('sql-compilation/upsert', () => {
     runtime.setNextResults([[], [{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
     const upserted = await collection.upsert({
-      create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+      create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
       update: { name: undefined } as never,
     });
 
     expect(upserted).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
     expect(runtime.executions).toHaveLength(2);
     expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
-      'insert into "users" ("id", "name", "email") values ($1, $2, $3) on conflict ("id") do nothing returning *',
+      'insert into "users" ("id", "name", "email", "invited_by_id") values ($1, $2, $3, $4) on conflict ("id") do nothing returning *',
     );
     expect(normalizeSql(runtime.executions[1]!.plan.sql)).toBe(
       'select * from "users" where "users"."id" = $1 limit $2',
     );
-    expect(runtime.executions[0]!.plan.params).toEqual([1, 'Alice', 'alice@example.com']);
+    expect(runtime.executions[0]!.plan.params).toEqual([1, 'Alice', 'alice@example.com', null]);
     expect(runtime.executions[1]!.plan.params).toEqual([1, 1]);
   });
 
