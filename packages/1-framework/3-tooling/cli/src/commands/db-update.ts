@@ -174,7 +174,8 @@ export function createDbUpdateCommand(): Command {
     command,
     'Update your database schema to match your contract',
     'Compares your database schema to the emitted contract and applies the necessary\n' +
-      'changes. Use --plan to preview operations before applying.',
+      'changes. Your database must be signed first (run `prisma-next db init`).\n' +
+      'Use --plan to preview operations before applying.',
   );
   addMigrationCommandOptions(command);
   command.option(
