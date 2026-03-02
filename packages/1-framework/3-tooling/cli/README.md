@@ -898,16 +898,6 @@ prisma-next migration verify --dir <path>
 - **Draft**: `edgeId` is null — automatically attests the package
 - **Mismatch**: package has been modified since attestation (command exits non-zero)
 
-### `prisma-next migration new`
-
-Scaffold an empty migration package in Draft state.
-
-```bash
-prisma-next migration new --name <slug> [--config <path>]
-```
-
-Creates a migration directory with placeholder `migration.json` and `ops.json` files. The package has `edgeId: null` (Draft) — run `migration verify` to attest after editing.
-
 ## Architecture
 
 ```mermaid
@@ -1252,7 +1242,6 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/commands/contract-emit`**: Exports `createContractEmitCommand`
 - **`@prisma-next/cli/commands/migration-plan`**: Exports `createMigrationPlanCommand`
 - **`@prisma-next/cli/commands/migration-apply`**: Exports `createMigrationApplyCommand`
-- **`@prisma-next/cli/commands/migration-new`**: Exports `createMigrationNewCommand`
 - **`@prisma-next/cli/commands/migration-verify`**: Exports `createMigrationVerifyCommand`
 - **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
 

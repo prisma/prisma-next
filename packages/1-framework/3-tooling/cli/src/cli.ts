@@ -7,7 +7,6 @@ import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
 import { createMigrationApplyCommand } from './commands/migration-apply';
-import { createMigrationNewCommand } from './commands/migration-new';
 import { createMigrationPlanCommand } from './commands/migration-plan';
 import { createMigrationVerifyCommand } from './commands/migration-verify';
 import { setCommandDescriptions } from './utils/command-helpers';
@@ -220,9 +219,6 @@ migrationCommand.addCommand(migrationPlanCommand);
 
 const migrationVerifyCommand = createMigrationVerifyCommand();
 migrationCommand.addCommand(migrationVerifyCommand);
-
-const migrationNewCommand = createMigrationNewCommand();
-migrationCommand.addCommand(migrationNewCommand);
 
 const migrationApplyCommand = createMigrationApplyCommand();
 migrationCommand.addCommand(migrationApplyCommand);

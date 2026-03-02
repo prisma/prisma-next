@@ -77,7 +77,7 @@ async function executeMigrationVerifyCommand(
     return notOk(
       errorRuntime('edgeId mismatch — migration has been modified', {
         why: `stored=${result.storedEdgeId}, computed=${result.computedEdgeId}`,
-        fix: 'Re-attest with `migration verify` if the change was intentional, or restore the original migration.',
+        fix: 'If the change was intentional, set "edgeId" to null in migration.json and rerun `migration verify` to re-attest. Otherwise, restore the original migration.',
         meta: { storedEdgeId: result.storedEdgeId, computedEdgeId: result.computedEdgeId },
       }),
     );
