@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import postgres from '@prisma-next/postgres/runtime';
+import postgres from '@prisma-next/postgres';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { lints, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
 import { teardownTestDatabase } from '@prisma-next/sql-runtime/test/utils';

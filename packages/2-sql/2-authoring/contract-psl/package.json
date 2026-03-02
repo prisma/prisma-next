@@ -34,14 +34,8 @@
     "src"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs"
-    },
-    "./provider": {
-      "types": "./dist/provider.d.mts",
-      "import": "./dist/provider.mjs"
-    },
+    ".": "./dist/index.mjs",
+    "./provider": "./dist/provider.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",

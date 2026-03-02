@@ -175,7 +175,7 @@ describe('buildReconciliationPlan', () => {
         id: 'dropConstraint.post.fk_author',
         operationClass: 'destructive',
       });
-      expect(result.operations[0]!.target.details.objectType).toBe('foreignKey');
+      expect(result.operations[0]!.target.details!.objectType).toBe('foreignKey');
       expect(result.operations[0]!.execute[0]!.sql).toContain('DROP CONSTRAINT');
     });
 
@@ -190,7 +190,7 @@ describe('buildReconciliationPlan', () => {
       ]);
 
       expect(result.operations).toHaveLength(1);
-      expect(result.operations[0]!.target.details.objectType).toBe('unique');
+      expect(result.operations[0]!.target.details!.objectType).toBe('unique');
     });
 
     it('generates drop constraint with primaryKey kind for extra_primary_key', () => {
@@ -204,7 +204,7 @@ describe('buildReconciliationPlan', () => {
       ]);
 
       expect(result.operations).toHaveLength(1);
-      expect(result.operations[0]!.target.details.objectType).toBe('primaryKey');
+      expect(result.operations[0]!.target.details!.objectType).toBe('primaryKey');
     });
 
     it('uses default pkey name when indexOrConstraint is absent for extra_primary_key', () => {

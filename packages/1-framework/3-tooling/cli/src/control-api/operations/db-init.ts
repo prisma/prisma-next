@@ -137,7 +137,9 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
         plan: { operations: [] },
         destination: {
           storageHash: migrationPlan.destination.storageHash,
-          profileHash: migrationPlan.destination.profileHash,
+          ...(migrationPlan.destination.profileHash !== undefined
+            ? { profileHash: migrationPlan.destination.profileHash }
+            : {}),
         },
         ...(mode === 'apply'
           ? {
@@ -196,7 +198,9 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       },
       destination: {
         storageHash: migrationPlan.destination.storageHash,
-        profileHash: migrationPlan.destination.profileHash,
+        ...(migrationPlan.destination.profileHash !== undefined
+          ? { profileHash: migrationPlan.destination.profileHash }
+          : {}),
       },
       summary: `Planned ${migrationPlan.operations.length} operation(s)`,
     };
@@ -263,7 +267,9 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     },
     destination: {
       storageHash: migrationPlan.destination.storageHash,
-      profileHash: migrationPlan.destination.profileHash,
+      ...(migrationPlan.destination.profileHash !== undefined
+        ? { profileHash: migrationPlan.destination.profileHash }
+        : {}),
     },
     execution: {
       operationsPlanned: execution.operationsPlanned,
