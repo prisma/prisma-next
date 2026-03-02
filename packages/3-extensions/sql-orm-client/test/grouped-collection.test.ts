@@ -204,7 +204,7 @@ describe('GroupedCollection', () => {
     expect(typeof grouped['having']).toBe('function');
     expect(typeof grouped['aggregate']).toBe('function');
     expect(grouped['all']).toBeUndefined();
-    expect(grouped['find']).toBeUndefined();
+    expect(grouped['first']).toBeUndefined();
     expect(grouped['include']).toBeUndefined();
     expect(grouped['select']).toBeUndefined();
   });

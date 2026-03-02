@@ -47,13 +47,13 @@ db
 
 ## Nested mutation
 
-We're not awaiting `find()`, instead using `.comments` to drop to a `comments` collection attached to the parent `post` record.
+We're not awaiting `first()`, instead using `.comments` to drop to a `comments` collection attached to the parent `post` record.
 
 ```typescript
  db
   .posts
   .where({ id: postId })
-  .find()
+  .first()
   .comments
   .create(commentInput)
 ```

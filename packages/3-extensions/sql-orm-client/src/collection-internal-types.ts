@@ -44,7 +44,7 @@ export type IncludedRelationsForRow<
 
 export type IncludeRefinementTerminals =
   | 'all'
-  | 'find'
+  | 'first'
   | 'aggregate'
   | 'groupBy'
   | 'create'

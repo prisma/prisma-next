@@ -20,7 +20,7 @@ See also [Prisma ORM Comparison](./prisma-orm-comparison.md) for context and cod
 
 The `@prisma-next/sql-orm-client` package already has a working prototype on the current branch with:
 
-- A fluent, immutable query builder with `where()`, `include()`, `orderBy()`, `take()`, `skip()`, `all()`, `find()`
+- A fluent, immutable query builder with `where()`, `include()`, `orderBy()`, `take()`, `skip()`, `all()`, `first()`
 - A base class for creating model-specific entry points
 - An `orm()` factory that creates a typed client object (e.g. `db.users`, `db.posts`)
 - Custom subclasses with domain methods (e.g. `admins()`, `forUser(userId)`)
@@ -37,7 +37,7 @@ This spec takes that prototype, fills in the gaps (mutations, aggregations, proj
 
 3. **Contract-derived type safety.** Every type — row shapes, field accessors, relation names, unique constraints, create inputs — is derived from the contract artifact. The contract is the single source of truth.
 
-4. **Filters are data.** Filter expressions are plain PN AST nodes (`WhereExpr`). They can be built with the ergonomic callback API, composed with `and()`/`or()`/`not()`, or constructed externally (e.g. via the Kysely integration). `where()` and `find()` consume them via callback overloads (not raw `WhereExpr` arguments), which avoids ambiguity with shorthand object filters.
+4. **Filters are data.** Filter expressions are plain PN AST nodes (`WhereExpr`). They can be built with the ergonomic callback API, composed with `and()`/`or()`/`not()`, or constructed externally (e.g. via the Kysely integration). `where()` and `first()` consume them via callback overloads (not raw `WhereExpr` arguments), which avoids ambiguity with shorthand object filters.
 
 5. **Safe by default.** `update()` and `delete()` refuse to compile without a `where()` clause. If you really want to affect every record, you write `where(all)` to make that intention explicit.
 
@@ -90,7 +90,7 @@ An earlier design considered splitting query building and query execution into s
 
 1. **Terminal methods are needed everywhere execution happens.** That's not just the top level — it's stored base queries (`const admins = db.users.admins(); await admins.aggregate(a => ({ count: a.count() }))`), scoped collections passed between functions, and any other context where you want to run a query. Restricting terminal methods to a "top-level" class would mean losing them in too many legitimate contexts.
 
-2. **Include refinements are already safe.** The one place where executing would be a mistake — inside an `include()` refinement callback — is prevented by the type system. The callback receives a restricted collection that has no query-executing terminals (`all()`, `find()`, mutations). It can only return query fragments (`where`, `orderBy`, `take`, nested `include`, `combine`, and to-many aggregation selectors), which the parent query compiles.
+2. **Include refinements are already safe.** The one place where executing would be a mistake — inside an `include()` refinement callback — is prevented by the type system. The callback receives a restricted collection that has no query-executing terminals (`all()`, `first()`, mutations). It can only return query fragments (`where`, `orderBy`, `take`, nested `include`, `combine`, and to-many aggregation selectors), which the parent query compiles.
 
 3. **Covariant `this` is simpler with one class.** If custom methods are defined on Collection and a separate Repository extends it, then `admins()` (defined on Collection) returns `Collection` — losing the terminal methods. Making the return type preserve the subclass requires `this`-type plumbing and careful clone logic. With one class, `this` always has everything.
 
@@ -480,7 +480,7 @@ db.users.include('posts')       // { ...UserFields, posts: PostRow[] }
 db.posts.include('author')      // { ...PostFields, author: UserRow | null }
 
 // With refinement — receives the related model's include collection (with custom methods if registered).
-// It does not execute queries — it has no `all()` / `find()` / mutation terminals.
+// It does not execute queries — it has no `all()` / `first()` / mutation terminals.
 db.users.include('posts', p =>
   p.where(post => post.published.eq(true))
    .orderBy(post => post.createdAt.desc())
@@ -632,43 +632,43 @@ This distinction matters for two reasons:
 
 2. **Compatibility with effect systems.** Libraries like Effect's `tryPromise` expect to receive a function that initiates work. With eager execution, the terminal method is that function — the returned thenable is a straightforward value, not a lazy thunk that re-executes on each `.then()` call.
 
-#### `find()`
+#### `first()`
 
 Returns the first matching record or `null`. Compiles to `LIMIT 1`.
 
-`find()` supports three call forms:
+`first()` supports three call forms:
 
-- `find()` — no additional filter
-- `find(filters: SimpleFilters)` — shorthand equality object
-- `find(callback: (c: ModelAccessor<...>) => WhereExpr)` — callback filter
+- `first()` — no additional filter
+- `first(filters: SimpleFilters)` — shorthand equality object
+- `first(callback: (c: ModelAccessor<...>) => WhereExpr)` — callback filter
 
 The filter overloads match `where()`. Raw `WhereExpr` is not accepted directly as an argument. When a filter is provided, it is ANDed with any existing `where()` filters on the collection:
 
 ```typescript
 // Inline filter (most common for unique lookups)
-const user = await db.users.find({ id: 42 });
-const user = await db.users.find({ email: 'alice@example.com' });
+const user = await db.users.first({ id: 42 });
+const user = await db.users.first({ email: 'alice@example.com' });
 
 // Callback filter
-const activeAlice = await db.users.find(u =>
+const activeAlice = await db.users.first(u =>
   and(u.active.eq(true), u.email.eq('alice@example.com'))
 );
 
 // Composes with prior where() — filters are ANDed
 const activeAlice = await db.users
   .where(u => u.active.eq(true))
-  .find({ email: 'alice@example.com' });
+  .first({ email: 'alice@example.com' });
 
 // No argument — first match from accumulated filters
 const firstAdmin = await db.users
   .where(u => u.role.eq('admin'))
-  .find();
+  .first();
 
 // Composes with select() and include()
 const user = await db.users
   .select('name', 'email')
   .include('posts')
-  .find({ id: 42 });
+  .first({ id: 42 });
 // Type: { name: string; email: string; posts: PostRow[] } | null
 ```
 
@@ -724,11 +724,11 @@ Every mutation operation has three variants that mirror the read terminals:
 
 | Variant | Suffix | Returns | Analogous read |
 |---------|--------|---------|---------------|
-| **Single** | (base name) | `Promise<Row>` or `Promise<Row \| null>` | `find()` |
+| **Single** | (base name) | `Promise<Row>` or `Promise<Row \| null>` | `first()` |
 | **Multi** | `*All` | `AsyncIterableResult<Row>` | `all()` |
 | **Count** | `*Count` | `Promise<number>` | `aggregate()` |
 
-The single variant applies LIMIT 1 (for update/delete), just as `find()` does for reads. The multi variant streams results back, just as `all()` does. The count variant returns only the number of affected rows.
+The single variant applies LIMIT 1 (for update/delete), just as `first()` does for reads. The multi variant streams results back, just as `all()` does. The count variant returns only the number of affected rows.
 
 ### 7.1 Create
 
@@ -1017,11 +1017,11 @@ const stats = await db.orders
   }));
 ```
 
-`GroupedCollection` has a restricted surface by design. It supports `having` and `aggregate`, but does not expose relation loading or row-query terminals (`all`, `find`, `select`, `include`) or mutation terminals. Aggregation builders (`count`, `sum`, `avg`, `min`, `max`) are available inside the `having` and `aggregate` callbacks.
+`GroupedCollection` has a restricted surface by design. It supports `having` and `aggregate`, but does not expose relation loading or row-query terminals (`all`, `first`, `select`, `include`) or mutation terminals. Aggregation builders (`count`, `sum`, `avg`, `min`, `max`) are available inside the `having` and `aggregate` callbacks.
 
 ### 8.3 Aggregations in Includes + `combine()`
 
-Include refinement callbacks do **not** execute queries (they have no `all()` / `find()` terminals). Instead, they return a *query fragment* describing how the include should be loaded.
+Include refinement callbacks do **not** execute queries (they have no `all()` / `first()` terminals). Instead, they return a *query fragment* describing how the include should be loaded.
 
 For **to-many** includes, refinement collections also expose scalar aggregation selectors (`count`, `sum`, `avg`, `min`, `max`). These do not execute either — they describe what the parent include should compute for that relation.
 
@@ -1174,7 +1174,7 @@ The single-record variant currently uses the bare verb: `create`, `update`, `del
 Trade-offs:
 - Bare verb is shorter and handles the most common case without ceremony.
 - Suffixed form is more consistent — every variant has an explicit suffix, no implicit "single" behavior.
-- Bare verb has precedent: `find()` (the single-record read) doesn't use `findOne`.
+- Bare verb has precedent: `first()` (the single-record read) doesn't use `findOne`.
 
 ### 11.3 Alternative: Chainable Mutations with Read Terminals
 
@@ -1183,16 +1183,16 @@ Trade-offs:
 Instead of separate method names (`update`/`updateAll`/`updateCount`), mutations could be **chainable** — `update(data)` returns an intermediate "pending mutation" that you terminate with the same read terminals:
 
 ```typescript
-db.users.where({ id: 42 }).update({ name: 'Bob' }).find()    // → Promise<Row | null>
+db.users.where({ id: 42 }).update({ name: 'Bob' }).first()    // → Promise<Row | null>
 db.users.where(...).update({ name: 'Bob' }).all()             // → AsyncIterableResult<Row>
 db.users.where(...).update({ name: 'Bob' }).aggregate(a => ({ count: a.count() }))  // → Promise<{ count: number }>
 
-db.users.where({ id: 42 }).delete().find()                    // → Promise<Row | null>
+db.users.where({ id: 42 }).delete().first()                    // → Promise<Row | null>
 db.users.where(...).delete().all()                             // → AsyncIterableResult<Row>
 db.users.where(...).delete().aggregate(a => ({ count: a.count() }))  // → Promise<{ count: number }>
 ```
 
-Pros: Reuses the read vocabulary exactly, no new method names. Cons: `delete().find()` reads oddly (you're not "finding" the deleted row), and mutations become two calls instead of one.
+Pros: Reuses the read vocabulary exactly, no new method names. Cons: `delete().first()` reads oddly (you're not "finding" the deleted row), and mutations become two calls instead of one.
 
 ### 11.4 Shorthand Filter Edge Cases
 
@@ -1247,7 +1247,7 @@ import {
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `all()` | `AsyncIterableResult<Row>` | All matches; async iterable + thenable (`await` → `Row[]`) |
-| `find()` / `find(filters \| callback)` | `Promise<Row \| null>` | First match or null (LIMIT 1); optional filter ANDed with existing `where()` |
+| `first()` / `first(filters \| callback)` | `Promise<Row \| null>` | First match or null (LIMIT 1); optional filter ANDed with existing `where()` |
 | `aggregate(fn)` | `Promise<object>` | Compute one or more aggregations in a single query |
 
 ### Terminal Methods — Mutations (Single, requires `returning`)
@@ -1294,7 +1294,7 @@ import {
 
 ### Include Refinement Collections (Non-Executing)
 
-Include refinement callbacks receive a non-executing collection surface. These objects support query-building methods (e.g. `where`, `orderBy`, `take`, `skip`, nested `include`) but do not expose terminals like `all()` / `find()` / mutations.
+Include refinement callbacks receive a non-executing collection surface. These objects support query-building methods (e.g. `where`, `orderBy`, `take`, `skip`, nested `include`) but do not expose terminals like `all()` / `first()` / mutations.
 
 They also support `combine()` to return multiple named branches for a single relation:
 
@@ -1375,7 +1375,7 @@ async function main(db: ReturnType<typeof createClient>) {
   const alice = await db.users
     .select('name', 'email')
     .include('posts', p => p.published().take(5))
-    .find({ email: 'alice@example.com' });
+    .first({ email: 'alice@example.com' });
 
   // Relational filter
   const usersWithPublishedPosts = await db.users
@@ -1437,9 +1437,9 @@ Changes needed from the current prototype to match this specification:
 | `FilterExpr` | Internal `{ column, op, value }` | PN AST `WhereExpr` |
 | `ColumnAccessor` | Scalar comparisons only (eq, neq, gt, lt, gte, lte) | Full `ModelAccessor` with relation accessors and additional operators |
 | `where()` overloads | Callback only | Callback returning `WhereExpr` + shorthand object |
-| `findFirst()` → `find()` | `AsyncIterableResult<Row>` | `Promise<Row \| null>` |
+| `findFirst()` → `first()` | `AsyncIterableResult<Row>` | `Promise<Row \| null>` |
 | `findMany()` → `all()` | `AsyncIterableResult<Row>` (iterable only) | `AsyncIterableResult<Row>` (iterable + thenable) |
-| `findUnique()` | Does not exist | Removed; use `where()` + `find()` |
+| `findUnique()` | Does not exist | Removed; use `where()` + `first()` |
 | `select()` | Does not exist | Field projection with type narrowing |
 | `cursor()` | Does not exist | Cursor-based pagination |
 | `distinct()` / `distinctOn()` | Does not exist | Distinct selection |
