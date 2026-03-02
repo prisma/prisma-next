@@ -39,19 +39,8 @@
     "schemas"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/contract-builder.d.mts",
-      "import": "./dist/contract-builder.mjs"
-    },
-    "./contract-builder": {
-      "types": "./dist/contract-builder.d.mts",
-      "import": "./dist/contract-builder.mjs"
-    },
-    "./config-types": {
-      "types": "./dist/config-types.d.mts",
-      "import": "./dist/config-types.mjs"
-    },
-    "./schema-sql": "./schemas/data-contract-sql-v1.json",
+    "./config-types": "./dist/config-types.mjs",
+    "./contract-builder": "./dist/contract-builder.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

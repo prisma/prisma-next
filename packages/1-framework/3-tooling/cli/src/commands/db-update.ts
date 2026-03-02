@@ -111,10 +111,14 @@ async function executeDbUpdateCommand(
         })),
         ...(result.value.plan.sql !== undefined ? { sql: result.value.plan.sql } : {}),
       },
-      origin: {
-        storageHash: result.value.origin.storageHash,
-        ...ifDefined('profileHash', result.value.origin.profileHash),
-      },
+      ...(result.value.origin
+        ? {
+            origin: {
+              storageHash: result.value.origin.storageHash,
+              ...ifDefined('profileHash', result.value.origin.profileHash),
+            },
+          }
+        : {}),
       ...(result.value.execution
         ? {
             execution: {
