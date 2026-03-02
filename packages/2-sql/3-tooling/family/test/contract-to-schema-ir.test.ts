@@ -85,6 +85,57 @@ describe('contractToSchemaIR', () => {
     expect('typeRef' in column).toBe(false);
   });
 
+  it('expands parameterized native types when expandNativeType is provided', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            id: col({
+              nativeType: 'character',
+              codecId: 'sql/char@1',
+              typeParams: { length: 36 },
+            }),
+            name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+          },
+        }),
+      },
+    };
+
+    const expand = (input: {
+      nativeType: string;
+      codecId?: string;
+      typeParams?: Record<string, unknown>;
+    }) => {
+      if (input.typeParams && 'length' in input.typeParams) {
+        return `${input.nativeType}(${input.typeParams['length']})`;
+      }
+      return input.nativeType;
+    };
+
+    const result = contractToSchemaIR(storage, expand);
+    expect(result.tables['T']!.columns['id']!.nativeType).toBe('character(36)');
+    expect(result.tables['T']!.columns['name']!.nativeType).toBe('text');
+  });
+
+  it('uses base nativeType when no expandNativeType is provided', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            id: col({
+              nativeType: 'character',
+              codecId: 'sql/char@1',
+              typeParams: { length: 36 },
+            }),
+          },
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(storage);
+    expect(result.tables['T']!.columns['id']!.nativeType).toBe('character');
+  });
+
   it('converts literal column defaults', () => {
     const storage: SqlStorage = {
       tables: {

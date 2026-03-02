@@ -27,14 +27,40 @@ function convertDefault(def: ColumnDefault): string {
   return String(def.value);
 }
 
-function convertColumn(name: string, column: StorageColumn): SqlColumnIR {
-  const ir: SqlColumnIR = {
+/**
+ * Target-specific callback that expands a column's base `nativeType` and optional
+ * `typeParams` into the fully-qualified type string used by the database
+ * (e.g. `character` + `{ length: 36 }` → `character(36)`).
+ *
+ * This lives in the family layer as a callback rather than importing a concrete
+ * implementation because each target (Postgres, MySQL, SQLite, …) has its own
+ * parameterization syntax. The target wires its expander when calling
+ * `contractToSchemaIR`, keeping the family layer target-agnostic.
+ */
+export type NativeTypeExpander = (input: {
+  readonly nativeType: string;
+  readonly codecId?: string;
+  readonly typeParams?: Record<string, unknown>;
+}) => string;
+
+function convertColumn(
+  name: string,
+  column: StorageColumn,
+  expandNativeType?: NativeTypeExpander,
+): SqlColumnIR {
+  const nativeType = expandNativeType
+    ? expandNativeType({
+        nativeType: column.nativeType,
+        codecId: column.codecId,
+        typeParams: column.typeParams,
+      })
+    : column.nativeType;
+  return {
     name,
-    nativeType: column.nativeType,
+    nativeType,
     nullable: column.nullable,
     ...(column.default != null ? { default: convertDefault(column.default) } : {}),
   };
-  return ir;
 }
 
 function convertUnique(unique: UniqueConstraint): SqlUniqueIR {
@@ -61,10 +87,14 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
   };
 }
 
-function convertTable(name: string, table: StorageTable): SqlTableIR {
+function convertTable(
+  name: string,
+  table: StorageTable,
+  expandNativeType?: NativeTypeExpander,
+): SqlTableIR {
   const columns: Record<string, SqlColumnIR> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
-    columns[colName] = convertColumn(colName, colDef);
+    columns[colName] = convertColumn(colName, colDef, expandNativeType);
   }
 
   return {
@@ -123,18 +153,22 @@ export function detectDestructiveChanges(
 /**
  * Converts a contract's `SqlStorage` to `SqlSchemaIR`.
  *
- * This is a lossy conversion that drops codec metadata (`codecId`, `typeParams`, `typeRef`)
- * since the schema IR only represents structural information. The resulting schema IR can be
- * fed into the existing planner as the "from" state for offline migration planning.
+ * Drops codec metadata (`codecId`, `typeRef`) since the schema IR only represents structural
+ * information. When `expandNativeType` is provided, parameterized types are expanded
+ * (e.g. `character` + `{ length: 36 }` → `character(36)`) so the resulting IR compares
+ * correctly against the "to" contract during planning.
  *
  * `extensions` is always `[]` — the planner resolves extension dependencies from framework
  * components, and an empty array means "nothing installed yet" which is correct for the
  * "from" side of a diff.
  */
-export function contractToSchemaIR(storage: SqlStorage): SqlSchemaIR {
+export function contractToSchemaIR(
+  storage: SqlStorage,
+  expandNativeType?: NativeTypeExpander,
+): SqlSchemaIR {
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
-    tables[tableName] = convertTable(tableName, tableDef);
+    tables[tableName] = convertTable(tableName, tableDef, expandNativeType);
   }
 
   return {

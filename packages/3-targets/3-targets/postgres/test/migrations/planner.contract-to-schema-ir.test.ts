@@ -1,3 +1,4 @@
+import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MigrationPlannerResult } from '@prisma-next/core-control-plane/types';
 import { contractToSchemaIR, detectDestructiveChanges } from '@prisma-next/family-sql/control';
@@ -53,7 +54,7 @@ function createTestContract(
 
 function planFromStorages(from: SqlStorage | null, to: SqlStorage): MigrationPlannerResult {
   const toContract = createTestContract(to);
-  const fromSchemaIR = contractToSchemaIR(from ?? { tables: {} });
+  const fromSchemaIR = contractToSchemaIR(from ?? { tables: {} }, expandParameterizedNativeType);
   const planner = createPostgresMigrationPlanner();
   return planner.plan({
     contract: toContract,
@@ -82,7 +83,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(storage);
-    const schemaIR = contractToSchemaIR(storage);
+    const schemaIR = contractToSchemaIR(storage, expandParameterizedNativeType);
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -115,7 +116,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(storage);
-    const emptySchemaIR = contractToSchemaIR({ tables: {} });
+    const emptySchemaIR = contractToSchemaIR({ tables: {} }, expandParameterizedNativeType);
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -173,7 +174,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(toStorage);
-    const fromSchemaIR = contractToSchemaIR(fromStorage);
+    const fromSchemaIR = contractToSchemaIR(fromStorage, expandParameterizedNativeType);
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -222,7 +223,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(storage);
-    const schemaIR = contractToSchemaIR(storage);
+    const schemaIR = contractToSchemaIR(storage, expandParameterizedNativeType);
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({

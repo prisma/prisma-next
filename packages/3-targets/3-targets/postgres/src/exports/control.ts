@@ -1,3 +1,4 @@
+import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   ControlTargetInstance,
@@ -28,7 +29,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       },
       contractToSchema(contract: ContractIR | null) {
         const storage = contract ? (contract.storage as SqlStorage) : { tables: {} };
-        return contractToSchemaIR(storage);
+        return contractToSchemaIR(storage, expandParameterizedNativeType);
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {
