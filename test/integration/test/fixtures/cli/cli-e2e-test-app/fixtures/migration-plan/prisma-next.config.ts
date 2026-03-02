@@ -10,7 +10,7 @@ export default defineConfig({
   adapter: postgresAdapter,
   extensions: [],
   contract: {
-    source: contract,
+    source: async () => ({ ok: true as const, value: contract }),
     output: 'output/contract.json',
     types: 'output/contract.d.ts',
   },

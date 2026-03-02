@@ -288,12 +288,13 @@ withTempDir(({ createTempDir }) => {
 
     describe('destructive changes', () => {
       it(
-        'fails when a column is removed',
+        'plans a drop-column migration when a column is removed',
         async () => {
           const { testDir, configPath } = setupTestDirectoryFromFixtures(
             createTempDir,
             fixtureSubdir,
           );
+          const migrationsDir = join(testDir, 'migrations');
 
           await emitContract(testDir, configPath);
           await runMigrationPlan(testDir, [
@@ -317,23 +318,34 @@ withTempDir(({ createTempDir }) => {
 
           consoleOutput.length = 0;
           consoleErrors.length = 0;
+          await runMigrationPlan(testDir, [
+            '--config',
+            configPath,
+            '--name',
+            'remove_email',
+            '--json',
+            '--no-color',
+          ]);
 
-          let threw = false;
-          try {
-            await runMigrationPlan(testDir, [
-              '--config',
-              configPath,
-              '--name',
-              'remove_email',
-              '--no-color',
-            ]);
-          } catch {
-            threw = true;
-          }
+          const output = consoleOutput.join('\n').trim();
+          const parsed = JSON.parse(output) as MigrationPlanResult;
 
-          expect(threw).toBe(true);
-          const errorOutput = consoleErrors.join('\n');
-          expect(errorOutput).toContain('destructive changes');
+          expect(parsed.ok).toBe(true);
+          expect(parsed.noOp).toBe(false);
+
+          const dropOp = parsed.operations.find(
+            (op) => op.id.includes('email') || op.label.toLowerCase().includes('email'),
+          );
+          expect(dropOp).toBeDefined();
+
+          const packages = await readMigrationsDir(migrationsDir);
+          expect(packages).toHaveLength(2);
+
+          const destructivePkg = packages.find((p) => p.manifest.from !== EMPTY_CONTRACT_HASH)!;
+          const destructiveOps = destructivePkg.ops.filter(
+            (op) => op.operationClass === 'destructive',
+          );
+          expect(destructiveOps.length).toBeGreaterThan(0);
         },
         timeouts.typeScriptCompilation,
       );

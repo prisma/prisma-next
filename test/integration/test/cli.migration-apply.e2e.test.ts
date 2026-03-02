@@ -366,5 +366,169 @@ withTempDir(({ createTempDir }) => {
         timeouts.spinUpPpgDev,
       );
     });
+
+    describe('destructive changes', () => {
+      it(
+        'applies a migration that drops a column',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            const { testDir, configPath, contractPath } = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+
+            // Plan and apply the initial migration (creates user table with id + email)
+            await emitContract(testDir, configPath);
+            await runMigrationPlan(testDir, [
+              '--config',
+              configPath,
+              '--name',
+              'initial',
+              '--no-color',
+            ]);
+            consoleOutput.length = 0;
+            await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
+
+            const firstApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            expect(firstApply.ok).toBe(true);
+            expect(firstApply.migrationsApplied).toBe(1);
+
+            // Verify email column exists
+            await withClient(connectionString, async (client) => {
+              const result = await client.query(`
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'email'
+              `);
+              expect(result.rows.length).toBe(1);
+            });
+
+            // Remove the email column from the contract
+            const contractSrc = readFileSync(contractPath!, 'utf-8');
+            const modified = contractSrc
+              .replace(/\.column\('email'[^)]*\)\s*\n/, '')
+              .replace(/\.field\('email'[^)]*\)/, '');
+            writeFileSync(contractPath!, modified, 'utf-8');
+
+            // Re-emit and plan the destructive migration
+            await emitContract(testDir, configPath);
+            consoleOutput.length = 0;
+            await runMigrationPlan(testDir, [
+              '--config',
+              configPath,
+              '--name',
+              'drop_email',
+              '--no-color',
+            ]);
+
+            // Apply the destructive migration
+            consoleOutput.length = 0;
+            consoleErrors.length = 0;
+            await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
+
+            const secondApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            expect(secondApply.ok).toBe(true);
+            expect(secondApply.migrationsApplied).toBe(1);
+
+            // Verify email column no longer exists
+            await withClient(connectionString, async (client) => {
+              const result = await client.query(`
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'email'
+              `);
+              expect(result.rows.length).toBe(0);
+            });
+
+            // Verify marker was updated
+            await withClient(connectionString, async (client) => {
+              const result = await client.query(
+                'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
+                [1],
+              );
+              expect(result.rows.length).toBe(1);
+              expect(result.rows[0]?.core_hash).toBe(secondApply.markerHash);
+            });
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+
+      it(
+        'applies multiple migrations including destructive in DAG order',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            const { testDir, configPath, contractPath } = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+
+            // Plan initial migration
+            await emitContract(testDir, configPath);
+            await runMigrationPlan(testDir, [
+              '--config',
+              configPath,
+              '--name',
+              'initial',
+              '--no-color',
+            ]);
+
+            // Add a column, then remove email — two sequential changes
+            const contractSrc = readFileSync(contractPath!, 'utf-8');
+            const withName = contractSrc.replace(
+              `.primaryKey(['id'])`,
+              `.column('name', { type: textColumn, nullable: true })\n      .primaryKey(['id'])`,
+            );
+            writeFileSync(contractPath!, withName, 'utf-8');
+            await emitContract(testDir, configPath);
+            await runMigrationPlan(testDir, [
+              '--config',
+              configPath,
+              '--name',
+              'add_name',
+              '--no-color',
+            ]);
+
+            const withNameSrc = readFileSync(contractPath!, 'utf-8');
+            const withoutEmail = withNameSrc
+              .replace(/\.column\('email'[^)]*\)\s*\n/, '')
+              .replace(/\.field\('email'[^)]*\)/, '');
+            writeFileSync(contractPath!, withoutEmail, 'utf-8');
+            await emitContract(testDir, configPath);
+            await runMigrationPlan(testDir, [
+              '--config',
+              configPath,
+              '--name',
+              'drop_email',
+              '--no-color',
+            ]);
+
+            // Apply all three migrations at once against fresh DB
+            consoleOutput.length = 0;
+            await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
+
+            const result = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            expect(result.ok).toBe(true);
+            expect(result.migrationsApplied).toBe(3);
+
+            // Verify final state: user table has id + name, no email
+            await withClient(connectionString, async (client) => {
+              const cols = await client.query(`
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'user'
+                ORDER BY ordinal_position
+              `);
+              const columnNames = cols.rows.map((r: Record<string, unknown>) => r['column_name']);
+              expect(columnNames).toContain('id');
+              expect(columnNames).toContain('name');
+              expect(columnNames).not.toContain('email');
+            });
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
   });
 });
