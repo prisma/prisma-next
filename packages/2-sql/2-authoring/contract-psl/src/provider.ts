@@ -1,16 +1,20 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type {
+  TargetBoundComponentDescriptor,
+  TargetPackRef,
+} from '@prisma-next/contract/framework-components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
-import { createBuiltinDefaultFunctionRegistry } from './default-function-registry';
+import { assembleControlMutationDefaults } from './default-function-registry';
 import { interpretPslDocumentToSqlContractIR } from './interpreter';
 
 export interface PrismaContractOptions {
   readonly output?: string;
   readonly target?: TargetPackRef<'sql', 'postgres'>;
+  readonly frameworkComponents?: readonly TargetBoundComponentDescriptor<'sql', string>[];
 }
 
 export function prismaContract(
@@ -42,12 +46,23 @@ export function prismaContract(
         schema,
         sourceId: schemaPath,
       });
+      const frameworkComponents = options?.frameworkComponents ?? [];
+      const composedExtensionPacks = new Set<string>(context.composedExtensionPacks ?? []);
+      for (const component of frameworkComponents) {
+        if (component.kind === 'extension') {
+          composedExtensionPacks.add(component.id);
+        }
+      }
+      const controlMutationDefaults = assembleControlMutationDefaults(frameworkComponents);
 
       const interpreted = interpretPslDocumentToSqlContractIR({
         document,
         ...ifDefined('target', options?.target),
-        composedExtensionPacks: context.composedExtensionPacks,
-        defaultFunctionRegistry: createBuiltinDefaultFunctionRegistry(),
+        ...ifDefined(
+          'composedExtensionPacks',
+          composedExtensionPacks.size > 0 ? Array.from(composedExtensionPacks) : undefined,
+        ),
+        controlMutationDefaults,
       });
       if (!interpreted.ok) {
         return interpreted;

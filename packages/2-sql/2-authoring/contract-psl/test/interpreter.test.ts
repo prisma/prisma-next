@@ -1,8 +1,10 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
+import { createBuiltinControlMutationDefaults } from '../src/default-function-registry';
 import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
 
 describe('interpretPslDocumentToSqlContractIR', () => {
+  const builtinControlMutationDefaults = createBuiltinControlMutationDefaults();
   it('builds sql contract ir from simple psl schema', () => {
     const document = parsePslDocument({
       schema: `model User {
@@ -13,7 +15,10 @@ describe('interpretPslDocumentToSqlContractIR', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -74,7 +79,10 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -147,7 +155,10 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -184,7 +195,10 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -219,7 +233,10 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -274,7 +291,10 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -306,7 +326,10 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -338,7 +361,10 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -370,7 +396,10 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -395,7 +424,10 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -538,7 +570,10 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -562,7 +597,10 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -597,7 +635,10 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -662,7 +703,10 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
