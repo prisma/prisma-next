@@ -9,17 +9,17 @@ import type { MigrationManifest, MigrationOps } from './types';
 export interface VerifyResult {
   readonly ok: boolean;
   readonly reason?: 'draft' | 'mismatch';
-  readonly storedEdgeId?: string;
-  readonly computedEdgeId?: string;
+  readonly storedMigrationId?: string;
+  readonly computedMigrationId?: string;
 }
 
 function sha256Hex(input: string): string {
   return createHash('sha256').update(input).digest('hex');
 }
 
-export function computeEdgeId(manifest: MigrationManifest, ops: MigrationOps): string {
+export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOps): string {
   const {
-    edgeId: _edgeId,
+    migrationId: _migrationId,
     signature: _signature,
     fromContract: _fromContract,
     toContract: _toContract,
@@ -46,31 +46,31 @@ export function computeEdgeId(manifest: MigrationManifest, ops: MigrationOps): s
 
 export async function attestMigration(dir: string): Promise<string> {
   const pkg = await readMigrationPackage(dir);
-  const edgeId = computeEdgeId(pkg.manifest, pkg.ops);
+  const migrationId = computeMigrationId(pkg.manifest, pkg.ops);
 
-  const updated = { ...pkg.manifest, edgeId };
+  const updated = { ...pkg.manifest, migrationId };
   await writeFile(join(dir, 'migration.json'), JSON.stringify(updated, null, 2));
 
-  return edgeId;
+  return migrationId;
 }
 
 export async function verifyMigration(dir: string): Promise<VerifyResult> {
   const pkg = await readMigrationPackage(dir);
 
-  if (pkg.manifest.edgeId === null) {
+  if (pkg.manifest.migrationId === null) {
     return { ok: false, reason: 'draft' };
   }
 
-  const computed = computeEdgeId(pkg.manifest, pkg.ops);
+  const computed = computeMigrationId(pkg.manifest, pkg.ops);
 
-  if (pkg.manifest.edgeId === computed) {
-    return { ok: true, storedEdgeId: pkg.manifest.edgeId, computedEdgeId: computed };
+  if (pkg.manifest.migrationId === computed) {
+    return { ok: true, storedMigrationId: pkg.manifest.migrationId, computedMigrationId: computed };
   }
 
   return {
     ok: false,
     reason: 'mismatch',
-    storedEdgeId: pkg.manifest.edgeId,
-    computedEdgeId: computed,
+    storedMigrationId: pkg.manifest.migrationId,
+    computedMigrationId: computed,
   };
 }

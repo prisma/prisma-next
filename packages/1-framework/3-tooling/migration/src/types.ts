@@ -11,8 +11,8 @@ export interface MigrationHints {
 export interface MigrationManifest {
   readonly from: string;
   readonly to: string;
-  readonly edgeId: string | null;
-  readonly parentEdgeId: string | null;
+  readonly migrationId: string | null;
+  readonly parentMigrationId: string | null;
   readonly kind: 'regular' | 'baseline';
   readonly fromContract: ContractIR | null;
   readonly toContract: ContractIR;
@@ -32,11 +32,11 @@ export interface MigrationPackage {
   readonly ops: MigrationOps;
 }
 
-export interface MigrationGraphEdge {
+export interface MigrationChainEntry {
   readonly from: string;
   readonly to: string;
-  readonly edgeId: string | null;
-  readonly parentEdgeId: string | null;
+  readonly migrationId: string | null;
+  readonly parentMigrationId: string | null;
   readonly dirName: string;
   readonly createdAt: string;
   readonly labels: readonly string[];
@@ -44,8 +44,8 @@ export interface MigrationGraphEdge {
 
 export interface MigrationGraph {
   readonly nodes: ReadonlySet<string>;
-  readonly edges: ReadonlyMap<string, readonly MigrationGraphEdge[]>;
-  readonly reverseEdges: ReadonlyMap<string, readonly MigrationGraphEdge[]>;
-  readonly edgeById: ReadonlyMap<string, MigrationGraphEdge>;
-  readonly childEdges: ReadonlyMap<string | null, readonly MigrationGraphEdge[]>;
+  readonly forwardChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
+  readonly reverseChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
+  readonly migrationById: ReadonlyMap<string, MigrationChainEntry>;
+  readonly childrenByParentId: ReadonlyMap<string | null, readonly MigrationChainEntry[]>;
 }

@@ -60,13 +60,13 @@ function createManifest(
   to: string,
   toContract: ContractIR,
   fromContract: ContractIR | null = null,
-  parentEdgeId: string | null = null,
+  parentMigrationId: string | null = null,
 ): MigrationManifest {
   return {
     from,
     to,
-    edgeId: null,
-    parentEdgeId,
+    migrationId: null,
+    parentMigrationId,
     kind: 'regular',
     fromContract,
     toContract,
@@ -92,7 +92,7 @@ async function setupMigrationDir(
 }
 
 describe('resolveByHashPrefix', () => {
-  it('resolves exact edgeId match', async () => {
+  it('resolves exact migrationId match', async () => {
     const tempDir = await createTempDir('exact');
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -114,12 +114,12 @@ describe('resolveByHashPrefix', () => {
 
     const packages = await readMigrationsDir(migrationsDir);
     const pkg = packages[0]!;
-    const edgeId = pkg.manifest.edgeId!;
+    const migrationId = pkg.manifest.migrationId!;
 
-    const result = resolveByHashPrefix(packages, edgeId);
+    const result = resolveByHashPrefix(packages, migrationId);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.manifest.edgeId).toBe(edgeId);
+      expect(result.value.manifest.migrationId).toBe(migrationId);
     }
   });
 
@@ -144,13 +144,13 @@ describe('resolveByHashPrefix', () => {
     );
 
     const packages = await readMigrationsDir(migrationsDir);
-    const edgeId = packages[0]!.manifest.edgeId!;
-    const prefix = edgeId.slice(0, 12);
+    const migrationId = packages[0]!.manifest.migrationId!;
+    const prefix = migrationId.slice(0, 12);
 
     const result = resolveByHashPrefix(packages, prefix);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.manifest.edgeId).toBe(edgeId);
+      expect(result.value.manifest.migrationId).toBe(migrationId);
     }
   });
 
@@ -162,8 +162,8 @@ describe('resolveByHashPrefix', () => {
         manifest: {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:hash-a',
-          edgeId: 'sha256:abc123',
-          parentEdgeId: null,
+          migrationId: 'sha256:abc123',
+          parentMigrationId: null,
           kind: 'regular',
           fromContract: null,
           toContract: createTestContract(),
@@ -191,8 +191,8 @@ describe('resolveByHashPrefix', () => {
         manifest: {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:hash-a',
-          edgeId: 'sha256:abc111',
-          parentEdgeId: null,
+          migrationId: 'sha256:abc111',
+          parentMigrationId: null,
           kind: 'regular',
           fromContract: null,
           toContract: contract,
@@ -208,8 +208,8 @@ describe('resolveByHashPrefix', () => {
         manifest: {
           from: 'sha256:hash-a',
           to: 'sha256:hash-b',
-          edgeId: 'sha256:abc222',
-          parentEdgeId: 'sha256:abc111',
+          migrationId: 'sha256:abc222',
+          parentMigrationId: 'sha256:abc111',
           kind: 'regular',
           fromContract: contract,
           toContract: contract,
@@ -236,8 +236,8 @@ describe('resolveByHashPrefix', () => {
         manifest: {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:hash-a',
-          edgeId: 'sha256:abc123def456',
-          parentEdgeId: null,
+          migrationId: 'sha256:abc123def456',
+          parentMigrationId: null,
           kind: 'regular',
           fromContract: null,
           toContract: createTestContract(),
@@ -252,11 +252,11 @@ describe('resolveByHashPrefix', () => {
     const result = resolveByHashPrefix(packages, 'abc123');
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.manifest.edgeId).toBe('sha256:abc123def456');
+      expect(result.value.manifest.migrationId).toBe('sha256:abc123def456');
     }
   });
 
-  it('skips draft migrations (edgeId: null)', () => {
+  it('skips draft migrations (migrationId: null)', () => {
     const packages: MigrationPackage[] = [
       {
         dirName: '20260101_100000_draft',
@@ -264,8 +264,8 @@ describe('resolveByHashPrefix', () => {
         manifest: {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:hash-a',
-          edgeId: null,
-          parentEdgeId: null,
+          migrationId: null,
+          parentMigrationId: null,
           kind: 'regular',
           fromContract: null,
           toContract: createTestContract(),
@@ -294,7 +294,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_add_user',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        edgeId: 'sha256:edge-abc',
+        migrationId: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -311,7 +311,7 @@ describe('formatMigrationShowOutput', () => {
     expect(stripped).toContain('kind: regular');
     expect(stripped).toContain(`from: ${EMPTY_CONTRACT_HASH}`);
     expect(stripped).toContain('to:   sha256:hash-a');
-    expect(stripped).toContain('edgeId: sha256:edge-abc');
+    expect(stripped).toContain('migrationId: sha256:edge-abc');
     expect(stripped).toContain('2026-01-01T10:00:00.000Z');
   });
 
@@ -323,7 +323,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        edgeId: 'sha256:edge-abc',
+        migrationId: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -355,7 +355,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        edgeId: 'sha256:edge-abc',
+        migrationId: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -385,7 +385,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        edgeId: 'sha256:edge-abc',
+        migrationId: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -410,7 +410,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        edgeId: 'sha256:edge-abc',
+        migrationId: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -427,7 +427,7 @@ describe('formatMigrationShowOutput', () => {
     expect(stripped).toContain('CREATE TABLE "user" (id int4 NOT NULL);');
   });
 
-  it('shows draft indicator when edgeId is null', () => {
+  it('shows draft indicator when migrationId is null', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
       {
@@ -435,7 +435,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        edgeId: null,
+        migrationId: null,
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [],
@@ -458,7 +458,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        edgeId: null,
+        migrationId: null,
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [],

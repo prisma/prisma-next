@@ -1,5 +1,5 @@
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
-import { findLeafEdge, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { MigrationPackage } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
@@ -34,7 +34,7 @@ export interface MigrationShowResult {
   readonly dirPath: string;
   readonly from: string;
   readonly to: string;
-  readonly edgeId: string | null;
+  readonly migrationId: string | null;
   readonly kind: string;
   readonly createdAt: string;
   readonly operations: readonly {
@@ -55,8 +55,8 @@ export function resolveByHashPrefix(
   prefix: string,
 ): Result<MigrationPackage, CliStructuredError> {
   const normalizedPrefix = prefix.startsWith('sha256:') ? prefix : `sha256:${prefix}`;
-  const attested = packages.filter((p) => typeof p.manifest.edgeId === 'string');
-  const matches = attested.filter((p) => p.manifest.edgeId!.startsWith(normalizedPrefix));
+  const attested = packages.filter((p) => typeof p.manifest.migrationId === 'string');
+  const matches = attested.filter((p) => p.manifest.migrationId!.startsWith(normalizedPrefix));
 
   if (matches.length === 1) {
     return ok(matches[0]!);
@@ -65,13 +65,13 @@ export function resolveByHashPrefix(
   if (matches.length === 0) {
     return notOk(
       errorRuntime('No migration found matching prefix', {
-        why: `No attested migration has an edgeId starting with "${normalizedPrefix}"`,
+        why: `No attested migration has a migrationId starting with "${normalizedPrefix}"`,
         fix: 'Run `prisma-next migration show` (no argument) to see the latest migration, or check the migrations directory for available packages.',
       }),
     );
   }
 
-  const candidates = matches.map((p) => `  ${p.dirName}  ${p.manifest.edgeId}`).join('\n');
+  const candidates = matches.map((p) => `  ${p.dirName}  ${p.manifest.migrationId}`).join('\n');
   return notOk(
     errorRuntime('Ambiguous hash prefix', {
       why: `Multiple migrations match prefix "${normalizedPrefix}":\n${candidates}`,
@@ -134,30 +134,32 @@ async function executeMigrationShowCommand(
         if (!resolved.ok) return resolved;
         pkg = resolved.value;
       } else {
-        const attested = allPackages.filter((p) => typeof p.manifest.edgeId === 'string');
+        const attested = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
         if (attested.length === 0) {
           return notOk(
             errorRuntime('No attested migrations found', {
-              why: `All migrations in ${migrationsRelative} are drafts (edgeId: null)`,
+              why: `All migrations in ${migrationsRelative} are drafts (migrationId: null)`,
               fix: 'Run `prisma-next migration verify --dir <path>` to attest a draft migration.',
             }),
           );
         }
         const graph = reconstructGraph(attested);
-        const leafEdge = findLeafEdge(graph);
-        if (!leafEdge) {
+        const latestMigration = findLatestMigration(graph);
+        if (!latestMigration) {
           return notOk(
             errorRuntime('Could not resolve latest migration', {
-              why: 'No leaf edge found in the migration graph',
+              why: 'No latest migration found in the migration chain',
               fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
             }),
           );
         }
-        const leafPkg = attested.find((p) => p.manifest.edgeId === leafEdge.edgeId);
+        const leafPkg = attested.find(
+          (p) => p.manifest.migrationId === latestMigration.migrationId,
+        );
         if (!leafPkg) {
           return notOk(
             errorRuntime('Could not resolve latest migration', {
-              why: `Leaf edge ${leafEdge.dirName} does not match any package`,
+              why: `Latest migration ${latestMigration.dirName} does not match any package`,
               fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
             }),
           );
@@ -191,7 +193,7 @@ async function executeMigrationShowCommand(
     dirPath: relative(process.cwd(), pkg.dirPath),
     from: pkg.manifest.from,
     to: pkg.manifest.to,
-    edgeId: pkg.manifest.edgeId,
+    migrationId: pkg.manifest.migrationId,
     kind: pkg.manifest.kind,
     createdAt: pkg.manifest.createdAt,
     operations: ops.map((op) => ({
@@ -221,7 +223,10 @@ export function createMigrationShowCommand(): Command {
         return formatCommandHelp({ command: cmd, flags: defaultFlags });
       },
     })
-    .argument('[target]', 'Migration directory path or edgeId hash prefix (defaults to latest)')
+    .argument(
+      '[target]',
+      'Migration directory path or migrationId hash prefix (defaults to latest)',
+    )
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--json [format]', 'Output as JSON (object)', false)
     .option('-q, --quiet', 'Quiet mode: errors only')

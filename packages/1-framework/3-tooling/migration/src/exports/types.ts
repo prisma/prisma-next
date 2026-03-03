@@ -1,7 +1,7 @@
 export { MigrationToolsError } from '../errors';
 export type {
+  MigrationChainEntry,
   MigrationGraph,
-  MigrationGraphEdge,
   MigrationHints,
   MigrationManifest,
   MigrationOps,

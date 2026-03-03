@@ -4,36 +4,36 @@ import { tmpdir } from 'node:os';
 import { canonicalizeContract } from '@prisma-next/core-control-plane/emission';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { attestMigration, computeEdgeId, verifyMigration } from '../src/attestation';
+import { attestMigration, computeMigrationId, verifyMigration } from '../src/attestation';
 import { canonicalizeJson } from '../src/canonicalize-json';
 import { writeMigrationPackage } from '../src/io';
 import { createTestContract, createTestManifest, createTestOps } from './fixtures';
 
-describe('computeEdgeId', () => {
+describe('computeMigrationId', () => {
   it('produces deterministic output', () => {
     const manifest = createTestManifest();
     const ops = createTestOps();
-    const id1 = computeEdgeId(manifest, ops);
-    const id2 = computeEdgeId(manifest, ops);
+    const id1 = computeMigrationId(manifest, ops);
+    const id2 = computeMigrationId(manifest, ops);
     expect(id1).toBe(id2);
   });
 
   it('returns sha256: prefixed string', () => {
-    const id = computeEdgeId(createTestManifest(), createTestOps());
+    const id = computeMigrationId(createTestManifest(), createTestOps());
     expect(id).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
   it('handles fromContract: null (empty project)', () => {
     const manifest = createTestManifest({ fromContract: null });
-    const id = computeEdgeId(manifest, createTestOps());
+    const id = computeMigrationId(manifest, createTestOps());
     expect(id).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
-  it('ignores existing edgeId in manifest', () => {
+  it('ignores existing migrationId in manifest', () => {
     const manifest = createTestManifest();
-    const withEdgeId = createTestManifest({ edgeId: 'sha256:fakehash' });
+    const withMigrationId = createTestManifest({ migrationId: 'sha256:fakehash' });
     const ops = createTestOps();
-    expect(computeEdgeId(manifest, ops)).toBe(computeEdgeId(withEdgeId, ops));
+    expect(computeMigrationId(manifest, ops)).toBe(computeMigrationId(withMigrationId, ops));
   });
 
   it('ignores signature in manifest', () => {
@@ -42,20 +42,20 @@ describe('computeEdgeId', () => {
       signature: { keyId: 'key1', value: 'sig_value' },
     });
     const ops = createTestOps();
-    expect(computeEdgeId(manifest, ops)).toBe(computeEdgeId(withSig, ops));
+    expect(computeMigrationId(manifest, ops)).toBe(computeMigrationId(withSig, ops));
   });
 
   it('changes when manifest field changes', () => {
     const ops = createTestOps();
-    const id1 = computeEdgeId(createTestManifest({ labels: [] }), ops);
-    const id2 = computeEdgeId(createTestManifest({ labels: ['custom'] }), ops);
+    const id1 = computeMigrationId(createTestManifest({ labels: [] }), ops);
+    const id2 = computeMigrationId(createTestManifest({ labels: ['custom'] }), ops);
     expect(id1).not.toBe(id2);
   });
 
   it('changes when ops change', () => {
     const manifest = createTestManifest();
-    const id1 = computeEdgeId(manifest, createTestOps());
-    const id2 = computeEdgeId(manifest, []);
+    const id1 = computeMigrationId(manifest, createTestOps());
+    const id2 = computeMigrationId(manifest, []);
     expect(id1).not.toBe(id2);
   });
 
@@ -67,14 +67,14 @@ describe('computeEdgeId', () => {
     const m2 = createTestManifest({
       toContract: createTestContract({ target: 'mysql' }),
     });
-    expect(computeEdgeId(m1, ops)).not.toBe(computeEdgeId(m2, ops));
+    expect(computeMigrationId(m1, ops)).not.toBe(computeMigrationId(m2, ops));
   });
 
-  it('changes when parentEdgeId changes', () => {
+  it('changes when parentMigrationId changes', () => {
     const ops = createTestOps();
-    const root = createTestManifest({ parentEdgeId: null });
-    const child = createTestManifest({ parentEdgeId: 'sha256:parent' });
-    expect(computeEdgeId(root, ops)).not.toBe(computeEdgeId(child, ops));
+    const root = createTestManifest({ parentMigrationId: null });
+    const child = createTestManifest({ parentMigrationId: 'sha256:parent' });
+    expect(computeMigrationId(root, ops)).not.toBe(computeMigrationId(child, ops));
   });
 
   it('uses framed tuple hashing for edge input parts', () => {
@@ -82,7 +82,7 @@ describe('computeEdgeId', () => {
     const ops = createTestOps();
 
     const {
-      edgeId: _edgeId,
+      migrationId: _migrationId,
       signature: _signature,
       fromContract: _fromContract,
       toContract: _toContract,
@@ -104,8 +104,8 @@ describe('computeEdgeId', () => {
 
     const legacy = `sha256:${createHash('sha256').update(canonicalParts.join(':')).digest('hex')}`;
 
-    expect(computeEdgeId(manifest, ops)).toBe(expected);
-    expect(computeEdgeId(manifest, ops)).not.toBe(legacy);
+    expect(computeMigrationId(manifest, ops)).toBe(expected);
+    expect(computeMigrationId(manifest, ops)).not.toBe(legacy);
   });
 
   it('changes when canonical part boundaries change', () => {
@@ -113,10 +113,10 @@ describe('computeEdgeId', () => {
     const baseOps = createTestOps();
     const boundaryShiftedOps = baseOps.map((op) => ({ ...op, label: `${op.label}:suffix` }));
 
-    const baseEdgeId = computeEdgeId(manifest, baseOps);
-    const boundaryShiftedEdgeId = computeEdgeId(manifest, boundaryShiftedOps);
+    const baseMigrationId = computeMigrationId(manifest, baseOps);
+    const boundaryShiftedMigrationId = computeMigrationId(manifest, boundaryShiftedOps);
 
-    expect(baseEdgeId).not.toBe(boundaryShiftedEdgeId);
+    expect(baseMigrationId).not.toBe(boundaryShiftedMigrationId);
   });
 });
 
@@ -135,8 +135,8 @@ describe('attestMigration + verifyMigration', () => {
     const dir = join(tmpDir, '20260225T1430_test');
     await writeMigrationPackage(dir, createTestManifest(), createTestOps());
 
-    const edgeId = await attestMigration(dir);
-    expect(edgeId).toMatch(/^sha256:/);
+    const migrationId = await attestMigration(dir);
+    expect(migrationId).toMatch(/^sha256:/);
 
     const result = await verifyMigration(dir);
     expect(result.ok).toBe(true);
@@ -144,7 +144,7 @@ describe('attestMigration + verifyMigration', () => {
 
   it('verify returns draft status for unattested migration', async () => {
     const dir = join(tmpDir, '20260225T1430_draft');
-    await writeMigrationPackage(dir, createTestManifest({ edgeId: null }), createTestOps());
+    await writeMigrationPackage(dir, createTestManifest({ migrationId: null }), createTestOps());
 
     const result = await verifyMigration(dir);
     expect(result.ok).toBe(false);
@@ -168,12 +168,12 @@ describe('attestMigration + verifyMigration', () => {
   it('verify detects tampered manifest field', async () => {
     const dir = join(tmpDir, '20260225T1430_tampered_manifest');
     await writeMigrationPackage(dir, createTestManifest(), createTestOps());
-    const edgeId = await attestMigration(dir);
+    const migrationId = await attestMigration(dir);
 
     const manifestPath = join(dir, 'migration.json');
     const content = JSON.parse(await readFile(manifestPath, 'utf-8'));
     content.labels = ['tampered'];
-    content.edgeId = edgeId;
+    content.migrationId = migrationId;
     await writeFile(manifestPath, JSON.stringify(content, null, 2));
 
     const result = await verifyMigration(dir);

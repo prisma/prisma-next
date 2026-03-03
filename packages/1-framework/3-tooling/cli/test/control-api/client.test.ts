@@ -822,7 +822,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.migrationApply({
         originHash: 'sha256:empty',
         destinationHash: 'sha256:abc',
-        pendingEdges: [
+        pendingMigrations: [
           {
             dirName: '001_init',
             from: 'sha256:empty',
@@ -902,7 +902,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.migrationApply({
         originHash: 'sha256:empty',
         destinationHash: 'sha256:abc',
-        pendingEdges: [
+        pendingMigrations: [
           {
             dirName: '001_init',
             from: 'sha256:empty',
@@ -922,7 +922,7 @@ describe('ControlClient progress emission', () => {
       }
     });
 
-    it('returns EDGE_NOT_FOUND when pending edges are discontinuous', async () => {
+    it('returns MIGRATION_PATH_NOT_FOUND when pending migrations are discontinuous', async () => {
       const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
         createMockComponents();
       let executeCalls = 0;
@@ -961,7 +961,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.migrationApply({
         originHash: 'sha256:empty',
         destinationHash: 'sha256:ccc',
-        pendingEdges: [
+        pendingMigrations: [
           {
             dirName: '001_init',
             from: 'sha256:empty',
@@ -984,7 +984,7 @@ describe('ControlClient progress emission', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.failure.code).toBe('EDGE_NOT_FOUND');
+        expect(result.failure.code).toBe('MIGRATION_PATH_NOT_FOUND');
       }
       expect(executeCalls).toBe(0);
     });
@@ -1003,7 +1003,7 @@ describe('ControlClient progress emission', () => {
         client.migrationApply({
           originHash: 'sha256:empty',
           destinationHash: 'sha256:empty',
-          pendingEdges: [],
+          pendingMigrations: [],
           connection: 'postgres://test',
         }),
       ).rejects.toThrow('does not support migrations');

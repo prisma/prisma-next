@@ -9,7 +9,7 @@ import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
-import type { MigrationApplyEdge, MigrationApplyFailure } from '../control-api/types';
+import type { MigrationApplyFailure, MigrationApplyStep } from '../control-api/types';
 import {
   CliStructuredError,
   type CliStructuredError as CliStructuredErrorType,
@@ -85,13 +85,13 @@ function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType
   });
 }
 
-function packageToEdge(pkg: MigrationPackage): MigrationApplyEdge {
+function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
   return {
     dirName: pkg.dirName,
     from: pkg.manifest.from,
     to: pkg.manifest.to,
     toContract: pkg.manifest.toContract,
-    operations: pkg.ops as MigrationApplyEdge['operations'],
+    operations: pkg.ops as MigrationApplyStep['operations'],
   };
 }
 
@@ -179,11 +179,11 @@ async function executeMigrationApplyCommand(
     console.log(header);
   }
 
-  // Read migrations and build DAG (offline — no DB needed)
+  // Read migrations and build migration chain model (offline — no DB needed)
   let packages: readonly MigrationPackage[];
   try {
     const allPackages = await readMigrationsDir(migrationsDir);
-    packages = allPackages.filter((p) => typeof p.manifest.edgeId === 'string');
+    packages = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -320,30 +320,30 @@ async function executeMigrationApplyCommand(
 
     // Resolve graph edges to full apply-ready edges
     const packageByDir = new Map(packages.map((pkg) => [pkg.dirName, pkg]));
-    const pendingEdges: MigrationApplyEdge[] = [];
-    for (const edge of pendingPath) {
-      const pkg = packageByDir.get(edge.dirName);
+    const pendingMigrations: MigrationApplyStep[] = [];
+    for (const migration of pendingPath) {
+      const pkg = packageByDir.get(migration.dirName);
       if (!pkg) {
         return notOk(
-          errorRuntime(`Migration package not found: ${edge.dirName}`, {
-            why: `The migration directory for edge ${edge.from} → ${edge.to} was not found`,
+          errorRuntime(`Migration package not found: ${migration.dirName}`, {
+            why: `The migration directory for path segment ${migration.from} → ${migration.to} was not found`,
             fix: 'Ensure all migration directories are present and intact.',
           }),
         );
       }
-      pendingEdges.push(packageToEdge(pkg));
+      pendingMigrations.push(packageToStep(pkg));
     }
 
     if (!flags.quiet && flags.json !== 'object') {
-      for (const edge of pendingEdges) {
-        console.log(`  Applying ${edge.dirName}...`);
+      for (const migration of pendingMigrations) {
+        console.log(`  Applying ${migration.dirName}...`);
       }
     }
 
     const applyResult = await client.migrationApply({
       originHash: markerHash,
       destinationHash,
-      pendingEdges,
+      pendingMigrations,
     });
 
     if (!applyResult.ok) {
@@ -381,7 +381,7 @@ export function createMigrationApplyCommand(): Command {
     command,
     'Apply planned migrations to the database',
     'Applies previously planned migrations (created by `migration plan`) to a live database.\n' +
-      'Compares the database marker against the migration DAG to determine which\n' +
+      'Compares the database marker against the migration chain to determine which\n' +
       'migrations are pending, then executes them sequentially. Each migration runs\n' +
       'in its own transaction. Does not plan new migrations — run `migration plan` first.',
   );

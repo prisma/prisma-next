@@ -28,8 +28,8 @@ const MigrationHintsSchema = type({
 const MigrationManifestSchema = type({
   from: 'string',
   to: 'string',
-  edgeId: 'string | null',
-  parentEdgeId: 'string | null',
+  migrationId: 'string | null',
+  parentMigrationId: 'string | null',
   kind: "'regular' | 'baseline'",
   fromContract: 'object | null',
   toContract: 'object',

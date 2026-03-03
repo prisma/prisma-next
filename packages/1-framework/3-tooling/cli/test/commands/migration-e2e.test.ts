@@ -75,8 +75,8 @@ describe('migration plan → verify end-to-end', () => {
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:initial-hash',
-      edgeId: null,
-      parentEdgeId: null,
+      migrationId: null,
+      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract,
@@ -93,24 +93,24 @@ describe('migration plan → verify end-to-end', () => {
     const dirName = formatMigrationDirName(new Date(), 'initial');
     const packageDir = join(migrationsDir, dirName);
     await writeMigrationPackage(packageDir, manifest, ops);
-    const edgeId = await attestMigration(packageDir);
+    const migrationId = await attestMigration(packageDir);
 
     // Verify the package
     const verifyResult = await verifyMigration(packageDir);
     expect(verifyResult.ok).toBe(true);
-    expect(verifyResult.storedEdgeId).toBe(edgeId);
+    expect(verifyResult.storedMigrationId).toBe(migrationId);
 
     // Read back and validate structure
     const pkg = await readMigrationPackage(packageDir);
     expect(pkg.manifest.from).toBe(EMPTY_CONTRACT_HASH);
     expect(pkg.manifest.to).toBe('sha256:initial-hash');
-    expect(pkg.manifest.edgeId).toBe(edgeId);
+    expect(pkg.manifest.migrationId).toBe(migrationId);
     expect(pkg.manifest.fromContract).toBeNull();
     expect(pkg.manifest.toContract).toEqual(toContract);
     expect(pkg.ops).toHaveLength(1);
   });
 
-  it('incremental change: two plans form valid DAG chain', async () => {
+  it('incremental change: two plans form a valid migration chain', async () => {
     const root = await createTempDir();
     const migrationsDir = join(root, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -131,8 +131,8 @@ describe('migration plan → verify end-to-end', () => {
       {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        edgeId: null,
-        parentEdgeId: null,
+        migrationId: null,
+        parentMigrationId: null,
         kind: 'regular',
         fromContract: null,
         toContract: contractA,
@@ -147,7 +147,7 @@ describe('migration plan → verify end-to-end', () => {
       },
       [createTableOp('user')],
     );
-    const edgeId1 = await attestMigration(path1);
+    const migrationId1 = await attestMigration(path1);
 
     // Plan 2: A → B
     const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
@@ -157,8 +157,8 @@ describe('migration plan → verify end-to-end', () => {
       {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        edgeId: null,
-        parentEdgeId: edgeId1,
+        migrationId: null,
+        parentMigrationId: migrationId1,
         kind: 'regular',
         fromContract: contractA,
         toContract: contractB,
@@ -175,7 +175,7 @@ describe('migration plan → verify end-to-end', () => {
     );
     await attestMigration(path2);
 
-    // Verify the DAG
+    // Verify the migration chain
     const packages = await readMigrationsDir(migrationsDir);
     expect(packages).toHaveLength(2);
 
@@ -210,8 +210,8 @@ describe('migration plan → verify end-to-end', () => {
       {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:target-hash',
-        edgeId: null,
-        parentEdgeId: null,
+        migrationId: null,
+        parentMigrationId: null,
         kind: 'regular',
         fromContract: null,
         toContract: contract,
@@ -246,14 +246,14 @@ describe('migration plan → verify end-to-end', () => {
     const dirName = formatMigrationDirName(new Date(), 'manual');
     const packageDir = join(root, dirName);
 
-    // Scaffold: Draft migration (edgeId: null)
+    // Scaffold: Draft migration (migrationId: null)
     await writeMigrationPackage(
       packageDir,
       {
         from: EMPTY_CONTRACT_HASH,
         to: EMPTY_CONTRACT_HASH,
-        edgeId: null,
-        parentEdgeId: null,
+        migrationId: null,
+        parentMigrationId: null,
         kind: 'regular',
         fromContract: null,
         toContract: createContract({}),
@@ -270,12 +270,12 @@ describe('migration plan → verify end-to-end', () => {
     expect(result1.reason).toBe('draft');
 
     // Attest (same as what migration verify does for drafts)
-    const edgeId = await attestMigration(packageDir);
-    expect(edgeId).toMatch(/^sha256:/);
+    const migrationId = await attestMigration(packageDir);
+    expect(migrationId).toMatch(/^sha256:/);
 
     // Verify now passes
     const result2 = await verifyMigration(packageDir);
     expect(result2.ok).toBe(true);
-    expect(result2.storedEdgeId).toBe(edgeId);
+    expect(result2.storedMigrationId).toBe(migrationId);
   });
 });

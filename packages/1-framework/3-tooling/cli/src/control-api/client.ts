@@ -417,7 +417,7 @@ class ControlClientImpl implements ControlClient {
       familyInstance,
       originHash: options.originHash,
       destinationHash: options.destinationHash,
-      pendingEdges: options.pendingEdges,
+      pendingMigrations: options.pendingMigrations,
       migrations: this.options.target.migrations,
       frameworkComponents,
       targetId: this.options.target.targetId,

@@ -426,10 +426,10 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
 // ============================================================================
 
 /**
- * A pre-planned migration edge ready for execution.
+ * A pre-planned migration step ready for execution.
  * Contains the manifest metadata and the serialized operations from ops.json.
  */
-export interface MigrationApplyEdge {
+export interface MigrationApplyStep {
   readonly dirName: string;
   readonly from: string;
   readonly to: string;
@@ -457,10 +457,10 @@ export interface MigrationApplyOptions {
    */
   readonly destinationHash: string;
   /**
-   * Ordered list of migration edges to execute from originHash to destinationHash.
+   * Ordered list of migrations to execute from originHash to destinationHash.
    * The execution layer does not choose defaults; it only executes this explicit path.
    */
-  readonly pendingEdges: readonly MigrationApplyEdge[];
+  readonly pendingMigrations: readonly MigrationApplyStep[];
   /**
    * Database connection. If provided, migrationApply will connect before executing.
    * If omitted, the client must already be connected.
@@ -493,7 +493,7 @@ export interface MigrationApplySuccess {
 /**
  * Failure codes for migrationApply operation.
  */
-export type MigrationApplyFailureCode = 'RUNNER_FAILED' | 'EDGE_NOT_FOUND';
+export type MigrationApplyFailureCode = 'RUNNER_FAILED' | 'MIGRATION_PATH_NOT_FOUND';
 
 /**
  * Failure details for migrationApply operation.
@@ -653,7 +653,7 @@ export interface ControlClient {
    *
    * @param options.originHash - Explicit source hash for the apply path
    * @param options.destinationHash - Explicit destination hash for the apply path
-   * @param options.pendingEdges - Ordered migration edges to execute
+   * @param options.pendingMigrations - Ordered migrations to execute
    * @returns Result pattern: Ok with applied details, NotOk with failure details
    * @throws If not connected, target doesn't support migrations, or infrastructure failure
    */

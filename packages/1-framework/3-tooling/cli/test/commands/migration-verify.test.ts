@@ -41,8 +41,8 @@ describe('migration verify', () => {
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:test',
-      edgeId: null,
-      parentEdgeId: null,
+      migrationId: null,
+      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract: createTestContract(),
@@ -56,9 +56,9 @@ describe('migration verify', () => {
 
     const result = await verifyMigration(packageDir);
     expect(result.ok).toBe(true);
-    expect(result.storedEdgeId).toBeDefined();
-    expect(result.computedEdgeId).toBeDefined();
-    expect(result.storedEdgeId).toBe(result.computedEdgeId);
+    expect(result.storedMigrationId).toBeDefined();
+    expect(result.computedMigrationId).toBeDefined();
+    expect(result.storedMigrationId).toBe(result.computedMigrationId);
   });
 
   it('detects tampered package', async () => {
@@ -69,8 +69,8 @@ describe('migration verify', () => {
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:test',
-      edgeId: null,
-      parentEdgeId: null,
+      migrationId: null,
+      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract: createTestContract(),
@@ -95,7 +95,7 @@ describe('migration verify', () => {
     const result = await verifyMigration(packageDir);
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('mismatch');
-    expect(result.storedEdgeId).not.toBe(result.computedEdgeId);
+    expect(result.storedMigrationId).not.toBe(result.computedMigrationId);
   });
 
   it('attests draft package', async () => {
@@ -106,8 +106,8 @@ describe('migration verify', () => {
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:test',
-      edgeId: null,
-      parentEdgeId: null,
+      migrationId: null,
+      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract: createTestContract(),
@@ -124,8 +124,8 @@ describe('migration verify', () => {
     expect(result.reason).toBe('draft');
 
     // Attest it
-    const edgeId = await attestMigration(packageDir);
-    expect(edgeId).toMatch(/^sha256:/);
+    const migrationId = await attestMigration(packageDir);
+    expect(migrationId).toMatch(/^sha256:/);
 
     // Now verify again — passes
     const result2 = await verifyMigration(packageDir);

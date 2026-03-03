@@ -65,31 +65,31 @@ describe('formatMigrationVerifyCommandOutput', () => {
   it('formats verified status output', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationVerifyCommandOutput(
-      { status: 'verified', edgeId: 'sha256:edge' },
+      { status: 'verified', migrationId: 'sha256:edge' },
       flags,
     );
 
     const stripped = stripAnsi(output);
     expect(stripped).toContain('Migration verified');
-    expect(stripped).toContain('edgeId: sha256:edge');
+    expect(stripped).toContain('migrationId: sha256:edge');
   });
 
   it('formats attested status output', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationVerifyCommandOutput(
-      { status: 'attested', edgeId: 'sha256:edge' },
+      { status: 'attested', migrationId: 'sha256:edge' },
       flags,
     );
 
     const stripped = stripAnsi(output);
     expect(stripped).toContain('Draft migration attested');
-    expect(stripped).toContain('edgeId: sha256:edge');
+    expect(stripped).toContain('migrationId: sha256:edge');
   });
 
   it('returns empty output in quiet mode', () => {
     const flags = parseGlobalFlags({ quiet: true, 'no-color': true });
     expect(
-      formatMigrationVerifyCommandOutput({ status: 'verified', edgeId: 'sha256:edge' }, flags),
+      formatMigrationVerifyCommandOutput({ status: 'verified', migrationId: 'sha256:edge' }, flags),
     ).toBe('');
   });
 });

@@ -7,7 +7,7 @@ import type {
   MigrationPlanOperation,
 } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
-import { findLeafEdge, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
   formatMigrationDirName,
   readMigrationsDir,
@@ -56,7 +56,7 @@ export interface MigrationPlanResult {
   readonly noOp: boolean;
   readonly from: string;
   readonly to: string;
-  readonly edgeId?: string;
+  readonly migrationId?: string;
   readonly dir?: string;
   readonly operations: readonly {
     readonly id: string;
@@ -170,14 +170,14 @@ async function executeMigrationPlanCommand(
   // Read existing migrations and determine "from" contract
   let fromContract: ContractIR | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
-  let parentEdgeId: string | null = null;
+  let parentMigrationId: string | null = null;
 
   try {
     const allPackages = await readMigrationsDir(migrationsDir);
-    const packages = allPackages.filter((p) => typeof p.manifest.edgeId === 'string');
+    const packages = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
     const graph = reconstructGraph(packages);
-    const leafEdge = findLeafEdge(graph);
-    const leafHash = leafEdge ? leafEdge.to : EMPTY_CONTRACT_HASH;
+    const latestMigration = findLatestMigration(graph);
+    const leafHash = latestMigration ? latestMigration.to : EMPTY_CONTRACT_HASH;
 
     if (options.from) {
       fromHash = options.from;
@@ -186,16 +186,16 @@ async function executeMigrationPlanCommand(
         return notOk(
           errorRuntime('Starting contract not found', {
             why: `No migration with to="${fromHash}" exists in ${migrationsRelative}`,
-            fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the DAG leaf.',
+            fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration leaf.',
           }),
         );
       }
       fromContract = sourcePkg.manifest.toContract;
-      parentEdgeId = sourcePkg.manifest.edgeId;
-    } else if (leafHash !== EMPTY_CONTRACT_HASH && leafEdge) {
+      parentMigrationId = sourcePkg.manifest.migrationId;
+    } else if (leafHash !== EMPTY_CONTRACT_HASH && latestMigration) {
       fromHash = leafHash;
-      parentEdgeId = leafEdge.edgeId;
-      const leafPkg = packages.find((p) => p.manifest.edgeId === leafEdge.edgeId);
+      parentMigrationId = latestMigration.migrationId;
+      const leafPkg = packages.find((p) => p.manifest.migrationId === latestMigration.migrationId);
       if (leafPkg) {
         fromContract = leafPkg.manifest.toContract;
       }
@@ -287,8 +287,8 @@ async function executeMigrationPlanCommand(
   const manifest: MigrationManifest = {
     from: fromHash,
     to: toStorageHash,
-    edgeId: null,
-    parentEdgeId,
+    migrationId: null,
+    parentMigrationId,
     kind: 'regular',
     fromContract,
     toContract: toContractJson,
@@ -304,7 +304,7 @@ async function executeMigrationPlanCommand(
 
   try {
     await writeMigrationPackage(packageDir, manifest, ops);
-    const edgeId = await attestMigration(packageDir);
+    const migrationId = await attestMigration(packageDir);
 
     const sql = extractSqlDdl(ops);
     const result: MigrationPlanResult = {
@@ -312,7 +312,7 @@ async function executeMigrationPlanCommand(
       noOp: false,
       from: fromHash,
       to: toStorageHash,
-      edgeId,
+      migrationId,
       dir: relative(process.cwd(), packageDir),
       operations: ops.map((op) => ({
         id: op.id,
@@ -347,7 +347,7 @@ export function createMigrationPlanCommand(): Command {
     })
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--name <slug>', 'Name slug for the migration directory', 'migration')
-    .option('--from <hash>', 'Explicit starting contract hash (overrides DAG leaf)')
+    .option('--from <hash>', 'Explicit starting contract hash (overrides migration chain leaf)')
     .option('--json [format]', 'Output as JSON (object)', false)
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
@@ -418,8 +418,8 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
 
   lines.push(dim_(`from:   ${result.from}`));
   lines.push(dim_(`to:     ${result.to}`));
-  if (result.edgeId) {
-    lines.push(dim_(`edgeId: ${result.edgeId}`));
+  if (result.migrationId) {
+    lines.push(dim_(`migrationId: ${result.migrationId}`));
   }
   if (result.dir) {
     lines.push(dim_(`dir:    ${result.dir}`));

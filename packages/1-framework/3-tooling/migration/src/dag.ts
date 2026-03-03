@@ -1,13 +1,18 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { errorAmbiguousLeaf, errorDuplicateEdgeId, errorNoLeaf, errorSelfLoop } from './errors';
-import type { MigrationGraph, MigrationGraphEdge, MigrationPackage } from './types';
+import {
+  errorAmbiguousLeaf,
+  errorDuplicateMigrationId,
+  errorNoLeaf,
+  errorSelfLoop,
+} from './errors';
+import type { MigrationChainEntry, MigrationGraph, MigrationPackage } from './types';
 
 export function reconstructGraph(packages: readonly MigrationPackage[]): MigrationGraph {
   const nodes = new Set<string>();
-  const edges = new Map<string, MigrationGraphEdge[]>();
-  const reverseEdges = new Map<string, MigrationGraphEdge[]>();
-  const edgeById = new Map<string, MigrationGraphEdge>();
-  const childEdges = new Map<string | null, MigrationGraphEdge[]>();
+  const forwardChain = new Map<string, MigrationChainEntry[]>();
+  const reverseChain = new Map<string, MigrationChainEntry[]>();
+  const migrationById = new Map<string, MigrationChainEntry>();
+  const childrenByParentId = new Map<string | null, MigrationChainEntry[]>();
 
   for (const pkg of packages) {
     const { from, to } = pkg.manifest;
@@ -19,60 +24,60 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
     nodes.add(from);
     nodes.add(to);
 
-    const edge: MigrationGraphEdge = {
+    const migration: MigrationChainEntry = {
       from,
       to,
-      edgeId: pkg.manifest.edgeId,
-      parentEdgeId: pkg.manifest.parentEdgeId,
+      migrationId: pkg.manifest.migrationId,
+      parentMigrationId: pkg.manifest.parentMigrationId,
       dirName: pkg.dirName,
       createdAt: pkg.manifest.createdAt,
       labels: pkg.manifest.labels,
     };
 
-    if (edge.edgeId !== null) {
-      if (edgeById.has(edge.edgeId)) {
-        throw errorDuplicateEdgeId(edge.edgeId);
+    if (migration.migrationId !== null) {
+      if (migrationById.has(migration.migrationId)) {
+        throw errorDuplicateMigrationId(migration.migrationId);
       }
-      edgeById.set(edge.edgeId, edge);
+      migrationById.set(migration.migrationId, migration);
     }
 
-    const parentId = edge.parentEdgeId;
-    const siblings = childEdges.get(parentId);
+    const parentId = migration.parentMigrationId;
+    const siblings = childrenByParentId.get(parentId);
     if (siblings) {
-      siblings.push(edge);
+      siblings.push(migration);
     } else {
-      childEdges.set(parentId, [edge]);
+      childrenByParentId.set(parentId, [migration]);
     }
 
-    const fwd = edges.get(from);
+    const fwd = forwardChain.get(from);
     if (fwd) {
-      fwd.push(edge);
+      fwd.push(migration);
     } else {
-      edges.set(from, [edge]);
+      forwardChain.set(from, [migration]);
     }
 
-    const rev = reverseEdges.get(to);
+    const rev = reverseChain.get(to);
     if (rev) {
-      rev.push(edge);
+      rev.push(migration);
     } else {
-      reverseEdges.set(to, [edge]);
+      reverseChain.set(to, [migration]);
     }
   }
 
-  return { nodes, edges, reverseEdges, edgeById, childEdges };
+  return { nodes, forwardChain, reverseChain, migrationById, childrenByParentId };
 }
 
 /**
- * Walk the parent-edge chain to find the terminal edge.
- * Returns the edge with no children, or null for an empty graph.
+ * Walk the parent-migration chain to find the latest migration.
+ * Returns the migration with no children, or null for an empty graph.
  * Throws AMBIGUOUS_LEAF if the chain branches.
  */
-export function findLeafEdge(graph: MigrationGraph): MigrationGraphEdge | null {
+export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry | null {
   if (graph.nodes.size === 0) {
     return null;
   }
 
-  const roots = graph.childEdges.get(null);
+  const roots = graph.childrenByParentId.get(null);
   if (!roots || roots.length === 0) {
     throw errorNoLeaf([...graph.nodes].sort());
   }
@@ -86,9 +91,9 @@ export function findLeafEdge(graph: MigrationGraph): MigrationGraphEdge | null {
     throw errorNoLeaf([...graph.nodes].sort());
   }
 
-  for (let depth = 0; depth < graph.edgeById.size + 1 && current; depth++) {
-    const children: readonly MigrationGraphEdge[] | undefined =
-      current.edgeId !== null ? graph.childEdges.get(current.edgeId) : undefined;
+  for (let depth = 0; depth < graph.migrationById.size + 1 && current; depth++) {
+    const children: readonly MigrationChainEntry[] | undefined =
+      current.migrationId !== null ? graph.childrenByParentId.get(current.migrationId) : undefined;
 
     if (!children || children.length === 0) {
       return current;
@@ -106,27 +111,27 @@ export function findLeafEdge(graph: MigrationGraph): MigrationGraphEdge | null {
 
 /**
  * Find the leaf contract hash of the migration chain.
- * Convenience wrapper around findLeafEdge.
+ * Convenience wrapper around findLatestMigration.
  */
 export function findLeaf(graph: MigrationGraph): string {
-  const edge = findLeafEdge(graph);
-  return edge ? edge.to : EMPTY_CONTRACT_HASH;
+  const migration = findLatestMigration(graph);
+  return migration ? migration.to : EMPTY_CONTRACT_HASH;
 }
 
 /**
- * Find the ordered chain of edges from `fromHash` to `toHash` by walking the
- * parent-edge chain. Returns the sub-sequence of edges whose cumulative path
+ * Find the ordered chain of migrations from `fromHash` to `toHash` by walking the
+ * parent-migration chain. Returns the sub-sequence of migrations whose cumulative path
  * goes from `fromHash` to `toHash`.
  *
  * This reconstructs the full chain from root to leaf via parent pointers, then
  * extracts the segment between the two hashes. This correctly handles revisited
- * contract hashes (e.g. A→B→A) because it operates on edges, not nodes.
+ * contract hashes (e.g. A→B→A) because it operates on migrations, not nodes.
  */
 export function findPath(
   graph: MigrationGraph,
   fromHash: string,
   toHash: string,
-): readonly MigrationGraphEdge[] | null {
+): readonly MigrationChainEntry[] | null {
   if (fromHash === toHash) return [];
 
   const chain = buildChain(graph);
@@ -160,20 +165,21 @@ export function findPath(
 }
 
 /**
- * Build the full ordered chain of edges from root to leaf by following
+ * Build the full ordered chain of migrations from root to leaf by following
  * parent pointers. Returns null if the chain cannot be reconstructed
  * (e.g. missing root, branches).
  */
-function buildChain(graph: MigrationGraph): readonly MigrationGraphEdge[] | null {
-  const roots = graph.childEdges.get(null);
+function buildChain(graph: MigrationGraph): readonly MigrationChainEntry[] | null {
+  const roots = graph.childrenByParentId.get(null);
   if (!roots || roots.length !== 1) return null;
 
-  const chain: MigrationGraphEdge[] = [];
-  let current: MigrationGraphEdge | undefined = roots[0];
+  const chain: MigrationChainEntry[] = [];
+  let current: MigrationChainEntry | undefined = roots[0];
 
-  for (let depth = 0; depth < graph.edgeById.size + 1 && current; depth++) {
+  for (let depth = 0; depth < graph.migrationById.size + 1 && current; depth++) {
     chain.push(current);
-    const children = current.edgeId !== null ? graph.childEdges.get(current.edgeId) : undefined;
+    const children =
+      current.migrationId !== null ? graph.childrenByParentId.get(current.migrationId) : undefined;
     if (!children || children.length === 0) break;
     if (children.length > 1) return null;
     current = children[0];
@@ -198,7 +204,7 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
   function dfs(u: string): void {
     color.set(u, GRAY);
 
-    const outgoing = graph.edges.get(u);
+    const outgoing = graph.forwardChain.get(u);
     if (outgoing) {
       for (const edge of outgoing) {
         const v = edge.to;
@@ -232,15 +238,17 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
   return cycles;
 }
 
-export function detectOrphans(graph: MigrationGraph): readonly MigrationGraphEdge[] {
+export function detectOrphans(graph: MigrationGraph): readonly MigrationChainEntry[] {
   if (graph.nodes.size === 0) return [];
 
   const reachable = new Set<string>();
-  const rootEdges = graph.childEdges.get(null) ?? [];
-  const emptyRootExists = rootEdges.some((edge) => edge.from === EMPTY_CONTRACT_HASH);
+  const rootMigrations = graph.childrenByParentId.get(null) ?? [];
+  const emptyRootExists = rootMigrations.some(
+    (migration) => migration.from === EMPTY_CONTRACT_HASH,
+  );
   const rootHashes = emptyRootExists
     ? [EMPTY_CONTRACT_HASH]
-    : [...new Set(rootEdges.map((edge) => edge.from))];
+    : [...new Set(rootMigrations.map((migration) => migration.from))];
   const queue: string[] = rootHashes.length > 0 ? rootHashes : [EMPTY_CONTRACT_HASH];
 
   for (const hash of queue) {
@@ -250,21 +258,21 @@ export function detectOrphans(graph: MigrationGraph): readonly MigrationGraphEdg
   while (queue.length > 0) {
     const node = queue.shift();
     if (node === undefined) break;
-    const outgoing = graph.edges.get(node);
+    const outgoing = graph.forwardChain.get(node);
     if (!outgoing) continue;
 
-    for (const edge of outgoing) {
-      if (!reachable.has(edge.to)) {
-        reachable.add(edge.to);
-        queue.push(edge.to);
+    for (const migration of outgoing) {
+      if (!reachable.has(migration.to)) {
+        reachable.add(migration.to);
+        queue.push(migration.to);
       }
     }
   }
 
-  const orphans: MigrationGraphEdge[] = [];
-  for (const [from, edgeList] of graph.edges) {
+  const orphans: MigrationChainEntry[] = [];
+  for (const [from, migrations] of graph.forwardChain) {
     if (!reachable.has(from)) {
-      orphans.push(...edgeList);
+      orphans.push(...migrations);
     }
   }
 

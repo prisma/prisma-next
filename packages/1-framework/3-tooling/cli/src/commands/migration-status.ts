@@ -4,8 +4,8 @@ import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/typ
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type {
+  MigrationChainEntry,
   MigrationGraph,
-  MigrationGraphEdge,
   MigrationPackage,
 } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
@@ -47,7 +47,7 @@ export interface MigrationStatusEntry {
   readonly dirName: string;
   readonly from: string;
   readonly to: string;
-  readonly edgeId: string | null;
+  readonly migrationId: string | null;
   readonly operationCount: number;
   readonly operationSummary: string;
   readonly hasDestructive: boolean;
@@ -102,7 +102,7 @@ function summarizeOps(ops: readonly MigrationPlanOperation[]): {
 }
 
 export function buildMigrationEntries(
-  chain: readonly MigrationGraphEdge[],
+  chain: readonly MigrationChainEntry[],
   packages: readonly MigrationPackage[],
   markerHash: string | undefined,
 ): MigrationStatusEntry[] {
@@ -116,8 +116,8 @@ export function buildMigrationEntries(
   const entries: MigrationStatusEntry[] = [];
   let reachedMarker = markerHash === undefined || markerHash === EMPTY_CONTRACT_HASH;
 
-  for (const edge of chain) {
-    const pkg = pkgByDirName.get(edge.dirName);
+  for (const migration of chain) {
+    const pkg = pkgByDirName.get(migration.dirName);
     const ops = (pkg?.ops ?? []) as readonly MigrationPlanOperation[];
     const { summary, hasDestructive } = summarizeOps(ops);
 
@@ -131,17 +131,17 @@ export function buildMigrationEntries(
     }
 
     entries.push({
-      dirName: edge.dirName,
-      from: edge.from,
-      to: edge.to,
-      edgeId: edge.edgeId,
+      dirName: migration.dirName,
+      from: migration.from,
+      to: migration.to,
+      migrationId: migration.migrationId,
       operationCount: ops.length,
       operationSummary: summary,
       hasDestructive,
       status,
     });
 
-    if (!reachedMarker && edge.to === markerHash) {
+    if (!reachedMarker && migration.to === markerHash) {
       reachedMarker = true;
     }
   }
@@ -177,7 +177,7 @@ async function executeMigrationStatusCommand(
     }
     const header = formatStyledHeader({
       command: 'migration status',
-      description: 'Show migration graph and applied status',
+      description: 'Show migration chain and applied status',
       details,
       flags,
     });
@@ -235,7 +235,7 @@ async function executeMigrationStatusCommand(
     );
   }
 
-  const attested = allPackages.filter((p) => typeof p.manifest.edgeId === 'string');
+  const attested = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
 
   if (attested.length === 0) {
     if (contractHash !== EMPTY_CONTRACT_HASH) {
@@ -395,10 +395,10 @@ export function createMigrationStatusCommand(): Command {
   const command = new Command('status');
   setCommandDescriptions(
     command,
-    'Show migration graph and applied status',
-    'Displays the migration graph as a linear chain. When a database connection\n' +
+    'Show migration chain and applied status',
+    'Displays the migration chain in order. When a database connection\n' +
       'is available, shows which migrations are applied and which are pending.\n' +
-      'Without a database connection, shows the graph from disk only.',
+      'Without a database connection, shows the chain from disk only.',
   );
   command
     .configureHelp({

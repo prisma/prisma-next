@@ -52,21 +52,21 @@ async function writeAttestedMigration(
   opts: {
     from: string;
     to: string;
-    parentEdgeId?: string | null;
+    parentMigrationId?: string | null;
     fromContract: ContractIR | null;
     toContract: ContractIR;
     ops: MigrationPlanOperation[];
     timestamp: Date;
     slug: string;
   },
-): Promise<{ dirName: string; edgeId: string }> {
+): Promise<{ dirName: string; migrationId: string }> {
   const dirName = formatMigrationDirName(opts.timestamp, opts.slug);
   const packageDir = join(migrationsDir, dirName);
   const manifest: MigrationManifest = {
     from: opts.from,
     to: opts.to,
-    edgeId: null,
-    parentEdgeId: opts.parentEdgeId ?? null,
+    migrationId: null,
+    parentMigrationId: opts.parentMigrationId ?? null,
     kind: 'regular',
     fromContract: opts.fromContract,
     toContract: opts.toContract,
@@ -80,8 +80,8 @@ async function writeAttestedMigration(
     createdAt: opts.timestamp.toISOString(),
   };
   await writeMigrationPackage(packageDir, manifest, opts.ops);
-  const edgeId = await attestMigration(packageDir);
-  return { dirName, edgeId };
+  const migrationId = await attestMigration(packageDir);
+  return { dirName, migrationId };
 }
 
 describe('migration apply — pending migration resolution', () => {
@@ -109,7 +109,7 @@ describe('migration apply — pending migration resolution', () => {
     });
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.edgeId !== null);
+    const attested = packages.filter((p) => p.manifest.migrationId !== null);
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
 
@@ -156,7 +156,7 @@ describe('migration apply — pending migration resolution', () => {
     await writeAttestedMigration(migrationsDir, {
       from: 'sha256:hash-a',
       to: 'sha256:hash-b',
-      parentEdgeId: m1.edgeId,
+      parentMigrationId: m1.migrationId,
       fromContract: contractA,
       toContract: contractB,
       ops: [createTableOp('post')],
@@ -165,7 +165,7 @@ describe('migration apply — pending migration resolution', () => {
     });
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.edgeId !== null);
+    const attested = packages.filter((p) => p.manifest.migrationId !== null);
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
 
@@ -214,7 +214,7 @@ describe('migration apply — pending migration resolution', () => {
     await writeAttestedMigration(migrationsDir, {
       from: 'sha256:hash-a',
       to: 'sha256:hash-b',
-      parentEdgeId: m1.edgeId,
+      parentMigrationId: m1.migrationId,
       fromContract: contractA,
       toContract: contractB,
       ops: [createTableOp('post')],
@@ -223,7 +223,7 @@ describe('migration apply — pending migration resolution', () => {
     });
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.edgeId !== null);
+    const attested = packages.filter((p) => p.manifest.migrationId !== null);
     const graph = reconstructGraph(attested);
 
     const pathToContractA = findPath(graph, EMPTY_CONTRACT_HASH, 'sha256:hash-a');
@@ -247,7 +247,7 @@ describe('migration apply — pending migration resolution', () => {
     });
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.edgeId !== null);
+    const attested = packages.filter((p) => p.manifest.migrationId !== null);
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
 
@@ -255,7 +255,7 @@ describe('migration apply — pending migration resolution', () => {
     expect(path).toHaveLength(0);
   });
 
-  it('returns null when marker hash is not in DAG', async () => {
+  it('returns null when marker hash is not in migration chain', async () => {
     const tempDir = await createTempDir('unknown-marker');
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -271,7 +271,7 @@ describe('migration apply — pending migration resolution', () => {
     });
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.edgeId !== null);
+    const attested = packages.filter((p) => p.manifest.migrationId !== null);
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
 
@@ -297,8 +297,8 @@ describe('migration apply — pending migration resolution', () => {
     const draftManifest: MigrationManifest = {
       from: 'sha256:hash-a',
       to: EMPTY_CONTRACT_HASH,
-      edgeId: null,
-      parentEdgeId: null,
+      migrationId: null,
+      parentMigrationId: null,
       kind: 'regular',
       fromContract: createTestContract(),
       toContract: createTestContract(),
@@ -312,7 +312,7 @@ describe('migration apply — pending migration resolution', () => {
     const allPackages = await readMigrationsDir(migrationsDir);
     expect(allPackages).toHaveLength(2);
 
-    const attested = allPackages.filter((p) => p.manifest.edgeId !== null);
+    const attested = allPackages.filter((p) => p.manifest.migrationId !== null);
     expect(attested).toHaveLength(1);
 
     const graph = reconstructGraph(attested);
@@ -357,7 +357,7 @@ describe('migration apply — pending migration resolution', () => {
     await writeAttestedMigration(migrationsDir, {
       from: 'sha256:hash-a',
       to: 'sha256:hash-b',
-      parentEdgeId: m1.edgeId,
+      parentMigrationId: m1.migrationId,
       fromContract: contractA,
       toContract: contractB,
       ops: [createTableOp('post')],
@@ -366,7 +366,7 @@ describe('migration apply — pending migration resolution', () => {
     });
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => typeof p.manifest.edgeId === 'string');
+    const attested = packages.filter((p) => typeof p.manifest.migrationId === 'string');
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
 
@@ -396,7 +396,7 @@ describe('migration apply — pending migration resolution', () => {
     const m2 = await writeAttestedMigration(migrationsDir, {
       from: 'sha256:hash-a',
       to: 'sha256:hash-b',
-      parentEdgeId: m1.edgeId,
+      parentMigrationId: m1.migrationId,
       fromContract: contractA,
       toContract: contractB,
       ops: [createTableOp('post')],
@@ -405,18 +405,18 @@ describe('migration apply — pending migration resolution', () => {
     });
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.edgeId !== null);
+    const attested = packages.filter((p) => p.manifest.migrationId !== null);
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
     const path = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
     expect(path).toHaveLength(2);
 
-    for (const edge of path) {
-      const pkg = attested.find((p) => p.dirName === edge.dirName);
+    for (const migration of path) {
+      const pkg = attested.find((p) => p.dirName === migration.dirName);
       expect(pkg).toBeDefined();
-      expect(pkg!.manifest.from).toBe(edge.from);
-      expect(pkg!.manifest.to).toBe(edge.to);
+      expect(pkg!.manifest.from).toBe(migration.from);
+      expect(pkg!.manifest.to).toBe(migration.to);
     }
 
     expect(path[0]!.dirName).toBe(m1.dirName);

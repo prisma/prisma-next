@@ -944,7 +944,7 @@ export interface MigrationApplyCommandOutputResult {
 
 export interface MigrationVerifyCommandOutputResult {
   readonly status: 'verified' | 'attested';
-  readonly edgeId?: string;
+  readonly migrationId?: string;
 }
 
 export function formatMigrationApplyCommandOutput(
@@ -1006,11 +1006,11 @@ export function formatMigrationVerifyCommandOutput(
   switch (result.status) {
     case 'verified':
       lines.push(`${formatGreen('✔')} Migration verified`);
-      lines.push(formatDimText(`  edgeId: ${result.edgeId}`));
+      lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
       break;
     case 'attested':
       lines.push(`${formatYellow('◉')} Draft migration attested`);
-      lines.push(formatDimText(`  edgeId: ${result.edgeId}`));
+      lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
       break;
   }
 
@@ -1022,7 +1022,7 @@ interface MigrationShowResult {
   readonly dirPath: string;
   readonly from: string;
   readonly to: string;
-  readonly edgeId: string | null;
+  readonly migrationId: string | null;
   readonly kind: string;
   readonly createdAt: string;
   readonly operations: readonly {
@@ -1050,10 +1050,10 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
   lines.push(`${prefix}${formatDimText(`  kind: ${result.kind}`)}`);
   lines.push(`${prefix}${formatDimText(`  from: ${result.from}`)}`);
   lines.push(`${prefix}${formatDimText(`  to:   ${result.to}`)}`);
-  if (result.edgeId) {
-    lines.push(`${prefix}${formatDimText(`  edgeId: ${result.edgeId}`)}`);
+  if (result.migrationId) {
+    lines.push(`${prefix}${formatDimText(`  migrationId: ${result.migrationId}`)}`);
   } else {
-    lines.push(`${prefix}${formatYellow('  edgeId: (draft — not yet attested)')}`);
+    lines.push(`${prefix}${formatYellow('  migrationId: (draft — not yet attested)')}`);
   }
   lines.push(`${prefix}${formatDimText(`  created: ${result.createdAt}`)}`);
 
@@ -1100,7 +1100,7 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
 interface MigrationStatusEntry {
   readonly dirName: string;
   readonly to: string;
-  readonly edgeId: string | null;
+  readonly migrationId: string | null;
   readonly operationSummary: string;
   readonly hasDestructive: boolean;
   readonly status: 'applied' | 'pending' | 'unknown';

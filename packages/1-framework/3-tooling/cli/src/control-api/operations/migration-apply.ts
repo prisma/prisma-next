@@ -11,8 +11,8 @@ import type {
 import { notOk, ok } from '@prisma-next/utils/result';
 import type {
   MigrationApplyAppliedEntry,
-  MigrationApplyEdge,
   MigrationApplyResult,
+  MigrationApplyStep,
   OnControlProgress,
 } from '../types';
 
@@ -21,7 +21,7 @@ export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetI
   readonly familyInstance: ControlFamilyInstance<TFamilyId>;
   readonly originHash: string;
   readonly destinationHash: string;
-  readonly pendingEdges: readonly MigrationApplyEdge[];
+  readonly pendingMigrations: readonly MigrationApplyStep[];
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
     TTargetId,
@@ -40,19 +40,19 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     familyInstance,
     originHash,
     destinationHash,
-    pendingEdges,
+    pendingMigrations,
     migrations,
     frameworkComponents,
     targetId,
     onProgress,
   } = options;
 
-  if (pendingEdges.length === 0) {
+  if (pendingMigrations.length === 0) {
     if (originHash !== destinationHash) {
       return notOk({
-        code: 'EDGE_NOT_FOUND' as const,
+        code: 'MIGRATION_PATH_NOT_FOUND' as const,
         summary: 'No migrations provided for requested origin and destination',
-        why: `Requested ${originHash} -> ${destinationHash} but pendingEdges is empty`,
+        why: `Requested ${originHash} -> ${destinationHash} but pendingMigrations is empty`,
         meta: { originHash, destinationHash },
       });
     }
@@ -64,30 +64,30 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     });
   }
 
-  const firstEdge = pendingEdges[0]!;
-  const lastEdge = pendingEdges[pendingEdges.length - 1]!;
-  if (firstEdge.from !== originHash || lastEdge.to !== destinationHash) {
+  const firstMigration = pendingMigrations[0]!;
+  const lastMigration = pendingMigrations[pendingMigrations.length - 1]!;
+  if (firstMigration.from !== originHash || lastMigration.to !== destinationHash) {
     return notOk({
-      code: 'EDGE_NOT_FOUND' as const,
+      code: 'MIGRATION_PATH_NOT_FOUND' as const,
       summary: 'Migration apply path does not match requested origin and destination',
-      why: `Path resolved as ${firstEdge.from} -> ${lastEdge.to}, but requested ${originHash} -> ${destinationHash}`,
+      why: `Path resolved as ${firstMigration.from} -> ${lastMigration.to}, but requested ${originHash} -> ${destinationHash}`,
       meta: {
         originHash,
         destinationHash,
-        pathOrigin: firstEdge.from,
-        pathDestination: lastEdge.to,
+        pathOrigin: firstMigration.from,
+        pathDestination: lastMigration.to,
       },
     });
   }
 
-  for (let i = 1; i < pendingEdges.length; i++) {
-    const previous = pendingEdges[i - 1]!;
-    const current = pendingEdges[i]!;
+  for (let i = 1; i < pendingMigrations.length; i++) {
+    const previous = pendingMigrations[i - 1]!;
+    const current = pendingMigrations[i]!;
     if (previous.to !== current.from) {
       return notOk({
-        code: 'EDGE_NOT_FOUND' as const,
-        summary: 'Migration apply path contains a discontinuity between adjacent edges',
-        why: `Edge "${previous.dirName}" ends at ${previous.to}, but next edge "${current.dirName}" starts at ${current.from}`,
+        code: 'MIGRATION_PATH_NOT_FOUND' as const,
+        summary: 'Migration apply path contains a discontinuity between adjacent migrations',
+        why: `Migration "${previous.dirName}" ends at ${previous.to}, but next migration "${current.dirName}" starts at ${current.from}`,
         meta: {
           originHash,
           destinationHash,
@@ -104,16 +104,16 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
   const runner = migrations.createRunner(familyInstance);
   const applied: MigrationApplyAppliedEntry[] = [];
 
-  for (const edge of pendingEdges) {
-    const edgeSpanId = `migration:${edge.dirName}`;
+  for (const migration of pendingMigrations) {
+    const migrationSpanId = `migration:${migration.dirName}`;
     onProgress?.({
       action: 'migrationApply',
       kind: 'spanStart',
-      spanId: edgeSpanId,
-      label: `Applying ${edge.dirName}`,
+      spanId: migrationSpanId,
+      label: `Applying ${migration.dirName}`,
     });
 
-    const operations = edge.operations as readonly MigrationPlanOperation[];
+    const operations = migration.operations as readonly MigrationPlanOperation[];
 
     // Allow all operation classes. The policy gate belongs at plan time, not
     // apply time — the planner already decided what to emit. Restricting here
@@ -126,12 +126,14 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     // for a fresh database (no marker present).
     const plan = {
       targetId,
-      origin: edge.from === EMPTY_CONTRACT_HASH ? null : { storageHash: edge.from },
-      destination: { storageHash: edge.to },
+      origin: migration.from === EMPTY_CONTRACT_HASH ? null : { storageHash: migration.from },
+      destination: { storageHash: migration.to },
       operations,
     };
 
-    const destinationContract = familyInstance.validateContractIR(edge.toContract as ContractIR);
+    const destinationContract = familyInstance.validateContractIR(
+      migration.toContract as ContractIR,
+    );
 
     const runnerResult: MigrationRunnerResult = await runner.execute({
       plan,
@@ -150,7 +152,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       onProgress?.({
         action: 'migrationApply',
         kind: 'spanEnd',
-        spanId: edgeSpanId,
+        spanId: migrationSpanId,
         outcome: 'error',
       });
       return notOk({
@@ -158,9 +160,9 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
         summary: runnerResult.failure.summary,
         why: runnerResult.failure.why,
         meta: {
-          migration: edge.dirName,
-          from: edge.from,
-          to: edge.to,
+          migration: migration.dirName,
+          from: migration.from,
+          to: migration.to,
           ...(runnerResult.failure.meta ?? {}),
         },
       });
@@ -169,19 +171,19 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     onProgress?.({
       action: 'migrationApply',
       kind: 'spanEnd',
-      spanId: edgeSpanId,
+      spanId: migrationSpanId,
       outcome: 'ok',
     });
 
     applied.push({
-      dirName: edge.dirName,
-      from: edge.from,
-      to: edge.to,
+      dirName: migration.dirName,
+      from: migration.from,
+      to: migration.to,
       operationsExecuted: runnerResult.value.operationsExecuted,
     });
   }
 
-  const finalHash = pendingEdges[pendingEdges.length - 1]!.to;
+  const finalHash = pendingMigrations[pendingMigrations.length - 1]!.to;
   const totalOps = applied.reduce((sum, a) => sum + a.operationsExecuted, 0);
 
   return ok({

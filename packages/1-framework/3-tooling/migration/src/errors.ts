@@ -3,7 +3,7 @@
  *
  * Follows the NAMESPACE.SUBCODE convention from ADR 027. All codes live under
  * the MIGRATION namespace. These are tooling-time errors (file I/O, attestation,
- * DAG reconstruction), distinct from the runtime MIGRATION.* codes for apply-time
+ * migration-chain reconstruction), distinct from the runtime MIGRATION.* codes for apply-time
  * failures (PRECHECK_FAILED, POSTCHECK_FAILED, etc.).
  *
  * Fields:
@@ -102,20 +102,20 @@ export function errorAmbiguousLeaf(leaves: readonly string[]): MigrationToolsErr
 
 export function errorNoLeaf(nodes: readonly string[]): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.NO_LEAF', 'Migration graph has no leaf', {
-    why: `No root edge found in the migration graph (nodes: ${nodes.join(', ')}). Every migration references a parentEdgeId that does not exist, or the graph is empty.`,
-    fix: 'Inspect the migrations directory for corrupted migration.json files. Each migration must have a valid parentEdgeId (or null for the first migration).',
+    why: `No root migration found in the migration graph (nodes: ${nodes.join(', ')}). Every migration references a parentMigrationId that does not exist, or the graph is empty.`,
+    fix: 'Inspect the migrations directory for corrupted migration.json files. Each migration must have a valid parentMigrationId (or null for the first migration).',
     details: { nodes },
   });
 }
 
-export function errorDuplicateEdgeId(edgeId: string): MigrationToolsError {
+export function errorDuplicateMigrationId(migrationId: string): MigrationToolsError {
   return new MigrationToolsError(
-    'MIGRATION.DUPLICATE_EDGE_ID',
-    'Duplicate edgeId in migration graph',
+    'MIGRATION.DUPLICATE_MIGRATION_ID',
+    'Duplicate migrationId in migration graph',
     {
-      why: `Multiple migrations share edgeId "${edgeId}". This makes parent-chain reconstruction ambiguous and unsafe.`,
-      fix: 'Regenerate one of the conflicting migrations so each edgeId is unique, then re-run migration commands.',
-      details: { edgeId },
+      why: `Multiple migrations share migrationId "${migrationId}". This makes parent-chain reconstruction ambiguous and unsafe.`,
+      fix: 'Regenerate one of the conflicting migrations so each migrationId is unique, then re-run migration commands.',
+      details: { migrationId },
     },
   );
 }

@@ -1,23 +1,23 @@
 # @prisma-next/migration-tools
 
-On-disk migration persistence, attestation, and DAG reconstruction for Prisma Next.
+On-disk migration persistence, attestation, and chain reconstruction for Prisma Next.
 
 ## Responsibilities
 
 - **Types**: Define the on-disk migration format (`MigrationManifest`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`)
 - **I/O**: Read and write migration packages to/from disk (`migration.json` + `ops.json`)
-- **Attestation**: Compute and verify content-addressed edge IDs for tamper detection
-- **DAG**: Reconstruct and navigate the migration graph (path finding, leaf detection, cycle/orphan detection)
+- **Attestation**: Compute and verify content-addressed migration IDs for tamper detection
+- **Chain reconstruction**: Reconstruct and navigate migration history (path finding, latest migration detection, cycle/orphan detection)
 
 ## Attestation framing
 
-`computeEdgeId` in `attestation.ts` uses explicit framing:
+`computeMigrationId` in `attestation.ts` uses explicit framing:
 
 1. Canonicalize migration manifest metadata, ops, and embedded contracts.
 2. Hash each canonical part independently with SHA-256.
 3. Hash the canonical JSON tuple of those part hashes.
 
-This avoids delimiter-ambiguity and ensures `edgeId` commits to the exact 4-part tuple.
+This avoids delimiter-ambiguity and ensures `migrationId` commits to the exact 4-part tuple.
 
 ## Ops validation boundary
 
@@ -33,8 +33,8 @@ Full semantic validation happens in target/family migration planners and runners
 ```mermaid
 graph TD
     CLI["CLI commands<br/>(migration plan, apply, verify)"] --> IO["io.ts<br/>File I/O"]
-    CLI --> ATT["attestation.ts<br/>Edge attestation"]
-    CLI --> DAG["dag.ts<br/>DAG operations"]
+    CLI --> ATT["attestation.ts<br/>Migration attestation"]
+    CLI --> DAG["dag.ts<br/>Chain operations"]
     IO --> TYPES["types.ts<br/>MigrationManifest, etc."]
     ATT --> IO
     ATT --> CAN["canonicalize-json.ts"]
@@ -61,9 +61,9 @@ graph TD
 
 | Subpath | Contents |
 |---|---|
-| `./types` | `MigrationManifest`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`, `MigrationGraphEdge`, `MigrationHints` |
+| `./types` | `MigrationManifest`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`, `MigrationChainEntry`, `MigrationHints` |
 | `./io` | `writeMigrationPackage`, `readMigrationPackage`, `readMigrationsDir`, `formatMigrationDirName` |
-| `./attestation` | `computeEdgeId`, `attestMigration`, `verifyMigration` |
+| `./attestation` | `computeMigrationId`, `attestMigration`, `verifyMigration` |
 | `./dag` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |
 
 ## On-Disk Format

@@ -85,7 +85,7 @@ withTempDir(({ createTempDir }) => {
           const pkg = packages[0]!;
           expect(pkg.manifest.from).toBe(EMPTY_CONTRACT_HASH);
           expect(pkg.manifest.to).not.toBe(EMPTY_CONTRACT_HASH);
-          expect(pkg.manifest.edgeId).not.toBeNull();
+          expect(pkg.manifest.migrationId).not.toBeNull();
           expect(pkg.ops.length).toBeGreaterThan(0);
 
           const tableOp = pkg.ops.find((op) => op.id.includes('user'));
@@ -147,7 +147,7 @@ withTempDir(({ createTempDir }) => {
           expect(parsed.noOp).toBe(false);
           expect(parsed.from).toBe(EMPTY_CONTRACT_HASH);
           expect(parsed.to).toBeDefined();
-          expect(parsed.edgeId).toBeDefined();
+          expect(parsed.migrationId).toBeDefined();
           expect(parsed.operations.length).toBeGreaterThan(0);
           expect(parsed.dir).toBeDefined();
         },

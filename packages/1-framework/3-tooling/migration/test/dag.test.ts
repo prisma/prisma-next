@@ -1,11 +1,11 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { describe, expect, it } from 'vitest';
-import { computeEdgeId } from '../src/attestation';
+import { computeMigrationId } from '../src/attestation';
 import {
   detectCycles,
   detectOrphans,
+  findLatestMigration,
   findLeaf,
-  findLeafEdge,
   findPath,
   reconstructGraph,
 } from '../src/dag';
@@ -13,22 +13,25 @@ import { MigrationToolsError } from '../src/errors';
 import type { MigrationPackage } from '../src/types';
 import { createTestManifest, createTestOps } from './fixtures';
 
-let edgeCounter = 0;
+let migrationCounter = 0;
 
 function pkg(
   from: string,
   to: string,
   dirName: string,
-  parentEdgeId: string | null = null,
+  parentMigrationId: string | null = null,
   createdAt = '2026-02-25T14:00:00.000Z',
 ): MigrationPackage {
-  const manifest = createTestManifest({ from, to, parentEdgeId, createdAt });
+  const manifest = createTestManifest({ from, to, parentMigrationId, createdAt });
   const ops = createTestOps();
-  const edgeId = computeEdgeId({ ...manifest, createdAt: `${createdAt}-${edgeCounter++}` }, ops);
+  const migrationId = computeMigrationId(
+    { ...manifest, createdAt: `${createdAt}-${migrationCounter++}` },
+    ops,
+  );
   return {
     dirName,
     dirPath: `/migrations/${dirName}`,
-    manifest: { ...manifest, edgeId },
+    manifest: { ...manifest, migrationId },
     ops,
   };
 }
@@ -39,7 +42,7 @@ function chain(...specs: Array<[string, string, string]>): MigrationPackage[] {
   for (const [from, to, dirName] of specs) {
     const p = pkg(from!, to!, dirName!, parentId);
     packages.push(p);
-    parentId = p.manifest.edgeId;
+    parentId = p.manifest.migrationId;
   }
   return packages;
 }
@@ -53,32 +56,32 @@ describe('reconstructGraph', () => {
     expect(graph.nodes.size).toBe(2);
     expect(graph.nodes.has(E)).toBe(true);
     expect(graph.nodes.has('H1')).toBe(true);
-    expect(graph.edges.get(E)).toHaveLength(1);
-    expect(graph.reverseEdges.get('H1')).toHaveLength(1);
+    expect(graph.forwardChain.get(E)).toHaveLength(1);
+    expect(graph.reverseChain.get('H1')).toHaveLength(1);
   });
 
   it('builds graph from empty packages', () => {
     const graph = reconstructGraph([]);
     expect(graph.nodes.size).toBe(0);
-    expect(graph.edges.size).toBe(0);
+    expect(graph.forwardChain.size).toBe(0);
   });
 
   it('builds graph from linear chain', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2'], ['H2', 'H3', 'm3']);
     const graph = reconstructGraph(packages);
     expect(graph.nodes.size).toBe(4);
-    expect(graph.edges.get(E)).toHaveLength(1);
-    expect(graph.edges.get('H1')).toHaveLength(1);
-    expect(graph.edges.get('H2')).toHaveLength(1);
+    expect(graph.forwardChain.get(E)).toHaveLength(1);
+    expect(graph.forwardChain.get('H1')).toHaveLength(1);
+    expect(graph.forwardChain.get('H2')).toHaveLength(1);
   });
 
-  it('builds edgeById and childEdges indexes', () => {
+  it('builds migrationById and childrenByParentId indexes', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    expect(graph.edgeById.size).toBe(2);
-    expect(graph.childEdges.get(null)).toHaveLength(1);
-    const rootEdge = graph.childEdges.get(null)![0]!;
-    expect(graph.childEdges.get(rootEdge.edgeId!)).toHaveLength(1);
+    expect(graph.migrationById.size).toBe(2);
+    expect(graph.childrenByParentId.get(null)).toHaveLength(1);
+    const rootMigration = graph.childrenByParentId.get(null)![0]!;
+    expect(graph.childrenByParentId.get(rootMigration.migrationId!)).toHaveLength(1);
   });
 
   it('rejects self-loop with code MIGRATION.SELF_LOOP', () => {
@@ -96,18 +99,18 @@ describe('reconstructGraph', () => {
     }
   });
 
-  it('rejects duplicate edgeId values', () => {
+  it('rejects duplicate migrationId values', () => {
     const first = pkg(E, 'H1', 'm1');
-    const secondBase = pkg('H1', 'H2', 'm2', first.manifest.edgeId);
+    const secondBase = pkg('H1', 'H2', 'm2', first.manifest.migrationId);
     const second = {
       ...secondBase,
       manifest: {
         ...secondBase.manifest,
-        edgeId: first.manifest.edgeId,
+        migrationId: first.manifest.migrationId,
       },
     };
 
-    expect(() => reconstructGraph([first, second])).toThrow('Duplicate edgeId');
+    expect(() => reconstructGraph([first, second])).toThrow('Duplicate migrationId');
   });
 });
 
@@ -148,9 +151,9 @@ describe('findLeaf', () => {
 
   it('errors on branching with code MIGRATION.AMBIGUOUS_LEAF', () => {
     const root = chain([E, 'H1', 'm1']);
-    const rootEdgeId = root[0]!.manifest.edgeId;
-    const branch1 = pkg('H1', 'H2a', 'm2a', rootEdgeId);
-    const branch2 = pkg('H1', 'H2b', 'm2b', rootEdgeId);
+    const rootMigrationId = root[0]!.manifest.migrationId;
+    const branch1 = pkg('H1', 'H2a', 'm2a', rootMigrationId);
+    const branch2 = pkg('H1', 'H2b', 'm2b', rootMigrationId);
     const graph = reconstructGraph([...root, branch1, branch2]);
     try {
       findLeaf(graph);
@@ -181,28 +184,28 @@ describe('findLeaf', () => {
   });
 });
 
-describe('findLeafEdge', () => {
+describe('findLatestMigration', () => {
   it('returns null for empty graph', () => {
     const graph = reconstructGraph([]);
-    expect(findLeafEdge(graph)).toBeNull();
+    expect(findLatestMigration(graph)).toBeNull();
   });
 
-  it('returns the terminal edge', () => {
+  it('returns the latest migration', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    const leaf = findLeafEdge(graph);
-    expect(leaf).not.toBeNull();
-    expect(leaf!.dirName).toBe('m2');
-    expect(leaf!.to).toBe('H2');
+    const latest = findLatestMigration(graph);
+    expect(latest).not.toBeNull();
+    expect(latest!.dirName).toBe('m2');
+    expect(latest!.to).toBe('H2');
   });
 
-  it('returns the terminal edge for revisited hashes', () => {
+  it('returns the latest migration for revisited hashes', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2'], ['H2', 'H1', 'm3']);
     const graph = reconstructGraph(packages);
-    const leaf = findLeafEdge(graph);
-    expect(leaf).not.toBeNull();
-    expect(leaf!.dirName).toBe('m3');
-    expect(leaf!.to).toBe('H1');
+    const latest = findLatestMigration(graph);
+    expect(latest).not.toBeNull();
+    expect(latest!.dirName).toBe('m3');
+    expect(latest!.to).toBe('H1');
   });
 });
 
@@ -290,7 +293,7 @@ describe('detectOrphans', () => {
     expect(detectOrphans(graph)).toEqual([]);
   });
 
-  it('detects orphan edge', () => {
+  it('detects orphan migration', () => {
     const p1 = chain([E, 'H1', 'm1']);
     const orphan = pkg('D', 'E2', 'm_orphan');
     const graph = reconstructGraph([...p1, orphan]);

@@ -31,9 +31,9 @@ export interface MigrationVerifyResult {
   readonly ok: boolean;
   readonly status: 'verified' | 'attested';
   readonly dir: string;
-  readonly edgeId?: string;
-  readonly storedEdgeId?: string;
-  readonly computedEdgeId?: string;
+  readonly migrationId?: string;
+  readonly storedMigrationId?: string;
+  readonly computedMigrationId?: string;
   readonly summary: string;
 }
 
@@ -61,29 +61,32 @@ async function executeMigrationVerifyCommand(
         ok: true,
         status: 'verified',
         dir,
-        ...ifDefined('edgeId', result.storedEdgeId),
-        ...ifDefined('storedEdgeId', result.storedEdgeId),
-        ...ifDefined('computedEdgeId', result.computedEdgeId),
-        summary: 'Migration package verified — edgeId matches',
+        ...ifDefined('migrationId', result.storedMigrationId),
+        ...ifDefined('storedMigrationId', result.storedMigrationId),
+        ...ifDefined('computedMigrationId', result.computedMigrationId),
+        summary: 'Migration package verified — migrationId matches',
       });
     }
 
     if (result.reason === 'draft') {
-      const edgeId = await attestMigration(dir);
+      const migrationId = await attestMigration(dir);
       return ok({
         ok: true,
         status: 'attested',
         dir,
-        edgeId,
-        summary: `Draft migration attested with edgeId: ${edgeId}`,
+        migrationId,
+        summary: `Draft migration attested with migrationId: ${migrationId}`,
       });
     }
 
     return notOk(
-      errorRuntime('edgeId mismatch — migration has been modified', {
-        why: `stored=${result.storedEdgeId}, computed=${result.computedEdgeId}`,
-        fix: 'If the change was intentional, set "edgeId" to null in migration.json and rerun `migration verify` to re-attest. Otherwise, restore the original migration.',
-        meta: { storedEdgeId: result.storedEdgeId, computedEdgeId: result.computedEdgeId },
+      errorRuntime('migrationId mismatch — migration has been modified', {
+        why: `stored=${result.storedMigrationId}, computed=${result.computedMigrationId}`,
+        fix: 'If the change was intentional, set "migrationId" to null in migration.json and rerun `migration verify` to re-attest. Otherwise, restore the original migration.',
+        meta: {
+          storedMigrationId: result.storedMigrationId,
+          computedMigrationId: result.computedMigrationId,
+        },
       }),
     );
   } catch (error) {
@@ -108,9 +111,9 @@ export function createMigrationVerifyCommand(): Command {
   const command = new Command('verify');
   setCommandDescriptions(
     command,
-    'Verify a migration package edgeId',
-    'Recomputes the content-addressed edgeId for a migration package and compares\n' +
-      'it against the stored value. Draft migrations (edgeId: null) are automatically\n' +
+    'Verify a migration package migrationId',
+    'Recomputes the content-addressed migrationId for a migration package and compares\n' +
+      'it against the stored value. Draft migrations (migrationId: null) are automatically\n' +
       'attested.',
   );
   command

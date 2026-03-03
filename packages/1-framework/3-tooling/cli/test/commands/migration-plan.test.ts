@@ -71,8 +71,8 @@ describe('migration plan — core flow', () => {
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:test-hash',
-      edgeId: null,
-      parentEdgeId: null,
+      migrationId: null,
+      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract,
@@ -92,13 +92,13 @@ describe('migration plan — core flow', () => {
     const packageDir = join(migrationsDir, dirName);
 
     await writeMigrationPackage(packageDir, manifest, ops);
-    const edgeId = await attestMigration(packageDir);
+    const migrationId = await attestMigration(packageDir);
 
     const pkg = await readMigrationPackage(packageDir);
 
     expect(pkg.manifest.from).toBe(EMPTY_CONTRACT_HASH);
     expect(pkg.manifest.to).toBe('sha256:test-hash');
-    expect(pkg.manifest.edgeId).toBe(edgeId);
+    expect(pkg.manifest.migrationId).toBe(migrationId);
     expect(pkg.manifest.kind).toBe('regular');
     expect(pkg.manifest.fromContract).toBeNull();
     expect(pkg.ops).toHaveLength(1);
@@ -114,8 +114,8 @@ describe('migration plan — core flow', () => {
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:same-hash',
-      edgeId: null,
-      parentEdgeId: null,
+      migrationId: null,
+      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract: contract,
@@ -146,7 +146,7 @@ describe('migration plan — core flow', () => {
     expect(leaf).toBe(toStorageHash);
   });
 
-  it('builds incremental DAG chain', async () => {
+  it('builds incremental migration chain', async () => {
     const tempDir = await createTempDir('incremental');
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -175,8 +175,8 @@ describe('migration plan — core flow', () => {
       {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        edgeId: null,
-        parentEdgeId: null,
+        migrationId: null,
+        parentMigrationId: null,
         kind: 'regular',
         fromContract: null,
         toContract: contractA,
@@ -191,7 +191,7 @@ describe('migration plan — core flow', () => {
       },
       [createTableOp('user')],
     );
-    const edgeId1 = await attestMigration(path1);
+    const migrationId1 = await attestMigration(path1);
 
     // Second migration: A -> B
     const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
@@ -201,8 +201,8 @@ describe('migration plan — core flow', () => {
       {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        edgeId: null,
-        parentEdgeId: edgeId1,
+        migrationId: null,
+        parentMigrationId: migrationId1,
         kind: 'regular',
         fromContract: contractA,
         toContract: contractB,
@@ -219,7 +219,7 @@ describe('migration plan — core flow', () => {
     );
     await attestMigration(path2);
 
-    // Verify DAG
+    // Verify migration chain
     const packages = await readMigrationsDir(migrationsDir);
     expect(packages).toHaveLength(2);
 
@@ -257,8 +257,8 @@ describe('--from hash lookup', () => {
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:known-hash',
-      edgeId: null,
-      parentEdgeId: null,
+      migrationId: null,
+      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract: createTestContract(),

@@ -1,8 +1,8 @@
 export {
   detectCycles,
   detectOrphans,
+  findLatestMigration,
   findLeaf,
-  findLeafEdge,
   findPath,
   reconstructGraph,
 } from '../dag';

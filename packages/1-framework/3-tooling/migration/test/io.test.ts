@@ -102,12 +102,12 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('errors when edgeId is missing from manifest', async () => {
+  it('errors when migrationId is missing from manifest', async () => {
     const dir = join(tmpDir, '20260225T1430_no_edgeid');
     const manifest = createTestManifest();
-    const { edgeId: _, ...manifestWithoutEdgeId } = manifest;
+    const { migrationId: _, ...manifestWithoutMigrationId } = manifest;
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifestWithoutEdgeId));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifestWithoutMigrationId));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -116,9 +116,9 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('errors when edgeId has wrong type', async () => {
+  it('errors when migrationId has wrong type', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_edgeid');
-    const manifest = { ...createTestManifest(), edgeId: 123 };
+    const manifest = { ...createTestManifest(), migrationId: 123 };
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'migration.json'), JSON.stringify(manifest));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
@@ -231,15 +231,15 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     expect(pkg.manifest.authorship).toEqual({ author: 'test', email: 'test@example.com' });
   });
 
-  it('accepts manifest with edgeId: null (draft)', async () => {
+  it('accepts manifest with migrationId: null (draft)', async () => {
     const dir = join(tmpDir, '20260225T1430_draft');
-    const manifest = createTestManifest({ edgeId: null });
+    const manifest = createTestManifest({ migrationId: null });
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'migration.json'), JSON.stringify(manifest));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     const pkg = await readMigrationPackage(dir);
-    expect(pkg.manifest.edgeId).toBeNull();
+    expect(pkg.manifest.migrationId).toBeNull();
   });
 
   it('errors when writing to existing directory with code MIGRATION.DIR_EXISTS', async () => {

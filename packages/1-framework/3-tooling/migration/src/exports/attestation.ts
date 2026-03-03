@@ -1,1 +1,1 @@
-export { attestMigration, computeEdgeId, verifyMigration } from '../attestation';
+export { attestMigration, computeMigrationId, verifyMigration } from '../attestation';
