@@ -1009,6 +1009,107 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
   return lines.join('\n');
 }
 
+interface MigrationStatusEntry {
+  readonly dirName: string;
+  readonly to: string;
+  readonly edgeId: string | null;
+  readonly operationSummary: string;
+  readonly hasDestructive: boolean;
+  readonly status: 'applied' | 'pending' | 'unknown';
+}
+
+interface MigrationStatusResult {
+  readonly mode: 'online' | 'offline';
+  readonly migrations: readonly MigrationStatusEntry[];
+  readonly markerHash?: string;
+  readonly leafHash: string;
+  readonly summary: string;
+}
+
+export function formatMigrationStatusOutput(
+  result: MigrationStatusResult,
+  flags: GlobalFlags,
+): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const prefix = createPrefix(flags);
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatYellow = createColorFormatter(useColor, yellow);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+  const formatCyan = createColorFormatter(useColor, cyan);
+
+  if (result.migrations.length === 0) {
+    lines.push(`${prefix}${formatDimText('No migrations found')}`);
+    return lines.join('\n');
+  }
+
+  lines.push(`${prefix}${formatDimText('∅ (empty)')}`);
+  lines.push(`${prefix}${formatDimText('│')}`);
+
+  for (let i = 0; i < result.migrations.length; i++) {
+    const entry = result.migrations[i]!;
+    const isLast = i === result.migrations.length - 1;
+    const treeChar = isLast ? '└' : '├';
+    const continueLine = isLast ? ' ' : '│';
+
+    let statusBadge = '';
+    if (entry.status === 'applied') {
+      statusBadge = formatGreen('  ✓ Applied');
+    } else if (entry.status === 'pending') {
+      statusBadge = formatYellow('  ⧗ Pending');
+    }
+
+    let marker = '';
+    if (result.mode === 'online') {
+      const isLastApplied =
+        entry.status === 'applied' &&
+        (i === result.migrations.length - 1 || result.migrations[i + 1]?.status !== 'applied');
+      if (isLastApplied) {
+        marker = formatCyan('  ◄ DB');
+      }
+      if (isLast) {
+        marker += `  ${formatCyan('◄ Contract')}`;
+      }
+    }
+
+    lines.push(`${prefix}${formatDimText(treeChar)}─ ${entry.dirName}${statusBadge}${marker}`);
+
+    const opsSummary = entry.hasDestructive
+      ? formatYellow(entry.operationSummary)
+      : formatDimText(entry.operationSummary);
+    lines.push(`${prefix}${formatDimText(continueLine)}    ${opsSummary}`);
+
+    const hashDisplay = entry.to.length > 20 ? `${entry.to.slice(0, 20)}...` : entry.to;
+    lines.push(`${prefix}${formatDimText(continueLine)}    ${formatDimText(`→ ${hashDisplay}`)}`);
+
+    if (!isLast) {
+      lines.push(`${prefix}${formatDimText('│')}`);
+    }
+  }
+
+  lines.push(`${prefix}`);
+
+  if (result.mode === 'online') {
+    const hasUnknown = result.migrations.some((e) => e.status === 'unknown');
+    const pendingCount = result.migrations.filter((e) => e.status === 'pending').length;
+    if (hasUnknown) {
+      lines.push(`${prefix}${formatYellow('⚠')} ${result.summary}`);
+    } else if (pendingCount === 0) {
+      lines.push(`${prefix}${formatGreen('✔')} ${result.summary}`);
+    } else {
+      lines.push(`${prefix}${formatYellow('⧗')} ${result.summary}`);
+    }
+  } else {
+    lines.push(`${prefix}${result.summary}`);
+  }
+
+  return lines.join('\n');
+}
+
 /**
  * Formats human-readable output for migration commands (db init, db update) in apply mode.
  */

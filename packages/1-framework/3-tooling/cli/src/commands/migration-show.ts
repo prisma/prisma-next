@@ -1,6 +1,6 @@
 import { relative, resolve } from 'node:path';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
-import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findLeafEdge, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { MigrationPackage } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
@@ -143,12 +143,20 @@ async function executeMigrationShowCommand(
           );
         }
         const graph = reconstructGraph(attested);
-        const leafHash = findLeaf(graph);
-        const leafPkg = attested.find((p) => p.manifest.to === leafHash);
+        const leafEdge = findLeafEdge(graph);
+        if (!leafEdge) {
+          return notOk(
+            errorRuntime('Could not resolve latest migration', {
+              why: 'No leaf edge found in the migration graph',
+              fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
+            }),
+          );
+        }
+        const leafPkg = attested.find((p) => p.manifest.edgeId === leafEdge.edgeId);
         if (!leafPkg) {
           return notOk(
             errorRuntime('Could not resolve latest migration', {
-              why: `DAG leaf hash ${leafHash} does not match any migration's "to" hash`,
+              why: `Leaf edge ${leafEdge.dirName} does not match any package`,
               fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
             }),
           );
