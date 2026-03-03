@@ -5,6 +5,7 @@ import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeAdapterDescriptor,
 } from '@prisma-next/sql-runtime';
+import { createBuiltinMutationDefaultGenerators } from '@prisma-next/sql-runtime';
 import { type as arktype } from 'arktype';
 import { createPostgresAdapter } from '../core/adapter';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
@@ -67,6 +68,7 @@ const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', 
     codecs: createPostgresCodecRegistry,
     operationSignatures: () => [],
     parameterizedCodecs: () => parameterizedCodecDescriptors,
+    mutationDefaultGenerators: () => createBuiltinMutationDefaultGenerators(),
     create(): SqlRuntimeAdapter {
       return createPostgresAdapter();
     },
