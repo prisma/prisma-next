@@ -550,19 +550,21 @@ This is the footgun when a user plans, changes their mind, and plans again witho
 # Edit contract: add column A
 prisma-next contract emit
 prisma-next migration plan --name attempt-1
+# → edge1: parentEdgeId: leaf.edgeId
 
 # Change mind — edit contract differently: add column B instead
 prisma-next contract emit
 prisma-next migration plan --name attempt-2
+# → edge2: parentEdgeId: leaf.edgeId (same parent as edge1!)
 ```
 
 **Expected:**
 - Both `migration plan` commands **succeed** — no error at plan time
-- Two migration directories on disk, both with `from` pointing to the same parent hash
+- Two migration directories on disk, both with the same `parentEdgeId`
 - The DAG now has a branch (two leaves)
 - **The next `migration plan` or `migration apply` fails with `MIGRATION.AMBIGUOUS_LEAF`**
 - The error fires on the *third* operation, not the second — this is a delayed failure
-- Fix text should tell the user to delete the unwanted migration directory (not "squash/merge" which doesn't exist as a command)
+- Fix text tells the user to delete the unwanted migration directory and re-plan
 
 ---
 
@@ -1004,25 +1006,37 @@ prisma-next db verify --db $DB
 **Precondition:** W2 completed. Two developers have the same migration history on disk.
 
 ```bash
-# Developer A: add column A
-# Edit contract: add column A
+# Developer A (on branch feature-a): add email column
+# Edit contract: add email column
 prisma-next contract emit
-prisma-next migration plan --name add-col-a
+prisma-next migration plan --name add_email
+# → edge-alice: hash-a → hash-b, parentEdgeId: edge1.edgeId
 
-# Developer B (simulated): add column B from the same starting point
-# Reset contract to pre-A state, add column B instead
+# Developer B (on branch feature-b, from the same starting point): add avatar column
+# Edit contract: add avatar column
 prisma-next contract emit
-# Manually create a second migration directory with the same `from` hash as A
-# (In practice this happens when both developers branch from the same git state)
+prisma-next migration plan --name add_avatar
+# → edge-bob: hash-a → hash-c, parentEdgeId: edge1.edgeId
 ```
 
-After merging both developers' branches, the `migrations/` directory contains two edges with the same `from` hash.
+After merging both git branches, the `migrations/` directory contains both `edge-alice` and `edge-bob`. Both have the same `parentEdgeId` (pointing to edge1), creating a branch in the parent chain.
 
 **Expected:**
-- Any `migration plan` or `migration apply` fails with `MIGRATION.AMBIGUOUS_LEAF`
+- Any `migration plan`, `migration apply`, `migration status`, or `migration show` fails with `MIGRATION.AMBIGUOUS_LEAF`
 - The error lists both leaf hashes
-- Fix text should explain: one developer needs to delete their migration, rebase onto the other's, and re-plan
-- This is the standard team conflict resolution flow and the error message quality matters a lot
+- Fix text explains: delete one migration directory, then re-run `migration plan` to re-plan from the other's leaf
+- The branch is detected structurally via `parentEdgeId`, not by `from` hash comparison
+
+**Manual resolution:**
+```bash
+# Bob resolves by re-planning his migration from Alice's leaf
+rm -rf migrations/20260303T1044_add_avatar
+prisma-next migration plan --name add_avatar
+# → new edge: hash-b → hash-d, parentEdgeId: edge-alice.edgeId
+# Chain is linear again: edge1 → edge-alice → edge-bob-v2
+```
+
+See spec RD-19 for future auto-rebase/squash strategies.
 
 ---
 
@@ -1121,6 +1135,81 @@ prisma-next migration show sha256:abc123
 
 ---
 
+## W19: `migration status` offline (no DB)
+
+**Scenario:** User runs `migration status` without a database connection.
+
+```bash
+prisma-next migration status
+```
+
+**Expected:**
+- Shows the migration graph as a linear chain from `∅ (empty)` to the leaf
+- Each migration shows directory name, operation summary, and target hash
+- No applied/pending markers (offline mode)
+- Summary shows "N migration(s) on disk"
+
+---
+
+## W20: `migration status` online (with DB)
+
+**Scenario:** User runs `migration status` with a database connection.
+
+```bash
+prisma-next migration status --db postgresql://...
+```
+
+**Expected:**
+- Shows the migration graph with `✓ Applied` and `⧗ Pending` markers
+- `◄ DB` marker on the migration matching the database marker hash
+- `◄ Contract` marker on the leaf migration
+- Summary shows pending count or "up to date"
+
+---
+
+## E20: `migration status` with branched DAG
+
+**Scenario:** Two developers plan migrations in parallel, creating a branch.
+
+```bash
+prisma-next migration status
+```
+
+**Expected:**
+- Error with `MIGRATION.AMBIGUOUS_LEAF`
+- Branch visualization is not supported (explicit shortcoming)
+
+---
+
+## W21: `migration plan` + `migration status` with contract hash revisit
+
+**Scenario:** User adds a column, plans a migration, then reverts the column and plans again — creating a migration that returns to a previously-seen contract hash (A→B→A).
+
+```bash
+# Start from a contract with one table
+prisma-next contract emit
+prisma-next migration plan --name add_bio
+# migrations/20260303T0948_add_bio: empty → hash-a
+
+# Add a column to the contract
+prisma-next contract emit
+prisma-next migration plan --name add_email
+# migrations/20260303T1006_add_email: hash-a → hash-b
+
+# Remove the column, revert contract
+prisma-next contract emit
+prisma-next migration plan --name remove_email
+# migrations/20260303T1012_remove_email: hash-b → hash-a
+```
+
+**Expected:**
+- `migration plan` succeeds for all three steps. The third migration has `parentEdgeId` pointing to the second migration's `edgeId`
+- `migration status` correctly shows all 3 migrations as a linear chain, even though the final hash equals the first migration's target hash
+- `migration show` defaults to the third migration (the leaf), not the first
+- `migration apply` executes all three migrations in order if starting from empty DB
+
+---
+
 ## Verification checklist
 
 | ID | Category | Verified | Notes |
@@ -1183,3 +1272,7 @@ prisma-next migration show sha256:abc123
 | E18 | Out-of-order | | migration show ambiguous prefix |
 | E19 | Out-of-order | | migration show unknown prefix |
 | W18 | Happy path | | migration show hash prefix |
+| W19 | Happy path | | migration status offline |
+| W20 | Happy path | | migration status online |
+| E20 | Edge case | | migration status branched DAG |
+| W21 | Happy path | | Contract hash revisit (A→B→A) |

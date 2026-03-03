@@ -32,7 +32,7 @@ Two user flows are in scope:
 
 ### FR-2: On-disk migration file format (TypeScript types)
 - Define TypeScript types/interfaces for the on-disk artifacts specified in ADR 028:
-  - `migration.json` header (from/to hashes, edgeId, kind, fromContract, toContract, hints, pre/post, labels, authorship)
+  - `migration.json` header (from/to hashes, edgeId, parentEdgeId, kind, fromContract, toContract, hints, pre/post, labels, authorship)
   - `ops.json` (SQL operations for the target)
 - These types must be the single source of truth for serialization/deserialization
 
@@ -48,6 +48,7 @@ Two user flows are in scope:
 ### FR-5: DAG reconstruction from disk
 - Reconstruct the migration graph by reading all `migration.json` files from the `migrations/` directory
 - Support basic graph operations: path-exists, plan-to (find path from A to B), cycle detection, orphan detection
+- Chain ordering is determined by `parentEdgeId` pointers (see RD-18), not by node-level graph analysis or timestamps
 
 ### FR-6: `prisma-next migration plan` CLI command
 - Fully offline — no database connection required
@@ -58,7 +59,7 @@ Two user flows are in scope:
 - Write the resulting edge to disk as a new migration package
 - Output a human-readable summary of operations
 - Optional `--from <hash>` to explicitly select a different starting contract
-- "From" resolution: the DAG leaf is the unique node with no outgoing edges reachable from `sha256:empty`. In the common case (linear history) this is unambiguous. When the DAG branches (multiple leaves), the command fails with a diagnostic listing the ambiguous leaves and the user must specify `--from <hash>`. See RD-2 for details.
+- "From" resolution: the DAG leaf is the target hash of the edge with no children (no other edge has this edge's `edgeId` as its `parentEdgeId`). In the common case (linear history) this is unambiguous. When the DAG branches (multiple edges share the same `parentEdgeId`), the command fails with a diagnostic listing the ambiguous leaves and the user must specify `--from <hash>`. See RD-2 and RD-18 for details.
 
 ### FR-8: `prisma-next migration new` CLI command (scaffold)
 - Scaffold an empty migration package directory (Draft state) with placeholder `migration.json` and `ops.json`
@@ -109,6 +110,7 @@ Two user flows are in scope:
 - **Production-ready apply**: Dry-run, rollback, multi-step orchestration, partial apply, apply-to-specific-hash.
 - **Destructive operations (production-ready)**: The planner and `migration plan` now support destructive operations (drops, type changes). However, production safeguards (confirmation prompts, `--allow-destructive` flags, dry-run) are deferred. See RD-17 for the policy architecture.
 - **Squash/baseline tooling**: Creating baselines from paths, archiving edges. Infrastructure is designed for it but tooling is deferred.
+- **Branch resolution tooling**: Automatic rebase or squash of parallel migrations created by team collaboration. The `parentEdgeId` design supports this (see RD-19), but the current resolution is manual: delete one branch, re-plan from the other. See RD-19 for future disambiguation strategies.
 - **Preflight commands**: `prisma-next preflight` (shadow or PPg). Deferred.
 - **Graph visualization**: Rendering the DAG for human review. Deferred.
 - **Signing infrastructure**: `migration sign` with key management. `migration verify` will compute hashes but signing is stretch.
@@ -209,11 +211,11 @@ This conversion is intentionally lossy in the contract→schemaIR direction (dro
 
 **"From" contract resolution:**
 - If no migrations exist, assume the empty contract (`sha256:empty`) as the starting point (new project). The converted schema IR is an empty schema.
-- If migrations exist, find the DAG leaf: the node reachable from `sha256:empty` that has no outgoing edges. In a linear history (the common case) the leaf is unambiguous.
-- If the DAG has multiple leaves (branching history — e.g., two developers planned migrations from the same starting point), `findLeaf` fails with a diagnostic listing the ambiguous leaves. The user must pass `--from <hash>` to disambiguate.
+- If migrations exist, find the DAG leaf: the edge whose `edgeId` is not referenced as `parentEdgeId` by any other edge. The leaf's `to` hash is the current contract state. In a linear history (the common case) the leaf is unambiguous.
+- If the DAG has multiple leaves (branching history — e.g., two developers planned migrations from the same starting point, producing edges with the same `parentEdgeId`), `findLeaf` fails with a diagnostic listing the ambiguous leaves. The user must pass `--from <hash>` to disambiguate.
 - `--from <hash>` always takes precedence when provided — the planner looks up the matching migration's `toContract` for the "from" side.
 
-We resolve by DAG topology, not by timestamp. Timestamps are metadata for human readability (directory naming) but are not authoritative for ordering — the DAG edges (`from`/`to` hashes) are.
+We resolve by parent-edge chain (see RD-18), not by timestamp. Timestamps are metadata for human readability (directory naming) but are not authoritative for ordering.
 
 ## RD-3: `migration plan` vs `db init` share the same planner, different schema IR source
 
@@ -290,6 +292,112 @@ Terminology note: "attestation" (hashing migration content → `edgeId`), "signi
 **Where the policy lives:**
 - `migration plan` (planner call): passes `{ allowedOperationClasses: ['additive', 'widening', 'destructive'] }` — the planner is allowed to produce any operation class it supports.
 - `migration apply` (runner call): passes all operation classes (`additive`, `widening`, `destructive`). The policy gate belongs at plan time, not apply time — apply trusts whatever the planner emitted.
+
+## RD-18: Parent-edge linking (`parentEdgeId`)
+
+### Problem
+
+The DAG model treats contract storage hashes as nodes and migrations as edges. `findLeaf` determines the "current" state by finding nodes with no outgoing edges, and `findPath` uses BFS with a visited-nodes set. This breaks when a migration returns to a previously-seen contract hash — a valid scenario (e.g., add a column, then remove it):
+
+```
+edge1: empty → hash-a   (create table)
+edge2: hash-a → hash-b  (add column)
+edge3: hash-b → hash-a  (drop column)
+```
+
+Here `hash-a` has an outgoing edge (edge2), so `findLeaf` doesn't consider it a leaf — even though edge3 is the chronologically latest migration. `findPath` with visited-nodes would also short-circuit at `hash-a` on first visit and never reconstruct the full 3-edge chain.
+
+Using timestamps to resolve ordering was considered but rejected: in a team collaboration scenario where two developers plan migrations from the same contract state, timestamp-based ordering would silently pick the earlier one and orphan the other. The current `AMBIGUOUS_LEAF` error is the correct behavior for branches — it forces explicit resolution.
+
+### Decision
+
+Add a required `parentEdgeId` field to `MigrationManifest`. This is the `edgeId` of the migration that this migration follows in the chain, or `null` for the first migration (whose `from` is `sha256:empty`).
+
+```
+edge1: empty → hash-a   parentEdgeId: null
+edge2: hash-a → hash-b  parentEdgeId: edge1.edgeId
+edge3: hash-b → hash-a  parentEdgeId: edge2.edgeId
+```
+
+The parent chain is `edge1 → edge2 → edge3` regardless of contract hash revisits. Chain reconstruction follows parent pointers, not node-level graph analysis.
+
+**Key properties:**
+
+- **Leaf**: An edge whose `edgeId` is not referenced as `parentEdgeId` by any other edge. Equivalent to "the edge with no children."
+- **Branch detection**: Two edges with the same `parentEdgeId` = a branch = `AMBIGUOUS_LEAF`. This is structurally detectable without timestamps.
+- **Path reconstruction**: Follow the parent chain from the leaf backward to the root, then reverse. No visited-nodes set needed; revisited contract hashes are handled naturally.
+- **Content-addressing**: `parentEdgeId` is metadata for chain ordering. It is stripped from the hash input when computing `edgeId`, the same way `edgeId` and `signature` are stripped. This means `edgeId` remains purely structural (same ops + same from/to = same content hash). Future squash/rebase operations can reassign `parentEdgeId` without changing the content identity of the migration itself.
+- **Team collaboration**: Two developers planning from the same leaf produce edges with the same `parentEdgeId`. The system detects this as a branch and surfaces `AMBIGUOUS_LEAF`, requiring explicit resolution (squash, rebase, or `--from`).
+
+**`parentEdgeId` is a required field.** There are no existing production users, so backward compatibility is not a concern.
+
+### Consequences
+
+- `migration plan` must look up the leaf edge's `edgeId` and write it as `parentEdgeId` on the new manifest.
+- `findLeaf` is rewritten to walk the parent chain from root, not analyze node-level outgoing edges.
+- `findPath` is rewritten to traverse the edge chain via parent pointers, not BFS over nodes.
+- `reconstructGraph` adds a `childEdges` index (mapping `parentEdgeId → edge[]`) for efficient chain walking.
+- `MigrationGraphEdge` gains a `parentEdgeId` field.
+
+## RD-19: Team collaboration — parallel migrations and branch resolution
+
+### Scenario
+
+Two developers, Alice and Bob, start from the same migration history. Both plan migrations independently:
+
+```
+Shared history:
+  edge1: empty → hash-a  (parentEdgeId: null)
+
+Alice plans on her git branch:
+  edge-alice: hash-a → hash-b  (parentEdgeId: edge1.edgeId)  — add email column
+
+Bob plans on his git branch:
+  edge-bob: hash-a → hash-c   (parentEdgeId: edge1.edgeId)   — add avatar column
+```
+
+When they merge into the same branch, the `migrations/` directory contains both edges. Both have `parentEdgeId: edge1.edgeId` — edge1 has two children.
+
+### Current behavior
+
+`findLeaf` detects the branch and throws `MIGRATION.AMBIGUOUS_LEAF` with both leaf hashes listed. All commands that depend on a unique leaf (`migration plan`, `migration apply`, `migration status`, `migration show`) fail with this error.
+
+The error message tells the user to resolve the branch manually:
+- Delete one migration, rebase onto the other, and re-plan
+- Or use `--from <hash>` to explicitly select a starting point
+
+This is a hard error by design. Silently choosing one branch (e.g., by timestamp) would orphan the other developer's migration, which is dangerous.
+
+### Manual resolution workflow (current)
+
+1. Alice and Bob merge their git branches. The result has both `edge-alice` and `edge-bob` in `migrations/`.
+2. Any migration command fails with `AMBIGUOUS_LEAF`.
+3. One developer (say Bob) resolves:
+   - Delete his migration directory (`rm -rf migrations/20260303T1044_add_avatar`)
+   - Run `prisma-next migration plan --name add_avatar` — this now plans from Alice's leaf, producing an edge with `parentEdgeId: edge-alice.edgeId`
+4. The chain is linear again: `edge1 → edge-alice → edge-bob-v2`.
+
+### Future disambiguation strategies (not implemented)
+
+Several approaches could automate branch resolution in the future:
+
+**Auto-rebase (recommended for v2):**
+A `migration rebase` command that:
+1. Detects the branch
+2. Picks a canonical ordering (e.g., by `createdAt`, or user-specified)
+3. Re-plans the "rebased" migration from the other branch's leaf
+4. Writes the new migration with the correct `parentEdgeId`
+5. Removes the old conflicting migration
+
+This is analogous to `git rebase`. Because `parentEdgeId` is excluded from `edgeId` computation, re-parenting a migration preserves its content hash if the operations are the same — but in practice, re-planning from a different base often produces different operations (e.g., different column ordering or conflict with the other migration's changes), so a full re-plan is the correct approach.
+
+**Auto-squash:**
+A `migration squash` command that merges multiple edges into a single edge covering the combined changes. This requires re-planning from the common ancestor to the combined target state. Useful for cleaning up long migration chains, not just branch resolution.
+
+**Parallel edge labels (from ADR 039):**
+ADR 039 specifies a `parallel-ok` label that allows two edges with the same `(from, to)` pair. This could be extended to allow parallel edges from the same `parentEdgeId` when explicitly labeled, with deterministic tie-breaking by the sort tuple (label priority, `createdAt`, `to`, `edgeId`). This is only safe when the migrations are genuinely independent (commutative operations).
+
+**Key design constraint:** Any future auto-resolution must re-plan (not just re-parent) the rebased migration. The operations depend on the "from" contract state, which changes when the base changes. Simply updating `parentEdgeId` without re-planning would produce a migration whose operations were planned against a stale base state.
 
 ## RD-16: Structured errors with MIGRATION.* stable codes
 
