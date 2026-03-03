@@ -1774,6 +1774,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../packages/2-sql/3-tooling/family
+      '@prisma-next/ids':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/2-authoring/ids
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/shared/operations

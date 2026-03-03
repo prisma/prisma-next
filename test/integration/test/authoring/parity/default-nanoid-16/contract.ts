@@ -1,17 +1,10 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import { textColumn } from '@prisma-next/adapter-postgres/column-types';
+import { nanoid } from '@prisma-next/ids';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
 export const contract = defineContract<CodecTypes>()
   .target(postgresPack)
-  .table('user', (t) =>
-    t
-      .generated('id', {
-        type: textColumn,
-        generated: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
-      })
-      .primaryKey(['id']),
-  )
+  .table('user', (t) => t.generated('id', nanoid({ size: 16 })).primaryKey(['id']))
   .model('User', 'user', (m) => m.field('id', 'id'))
   .build();

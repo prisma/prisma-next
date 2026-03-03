@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:9e27b90da3eb44a199ce86ba13e2082b0d2cdc502803c95138a32b3afb88c0ec",
+  "storageHash": "sha256:acb9845800b87237a5d37f2fa3739899bfd13d9dc2d7ce0ea47865bce2cc666d",
   "executionHash": "sha256:57c307c24cd2dc8eb5e7cf53beb4767f19728c92925835a8ca24b3f11a5cfc95",
   "profileHash": "sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89",
   "models": {
@@ -24,8 +24,11 @@
       "user": {
         "columns": {
           "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "typeParams": {
+              "length": 36
+            }
           }
         },
         "foreignKeys": [],
