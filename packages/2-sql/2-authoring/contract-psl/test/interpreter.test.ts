@@ -118,6 +118,18 @@ model Post {
         },
       },
     });
+    expect(result.value.relations).toMatchObject({
+      post: {
+        author: {
+          to: 'User',
+          cardinality: 'N:1',
+          on: {
+            parentCols: ['userId'],
+            childCols: ['id'],
+          },
+        },
+      },
+    });
   });
 
   it('returns diagnostics for unsupported referential action tokens', () => {
@@ -534,6 +546,159 @@ model Document {
     expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'PSL_UNSUPPORTED_FIELD_LIST' })]),
+    );
+  });
+
+  it('accepts relation navigation list fields and emits relation metadata for both sides', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  posts Post[]
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.relations).toMatchObject({
+      user: {
+        posts: {
+          to: 'Post',
+          cardinality: '1:N',
+          on: {
+            parentCols: ['id'],
+            childCols: ['userId'],
+          },
+        },
+      },
+      post: {
+        user: {
+          to: 'User',
+          cardinality: 'N:1',
+          on: {
+            parentCols: ['userId'],
+            childCols: ['id'],
+          },
+        },
+      },
+    });
+  });
+
+  it('matches named backrelations using positional and named relation forms', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  authored Post[] @relation("AuthoredPosts")
+  reviewed Post[] @relation(name: "ReviewedPosts")
+}
+
+model Post {
+  id Int @id
+  authorId Int
+  reviewerId Int
+  author User @relation("AuthoredPosts", fields: [authorId], references: [id])
+  reviewer User @relation(name: "ReviewedPosts", fields: [reviewerId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.relations.user).toMatchObject({
+      authored: {
+        to: 'Post',
+        cardinality: '1:N',
+        on: {
+          parentCols: ['id'],
+          childCols: ['authorId'],
+        },
+      },
+      reviewed: {
+        to: 'Post',
+        cardinality: '1:N',
+        on: {
+          parentCols: ['id'],
+          childCols: ['reviewerId'],
+        },
+      },
+    });
+  });
+
+  it('returns diagnostics for orphaned backrelation list fields', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  posts Post[]
+}
+
+model Post {
+  id Int @id
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_ORPHANED_BACKRELATION_LIST',
+          message: expect.stringContaining('User.posts'),
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics for ambiguous backrelation list matches', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  posts Post[]
+}
+
+model Post {
+  id Int @id
+  primaryUserId Int
+  secondaryUserId Int
+  primaryUser User @relation(fields: [primaryUserId], references: [id])
+  secondaryUser User @relation(fields: [secondaryUserId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+          message: expect.stringContaining('User.posts'),
+        }),
+      ]),
     );
   });
 

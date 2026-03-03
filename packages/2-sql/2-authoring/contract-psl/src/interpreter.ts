@@ -106,6 +106,44 @@ type ResolvedField = {
   readonly isUnique: boolean;
 };
 
+type ParsedRelationAttribute = {
+  readonly relationName?: string;
+  readonly fields?: readonly string[];
+  readonly references?: readonly string[];
+  readonly onDelete?: string;
+  readonly onUpdate?: string;
+};
+
+type FkRelationMetadata = {
+  readonly declaringModelName: string;
+  readonly declaringFieldName: string;
+  readonly declaringTableName: string;
+  readonly targetModelName: string;
+  readonly targetTableName: string;
+  readonly relationName?: string;
+  readonly localColumns: readonly string[];
+  readonly referencedColumns: readonly string[];
+};
+
+type ModelBackrelationCandidate = {
+  readonly modelName: string;
+  readonly tableName: string;
+  readonly field: PslField;
+  readonly targetModelName: string;
+  readonly relationName?: string;
+};
+
+type ModelRelationMetadata = {
+  readonly fieldName: string;
+  readonly toModel: string;
+  readonly toTable: string;
+  readonly cardinality: '1:N' | 'N:1';
+  readonly parentTable: string;
+  readonly parentColumns: readonly string[];
+  readonly childTable: string;
+  readonly childColumns: readonly string[];
+};
+
 type ModelNameMapping = {
   readonly model: PslModel;
   readonly tableName: string;
@@ -133,6 +171,20 @@ type DynamicTableBuilder = {
 
 type DynamicModelBuilder = {
   field(name: string, column: string): DynamicModelBuilder;
+  relation(
+    name: string,
+    options: {
+      toModel: string;
+      toTable: string;
+      cardinality: '1:1' | '1:N' | 'N:1';
+      on: {
+        parentTable: string;
+        parentColumns: readonly string[];
+        childTable: string;
+        childColumns: readonly string[];
+      };
+    },
+  ): DynamicModelBuilder;
 };
 
 type DynamicContractBuilder = {
@@ -415,6 +467,9 @@ function collectResolvedFields(
 
   for (const field of model.fields) {
     if (field.list) {
+      if (modelNames.has(field.typeName)) {
+        continue;
+      }
       diagnostics.push({
         code: 'PSL_UNSUPPORTED_FIELD_LIST',
         message: `Field "${model.name}.${field.name}" uses list types, which are not supported in SQL PSL provider v1`,
@@ -695,25 +750,40 @@ function parseRelationAttribute(input: {
   readonly fieldName: string;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
-}):
-  | {
-      readonly fields: readonly string[];
-      readonly references: readonly string[];
-      readonly onDelete?: string;
-      readonly onUpdate?: string;
-    }
-  | undefined {
-  for (const arg of input.attribute.args) {
-    if (arg.kind === 'positional') {
+}): ParsedRelationAttribute | undefined {
+  const positionalEntries = input.attribute.args.filter((arg) => arg.kind === 'positional');
+  if (positionalEntries.length > 1) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+      message: `Relation field "${input.modelName}.${input.fieldName}" has too many positional arguments`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+
+  let relationNameFromPositional: string | undefined;
+  const positionalNameEntry = getPositionalArgumentEntry(input.attribute);
+  if (positionalNameEntry) {
+    const parsedName = parseQuotedStringLiteral(positionalNameEntry.value);
+    if (!parsedName) {
       input.diagnostics.push({
         code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-        message: `Relation field "${input.modelName}.${input.fieldName}" must use named arguments`,
+        message: `Relation field "${input.modelName}.${input.fieldName}" positional relation name must be a quoted string literal`,
         sourceId: input.sourceId,
-        span: arg.span,
+        span: positionalNameEntry.span,
       });
       return undefined;
     }
+    relationNameFromPositional = parsedName;
+  }
+
+  for (const arg of input.attribute.args) {
+    if (arg.kind === 'positional') {
+      continue;
+    }
     if (
+      arg.name !== 'name' &&
       arg.name !== 'fields' &&
       arg.name !== 'references' &&
       arg.name !== 'onDelete' &&
@@ -729,9 +799,38 @@ function parseRelationAttribute(input: {
     }
   }
 
+  const namedRelationNameRaw = getNamedArgument(input.attribute, 'name');
+  const namedRelationName = namedRelationNameRaw
+    ? parseQuotedStringLiteral(namedRelationNameRaw)
+    : undefined;
+  if (namedRelationNameRaw && !namedRelationName) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+      message: `Relation field "${input.modelName}.${input.fieldName}" named relation name must be a quoted string literal`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+
+  if (
+    relationNameFromPositional &&
+    namedRelationName &&
+    relationNameFromPositional !== namedRelationName
+  ) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+      message: `Relation field "${input.modelName}.${input.fieldName}" has conflicting positional and named relation names`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+  const relationName = namedRelationName ?? relationNameFromPositional;
+
   const fieldsRaw = getNamedArgument(input.attribute, 'fields');
   const referencesRaw = getNamedArgument(input.attribute, 'references');
-  if (!fieldsRaw || !referencesRaw) {
+  if ((fieldsRaw && !referencesRaw) || (!fieldsRaw && referencesRaw)) {
     input.diagnostics.push({
       code: 'PSL_INVALID_RELATION_ATTRIBUTE',
       message: `Relation field "${input.modelName}.${input.fieldName}" requires fields and references arguments`,
@@ -740,21 +839,34 @@ function parseRelationAttribute(input: {
     });
     return undefined;
   }
-  const fields = parseFieldList(fieldsRaw);
-  const references = parseFieldList(referencesRaw);
-  if (!fields || !references || fields.length === 0 || references.length === 0) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-      message: `Relation field "${input.modelName}.${input.fieldName}" requires bracketed fields and references lists`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
+
+  let fields: readonly string[] | undefined;
+  let references: readonly string[] | undefined;
+  if (fieldsRaw && referencesRaw) {
+    const parsedFields = parseFieldList(fieldsRaw);
+    const parsedReferences = parseFieldList(referencesRaw);
+    if (
+      !parsedFields ||
+      !parsedReferences ||
+      parsedFields.length === 0 ||
+      parsedReferences.length === 0
+    ) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        message: `Relation field "${input.modelName}.${input.fieldName}" requires bracketed fields and references lists`,
+        sourceId: input.sourceId,
+        span: input.attribute.span,
+      });
+      return undefined;
+    }
+    fields = parsedFields;
+    references = parsedReferences;
   }
 
   return {
-    fields,
-    references,
+    ...(relationName ? { relationName } : {}),
+    ...(fields ? { fields } : {}),
+    ...(references ? { references } : {}),
     ...(getNamedArgument(input.attribute, 'onDelete')
       ? { onDelete: unquoteStringLiteral(getNamedArgument(input.attribute, 'onDelete') ?? '') }
       : {}),
@@ -879,6 +991,13 @@ export function interpretPslDocumentToSqlContractIR(
   }
 
   const modelMappings = buildModelMappings(input.document.ast.models, diagnostics, sourceId);
+  const resolvedModels: Array<{
+    model: PslModel;
+    mapping: ModelNameMapping;
+    resolvedFields: ResolvedField[];
+  }> = [];
+  const fkRelationMetadata: FkRelationMetadata[] = [];
+  const backrelationCandidates: ModelBackrelationCandidate[] = [];
 
   for (const model of input.document.ast.models) {
     const mapping = modelMappings.get(model.name);
@@ -898,6 +1017,7 @@ export function interpretPslDocumentToSqlContractIR(
       diagnostics,
       sourceId,
     );
+    resolvedModels.push({ model, mapping, resolvedFields });
 
     const primaryKeyColumns = resolvedFields
       .filter((field) => field.isId)
@@ -908,6 +1028,53 @@ export function interpretPslDocumentToSqlContractIR(
         message: `Model "${model.name}" must declare at least one @id field for SQL provider`,
         sourceId,
         span: model.span,
+      });
+    }
+
+    for (const field of model.fields) {
+      if (!field.list || !modelNames.has(field.typeName)) {
+        continue;
+      }
+      const relationAttribute = getAttribute(field.attributes, 'relation');
+      let relationName: string | undefined;
+      if (relationAttribute) {
+        const parsedRelation = parseRelationAttribute({
+          attribute: relationAttribute,
+          modelName: model.name,
+          fieldName: field.name,
+          sourceId,
+          diagnostics,
+        });
+        if (!parsedRelation) {
+          continue;
+        }
+        if (parsedRelation.fields || parsedRelation.references) {
+          diagnostics.push({
+            code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+            message: `Backrelation list field "${model.name}.${field.name}" cannot declare fields/references; define them on the FK-side relation field`,
+            sourceId,
+            span: relationAttribute.span,
+          });
+          continue;
+        }
+        if (parsedRelation.onDelete || parsedRelation.onUpdate) {
+          diagnostics.push({
+            code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+            message: `Backrelation list field "${model.name}.${field.name}" cannot declare onDelete/onUpdate; define referential actions on the FK-side relation field`,
+            sourceId,
+            span: relationAttribute.span,
+          });
+          continue;
+        }
+        relationName = parsedRelation.relationName;
+      }
+
+      backrelationCandidates.push({
+        modelName: model.name,
+        tableName,
+        field,
+        targetModelName: field.typeName,
+        ...(relationName ? { relationName } : {}),
       });
     }
 
@@ -1003,6 +1170,10 @@ export function interpretPslDocumentToSqlContractIR(
       }
 
       for (const relationAttribute of relationAttributes) {
+        if (relationAttribute.field.list) {
+          continue;
+        }
+
         if (!modelNames.has(relationAttribute.field.typeName)) {
           diagnostics.push({
             code: 'PSL_INVALID_RELATION_TARGET',
@@ -1021,6 +1192,15 @@ export function interpretPslDocumentToSqlContractIR(
           diagnostics,
         });
         if (!parsedRelation) {
+          continue;
+        }
+        if (!parsedRelation.fields || !parsedRelation.references) {
+          diagnostics.push({
+            code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+            message: `Relation field "${model.name}.${relationAttribute.field.name}" requires fields and references arguments`,
+            sourceId,
+            span: relationAttribute.relation.span,
+          });
           continue;
         }
 
@@ -1094,18 +1274,126 @@ export function interpretPslDocumentToSqlContractIR(
             ...(onUpdate ? { onUpdate } : {}),
           },
         );
+
+        fkRelationMetadata.push({
+          declaringModelName: model.name,
+          declaringFieldName: relationAttribute.field.name,
+          declaringTableName: tableName,
+          targetModelName: targetMapping.model.name,
+          targetTableName: targetMapping.tableName,
+          ...(parsedRelation.relationName ? { relationName: parsedRelation.relationName } : {}),
+          localColumns,
+          referencedColumns,
+        });
       }
 
       return table;
     });
+  }
 
-    builder = builder.model(model.name, tableName, (modelBuilder: DynamicModelBuilder) => {
-      let next = modelBuilder;
-      for (const resolvedField of resolvedFields) {
-        next = next.field(resolvedField.field.name, resolvedField.columnName);
-      }
-      return next;
+  const modelRelations = new Map<string, ModelRelationMetadata[]>();
+  for (const relation of fkRelationMetadata) {
+    const current = modelRelations.get(relation.declaringModelName) ?? [];
+    current.push({
+      fieldName: relation.declaringFieldName,
+      toModel: relation.targetModelName,
+      toTable: relation.targetTableName,
+      cardinality: 'N:1',
+      parentTable: relation.declaringTableName,
+      parentColumns: relation.localColumns,
+      childTable: relation.targetTableName,
+      childColumns: relation.referencedColumns,
     });
+    modelRelations.set(relation.declaringModelName, current);
+  }
+
+  for (const candidate of backrelationCandidates) {
+    const matches = fkRelationMetadata.filter((relation) => {
+      if (
+        relation.declaringModelName !== candidate.targetModelName ||
+        relation.targetModelName !== candidate.modelName
+      ) {
+        return false;
+      }
+      if (candidate.relationName) {
+        return relation.relationName === candidate.relationName;
+      }
+      return true;
+    });
+
+    if (matches.length === 0) {
+      diagnostics.push({
+        code: 'PSL_ORPHANED_BACKRELATION_LIST',
+        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+        sourceId,
+        span: candidate.field.span,
+      });
+      continue;
+    }
+    if (matches.length > 1) {
+      diagnostics.push({
+        code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
+        sourceId,
+        span: candidate.field.span,
+      });
+      continue;
+    }
+
+    const matched = matches[0];
+    if (!matched) {
+      continue;
+    }
+
+    const current = modelRelations.get(candidate.modelName) ?? [];
+    current.push({
+      fieldName: candidate.field.name,
+      toModel: matched.declaringModelName,
+      toTable: matched.declaringTableName,
+      cardinality: '1:N',
+      parentTable: candidate.tableName,
+      parentColumns: matched.referencedColumns,
+      childTable: matched.declaringTableName,
+      childColumns: matched.localColumns,
+    });
+    modelRelations.set(candidate.modelName, current);
+  }
+
+  const sortedModels = [...resolvedModels].sort((left, right) => {
+    if (left.mapping.tableName === right.mapping.tableName) {
+      return left.model.name.localeCompare(right.model.name);
+    }
+    return left.mapping.tableName.localeCompare(right.mapping.tableName);
+  });
+
+  for (const entry of sortedModels) {
+    const relationEntries = [...(modelRelations.get(entry.model.name) ?? [])].sort((left, right) =>
+      left.fieldName.localeCompare(right.fieldName),
+    );
+    builder = builder.model(
+      entry.model.name,
+      entry.mapping.tableName,
+      (modelBuilder: DynamicModelBuilder) => {
+        let next = modelBuilder;
+        for (const resolvedField of entry.resolvedFields) {
+          next = next.field(resolvedField.field.name, resolvedField.columnName);
+        }
+        for (const relation of relationEntries) {
+          next = next.relation(relation.fieldName, {
+            toModel: relation.toModel,
+            toTable: relation.toTable,
+            cardinality: relation.cardinality,
+            on: {
+              parentTable: relation.parentTable,
+              parentColumns: relation.parentColumns,
+              childTable: relation.childTable,
+              childColumns: relation.childColumns,
+            },
+          });
+        }
+        return next;
+      },
+    );
   }
 
   if (diagnostics.length > 0) {

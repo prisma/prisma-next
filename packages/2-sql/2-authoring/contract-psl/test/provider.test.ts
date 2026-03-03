@@ -49,6 +49,54 @@ describe('prismaContract provider helper', () => {
         },
       });
     });
+
+    it('interprets relation backrelation lists and emits relation metadata', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  posts Post[]
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value.relations).toMatchObject({
+        user: {
+          posts: {
+            cardinality: '1:N',
+            on: {
+              parentCols: ['id'],
+              childCols: ['userId'],
+            },
+          },
+        },
+        post: {
+          user: {
+            cardinality: 'N:1',
+            on: {
+              parentCols: ['userId'],
+              childCols: ['id'],
+            },
+          },
+        },
+      });
+    });
   });
 
   describe('given unsupported constructs in schema', () => {
