@@ -2,7 +2,7 @@
 
 ## Summary
 
-Expand the SQL PSL provider to accept **relation navigation list fields** (`Post[]` backrelations) while keeping **scalar lists** (`String[]`) as strict errors. In the same slice, emit deterministic top-level `**contract.relations`** metadata for both sides of each 1:N relation so ORM includes can resolve joins reliably and PSL-first parity matches TS-first emission.
+Expand the SQL PSL provider to accept **relation navigation list fields** (`Post[]` backrelations) while keeping **scalar lists** (`String[]`) as strict errors. In the same slice, emit deterministic top-level `contract.relations` metadata for both sides of each 1:N relation so ORM includes can resolve joins reliably and PSL-first parity matches TS-first emission.
 
 **Spec:** `projects/psl-contract-authoring/specs/Milestone 8 - Relation navigation list fields and contract.relations lowering.spec.md`
 
