@@ -517,6 +517,19 @@ function collectResolvedFields(
           diagnostics,
         })
       : {};
+    if (field.optional && loweredDefault.executionDefault) {
+      const generatorDescription =
+        loweredDefault.executionDefault.kind === 'generator'
+          ? `"${loweredDefault.executionDefault.id}"`
+          : 'for this field';
+      diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+        message: `Field "${model.name}.${field.name}" cannot be optional when using execution default ${generatorDescription}. Remove "?" or use a storage default.`,
+        sourceId,
+        span: defaultAttribute?.span ?? field.span,
+      });
+      continue;
+    }
     if (loweredDefault.executionDefault) {
       const generatedDescriptor = resolveGeneratedColumnDescriptor(loweredDefault.executionDefault);
       if (generatedDescriptor) {
