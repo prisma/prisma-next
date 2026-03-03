@@ -170,7 +170,7 @@ Vocabulary-driven surfaces use the registries for validation and lowering; lower
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
 - Follow-up plan: `projects/psl-contract-authoring/plans/Follow-up - Pack-provided mutation default functions registry-plan.md`
-- Project plan: `projects/psl-contract-authoring/plans/plan.md`
+- Project plan: `projects/psl-contract-authoring/plan.md`
 - Milestone 5 spec: `projects/psl-contract-authoring/specs/Milestone 5 - ID variants and default function parity.spec.md`
 - Architecture overview: `docs/Architecture Overview.md`
 - Runtime mutation defaults ADR: `docs/architecture docs/adrs/ADR 158 - Execution mutation defaults.md`
