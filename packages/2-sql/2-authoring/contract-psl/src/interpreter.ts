@@ -14,6 +14,7 @@ import type {
   PslSpan,
 } from '@prisma-next/psl-parser';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
   createBuiltinDefaultFunctionRegistry,
@@ -608,10 +609,8 @@ function collectResolvedFields(
       field,
       columnName: mappedColumnName,
       descriptor,
-      ...(loweredDefault.defaultValue ? { defaultValue: loweredDefault.defaultValue } : {}),
-      ...(loweredDefault.executionDefault
-        ? { executionDefault: loweredDefault.executionDefault }
-        : {}),
+      ...ifDefined('defaultValue', loweredDefault.defaultValue),
+      ...ifDefined('executionDefault', loweredDefault.executionDefault),
       isId: Boolean(getAttribute(field.attributes, 'id')),
       isUnique: Boolean(getAttribute(field.attributes, 'unique')),
     });
@@ -908,16 +907,15 @@ function parseRelationAttribute(input: {
     references = parsedReferences;
   }
 
+  const onDeleteArgument = getNamedArgument(input.attribute, 'onDelete');
+  const onUpdateArgument = getNamedArgument(input.attribute, 'onUpdate');
+
   return {
-    ...(relationName ? { relationName } : {}),
-    ...(fields ? { fields } : {}),
-    ...(references ? { references } : {}),
-    ...(getNamedArgument(input.attribute, 'onDelete')
-      ? { onDelete: unquoteStringLiteral(getNamedArgument(input.attribute, 'onDelete') ?? '') }
-      : {}),
-    ...(getNamedArgument(input.attribute, 'onUpdate')
-      ? { onUpdate: unquoteStringLiteral(getNamedArgument(input.attribute, 'onUpdate') ?? '') }
-      : {}),
+    ...ifDefined('relationName', relationName),
+    ...ifDefined('fields', fields),
+    ...ifDefined('references', references),
+    ...ifDefined('onDelete', onDeleteArgument ? unquoteStringLiteral(onDeleteArgument) : undefined),
+    ...ifDefined('onUpdate', onUpdateArgument ? unquoteStringLiteral(onUpdateArgument) : undefined),
   };
 }
 
@@ -1129,7 +1127,7 @@ export function interpretPslDocumentToSqlContractIR(
         tableName,
         field,
         targetModelName: field.typeName,
-        ...(relationName ? { relationName } : {}),
+        ...ifDefined('relationName', relationName),
       });
     }
 
@@ -1158,8 +1156,8 @@ export function interpretPslDocumentToSqlContractIR(
             default?: ColumnDefault;
           } = {
             type: resolvedField.descriptor,
-            ...(resolvedField.field.optional ? { nullable: true as const } : {}),
-            ...(resolvedField.defaultValue ? { default: resolvedField.defaultValue } : {}),
+            ...ifDefined('nullable', resolvedField.field.optional ? (true as const) : undefined),
+            ...ifDefined('default', resolvedField.defaultValue),
           };
           table = table.column(resolvedField.columnName, options);
         }
@@ -1325,8 +1323,8 @@ export function interpretPslDocumentToSqlContractIR(
             columns: referencedColumns,
           },
           {
-            ...(onDelete ? { onDelete } : {}),
-            ...(onUpdate ? { onUpdate } : {}),
+            ...ifDefined('onDelete', onDelete),
+            ...ifDefined('onUpdate', onUpdate),
           },
         );
 
@@ -1336,7 +1334,7 @@ export function interpretPslDocumentToSqlContractIR(
           declaringTableName: tableName,
           targetModelName: targetMapping.model.name,
           targetTableName: targetMapping.tableName,
-          ...(parsedRelation.relationName ? { relationName: parsedRelation.relationName } : {}),
+          ...ifDefined('relationName', parsedRelation.relationName),
           localColumns,
           referencedColumns,
         });
