@@ -40,6 +40,27 @@ The outcome is one canonical extension path for default behavior across authorin
   - lowers to either storage defaults (`ColumnDefault`) or execution mutation defaults (`ExecutionMutationDefaultValue`).
 - **Runtime generator registry (execution-time)**: a composed registry of generator implementations keyed by generator id referenced by `execution.mutations.defaults`.
 
+## Assembly ownership (layering)
+
+The lowering and generator registries are **assembled outside** vocabulary-driven authoring packages:
+
+- `@prisma-next/sql-contract-psl` (and other authoring surfaces) **consume** an already-assembled registry as an input.
+- Assembly is owned by control-plane composition/orchestration (for example the SQL family/control layer and/or CLI wiring), sourced from the configured target/adapter/extension packs.
+
+## Hard constraint: no built-ins or generator special cases outside the registry
+
+The registry is the **single source of truth** for mutation-default behavior. Therefore:
+
+- Vocabulary-driven authoring packages (PSL initially) must contain **no hardcoded**:
+  - default target selection
+  - target-specific scalar→codec/native mappings
+  - generator id lists
+  - generator-specific branching (including parameterized behavior like “nanoid size → storage length”)
+  - generator-owned storage-shape metadata (e.g. “uuidv4 → char(36)”, “cuid2 → char(24)”)
+- TS-first convenience helpers may exist, but they must **consume registry-provided metadata** for generator-owned storage shapes and parameterization. They must not re-declare those facts in their own tables.
+
+Baseline built-ins are still supported, but they must be provided by **composed components** as registry contributors (target/adapter/packs), not by embedding built-in tables or special cases in the authoring surface.
+
 ## Applicability is a control-plane concern
 
 Applicability (“this default function is valid for these columns”) is enforced by the lowering registry. The runtime generator registry is not expected to be keyed by column type; it executes generator ids that were already validated and embedded into the contract.
@@ -84,6 +105,7 @@ Vocabulary-driven surfaces use the registries for validation and lowering; lower
   - explicit behavior for baseline built-ins (always-on baseline vs composed-only)
 - Update vocabulary-driven authoring (PSL initially) to consume the assembled default-function registry instead of relying on provider-owned hardcoded vocabulary.
 - Update execution mutation default application to resolve generators from the assembled runtime generator registry.
+- Ensure generator-owned storage-shape metadata (including any parameterization) is provided via registry contributions, so authoring surfaces do not re-encode generator semantics.
 - Preserve existing span-based diagnostics and error categories:
   - unknown default function name
   - invalid argument shape/value for known function
@@ -124,6 +146,8 @@ Vocabulary-driven surfaces use the registries for validation and lowering; lower
 ## Emission and Diagnostics
 
 - Vocabulary-driven emission (PSL initially) uses an assembled registry derived from configured framework components.
+- Vocabulary-driven authoring packages (PSL initially) **do not assemble** registries; they accept assembled registries as inputs from the control-plane composition layer.
+- Vocabulary-driven authoring packages (PSL initially) contain **no built-in** generator/function tables or generator-id special casing; all such behavior comes from the composed registry (including baseline built-ins).
 - Unknown default function diagnostics remain span-based and use stable diagnostic codes/messages.
 - Invalid argument diagnostics remain span-based and use stable diagnostic codes/messages.
 

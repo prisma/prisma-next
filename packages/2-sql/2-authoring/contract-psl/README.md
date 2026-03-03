@@ -1,6 +1,6 @@
 # @prisma-next/sql-contract-psl
 
-PSL-first SQL contract interpretation and provider composition for Prisma Next.
+PSL-first SQL contract interpretation for Prisma Next.
 
 ## Overview
 
@@ -15,14 +15,14 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 
 - Interpret `ParsePslDocumentResult` into SQL `ContractIR`
 - Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
-- Lower supported default functions through a component-composed registry boundary (target/adapter/extensions)
+- Lower supported default functions through composed registry inputs
 - Support pgvector parity mapping from PSL attributes to existing TS-representable descriptor shape (`codecId`, `nativeType`, `typeParams`)
 - Map PSL relation action tokens to SQL contract referential actions and emit diagnostics for unsupported values
 - Emit deterministic relation metadata in `models.<Model>.relations` and top-level `contract.relations`
 - Enforce extension composition for supported namespaced attributes (for example `@pgvector.column(...)`)
 - Validate generator applicability by declared `codecId` support on composed generator descriptors
-- Fail fast on duplicate default-function names and duplicate generator ids during composition
-- Compose provider flow for SQL PSL-first config (`read -> parse -> interpret`)
+- Consume target-bound scalar descriptors and mutation-default registries assembled by composition layers
+- Compose provider flow for SQL PSL-first config (`read -> parse -> interpret`) without local registry assembly
 - Preserve parser diagnostics and add interpreter diagnostics with stable codes
 - Return `notOk` with structured diagnostics for unsupported constructs
 - Keep interpretation deterministic for equivalent AST inputs
@@ -41,7 +41,7 @@ The **pure interpreter entrypoint** specifically excludes:
 - Artifact emission (`contract.json`, `contract.d.ts`) and hashing
 - CLI or ControlClient orchestration
 
-Current scope is SQL/Postgres-first: scalar and enum mappings resolve to Postgres codec/native type descriptors in v1.
+Current scope is SQL/Postgres-first: callers pass Postgres-oriented scalar descriptors and target context in v1.
 
 Unsupported PSL constructs in v1 (strict errors):
 
@@ -55,7 +55,7 @@ Unsupported PSL constructs in v1 (strict errors):
 - **Implicit Prisma ORM many-to-many remains unsupported** (list navigation on both sides without explicit join model)
   - Represent many-to-many with an explicit join model (two foreign keys)
 
-Supported `@default(...)` surface in v1 when the composed framework components contribute the handlers:
+Supported `@default(...)` surface in v1 when composed contributors provide handlers:
 
 - Storage defaults: `autoincrement()`, `now()`, literals, `dbgenerated("...")`
 - Execution defaults: `uuid()`, `uuid(4)`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(<2-255>)`
@@ -65,11 +65,10 @@ Supported `@default(...)` surface in v1 when the composed framework components c
 ## Public API
 
 - `@prisma-next/sql-contract-psl`
-  - `interpretPslDocumentToSqlContractIR({ document, target? })`
+  - `interpretPslDocumentToSqlContractIR({ document, target, scalarTypeDescriptors, controlMutationDefaults?, composedExtensionPacks? })`
 - `@prisma-next/sql-contract-psl/provider`
-  - `prismaContract(schemaPath, { output?, target?, frameworkComponents?, composedExtensionPacks? })`
-  - `frameworkComponents` is the primary composition input for namespace availability and mutation-default lowering/generator descriptors.
-  - `composedExtensionPacks` remains as an optional compatibility hook for namespace ids.
+  - `prismaContract(schemaPath, { output?, target, scalarTypeDescriptors, controlMutationDefaults?, composedExtensionPacks? })`
+  - Provider input is fully preassembled by composition layers (for example `@prisma-next/family-sql/control` helpers).
 
 ## Dependencies
 
@@ -81,6 +80,7 @@ Supported `@default(...)` surface in v1 when the composed framework components c
   - `@prisma-next/contract` and `@prisma-next/utils`
 - **Used by**
   - PSL contract providers configured via `contract.source`
+  - Composition helpers such as `@prisma-next/family-sql/control` that assemble provider inputs
 
 ## Architecture
 
