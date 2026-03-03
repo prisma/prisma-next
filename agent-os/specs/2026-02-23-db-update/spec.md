@@ -1,10 +1,10 @@
 # Summary
 
-Add `prisma-next db update` as the contract-driven reconciliation command for existing databases. The command plans and applies additive, widening, and destructive schema changes, exposes plan/apply modes with JSON output, and preserves runner safety checks and marker/ledger audit behavior. Works on any database, whether or not it has been initialized with `db init`.
+Add `prisma-next db update` as the contract-driven reconciliation command for existing databases. The command plans and applies additive, widening, and destructive schema changes, exposes plan/apply modes with JSON output, and preserves marker/ledger audit behavior. Works on any database, whether or not it has been initialized with `db init`.
 
 # Description
 
-This branch implements a new CLI command, `prisma-next db update`, and a matching control API operation to update a database schema to match the current emitted contract. The command introspects the live schema, plans a migration allowing additive, widening, and destructive operation classes, and either outputs a dry-run plan or applies the plan via the migration runner. The marker table is created if missing and updated regardless of prior content. It also adds supporting docs, demos, and end-to-end tests that mirror the scenarios in `DEMO.md`.
+This branch implements a new CLI command, `prisma-next db update`, and a matching control API operation to update a database schema to match the current emitted contract. The command introspects the live schema, plans a migration allowing additive, widening, and destructive operation classes, and either outputs a dry-run plan or applies the plan via the migration runner. The marker table is created if missing and updated regardless of prior content. It also adds supporting docs and end-to-end scenario coverage.
 
 # Requirements
 
@@ -19,14 +19,14 @@ This branch implements a new CLI command, `prisma-next db update`, and a matchin
 - Introspect the live schema and plan reconciliation against the emitted contract using a policy that allows additive, widening, and destructive operations.
 - In `--plan` mode, return a deterministic plan summary without applying changes.
 - In `--plan` mode, emit SQL DDL alongside the plan summary when the target belongs to the SQL family.
-- In apply mode, execute with full runner checks enabled and update marker + ledger through the runner.
+- In apply mode, execute with runner checks disabled by default and update marker + ledger through the runner.
 - Map planner conflicts and runner failures to structured CLI errors with actionable recovery guidance.
 - Expose a programmatic control API operation (`client.dbUpdate`) that mirrors the CLI behavior.
 
 ## Non-Functional Requirements
 
 - Deterministic planning: operation ordering and IDs are stable for identical inputs.
-- Safety invariants: runner checks, advisory locks, and marker/ledger audit rules remain unchanged from existing migration behavior.
+- Safety invariants: advisory locks and marker/ledger audit rules remain unchanged from existing migration behavior.
 - CLI output remains stable and machine-readable; JSON output must be consistent with existing migration envelopes.
 - The command must be idempotent when the database already matches the contract (0 operations planned/applied).
 
@@ -78,12 +78,9 @@ This branch implements a new CLI command, `prisma-next db update`, and a matchin
 # References
 
 - `agent-os/specs/2026-02-23-db-update/planning/requirements.md`
-- `DEMO.md`
 - `docs/commands/SUMMARY.md`
-- `docs/commands/db-update.md`
 - `packages/1-framework/3-tooling/cli/src/commands/db-update.ts`
 - `packages/1-framework/3-tooling/cli/src/control-api/operations/db-update.ts`
-- `examples/db-update-demo/README.md`
 - `test/integration/test/cli.db-update.e2e.test.ts`
 - `test/integration/test/cli.db-update.e2e.errors.test.ts`
 

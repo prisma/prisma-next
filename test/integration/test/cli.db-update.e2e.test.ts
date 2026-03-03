@@ -169,7 +169,7 @@ withTempDir(({ createTempDir }) => {
 });
 
 // ---------------------------------------------------------------------------
-// DEMO.md Scenarios (rich account/project contract)
+// Rich account/project reconciliation scenarios
 // ---------------------------------------------------------------------------
 
 const scenarioFixtureSubdir = 'db-update-scenarios';
@@ -194,7 +194,7 @@ async function switchToContractV2(testDir: string, configPath: string): Promise<
 }
 
 withTempDir(({ createTempDir }) => {
-  describe('db update scenarios (DEMO.md)', () => {
+  describe('db update scenarios', () => {
     let consoleOutput: string[] = [];
     let consoleErrors: string[] = [];
     let cleanupMocks: () => void;

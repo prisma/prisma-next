@@ -9,7 +9,7 @@ The command must:
 - Work on any database, whether or not it has been initialized with `db init`. Create the marker table if missing; update the marker regardless of prior content.
 - Plan from live schema + desired contract, not from authoring lifecycle hints.
 - Allow additive, widening, and destructive operation classes where supported.
-- Reuse existing migration runner safety and audit semantics (lock, checks, marker, ledger).
+- Reuse existing migration runner safety and audit semantics (lock, marker, ledger), with execution checks disabled by default for `db update`.
 
 ### Functional requirements
 
@@ -31,7 +31,7 @@ The command must:
    - No reliance on `@deprecated`/`@deleted` hints in this iteration.
 
 4. **Execution behavior**
-   - In apply mode, keep runner execution checks enabled (precheck/postcheck/idempotency).
+   - In apply mode, disable runner execution checks by default (precheck/postcheck/idempotency) for lower per-operation overhead.
    - Preserve runner lock/transaction/verification semantics.
    - On success, marker and ledger are written through existing runner behavior.
 
@@ -54,7 +54,7 @@ The command must:
 
 ### Documentation
 
-- Add `docs/commands/db-update.md`.
+- Keep `docs/commands/SUMMARY.md` and `docs/commands/README.md` aligned with current `db update` semantics.
 - Update CLI README with `db update` usage, behavior, outputs, and error codes.
 - Update architecture docs for `db update` strategy and explicitly state no lifecycle hint dependency in this phase.
 
