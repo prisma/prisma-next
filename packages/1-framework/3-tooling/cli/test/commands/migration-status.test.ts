@@ -552,6 +552,36 @@ describe('formatMigrationStatusOutput', () => {
     expect(stripped).not.toContain('∅');
   });
 
+  it('renders diagnostics when no migrations exist but contract has changed', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'online',
+        migrations: [],
+        leafHash: EMPTY_CONTRACT_HASH,
+        contractHash: 'sha256:some-new-hash',
+        summary: 'No migrations found',
+        markerHash: EMPTY_CONTRACT_HASH,
+        diagnostics: [
+          {
+            code: 'CONTRACT.AHEAD',
+            severity: 'warn',
+            message: 'Contract has changed since the last migration was planned',
+            hints: [
+              "Run 'prisma-next migration plan' to generate a migration for the current contract",
+            ],
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('No migrations found');
+    expect(stripped).toContain('Contract has changed since the last migration was planned');
+    expect(stripped).toContain('migration plan');
+  });
+
   it('returns empty string in quiet mode', () => {
     const flags = parseGlobalFlags({ quiet: true });
     const output = formatMigrationStatusOutput(
