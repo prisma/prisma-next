@@ -1,12 +1,10 @@
-export {
-  type ControlMutationDefaults,
-  createBuiltinControlMutationDefaults,
-  createBuiltinDefaultFunctionRegistry,
-  createBuiltinMutationDefaultGeneratorDescriptors,
-  type DefaultFunctionLoweringContext,
-  type DefaultFunctionLoweringHandler,
-  type DefaultFunctionRegistry,
-  type MutationDefaultGeneratorDescriptor,
+export type {
+  ControlMutationDefaults,
+  DefaultFunctionLoweringContext,
+  DefaultFunctionLoweringHandler,
+  DefaultFunctionRegistry,
+  DefaultFunctionRegistryEntry,
+  MutationDefaultGeneratorDescriptor,
 } from '../default-function-registry';
 export {
   type InterpretPslDocumentToSqlContractIRInput,

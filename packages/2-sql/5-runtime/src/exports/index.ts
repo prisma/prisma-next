@@ -30,7 +30,6 @@ export type {
   TypeHelperRegistry,
 } from '../sql-context';
 export {
-  createBuiltinMutationDefaultGenerators,
   createExecutionContext,
   createSqlExecutionStack,
 } from '../sql-context';

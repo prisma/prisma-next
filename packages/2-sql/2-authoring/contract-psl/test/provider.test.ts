@@ -2,22 +2,21 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createBuiltinControlMutationDefaults } from '../src/default-function-registry';
 import { prismaContract } from '../src/exports/provider';
+import {
+  createBuiltinLikeControlMutationDefaults,
+  postgresScalarTypeDescriptors,
+  postgresTarget,
+} from './fixtures';
 
 describe('prismaContract provider helper', () => {
   const originalCwd = process.cwd();
   const tempDirs: string[] = [];
-  const frameworkComponents = [
-    {
-      kind: 'adapter' as const,
-      id: 'test-adapter',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      controlMutationDefaults: () => createBuiltinControlMutationDefaults(),
-    },
-  ];
+  const baseOptions = {
+    target: postgresTarget,
+    scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+  } as const;
 
   afterEach(async () => {
     process.chdir(originalCwd);
@@ -43,7 +42,10 @@ describe('prismaContract provider helper', () => {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma', { output: 'output/contract.json' });
+      const contract = prismaContract('./schema.prisma', {
+        ...baseOptions,
+        output: 'output/contract.json',
+      });
 
       expect(contract.output).toBe('output/contract.json');
       const result = await contract.source();
@@ -126,7 +128,7 @@ model Post {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma');
+      const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source();
 
       expect(result.ok).toBe(false);
@@ -206,7 +208,7 @@ model Post {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma');
+      const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source();
 
       expect(result.ok).toBe(false);
@@ -246,16 +248,8 @@ model Document {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', {
-        frameworkComponents: [
-          ...frameworkComponents,
-          {
-            kind: 'extension' as const,
-            id: 'pgvector',
-            version: '0.0.1',
-            familyId: 'sql' as const,
-            targetId: 'postgres' as const,
-          },
-        ],
+        ...baseOptions,
+        composedExtensionPacks: ['pgvector'],
       });
       const result = await contract.source();
 
@@ -293,7 +287,7 @@ model Document {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', {
-        frameworkComponents,
+        ...baseOptions,
       });
       const result = await contract.source();
 
@@ -352,7 +346,7 @@ model Document {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', {
-        frameworkComponents,
+        ...baseOptions,
       });
       const result = await contract.source();
 
@@ -375,13 +369,48 @@ model Document {
     });
   });
 
+  describe('given provider inputs without assembled mutation defaults', () => {
+    it('does not assemble mutation default handlers internally', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  externalId String @default(uuid())
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', {
+        target: postgresTarget,
+        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      });
+      const result = await contract.source();
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
+            message: expect.stringContaining('uuid'),
+          }),
+        ]),
+      );
+    });
+  });
+
   describe('given a missing schema file', () => {
     it('returns PSL_SCHEMA_READ_FAILED diagnostics when schema file is missing', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
 
       process.chdir(tempDir);
-      const contract = prismaContract('./missing.prisma');
+      const contract = prismaContract('./missing.prisma', baseOptions);
       const result = await contract.source();
 
       expect(result.ok).toBe(false);

@@ -34,58 +34,10 @@ type ColumnDescriptor = {
 
 export interface InterpretPslDocumentToSqlContractIRInput {
   readonly document: ParsePslDocumentResult;
-  readonly target?: TargetPackRef<'sql', 'postgres'>;
+  readonly target: TargetPackRef<'sql', 'postgres'>;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensionPacks?: readonly string[];
   readonly controlMutationDefaults?: ControlMutationDefaults;
-  readonly defaultFunctionRegistry?: DefaultFunctionRegistry;
-  readonly generatorDescriptors?: readonly MutationDefaultGeneratorDescriptor[];
-}
-
-const DEFAULT_POSTGRES_TARGET: TargetPackRef<'sql', 'postgres'> = {
-  kind: 'target',
-  familyId: 'sql',
-  targetId: 'postgres',
-  id: 'postgres',
-  version: '0.0.1',
-  capabilities: {},
-};
-
-const SCALAR_COLUMN_MAP: Record<string, ColumnDescriptor> = {
-  String: { codecId: 'pg/text@1', nativeType: 'text' },
-  Boolean: { codecId: 'pg/bool@1', nativeType: 'bool' },
-  Int: { codecId: 'pg/int4@1', nativeType: 'int4' },
-  BigInt: { codecId: 'pg/int8@1', nativeType: 'int8' },
-  Float: { codecId: 'pg/float8@1', nativeType: 'float8' },
-  Decimal: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
-  DateTime: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
-  Json: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
-  Bytes: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
-};
-
-const GENERATED_ID_COLUMN_MAP: Partial<Record<string, ColumnDescriptor>> = {
-  ulid: { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 26 } },
-  uuidv7: { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 36 } },
-  uuidv4: { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 36 } },
-  cuid2: { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 24 } },
-};
-
-function resolveGeneratedColumnDescriptor(
-  executionDefault: ExecutionMutationDefaultValue,
-): ColumnDescriptor | undefined {
-  if (executionDefault.kind !== 'generator') {
-    return undefined;
-  }
-
-  if (executionDefault.id === 'nanoid') {
-    const rawSize = executionDefault.params?.['size'];
-    const length =
-      typeof rawSize === 'number' && Number.isInteger(rawSize) && rawSize >= 2 && rawSize <= 255
-        ? rawSize
-        : 21;
-    return { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length } };
-  }
-
-  return GENERATED_ID_COLUMN_MAP[executionDefault.id];
 }
 
 const REFERENTIAL_ACTION_MAP = {
@@ -481,6 +433,7 @@ function resolveColumnDescriptor(
   field: PslField,
   enumTypeDescriptors: Map<string, ColumnDescriptor>,
   namedTypeDescriptors: Map<string, ColumnDescriptor>,
+  scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
 ): ColumnDescriptor | undefined {
   if (field.typeRef && namedTypeDescriptors.has(field.typeRef)) {
     return namedTypeDescriptors.get(field.typeRef);
@@ -491,7 +444,7 @@ function resolveColumnDescriptor(
   if (enumTypeDescriptors.has(field.typeName)) {
     return enumTypeDescriptors.get(field.typeName);
   }
-  return SCALAR_COLUMN_MAP[field.typeName];
+  return scalarTypeDescriptors.get(field.typeName);
 }
 
 function collectResolvedFields(
@@ -506,6 +459,7 @@ function collectResolvedFields(
   generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
+  scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
 ): ResolvedField[] {
   const resolvedFields: ResolvedField[] = [];
 
@@ -556,7 +510,12 @@ function collectResolvedFields(
       continue;
     }
 
-    let descriptor = resolveColumnDescriptor(field, enumTypeDescriptors, namedTypeDescriptors);
+    let descriptor = resolveColumnDescriptor(
+      field,
+      enumTypeDescriptors,
+      namedTypeDescriptors,
+      scalarTypeDescriptors,
+    );
     const pgvectorColumnAttribute = getAttribute(field.attributes, 'pgvector.column');
     if (pgvectorColumnAttribute) {
       if (!composedExtensions.has('pgvector')) {
@@ -632,7 +591,10 @@ function collectResolvedFields(
       continue;
     }
     if (loweredDefault.executionDefault) {
-      const generatedDescriptor = resolveGeneratedColumnDescriptor(loweredDefault.executionDefault);
+      const generatorDescriptor = generatorDescriptorById.get(loweredDefault.executionDefault.id);
+      const generatedDescriptor = generatorDescriptor?.resolveGeneratedColumnDescriptor?.({
+        generated: loweredDefault.executionDefault,
+      });
       if (generatedDescriptor) {
         descriptor = generatedDescriptor;
       }
@@ -1104,24 +1066,44 @@ function parseRelationAttribute(input: {
 export function interpretPslDocumentToSqlContractIR(
   input: InterpretPslDocumentToSqlContractIRInput,
 ): Result<ContractIR, ContractSourceDiagnostics> {
+  const sourceId = input.document.ast.sourceId;
+  if (!input.target) {
+    return notOk({
+      summary: 'PSL to SQL Contract IR normalization failed',
+      diagnostics: [
+        {
+          code: 'PSL_TARGET_CONTEXT_REQUIRED',
+          message: 'PSL interpretation requires an explicit target context from composition.',
+          sourceId,
+        },
+      ],
+    });
+  }
+  if (!input.scalarTypeDescriptors) {
+    return notOk({
+      summary: 'PSL to SQL Contract IR normalization failed',
+      diagnostics: [
+        {
+          code: 'PSL_SCALAR_TYPE_CONTEXT_REQUIRED',
+          message: 'PSL interpretation requires composed scalar type descriptors.',
+          sourceId,
+        },
+      ],
+    });
+  }
+
   const diagnostics: ContractSourceDiagnostic[] = mapParserDiagnostics(input.document);
   const modelNames = new Set(input.document.ast.models.map((model) => model.name));
-  const sourceId = input.document.ast.sourceId;
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
   const defaultFunctionRegistry =
-    input.controlMutationDefaults?.defaultFunctionRegistry ??
-    input.defaultFunctionRegistry ??
-    new Map<string, never>();
-  const generatorDescriptors =
-    input.controlMutationDefaults?.generatorDescriptors ?? input.generatorDescriptors ?? [];
+    input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map<string, never>();
+  const generatorDescriptors = input.controlMutationDefaults?.generatorDescriptors ?? [];
   const generatorDescriptorById = new Map<string, MutationDefaultGeneratorDescriptor>();
   for (const descriptor of generatorDescriptors) {
     generatorDescriptorById.set(descriptor.id, descriptor);
   }
 
-  let builder = defineContract().target(
-    input.target ?? DEFAULT_POSTGRES_TARGET,
-  ) as unknown as DynamicContractBuilder;
+  let builder = defineContract().target(input.target) as unknown as DynamicContractBuilder;
   const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
   const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
   const namedTypeBaseTypes = new Map<string, string>();
@@ -1143,7 +1125,8 @@ export function interpretPslDocumentToSqlContractIR(
 
   for (const declaration of input.document.ast.types?.declarations ?? []) {
     const baseDescriptor =
-      enumTypeDescriptors.get(declaration.baseType) ?? SCALAR_COLUMN_MAP[declaration.baseType];
+      enumTypeDescriptors.get(declaration.baseType) ??
+      input.scalarTypeDescriptors.get(declaration.baseType);
     if (!baseDescriptor) {
       diagnostics.push({
         code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
@@ -1250,6 +1233,7 @@ export function interpretPslDocumentToSqlContractIR(
       generatorDescriptorById,
       diagnostics,
       sourceId,
+      input.scalarTypeDescriptors,
     );
     resolvedModels.push({ model, mapping, resolvedFields });
 

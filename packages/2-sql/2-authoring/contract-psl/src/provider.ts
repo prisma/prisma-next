@@ -1,36 +1,30 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig } from '@prisma-next/config/config-types';
-import type {
-  TargetBoundComponentDescriptor,
-  TargetPackRef,
-} from '@prisma-next/contract/framework-components';
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
-import { assembleControlMutationDefaults } from './default-function-registry';
+import type { ControlMutationDefaults } from './default-function-registry';
 import { interpretPslDocumentToSqlContractIR } from './interpreter';
 
 export interface PrismaContractOptions {
   readonly output?: string;
-  readonly target?: TargetPackRef<'sql', 'postgres'>;
-  readonly frameworkComponents?: readonly TargetBoundComponentDescriptor<'sql', string>[];
-  /**
-   * Milestone-local namespace availability hook.
-   *
-   * This currently models composed extension packs by id only (for example `["pgvector"]`),
-   * and is sufficient for namespace presence checks in the PSL interpreter.
-   *
-   * Future milestones can evolve this to richer composed pack metadata/manifests when
-   * attribute-level schema/argument validation needs to move beyond namespace existence.
-   */
+  readonly target: TargetPackRef<'sql', 'postgres'>;
+  readonly scalarTypeDescriptors: ReadonlyMap<
+    string,
+    {
+      readonly codecId: string;
+      readonly nativeType: string;
+      readonly typeRef?: string;
+      readonly typeParams?: Record<string, unknown>;
+    }
+  >;
+  readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly composedExtensionPacks?: readonly string[];
 }
 
-export function prismaContract(
-  schemaPath: string,
-  options?: PrismaContractOptions,
-): ContractConfig {
+export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
   return {
     source: async () => {
       const absoluteSchemaPath = resolve(schemaPath);
@@ -56,25 +50,19 @@ export function prismaContract(
         schema,
         sourceId: schemaPath,
       });
-      const frameworkComponents = options?.frameworkComponents ?? [];
-      const composedExtensionPacks = new Set<string>(options?.composedExtensionPacks ?? []);
-      for (const component of frameworkComponents) {
-        if (component.kind === 'extension') {
-          composedExtensionPacks.add(component.id);
-        }
-      }
-      const controlMutationDefaults = assembleControlMutationDefaults(frameworkComponents);
+      const composedExtensionPacks = options.composedExtensionPacks ?? [];
 
       return interpretPslDocumentToSqlContractIR({
         document,
-        ...ifDefined('target', options?.target),
+        target: options.target,
+        scalarTypeDescriptors: options.scalarTypeDescriptors,
         ...ifDefined(
           'composedExtensionPacks',
-          composedExtensionPacks.size > 0 ? Array.from(composedExtensionPacks) : undefined,
+          composedExtensionPacks.length > 0 ? composedExtensionPacks : undefined,
         ),
-        controlMutationDefaults,
+        ...ifDefined('controlMutationDefaults', options.controlMutationDefaults),
       });
     },
-    ...ifDefined('output', options?.output),
+    ...ifDefined('output', options.output),
   };
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
 import {
   assembleControlMutationDefaultContributions,
+  assemblePslInterpretationContributions,
   createControlMutationDefaultGeneratorDescriptorMap,
 } from '../src/core/assembly';
 
@@ -23,13 +24,16 @@ describe('assembleControlMutationDefaultContributions', () => {
         defaultFunctionRegistry: new Map([
           [
             'first_fn',
-            () => ({
-              ok: true as const,
-              value: {
-                kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'first()' },
-              },
-            }),
+            {
+              lower: () => ({
+                ok: true as const,
+                value: {
+                  kind: 'storage' as const,
+                  defaultValue: { kind: 'function' as const, expression: 'first()' },
+                },
+              }),
+              usageSignatures: ['first_fn()'],
+            },
           ],
         ]),
         generatorDescriptors: [
@@ -46,13 +50,16 @@ describe('assembleControlMutationDefaultContributions', () => {
         defaultFunctionRegistry: new Map([
           [
             'second_fn',
-            () => ({
-              ok: true as const,
-              value: {
-                kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'second()' },
-              },
-            }),
+            {
+              lower: () => ({
+                ok: true as const,
+                value: {
+                  kind: 'storage' as const,
+                  defaultValue: { kind: 'function' as const, expression: 'second()' },
+                },
+              }),
+              usageSignatures: ['second_fn()'],
+            },
           ],
         ]),
         generatorDescriptors: [
@@ -82,13 +89,16 @@ describe('assembleControlMutationDefaultContributions', () => {
         defaultFunctionRegistry: new Map([
           [
             'duplicate_fn',
-            () => ({
-              ok: true as const,
-              value: {
-                kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'first()' },
-              },
-            }),
+            {
+              lower: () => ({
+                ok: true as const,
+                value: {
+                  kind: 'storage' as const,
+                  defaultValue: { kind: 'function' as const, expression: 'first()' },
+                },
+              }),
+              usageSignatures: ['duplicate_fn()'],
+            },
           ],
         ]),
         generatorDescriptors: [],
@@ -99,13 +109,16 @@ describe('assembleControlMutationDefaultContributions', () => {
         defaultFunctionRegistry: new Map([
           [
             'duplicate_fn',
-            () => ({
-              ok: true as const,
-              value: {
-                kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'second()' },
-              },
-            }),
+            {
+              lower: () => ({
+                ok: true as const,
+                value: {
+                  kind: 'storage' as const,
+                  defaultValue: { kind: 'function' as const, expression: 'second()' },
+                },
+              }),
+              usageSignatures: ['duplicate_fn()'],
+            },
           ],
         ]),
         generatorDescriptors: [],
@@ -143,6 +156,54 @@ describe('assembleControlMutationDefaultContributions', () => {
 
     expect(() => createControlMutationDefaultGeneratorDescriptorMap([first, second])).toThrow(
       /Duplicate mutation default generator id "duplicate-generator"/,
+    );
+  });
+
+  it('collects scalar type descriptor contributions', () => {
+    const first = createDescriptor('first', {
+      pslTypeDescriptors: () => ({
+        scalarTypeDescriptors: new Map([
+          ['String', { codecId: 'first/text@1', nativeType: 'text' }],
+        ]),
+      }),
+    });
+    const second = createDescriptor('second', {
+      pslTypeDescriptors: () => ({
+        scalarTypeDescriptors: new Map([
+          ['Bytes', { codecId: 'first/bytes@1', nativeType: 'bytea' }],
+        ]),
+      }),
+    });
+
+    const contributions = assemblePslInterpretationContributions([first, second]);
+    expect(contributions.scalarTypeDescriptors.get('String')).toMatchObject({
+      codecId: 'first/text@1',
+      nativeType: 'text',
+    });
+    expect(contributions.scalarTypeDescriptors.get('Bytes')).toMatchObject({
+      codecId: 'first/bytes@1',
+      nativeType: 'bytea',
+    });
+  });
+
+  it('throws for duplicate scalar type descriptors', () => {
+    const first = createDescriptor('first', {
+      pslTypeDescriptors: () => ({
+        scalarTypeDescriptors: new Map([
+          ['String', { codecId: 'first/text@1', nativeType: 'text' }],
+        ]),
+      }),
+    });
+    const second = createDescriptor('second', {
+      pslTypeDescriptors: () => ({
+        scalarTypeDescriptors: new Map([
+          ['String', { codecId: 'second/text@1', nativeType: 'text' }],
+        ]),
+      }),
+    });
+
+    expect(() => assemblePslInterpretationContributions([first, second])).toThrow(
+      /Duplicate PSL scalar type descriptor "String"/,
     );
   });
 });
