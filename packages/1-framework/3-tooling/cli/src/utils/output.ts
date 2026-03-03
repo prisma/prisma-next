@@ -1,4 +1,4 @@
-import { relative } from 'node:path';
+import { relative } from 'pathe';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { bgGreen, blue, bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { Command } from 'commander';
@@ -925,6 +925,94 @@ export function formatMigrationPlanOutput(
   lines.push(`${prefix}`);
   lines.push(`${prefix}${formatDimText('This is a dry run. No changes were applied.')}`);
   lines.push(`${prefix}${formatDimText('Run without --plan to apply changes.')}`);
+
+  return lines.join('\n');
+}
+
+export interface MigrationApplyCommandOutputResult {
+  readonly migrationsApplied: number;
+  readonly markerHash: string;
+  readonly applied: readonly {
+    readonly dirName: string;
+    readonly operationsExecuted: number;
+  }[];
+  readonly summary: string;
+  readonly timings?: {
+    readonly total: number;
+  };
+}
+
+export interface MigrationVerifyCommandOutputResult {
+  readonly status: 'verified' | 'attested';
+  readonly edgeId?: string;
+}
+
+export function formatMigrationApplyCommandOutput(
+  result: MigrationApplyCommandOutputResult,
+  flags: GlobalFlags,
+): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  if (result.migrationsApplied === 0) {
+    lines.push(`${formatGreen('✔')} ${result.summary}`);
+    lines.push(formatDimText(`  marker: ${result.markerHash}`));
+    return lines.join('\n');
+  }
+
+  lines.push(`${formatGreen('✔')} ${result.summary}`);
+  lines.push('');
+
+  for (let i = 0; i < result.applied.length; i++) {
+    const migration = result.applied[i]!;
+    const isLast = i === result.applied.length - 1;
+    const treeChar = isLast ? '└' : '├';
+    lines.push(
+      `${formatDimText(treeChar)}─ ${migration.dirName} ${formatDimText(`[${migration.operationsExecuted} op(s)]`)}`,
+    );
+  }
+
+  lines.push('');
+  lines.push(formatDimText(`marker: ${result.markerHash}`));
+
+  if (isVerbose(flags, 1) && result.timings) {
+    lines.push('');
+    lines.push(formatDimText(`Total time: ${result.timings.total}ms`));
+  }
+
+  return lines.join('\n');
+}
+
+export function formatMigrationVerifyCommandOutput(
+  result: MigrationVerifyCommandOutputResult,
+  flags: GlobalFlags,
+): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatYellow = createColorFormatter(useColor, yellow);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  switch (result.status) {
+    case 'verified':
+      lines.push(`${formatGreen('✔')} Migration verified`);
+      lines.push(formatDimText(`  edgeId: ${result.edgeId}`));
+      break;
+    case 'attested':
+      lines.push(`${formatYellow('◉')} Draft migration attested`);
+      lines.push(formatDimText(`  edgeId: ${result.edgeId}`));
+      break;
+  }
 
   return lines.join('\n');
 }

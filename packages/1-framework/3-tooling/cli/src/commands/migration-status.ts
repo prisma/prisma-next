@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
+import { relative, resolve } from 'pathe';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';

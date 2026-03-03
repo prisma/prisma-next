@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { resolve } from 'pathe';
 import type { Command } from 'commander';
 
 const longDescriptions = new WeakMap<Command, string>();

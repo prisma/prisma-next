@@ -1,4 +1,4 @@
-import { relative, resolve } from 'node:path';
+import { relative, resolve } from 'pathe';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { findLeafEdge, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';

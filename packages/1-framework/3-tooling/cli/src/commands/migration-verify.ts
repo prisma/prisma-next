@@ -5,7 +5,11 @@ import { Command } from 'commander';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import { formatCommandHelp, formatStyledHeader } from '../utils/output';
+import {
+  formatCommandHelp,
+  formatMigrationVerifyCommandOutput,
+  formatStyledHeader,
+} from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 
 interface MigrationVerifyOptions {
@@ -132,7 +136,7 @@ export function createMigrationVerifyCommand(): Command {
         if (flags.json === 'object') {
           console.log(JSON.stringify(verifyResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationVerifyOutput(verifyResult, flags));
+          console.log(formatMigrationVerifyCommandOutput(verifyResult, flags));
         }
       });
 
@@ -140,25 +144,4 @@ export function createMigrationVerifyCommand(): Command {
     });
 
   return command;
-}
-
-function formatMigrationVerifyOutput(result: MigrationVerifyResult, flags: GlobalFlags): string {
-  const lines: string[] = [];
-  const useColor = flags.color !== false;
-  const green_ = useColor ? (s: string) => `\x1b[32m${s}\x1b[0m` : (s: string) => s;
-  const yellow_ = useColor ? (s: string) => `\x1b[33m${s}\x1b[0m` : (s: string) => s;
-  const dim_ = useColor ? (s: string) => `\x1b[2m${s}\x1b[0m` : (s: string) => s;
-
-  switch (result.status) {
-    case 'verified':
-      lines.push(`${green_('✔')} Migration verified`);
-      lines.push(dim_(`  edgeId: ${result.edgeId}`));
-      break;
-    case 'attested':
-      lines.push(`${yellow_('◉')} Draft migration attested`);
-      lines.push(dim_(`  edgeId: ${result.edgeId}`));
-      break;
-  }
-
-  return lines.join('\n');
 }

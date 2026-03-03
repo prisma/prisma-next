@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
+import { relative, resolve } from 'pathe';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
@@ -25,7 +25,11 @@ import {
   setCommandDescriptions,
 } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import { formatCommandHelp, formatStyledHeader } from '../utils/output';
+import {
+  formatCommandHelp,
+  formatMigrationApplyCommandOutput,
+  formatStyledHeader,
+} from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 
 interface MigrationApplyCommandOptions {
@@ -377,7 +381,7 @@ export function createMigrationApplyCommand(): Command {
         if (flags.json === 'object') {
           console.log(JSON.stringify(applyResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationApplyOutput(applyResult, flags));
+          console.log(formatMigrationApplyCommandOutput(applyResult, flags));
         }
       });
 
@@ -385,38 +389,4 @@ export function createMigrationApplyCommand(): Command {
     });
 
   return command;
-}
-
-function formatMigrationApplyOutput(result: MigrationApplyResult, flags: GlobalFlags): string {
-  const lines: string[] = [];
-  const useColor = flags.color !== false;
-
-  const green_ = useColor ? (s: string) => `\x1b[32m${s}\x1b[0m` : (s: string) => s;
-  const dim_ = useColor ? (s: string) => `\x1b[2m${s}\x1b[0m` : (s: string) => s;
-
-  if (result.migrationsApplied === 0) {
-    lines.push(`${green_('✔')} ${result.summary}`);
-    lines.push(dim_(`  marker: ${result.markerHash}`));
-    return lines.join('\n');
-  }
-
-  lines.push(`${green_('✔')} ${result.summary}`);
-  lines.push('');
-
-  for (let i = 0; i < result.applied.length; i++) {
-    const m = result.applied[i]!;
-    const isLast = i === result.applied.length - 1;
-    const treeChar = isLast ? '└' : '├';
-    lines.push(`${dim_(treeChar)}─ ${m.dirName} ${dim_(`[${m.operationsExecuted} op(s)]`)}`);
-  }
-
-  lines.push('');
-  lines.push(dim_(`marker: ${result.markerHash}`));
-
-  if (flags.verbose && result.timings) {
-    lines.push('');
-    lines.push(dim_(`Total time: ${result.timings.total}ms`));
-  }
-
-  return lines.join('\n');
 }
