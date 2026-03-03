@@ -1,6 +1,6 @@
 # Authoring surface gap inventory (TS + Prisma PSL)
 
-This document exists to keep `projects/psl-contract-authoring/plans/plan.md` readable.
+This document exists to keep `projects/psl-contract-authoring/plan.md` readable.
 
 It records two related (but distinct) inventories:
 

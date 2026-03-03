@@ -219,6 +219,6 @@ Remaining questions:
 - `docs/architecture docs/subsystems/1. Data Contract.md`
 - `docs/architecture docs/adrs/ADR 006 - Dual Authoring Modes.md`
 - `packages/1-framework/3-tooling/cli/src/commands/contract-emit.ts`
-- `projects/psl-contract-authoring/plans/plan.md`
+- `projects/psl-contract-authoring/plan.md`
 - `projects/psl-contract-authoring/references/authoring-surface-gap-inventory.md`
 - Linear: `https://linear.app/prisma-company/issue/TML-2018/optional-split-up-1-coremigration`
