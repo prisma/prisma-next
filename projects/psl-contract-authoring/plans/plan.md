@@ -171,6 +171,9 @@ Introduce a PSL grammar extension for inline SQL literals using backticks (`sql\
 
 Support PSL relation navigation list fields (e.g. `Post[]` backrelation fields) while continuing to reject scalar lists. This requires loosening the current “reject all lists” behavior to “reject scalar lists; accept relation navigation lists” and extending the PSL interpreter to populate `contract.relations` consistently for both sides of a relation.
 
+**Spec:** `projects/psl-contract-authoring/specs/Milestone 8 - Relation navigation list fields and contract.relations lowering.spec.md`
+**Execution Plan:** `projects/psl-contract-authoring/plans/Milestone 8 - Relation navigation list fields and contract.relations lowering-plan.md`
+
 **Tasks:**
 
 - Adjust list-field handling to:
