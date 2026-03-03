@@ -166,21 +166,20 @@ export function parseDefaultFunctionCall(
 
   const functionArgsRaw = trimmed.slice(openParen + 1, closeParen);
   const parts = splitTopLevelArgs(functionArgsRaw);
-  const args = parts
-    .map((part) => {
-      const raw = part.raw.trim();
-      if (raw.length === 0) {
-        return undefined;
-      }
-      const leadingPartWhitespace = part.raw.length - part.raw.trimStart().length;
-      const argStart = leadingWhitespace + openParen + 1 + part.start + leadingPartWhitespace;
-      const argEnd = argStart + raw.length;
-      return {
-        raw,
-        span: createSpanFromBase(expressionSpan, argStart, argEnd, expression),
-      } satisfies DefaultFunctionArgument;
-    })
-    .filter((arg): arg is DefaultFunctionArgument => Boolean(arg));
+  const args: DefaultFunctionArgument[] = [];
+  for (const part of parts) {
+    const raw = part.raw.trim();
+    if (raw.length === 0) {
+      return undefined;
+    }
+    const leadingPartWhitespace = part.raw.length - part.raw.trimStart().length;
+    const argStart = leadingWhitespace + openParen + 1 + part.start + leadingPartWhitespace;
+    const argEnd = argStart + raw.length;
+    args.push({
+      raw,
+      span: createSpanFromBase(expressionSpan, argStart, argEnd, expression),
+    });
+  }
 
   const functionStart = leadingWhitespace;
   const functionEnd = contentEnd;
