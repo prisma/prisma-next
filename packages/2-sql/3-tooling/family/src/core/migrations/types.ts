@@ -27,6 +27,13 @@ export type AnyRecord = Readonly<Record<string, unknown>>;
 
 export interface SqlControlStaticContributions {
   readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
+  readonly controlMutationDefaults?: () => {
+    readonly defaultFunctionRegistry: ReadonlyMap<string, unknown>;
+    readonly generatorDescriptors: ReadonlyArray<{
+      readonly id: string;
+      readonly applicableCodecIds: readonly string[];
+    }>;
+  };
 }
 
 export interface ComponentDatabaseDependency<TTargetDetails> {
