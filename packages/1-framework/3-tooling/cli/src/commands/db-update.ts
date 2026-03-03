@@ -44,15 +44,15 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
     return errorRunnerFailed(failure.summary, {
       why: failure.why ?? 'Migration runner failed',
       fix: 'Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`',
-      ...(failure.meta ? { meta: failure.meta } : {}),
+      ...ifDefined('meta', failure.meta),
     });
   }
 
   if (failure.code === 'DESTRUCTIVE_CHANGES') {
     return errorDestructiveChanges(failure.summary, {
-      ...(failure.why ? { why: failure.why } : {}),
+      ...ifDefined('why', failure.why),
       fix: 'Use `prisma-next db update --plan` to preview, then re-run with `--accept-data-loss` to apply destructive changes',
-      ...(failure.meta ? { meta: failure.meta } : {}),
+      ...ifDefined('meta', failure.meta),
     });
   }
 
@@ -109,24 +109,26 @@ async function executeDbUpdateCommand(
           label: op.label,
           operationClass: op.operationClass,
         })),
-        ...(result.value.plan.sql !== undefined ? { sql: result.value.plan.sql } : {}),
+        ...ifDefined('sql', result.value.plan.sql),
       },
-      ...(result.value.execution
-        ? {
-            execution: {
+      ...ifDefined(
+        'execution',
+        result.value.execution
+          ? {
               operationsPlanned: result.value.execution.operationsPlanned,
               operationsExecuted: result.value.execution.operationsExecuted,
-            },
-          }
-        : {}),
-      ...(result.value.marker
-        ? {
-            marker: {
+            }
+          : undefined,
+      ),
+      ...ifDefined(
+        'marker',
+        result.value.marker
+          ? {
               storageHash: result.value.marker.storageHash,
               ...ifDefined('profileHash', result.value.marker.profileHash),
-            },
-          }
-        : {}),
+            }
+          : undefined,
+      ),
       summary: result.value.summary,
       timings: { total: Date.now() - startTime },
     };
