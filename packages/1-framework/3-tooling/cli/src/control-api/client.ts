@@ -415,6 +415,8 @@ class ControlClientImpl implements ControlClient {
     return executeMigrationApply({
       driver,
       familyInstance,
+      originHash: options.originHash,
+      destinationHash: options.destinationHash,
       pendingEdges: options.pendingEdges,
       migrations: this.options.target.migrations,
       frameworkComponents,

@@ -447,8 +447,18 @@ export interface MigrationApplyEdge {
  */
 export interface MigrationApplyOptions {
   /**
-   * Ordered list of migration edges to apply (from pending path resolution).
-   * Each edge contains the manifest metadata and serialized operations.
+   * Hash of the database state this apply path starts from.
+   * This is resolved by the caller (typically the CLI orchestration layer).
+   */
+  readonly originHash: string;
+  /**
+   * Hash of the target contract this apply path must reach.
+   * This is resolved by the caller (typically the CLI orchestration layer).
+   */
+  readonly destinationHash: string;
+  /**
+   * Ordered list of migration edges to execute from originHash to destinationHash.
+   * The execution layer does not choose defaults; it only executes this explicit path.
    */
   readonly pendingEdges: readonly MigrationApplyEdge[];
   /**
@@ -641,7 +651,9 @@ export interface ControlClient {
    * Each migration runs in its own transaction with full execution checks.
    * Resume-safe: re-running after failure picks up from the last applied migration.
    *
-   * @param options.pendingEdges - Ordered migration edges to apply
+   * @param options.originHash - Explicit source hash for the apply path
+   * @param options.destinationHash - Explicit destination hash for the apply path
+   * @param options.pendingEdges - Ordered migration edges to execute
    * @returns Result pattern: Ok with applied details, NotOk with failure details
    * @throws If not connected, target doesn't support migrations, or infrastructure failure
    */

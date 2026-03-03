@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'pathe';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { MigrationGraph, MigrationPackage } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
@@ -132,6 +132,32 @@ async function executeMigrationApplyCommand(
     );
   }
 
+  let destinationHash: string;
+  try {
+    const contractPathAbsolute = resolveContractPath(config);
+    const contractRaw = JSON.parse(await readFile(contractPathAbsolute, 'utf-8')) as Record<
+      string,
+      unknown
+    >;
+    const contractHash = contractRaw['storageHash'];
+    if (typeof contractHash !== 'string') {
+      return notOk(
+        errorRuntime('Current contract is missing storage hash', {
+          why: `The contract at ${relative(process.cwd(), contractPathAbsolute)} does not contain a valid storageHash`,
+          fix: 'Run `prisma-next contract emit` and re-run `prisma-next migration apply`.',
+        }),
+      );
+    }
+    destinationHash = contractHash;
+  } catch (error) {
+    return notOk(
+      errorRuntime('Current contract is unavailable', {
+        why: `Failed to read contract hash before apply: ${error instanceof Error ? error.message : String(error)}`,
+        fix: 'Run `prisma-next contract emit` to generate a valid contract.json, then retry apply.',
+      }),
+    );
+  }
+
   if (flags.json !== 'object' && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
@@ -183,6 +209,15 @@ async function executeMigrationApplyCommand(
           }),
         );
       }
+      if (destinationHash !== EMPTY_CONTRACT_HASH) {
+        return notOk(
+          errorRuntime('Current contract has no planned migrations', {
+            why: `No attested migrations were found in ${migrationsRelative}, but current contract hash is "${destinationHash}"`,
+            fix: 'Run `prisma-next migration plan` to create an attested migration for the current contract.',
+            meta: { destinationHash, migrationsDir: migrationsRelative },
+          }),
+        );
+      }
     } finally {
       await client.close();
     }
@@ -198,35 +233,13 @@ async function executeMigrationApplyCommand(
   }
 
   let graph: MigrationGraph;
-  let leafHash: string;
   try {
     graph = reconstructGraph(packages);
-    leafHash = findLeaf(graph);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
     }
     throw error;
-  }
-
-  // Stale-plan detection: warn if contract.json exists and its hash differs from DAG leaf
-  if (!flags.quiet && flags.json !== 'object') {
-    try {
-      const contractPathAbsolute = resolveContractPath(config);
-      const contractRaw = JSON.parse(await readFile(contractPathAbsolute, 'utf-8')) as Record<
-        string,
-        unknown
-      >;
-      const contractHash = contractRaw['storageHash'];
-      if (typeof contractHash === 'string' && contractHash !== leafHash) {
-        console.warn(
-          `\n⚠  Warning: contract.json storageHash (${contractHash}) does not match the latest planned migration (${leafHash}).` +
-            '\n   Run `prisma-next migration plan` to plan a migration for the current contract.\n',
-        );
-      }
-    } catch {
-      // contract.json missing or unreadable — skip (e.g. CI with pinned migrations)
-    }
   }
 
   // Create control client for all DB operations
@@ -269,13 +282,23 @@ async function executeMigrationApplyCommand(
       );
     }
 
-    const pendingPath = findPath(graph, markerHash, leafHash);
+    if (!graph.nodes.has(destinationHash)) {
+      return notOk(
+        errorRuntime('Current contract has no planned migration path', {
+          why: `Current contract hash "${destinationHash}" is not present in the migration history at ${migrationsRelative}`,
+          fix: 'Run `prisma-next migration plan` to create a migration for the current contract, then re-run apply.',
+          meta: { destinationHash, knownNodes: [...graph.nodes] },
+        }),
+      );
+    }
+
+    const pendingPath = findPath(graph, markerHash, destinationHash);
     if (!pendingPath) {
       return notOk(
         errorRuntime('No migration path from current state to target', {
-          why: `Cannot find a path from marker hash "${markerHash}" to leaf "${leafHash}"`,
+          why: `Cannot find a path from marker hash "${markerHash}" to target "${destinationHash}"`,
           fix: 'Check the migration history for gaps or inconsistencies.',
-          meta: { markerHash, leafHash },
+          meta: { markerHash, destinationHash },
         }),
       );
     }
@@ -314,7 +337,11 @@ async function executeMigrationApplyCommand(
       }
     }
 
-    const applyResult = await client.migrationApply({ pendingEdges });
+    const applyResult = await client.migrationApply({
+      originHash: markerHash,
+      destinationHash,
+      pendingEdges,
+    });
 
     if (!applyResult.ok) {
       return notOk(mapApplyFailure(applyResult.failure));

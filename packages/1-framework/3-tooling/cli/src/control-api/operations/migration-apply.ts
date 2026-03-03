@@ -19,6 +19,8 @@ import type {
 export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId>;
+  readonly originHash: string;
+  readonly destinationHash: string;
   readonly pendingEdges: readonly MigrationApplyEdge[];
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
@@ -36,12 +38,47 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
   const {
     driver,
     familyInstance,
+    originHash,
+    destinationHash,
     pendingEdges,
     migrations,
     frameworkComponents,
     targetId,
     onProgress,
   } = options;
+
+  if (pendingEdges.length === 0) {
+    if (originHash !== destinationHash) {
+      return notOk({
+        code: 'EDGE_NOT_FOUND' as const,
+        summary: 'No migrations provided for requested origin and destination',
+        why: `Requested ${originHash} -> ${destinationHash} but pendingEdges is empty`,
+        meta: { originHash, destinationHash },
+      });
+    }
+    return ok({
+      migrationsApplied: 0,
+      markerHash: originHash,
+      applied: [],
+      summary: 'Already up to date',
+    });
+  }
+
+  const firstEdge = pendingEdges[0]!;
+  const lastEdge = pendingEdges[pendingEdges.length - 1]!;
+  if (firstEdge.from !== originHash || lastEdge.to !== destinationHash) {
+    return notOk({
+      code: 'EDGE_NOT_FOUND' as const,
+      summary: 'Migration apply path does not match requested origin and destination',
+      why: `Path resolved as ${firstEdge.from} -> ${lastEdge.to}, but requested ${originHash} -> ${destinationHash}`,
+      meta: {
+        originHash,
+        destinationHash,
+        pathOrigin: firstEdge.from,
+        pathDestination: lastEdge.to,
+      },
+    });
+  }
 
   const runner = migrations.createRunner(familyInstance);
   const applied: MigrationApplyAppliedEntry[] = [];

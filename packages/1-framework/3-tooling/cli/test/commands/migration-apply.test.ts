@@ -180,6 +180,57 @@ describe('migration apply — pending migration resolution', () => {
     expect(fullPath![1]!.to).toBe('sha256:hash-b');
   });
 
+  it('finds path to an explicit destination hash', async () => {
+    const tempDir = await createTempDir('explicit-destination');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    const contractA = createTestContract({
+      storage: {
+        tables: {
+          user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+        },
+      },
+    });
+    const contractB = createTestContract({
+      storage: {
+        tables: {
+          user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+          post: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+        },
+      },
+    });
+
+    const m1 = await writeAttestedMigration(migrationsDir, {
+      from: EMPTY_CONTRACT_HASH,
+      to: 'sha256:hash-a',
+      fromContract: null,
+      toContract: contractA,
+      ops: [createTableOp('user')],
+      timestamp: new Date(2026, 0, 1, 10, 0),
+      slug: 'add_user',
+    });
+
+    await writeAttestedMigration(migrationsDir, {
+      from: 'sha256:hash-a',
+      to: 'sha256:hash-b',
+      parentEdgeId: m1.edgeId,
+      fromContract: contractA,
+      toContract: contractB,
+      ops: [createTableOp('post')],
+      timestamp: new Date(2026, 0, 2, 10, 0),
+      slug: 'add_post',
+    });
+
+    const packages = await readMigrationsDir(migrationsDir);
+    const attested = packages.filter((p) => p.manifest.edgeId !== null);
+    const graph = reconstructGraph(attested);
+
+    const pathToContractA = findPath(graph, EMPTY_CONTRACT_HASH, 'sha256:hash-a');
+    expect(pathToContractA).toHaveLength(1);
+    expect(pathToContractA![0]!.to).toBe('sha256:hash-a');
+  });
+
   it('returns empty path when marker already at leaf', async () => {
     const tempDir = await createTempDir('at-leaf');
     const migrationsDir = join(tempDir, 'migrations');

@@ -820,6 +820,8 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.migrationApply({
+        originHash: 'sha256:empty',
+        destinationHash: 'sha256:abc',
         pendingEdges: [
           {
             dirName: '001_init',
@@ -898,6 +900,8 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.migrationApply({
+        originHash: 'sha256:empty',
+        destinationHash: 'sha256:abc',
         pendingEdges: [
           {
             dirName: '001_init',
@@ -930,6 +934,8 @@ describe('ControlClient progress emission', () => {
 
       await expect(
         client.migrationApply({
+          originHash: 'sha256:empty',
+          destinationHash: 'sha256:empty',
           pendingEdges: [],
           connection: 'postgres://test',
         }),

@@ -164,6 +164,56 @@ withTempDir(({ createTempDir }) => {
       );
     });
 
+    describe('destination contract targeting', () => {
+      it(
+        'fails when current contract has no planned migration path',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            const { testDir, configPath, contractPath } = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+
+            await emitContract(testDir, configPath);
+            await runMigrationPlan(testDir, [
+              '--config',
+              configPath,
+              '--name',
+              'initial',
+              '--no-color',
+            ]);
+            await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
+
+            // Change contract and re-emit without planning a new migration.
+            const contractSrc = readFileSync(contractPath!, 'utf-8');
+            const modified = contractSrc.replace(
+              `.primaryKey(['id'])`,
+              `.column('nickname', { type: textColumn, nullable: true })\n      .primaryKey(['id'])`,
+            );
+            writeFileSync(contractPath!, modified, 'utf-8');
+            await emitContract(testDir, configPath);
+
+            consoleOutput.length = 0;
+            consoleErrors.length = 0;
+            let failed = false;
+            try {
+              await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
+            } catch {
+              failed = true;
+            }
+
+            expect(failed).toBe(true);
+            expect(getExitCode()).toBe(1);
+            const stderr = stripAnsi(consoleErrors.join('\n'));
+            expect(stderr).toContain('Current contract has no planned migration path');
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
+
     describe('multiple migrations', () => {
       it(
         'applies multiple migrations in DAG order',
