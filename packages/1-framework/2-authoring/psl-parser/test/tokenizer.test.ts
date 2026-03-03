@@ -187,6 +187,15 @@ describe('Tokenizer', () => {
         Eof            """
       `);
     });
+
+    it('tokenizes astral unicode identifiers', () => {
+      expect(tokenize('𐐀𐐁 test')).toMatchInlineSnapshot(`
+        "Ident          "𐐀𐐁"
+        Whitespace     " "
+        Ident          "test"
+        Eof            """
+      `);
+    });
   });
 
   describe('edge cases', () => {
