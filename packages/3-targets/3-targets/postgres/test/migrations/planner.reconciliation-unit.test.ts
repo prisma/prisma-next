@@ -524,13 +524,22 @@ describe('buildReconciliationPlan', () => {
   // =========================================================================
 
   describe('deterministic output ordering', () => {
-    it('returns operations sorted by id', () => {
+    it('keeps planner operation ordering without id resorting', () => {
       const result = plan([
-        issue({ kind: 'extra_table', table: 'zebra', message: 'extra' }),
-        issue({ kind: 'extra_table', table: 'alpha', message: 'extra' }),
+        issue({
+          kind: 'nullability_mismatch',
+          table: 'user',
+          column: 'bio',
+          expected: 'true',
+          message: 'mismatch',
+        }),
+        issue({ kind: 'extra_table', table: 'legacy_audit', message: 'extra' }),
       ]);
 
-      expect(result.operations.map((op) => op.id)).toEqual(['dropTable.alpha', 'dropTable.zebra']);
+      expect(result.operations.map((op) => op.id)).toEqual([
+        'dropTable.legacy_audit',
+        'alterNullability.user.bio',
+      ]);
     });
   });
 
