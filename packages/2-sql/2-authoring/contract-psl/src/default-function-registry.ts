@@ -34,21 +34,31 @@ export type DefaultFunctionLoweringHandler = (input: {
   readonly context: DefaultFunctionLoweringContext;
 }) => LoweredDefaultResult;
 
-export type DefaultFunctionRegistry = ReadonlyMap<string, DefaultFunctionLoweringHandler>;
+export interface DefaultFunctionRegistryEntry {
+  readonly lower: DefaultFunctionLoweringHandler;
+  readonly usageSignatures?: readonly string[];
+}
+
+export type DefaultFunctionRegistry = ReadonlyMap<string, DefaultFunctionRegistryEntry>;
 
 export interface MutationDefaultGeneratorDescriptor {
   readonly id: string;
   readonly applicableCodecIds: readonly string[];
+  readonly resolveGeneratedColumnDescriptor?: (input: {
+    readonly generated: ExecutionMutationDefaultValue;
+  }) =>
+    | {
+        readonly codecId: string;
+        readonly nativeType: string;
+        readonly typeRef?: string;
+        readonly typeParams?: Record<string, unknown>;
+      }
+    | undefined;
 }
 
 export interface ControlMutationDefaults {
   readonly defaultFunctionRegistry: DefaultFunctionRegistry;
   readonly generatorDescriptors: readonly MutationDefaultGeneratorDescriptor[];
-}
-
-export interface ControlMutationDefaultsContributor {
-  readonly id: string;
-  readonly controlMutationDefaults?: () => ControlMutationDefaults;
 }
 
 function resolveSpanPositionFromBase(
@@ -207,385 +217,16 @@ export function parseDefaultFunctionCall(
   };
 }
 
-function invalidArgumentDiagnostic(input: {
-  readonly context: DefaultFunctionLoweringContext;
-  readonly span: PslSpan;
-  readonly message: string;
-}): LoweredDefaultResult {
-  return {
-    ok: false,
-    diagnostic: {
-      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-      message: input.message,
-      sourceId: input.context.sourceId,
-      span: input.span,
-    },
-  };
-}
-
-function executionGenerator(
-  id: ExecutionMutationDefaultValue['id'],
-  params?: Record<string, unknown>,
-): LoweredDefaultResult {
-  return {
-    ok: true,
-    value: {
-      kind: 'execution',
-      generated: {
-        kind: 'generator',
-        id,
-        ...(params ? { params } : {}),
-      },
-    },
-  };
-}
-
-function expectNoArgs(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-  readonly usage: string;
-}): LoweredDefaultResult | undefined {
-  if (input.call.args.length === 0) {
-    return undefined;
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.span,
-    message: `Default function "${input.call.name}" does not accept arguments. Use ${input.usage}.`,
-  });
-}
-
-function parseIntegerArgument(raw: string): number | undefined {
-  const trimmed = raw.trim();
-  if (!/^-?\d+$/.test(trimmed)) {
-    return undefined;
-  }
-  const value = Number(trimmed);
-  if (!Number.isInteger(value)) {
-    return undefined;
-  }
-  return value;
-}
-
-function parseStringLiteral(raw: string): string | undefined {
-  const match = raw.trim().match(/^(['"])(.*)\1$/s);
-  if (!match) {
-    return undefined;
-  }
-  return match[2] ?? '';
-}
-
-function lowerAutoincrement(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  const maybeNoArgs = expectNoArgs({
-    call: input.call,
-    context: input.context,
-    usage: '`autoincrement()`',
-  });
-  if (maybeNoArgs) {
-    return maybeNoArgs;
-  }
-  return {
-    ok: true,
-    value: {
-      kind: 'storage',
-      defaultValue: {
-        kind: 'function',
-        expression: 'autoincrement()',
-      },
-    },
-  };
-}
-
-function lowerNow(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  const maybeNoArgs = expectNoArgs({
-    call: input.call,
-    context: input.context,
-    usage: '`now()`',
-  });
-  if (maybeNoArgs) {
-    return maybeNoArgs;
-  }
-  return {
-    ok: true,
-    value: {
-      kind: 'storage',
-      defaultValue: {
-        kind: 'function',
-        expression: 'now()',
-      },
-    },
-  };
-}
-
-function lowerUuid(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  if (input.call.args.length === 0) {
-    return executionGenerator('uuidv4');
-  }
-  if (input.call.args.length !== 1) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.span,
-      message:
-        'Default function "uuid" accepts at most one version argument: `uuid()`, `uuid(4)`, or `uuid(7)`.',
-    });
-  }
-  const version = parseIntegerArgument(input.call.args[0]?.raw ?? '');
-  if (version === 4) {
-    return executionGenerator('uuidv4');
-  }
-  if (version === 7) {
-    return executionGenerator('uuidv7');
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.args[0]?.span ?? input.call.span,
-    message:
-      'Default function "uuid" supports only `uuid()`, `uuid(4)`, or `uuid(7)` in SQL PSL provider v1.',
-  });
-}
-
-function lowerCuid(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  if (input.call.args.length === 0) {
-    return {
-      ok: false,
-      diagnostic: {
-        code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-        message:
-          'Default function "cuid()" is not supported in SQL PSL provider v1. Use `cuid(2)` instead.',
-        sourceId: input.context.sourceId,
-        span: input.call.span,
-      },
-    };
-  }
-  if (input.call.args.length !== 1) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.span,
-      message: 'Default function "cuid" accepts exactly one version argument: `cuid(2)`.',
-    });
-  }
-  const version = parseIntegerArgument(input.call.args[0]?.raw ?? '');
-  if (version === 2) {
-    return executionGenerator('cuid2');
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.args[0]?.span ?? input.call.span,
-    message: 'Default function "cuid" supports only `cuid(2)` in SQL PSL provider v1.',
-  });
-}
-
-function lowerUlid(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  const maybeNoArgs = expectNoArgs({
-    call: input.call,
-    context: input.context,
-    usage: '`ulid()`',
-  });
-  if (maybeNoArgs) {
-    return maybeNoArgs;
-  }
-  return executionGenerator('ulid');
-}
-
-function lowerNanoid(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  if (input.call.args.length === 0) {
-    return executionGenerator('nanoid');
-  }
-  if (input.call.args.length !== 1) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.span,
-      message:
-        'Default function "nanoid" accepts at most one size argument: `nanoid()` or `nanoid(<2-255>)`.',
-    });
-  }
-  const size = parseIntegerArgument(input.call.args[0]?.raw ?? '');
-  if (size !== undefined && size >= 2 && size <= 255) {
-    return executionGenerator('nanoid', { size });
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.args[0]?.span ?? input.call.span,
-    message: 'Default function "nanoid" size argument must be an integer between 2 and 255.',
-  });
-}
-
-function lowerDbgenerated(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  if (input.call.args.length !== 1) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.span,
-      message:
-        'Default function "dbgenerated" requires exactly one string argument: `dbgenerated("...")`.',
-    });
-  }
-  const rawExpression = parseStringLiteral(input.call.args[0]?.raw ?? '');
-  if (rawExpression === undefined) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.args[0]?.span ?? input.call.span,
-      message: 'Default function "dbgenerated" argument must be a string literal.',
-    });
-  }
-  if (rawExpression.trim().length === 0) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.args[0]?.span ?? input.call.span,
-      message: 'Default function "dbgenerated" argument cannot be empty.',
-    });
-  }
-  return {
-    ok: true,
-    value: {
-      kind: 'storage',
-      defaultValue: {
-        kind: 'function',
-        expression: rawExpression,
-      },
-    },
-  };
-}
-
-const supportedFunctionUsageByName: Readonly<Record<string, readonly string[]>> = {
-  autoincrement: ['autoincrement()'],
-  now: ['now()'],
-  uuid: ['uuid()', 'uuid(4)', 'uuid(7)'],
-  cuid: ['cuid(2)'],
-  ulid: ['ulid()'],
-  nanoid: ['nanoid()', 'nanoid(n)'],
-  dbgenerated: ['dbgenerated("...")'],
-};
-
-const unknownFunctionSuggestionsByName: Readonly<Record<string, string>> = {
-  cuid2: 'Use `cuid(2)`.',
-  uuidv4: 'Use `uuid()` or `uuid(4)`.',
-  uuidv7: 'Use `uuid(7)`.',
-};
-
 function formatSupportedFunctionList(registry: DefaultFunctionRegistry): string {
-  const signatures = Array.from(registry.keys())
-    .sort()
-    .flatMap((functionName) => supportedFunctionUsageByName[functionName] ?? [`${functionName}()`]);
+  const signatures = Array.from(registry.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .flatMap(([functionName, entry]) => {
+      const usageSignatures = entry.usageSignatures?.filter((signature) => signature.length > 0);
+      return usageSignatures && usageSignatures.length > 0
+        ? usageSignatures
+        : [`${functionName}()`];
+    });
   return signatures.length > 0 ? signatures.join(', ') : 'none';
-}
-
-export function createBuiltinDefaultFunctionRegistry(): DefaultFunctionRegistry {
-  return new Map<string, DefaultFunctionLoweringHandler>([
-    ['autoincrement', lowerAutoincrement],
-    ['now', lowerNow],
-    ['uuid', lowerUuid],
-    ['cuid', lowerCuid],
-    ['ulid', lowerUlid],
-    ['nanoid', lowerNanoid],
-    ['dbgenerated', lowerDbgenerated],
-  ]);
-}
-
-export function createBuiltinMutationDefaultGeneratorDescriptors(): readonly MutationDefaultGeneratorDescriptor[] {
-  return [
-    {
-      id: 'uuidv4',
-      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-    },
-    {
-      id: 'uuidv7',
-      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-    },
-    {
-      id: 'cuid2',
-      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-    },
-    {
-      id: 'ulid',
-      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-    },
-    {
-      id: 'nanoid',
-      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-    },
-  ];
-}
-
-export function createBuiltinControlMutationDefaults(): ControlMutationDefaults {
-  return {
-    defaultFunctionRegistry: createBuiltinDefaultFunctionRegistry(),
-    generatorDescriptors: createBuiltinMutationDefaultGeneratorDescriptors(),
-  };
-}
-
-export function assembleControlMutationDefaults(
-  contributors: ReadonlyArray<ControlMutationDefaultsContributor>,
-): ControlMutationDefaults {
-  const defaultFunctionRegistry = new Map<string, DefaultFunctionLoweringHandler>();
-  const generatorDescriptors: MutationDefaultGeneratorDescriptor[] = [];
-  const generatorOwners = new Map<string, string>();
-  const functionOwners = new Map<string, string>();
-
-  for (const contributor of contributors) {
-    const contributions = contributor.controlMutationDefaults?.();
-    if (!contributions) {
-      continue;
-    }
-
-    for (const [functionName, handler] of contributions.defaultFunctionRegistry) {
-      const owner = functionOwners.get(functionName);
-      if (owner) {
-        throw new Error(
-          `Duplicate mutation default function "${functionName}". Descriptor "${contributor.id}" conflicts with "${owner}".`,
-        );
-      }
-      defaultFunctionRegistry.set(functionName, handler);
-      functionOwners.set(functionName, contributor.id);
-    }
-
-    for (const descriptor of contributions.generatorDescriptors) {
-      const owner = generatorOwners.get(descriptor.id);
-      if (owner) {
-        throw new Error(
-          `Duplicate mutation default generator id "${descriptor.id}". Descriptor "${contributor.id}" conflicts with "${owner}".`,
-        );
-      }
-      generatorDescriptors.push(descriptor);
-      generatorOwners.set(descriptor.id, contributor.id);
-    }
-  }
-
-  return {
-    defaultFunctionRegistry,
-    generatorDescriptors,
-  };
-}
-
-export function createMutationDefaultGeneratorDescriptorMap(
-  contributors: ReadonlyArray<ControlMutationDefaultsContributor>,
-): ReadonlyMap<string, MutationDefaultGeneratorDescriptor> {
-  const assembled = assembleControlMutationDefaults(contributors);
-  const result = new Map<string, MutationDefaultGeneratorDescriptor>();
-  for (const descriptor of assembled.generatorDescriptors) {
-    result.set(descriptor.id, descriptor);
-  }
-  return result;
 }
 
 export function lowerDefaultFunctionWithRegistry(input: {
@@ -593,18 +234,17 @@ export function lowerDefaultFunctionWithRegistry(input: {
   readonly registry: DefaultFunctionRegistry;
   readonly context: DefaultFunctionLoweringContext;
 }): LoweredDefaultResult {
-  const handler = input.registry.get(input.call.name);
-  if (handler) {
-    return handler({ call: input.call, context: input.context });
+  const entry = input.registry.get(input.call.name);
+  if (entry) {
+    return entry.lower({ call: input.call, context: input.context });
   }
   const supportedFunctionList = formatSupportedFunctionList(input.registry);
-  const suggestion = unknownFunctionSuggestionsByName[input.call.name];
 
   return {
     ok: false,
     diagnostic: {
       code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-      message: `Default function "${input.call.name}" is not supported in SQL PSL provider v1. Supported functions: ${supportedFunctionList}.${suggestion ? ` ${suggestion}` : ''}`,
+      message: `Default function "${input.call.name}" is not supported in SQL PSL provider v1. Supported functions: ${supportedFunctionList}.`,
       sourceId: input.context.sourceId,
       span: input.call.span,
     },

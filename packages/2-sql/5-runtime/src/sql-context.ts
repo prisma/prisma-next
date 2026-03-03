@@ -1,8 +1,5 @@
 import { checkContractComponentRequirements } from '@prisma-next/contract/framework-components';
-import type {
-  ExecutionMutationDefaultValue,
-  GeneratedValueSpec,
-} from '@prisma-next/contract/types';
+import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { createExecutionStack, type ExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeAdapterDescriptor,
@@ -14,7 +11,6 @@ import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/core-execution-plane/types';
-import { generateId } from '@prisma-next/ids/runtime';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
@@ -150,25 +146,6 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
 }
 
 export type { ExecutionContext, JsonSchemaValidatorRegistry, TypeHelperRegistry };
-
-const builtinMutationDefaultGeneratorIds = [
-  'ulid',
-  'nanoid',
-  'uuidv7',
-  'uuidv4',
-  'cuid2',
-  'ksuid',
-] as const satisfies readonly GeneratedValueSpec['id'][];
-
-export function createBuiltinMutationDefaultGenerators(): readonly RuntimeMutationDefaultGenerator[] {
-  return builtinMutationDefaultGeneratorIds.map((id) => ({
-    id,
-    generate: (params?: Record<string, unknown>) => {
-      const spec: GeneratedValueSpec = params ? { id, params } : { id };
-      return generateId(spec);
-    },
-  }));
-}
 
 export function assertExecutionStackContractRequirements(
   contract: SqlContract<SqlStorage>,
@@ -389,6 +366,7 @@ function collectMutationDefaultGenerators(
           {
             id: generator.id,
             existingOwner,
+            incomingOwner: contributor.id,
           },
         );
       }

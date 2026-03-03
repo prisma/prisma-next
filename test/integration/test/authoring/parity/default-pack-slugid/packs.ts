@@ -34,7 +34,9 @@ const slugidDefaultsPack: SqlControlExtensionDescriptor<'postgres'> = {
   targetId: 'postgres',
   operationSignatures: () => [],
   controlMutationDefaults: () => ({
-    defaultFunctionRegistry: new Map([['slugid', slugidDefaultHandler]]),
+    defaultFunctionRegistry: new Map([
+      ['slugid', { lower: slugidDefaultHandler, usageSignatures: ['slugid()'] }],
+    ]),
     generatorDescriptors: [{ id: 'slugid', applicableCodecIds: ['pg/text@1'] }],
   }),
   create() {
