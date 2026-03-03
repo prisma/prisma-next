@@ -29,6 +29,39 @@ const loweringContext = {
 } as const;
 
 describe('default function registry', () => {
+  it('returns undefined for invalid function-call shapes', () => {
+    expect(parseDefaultFunctionCall('uuid', createSpan())).toBeUndefined();
+    expect(parseDefaultFunctionCall('uuid(4', createSpan())).toBeUndefined();
+    expect(parseDefaultFunctionCall('4uuid()', createSpan())).toBeUndefined();
+  });
+
+  it('parses top-level args with nested commas and escapes', () => {
+    const call = parseDefaultFunctionCall(
+      String.raw`fn("a,b", inner(1, 2), [x, y], "escaped \"quote\"")`,
+      createSpan(),
+    );
+
+    expect(call).toBeDefined();
+    if (!call) return;
+
+    expect(call.args.map((arg) => arg.raw)).toEqual([
+      '"a,b"',
+      'inner(1, 2)',
+      '[x, y]',
+      String.raw`"escaped \"quote\""`,
+    ]);
+  });
+
+  it('ignores empty arguments from trailing commas', () => {
+    const call = parseDefaultFunctionCall('uuid(4, )', createSpan());
+
+    expect(call).toBeDefined();
+    if (!call) return;
+
+    expect(call.args).toHaveLength(1);
+    expect(call.args[0]?.raw).toBe('4');
+  });
+
   it('computes multiline spans for parsed function calls', () => {
     const call = parseDefaultFunctionCall(
       `dbgenerated(
@@ -44,6 +77,19 @@ describe('default function registry', () => {
     expect(call.span.end).toMatchObject({ line: 5, column: 2 });
     expect(call.args).toHaveLength(1);
     expect(call.args[0]?.span.start).toMatchObject({ line: 4, column: 3 });
+  });
+
+  it('handles carriage-return line breaks in spans', () => {
+    const call = parseDefaultFunctionCall(
+      `dbgenerated(\r\n  "gen_random_uuid()"\r\n)`,
+      createSpan({ offset: 2, line: 9, column: 8 }),
+    );
+
+    expect(call).toBeDefined();
+    if (!call) return;
+
+    expect(call.span.start).toMatchObject({ line: 9, column: 8 });
+    expect(call.span.end).toMatchObject({ line: 11, column: 2 });
   });
 
   it('lowers cuid(2) and rejects cuid() with actionable guidance', () => {
@@ -114,6 +160,24 @@ describe('default function registry', () => {
     expect(loweredUnknown.diagnostic.message).not.toContain('autoincrement()');
   });
 
+  it('includes additive suggestion for known mistyped generator ids', () => {
+    const unknownCall = parseDefaultFunctionCall('uuidv7()', createSpan());
+    const registry = createBuiltinDefaultFunctionRegistry();
+
+    expect(unknownCall).toBeDefined();
+    if (!unknownCall) return;
+
+    const loweredUnknown = lowerDefaultFunctionWithRegistry({
+      call: unknownCall,
+      registry,
+      context: loweringContext,
+    });
+    expect(loweredUnknown.ok).toBe(false);
+    if (loweredUnknown.ok) return;
+
+    expect(loweredUnknown.diagnostic.message).toContain('Use `uuid(7)`.');
+  });
+
   it('preserves escaped dbgenerated string content', () => {
     const registry = createBuiltinDefaultFunctionRegistry();
     const call = parseDefaultFunctionCall(
@@ -139,5 +203,49 @@ describe('default function registry', () => {
         expression: String.raw`nextval(\"public\".\"user_id_seq\")`,
       },
     });
+  });
+
+  it('returns diagnostics for nanoid and dbgenerated invalid argument shapes', () => {
+    const registry = createBuiltinDefaultFunctionRegistry();
+    const badNanoidCall = parseDefaultFunctionCall('nanoid(16, 32)', createSpan());
+    const missingDbgeneratedArgCall = parseDefaultFunctionCall('dbgenerated()', createSpan());
+    const nonStringDbgeneratedArgCall = parseDefaultFunctionCall('dbgenerated(123)', createSpan());
+
+    expect(badNanoidCall).toBeDefined();
+    expect(missingDbgeneratedArgCall).toBeDefined();
+    expect(nonStringDbgeneratedArgCall).toBeDefined();
+    if (!badNanoidCall || !missingDbgeneratedArgCall || !nonStringDbgeneratedArgCall) return;
+
+    const badNanoid = lowerDefaultFunctionWithRegistry({
+      call: badNanoidCall,
+      registry,
+      context: loweringContext,
+    });
+    expect(badNanoid.ok).toBe(false);
+    if (!badNanoid.ok) {
+      expect(badNanoid.diagnostic.message).toContain('nanoid');
+    }
+
+    const missingDbgeneratedArg = lowerDefaultFunctionWithRegistry({
+      call: missingDbgeneratedArgCall,
+      registry,
+      context: loweringContext,
+    });
+    expect(missingDbgeneratedArg.ok).toBe(false);
+    if (!missingDbgeneratedArg.ok) {
+      expect(missingDbgeneratedArg.diagnostic.message).toContain(
+        'requires exactly one string argument',
+      );
+    }
+
+    const nonStringDbgeneratedArg = lowerDefaultFunctionWithRegistry({
+      call: nonStringDbgeneratedArgCall,
+      registry,
+      context: loweringContext,
+    });
+    expect(nonStringDbgeneratedArg.ok).toBe(false);
+    if (!nonStringDbgeneratedArg.ok) {
+      expect(nonStringDbgeneratedArg.diagnostic.message).toContain('must be a string literal');
+    }
   });
 });

@@ -57,6 +57,14 @@ const SCALAR_COLUMN_MAP: Record<string, ColumnDescriptor> = {
   Bytes: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
 };
 
+const GENERATED_ID_COLUMN_MAP: Partial<Record<string, ColumnDescriptor>> = {
+  ulid: { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 26 } },
+  nanoid: { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 21 } },
+  uuidv7: { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 36 } },
+  uuidv4: { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 36 } },
+  cuid2: { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 24 } },
+};
+
 const REFERENTIAL_ACTION_MAP = {
   NoAction: 'noAction',
   Restrict: 'restrict',
@@ -491,6 +499,9 @@ function collectResolvedFields(
           diagnostics,
         })
       : {};
+    if (loweredDefault.executionDefault?.kind === 'generator') {
+      descriptor = GENERATED_ID_COLUMN_MAP[loweredDefault.executionDefault.id] ?? descriptor;
+    }
     const mappedColumnName = mapping.fieldColumns.get(field.name) ?? field.name;
     resolvedFields.push({
       field,
