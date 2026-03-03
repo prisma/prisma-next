@@ -49,7 +49,7 @@ const createMockDriver = (
 });
 
 describe('PostgresControlAdapter column defaults', () => {
-  it('stores raw default expressions from database', async () => {
+  it('stores raw default expressions from database', { timeout: 1_000 }, async () => {
     const adapter = new PostgresControlAdapter();
     const mockDriver = createMockDriver([
       {
