@@ -2,52 +2,92 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:987c42ba7205051110984a2cafe4ce9d985bd3eb44baa598e92dbb8d5ed9afdc",
+  "storageHash": "sha256:7bc2d92b8bd871bb95a1030e0befcb591b9641949fed2263293e9111ca1b90b3",
   "profileHash": "sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89",
   "models": {
-    "Member": {
+    "Post": {
       "fields": {
         "id": {
-          "column": "member_id"
+          "column": "id"
         },
-        "teamId": {
-          "column": "team_ref"
+        "userId": {
+          "column": "userId"
         }
       },
       "relations": {},
       "storage": {
-        "table": "team_member"
+        "table": "post"
       }
     },
-    "Team": {
+    "User": {
       "fields": {
         "id": {
-          "column": "team_id"
+          "column": "id"
         }
       },
       "relations": {},
       "storage": {
-        "table": "org_team"
+        "table": "user"
       }
     }
   },
   "relations": {
-    "team_member": {
-      "team": {
+    "post": {
+      "user": {
         "cardinality": "N:1",
         "on": {
-          "childCols": ["team_id"],
-          "parentCols": ["team_ref"]
+          "childCols": ["id"],
+          "parentCols": ["userId"]
         },
-        "to": "Team"
+        "to": "User"
+      }
+    },
+    "user": {
+      "posts": {
+        "cardinality": "1:N",
+        "on": {
+          "childCols": ["userId"],
+          "parentCols": ["id"]
+        },
+        "to": "Post"
       }
     }
   },
   "storage": {
     "tables": {
-      "org_team": {
+      "post": {
         "columns": {
-          "team_id": {
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          },
+          "userId": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          }
+        },
+        "foreignKeys": [
+          {
+            "columns": ["userId"],
+            "constraint": true,
+            "index": true,
+            "onDelete": "cascade",
+            "onUpdate": "cascade",
+            "references": {
+              "columns": ["id"],
+              "table": "user"
+            }
+          }
+        ],
+        "indexes": [],
+        "primaryKey": {
+          "columns": ["id"]
+        },
+        "uniques": []
+      },
+      "user": {
+        "columns": {
+          "id": {
             "codecId": "pg/int4@1",
             "nativeType": "int4"
           }
@@ -55,47 +95,9 @@
         "foreignKeys": [],
         "indexes": [],
         "primaryKey": {
-          "columns": ["team_id"]
+          "columns": ["id"]
         },
         "uniques": []
-      },
-      "team_member": {
-        "columns": {
-          "member_id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          },
-          "team_ref": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          }
-        },
-        "foreignKeys": [
-          {
-            "columns": ["team_ref"],
-            "constraint": true,
-            "index": true,
-            "onDelete": "cascade",
-            "onUpdate": "cascade",
-            "references": {
-              "columns": ["team_id"],
-              "table": "org_team"
-            }
-          }
-        ],
-        "indexes": [
-          {
-            "columns": ["team_ref"]
-          }
-        ],
-        "primaryKey": {
-          "columns": ["member_id"]
-        },
-        "uniques": [
-          {
-            "columns": ["team_ref", "member_id"]
-          }
-        ]
       }
     }
   },
