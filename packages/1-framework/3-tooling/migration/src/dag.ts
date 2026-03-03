@@ -83,8 +83,9 @@ export function findLeafEdge(graph: MigrationGraph): MigrationGraphEdge | null {
     throw errorNoLeaf([...graph.nodes].sort());
   }
 
-  for (let depth = 0; depth < graph.edgeById.size + 1; depth++) {
-    const children = current.edgeId !== null ? graph.childEdges.get(current.edgeId) : undefined;
+  for (let depth = 0; depth < graph.edgeById.size + 1 && current; depth++) {
+    const children: readonly MigrationGraphEdge[] | undefined =
+      current.edgeId !== null ? graph.childEdges.get(current.edgeId) : undefined;
 
     if (!children || children.length === 0) {
       return current;
@@ -94,9 +95,7 @@ export function findLeafEdge(graph: MigrationGraph): MigrationGraphEdge | null {
       throw errorAmbiguousLeaf(children.map((e) => e.to));
     }
 
-    const next = children[0];
-    if (!next) break;
-    current = next;
+    current = children[0];
   }
 
   throw errorNoLeaf([...graph.nodes].sort());
