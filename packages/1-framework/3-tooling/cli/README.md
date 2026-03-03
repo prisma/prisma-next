@@ -932,17 +932,18 @@ prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [-
 **What it does:**
 1. Reads attested migration packages from `config.migrations.dir`
 2. Reconstructs the migration DAG (skips drafts with `edgeId: null`)
-3. Connects to the database and reads the current marker
-4. Finds the path from the marker hash to the DAG leaf
-5. Executes each pending migration in order using the target's `MigrationRunner`
-6. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
-7. After each migration, the runner verifies the schema and updates the marker/ledger
+3. Reads the current contract hash from `contract.json`
+4. Connects to the database and reads the current marker hash
+5. Finds the path from the marker hash to the current contract hash
+6. Executes each pending migration in order using the target's `MigrationRunner`
+7. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
+8. After each migration, the runner verifies the schema and updates the marker/ledger
 
 **Config requirements:** Requires `driver` and `db.connection` (or `--db`). `migrations.dir` is optional and defaults to `migrations/`.
 
 **Resume semantics:** If a migration fails, previously applied migrations are preserved. Re-running `migration apply` resumes from the last successful migration.
 
-**Stale-plan detection:** If `contract.json` is present and its `storageHash` differs from the DAG leaf, a warning is emitted advising you to run `migration plan`. This is silently skipped when `contract.json` is absent (e.g. CI with pinned migrations).
+**Planning requirement:** `migration apply` now requires the current contract hash to exist in attested on-disk migrations. If the contract has changed and no migration was planned, apply exits with an error and asks you to run `migration plan`.
 
 ### `prisma-next migration verify`
 

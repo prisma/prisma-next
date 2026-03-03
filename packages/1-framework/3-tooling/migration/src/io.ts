@@ -48,6 +48,7 @@ const MigrationOpSchema = type({
   operationClass: "'additive' | 'widening' | 'destructive'",
 });
 
+// Intentionally shallow: operation-specific payload validation is owned by planner/runner layers.
 const MigrationOpsSchema = MigrationOpSchema.array();
 
 export async function writeMigrationPackage(

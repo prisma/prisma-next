@@ -9,6 +9,25 @@ On-disk migration persistence, attestation, and DAG reconstruction for Prisma Ne
 - **Attestation**: Compute and verify content-addressed edge IDs for tamper detection
 - **DAG**: Reconstruct and navigate the migration graph (path finding, leaf detection, cycle/orphan detection)
 
+## Attestation framing
+
+`computeEdgeId` in `attestation.ts` uses explicit framing:
+
+1. Canonicalize migration manifest metadata, ops, and embedded contracts.
+2. Hash each canonical part independently with SHA-256.
+3. Hash the canonical JSON tuple of those part hashes.
+
+This avoids delimiter-ambiguity and ensures `edgeId` commits to the exact 4-part tuple.
+
+## Ops validation boundary
+
+`readMigrationPackage` performs intentionally shallow `ops.json` validation in `io.ts`:
+
+- validates envelope fields (`id`, `label`, `operationClass`)
+- does not fully validate operation-specific payload shape
+
+Full semantic validation happens in target/family migration planners and runners at execution/planning time.
+
 ## Architecture
 
 ```mermaid
