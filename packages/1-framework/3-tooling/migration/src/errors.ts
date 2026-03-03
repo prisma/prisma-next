@@ -94,16 +94,16 @@ export function errorSelfLoop(dirName: string, hash: string): MigrationToolsErro
 
 export function errorAmbiguousLeaf(leaves: readonly string[]): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.AMBIGUOUS_LEAF', 'Ambiguous migration graph', {
-    why: `Multiple leaf nodes found: ${leaves.join(', ')}. The migration graph has diverged into branches that have not been merged.`,
-    fix: 'Specify --from <hash> to select a branch, or squash/merge the branches so there is a single linear history.',
+    why: `Multiple leaf nodes found: ${leaves.join(', ')}. The migration graph has diverged — this typically happens when two developers plan migrations from the same starting point.`,
+    fix: 'Delete one of the conflicting migration directories, then re-run `migration plan` to re-plan it from the remaining branch. Or use --from <hash> to explicitly select a starting point.',
     details: { leaves },
   });
 }
 
 export function errorNoLeaf(nodes: readonly string[]): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.NO_LEAF', 'Migration graph has no leaf', {
-    why: `No terminal node exists in the migration graph (nodes: ${nodes.join(', ')}). This usually means a cycle or corrupted edge data.`,
-    fix: 'Inspect the migrations directory for cycles or invalid edges, then repair or remove the corrupt migration package.',
+    why: `No root edge found in the migration graph (nodes: ${nodes.join(', ')}). Every migration references a parentEdgeId that does not exist, or the graph is empty.`,
+    fix: 'Inspect the migrations directory for corrupted migration.json files. Each migration must have a valid parentEdgeId (or null for the first migration).',
     details: { nodes },
   });
 }

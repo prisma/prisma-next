@@ -16,6 +16,7 @@ export interface VerifyResult {
 export function computeEdgeId(manifest: MigrationManifest, ops: MigrationOps): string {
   const {
     edgeId: _edgeId,
+    parentEdgeId: _parentEdgeId,
     signature: _signature,
     fromContract: _fromContract,
     toContract: _toContract,

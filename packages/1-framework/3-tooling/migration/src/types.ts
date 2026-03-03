@@ -12,6 +12,7 @@ export interface MigrationManifest {
   readonly from: string;
   readonly to: string;
   readonly edgeId: string | null;
+  readonly parentEdgeId: string | null;
   readonly kind: 'regular' | 'baseline';
   readonly fromContract: ContractIR | null;
   readonly toContract: ContractIR;
@@ -35,6 +36,7 @@ export interface MigrationGraphEdge {
   readonly from: string;
   readonly to: string;
   readonly edgeId: string | null;
+  readonly parentEdgeId: string | null;
   readonly dirName: string;
   readonly createdAt: string;
   readonly labels: readonly string[];
@@ -44,4 +46,6 @@ export interface MigrationGraph {
   readonly nodes: ReadonlySet<string>;
   readonly edges: ReadonlyMap<string, readonly MigrationGraphEdge[]>;
   readonly reverseEdges: ReadonlyMap<string, readonly MigrationGraphEdge[]>;
+  readonly edgeById: ReadonlyMap<string, MigrationGraphEdge>;
+  readonly childEdges: ReadonlyMap<string | null, readonly MigrationGraphEdge[]>;
 }

@@ -1,1 +1,8 @@
-export { detectCycles, detectOrphans, findLeaf, findPath, reconstructGraph } from '../dag';
+export {
+  detectCycles,
+  detectOrphans,
+  findLeaf,
+  findLeafEdge,
+  findPath,
+  reconstructGraph,
+} from '../dag';
