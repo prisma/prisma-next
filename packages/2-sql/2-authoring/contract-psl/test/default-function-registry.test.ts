@@ -52,14 +52,10 @@ describe('default function registry', () => {
     ]);
   });
 
-  it('ignores empty arguments from trailing commas', () => {
-    const call = parseDefaultFunctionCall('uuid(4, )', createSpan());
-
-    expect(call).toBeDefined();
-    if (!call) return;
-
-    expect(call.args).toHaveLength(1);
-    expect(call.args[0]?.raw).toBe('4');
+  it('rejects empty argument slots in function calls', () => {
+    expect(parseDefaultFunctionCall('uuid(4, )', createSpan())).toBeUndefined();
+    expect(parseDefaultFunctionCall('uuid(,4)', createSpan())).toBeUndefined();
+    expect(parseDefaultFunctionCall('uuid(,)', createSpan())).toBeUndefined();
   });
 
   it('computes multiline spans for parsed function calls', () => {
