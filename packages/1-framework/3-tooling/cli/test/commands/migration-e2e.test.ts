@@ -76,6 +76,7 @@ describe('migration plan → verify end-to-end', () => {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:initial-hash',
       edgeId: null,
+      parentEdgeId: null,
       kind: 'regular',
       fromContract: null,
       toContract,
@@ -131,6 +132,7 @@ describe('migration plan → verify end-to-end', () => {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         edgeId: null,
+        parentEdgeId: null,
         kind: 'regular',
         fromContract: null,
         toContract: contractA,
@@ -145,7 +147,7 @@ describe('migration plan → verify end-to-end', () => {
       },
       [createTableOp('user')],
     );
-    await attestMigration(path1);
+    const edgeId1 = await attestMigration(path1);
 
     // Plan 2: A → B
     const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
@@ -156,6 +158,7 @@ describe('migration plan → verify end-to-end', () => {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
         edgeId: null,
+        parentEdgeId: edgeId1,
         kind: 'regular',
         fromContract: contractA,
         toContract: contractB,
@@ -208,6 +211,7 @@ describe('migration plan → verify end-to-end', () => {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:target-hash',
         edgeId: null,
+        parentEdgeId: null,
         kind: 'regular',
         fromContract: null,
         toContract: contract,
@@ -249,6 +253,7 @@ describe('migration plan → verify end-to-end', () => {
         from: EMPTY_CONTRACT_HASH,
         to: EMPTY_CONTRACT_HASH,
         edgeId: null,
+        parentEdgeId: null,
         kind: 'regular',
         fromContract: null,
         toContract: createContract({}),

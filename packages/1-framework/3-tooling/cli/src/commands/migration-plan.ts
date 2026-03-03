@@ -5,7 +5,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
-import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findLeafEdge, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
   formatMigrationDirName,
   readMigrationsDir,
@@ -168,12 +168,14 @@ async function executeMigrationPlanCommand(
   // Read existing migrations and determine "from" contract
   let fromContract: ContractIR | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
+  let parentEdgeId: string | null = null;
 
   try {
     const allPackages = await readMigrationsDir(migrationsDir);
     const packages = allPackages.filter((p) => typeof p.manifest.edgeId === 'string');
     const graph = reconstructGraph(packages);
-    const leafHash = findLeaf(graph);
+    const leafEdge = findLeafEdge(graph);
+    const leafHash = leafEdge ? leafEdge.to : EMPTY_CONTRACT_HASH;
 
     if (options.from) {
       fromHash = options.from;
@@ -187,9 +189,11 @@ async function executeMigrationPlanCommand(
         );
       }
       fromContract = sourcePkg.manifest.toContract;
-    } else if (leafHash !== EMPTY_CONTRACT_HASH) {
+      parentEdgeId = sourcePkg.manifest.edgeId;
+    } else if (leafHash !== EMPTY_CONTRACT_HASH && leafEdge) {
       fromHash = leafHash;
-      const leafPkg = packages.find((p) => p.manifest.to === leafHash);
+      parentEdgeId = leafEdge.edgeId;
+      const leafPkg = packages.find((p) => p.manifest.edgeId === leafEdge.edgeId);
       if (leafPkg) {
         fromContract = leafPkg.manifest.toContract;
       }
@@ -281,6 +285,7 @@ async function executeMigrationPlanCommand(
     from: fromHash,
     to: toStorageHash,
     edgeId: null,
+    parentEdgeId,
     kind: 'regular',
     fromContract,
     toContract: toContractJson,

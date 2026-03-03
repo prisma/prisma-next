@@ -72,6 +72,7 @@ describe('migration plan — core flow', () => {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:test-hash',
       edgeId: null,
+      parentEdgeId: null,
       kind: 'regular',
       fromContract: null,
       toContract,
@@ -114,6 +115,7 @@ describe('migration plan — core flow', () => {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:same-hash',
       edgeId: null,
+      parentEdgeId: null,
       kind: 'regular',
       fromContract: null,
       toContract: contract,
@@ -174,6 +176,7 @@ describe('migration plan — core flow', () => {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         edgeId: null,
+        parentEdgeId: null,
         kind: 'regular',
         fromContract: null,
         toContract: contractA,
@@ -188,7 +191,7 @@ describe('migration plan — core flow', () => {
       },
       [createTableOp('user')],
     );
-    await attestMigration(path1);
+    const edgeId1 = await attestMigration(path1);
 
     // Second migration: A -> B
     const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
@@ -199,6 +202,7 @@ describe('migration plan — core flow', () => {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
         edgeId: null,
+        parentEdgeId: edgeId1,
         kind: 'regular',
         fromContract: contractA,
         toContract: contractB,
@@ -254,6 +258,7 @@ describe('--from hash lookup', () => {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:known-hash',
       edgeId: null,
+      parentEdgeId: null,
       kind: 'regular',
       fromContract: null,
       toContract: createTestContract(),
