@@ -238,6 +238,21 @@ async function executeMigrationApplyCommand(
     await client.connect(dbConnection);
 
     const marker = await client.readMarker();
+
+    // Distinguish "no marker row" (null) from "marker row exists with the
+    // empty sentinel". The sentinel should never appear in a real marker row —
+    // if it does, the marker was corrupted and replaying all migrations would
+    // be dangerous (the DB likely already has tables).
+    if (marker?.storageHash === EMPTY_CONTRACT_HASH) {
+      return notOk(
+        errorRuntime('Database marker contains the empty sentinel hash', {
+          why: `The marker row exists but contains the empty sentinel value "${EMPTY_CONTRACT_HASH}". This should never happen — the marker should contain the hash of the last applied contract.`,
+          fix: 'The marker is corrupted. Reset the database with `prisma-next db init`, or manually update the marker to the correct contract hash.',
+          meta: { markerHash: EMPTY_CONTRACT_HASH },
+        }),
+      );
+    }
+
     const markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH;
 
     if (markerHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(markerHash)) {
