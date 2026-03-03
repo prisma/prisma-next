@@ -53,7 +53,7 @@ This is intentionally **not** a templating mechanism: interpolation is disallowe
 # References
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
-- Project plan: `projects/psl-contract-authoring/plans/plan.md`
+- Project plan: `projects/psl-contract-authoring/plan.md`
 - Gap inventory: `projects/psl-contract-authoring/references/authoring-surface-gap-inventory.md`
 - ADR (proposed): `projects/psl-contract-authoring/references/ADR - PSL sql template literals.md`
 
