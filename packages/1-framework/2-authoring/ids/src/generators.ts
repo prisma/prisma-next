@@ -1,4 +1,3 @@
-import type { GeneratedValueSpec } from '@prisma-next/contract/types';
 import { cuid2 as cuid2Generator } from 'uniku/cuid2';
 import { ksuid as ksuidGenerator } from 'uniku/ksuid';
 import { nanoid as nanoidGenerator } from 'uniku/nanoid';
@@ -23,6 +22,17 @@ export type IdGeneratorOptionsById = {
 
 type IdGenerator = (params?: Record<string, unknown>) => string;
 
+export const builtinGeneratorIds = [
+  'ulid',
+  'nanoid',
+  'uuidv7',
+  'uuidv4',
+  'cuid2',
+  'ksuid',
+] as const;
+
+export type BuiltinGeneratorId = (typeof builtinGeneratorIds)[number];
+
 function invokeGenerator<TOptions>(
   generator: (options?: TOptions) => string,
   params?: Record<string, unknown>,
@@ -40,4 +50,4 @@ export const idGenerators = {
   uuidv4: (params?: Record<string, unknown>) => invokeGenerator(uuidv4Generator, params),
   cuid2: (params?: Record<string, unknown>) => invokeGenerator(cuid2Generator, params),
   ksuid: (params?: Record<string, unknown>) => invokeGenerator(ksuidGenerator, params),
-} as const satisfies Record<GeneratedValueSpec['id'], IdGenerator>;
+} as const satisfies Record<BuiltinGeneratorId, IdGenerator>;
