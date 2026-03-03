@@ -695,4 +695,31 @@ model User {
       ]),
     );
   });
+
+  it('returns diagnostics for optional fields with execution defaults', () => {
+    const document = parsePslDocument({
+      schema: `model OptionalDefaults {
+  id Int @id
+  token String? @default(nanoid())
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining(
+            'cannot be optional when using execution default "nanoid"',
+          ),
+        }),
+      ]),
+    );
+  });
 });
