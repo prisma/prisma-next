@@ -254,6 +254,25 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
       return true;
     });
   });
+
+  it('creates missing parent directories before writing package files', async () => {
+    const dir = join(tmpDir, 'nested', '20260225T1430_nested');
+    await writeMigrationPackage(dir, createTestManifest(), createTestOps());
+
+    const pkg = await readMigrationPackage(dir);
+    expect(pkg.dirName).toBe('20260225T1430_nested');
+  });
+
+  it('rethrows non-ENOENT errors while reading manifest file', async () => {
+    const dir = join(tmpDir, '20260225T1430_bad_manifest_file');
+    await mkdir(dir, { recursive: true });
+    await mkdir(join(dir, 'migration.json'));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    await expect(readMigrationPackage(dir)).rejects.toMatchObject({
+      code: 'EISDIR',
+    });
+  });
 });
 
 describe('readMigrationsDir', () => {
@@ -298,6 +317,15 @@ describe('readMigrationsDir', () => {
   it('returns empty array for empty directory', async () => {
     const packages = await readMigrationsDir(tmpDir);
     expect(packages).toHaveLength(0);
+  });
+
+  it('rethrows non-ENOENT errors while reading migrations root', async () => {
+    const notADirectory = join(tmpDir, 'not-a-directory.txt');
+    await writeFile(notADirectory, 'content');
+
+    await expect(readMigrationsDir(notADirectory)).rejects.toMatchObject({
+      code: 'ENOTDIR',
+    });
   });
 
   it('skips files (not directories) in root', async () => {

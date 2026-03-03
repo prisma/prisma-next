@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { type } from 'arktype';
-import { basename, join } from 'pathe';
+import { basename, dirname, join } from 'pathe';
 import {
   errorDirectoryExists,
   errorInvalidJson,
@@ -13,6 +13,10 @@ import type { MigrationManifest, MigrationOps, MigrationPackage } from './types'
 const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
 const MAX_SLUG_LENGTH = 64;
+
+function hasErrnoCode(error: unknown, code: string): boolean {
+  return error instanceof Error && (error as { code?: string }).code === code;
+}
 
 const MigrationHintsSchema = type({
   used: 'string[]',
@@ -56,20 +60,19 @@ export async function writeMigrationPackage(
   manifest: MigrationManifest,
   ops: MigrationOps,
 ): Promise<void> {
-  let exists = false;
+  await mkdir(dirname(dir), { recursive: true });
+
   try {
-    await stat(dir);
-    exists = true;
-  } catch {
-    // directory doesn't exist, which is what we want
-  }
-  if (exists) {
-    throw errorDirectoryExists(dir);
+    await mkdir(dir);
+  } catch (error) {
+    if (hasErrnoCode(error, 'EEXIST')) {
+      throw errorDirectoryExists(dir);
+    }
+    throw error;
   }
 
-  await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, MANIFEST_FILE), JSON.stringify(manifest, null, 2));
-  await writeFile(join(dir, OPS_FILE), JSON.stringify(ops, null, 2));
+  await writeFile(join(dir, MANIFEST_FILE), JSON.stringify(manifest, null, 2), { flag: 'wx' });
+  await writeFile(join(dir, OPS_FILE), JSON.stringify(ops, null, 2), { flag: 'wx' });
 }
 
 export async function readMigrationPackage(dir: string): Promise<MigrationPackage> {
@@ -79,15 +82,21 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
   let manifestRaw: string;
   try {
     manifestRaw = await readFile(manifestPath, 'utf-8');
-  } catch {
-    throw errorMissingFile(MANIFEST_FILE, dir);
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) {
+      throw errorMissingFile(MANIFEST_FILE, dir);
+    }
+    throw error;
   }
 
   let opsRaw: string;
   try {
     opsRaw = await readFile(opsPath, 'utf-8');
-  } catch {
-    throw errorMissingFile(OPS_FILE, dir);
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) {
+      throw errorMissingFile(OPS_FILE, dir);
+    }
+    throw error;
   }
 
   let manifest: MigrationManifest;
@@ -138,8 +147,11 @@ export async function readMigrationsDir(
   let entries: string[];
   try {
     entries = await readdir(migrationsRoot);
-  } catch {
-    return [];
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) {
+      return [];
+    }
+    throw error;
   }
 
   const packages: MigrationPackage[] = [];
