@@ -73,12 +73,18 @@ describe('composed mutation default registries', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.execution?.mutations.defaults).toEqual([
-      {
-        ref: { table: 'user', column: 'slug' },
-        onCreate: { kind: 'generator', id: 'slugid' },
+    expect(result.value).toMatchObject({
+      execution: {
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'slug' },
+              onCreate: { kind: 'generator', id: 'slugid' },
+            },
+          ],
+        },
       },
-    ]);
+    });
   });
 
   it('emits applicability diagnostics for incompatible generator codec ids', () => {
