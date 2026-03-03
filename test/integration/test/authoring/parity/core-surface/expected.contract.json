@@ -52,7 +52,18 @@
       }
     }
   },
-  "relations": {},
+  "relations": {
+    "post": {
+      "author": {
+        "cardinality": "N:1",
+        "on": {
+          "childCols": ["id"],
+          "parentCols": ["userId"]
+        },
+        "to": "User"
+      }
+    }
+  },
   "storage": {
     "tables": {
       "post": {

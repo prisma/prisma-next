@@ -79,6 +79,21 @@ export const contract = defineContract<CodecTypes>()
       .field('profile', 'profile'),
   )
   .model('Post', 'post', (m) =>
-    m.field('id', 'id').field('userId', 'userId').field('title', 'title').field('rating', 'rating'),
+    m
+      .field('id', 'id')
+      .field('userId', 'userId')
+      .field('title', 'title')
+      .field('rating', 'rating')
+      .relation('author', {
+        toModel: 'User',
+        toTable: 'user',
+        cardinality: 'N:1',
+        on: {
+          parentTable: 'post',
+          parentColumns: ['userId'],
+          childTable: 'user',
+          childColumns: ['id'],
+        },
+      }),
   )
   .build();
