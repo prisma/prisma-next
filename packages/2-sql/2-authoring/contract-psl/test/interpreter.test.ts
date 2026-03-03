@@ -545,7 +545,76 @@ model Document {
 
     expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
     expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'PSL_UNSUPPORTED_FIELD_LIST' })]),
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_FIELD_LIST',
+          message: expect.stringContaining('scalar/storage list type'),
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics when navigation list fields use unsupported attributes', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  posts Post[] @unique
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+          message: 'Field "User.posts" uses unsupported attribute "@unique"',
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics when backrelation list declares FK-side relation arguments', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  posts Post[] @relation(fields: [id], references: [userId])
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: expect.stringContaining('cannot declare fields/references'),
+        }),
+      ]),
     );
   });
 
@@ -700,6 +769,59 @@ model Post {
         }),
       ]),
     );
+  });
+
+  it('matches backrelations with unrelated FK metadata present', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  posts Post[]
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Team {
+  id Int @id
+}
+
+model Member {
+  id Int @id
+  teamId Int
+  team Team @relation(fields: [teamId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.relations).toMatchObject({
+      user: {
+        posts: {
+          to: 'Post',
+          cardinality: '1:N',
+        },
+      },
+      post: {
+        user: {
+          to: 'User',
+          cardinality: 'N:1',
+        },
+      },
+      member: {
+        team: {
+          to: 'Team',
+          cardinality: 'N:1',
+        },
+      },
+    });
   });
 
   it('preserves parser diagnostics with source spans', () => {

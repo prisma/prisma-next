@@ -144,6 +144,18 @@ type ModelRelationMetadata = {
   readonly childColumns: readonly string[];
 };
 
+function fkRelationPairKey(declaringModelName: string, targetModelName: string): string {
+  return `${declaringModelName}::${targetModelName}`;
+}
+
+function fkRelationPairNameKey(
+  declaringModelName: string,
+  targetModelName: string,
+  relationName: string,
+): string {
+  return `${declaringModelName}::${targetModelName}::${relationName}`;
+}
+
 type ModelNameMapping = {
   readonly model: PslModel;
   readonly tableName: string;
@@ -472,7 +484,7 @@ function collectResolvedFields(
       }
       diagnostics.push({
         code: 'PSL_UNSUPPORTED_FIELD_LIST',
-        message: `Field "${model.name}.${field.name}" uses list types, which are not supported in SQL PSL provider v1`,
+        message: `Field "${model.name}.${field.name}" uses a scalar/storage list type, which is not supported in SQL PSL provider v1. Model-typed lists are only supported as backrelation navigation fields when they match an FK-side relation.`,
         sourceId,
         span: field.span,
       });
@@ -742,6 +754,39 @@ function buildModelMappings(
     });
   }
   return result;
+}
+
+function validateNavigationListFieldAttributes(input: {
+  readonly modelName: string;
+  readonly field: PslField;
+  readonly sourceId: string;
+  readonly composedExtensions: Set<string>;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): boolean {
+  let valid = true;
+  for (const attribute of input.field.attributes) {
+    if (attribute.name === 'relation') {
+      continue;
+    }
+    if (attribute.name.startsWith('pgvector.') && !input.composedExtensions.has('pgvector')) {
+      input.diagnostics.push({
+        code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+        message: `Attribute "@${attribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
+        sourceId: input.sourceId,
+        span: attribute.span,
+      });
+      valid = false;
+      continue;
+    }
+    input.diagnostics.push({
+      code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+      message: `Field "${input.modelName}.${input.field.name}" uses unsupported attribute "@${attribute.name}"`,
+      sourceId: input.sourceId,
+      span: attribute.span,
+    });
+    valid = false;
+  }
+  return valid;
 }
 
 function parseRelationAttribute(input: {
@@ -1035,6 +1080,13 @@ export function interpretPslDocumentToSqlContractIR(
       if (!field.list || !modelNames.has(field.typeName)) {
         continue;
       }
+      const attributesValid = validateNavigationListFieldAttributes({
+        modelName: model.name,
+        field,
+        sourceId,
+        composedExtensions,
+        diagnostics,
+      });
       const relationAttribute = getAttribute(field.attributes, 'relation');
       let relationName: string | undefined;
       if (relationAttribute) {
@@ -1067,6 +1119,9 @@ export function interpretPslDocumentToSqlContractIR(
           continue;
         }
         relationName = parsedRelation.relationName;
+      }
+      if (!attributesValid) {
+        continue;
       }
 
       backrelationCandidates.push({
@@ -1292,6 +1347,8 @@ export function interpretPslDocumentToSqlContractIR(
   }
 
   const modelRelations = new Map<string, ModelRelationMetadata[]>();
+  const fkRelationsByPair = new Map<string, FkRelationMetadata[]>();
+  const fkRelationsByPairAndName = new Map<string, FkRelationMetadata[]>();
   for (const relation of fkRelationMetadata) {
     const current = modelRelations.get(relation.declaringModelName) ?? [];
     current.push({
@@ -1305,21 +1362,37 @@ export function interpretPslDocumentToSqlContractIR(
       childColumns: relation.referencedColumns,
     });
     modelRelations.set(relation.declaringModelName, current);
+
+    const pairKey = fkRelationPairKey(relation.declaringModelName, relation.targetModelName);
+    const pairRelations = fkRelationsByPair.get(pairKey) ?? [];
+    pairRelations.push(relation);
+    fkRelationsByPair.set(pairKey, pairRelations);
+
+    if (relation.relationName) {
+      const pairNameKey = fkRelationPairNameKey(
+        relation.declaringModelName,
+        relation.targetModelName,
+        relation.relationName,
+      );
+      const pairNameRelations = fkRelationsByPairAndName.get(pairNameKey) ?? [];
+      pairNameRelations.push(relation);
+      fkRelationsByPairAndName.set(pairNameKey, pairNameRelations);
+    }
   }
 
   for (const candidate of backrelationCandidates) {
-    const matches = fkRelationMetadata.filter((relation) => {
-      if (
-        relation.declaringModelName !== candidate.targetModelName ||
-        relation.targetModelName !== candidate.modelName
-      ) {
-        return false;
-      }
-      if (candidate.relationName) {
-        return relation.relationName === candidate.relationName;
-      }
-      return true;
-    });
+    const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
+    const matches = candidate.relationName
+      ? [
+          ...(fkRelationsByPairAndName.get(
+            fkRelationPairNameKey(
+              candidate.targetModelName,
+              candidate.modelName,
+              candidate.relationName,
+            ),
+          ) ?? []),
+        ]
+      : [...(fkRelationsByPair.get(pairKey) ?? [])];
 
     if (matches.length === 0) {
       diagnostics.push({
