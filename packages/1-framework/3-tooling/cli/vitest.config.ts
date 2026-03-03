@@ -42,9 +42,8 @@ export default defineConfig({
         'src/commands/db-verify.ts',
         'src/commands/migration-apply.ts',
         'src/commands/migration-plan.ts',
-        'src/commands/migration-verify.ts',
-        'src/commands/migration-apply.ts',
-        'src/commands/migration-plan.ts',
+        'src/commands/migration-show.ts',
+        'src/commands/migration-status.ts',
         'src/commands/migration-verify.ts',
         // Exclude error factory functions - just constructors
         'src/utils/cli-errors.ts',
