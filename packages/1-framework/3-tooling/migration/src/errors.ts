@@ -107,3 +107,15 @@ export function errorNoLeaf(nodes: readonly string[]): MigrationToolsError {
     details: { nodes },
   });
 }
+
+export function errorDuplicateEdgeId(edgeId: string): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.DUPLICATE_EDGE_ID',
+    'Duplicate edgeId in migration graph',
+    {
+      why: `Multiple migrations share edgeId "${edgeId}". This makes parent-chain reconstruction ambiguous and unsafe.`,
+      fix: 'Regenerate one of the conflicting migrations so each edgeId is unique, then re-run migration commands.',
+      details: { edgeId },
+    },
+  );
+}

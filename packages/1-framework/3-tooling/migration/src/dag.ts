@@ -1,5 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { errorAmbiguousLeaf, errorNoLeaf, errorSelfLoop } from './errors';
+import { errorAmbiguousLeaf, errorDuplicateEdgeId, errorNoLeaf, errorSelfLoop } from './errors';
 import type { MigrationGraph, MigrationGraphEdge, MigrationPackage } from './types';
 
 export function reconstructGraph(packages: readonly MigrationPackage[]): MigrationGraph {
@@ -30,6 +30,9 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
     };
 
     if (edge.edgeId !== null) {
+      if (edgeById.has(edge.edgeId)) {
+        throw errorDuplicateEdgeId(edge.edgeId);
+      }
       edgeById.set(edge.edgeId, edge);
     }
 
@@ -130,11 +133,7 @@ export function findPath(
   if (!chain) return null;
 
   let startIdx = -1;
-  if (
-    fromHash === EMPTY_CONTRACT_HASH &&
-    chain.length > 0 &&
-    chain[0]?.from === EMPTY_CONTRACT_HASH
-  ) {
+  if (chain.length > 0 && chain[0]?.from === fromHash) {
     startIdx = 0;
   } else {
     for (let i = chain.length - 1; i >= 0; i--) {
@@ -237,8 +236,16 @@ export function detectOrphans(graph: MigrationGraph): readonly MigrationGraphEdg
   if (graph.nodes.size === 0) return [];
 
   const reachable = new Set<string>();
-  const queue: string[] = [EMPTY_CONTRACT_HASH];
-  reachable.add(EMPTY_CONTRACT_HASH);
+  const rootEdges = graph.childEdges.get(null) ?? [];
+  const emptyRootExists = rootEdges.some((edge) => edge.from === EMPTY_CONTRACT_HASH);
+  const rootHashes = emptyRootExists
+    ? [EMPTY_CONTRACT_HASH]
+    : [...new Set(rootEdges.map((edge) => edge.from))];
+  const queue: string[] = rootHashes.length > 0 ? rootHashes : [EMPTY_CONTRACT_HASH];
+
+  for (const hash of queue) {
+    reachable.add(hash);
+  }
 
   while (queue.length > 0) {
     const node = queue.shift();

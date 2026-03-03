@@ -95,6 +95,20 @@ describe('reconstructGraph', () => {
       expect(mte.fix).toBeTruthy();
     }
   });
+
+  it('rejects duplicate edgeId values', () => {
+    const first = pkg(E, 'H1', 'm1');
+    const secondBase = pkg('H1', 'H2', 'm2', first.manifest.edgeId);
+    const second = {
+      ...secondBase,
+      manifest: {
+        ...secondBase.manifest,
+        edgeId: first.manifest.edgeId,
+      },
+    };
+
+    expect(() => reconstructGraph([first, second])).toThrow('Duplicate edgeId');
+  });
 });
 
 describe('findLeaf', () => {
@@ -240,6 +254,14 @@ describe('findPath', () => {
     expect(path).not.toBeNull();
     expect(path!.map((e) => e.dirName)).toEqual(['m2', 'm3']);
   });
+
+  it('finds path when fromHash equals non-empty chain root', () => {
+    const packages = chain(['H0', 'H1', 'm1'], ['H1', 'H2', 'm2']);
+    const graph = reconstructGraph(packages);
+    const path = findPath(graph, 'H0', 'H2');
+    expect(path).not.toBeNull();
+    expect(path!.map((e) => e.dirName)).toEqual(['m1', 'm2']);
+  });
 });
 
 describe('detectCycles', () => {
@@ -279,6 +301,12 @@ describe('detectOrphans', () => {
 
   it('reports no orphans for empty graph', () => {
     const graph = reconstructGraph([]);
+    expect(detectOrphans(graph)).toEqual([]);
+  });
+
+  it('reports no orphans when root chain starts from non-empty hash', () => {
+    const packages = chain(['H0', 'H1', 'm1'], ['H1', 'H2', 'm2']);
+    const graph = reconstructGraph(packages);
     expect(detectOrphans(graph)).toEqual([]);
   });
 });
