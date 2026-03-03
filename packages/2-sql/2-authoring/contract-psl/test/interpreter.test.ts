@@ -625,6 +625,16 @@ model User {
       tables: {
         defaults: {
           columns: {
+            idNanoidDefault: {
+              codecId: 'sql/char@1',
+              nativeType: 'character',
+              typeParams: { length: 21 },
+            },
+            idNanoidSized: {
+              codecId: 'sql/char@1',
+              nativeType: 'character',
+              typeParams: { length: 16 },
+            },
             dbExpr: {
               default: {
                 kind: 'function',
