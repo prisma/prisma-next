@@ -46,17 +46,14 @@ We treat generator/column compatibility as **declared applicability** supplied b
 
 Contributors provide applicability metadata sufficient to validate “this generator id is valid for this column descriptor”.
 
-At minimum this should support:
-
-- `codecId` matching (the common case)
-- optional predicate/constraints over a resolved column descriptor (for example `{ codecId, nativeType, typeParams, nullable, ... }`)
+For this slice, applicability is keyed by `codecId` only.
 
 ### 2) Introduce a component-composed generator registry (execution-time)
 
 Runtime resolves generator ids through a registry assembled from the composed runtime stack (target/adapter/extension packs).
 
-- The current built-in implementation for ids is effectively a static map inside `@prisma-next/ids/runtime` (see `generateId()`).
-- Under this ADR, built-ins become one contributor to the assembled registry; packs can add additional generator ids.
+- Built-ins are provided via normal component contributors (for example adapter/target contributors), not implicit runtime fallback wiring.
+- Packs can add additional generator ids.
 
 Missing generator ids referenced by a contract are a stable, targeted runtime error.
 
@@ -64,11 +61,14 @@ Missing generator ids referenced by a contract are a stable, targeted runtime er
 
 Emit-time lowering for default functions uses a composed registry of handlers that:
 
-- define supported vocabulary (names + argument rules),
-- declare applicability, and
+- define supported vocabulary (names + argument rules), and
 - lower to either:
   - storage defaults (`storage.tables.*.columns.*.default`), or
   - execution mutation defaults (`execution.mutations.defaults` with `{ kind: "generator", id, params? }`).
+
+Applicability is declared on generator descriptors and checked during authoring via `codecId`.
+
+Duplicate default-function names and duplicate generator ids are hard errors during assembly.
 
 This registry is the primary mechanism for vocabulary-driven authoring surfaces to validate defaults deterministically.
 
@@ -93,7 +93,7 @@ This is not a guided UX path; it is an explicit “trust me” contract authorin
 ### Costs
 
 - **Contributor responsibility**: applicability must be declared correctly; misdeclared applicability can yield runtime failures or incorrect assumptions.
-- **Registry assembly surface**: we must define deterministic precedence/override rules for duplicate ids/names.
+- **Registry assembly surface**: contributors must avoid duplicate ids/names because collisions fail assembly deterministically.
 - **Migration work**: move from “hardwired maps” (e.g. ids) to “composed registry contributors” incrementally.
 
 ### Risks and mitigations
@@ -101,7 +101,7 @@ This is not a guided UX path; it is an explicit “trust me” contract authorin
 - **Incorrect applicability declarations**:
   - Mitigation: conformance tests, pack-level tests, and (where feasible) runtime “encode probe” validation for built-ins (optional; not required by this ADR).
 - **Collision/override ambiguity**:
-  - Mitigation: deterministic precedence by composition order plus explicit error/warn modes.
+  - Mitigation: fail fast with deterministic hard errors for duplicate names/ids.
 
 ## Related ADRs
 

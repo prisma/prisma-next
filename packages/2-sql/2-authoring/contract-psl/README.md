@@ -15,11 +15,13 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 
 - Interpret `ParsePslDocumentResult` into SQL `ContractIR`
 - Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
-- Lower supported default functions through a registry boundary (provider-supplied in v1) so parser/interpreter remain generic
+- Lower supported default functions through a component-composed registry boundary (target/adapter/extensions)
 - Support pgvector parity mapping from PSL attributes to existing TS-representable descriptor shape (`codecId`, `nativeType`, `typeParams`)
 - Map PSL relation action tokens to SQL contract referential actions and emit diagnostics for unsupported values
 - Emit deterministic relation metadata in `models.<Model>.relations` and top-level `contract.relations`
 - Enforce extension composition for supported namespaced attributes (for example `@pgvector.column(...)`)
+- Validate generator applicability by declared `codecId` support on composed generator descriptors
+- Fail fast on duplicate default-function names and duplicate generator ids during composition
 - Compose provider flow for SQL PSL-first config (`read -> parse -> interpret`)
 - Preserve parser diagnostics and add interpreter diagnostics with stable codes
 - Return `notOk` with structured diagnostics for unsupported constructs
@@ -53,7 +55,7 @@ Unsupported PSL constructs in v1 (strict errors):
 - **Implicit Prisma ORM many-to-many remains unsupported** (list navigation on both sides without explicit join model)
   - Represent many-to-many with an explicit join model (two foreign keys)
 
-Supported `@default(...)` surface in v1:
+Supported `@default(...)` surface in v1 when the composed framework components contribute the handlers:
 
 - Storage defaults: `autoincrement()`, `now()`, literals, `dbgenerated("...")`
 - Execution defaults: `uuid()`, `uuid(4)`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(<2-255>)`
@@ -65,10 +67,9 @@ Supported `@default(...)` surface in v1:
 - `@prisma-next/sql-contract-psl`
   - `interpretPslDocumentToSqlContractIR({ document, target? })`
 - `@prisma-next/sql-contract-psl/provider`
-  - `prismaContract(schemaPath, { output?, target?, composedExtensionPacks? })`
-  - `composedExtensionPacks` is currently a milestone-local string-id hook for namespace
-    availability checks (for example `['pgvector']`); plan to evolve to richer composed pack
-    metadata/manifest inputs before broadening namespaced-attribute validation.
+  - `prismaContract(schemaPath, { output?, target?, frameworkComponents?, composedExtensionPacks? })`
+  - `frameworkComponents` is the primary composition input for namespace availability and mutation-default lowering/generator descriptors.
+  - `composedExtensionPacks` remains as an optional compatibility hook for namespace ids.
 
 ## Dependencies
 
