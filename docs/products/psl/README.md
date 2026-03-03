@@ -52,8 +52,8 @@ Many-to-many **can** be represented structurally with an explicit join model (tw
 - Supported defaults are split into:
   - **Storage defaults**: literals, `autoincrement()`, `now()`, `dbgenerated("...")`
   - **Execution defaults** (mutation-time generators): `uuid()`, `uuid(4)`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(n)`
-- `**cuid()` (cuid v1) is explicitly unsupported**; diagnostics guide users to `cuid(2)`.
-- `**dbgenerated("...")` is string-literal based** and (in v1) preserves the parsed contents as-is (escape sequences are not normalized).
+- **`cuid()` (cuid v1) is explicitly unsupported**; diagnostics guide users to `cuid(2)`.
+- **`dbgenerated("...")` is string-literal based** and (in v1) preserves the parsed contents as-is (escape sequences are not normalized).
 
 ### Indexes and constraints
 
