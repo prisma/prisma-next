@@ -24,8 +24,8 @@ const createConflicts = (): readonly CliErrorConflict[] => [
   { kind: 'constraint', summary: 'Fourth conflict' },
 ];
 
-describe('formatErrorOutput - why/fix deduplication', () => {
-  it('omits Fix line when fix is identical to why', () => {
+describe('formatErrorOutput - why/fix rendering', () => {
+  it('shows Fix line when fix is identical to why', () => {
     const error: CliErrorEnvelope = {
       ...baseError,
       why: 'Something went wrong',
@@ -37,7 +37,7 @@ describe('formatErrorOutput - why/fix deduplication', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('Why: Something went wrong');
-    expect(stripped).not.toContain('Fix:');
+    expect(stripped).toContain('Fix: Something went wrong');
   });
 
   it('shows both Why and Fix when they differ', () => {
