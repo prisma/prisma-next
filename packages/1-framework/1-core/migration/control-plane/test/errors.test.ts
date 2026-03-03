@@ -79,6 +79,17 @@ describe('CliStructuredError', () => {
     expect(envelope.summary).toBe('Test error');
   });
 
+  it('normalizes fix when fix equals why', () => {
+    const error = new CliStructuredError('4001', 'Test error', {
+      why: 'Same message',
+      fix: 'Same message',
+    });
+    const envelope = error.toEnvelope();
+
+    expect(error.fix).toBeUndefined();
+    expect(envelope.fix).toBeUndefined();
+  });
+
   describe('is() type guard', () => {
     it('returns true for CliStructuredError instances', () => {
       const error = new CliStructuredError('4001', 'Test error', { domain: 'CLI' });

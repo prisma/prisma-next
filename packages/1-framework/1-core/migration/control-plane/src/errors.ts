@@ -67,7 +67,7 @@ export class CliStructuredError extends Error {
     this.domain = options?.domain ?? 'CLI';
     this.severity = options?.severity ?? 'error';
     this.why = options?.why;
-    this.fix = options?.fix;
+    this.fix = options?.fix === options?.why ? undefined : options?.fix;
     this.where = options?.where
       ? {
           path: options.where.path,
