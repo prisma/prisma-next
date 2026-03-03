@@ -8,6 +8,7 @@ import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
 import { createMigrationApplyCommand } from './commands/migration-apply';
 import { createMigrationPlanCommand } from './commands/migration-plan';
+import { createMigrationShowCommand } from './commands/migration-show';
 import { createMigrationVerifyCommand } from './commands/migration-verify';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { parseGlobalFlags } from './utils/global-flags';
@@ -216,6 +217,9 @@ migrationCommand.configureHelp({
 
 const migrationPlanCommand = createMigrationPlanCommand();
 migrationCommand.addCommand(migrationPlanCommand);
+
+const migrationShowCommand = createMigrationShowCommand();
+migrationCommand.addCommand(migrationShowCommand);
 
 const migrationVerifyCommand = createMigrationVerifyCommand();
 migrationCommand.addCommand(migrationVerifyCommand);

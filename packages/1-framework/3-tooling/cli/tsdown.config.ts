@@ -14,6 +14,7 @@ export default defineConfig({
     'src/commands/contract-emit.ts',
     'src/commands/migration-apply.ts',
     'src/commands/migration-plan.ts',
+    'src/commands/migration-show.ts',
     'src/commands/migration-verify.ts',
     'src/config-loader.ts',
     'src/exports/control-api.ts',

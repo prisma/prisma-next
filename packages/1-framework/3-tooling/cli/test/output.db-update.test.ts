@@ -123,6 +123,39 @@ describe('formatMigrationPlanOutput', () => {
     expect(stripped).not.toContain('├');
   });
 
+  it('shows destructive warning when operations contain destructive class', () => {
+    const result = createPlanResult();
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationPlanOutput(result, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('⚠');
+    expect(stripped).toContain('destructive operations');
+    expect(stripped).toContain('data loss');
+  });
+
+  it('omits destructive warning when all operations are additive', () => {
+    const result = createPlanResult({
+      plan: {
+        targetId: 'postgres',
+        destination: { storageHash: 'sha256:dest-hash' },
+        operations: [
+          {
+            id: 'column.user.nickname',
+            label: 'Add column nickname on user',
+            operationClass: 'additive',
+          },
+        ],
+      },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationPlanOutput(result, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).not.toContain('⚠');
+    expect(stripped).not.toContain('data loss');
+  });
+
   it('returns empty string in quiet mode', () => {
     const result = createPlanResult();
     const flags = parseGlobalFlags({ quiet: true });

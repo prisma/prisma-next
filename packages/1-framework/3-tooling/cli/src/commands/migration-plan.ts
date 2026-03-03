@@ -16,6 +16,7 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join } from 'pathe';
 import { loadConfig } from '../config-loader';
+import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import {
   type CliErrorConflict,
   type CliStructuredError,
@@ -58,7 +59,9 @@ export interface MigrationPlanResult {
   readonly operations: readonly {
     readonly id: string;
     readonly label: string;
+    readonly operationClass: string;
   }[];
+  readonly sql?: readonly string[];
   readonly summary: string;
   readonly timings: {
     readonly total: number;
@@ -295,6 +298,7 @@ async function executeMigrationPlanCommand(
     await writeMigrationPackage(packageDir, manifest, ops);
     const edgeId = await attestMigration(packageDir);
 
+    const sql = extractSqlDdl(ops);
     const result: MigrationPlanResult = {
       ok: true,
       noOp: false,
@@ -302,7 +306,12 @@ async function executeMigrationPlanCommand(
       to: toStorageHash,
       edgeId,
       dir: relative(process.cwd(), packageDir),
-      operations: ops.map((op) => ({ id: op.id, label: op.label })),
+      operations: ops.map((op) => ({
+        id: op.id,
+        label: op.label,
+        operationClass: op.operationClass,
+      })),
+      sql,
       summary: `Planned ${ops.length} operation(s)`,
       timings: { total: Date.now() - startTime },
     };
@@ -363,6 +372,7 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   const useColor = flags.color !== false;
 
   const green_ = useColor ? (s: string) => `\x1b[32m${s}\x1b[0m` : (s: string) => s;
+  const yellow_ = useColor ? (s: string) => `\x1b[33m${s}\x1b[0m` : (s: string) => s;
   const dim_ = useColor ? (s: string) => `\x1b[2m${s}\x1b[0m` : (s: string) => s;
 
   if (result.noOp) {
@@ -376,11 +386,24 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   lines.push('');
 
   if (result.operations.length > 0) {
+    lines.push(dim_('│'));
     for (let i = 0; i < result.operations.length; i++) {
       const op = result.operations[i]!;
       const isLast = i === result.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
-      lines.push(`${dim_(treeChar)}─ ${op.id} ${dim_(`[${op.label}]`)}`);
+      const opClassLabel =
+        op.operationClass === 'destructive'
+          ? yellow_(`[${op.operationClass}]`)
+          : dim_(`[${op.operationClass}]`);
+      lines.push(`${dim_(treeChar)}─ ${op.label} ${opClassLabel}`);
+    }
+
+    const hasDestructive = result.operations.some((op) => op.operationClass === 'destructive');
+    if (hasDestructive) {
+      lines.push('');
+      lines.push(
+        `${yellow_('⚠')} This migration contains destructive operations that may cause data loss.`,
+      );
     }
     lines.push('');
   }
@@ -392,6 +415,18 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   }
   if (result.dir) {
     lines.push(dim_(`dir:    ${result.dir}`));
+  }
+
+  if (result.sql && result.sql.length > 0) {
+    lines.push('');
+    lines.push(dim_('DDL preview'));
+    lines.push('');
+    for (const statement of result.sql) {
+      const trimmed = statement.trim();
+      if (!trimmed) continue;
+      const line = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
+      lines.push(line);
+    }
   }
 
   if (flags.verbose && result.timings) {

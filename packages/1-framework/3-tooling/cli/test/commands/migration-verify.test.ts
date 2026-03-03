@@ -80,10 +80,14 @@ describe('migration verify', () => {
     await writeMigrationPackage(packageDir, manifest, []);
     await attestMigration(packageDir);
 
-    // Tamper with ops.json
+    // Tamper with ops.json (must still pass schema validation)
     await writeFile(
       join(packageDir, 'ops.json'),
-      JSON.stringify([{ op: 'tampered', id: 'fake', args: {} }], null, 2),
+      JSON.stringify(
+        [{ id: 'tampered.fake', label: 'Tampered operation', operationClass: 'additive' }],
+        null,
+        2,
+      ),
     );
 
     const result = await verifyMigration(packageDir);

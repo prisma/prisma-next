@@ -867,14 +867,26 @@ export function formatMigrationPlanOutput(
 
   // Show operations tree
   if (result.plan?.operations && result.plan.operations.length > 0) {
+    const formatYellow = createColorFormatter(useColor, yellow);
     lines.push(`${prefix}${formatDimText('│')}`);
     for (let i = 0; i < result.plan.operations.length; i++) {
       const op = result.plan.operations[i];
       if (!op) continue;
       const isLast = i === result.plan.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
-      const opClass = formatDimText(`[${op.operationClass}]`);
-      lines.push(`${prefix}${formatDimText(treeChar)}─ ${op.label} ${opClass}`);
+      const opClassLabel =
+        op.operationClass === 'destructive'
+          ? formatYellow(`[${op.operationClass}]`)
+          : formatDimText(`[${op.operationClass}]`);
+      lines.push(`${prefix}${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
+    }
+
+    const hasDestructive = result.plan.operations.some((op) => op.operationClass === 'destructive');
+    if (hasDestructive) {
+      lines.push(`${prefix}`);
+      lines.push(
+        `${prefix}${formatYellow('⚠')} This migration contains destructive operations that may cause data loss.`,
+      );
     }
   }
 
@@ -913,6 +925,86 @@ export function formatMigrationPlanOutput(
   lines.push(`${prefix}`);
   lines.push(`${prefix}${formatDimText('This is a dry run. No changes were applied.')}`);
   lines.push(`${prefix}${formatDimText('Run without --plan to apply changes.')}`);
+
+  return lines.join('\n');
+}
+
+interface MigrationShowResult {
+  readonly dirName: string;
+  readonly dirPath: string;
+  readonly from: string;
+  readonly to: string;
+  readonly edgeId: string | null;
+  readonly kind: string;
+  readonly createdAt: string;
+  readonly operations: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly operationClass: string;
+  }[];
+  readonly sql: readonly string[];
+  readonly summary: string;
+}
+
+export function formatMigrationShowOutput(result: MigrationShowResult, flags: GlobalFlags): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const prefix = createPrefix(flags);
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatYellow = createColorFormatter(useColor, yellow);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  lines.push(`${prefix}${formatGreen('✔')} ${result.dirName}`);
+  lines.push(`${prefix}${formatDimText(`  kind: ${result.kind}`)}`);
+  lines.push(`${prefix}${formatDimText(`  from: ${result.from}`)}`);
+  lines.push(`${prefix}${formatDimText(`  to:   ${result.to}`)}`);
+  if (result.edgeId) {
+    lines.push(`${prefix}${formatDimText(`  edgeId: ${result.edgeId}`)}`);
+  } else {
+    lines.push(`${prefix}${formatYellow('  edgeId: (draft — not yet attested)')}`);
+  }
+  lines.push(`${prefix}${formatDimText(`  created: ${result.createdAt}`)}`);
+
+  lines.push(`${prefix}`);
+  lines.push(`${prefix}${result.operations.length} operation(s)`);
+
+  if (result.operations.length > 0) {
+    lines.push(`${prefix}${formatDimText('│')}`);
+    for (let i = 0; i < result.operations.length; i++) {
+      const op = result.operations[i]!;
+      const isLast = i === result.operations.length - 1;
+      const treeChar = isLast ? '└' : '├';
+      const opClassLabel =
+        op.operationClass === 'destructive'
+          ? formatYellow(`[${op.operationClass}]`)
+          : formatDimText(`[${op.operationClass}]`);
+      lines.push(`${prefix}${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
+    }
+
+    const hasDestructive = result.operations.some((op) => op.operationClass === 'destructive');
+    if (hasDestructive) {
+      lines.push(`${prefix}`);
+      lines.push(
+        `${prefix}${formatYellow('⚠')} This migration contains destructive operations that may cause data loss.`,
+      );
+    }
+  }
+
+  if (result.sql.length > 0) {
+    lines.push(`${prefix}`);
+    lines.push(`${prefix}${formatDimText('DDL preview')}`);
+    lines.push(`${prefix}`);
+    for (const statement of result.sql) {
+      const trimmed = statement.trim();
+      if (!trimmed) continue;
+      const line = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
+      lines.push(`${prefix}${line}`);
+    }
+  }
 
   return lines.join('\n');
 }
