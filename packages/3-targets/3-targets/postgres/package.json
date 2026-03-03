@@ -26,7 +26,8 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "arktype": "^2.0.0"
+    "arktype": "^2.0.0",
+    "uniku": "^0.0.12"
   },
   "devDependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
