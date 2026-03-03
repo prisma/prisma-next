@@ -18,6 +18,7 @@ export interface DefaultFunctionLoweringContext {
   readonly sourceId: string;
   readonly modelName: string;
   readonly fieldName: string;
+  readonly columnCodecId?: string;
 }
 
 type LoweredDefaultValue =
@@ -34,6 +35,21 @@ export type DefaultFunctionLoweringHandler = (input: {
 }) => LoweredDefaultResult;
 
 export type DefaultFunctionRegistry = ReadonlyMap<string, DefaultFunctionLoweringHandler>;
+
+export interface MutationDefaultGeneratorDescriptor {
+  readonly id: string;
+  readonly applicableCodecIds: readonly string[];
+}
+
+export interface ControlMutationDefaults {
+  readonly defaultFunctionRegistry: DefaultFunctionRegistry;
+  readonly generatorDescriptors: readonly MutationDefaultGeneratorDescriptor[];
+}
+
+export interface ControlMutationDefaultsContributor {
+  readonly id: string;
+  readonly controlMutationDefaults?: () => ControlMutationDefaults;
+}
 
 function resolveSpanPositionFromBase(
   base: PslSpan,
@@ -484,6 +500,92 @@ export function createBuiltinDefaultFunctionRegistry(): DefaultFunctionRegistry 
     ['nanoid', lowerNanoid],
     ['dbgenerated', lowerDbgenerated],
   ]);
+}
+
+export function createBuiltinMutationDefaultGeneratorDescriptors(): readonly MutationDefaultGeneratorDescriptor[] {
+  return [
+    {
+      id: 'uuidv4',
+      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    },
+    {
+      id: 'uuidv7',
+      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    },
+    {
+      id: 'cuid2',
+      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    },
+    {
+      id: 'ulid',
+      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    },
+    {
+      id: 'nanoid',
+      applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    },
+  ];
+}
+
+export function createBuiltinControlMutationDefaults(): ControlMutationDefaults {
+  return {
+    defaultFunctionRegistry: createBuiltinDefaultFunctionRegistry(),
+    generatorDescriptors: createBuiltinMutationDefaultGeneratorDescriptors(),
+  };
+}
+
+export function assembleControlMutationDefaults(
+  contributors: ReadonlyArray<ControlMutationDefaultsContributor>,
+): ControlMutationDefaults {
+  const defaultFunctionRegistry = new Map<string, DefaultFunctionLoweringHandler>();
+  const generatorDescriptors: MutationDefaultGeneratorDescriptor[] = [];
+  const generatorOwners = new Map<string, string>();
+  const functionOwners = new Map<string, string>();
+
+  for (const contributor of contributors) {
+    const contributions = contributor.controlMutationDefaults?.();
+    if (!contributions) {
+      continue;
+    }
+
+    for (const [functionName, handler] of contributions.defaultFunctionRegistry) {
+      const owner = functionOwners.get(functionName);
+      if (owner) {
+        throw new Error(
+          `Duplicate mutation default function "${functionName}". Descriptor "${contributor.id}" conflicts with "${owner}".`,
+        );
+      }
+      defaultFunctionRegistry.set(functionName, handler);
+      functionOwners.set(functionName, contributor.id);
+    }
+
+    for (const descriptor of contributions.generatorDescriptors) {
+      const owner = generatorOwners.get(descriptor.id);
+      if (owner) {
+        throw new Error(
+          `Duplicate mutation default generator id "${descriptor.id}". Descriptor "${contributor.id}" conflicts with "${owner}".`,
+        );
+      }
+      generatorDescriptors.push(descriptor);
+      generatorOwners.set(descriptor.id, contributor.id);
+    }
+  }
+
+  return {
+    defaultFunctionRegistry,
+    generatorDescriptors,
+  };
+}
+
+export function createMutationDefaultGeneratorDescriptorMap(
+  contributors: ReadonlyArray<ControlMutationDefaultsContributor>,
+): ReadonlyMap<string, MutationDefaultGeneratorDescriptor> {
+  const assembled = assembleControlMutationDefaults(contributors);
+  const result = new Map<string, MutationDefaultGeneratorDescriptor>();
+  for (const descriptor of assembled.generatorDescriptors) {
+    result.set(descriptor.id, descriptor);
+  }
+  return result;
 }
 
 export function lowerDefaultFunctionWithRegistry(input: {
