@@ -180,6 +180,16 @@ Anything outside the supported set must fail with a strict, targeted error (not 
 
 **Decision:** unsupported PSL features are **strict errors**. We prefer predictability over partial/ignored interpretation.
 
+## Planned follow-up requirement: relation navigation lists + consistent `contract.relations`
+
+As a follow-up slice after v1, we plan to support **relation navigation list fields** (e.g. `User.posts Post[]`) while continuing to **strictly reject scalar list types** (e.g. `String[]`).
+
+Requirements for the follow-up:
+
+- Accept relation navigation lists (1:N backrelation fields) when they correspond to an existing foreign-key-side relation.
+- Keep scalar lists strictly unsupported.
+- Populate `contract.relations` consistently so both sides of a relation (N:1 and 1:N) are represented in a stable, deterministic way.
+
 ## Error behavior
 
 - Errors must include a precise PSL source location and a short explanation of what’s unsupported.
