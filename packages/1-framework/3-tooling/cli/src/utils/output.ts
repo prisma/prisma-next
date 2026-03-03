@@ -146,7 +146,7 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
   if (error.why) {
     lines.push(`${prefix}${formatDimText(`  Why: ${error.why}`)}`);
   }
-  if (error.fix && error.fix !== error.why) {
+  if (error.fix) {
     lines.push(`${prefix}${formatDimText(`  Fix: ${error.fix}`)}`);
   }
   if (error.where?.path) {
