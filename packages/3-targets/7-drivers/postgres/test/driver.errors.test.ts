@@ -361,6 +361,7 @@ describe('@prisma-next/driver-postgres', () => {
 
       await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
       await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
+      expect(mockClient.connect).toHaveBeenCalledTimes(2);
     },
     timeouts.spinUpPpgDev,
   );
