@@ -74,7 +74,7 @@ function scan(source: string, pos: number): Token {
     scanString(source, pos) ??
     scanPunctuation(source, pos) ?? {
       kind: 'Invalid' as const,
-      text: source.charAt(pos),
+      text: readChar(source, pos),
       offset: pos,
     }
   );
@@ -121,17 +121,13 @@ function scanAt(source: string, pos: number): Token | undefined {
 }
 
 function scanIdent(source: string, pos: number): Token | undefined {
-  if (!isIdentStart(source.charAt(pos))) return undefined;
-  let end = pos + 1;
+  const ch = readChar(source, pos);
+  if (!isIdentStart(ch)) return undefined;
+  let end = pos + ch.length;
   while (end < source.length) {
-    if (isIdentPart(source.charAt(end))) {
-      end++;
-    } else if (
-      source.charAt(end) === '-' &&
-      end + 1 < source.length &&
-      isIdentPart(source.charAt(end + 1))
-    ) {
-      end++;
+    const c = readChar(source, end);
+    if (isIdentPart(c)) {
+      end += c.length;
     } else {
       break;
     }
@@ -189,12 +185,17 @@ function scanPunctuation(source: string, pos: number): Token | undefined {
   return { kind, text: source.charAt(pos), offset: pos };
 }
 
+function readChar(source: string, pos: number): string {
+  const cp = source.codePointAt(pos);
+  return cp !== undefined ? String.fromCodePoint(cp) : '';
+}
+
 function isIdentStart(ch: string): boolean {
   return /\p{L}/u.test(ch) || ch === '_';
 }
 
 function isIdentPart(ch: string): boolean {
-  return isIdentStart(ch) || isDigit(ch);
+  return isIdentStart(ch) || isDigit(ch) || ch === '-';
 }
 
 function isDigit(ch: string): boolean {
