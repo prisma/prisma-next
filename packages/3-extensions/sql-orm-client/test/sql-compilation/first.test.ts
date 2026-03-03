@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createCollection } from '../collection-fixtures';
 import { normalizeSql } from './helpers';
 
-describe('sql-compilation/find', () => {
+describe('sql-compilation/first', () => {
   it('all() compiles and executes a SELECT query', async () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
@@ -25,21 +25,21 @@ describe('sql-compilation/find', () => {
     expect(normalizeSql(sqlText)).toBe('select * from "users" where "users"."name" = $1');
   });
 
-  it('find() adds limit 1', async () => {
+  it('first() adds limit 1', async () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
-    const result = await collection.find();
+    const result = await collection.first();
 
     expect(result).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
     expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe('select * from "users" limit $1');
   });
 
-  it('find() accepts shorthand object filters', async () => {
+  it('first() accepts shorthand object filters', async () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[{ id: 42, name: 'Alice', email: 'alice@example.com' }]]);
 
-    const result = await collection.find({ id: 42 });
+    const result = await collection.first({ id: 42 });
 
     expect(result).toEqual({ id: 42, name: 'Alice', email: 'alice@example.com' });
     expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
@@ -47,11 +47,11 @@ describe('sql-compilation/find', () => {
     );
   });
 
-  it('find() combines inline filters with pre-existing where() filters', async () => {
+  it('first() combines inline filters with pre-existing where() filters', async () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[{ id: 42, name: 'Alice', email: 'alice@example.com' }]]);
 
-    await collection.where({ name: 'Alice' }).find((user) => user.id.eq(42));
+    await collection.where({ name: 'Alice' }).first((user) => user.id.eq(42));
 
     const sqlText = runtime.executions[0]!.plan.sql;
     expect(normalizeSql(sqlText)).toBe(

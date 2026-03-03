@@ -11,7 +11,7 @@ After completing each task, mark it as done in the document and commit the resul
 
 ## Overview
 
-This task breakdown covers the full implementation of the ORM Client spec for `@prisma-next/sql-orm-client` (`/Users/aqrln/prisma/prisma-next/packages/3-extensions/sql-orm-client/`). The work builds incrementally on the existing prototype, which already has: `Collection` with `where()`/`include()`/`orderBy()`/`take()`/`skip()`/`all()`/`find()`, `createColumnAccessor()`, Kysely-based compilation, `orm()` factory with model aliasing, multi-query include stitching, and unit tests
+This task breakdown covers the full implementation of the ORM Client spec for `@prisma-next/sql-orm-client` (`/Users/aqrln/prisma/prisma-next/packages/3-extensions/sql-orm-client/`). The work builds incrementally on the existing prototype, which already has: `Collection` with `where()`/`include()`/`orderBy()`/`take()`/`skip()`/`all()`/`first()`, `createColumnAccessor()`, Kysely-based compilation, `orm()` factory with model aliasing, multi-query include stitching, and unit tests
 
 The tasks are ordered so that foundational internal refactors come first, followed by incremental feature additions that build on each other. Testing is embedded alongside implementation, not deferred to a separate phase.
 
@@ -123,7 +123,7 @@ Depends on: Group 1 (WhereExpr integration)
 
 ---
 
-## Group 3: Shorthand Object Filter and where()/find() Overloads
+## Group 3: Shorthand Object Filter and where()/first() Overloads
 
 Depends on: Group 2 (expanded ModelAccessor, logical combinators)
 
@@ -139,19 +139,19 @@ Depends on: Group 2 (expanded ModelAccessor, logical combinators)
   - Files to modify: `src/collection.ts`, `src/filters.ts`, `src/types.ts`
   - Write 4-6 tests: basic `where({ role: 'admin' })`, multi-field `where({ role: 'admin', active: true })`, null handling, undefined handling, empty object
 
-- [x] **3.2 Add filter overloads to find()**
-  - `find()` currently accepts an optional callback filter
+- [x] **3.2 Add filter overloads to first()**
+  - `first()` currently accepts an optional callback filter
   - Add a second overload accepting shorthand object (same as `where()`)
-  - `find({ email: 'alice@example.com' })` -- shorthand equality
-  - `find(u => u.email.eq('alice@example.com'))` -- callback
-  - `find()` -- no additional filter
+  - `first({ email: 'alice@example.com' })` -- shorthand equality
+  - `first(u => u.email.eq('alice@example.com'))` -- callback
+  - `first()` -- no additional filter
   - Provided filter is ANDed with existing `where()` filters
   - Files to modify: `src/collection.ts`
-  - Write 2-3 tests: `find({ id: 42 })`, `find(u => u.email.eq('alice'))`, `find()` after `where()`
+  - Write 2-3 tests: `first({ id: 42 })`, `first(u => u.email.eq('alice'))`, `first()` after `where()`
 
 **Acceptance Criteria for Group 3:**
 - `where()` accepts both callback and shorthand object
-- `find()` accepts both callback and shorthand object
+- `first()` accepts both callback and shorthand object
 - Shorthand filters correctly desugar to WhereExpr
 - Edge cases (null, undefined, empty object) handled per spec
 
@@ -251,7 +251,7 @@ Depends on: Group 1 (WhereExpr integration)
   - The `include()` refinement callback should receive an instance of the **registered collection class** for the related model
   - Already partially implemented: `#createCollection` checks `this.registry`
   - Verify that custom collection methods (e.g. `PostCollection.published()`) are available inside include refinement callbacks
-  - Ensure the refinement collection is a restricted surface (no `all()`, `find()`, mutation terminals) -- this may be done via a type narrowing or a separate `IncludeCollection` type
+  - Ensure the refinement collection is a restricted surface (no `all()`, `first()`, mutation terminals) -- this may be done via a type narrowing or a separate `IncludeCollection` type
   - Write 2-3 tests: custom method available in include refinement, registry propagation through nested includes
   - Files to modify: `src/collection.ts`, `src/types.ts` (if restricted surface type is needed)
 
@@ -446,7 +446,7 @@ Depends on: Group 11 (root aggregations)
 
 - [x] **12.1 Implement groupBy() returning GroupedCollection**
   - `groupBy(...fields)` returns a `GroupedCollection` -- a new class or restricted Collection surface
-  - `GroupedCollection` has: `having(predicate)`, `aggregate(fn)` -- but NOT `all()`, `find()`, `select()`, `include()`, mutations
+  - `GroupedCollection` has: `having(predicate)`, `aggregate(fn)` -- but NOT `all()`, `first()`, `select()`, `include()`, mutations
   - The `aggregate()` on GroupedCollection returns `Promise<Array<{ [groupField]: value; [aggField]: value }>>`
   - Create `src/grouped-collection.ts`
   - Files to create: `src/grouped-collection.ts`
@@ -536,7 +536,7 @@ Depends on: All previous groups
 - [x] **15.1 Update demo app to use new API patterns**
   - Migrate `/Users/aqrln/prisma/prisma-next/examples/prisma-next-demo/src/orm-client/` files
   - Replace old `orderBy(() => ({ column, direction }))` with new `orderBy(p => p.createdAt.desc())` pattern
-  - Add examples using: `select()`, shorthand `where()`, `find({ id: 42 })`, `and()`/`or()`
+  - Add examples using: `select()`, shorthand `where()`, `first({ id: 42 })`, `and()`/`or()`
   - Add mutation examples: `create()`, `update()` with `where()`
   - Add aggregation example: `aggregate()`
   - Files to modify: all files in `examples/prisma-next-demo/src/orm-client/`

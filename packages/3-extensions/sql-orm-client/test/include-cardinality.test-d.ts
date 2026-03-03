@@ -31,8 +31,8 @@ const usersWithPostCount = userCollection.include('posts', (posts) => posts.coun
 userCollection.include('posts', (posts) => {
   // @ts-expect-error include refinement collection does not expose all()
   posts.all();
-  // @ts-expect-error include refinement collection does not expose find()
-  posts.find();
+  // @ts-expect-error include refinement collection does not expose first()
+  posts.first();
   // @ts-expect-error include refinement collection does not expose create()
   posts.create({} as never);
   // @ts-expect-error include refinement collection does not expose update()

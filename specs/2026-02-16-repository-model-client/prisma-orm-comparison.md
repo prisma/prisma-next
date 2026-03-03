@@ -45,7 +45,7 @@ Both return all records. In Prisma Next, `all()` returns an `AsyncIterableResult
 
 ---
 
-### find (findFirst / findUnique)
+### first (findFirst / findUnique)
 
 **Prisma ORM:**
 ```typescript
@@ -62,21 +62,21 @@ const user = await prisma.user.findUnique({
 
 **Prisma Next:**
 ```typescript
-// find() with inline filter — covers both findFirst and findUnique use cases
-const user = await db.users.find({ email: 'alice@example.com' })
+// first() with inline filter — covers both findFirst and findUnique use cases
+const user = await db.users.first({ email: 'alice@example.com' })
 
-// find() with prior where()
+// first() with prior where()
 const user = await db.users
   .where(u => u.active.eq(true))
-  .find({ email: 'alice@example.com' })
+  .first({ email: 'alice@example.com' })
 
-// find() with no argument — first match from accumulated filters
+// first() with no argument — first match from accumulated filters
 const firstAdmin = await db.users
   .where(u => u.role.eq('admin'))
-  .find()
+  .first()
 ```
 
-Prisma Next has a single `find()` method that returns `Promise<Row | null>` (LIMIT 1). It supports the same two filter overloads as `where()` — shorthand object (`find({ email: 'alice@example.com' })`) and callback (`find(u => u.email.eq('alice@example.com'))`). Raw `WhereExpr` is not accepted directly as an argument. Any provided filter is ANDed with existing filters.
+Prisma Next has a single `first()` method that returns `Promise<Row | null>` (LIMIT 1). It supports the same two filter overloads as `where()` — shorthand object (`first({ email: 'alice@example.com' })`) and callback (`first(u => u.email.eq('alice@example.com'))`). Raw `WhereExpr` is not accepted directly as an argument. Any provided filter is ANDed with existing filters.
 
 ---
 
@@ -762,7 +762,7 @@ const usersWithRecentPosts = await db.users
 
 In Prisma ORM, filters are plain objects with a specific shape. They can be spread, but can't be inspected, transformed, or passed through generic filter-building infrastructure.
 
-In Prisma Next, filters are PN AST nodes (`WhereExpr`). They can be built with callbacks, constructed externally, composed with `and`/`or`/`not`, or even serialized and sent over a wire. `where()`/`find()` accept either a shorthand filter object or a callback that returns `WhereExpr`.
+In Prisma Next, filters are PN AST nodes (`WhereExpr`). They can be built with callbacks, constructed externally, composed with `and`/`or`/`not`, or even serialized and sent over a wire. `where()`/`first()` accept either a shorthand filter object or a callback that returns `WhereExpr`.
 
 ```typescript
 // Build filters programmatically from external input
@@ -807,7 +807,7 @@ const user = await prisma.user.findUnique({
 const user = await db.users
   .select('name', 'email')
   .include('posts')
-  .find({ id: 42 })
+  .first({ id: 42 })
 // Type: { name: string; email: string; posts: PostRow[] } | null
 ```
 

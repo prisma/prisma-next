@@ -519,10 +519,12 @@ export class Collection<
     return this.#dispatch();
   }
 
-  async find(): Promise<Row | null>;
-  async find(filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg): Promise<Row | null>;
-  async find(filter: ShorthandWhereFilter<TContract, ModelName>): Promise<Row | null>;
-  async find(
+  async first(): Promise<Row | null>;
+  async first(
+    filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
+  ): Promise<Row | null>;
+  async first(filter: ShorthandWhereFilter<TContract, ModelName>): Promise<Row | null>;
+  async first(
     filter?:
       | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
       | ShorthandWhereFilter<TContract, ModelName>,

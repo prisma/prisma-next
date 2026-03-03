@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createUsersCollection, timeouts, withCollectionRuntime } from './helpers';
 import { seedUsers } from './runtime-helpers';
 
-describe('integration/find', () => {
+describe('integration/first', () => {
   it(
-    'find() returns first matching row and null when no row matches',
+    'first() returns first matching row and null when no row matches',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
@@ -14,9 +14,9 @@ describe('integration/find', () => {
           { id: 2, name: 'Alice', email: 'alice2@example.com' },
         ]);
 
-        const found = await users.find({ name: 'Alice' });
-        const foundByFn = await users.find((user) => user.id.eq(2));
-        const missing = await users.find({ id: 999 });
+        const found = await users.first({ name: 'Alice' });
+        const foundByFn = await users.first((user) => user.id.eq(2));
+        const missing = await users.first({ id: 999 });
 
         expect(found).not.toBeNull();
         expect(found?.name).toBe('Alice');
@@ -28,7 +28,7 @@ describe('integration/find', () => {
   );
 
   it(
-    'find() respects existing orderBy() modifiers',
+    'first() respects existing orderBy() modifiers',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
@@ -42,7 +42,7 @@ describe('integration/find', () => {
         const found = await users
           .where({ name: 'Bob' })
           .orderBy((user) => user.id.desc())
-          .find();
+          .first();
 
         expect(found).toEqual({ id: 2, name: 'Bob', email: 'bob-2@example.com' });
       });

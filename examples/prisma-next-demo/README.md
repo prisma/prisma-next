@@ -84,7 +84,7 @@ The demo includes ORM client examples under `src/orm-client/`:
 
 - `ormClientGetUsers(limit, runtime)` — list users using ORM client API
 - `ormClientGetAdminUsers(limit, runtime)` — filter through a custom collection scope
-- `ormClientFindUserByEmail(email, runtime)` — `find()` with collection helpers
+- `ormClientFindUserByEmail(email, runtime)` — `first()` with collection helpers
 - `ormClientGetUserPosts(userId, limit, runtime)` — fetch user posts with collection filters + ordering
 - `ormClientGetDashboardUsers(emailDomain, postTitleTerm, limit, postsPerUser, runtime)` — compound `and/or/not` filters + relation filters + `select()` and `include()` composition
 - `ormClientGetPostFeed(postTitleTerm, limit, runtime)` — to-one include (`post -> user`) with projected fields
