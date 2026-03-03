@@ -1,6 +1,6 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 
@@ -127,6 +127,49 @@ model Post {
           expect.objectContaining({
             code: 'PSL_UNSUPPORTED_FIELD_LIST',
             sourceId: './schema.prisma',
+            message: expect.stringContaining('scalar/storage list type'),
+            span: expect.objectContaining({
+              start: expect.objectContaining({ line: 3 }),
+            }),
+          }),
+        ]),
+      );
+    });
+
+    it('returns diagnostics when navigation list fields declare unsupported attributes', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  posts Post[] @unique
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source();
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+
+      expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+            sourceId: './schema.prisma',
+            message: expect.stringContaining('User.posts'),
             span: expect.objectContaining({
               start: expect.objectContaining({ line: 3 }),
             }),
