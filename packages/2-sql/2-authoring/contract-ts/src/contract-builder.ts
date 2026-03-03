@@ -329,10 +329,10 @@ class SqlContractBuilder<
         readonly storageHash: StorageHash extends string ? StorageHash : string;
       } & (ExtensionPacks extends Record<string, unknown>
           ? { readonly extensionPacks: ExtensionPacks }
-          : Record<string, never>) &
+          : unknown) &
         (Capabilities extends Record<string, Record<string, boolean>>
           ? { readonly capabilities: Capabilities }
-          : Record<string, never>)
+          : unknown)
     : never {
     // Type helper to ensure literal types are preserved in return type
     type BuiltContract = Target extends string
@@ -348,10 +348,10 @@ class SqlContractBuilder<
           readonly storageHash: StorageHash extends string ? StorageHash : string;
         } & (ExtensionPacks extends Record<string, unknown>
             ? { readonly extensionPacks: ExtensionPacks }
-            : Record<string, never>) &
+            : unknown) &
           (Capabilities extends Record<string, Record<string, boolean>>
             ? { readonly capabilities: Capabilities }
-            : Record<string, never>)
+            : unknown)
       : never;
     if (!this.state.target) {
       throw new Error('target is required. Call .target() before .build()');
