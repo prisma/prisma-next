@@ -18,6 +18,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 - Lower supported default functions through a registry boundary (provider-supplied in v1) so parser/interpreter remain generic
 - Support pgvector parity mapping from PSL attributes to existing TS-representable descriptor shape (`codecId`, `nativeType`, `typeParams`)
 - Map PSL relation action tokens to SQL contract referential actions and emit diagnostics for unsupported values
+- Emit deterministic relation metadata in `models.<Model>.relations` and top-level `contract.relations`
 - Enforce extension composition for supported namespaced attributes (for example `@pgvector.column(...)`)
 - Compose provider flow for SQL PSL-first config (`read -> parse -> interpret`)
 - Preserve parser diagnostics and add interpreter diagnostics with stable codes
@@ -39,12 +40,14 @@ Current scope is SQL/Postgres-first: scalar and enum mappings resolve to Postgre
 
 Unsupported PSL constructs in v1 (strict errors):
 
-- **List fields are rejected**:
+- **Scalar and storage-oriented lists are rejected**:
   - Scalar lists like `String[]`
-  - Relation navigation lists like `Post[]` (one-to-many backrelation fields)
-  - Implicit Prisma ORM many-to-many (which relies on list relation fields)
-- Relations are modeled via the **foreign key side** only (`@relation(fields: [...], references: [...])`).
-  - Many-to-many can be represented using an explicit join model (two foreign keys), but without list navigation fields.
+  - Enum lists and named-type lists
+- **Relation navigation lists are supported** when they can be matched to an FK-side relation:
+  - Example: `User.posts Post[]` + `Post.user User @relation(fields: [userId], references: [id])`
+  - Matching may use `@relation("Name")` or `@relation(name: "Name")` when multiple candidates exist
+- **Implicit Prisma ORM many-to-many remains unsupported** (list navigation on both sides without explicit join model)
+  - Represent many-to-many with an explicit join model (two foreign keys)
 
 Supported `@default(...)` surface in v1:
 
