@@ -212,7 +212,7 @@
         },
         "id": {
           "type": "string",
-          "enum": ["ulid", "nanoid", "uuidv7", "uuidv4", "cuid2", "ksuid"]
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
         },
         "params": {
           "type": "object",

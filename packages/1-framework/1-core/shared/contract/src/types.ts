@@ -81,7 +81,7 @@ export interface FieldType {
 }
 
 export type GeneratedValueSpec = {
-  readonly id: 'ulid' | 'nanoid' | 'uuidv7' | 'uuidv4' | 'cuid2' | 'ksuid';
+  readonly id: string;
   readonly params?: Record<string, unknown>;
 };
 
