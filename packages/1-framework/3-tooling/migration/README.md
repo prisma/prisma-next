@@ -13,7 +13,7 @@ On-disk migration persistence, attestation, and DAG reconstruction for Prisma Ne
 
 ```mermaid
 graph TD
-    CLI["CLI commands<br/>(migration plan, verify, new)"] --> IO["io.ts<br/>File I/O"]
+    CLI["CLI commands<br/>(migration plan, apply, verify)"] --> IO["io.ts<br/>File I/O"]
     CLI --> ATT["attestation.ts<br/>Edge attestation"]
     CLI --> DAG["dag.ts<br/>DAG operations"]
     IO --> TYPES["types.ts<br/>MigrationManifest, etc."]
@@ -29,8 +29,9 @@ graph TD
 | Package | Why |
 |---|---|
 | `@prisma-next/contract` | `ContractIR` type for embedded contracts in manifests |
-| `@prisma-next/core-control-plane` | `AbstractOp` types, `EMPTY_CONTRACT_HASH`, `canonicalizeContract` |
-| `@prisma-next/utils` | Shared utilities |
+| `@prisma-next/core-control-plane` | `MigrationPlanOperation` types, `EMPTY_CONTRACT_HASH`, `canonicalizeContract` |
+| `arktype` | Runtime shape validation for `migration.json` and `ops.json` |
+| `@prisma-next/utils` | Workspace utility dependency (currently no direct runtime imports in this package) |
 | `pathe` | Cross-platform path manipulation |
 
 ### Dependents
@@ -54,7 +55,7 @@ Each migration is a directory containing two files:
 migrations/
   20260225T1430_add_users/
     migration.json    # MigrationManifest
-    ops.json          # AbstractOp[]
+    ops.json          # MigrationPlanOperation[]
 ```
 
 See [ADR 028](../../../docs/architecture%20docs/adrs/ADR%20028%20-%20Migration%20Structure%20%26%20Operations.md) and [ADR 001](../../../docs/architecture%20docs/adrs/ADR%20001%20-%20Migrations%20as%20Edges.md) for design rationale.
