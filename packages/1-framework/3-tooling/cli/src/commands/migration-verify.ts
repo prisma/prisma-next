@@ -1,5 +1,6 @@
 import { attestMigration, verifyMigration } from '@prisma-next/migration-tools/attestation';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
@@ -30,9 +31,9 @@ export interface MigrationVerifyResult {
   readonly ok: boolean;
   readonly status: 'verified' | 'attested';
   readonly dir: string;
-  readonly edgeId?: string | undefined;
-  readonly storedEdgeId?: string | undefined;
-  readonly computedEdgeId?: string | undefined;
+  readonly edgeId?: string;
+  readonly storedEdgeId?: string;
+  readonly computedEdgeId?: string;
   readonly summary: string;
 }
 
@@ -60,9 +61,9 @@ async function executeMigrationVerifyCommand(
         ok: true,
         status: 'verified',
         dir,
-        edgeId: result.storedEdgeId,
-        storedEdgeId: result.storedEdgeId,
-        computedEdgeId: result.computedEdgeId,
+        ...ifDefined('edgeId', result.storedEdgeId),
+        ...ifDefined('storedEdgeId', result.storedEdgeId),
+        ...ifDefined('computedEdgeId', result.computedEdgeId),
         summary: 'Migration package verified — edgeId matches',
       });
     }

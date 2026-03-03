@@ -1,7 +1,7 @@
-import { relative } from 'pathe';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { bgGreen, blue, bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { Command } from 'commander';
+import { relative } from 'pathe';
 import stringWidth from 'string-width';
 import stripAnsi from 'strip-ansi';
 import wrapAnsi from 'wrap-ansi';

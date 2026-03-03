@@ -1,5 +1,4 @@
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'pathe';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
@@ -12,6 +11,7 @@ import type {
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';

@@ -89,14 +89,14 @@ describe('computeEdgeId', () => {
       manifest.fromContract !== null ? canonicalizeContract(manifest.fromContract) : 'null',
       canonicalizeContract(manifest.toContract),
     ];
-    const partHashes = canonicalParts.map((part) => createHash('sha256').update(part).digest('hex'));
+    const partHashes = canonicalParts.map((part) =>
+      createHash('sha256').update(part).digest('hex'),
+    );
     const expected = `sha256:${createHash('sha256')
       .update(canonicalizeJson(partHashes))
       .digest('hex')}`;
 
-    const legacy = `sha256:${createHash('sha256')
-      .update(canonicalParts.join(':'))
-      .digest('hex')}`;
+    const legacy = `sha256:${createHash('sha256').update(canonicalParts.join(':')).digest('hex')}`;
 
     expect(computeEdgeId(manifest, ops)).toBe(expected);
     expect(computeEdgeId(manifest, ops)).not.toBe(legacy);

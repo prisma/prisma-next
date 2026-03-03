@@ -1,8 +1,8 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ContractSourceDiagnostics,
   ContractSourceProvider,
 } from '@prisma-next/config/config-types';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,

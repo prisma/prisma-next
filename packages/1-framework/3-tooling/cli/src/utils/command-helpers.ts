@@ -1,5 +1,5 @@
-import { resolve } from 'pathe';
 import type { Command } from 'commander';
+import { resolve } from 'pathe';
 
 const longDescriptions = new WeakMap<Command, string>();
 

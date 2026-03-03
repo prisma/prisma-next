@@ -1,9 +1,11 @@
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
-import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
+import type {
+  ControlTargetDescriptor,
+  MigrationPlanOperation,
+} from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { findLeafEdge, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -14,7 +16,7 @@ import {
 import { type MigrationManifest, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { join } from 'pathe';
+import { join, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import {
@@ -220,7 +222,8 @@ async function executeMigrationPlanCommand(
   }
 
   // Check target supports migrations
-  if (!config.target.migrations) {
+  const targetWithMigrations = config.target as ControlTargetDescriptor<string, string>;
+  if (!targetWithMigrations.migrations) {
     return notOk(
       errorTargetMigrationNotSupported({
         why: `Target "${config.target.id}" does not support migrations`,
@@ -229,7 +232,7 @@ async function executeMigrationPlanCommand(
   }
 
   // Plan migration using the same planner as db init
-  const { migrations } = config.target;
+  const { migrations } = targetWithMigrations;
   const stack = createControlPlaneStack({
     target: config.target,
     adapter: config.adapter,

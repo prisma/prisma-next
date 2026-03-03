@@ -1,4 +1,3 @@
-import { relative, resolve } from 'pathe';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { findLeafEdge, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
@@ -6,6 +5,7 @@ import type { MigrationPackage } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';

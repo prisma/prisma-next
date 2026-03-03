@@ -1,5 +1,4 @@
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'pathe';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
@@ -7,6 +6,7 @@ import type { MigrationGraph, MigrationPackage } from '@prisma-next/migration-to
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type { MigrationApplyEdge, MigrationApplyFailure } from '../control-api/types';
@@ -124,7 +124,10 @@ async function executeMigrationApplyCommand(
     return notOk(errorDriverRequired({ why: 'Config.driver is required for migration apply' }));
   }
 
-  if (!config.target.migrations) {
+  const targetWithMigrations = config.target as typeof config.target & {
+    readonly migrations?: unknown;
+  };
+  if (!targetWithMigrations.migrations) {
     return notOk(
       errorTargetMigrationNotSupported({
         why: `Target "${config.target.id}" does not support migrations`,
