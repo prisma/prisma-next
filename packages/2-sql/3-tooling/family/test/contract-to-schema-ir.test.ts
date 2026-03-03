@@ -154,6 +154,42 @@ describe('contractToSchemaIR', () => {
     expect(result.tables['T']!.columns['status']!.default).toBe("'active'");
   });
 
+  it('escapes single quotes in string literal defaults', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            author: col({
+              nativeType: 'text',
+              default: { kind: 'literal', value: "O'Reilly" },
+            }),
+          },
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(storage);
+    expect(result.tables['T']!.columns['author']!.default).toBe("'O''Reilly'");
+  });
+
+  it('escapes repeated single quotes in string literal defaults', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            textValue: col({
+              nativeType: 'text',
+              default: { kind: 'literal', value: "a'b''c" },
+            }),
+          },
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(storage);
+    expect(result.tables['T']!.columns['textValue']!.default).toBe("'a''b''''c'");
+  });
+
   it('converts function column defaults', () => {
     const storage: SqlStorage = {
       tables: {

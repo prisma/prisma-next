@@ -23,7 +23,7 @@ function convertDefault(def: ColumnDefault): string {
     return def.expression;
   }
   if (typeof def.value === 'string') {
-    return `'${def.value}'`;
+    return `'${def.value.replaceAll("'", "''")}'`;
   }
   return String(def.value);
 }
