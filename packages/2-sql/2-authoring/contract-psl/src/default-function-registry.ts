@@ -1,5 +1,5 @@
+import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
-import type { ContractSourceDiagnostic } from '@prisma-next/core-control-plane/config-types';
 import type { PslSpan } from '@prisma-next/psl-parser';
 
 interface DefaultFunctionArgument {
