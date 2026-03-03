@@ -14,5 +14,6 @@ export default defineConfig({
   extensionPacks,
   contract: prismaContract('./schema.prisma', {
     output: 'output/contract.json',
+    frameworkComponents: [postgres, postgresAdapter, ...extensionPacks],
   }),
 });
