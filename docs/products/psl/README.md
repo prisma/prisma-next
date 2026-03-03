@@ -25,9 +25,9 @@ For package-level responsibilities and supported defaults, see:
 
 ### Types and fields
 
-- **List fields are rejected** (strict error), including:
+- **Scalar and storage-oriented list fields are rejected** (strict error), including:
   - **Scalar lists** like `String[]`
-  - **Relation navigation lists** like `Post[]` (one-to-many backrelation fields)
+  - **Enum/named-type lists** (no array-column storage mapping in SQL PSL provider v1)
   - **Implicit Prisma ORM many-to-many** (which relies on list relation fields)
 
 This is a deliberate “strict subset” choice: PSL v1 is bounded by the current TS authoring surface + contract model and prefers “fail loudly” over silent partial interpretation.
@@ -38,11 +38,11 @@ This is a deliberate “strict subset” choice: PSL v1 is bounded by the curren
 
 ### Relations
 
-- PSL v1 supports the **foreign-key side** of relations only:
-  - `@relation(fields: [...], references: [...], onDelete?, onUpdate?)`
-- Because list relation fields are rejected, PSL v1 does **not** currently support:
-  - one-to-many “navigation” fields (`User.posts Post[]`)
-  - implicit many-to-many
+- PSL v1 supports:
+  - the **foreign-key side** of relations (`@relation(fields: [...], references: [...], onDelete?, onUpdate?)`)
+  - one-to-many **navigation list fields** (`User.posts Post[]`) when they can be matched to an FK-side relation
+  - relation naming via `@relation("Name")` and `@relation(name: "Name")` for disambiguation
+- PSL v1 still does **not** support implicit many-to-many.
 
 Many-to-many **can** be represented structurally with an explicit join model (two foreign keys), but without list navigation fields.
 
@@ -84,7 +84,6 @@ Many-to-many **can** be represented structurally with an explicit join model (tw
 
 These are recurring “next” areas implied by the above limitations:
 
-- **Relation navigation fields** (support list relation fields while still rejecting scalar lists)
 - **Broader parameterized native types** (`@db.`* parity beyond pgvector)
 - **Richer index / constraint features** (names, methods, predicates) gated by target/packs
 - **Tooling-friendly inline language blocks** (tagged template literals like `sql\`...`) for SQL snippets, with explicit rules (e.g. no interpolation) and parser-agnostic tag configuration
