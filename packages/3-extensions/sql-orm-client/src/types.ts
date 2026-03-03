@@ -551,7 +551,8 @@ export type CreateInput<TContract extends SqlContract<SqlStorage>, ModelName ext
 > &
   Partial<
     Pick<DefaultModelRow<TContract, ModelName>, OptionalCreateFieldNames<TContract, ModelName>>
-  >;
+  > &
+  RelationMutationFields<TContract, ModelName>;
 
 type ModelStorageTableDef<
   TContract extends SqlContract<SqlStorage>,

@@ -1,6 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { Collection } from '../src/collection';
-import type { RelationMutator } from '../src/types';
+
 import { createMockRuntime } from './helpers';
 
 type GeneratedLikeContract = SqlContract<
@@ -179,7 +179,7 @@ userCollection.create({
   id: 'user_001',
   name: 'Alice',
   email: 'alice@example.com',
-  posts: (posts: RelationMutator<GeneratedLikeContract, 'Post'>) =>
+  posts: (posts) =>
     posts.create([
       {
         id: 'post_001',
