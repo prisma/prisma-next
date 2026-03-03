@@ -18,9 +18,10 @@ import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
-  createBuiltinDefaultFunctionRegistry,
+  type ControlMutationDefaults,
   type DefaultFunctionRegistry,
   lowerDefaultFunctionWithRegistry,
+  type MutationDefaultGeneratorDescriptor,
   parseDefaultFunctionCall,
 } from './default-function-registry';
 
@@ -35,7 +36,9 @@ export interface InterpretPslDocumentToSqlContractIRInput {
   readonly document: ParsePslDocumentResult;
   readonly target?: TargetPackRef<'sql', 'postgres'>;
   readonly composedExtensionPacks?: readonly string[];
+  readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly defaultFunctionRegistry?: DefaultFunctionRegistry;
+  readonly generatorDescriptors?: readonly MutationDefaultGeneratorDescriptor[];
 }
 
 const DEFAULT_POSTGRES_TARGET: TargetPackRef<'sql', 'postgres'> = {
@@ -315,6 +318,8 @@ function lowerDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
   readonly defaultAttribute: PslAttribute;
+  readonly columnDescriptor: ColumnDescriptor;
+  readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly sourceId: string;
   readonly defaultFunctionRegistry: DefaultFunctionRegistry;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -369,6 +374,7 @@ function lowerDefaultForField(input: {
       sourceId: input.sourceId,
       modelName: input.modelName,
       fieldName: input.fieldName,
+      columnCodecId: input.columnDescriptor.codecId,
     },
   });
 
@@ -380,6 +386,28 @@ function lowerDefaultForField(input: {
   if (lowered.value.kind === 'storage') {
     return { defaultValue: lowered.value.defaultValue };
   }
+
+  const generatorDescriptor = input.generatorDescriptorById.get(lowered.value.generated.id);
+  if (!generatorDescriptor) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+      message: `Default generator "${lowered.value.generated.id}" is not available in the composed mutation default registry.`,
+      sourceId: input.sourceId,
+      span: expressionEntry.span,
+    });
+    return {};
+  }
+
+  if (!generatorDescriptor.applicableCodecIds.includes(input.columnDescriptor.codecId)) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+      message: `Default generator "${generatorDescriptor.id}" is not applicable to "${input.modelName}.${input.fieldName}" with codecId "${input.columnDescriptor.codecId}".`,
+      sourceId: input.sourceId,
+      span: expressionEntry.span,
+    });
+    return {};
+  }
+
   return { executionDefault: lowered.value.generated };
 }
 
@@ -475,6 +503,7 @@ function collectResolvedFields(
   modelNames: Set<string>,
   composedExtensions: Set<string>,
   defaultFunctionRegistry: DefaultFunctionRegistry,
+  generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
 ): ResolvedField[] {
@@ -582,6 +611,8 @@ function collectResolvedFields(
           modelName: model.name,
           fieldName: field.name,
           defaultAttribute,
+          columnDescriptor: descriptor,
+          generatorDescriptorById,
           sourceId,
           defaultFunctionRegistry,
           diagnostics,
@@ -1078,7 +1109,15 @@ export function interpretPslDocumentToSqlContractIR(
   const sourceId = input.document.ast.sourceId;
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
   const defaultFunctionRegistry =
-    input.defaultFunctionRegistry ?? createBuiltinDefaultFunctionRegistry();
+    input.controlMutationDefaults?.defaultFunctionRegistry ??
+    input.defaultFunctionRegistry ??
+    new Map<string, never>();
+  const generatorDescriptors =
+    input.controlMutationDefaults?.generatorDescriptors ?? input.generatorDescriptors ?? [];
+  const generatorDescriptorById = new Map<string, MutationDefaultGeneratorDescriptor>();
+  for (const descriptor of generatorDescriptors) {
+    generatorDescriptorById.set(descriptor.id, descriptor);
+  }
 
   let builder = defineContract().target(
     input.target ?? DEFAULT_POSTGRES_TARGET,
@@ -1208,6 +1247,7 @@ export function interpretPslDocumentToSqlContractIR(
       modelNames,
       composedExtensions,
       defaultFunctionRegistry,
+      generatorDescriptorById,
       diagnostics,
       sourceId,
     );

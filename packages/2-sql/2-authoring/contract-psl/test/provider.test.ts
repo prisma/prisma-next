@@ -2,11 +2,22 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createBuiltinControlMutationDefaults } from '../src/default-function-registry';
 import { prismaContract } from '../src/exports/provider';
 
 describe('prismaContract provider helper', () => {
   const originalCwd = process.cwd();
   const tempDirs: string[] = [];
+  const frameworkComponents = [
+    {
+      kind: 'adapter' as const,
+      id: 'test-adapter',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      controlMutationDefaults: () => createBuiltinControlMutationDefaults(),
+    },
+  ];
 
   afterEach(async () => {
     process.chdir(originalCwd);
@@ -235,7 +246,16 @@ model Document {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', {
-        composedExtensionPacks: ['pgvector'],
+        frameworkComponents: [
+          ...frameworkComponents,
+          {
+            kind: 'extension' as const,
+            id: 'pgvector',
+            version: '0.0.1',
+            familyId: 'sql' as const,
+            targetId: 'postgres' as const,
+          },
+        ],
       });
       const result = await contract.source();
 
@@ -272,7 +292,9 @@ model Document {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma');
+      const contract = prismaContract('./schema.prisma', {
+        frameworkComponents,
+      });
       const result = await contract.source();
 
       expect(result.ok).toBe(true);
@@ -329,7 +351,9 @@ model Document {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma');
+      const contract = prismaContract('./schema.prisma', {
+        frameworkComponents,
+      });
       const result = await contract.source();
 
       expect(result.ok).toBe(false);
