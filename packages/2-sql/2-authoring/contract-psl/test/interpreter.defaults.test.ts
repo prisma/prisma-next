@@ -1,8 +1,10 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
+import { createBuiltinControlMutationDefaults } from '../src/default-function-registry';
 import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
 
 describe('interpretPslDocumentToSqlContractIR default lowering', () => {
+  const builtinControlMutationDefaults = createBuiltinControlMutationDefaults();
   it('lowers supported default functions into execution and storage contract shapes', () => {
     const document = parsePslDocument({
       schema: `model Defaults {
@@ -19,7 +21,10 @@ describe('interpretPslDocumentToSqlContractIR default lowering', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -98,7 +103,10 @@ describe('interpretPslDocumentToSqlContractIR default lowering', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -138,7 +146,10 @@ describe('interpretPslDocumentToSqlContractIR default lowering', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
