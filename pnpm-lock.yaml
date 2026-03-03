@@ -1588,6 +1588,9 @@ importers:
       arktype:
         specifier: ^2.0.0
         version: 2.1.29
+      uniku:
+        specifier: ^0.0.12
+        version: 0.0.12
     devDependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
@@ -1634,6 +1637,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../2-sql/3-tooling/family
+      '@prisma-next/ids':
+        specifier: workspace:*
+        version: link:../../../1-framework/2-authoring/ids
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../../2-sql/1-core/contract
