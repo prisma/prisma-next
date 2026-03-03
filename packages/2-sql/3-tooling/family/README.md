@@ -20,6 +20,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Destructive Change Detection**: Compares two `SqlStorage` values and identifies destructive changes (dropped tables/columns) for migration policy enforcement
 - **Storage Type Control Hooks**: Extracts codec-owned control hooks for planning/verification/introspection of `storage.types` without adding enum-specific fields to shared IR
 - **Codec Ownership**: Enforces a single owner per `codecId` for parameterized renderers and control-plane hooks to prevent ambiguous conflicts during assembly
+- **Mutation Default Registry Assembly**: Assembles control-plane default-function handlers and generator descriptors from composed components with hard-error collisions
 - **Parameterized Type Verification**: Expands contract `typeParams` into expected native type strings during schema verification and flags missing parameters as type mismatches
 - **Schema Defaults Policy**: Ignores execution mutation defaults during schema verification since they are applied before DB writes
 - **Foreign Key Config Awareness**: Schema verification respects the contract's `foreignKeys` configuration — when `foreignKeys.constraints` is `false`, FK constraint checks are skipped during verification (see [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md))
@@ -102,7 +103,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 
 - **`src/core/control-descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
 - **`src/core/control-instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
-- **`src/core/assembly.ts`**: Assembly helpers for building operation registries, extracting type imports, and collecting codec-owned storage type control hooks. Test utilities import `convertOperationManifest` from the same package via relative path.
+- **`src/core/assembly.ts`**: Assembly helpers for building operation registries, extracting type imports, collecting codec-owned storage type control hooks, and composing mutation-default registries with duplicate detection.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations
 - **`src/core/migrations/`**: Migration IR helpers plus planner and runner SPI types (`MigrationPlanner`, `MigrationRunner`, `SqlControlTargetDescriptor`). Runners return `MigrationRunnerResult` which is a union of success/failure.
