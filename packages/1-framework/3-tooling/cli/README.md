@@ -786,7 +786,7 @@ Update your database schema to match the currently emitted contract.
 
 - Works on any database, whether or not it has been initialized with `db init` (creates the signature table if missing)
 - Allows `additive`, `widening`, and `destructive` operation classes where supported by planner/runner
-- Keeps full runner execution checks enabled
+- Disables per-operation runner execution checks by default (precheck/postcheck/idempotency)
 - In `--plan` mode for SQL targets, prints a DDL preview derived from planned operations
 
 **Command:**

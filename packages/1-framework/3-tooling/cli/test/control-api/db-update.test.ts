@@ -420,6 +420,53 @@ describe('executeDbUpdate', () => {
     });
   });
 
+  it('passes disabled execution checks to runner in apply mode', async () => {
+    const runnerExecute = vi
+      .fn()
+      .mockResolvedValue(ok({ operationsPlanned: 1, operationsExecuted: 1 }));
+    const migrations = {
+      createPlanner: () => ({
+        plan: vi.fn().mockReturnValue({
+          kind: 'success',
+          plan: {
+            targetId: 'postgres',
+            destination: { storageHash: 'sha256:dest' },
+            operations: [
+              {
+                id: 'column.user.nickname',
+                label: 'Add column nickname on user',
+                operationClass: 'additive',
+              },
+            ],
+          },
+        }),
+      }),
+      createRunner: () => ({
+        execute: runnerExecute,
+      }),
+    } as unknown as TargetMigrationsCapability<'sql', 'postgres', ControlFamilyInstance<'sql'>>;
+
+    const result = await executeDbUpdate({
+      driver: createMockDriver(),
+      familyInstance: createMockFamilyInstance(),
+      contractIR: dummyContractIR,
+      mode: 'apply',
+      migrations,
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(runnerExecute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        executionChecks: {
+          prechecks: false,
+          postchecks: false,
+          idempotencyChecks: false,
+        },
+      }),
+    );
+  });
+
   describe('progress events', () => {
     it('emits introspect and plan spans in plan mode', async () => {
       const events: ControlProgressEvent[] = [];

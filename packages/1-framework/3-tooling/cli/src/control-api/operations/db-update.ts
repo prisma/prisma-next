@@ -153,15 +153,19 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 
   const callbacks = createOperationCallbacks(onProgress, 'dbUpdate', applySpanId);
 
-  // db update keeps all execution checks enabled (the runner default). Unlike db init, which
-  // disables checks because it plans and applies from a fresh introspection, db update operates
-  // on databases that may have drifted since the last marker write.
   const runnerResult: MigrationRunnerResult = await runner.execute({
     plan: migrationPlan,
     driver,
     destinationContract: contractIR,
     policy,
     ...(callbacks ? { callbacks } : {}),
+    // db update plans and applies from a single introspection pass, so per-operation pre/postchecks
+    // and idempotency probes are intentionally disabled to avoid redundant roundtrips.
+    executionChecks: {
+      prechecks: false,
+      postchecks: false,
+      idempotencyChecks: false,
+    },
     frameworkComponents,
   });
 
