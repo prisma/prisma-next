@@ -46,6 +46,6 @@ This milestone implements the parser API in `packages/1-framework/2-authoring/ps
 # References
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
-- Project plan: `projects/psl-contract-authoring/plans/plan.md`
+- Project plan: `projects/psl-contract-authoring/plan.md`
 - Parser package: `packages/1-framework/2-authoring/psl-parser`
 
