@@ -108,7 +108,7 @@ If the runner detects that the resulting schema does not match the contract, it 
 | Requires marker | No | No |
 | Creates marker | Yes (on apply) | Creates or updates marker (on apply) |
 | Operation policy | Additive only | Additive + widening + destructive |
-| Execution checks | Disabled (fresh introspection) | Enabled (database may have drifted) |
+| Execution checks | Disabled (fresh introspection) | Disabled by default (same-session plan/apply) |
 | Existing marker handling | Idempotent if hash matches; error if mismatched | Ignored; marker is bookkeeping only |
 | Use case | Conservative first-time signing (additive only) | General-purpose schema evolution |
 
