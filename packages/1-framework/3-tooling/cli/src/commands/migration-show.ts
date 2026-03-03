@@ -54,8 +54,9 @@ export function resolveByHashPrefix(
   packages: readonly MigrationPackage[],
   prefix: string,
 ): Result<MigrationPackage, CliStructuredError> {
+  const normalizedPrefix = prefix.startsWith('sha256:') ? prefix : `sha256:${prefix}`;
   const attested = packages.filter((p) => typeof p.manifest.edgeId === 'string');
-  const matches = attested.filter((p) => p.manifest.edgeId!.startsWith(prefix));
+  const matches = attested.filter((p) => p.manifest.edgeId!.startsWith(normalizedPrefix));
 
   if (matches.length === 1) {
     return ok(matches[0]!);
@@ -64,7 +65,7 @@ export function resolveByHashPrefix(
   if (matches.length === 0) {
     return notOk(
       errorRuntime('No migration found matching prefix', {
-        why: `No attested migration has an edgeId starting with "${prefix}"`,
+        why: `No attested migration has an edgeId starting with "${normalizedPrefix}"`,
         fix: 'Run `prisma-next migration show` (no argument) to see the latest migration, or check the migrations directory for available packages.',
       }),
     );
@@ -73,7 +74,7 @@ export function resolveByHashPrefix(
   const candidates = matches.map((p) => `  ${p.dirName}  ${p.manifest.edgeId}`).join('\n');
   return notOk(
     errorRuntime('Ambiguous hash prefix', {
-      why: `Multiple migrations match prefix "${prefix}":\n${candidates}`,
+      why: `Multiple migrations match prefix "${normalizedPrefix}":\n${candidates}`,
       fix: 'Provide a longer prefix to uniquely identify the migration.',
     }),
   );

@@ -228,6 +228,34 @@ describe('resolveByHashPrefix', () => {
     }
   });
 
+  it('resolves prefix without sha256: scheme', () => {
+    const packages: MigrationPackage[] = [
+      {
+        dirName: '20260101_100000_test',
+        dirPath: '/tmp/test',
+        manifest: {
+          from: EMPTY_CONTRACT_HASH,
+          to: 'sha256:hash-a',
+          edgeId: 'sha256:abc123def456',
+          parentEdgeId: null,
+          kind: 'regular',
+          fromContract: null,
+          toContract: createTestContract(),
+          hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
+          labels: [],
+          createdAt: new Date().toISOString(),
+        },
+        ops: [],
+      },
+    ];
+
+    const result = resolveByHashPrefix(packages, 'abc123');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.manifest.edgeId).toBe('sha256:abc123def456');
+    }
+  });
+
   it('skips draft migrations (edgeId: null)', () => {
     const packages: MigrationPackage[] = [
       {
