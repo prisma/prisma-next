@@ -72,7 +72,7 @@ export function buildReconciliationPlan(options: {
   }
 
   return {
-    operations: operations.sort((a, b) => a.id.localeCompare(b.id)),
+    operations,
     conflicts: conflicts.sort(conflictComparator),
   };
 }
