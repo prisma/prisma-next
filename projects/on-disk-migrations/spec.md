@@ -357,6 +357,20 @@ The edge chain is `edge1 → edge2 → edge3` regardless of contract hash revisi
 
 **`parentEdgeId` is a required field.** There are no existing production users, so backward compatibility is not a concern.
 
+### Alternatives considered
+
+**1. Use `from` hash as an implicit parent pointer.** Each migration already has a `from` hash. To find the parent, find the edge whose `to` matches my `from`. This works when every contract hash is unique — but breaks when hashes are revisited. After `empty → C1 → C2 → C1`, a new migration with `from: C1` could follow edge1 (`to: C1`) or edge3 (`to: C1`). There is no way to distinguish a branch from a continuation. `parentEdgeId` is unambiguous because it points to a specific *edge*, not a *hash* that multiple edges may share.
+
+**2. Use timestamps (`createdAt`) for ordering.** Find the leaf via `max(createdAt)`. This fails in two ways. First, it cannot detect branches: if Alice plans at 10:01 and Bob plans at 10:02 from the same base, `max(createdAt)` silently picks Bob's migration and orphans Alice's. There is no error, no signal that two developers diverged — the system just loses one migration. Second, clock skew between machines can produce incorrect ordering. Timestamps are useful as human-readable metadata (directory naming) but are not reliable as an ordering primitive.
+
+**3. Use a sequence number.** Each migration gets a monotonically increasing `sequence: number`. The leaf is `max(sequence)`. This is simpler than parent pointers but has the same team-collaboration problem as timestamps: Alice gets sequence 2, Bob gets sequence 2. Now there are two migrations with the same sequence and no structural way to detect the conflict. Additionally, sequence numbers require coordination (who assigns the next number?), which is at odds with offline, independent planning.
+
+**4. Use a `HEAD` file.** Like git's `HEAD`, keep a `migrations/HEAD` file that records the current leaf's `edgeId`. `migration plan` reads HEAD, writes the new migration, updates HEAD. This is O(1) for leaf lookup and avoids graph traversal entirely. However, HEAD is a mutable singleton file that becomes a merge-conflict magnet in team workflows. When Alice and Bob both update HEAD on their branches, the git merge produces a conflict on HEAD — which is a useful signal, but annoying to resolve compared to the structural detection that `parentEdgeId` provides. HEAD also introduces a single point of corruption: if the file is lost or mangled, the system cannot determine the leaf without falling back to graph analysis anyway.
+
+**5. Treat hash revisits as errors.** If a migration would create a cycle at the node level (`to` hash already appears as a node), reject it. This keeps the contract graph acyclic without needing `parentEdgeId`. However, this blocks legitimate workflows: adding a column, deploying to production, discovering a problem, and rolling back. The rollback produces a migration whose `to` matches a previously-seen hash. Blocking this forces users to produce artificially different contract states (e.g., adding a no-op change) to avoid the error. This is hostile UX for a common real-world scenario.
+
+**6. Ignore revisited hashes and skip redundant migrations.** If the DB marker is already at the target hash, skip all intermediate migrations. This works for `migration apply` (which can compare the marker to the leaf and see "already there"), but fails for `migration plan`. The plan command is offline — it must determine the current schema state from disk alone. Without `parentEdgeId`, it cannot find the latest migration in a graph with revisited hashes (see "Problem" above). Additionally, skipping migrations is only safe when contract hashes are a faithful representation of database state. Future data migrations (backfills, transforms) would break this assumption: two databases at the same contract hash could differ in their data state depending on which migrations they applied.
+
 ### Consequences
 
 - `migration plan` must look up the leaf edge's `edgeId` and write it as `parentEdgeId` on the new manifest.
