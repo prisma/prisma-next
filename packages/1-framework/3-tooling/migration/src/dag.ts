@@ -78,7 +78,10 @@ export function findLeafEdge(graph: MigrationGraph): MigrationGraphEdge | null {
     throw errorAmbiguousLeaf(roots.map((e) => e.to));
   }
 
-  let current = roots[0]!;
+  let current = roots[0];
+  if (!current) {
+    throw errorNoLeaf([...graph.nodes].sort());
+  }
 
   for (let depth = 0; depth < graph.edgeById.size + 1; depth++) {
     const children = current.edgeId !== null ? graph.childEdges.get(current.edgeId) : undefined;
@@ -91,7 +94,9 @@ export function findLeafEdge(graph: MigrationGraph): MigrationGraphEdge | null {
       throw errorAmbiguousLeaf(children.map((e) => e.to));
     }
 
-    current = children[0]!;
+    const next = children[0];
+    if (!next) break;
+    current = next;
   }
 
   throw errorNoLeaf([...graph.nodes].sort());
@@ -129,12 +134,12 @@ export function findPath(
   if (
     fromHash === EMPTY_CONTRACT_HASH &&
     chain.length > 0 &&
-    chain[0]!.from === EMPTY_CONTRACT_HASH
+    chain[0]?.from === EMPTY_CONTRACT_HASH
   ) {
     startIdx = 0;
   } else {
     for (let i = chain.length - 1; i >= 0; i--) {
-      if (chain[i]!.to === fromHash) {
+      if (chain[i]?.to === fromHash) {
         startIdx = i + 1;
         break;
       }
@@ -145,7 +150,7 @@ export function findPath(
 
   let endIdx = -1;
   for (let i = chain.length - 1; i >= startIdx; i--) {
-    if (chain[i]!.to === toHash) {
+    if (chain[i]?.to === toHash) {
       endIdx = i + 1;
       break;
     }
