@@ -7,7 +7,7 @@ describe('pgvector codecs', () => {
     expect(vectorDef).toBeDefined();
     expect(vectorDef.typeId).toBe('pg/vector@1');
     expect(vectorDef.codec.targetTypes).toEqual(['vector']);
-  });
+  }, 1_000);
 
   it('encodes number array to PostgreSQL vector format', () => {
     const vectorCodec = codecDefinitions.vector.codec;
