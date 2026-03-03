@@ -10,6 +10,7 @@ import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { SqlStatement } from '../src/exports';
 import {
+  createBuiltinMutationDefaultGenerators,
   createExecutionContext,
   type createRuntime,
   createSqlExecutionStack,
@@ -121,6 +122,7 @@ export function createTestAdapterDescriptor(
     codecs: () => codecRegistry,
     operationSignatures: () => [],
     parameterizedCodecs: () => [],
+    mutationDefaultGenerators: () => createBuiltinMutationDefaultGenerators(),
     create(): SqlRuntimeAdapterInstance<'postgres'> {
       return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
     },

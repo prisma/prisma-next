@@ -1,5 +1,8 @@
 import { checkContractComponentRequirements } from '@prisma-next/contract/framework-components';
-import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type {
+  ExecutionMutationDefaultValue,
+  GeneratedValueSpec,
+} from '@prisma-next/contract/types';
 import { createExecutionStack, type ExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeAdapterDescriptor,
@@ -53,6 +56,12 @@ export interface SqlStaticContributions {
   readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
   readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
+  readonly mutationDefaultGenerators?: () => ReadonlyArray<RuntimeMutationDefaultGenerator>;
+}
+
+export interface RuntimeMutationDefaultGenerator {
+  readonly id: string;
+  readonly generate: (params?: Record<string, unknown>) => unknown;
 }
 
 export interface SqlRuntimeTargetDescriptor<
@@ -141,6 +150,25 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
 }
 
 export type { ExecutionContext, JsonSchemaValidatorRegistry, TypeHelperRegistry };
+
+const builtinMutationDefaultGeneratorIds = [
+  'ulid',
+  'nanoid',
+  'uuidv7',
+  'uuidv4',
+  'cuid2',
+  'ksuid',
+] as const satisfies readonly GeneratedValueSpec['id'][];
+
+export function createBuiltinMutationDefaultGenerators(): readonly RuntimeMutationDefaultGenerator[] {
+  return builtinMutationDefaultGeneratorIds.map((id) => ({
+    id,
+    generate: (params?: Record<string, unknown>) => {
+      const spec: GeneratedValueSpec = params ? { id, params } : { id };
+      return generateId(spec);
+    },
+  }));
+}
 
 export function assertExecutionStackContractRequirements(
   contract: SqlContract<SqlStorage>,
@@ -344,15 +372,58 @@ function buildJsonSchemaValidatorRegistry(
   };
 }
 
-function computeExecutionDefaultValue(spec: ExecutionMutationDefaultValue): unknown {
+function collectMutationDefaultGenerators(
+  contributors: ReadonlyArray<SqlStaticContributions & { readonly id: string }>,
+): ReadonlyMap<string, RuntimeMutationDefaultGenerator> {
+  const generators = new Map<string, RuntimeMutationDefaultGenerator>();
+  const owners = new Map<string, string>();
+
+  for (const contributor of contributors) {
+    const nextGenerators = contributor.mutationDefaultGenerators?.() ?? [];
+    for (const generator of nextGenerators) {
+      const existingOwner = owners.get(generator.id);
+      if (existingOwner !== undefined) {
+        throw runtimeError(
+          'RUNTIME.DUPLICATE_MUTATION_DEFAULT_GENERATOR',
+          `Duplicate mutation default generator '${generator.id}'.`,
+          {
+            id: generator.id,
+            existingOwner,
+          },
+        );
+      }
+      generators.set(generator.id, generator);
+      owners.set(generator.id, contributor.id);
+    }
+  }
+
+  return generators;
+}
+
+function computeExecutionDefaultValue(
+  spec: ExecutionMutationDefaultValue,
+  generatorRegistry: ReadonlyMap<string, RuntimeMutationDefaultGenerator>,
+): unknown {
   switch (spec.kind) {
-    case 'generator':
-      return generateId(spec.params ? { id: spec.id, params: spec.params } : { id: spec.id });
+    case 'generator': {
+      const generator = generatorRegistry.get(spec.id);
+      if (!generator) {
+        throw runtimeError(
+          'RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING',
+          `Contract references mutation default generator '${spec.id}' but no runtime component provides it.`,
+          {
+            id: spec.id,
+          },
+        );
+      }
+      return generator.generate(spec.params);
+    }
   }
 }
 
 function applyMutationDefaults(
   contract: SqlContract<SqlStorage>,
+  generatorRegistry: ReadonlyMap<string, RuntimeMutationDefaultGenerator>,
   options: MutationDefaultsOptions,
 ): ReadonlyArray<AppliedMutationDefault> {
   const defaults = contract.execution?.mutations.defaults ?? [];
@@ -381,7 +452,7 @@ function applyMutationDefaults(
 
     applied.push({
       column: columnName,
-      value: computeExecutionDefaultValue(defaultSpec),
+      value: computeExecutionDefaultValue(defaultSpec, generatorRegistry),
     });
     appliedColumns.add(columnName);
   }
@@ -403,7 +474,7 @@ export function createExecutionContext<
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();
 
-  const contributors: SqlStaticContributions[] = [
+  const contributors: Array<SqlStaticContributions & { readonly id: string }> = [
     stack.target,
     stack.adapter,
     ...stack.extensionPacks,
@@ -419,6 +490,7 @@ export function createExecutionContext<
   }
 
   const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(contributors);
+  const mutationDefaultGeneratorRegistry = collectMutationDefaultGenerators(contributors);
 
   if (parameterizedCodecDescriptors.size > 0) {
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
@@ -438,6 +510,7 @@ export function createExecutionContext<
     codecs: codecRegistry,
     types,
     ...(jsonSchemaValidators ? { jsonSchemaValidators } : {}),
-    applyMutationDefaults: (options) => applyMutationDefaults(contract, options),
+    applyMutationDefaults: (options) =>
+      applyMutationDefaults(contract, mutationDefaultGeneratorRegistry, options),
   };
 }
