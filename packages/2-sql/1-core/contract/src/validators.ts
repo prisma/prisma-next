@@ -21,7 +21,9 @@ type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: s
 const literalKindSchema = type("'literal'");
 const functionKindSchema = type("'function'");
 const generatorKindSchema = type("'generator'");
-const generatorIdSchema = type("'ulid' | 'nanoid' | 'uuidv7' | 'uuidv4' | 'cuid2' | 'ksuid'");
+const generatorIdSchema = type('string').narrow((value, ctx) => {
+  return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value) ? true : ctx.mustBe('a flat generator id');
+});
 
 export const ColumnDefaultLiteralSchema = type.declare<ColumnDefaultLiteral>().type({
   kind: literalKindSchema,

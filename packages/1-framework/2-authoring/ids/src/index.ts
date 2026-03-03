@@ -1,17 +1,14 @@
-import type {
-  ExecutionMutationDefaultValue,
-  GeneratedValueSpec,
-} from '@prisma-next/contract/types';
+import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { IdGeneratorOptionsById } from './generators';
+import type { BuiltinGeneratorId, IdGeneratorOptionsById } from './generators';
 
 type GeneratedColumnDescriptor = {
   readonly type: ColumnTypeDescriptor;
   readonly typeParams?: Record<string, unknown>;
 };
 
-const generatedColumnDescriptors: Record<GeneratedValueSpec['id'], GeneratedColumnDescriptor> = {
+const generatedColumnDescriptors: Record<BuiltinGeneratorId, GeneratedColumnDescriptor> = {
   ulid: {
     type: { codecId: 'sql/char@1', nativeType: 'character' },
     typeParams: { length: 26 },
@@ -45,7 +42,7 @@ export type GeneratedColumnSpec = {
   readonly generated: ExecutionMutationDefaultValue;
 };
 
-function createGeneratedSpec<TId extends GeneratedValueSpec['id']>(
+function createGeneratedSpec<TId extends BuiltinGeneratorId>(
   id: TId,
   options?: IdGeneratorOptionsById[TId],
 ): GeneratedColumnSpec {
