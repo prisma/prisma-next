@@ -45,6 +45,16 @@ export interface SqlControlDescriptorWithContributions extends SqlControlStaticC
   };
 }
 
+export interface ControlMutationDefaultGeneratorDescriptor {
+  readonly id: string;
+  readonly applicableCodecIds: readonly string[];
+}
+
+export interface AssembledControlMutationDefaultContributions {
+  readonly defaultFunctionRegistry: ReadonlyMap<string, unknown>;
+  readonly generatorDescriptors: readonly ControlMutationDefaultGeneratorDescriptor[];
+}
+
 export function assembleOperationRegistry(
   descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
 ): OperationRegistry {
@@ -213,4 +223,62 @@ export function extractParameterizedTypeImports(
   }
 
   return imports;
+}
+
+export function createControlMutationDefaultGeneratorDescriptorMap(
+  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
+): ReadonlyMap<string, ControlMutationDefaultGeneratorDescriptor> {
+  const map = new Map<string, ControlMutationDefaultGeneratorDescriptor>();
+  const owners = new Map<string, string>();
+
+  for (const descriptor of descriptors) {
+    const contributions = descriptor.controlMutationDefaults?.();
+    if (!contributions) {
+      continue;
+    }
+
+    for (const generatorDescriptor of contributions.generatorDescriptors) {
+      const owner = owners.get(generatorDescriptor.id);
+      if (owner) {
+        throw new Error(
+          `Duplicate mutation default generator id "${generatorDescriptor.id}". Descriptor "${descriptor.id}" conflicts with "${owner}".`,
+        );
+      }
+      map.set(generatorDescriptor.id, generatorDescriptor);
+      owners.set(generatorDescriptor.id, descriptor.id);
+    }
+  }
+
+  return map;
+}
+
+export function assembleControlMutationDefaultContributions(
+  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
+): AssembledControlMutationDefaultContributions {
+  const defaultFunctionRegistry = new Map<string, unknown>();
+  const functionOwners = new Map<string, string>();
+  const generatorMap = createControlMutationDefaultGeneratorDescriptorMap(descriptors);
+
+  for (const descriptor of descriptors) {
+    const contributions = descriptor.controlMutationDefaults?.();
+    if (!contributions) {
+      continue;
+    }
+
+    for (const [functionName, handler] of contributions.defaultFunctionRegistry) {
+      const owner = functionOwners.get(functionName);
+      if (owner) {
+        throw new Error(
+          `Duplicate mutation default function "${functionName}". Descriptor "${descriptor.id}" conflicts with "${owner}".`,
+        );
+      }
+      defaultFunctionRegistry.set(functionName, handler);
+      functionOwners.set(functionName, descriptor.id);
+    }
+  }
+
+  return {
+    defaultFunctionRegistry,
+    generatorDescriptors: Array.from(generatorMap.values()),
+  };
 }
