@@ -283,6 +283,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         leafHash: 'sha256:hash-b',
+        contractHash: 'sha256:hash-b',
         summary: '2 migration(s) on disk',
       },
       flags,
@@ -323,6 +324,7 @@ describe('formatMigrationStatusOutput', () => {
         ],
         markerHash: 'sha256:hash-a',
         leafHash: 'sha256:hash-b',
+        contractHash: 'sha256:hash-b',
         summary: "1 pending migration(s) — run 'prisma-next migration apply' to apply",
       },
       flags,
@@ -353,6 +355,7 @@ describe('formatMigrationStatusOutput', () => {
         ],
         markerHash: 'sha256:hash-a',
         leafHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-a',
         summary: 'Database is up to date (1 migration applied)',
       },
       flags,
@@ -383,6 +386,7 @@ describe('formatMigrationStatusOutput', () => {
         ],
         markerHash: 'sha256:totally-different',
         leafHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-a',
         summary:
           "Database marker does not match any migration — was the database managed with 'db update'?",
       },
@@ -394,6 +398,114 @@ describe('formatMigrationStatusOutput', () => {
     expect(stripped).toContain('db update');
     expect(stripped).not.toContain('Applied');
     expect(stripped).not.toContain('Pending');
+  });
+
+  it('renders contract-ahead hint when contract hash differs from leaf', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'offline',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            edgeId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'unknown',
+          },
+        ],
+        leafHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-b',
+        summary: '1 migration(s) on disk',
+        diagnostics: [
+          {
+            code: 'CONTRACT.AHEAD',
+            severity: 'warn',
+            message: 'Contract has changed since the last migration was planned',
+            hints: [
+              "Run 'prisma-next migration plan' to generate a migration for the current contract",
+            ],
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('◄ Contract is ahead — run migration plan');
+    expect(stripped).not.toContain('◄ Contract\n');
+  });
+
+  it('renders warn diagnostics with hints', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'offline',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            edgeId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'unknown',
+          },
+        ],
+        leafHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-a',
+        summary: '1 migration(s) on disk',
+        diagnostics: [
+          {
+            code: 'CONTRACT.UNREADABLE',
+            severity: 'warn',
+            message: 'Could not read contract file — contract state unknown',
+            hints: ["Run 'prisma-next contract emit' to generate a contract"],
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('⚠ Could not read contract file');
+    expect(stripped).toContain("Run 'prisma-next contract emit'");
+  });
+
+  it('does not render info diagnostics in human output', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'online',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            edgeId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'applied',
+          },
+        ],
+        markerHash: 'sha256:hash-a',
+        leafHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-a',
+        summary: 'Database is up to date (1 migration applied)',
+        diagnostics: [
+          {
+            code: 'MIGRATION.UP_TO_DATE',
+            severity: 'info',
+            message: 'Database is up to date',
+            hints: [],
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('up to date');
+    expect(stripped).not.toContain('MIGRATION.UP_TO_DATE');
   });
 
   it('highlights destructive operations in yellow', () => {
@@ -412,6 +524,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         leafHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-a',
         summary: '1 migration(s) on disk',
       },
       flags,
@@ -428,6 +541,7 @@ describe('formatMigrationStatusOutput', () => {
         mode: 'offline',
         migrations: [],
         leafHash: EMPTY_CONTRACT_HASH,
+        contractHash: EMPTY_CONTRACT_HASH,
         summary: 'No migrations found',
       },
       flags,
@@ -445,6 +559,7 @@ describe('formatMigrationStatusOutput', () => {
         mode: 'offline',
         migrations: [],
         leafHash: EMPTY_CONTRACT_HASH,
+        contractHash: EMPTY_CONTRACT_HASH,
         summary: 'No migrations found',
       },
       flags,

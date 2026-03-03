@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
@@ -14,7 +15,11 @@ import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
-import { maskConnectionUrl, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  maskConnectionUrl,
+  resolveContractPath,
+  setCommandDescriptions,
+} from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -49,13 +54,22 @@ export interface MigrationStatusEntry {
   readonly status: 'applied' | 'pending' | 'unknown';
 }
 
+export interface StatusDiagnostic {
+  readonly code: string;
+  readonly severity: 'warn' | 'info';
+  readonly message: string;
+  readonly hints: readonly string[];
+}
+
 export interface MigrationStatusResult {
   readonly ok: true;
   readonly mode: 'online' | 'offline';
   readonly migrations: readonly MigrationStatusEntry[];
   readonly markerHash?: string;
   readonly leafHash: string;
+  readonly contractHash: string;
   readonly summary: string;
+  readonly diagnostics: readonly StatusDiagnostic[];
 }
 
 function summarizeOps(ops: readonly MigrationPlanOperation[]): {
@@ -170,6 +184,41 @@ async function executeMigrationStatusCommand(
     console.log(header);
   }
 
+  const diagnostics: StatusDiagnostic[] = [];
+  let contractHash: string = EMPTY_CONTRACT_HASH;
+  try {
+    const contractPathAbsolute = resolveContractPath(config);
+    const contractContent = await readFile(contractPathAbsolute, 'utf-8');
+    try {
+      const contractRaw = JSON.parse(contractContent) as Record<string, unknown>;
+      const hash = contractRaw['storageHash'];
+      if (typeof hash === 'string') {
+        contractHash = hash;
+      } else {
+        diagnostics.push({
+          code: 'CONTRACT.MISSING_HASH',
+          severity: 'warn',
+          message: 'Contract file exists but has no storageHash field',
+          hints: ["Run 'prisma-next contract emit' to regenerate the contract"],
+        });
+      }
+    } catch {
+      diagnostics.push({
+        code: 'CONTRACT.INVALID_JSON',
+        severity: 'warn',
+        message: 'Contract file contains invalid JSON',
+        hints: ["Run 'prisma-next contract emit' to regenerate the contract"],
+      });
+    }
+  } catch {
+    diagnostics.push({
+      code: 'CONTRACT.UNREADABLE',
+      severity: 'warn',
+      message: 'Could not read contract file — contract state unknown',
+      hints: ["Run 'prisma-next contract emit' to generate a contract"],
+    });
+  }
+
   let allPackages: readonly MigrationPackage[];
   try {
     allPackages = await readMigrationsDir(migrationsDir);
@@ -189,12 +238,24 @@ async function executeMigrationStatusCommand(
   const attested = allPackages.filter((p) => typeof p.manifest.edgeId === 'string');
 
   if (attested.length === 0) {
+    if (contractHash !== EMPTY_CONTRACT_HASH) {
+      diagnostics.push({
+        code: 'CONTRACT.AHEAD',
+        severity: 'warn',
+        message: 'Contract has changed since the last migration was planned',
+        hints: [
+          "Run 'prisma-next migration plan' to generate a migration for the current contract",
+        ],
+      });
+    }
     return ok({
       ok: true,
       mode: dbConnection && hasDriver ? 'online' : 'offline',
       migrations: [],
       leafHash: EMPTY_CONTRACT_HASH,
+      contractHash,
       summary: 'No migrations found',
+      diagnostics,
     });
   }
 
@@ -279,12 +340,52 @@ async function executeMigrationStatusCommand(
     summary = `${entries.length} migration(s) on disk`;
   }
 
+  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== leafHash) {
+    diagnostics.push({
+      code: 'CONTRACT.AHEAD',
+      severity: 'warn',
+      message: 'Contract has changed since the last migration was planned',
+      hints: ["Run 'prisma-next migration plan' to generate a migration for the current contract"],
+    });
+  }
+
+  if (mode === 'online') {
+    const pendingCount = entries.filter((e) => e.status === 'pending').length;
+    if (!markerInChain) {
+      diagnostics.push({
+        code: 'MIGRATION.MARKER_DIVERGED',
+        severity: 'warn',
+        message: 'Database marker does not match any migration in the chain',
+        hints: [
+          "The database may have been managed with 'db update' instead of migrations",
+          "Run 'prisma-next db verify' to inspect the database state",
+        ],
+      });
+    } else if (pendingCount > 0) {
+      diagnostics.push({
+        code: 'MIGRATION.DATABASE_BEHIND',
+        severity: 'info',
+        message: `${pendingCount} migration(s) pending`,
+        hints: ["Run 'prisma-next migration apply' to apply pending migrations"],
+      });
+    } else {
+      diagnostics.push({
+        code: 'MIGRATION.UP_TO_DATE',
+        severity: 'info',
+        message: 'Database is up to date',
+        hints: [],
+      });
+    }
+  }
+
   const result: MigrationStatusResult = {
     ok: true,
     mode,
     migrations: entries,
     leafHash,
+    contractHash,
     summary,
+    diagnostics,
     ...(markerHash !== undefined ? { markerHash } : {}),
   };
   return ok(result);

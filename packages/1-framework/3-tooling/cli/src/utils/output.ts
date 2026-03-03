@@ -1018,12 +1018,21 @@ interface MigrationStatusEntry {
   readonly status: 'applied' | 'pending' | 'unknown';
 }
 
+interface StatusDiagnostic {
+  readonly code: string;
+  readonly severity: 'warn' | 'info';
+  readonly message: string;
+  readonly hints: readonly string[];
+}
+
 interface MigrationStatusResult {
   readonly mode: 'online' | 'offline';
   readonly migrations: readonly MigrationStatusEntry[];
   readonly markerHash?: string;
   readonly leafHash: string;
+  readonly contractHash: string;
   readonly summary: string;
+  readonly diagnostics?: readonly StatusDiagnostic[];
 }
 
 export function formatMigrationStatusOutput(
@@ -1071,9 +1080,11 @@ export function formatMigrationStatusOutput(
       if (isLastApplied) {
         marker = formatCyan('  ◄ DB');
       }
-      if (isLast) {
-        marker += `  ${formatCyan('◄ Contract')}`;
-      }
+    }
+    if (isLast && entry.to === result.contractHash) {
+      marker += `  ${formatCyan('◄ Contract')}`;
+    } else if (isLast && result.contractHash !== entry.to) {
+      marker += `  ${formatYellow('◄ Contract is ahead — run migration plan')}`;
     }
 
     lines.push(`${prefix}${formatDimText(treeChar)}─ ${entry.dirName}${statusBadge}${marker}`);
@@ -1105,6 +1116,17 @@ export function formatMigrationStatusOutput(
     }
   } else {
     lines.push(`${prefix}${result.summary}`);
+  }
+
+  const warnings = result.diagnostics?.filter((d) => d.severity === 'warn') ?? [];
+  if (warnings.length > 0) {
+    lines.push('');
+    for (const diag of warnings) {
+      lines.push(`${prefix}${formatYellow('⚠')} ${diag.message}`);
+      for (const hint of diag.hints) {
+        lines.push(`${prefix}  ${formatDimText(hint)}`);
+      }
+    }
   }
 
   return lines.join('\n');
