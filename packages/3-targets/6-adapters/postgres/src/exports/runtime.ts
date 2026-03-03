@@ -1,11 +1,13 @@
+import type { GeneratedValueSpec } from '@prisma-next/contract/types';
 import type { RuntimeAdapterInstance } from '@prisma-next/core-execution-plane/types';
+import { builtinGeneratorIds } from '@prisma-next/ids';
+import { generateId } from '@prisma-next/ids/runtime';
 import type { Adapter, CodecRegistry, QueryAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeAdapterDescriptor,
 } from '@prisma-next/sql-runtime';
-import { createBuiltinMutationDefaultGenerators } from '@prisma-next/sql-runtime';
 import { type as arktype } from 'arktype';
 import { createPostgresAdapter } from '../core/adapter';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
@@ -43,6 +45,16 @@ type JsonTypeParams = typeof jsonTypeParamsSchema.infer;
  */
 export type JsonCodecHelper = { readonly validate: JsonSchemaValidateFn };
 
+function createPostgresMutationDefaultGenerators() {
+  return builtinGeneratorIds.map((id) => ({
+    id,
+    generate: (params?: Record<string, unknown>) => {
+      const spec: GeneratedValueSpec = params ? { id, params } : { id };
+      return generateId(spec);
+    },
+  }));
+}
+
 function initJsonCodecHelper(params: JsonTypeParams): JsonCodecHelper {
   return { validate: compileJsonSchemaValidator(params.schemaJson as Record<string, unknown>) };
 }
@@ -68,7 +80,7 @@ const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', 
     codecs: createPostgresCodecRegistry,
     operationSignatures: () => [],
     parameterizedCodecs: () => parameterizedCodecDescriptors,
-    mutationDefaultGenerators: () => createBuiltinMutationDefaultGenerators(),
+    mutationDefaultGenerators: createPostgresMutationDefaultGenerators,
     create(): SqlRuntimeAdapter {
       return createPostgresAdapter();
     },

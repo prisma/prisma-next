@@ -1,10 +1,25 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
-import { createBuiltinControlMutationDefaults } from '../src/default-function-registry';
-import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
+import {
+  type InterpretPslDocumentToSqlContractIRInput,
+  interpretPslDocumentToSqlContractIR as interpretPslDocumentToSqlContractIRInternal,
+} from '../src/interpreter';
+import {
+  createBuiltinLikeControlMutationDefaults,
+  postgresScalarTypeDescriptors,
+  postgresTarget,
+} from './fixtures';
 
 describe('interpretPslDocumentToSqlContractIR default lowering', () => {
-  const builtinControlMutationDefaults = createBuiltinControlMutationDefaults();
+  const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
+  const interpretPslDocumentToSqlContractIR = (
+    input: Omit<InterpretPslDocumentToSqlContractIRInput, 'target' | 'scalarTypeDescriptors'>,
+  ) =>
+    interpretPslDocumentToSqlContractIRInternal({
+      target: postgresTarget,
+      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      ...input,
+    });
   it('lowers supported default functions into execution and storage contract shapes', () => {
     const document = parsePslDocument({
       schema: `model Defaults {

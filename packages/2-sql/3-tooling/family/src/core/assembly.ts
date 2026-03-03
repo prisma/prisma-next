@@ -7,7 +7,13 @@ import { normalizeRenderer } from '@prisma-next/contract/framework-components';
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
-import type { CodecControlHooks, SqlControlStaticContributions } from './migrations/types';
+import type {
+  CodecControlHooks,
+  ControlMutationDefaultFunctionEntry,
+  ControlMutationDefaultGeneratorDescriptor,
+  PslScalarTypeDescriptor,
+  SqlControlStaticContributions,
+} from './migrations/types';
 
 function addUniqueId(ids: string[], seen: Set<string>, id: string): void {
   if (!seen.has(id)) {
@@ -45,14 +51,14 @@ export interface SqlControlDescriptorWithContributions extends SqlControlStaticC
   };
 }
 
-export interface ControlMutationDefaultGeneratorDescriptor {
-  readonly id: string;
-  readonly applicableCodecIds: readonly string[];
+export interface AssembledControlMutationDefaultContributions {
+  readonly defaultFunctionRegistry: ReadonlyMap<string, ControlMutationDefaultFunctionEntry>;
+  readonly generatorDescriptors: readonly ControlMutationDefaultGeneratorDescriptor[];
 }
 
-export interface AssembledControlMutationDefaultContributions {
-  readonly defaultFunctionRegistry: ReadonlyMap<string, unknown>;
-  readonly generatorDescriptors: readonly ControlMutationDefaultGeneratorDescriptor[];
+export interface AssembledPslInterpretationContributions
+  extends AssembledControlMutationDefaultContributions {
+  readonly scalarTypeDescriptors: ReadonlyMap<string, PslScalarTypeDescriptor>;
 }
 
 export function assembleOperationRegistry(
@@ -255,7 +261,7 @@ export function createControlMutationDefaultGeneratorDescriptorMap(
 export function assembleControlMutationDefaultContributions(
   descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
 ): AssembledControlMutationDefaultContributions {
-  const defaultFunctionRegistry = new Map<string, unknown>();
+  const defaultFunctionRegistry = new Map<string, ControlMutationDefaultFunctionEntry>();
   const functionOwners = new Map<string, string>();
   const generatorMap = createControlMutationDefaultGeneratorDescriptorMap(descriptors);
 
@@ -280,5 +286,36 @@ export function assembleControlMutationDefaultContributions(
   return {
     defaultFunctionRegistry,
     generatorDescriptors: Array.from(generatorMap.values()),
+  };
+}
+
+export function assemblePslInterpretationContributions(
+  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
+): AssembledPslInterpretationContributions {
+  const mutationDefaults = assembleControlMutationDefaultContributions(descriptors);
+  const scalarTypeDescriptors = new Map<string, PslScalarTypeDescriptor>();
+  const scalarOwners = new Map<string, string>();
+
+  for (const descriptor of descriptors) {
+    const pslTypeContributions = descriptor.pslTypeDescriptors?.();
+    if (!pslTypeContributions) {
+      continue;
+    }
+
+    for (const [typeName, scalarDescriptor] of pslTypeContributions.scalarTypeDescriptors) {
+      const owner = scalarOwners.get(typeName);
+      if (owner) {
+        throw new Error(
+          `Duplicate PSL scalar type descriptor "${typeName}". Descriptor "${descriptor.id}" conflicts with "${owner}".`,
+        );
+      }
+      scalarTypeDescriptors.set(typeName, scalarDescriptor);
+      scalarOwners.set(typeName, descriptor.id);
+    }
+  }
+
+  return {
+    ...mutationDefaults,
+    scalarTypeDescriptors,
   };
 }
