@@ -93,7 +93,7 @@ describe('guards', () => {
       expect(result).toEqual([]);
     });
 
-    it('collects ColumnRefs from nested OperationExpr', () => {
+    it('collects ColumnRefs from nested OperationExpr', { timeout: 1_000 }, () => {
       const col1: ColumnRef = createColumnRef('user', 'id');
       const col2: ColumnRef = createColumnRef('user', 'email');
       const operation: OperationExpr = {
