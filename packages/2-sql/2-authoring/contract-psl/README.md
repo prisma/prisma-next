@@ -46,6 +46,7 @@ Unsupported PSL constructs in v1 (strict errors):
 - **Relation navigation lists are supported** when they can be matched to an FK-side relation:
   - Example: `User.posts Post[]` + `Post.user User @relation(fields: [userId], references: [id])`
   - Matching may use `@relation("Name")` or `@relation(name: "Name")` when multiple candidates exist
+  - Navigation list fields accept only `@relation` (name-only form); other field attributes are strict errors
 - **Implicit Prisma ORM many-to-many remains unsupported** (list navigation on both sides without explicit join model)
   - Represent many-to-many with an explicit join model (two foreign keys)
 
