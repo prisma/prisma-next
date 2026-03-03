@@ -70,13 +70,19 @@ describe('computeEdgeId', () => {
     expect(computeEdgeId(m1, ops)).not.toBe(computeEdgeId(m2, ops));
   });
 
+  it('changes when parentEdgeId changes', () => {
+    const ops = createTestOps();
+    const root = createTestManifest({ parentEdgeId: null });
+    const child = createTestManifest({ parentEdgeId: 'sha256:parent' });
+    expect(computeEdgeId(root, ops)).not.toBe(computeEdgeId(child, ops));
+  });
+
   it('uses framed tuple hashing for edge input parts', () => {
     const manifest = createTestManifest();
     const ops = createTestOps();
 
     const {
       edgeId: _edgeId,
-      parentEdgeId: _parentEdgeId,
       signature: _signature,
       fromContract: _fromContract,
       toContract: _toContract,

@@ -20,7 +20,6 @@ function sha256Hex(input: string): string {
 export function computeEdgeId(manifest: MigrationManifest, ops: MigrationOps): string {
   const {
     edgeId: _edgeId,
-    parentEdgeId: _parentEdgeId,
     signature: _signature,
     fromContract: _fromContract,
     toContract: _toContract,
