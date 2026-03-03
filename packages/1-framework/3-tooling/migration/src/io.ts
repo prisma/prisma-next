@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { type } from 'arktype';
 import { basename, join } from 'pathe';
 import {
   errorDirectoryExists,
@@ -12,6 +13,41 @@ import type { MigrationManifest, MigrationOps, MigrationPackage } from './types'
 const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
 const MAX_SLUG_LENGTH = 64;
+
+const MigrationHintsSchema = type({
+  used: 'string[]',
+  applied: 'string[]',
+  plannerVersion: 'string',
+  planningStrategy: 'string',
+});
+
+const MigrationManifestSchema = type({
+  from: 'string',
+  to: 'string',
+  edgeId: 'string | null',
+  kind: "'regular' | 'baseline'",
+  fromContract: 'object | null',
+  toContract: 'object',
+  hints: MigrationHintsSchema,
+  labels: 'string[]',
+  'authorship?': type({
+    'author?': 'string',
+    'email?': 'string',
+  }),
+  'signature?': type({
+    keyId: 'string',
+    value: 'string',
+  }).or('null'),
+  createdAt: 'string',
+});
+
+const MigrationOpSchema = type({
+  id: 'string',
+  label: 'string',
+  operationClass: "'additive' | 'widening' | 'destructive'",
+});
+
+const MigrationOpsSchema = MigrationOpSchema.array();
 
 export async function writeMigrationPackage(
   dir: string,
@@ -67,6 +103,7 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
   }
 
   validateManifest(manifest, manifestPath);
+  validateOps(ops, opsPath);
 
   return {
     dirName: basename(dir),
@@ -76,39 +113,20 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
   };
 }
 
-// Validates only the fields needed for DAG reconstruction and apply. Intentionally
-// minimal — the runner and planner perform deeper validation at execution time.
 function validateManifest(
   manifest: unknown,
   filePath: string,
 ): asserts manifest is MigrationManifest {
-  if (!manifest || typeof manifest !== 'object') {
-    throw errorInvalidManifest(filePath, 'expected an object');
+  const result = MigrationManifestSchema(manifest);
+  if (result instanceof type.errors) {
+    throw errorInvalidManifest(filePath, result.summary);
   }
-  const m = manifest as Record<string, unknown>;
-  const required = ['from', 'to', 'kind', 'toContract'] as const;
-  for (const field of required) {
-    if (!(field in m)) {
-      throw errorInvalidManifest(filePath, `missing required field "${field}"`);
-    }
-  }
-  if (typeof m['from'] !== 'string') {
-    throw errorInvalidManifest(filePath, '"from" must be a string');
-  }
-  if (typeof m['to'] !== 'string') {
-    throw errorInvalidManifest(filePath, '"to" must be a string');
-  }
-  if (m['kind'] !== 'regular' && m['kind'] !== 'baseline') {
-    throw errorInvalidManifest(filePath, '"kind" must be "regular" or "baseline"');
-  }
-  if (!('edgeId' in m)) {
-    throw errorInvalidManifest(filePath, '"edgeId" is missing (must be a string or null)');
-  }
-  if (m['edgeId'] !== null && typeof m['edgeId'] !== 'string') {
-    throw errorInvalidManifest(
-      filePath,
-      `"edgeId" must be a string or null, got ${typeof m['edgeId']} (${JSON.stringify(m['edgeId'])})`,
-    );
+}
+
+function validateOps(ops: unknown, filePath: string): asserts ops is MigrationOps {
+  const result = MigrationOpsSchema(ops);
+  if (result instanceof type.errors) {
+    throw errorInvalidManifest(filePath, result.summary);
   }
 }
 

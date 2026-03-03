@@ -751,6 +751,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../1-core/shared/utils
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
       pathe:
         specifier: ^2.0.3
         version: 2.0.3

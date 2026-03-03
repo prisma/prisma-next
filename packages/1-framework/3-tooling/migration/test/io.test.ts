@@ -129,6 +129,119 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
+  it('errors when "from" is not a string', async () => {
+    const dir = join(tmpDir, '20260225T1430_bad_from');
+    const manifest = { ...createTestManifest(), from: 42 };
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifest));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('errors when "kind" has invalid value', async () => {
+    const dir = join(tmpDir, '20260225T1430_bad_kind');
+    const manifest = { ...createTestManifest(), kind: 'rollback' };
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifest));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('errors when "toContract" is missing', async () => {
+    const dir = join(tmpDir, '20260225T1430_no_contract');
+    const { toContract: _, ...manifestWithout } = createTestManifest();
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifestWithout));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('errors when "createdAt" is missing', async () => {
+    const dir = join(tmpDir, '20260225T1430_no_created');
+    const { createdAt: _, ...manifestWithout } = createTestManifest();
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifestWithout));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('errors when "hints" is missing', async () => {
+    const dir = join(tmpDir, '20260225T1430_no_hints');
+    const { hints: _, ...manifestWithout } = createTestManifest();
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifestWithout));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('errors when ops is not an array', async () => {
+    const dir = join(tmpDir, '20260225T1430_bad_ops');
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestManifest()));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify({ not: 'an array' }));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('errors when ops entry is missing required fields', async () => {
+    const dir = join(tmpDir, '20260225T1430_bad_op_entry');
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestManifest()));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify([{ id: 'x' }]));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('accepts manifest with optional authorship field', async () => {
+    const dir = join(tmpDir, '20260225T1430_with_author');
+    const manifest = createTestManifest({
+      authorship: { author: 'test', email: 'test@example.com' },
+    });
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifest));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    const pkg = await readMigrationPackage(dir);
+    expect(pkg.manifest.authorship).toEqual({ author: 'test', email: 'test@example.com' });
+  });
+
+  it('accepts manifest with edgeId: null (draft)', async () => {
+    const dir = join(tmpDir, '20260225T1430_draft');
+    const manifest = createTestManifest({ edgeId: null });
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifest));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    const pkg = await readMigrationPackage(dir);
+    expect(pkg.manifest.edgeId).toBeNull();
+  });
+
   it('errors when writing to existing directory with code MIGRATION.DIR_EXISTS', async () => {
     const dir = join(tmpDir, '20260225T1430_exists');
     await mkdir(dir, { recursive: true });
