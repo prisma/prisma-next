@@ -167,6 +167,21 @@ Introduce a PSL grammar extension for inline SQL literals using backticks (`sql\
 **Spec:** `projects/psl-contract-authoring/specs/Milestone 7 - PSL sql template literal syntax.spec.md`
 **ADR (proposed):** `projects/psl-contract-authoring/references/ADR - PSL sql template literals.md`
 
+### Milestone 8: Relation navigation list fields + `contract.relations` lowering (follow-up)
+
+Support PSL relation navigation list fields (e.g. `Post[]` backrelation fields) while continuing to reject scalar lists. This requires loosening the current “reject all lists” behavior to “reject scalar lists; accept relation navigation lists” and extending the PSL interpreter to populate `contract.relations` consistently for both sides of a relation.
+
+**Tasks:**
+
+- Adjust list-field handling to:
+  - reject scalar lists like `String[]` (strict error), and
+  - accept relation navigation lists like `Post[]` when they refer to a model type (and are not backed by a scalar codec).
+- Extend interpretation/lowering to emit stable `contract.relations` entries for both sides of the relation (N:1 and 1:N), keyed deterministically.
+- Add fixture-driven parity coverage for:
+  - a basic 1:N relationship with the backrelation list present in PSL, and
+  - failure diagnostics for scalar list fields.
+- Update docs to reflect the new supported PSL relation surface and remaining many-to-many guidance (explicit join model).
+
 ### Milestone 6: Close-out (required)
 
 Finalize long-lived docs and remove transient project artifacts.
