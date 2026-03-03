@@ -28,7 +28,11 @@ For package-level responsibilities and supported defaults, see:
 - **Scalar and storage-oriented list fields are rejected** (strict error), including:
   - **Scalar lists** like `String[]`
   - **Enum/named-type lists** (no array-column storage mapping in SQL PSL provider v1)
-  - **Implicit Prisma ORM many-to-many** (which relies on list relation fields)
+
+- **Model-typed list fields are supported only as relation navigation lists** (see “Relations” below).
+  - These do not map to storage columns.
+  - They are accepted only when they can be matched to an FK-side relation.
+  - They are strict about attributes: only `@relation("Name")` / `@relation(name: "Name")` are allowed on the list side.
 
 This is a deliberate “strict subset” choice: PSL v1 is bounded by the current TS authoring surface + contract model and prefers “fail loudly” over silent partial interpretation.
 
@@ -42,7 +46,8 @@ This is a deliberate “strict subset” choice: PSL v1 is bounded by the curren
   - the **foreign-key side** of relations (`@relation(fields: [...], references: [...], onDelete?, onUpdate?)`)
   - one-to-many **navigation list fields** (`User.posts Post[]`) when they can be matched to an FK-side relation
   - relation naming via `@relation("Name")` and `@relation(name: "Name")` for disambiguation
-- PSL v1 still does **not** support implicit many-to-many.
+- PSL v1 emits deterministic relation metadata in `contract.relations` for both sides of a lowered 1:N relation (FK side + navigation list side).
+- PSL v1 still does **not** support implicit many-to-many (list fields on both sides without an explicit join model).
 
 Many-to-many **can** be represented structurally with an explicit join model (two foreign keys), but without list navigation fields.
 

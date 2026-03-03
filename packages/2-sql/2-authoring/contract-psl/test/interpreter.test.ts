@@ -687,7 +687,7 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.relations.user).toMatchObject({
+    expect(result.value.relations['user']).toMatchObject({
       authored: {
         to: 'Post',
         cardinality: '1:N',
