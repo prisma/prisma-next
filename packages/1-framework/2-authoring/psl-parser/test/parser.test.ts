@@ -247,6 +247,66 @@ model Post {
     });
   });
 
+  it('parses relation name arguments in positional and named forms with spans', () => {
+    const schema = `
+model User {
+  id Int @id
+  posts Post[] @relation("UserPosts")
+  authored Post[] @relation(name: "AuthorPosts")
+}
+
+model Post {
+  id Int @id
+  userId Int
+  authorId Int
+  user User @relation("UserPosts", fields: [userId], references: [id])
+  author User @relation(name: "AuthorPosts", fields: [authorId], references: [id])
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+
+    const userModel = result.ast.models.find((model) => model.name === 'User');
+    const postsField = userModel?.fields.find((field) => field.name === 'posts');
+    const authoredField = userModel?.fields.find((field) => field.name === 'authored');
+
+    const postsRelation = postsField?.attributes.find((attribute) => attribute.name === 'relation');
+    const authoredRelation = authoredField?.attributes.find(
+      (attribute) => attribute.name === 'relation',
+    );
+
+    expect(postsRelation?.args).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'positional',
+          value: '"UserPosts"',
+          span: expect.objectContaining({
+            start: expect.objectContaining({ line: 4 }),
+          }),
+        }),
+      ]),
+    );
+
+    expect(authoredRelation?.args).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'named',
+          name: 'name',
+          value: '"AuthorPosts"',
+          span: expect.objectContaining({
+            start: expect.objectContaining({ line: 5 }),
+          }),
+        }),
+      ]),
+    );
+  });
+
   it('is deterministic for identical input', () => {
     const schema = `
 model User {
