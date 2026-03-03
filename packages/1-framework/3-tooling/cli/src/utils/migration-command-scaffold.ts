@@ -138,8 +138,11 @@ export async function prepareMigrationContext(
     );
   }
 
-  // Check target supports migrations
-  if (!config.target.migrations) {
+  // Check target supports migrations via optional descriptor capability
+  const targetWithMigrations = config.target as typeof config.target & {
+    readonly migrations?: unknown;
+  };
+  if (!targetWithMigrations.migrations) {
     return notOk(
       errorTargetMigrationNotSupported({
         why: `Target "${config.target.id}" does not support migrations`,
