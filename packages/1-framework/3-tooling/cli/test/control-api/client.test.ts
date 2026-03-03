@@ -922,6 +922,73 @@ describe('ControlClient progress emission', () => {
       }
     });
 
+    it('returns EDGE_NOT_FOUND when pending edges are discontinuous', async () => {
+      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
+        createMockComponents();
+      let executeCalls = 0;
+
+      const mockTargetWithMigrations = {
+        ...mockTarget,
+        migrations: {
+          createPlanner: () => ({
+            plan: () => ({
+              kind: 'success',
+              plan: { targetId: 'postgres', destination: { storageHash: 'x' }, operations: [] },
+            }),
+          }),
+          createRunner: () => ({
+            execute: async () => {
+              executeCalls++;
+              return {
+                ok: true,
+                value: { operationsPlanned: 1, operationsExecuted: 1 },
+              };
+            },
+          }),
+          contractToSchema: () => ({}),
+        },
+      } as unknown as typeof mockTarget;
+
+      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as ContractIR;
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTargetWithMigrations,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      const result = await client.migrationApply({
+        originHash: 'sha256:empty',
+        destinationHash: 'sha256:ccc',
+        pendingEdges: [
+          {
+            dirName: '001_init',
+            from: 'sha256:empty',
+            to: 'sha256:aaa',
+            toContract: {},
+            operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
+          },
+          {
+            dirName: '002_gap',
+            from: 'sha256:bbb',
+            to: 'sha256:ccc',
+            toContract: {},
+            operations: [{ id: 'op2', label: 'ALTER TABLE', operationClass: 'additive' }],
+          },
+        ],
+        connection: 'postgres://test',
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('EDGE_NOT_FOUND');
+      }
+      expect(executeCalls).toBe(0);
+    });
+
     it('throws when target does not support migrations', async () => {
       const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor } = createMockComponents();
 

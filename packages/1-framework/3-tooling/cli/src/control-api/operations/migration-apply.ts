@@ -80,6 +80,27 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     });
   }
 
+  for (let i = 1; i < pendingEdges.length; i++) {
+    const previous = pendingEdges[i - 1]!;
+    const current = pendingEdges[i]!;
+    if (previous.to !== current.from) {
+      return notOk({
+        code: 'EDGE_NOT_FOUND' as const,
+        summary: 'Migration apply path contains a discontinuity between adjacent edges',
+        why: `Edge "${previous.dirName}" ends at ${previous.to}, but next edge "${current.dirName}" starts at ${current.from}`,
+        meta: {
+          originHash,
+          destinationHash,
+          previousDirName: previous.dirName,
+          previousTo: previous.to,
+          currentDirName: current.dirName,
+          currentFrom: current.from,
+          discontinuityIndex: i,
+        },
+      });
+    }
+  }
+
   const runner = migrations.createRunner(familyInstance);
   const applied: MigrationApplyAppliedEntry[] = [];
 
