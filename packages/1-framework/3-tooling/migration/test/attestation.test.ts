@@ -1,8 +1,11 @@
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { canonicalizeContract } from '@prisma-next/core-control-plane/emission';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { attestMigration, computeEdgeId, verifyMigration } from '../src/attestation';
+import { canonicalizeJson } from '../src/canonicalize-json';
 import { writeMigrationPackage } from '../src/io';
 import { createTestContract, createTestManifest, createTestOps } from './fixtures';
 
@@ -65,6 +68,49 @@ describe('computeEdgeId', () => {
       toContract: createTestContract({ target: 'mysql' }),
     });
     expect(computeEdgeId(m1, ops)).not.toBe(computeEdgeId(m2, ops));
+  });
+
+  it('uses framed tuple hashing for edge input parts', () => {
+    const manifest = createTestManifest();
+    const ops = createTestOps();
+
+    const {
+      edgeId: _edgeId,
+      parentEdgeId: _parentEdgeId,
+      signature: _signature,
+      fromContract: _fromContract,
+      toContract: _toContract,
+      ...strippedMeta
+    } = manifest;
+
+    const canonicalParts = [
+      canonicalizeJson(strippedMeta),
+      canonicalizeJson(ops),
+      manifest.fromContract !== null ? canonicalizeContract(manifest.fromContract) : 'null',
+      canonicalizeContract(manifest.toContract),
+    ];
+    const partHashes = canonicalParts.map((part) => createHash('sha256').update(part).digest('hex'));
+    const expected = `sha256:${createHash('sha256')
+      .update(canonicalizeJson(partHashes))
+      .digest('hex')}`;
+
+    const legacy = `sha256:${createHash('sha256')
+      .update(canonicalParts.join(':'))
+      .digest('hex')}`;
+
+    expect(computeEdgeId(manifest, ops)).toBe(expected);
+    expect(computeEdgeId(manifest, ops)).not.toBe(legacy);
+  });
+
+  it('changes when canonical part boundaries change', () => {
+    const manifest = createTestManifest({ labels: ['a:b'] });
+    const baseOps = createTestOps();
+    const boundaryShiftedOps = baseOps.map((op) => ({ ...op, label: `${op.label}:suffix` }));
+
+    const baseEdgeId = computeEdgeId(manifest, baseOps);
+    const boundaryShiftedEdgeId = computeEdgeId(manifest, boundaryShiftedOps);
+
+    expect(baseEdgeId).not.toBe(boundaryShiftedEdgeId);
   });
 });
 

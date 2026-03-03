@@ -13,6 +13,10 @@ export interface VerifyResult {
   readonly computedEdgeId?: string;
 }
 
+function sha256Hex(input: string): string {
+  return createHash('sha256').update(input).digest('hex');
+}
+
 export function computeEdgeId(manifest: MigrationManifest, ops: MigrationOps): string {
   const {
     edgeId: _edgeId,
@@ -30,13 +34,13 @@ export function computeEdgeId(manifest: MigrationManifest, ops: MigrationOps): s
     manifest.fromContract !== null ? canonicalizeContract(manifest.fromContract) : 'null';
   const canonicalToContract = canonicalizeContract(manifest.toContract);
 
-  const combined = [
+  const partHashes = [
     canonicalManifest,
     canonicalOps,
     canonicalFromContract,
     canonicalToContract,
-  ].join(':');
-  const hash = createHash('sha256').update(combined).digest('hex');
+  ].map(sha256Hex);
+  const hash = sha256Hex(canonicalizeJson(partHashes));
 
   return `sha256:${hash}`;
 }
