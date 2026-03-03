@@ -1,26 +1,30 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
-import type {
-  TargetBoundComponentDescriptor,
-  TargetPackRef,
-} from '@prisma-next/contract/framework-components';
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
-import { assembleControlMutationDefaults } from './default-function-registry';
+import type { ControlMutationDefaults } from './default-function-registry';
 import { interpretPslDocumentToSqlContractIR } from './interpreter';
 
 export interface PrismaContractOptions {
   readonly output?: string;
-  readonly target?: TargetPackRef<'sql', 'postgres'>;
-  readonly frameworkComponents?: readonly TargetBoundComponentDescriptor<'sql', string>[];
+  readonly target: TargetPackRef<'sql', 'postgres'>;
+  readonly scalarTypeDescriptors: ReadonlyMap<
+    string,
+    {
+      readonly codecId: string;
+      readonly nativeType: string;
+      readonly typeRef?: string;
+      readonly typeParams?: Record<string, unknown>;
+    }
+  >;
+  readonly controlMutationDefaults?: ControlMutationDefaults;
+  readonly composedExtensionPacks?: readonly string[];
 }
 
-export function prismaContract(
-  schemaPath: string,
-  options?: PrismaContractOptions,
-): ContractConfig {
+export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
   return {
     source: async (context: ContractSourceContext) => {
       const absoluteSchemaPath = resolve(schemaPath);
@@ -46,23 +50,20 @@ export function prismaContract(
         schema,
         sourceId: schemaPath,
       });
-      const frameworkComponents = options?.frameworkComponents ?? [];
-      const composedExtensionPacks = new Set<string>(context.composedExtensionPacks ?? []);
-      for (const component of frameworkComponents) {
-        if (component.kind === 'extension') {
-          composedExtensionPacks.add(component.id);
-        }
-      }
-      const controlMutationDefaults = assembleControlMutationDefaults(frameworkComponents);
+      const composedExtensionPacks = [
+        ...(context.composedExtensionPacks ?? []),
+        ...(options.composedExtensionPacks ?? []),
+      ];
 
       const interpreted = interpretPslDocumentToSqlContractIR({
         document,
-        ...ifDefined('target', options?.target),
+        target: options.target,
+        scalarTypeDescriptors: options.scalarTypeDescriptors,
         ...ifDefined(
           'composedExtensionPacks',
-          composedExtensionPacks.size > 0 ? Array.from(composedExtensionPacks) : undefined,
+          composedExtensionPacks.length > 0 ? composedExtensionPacks : undefined,
         ),
-        controlMutationDefaults,
+        ...ifDefined('controlMutationDefaults', options.controlMutationDefaults),
       });
       if (!interpreted.ok) {
         return interpreted;
@@ -70,6 +71,6 @@ export function prismaContract(
 
       return ok(interpreted.value);
     },
-    ...ifDefined('output', options?.output),
+    ...ifDefined('output', options.output),
   };
 }

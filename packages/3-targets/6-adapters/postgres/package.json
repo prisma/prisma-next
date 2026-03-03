@@ -24,6 +24,7 @@
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/ids": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-psl": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",

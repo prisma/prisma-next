@@ -4,9 +4,22 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '../src/default-function-registry';
-import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
+import {
+  type InterpretPslDocumentToSqlContractIRInput,
+  interpretPslDocumentToSqlContractIR as interpretPslDocumentToSqlContractIRInternal,
+} from '../src/interpreter';
+import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
 
 describe('composed mutation default registries', () => {
+  const interpretPslDocumentToSqlContractIR = (
+    input: Omit<InterpretPslDocumentToSqlContractIRInput, 'target' | 'scalarTypeDescriptors'>,
+  ) =>
+    interpretPslDocumentToSqlContractIRInternal({
+      target: postgresTarget,
+      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      ...input,
+    });
+
   it('rejects known default functions when no components contribute handlers', () => {
     const document = parsePslDocument({
       schema: `model User {
@@ -48,21 +61,24 @@ describe('composed mutation default registries', () => {
         defaultFunctionRegistry: new Map([
           [
             'slugid',
-            (input: {
-              call: ParsedDefaultFunctionCall;
-              context: DefaultFunctionLoweringContext;
-            }) => {
-              void input;
-              return {
-                ok: true as const,
-                value: {
-                  kind: 'execution' as const,
-                  generated: {
-                    kind: 'generator' as const,
-                    id: 'slugid',
+            {
+              lower: (input: {
+                call: ParsedDefaultFunctionCall;
+                context: DefaultFunctionLoweringContext;
+              }) => {
+                void input;
+                return {
+                  ok: true as const,
+                  value: {
+                    kind: 'execution' as const,
+                    generated: {
+                      kind: 'generator' as const,
+                      id: 'slugid',
+                    },
                   },
-                },
-              };
+                };
+              },
+              usageSignatures: ['slugid()'],
             },
           ],
         ]),
@@ -102,16 +118,19 @@ describe('composed mutation default registries', () => {
         defaultFunctionRegistry: new Map([
           [
             'slugid',
-            () => ({
-              ok: true as const,
-              value: {
-                kind: 'execution' as const,
-                generated: {
-                  kind: 'generator' as const,
-                  id: 'slugid',
+            {
+              lower: () => ({
+                ok: true as const,
+                value: {
+                  kind: 'execution' as const,
+                  generated: {
+                    kind: 'generator' as const,
+                    id: 'slugid',
+                  },
                 },
-              },
-            }),
+              }),
+              usageSignatures: ['slugid()'],
+            },
           ],
         ]),
         generatorDescriptors: [{ id: 'slugid', applicableCodecIds: ['pg/text@1'] }],
