@@ -885,6 +885,34 @@ prisma-next migration show [target] [--config <path>] [--json] [-v] [-q] [--time
 
 **Destructive warnings:** When a migration contains destructive operations (e.g., `DROP TABLE`, `ALTER COLUMN TYPE`), the output includes a prominent `⚠` warning about potential data loss.
 
+### `prisma-next migration status`
+
+Show the migration graph and applied status. Adapts based on context:
+
+- **With DB connection**: Shows applied/pending markers and "you are here" indicators
+- **Without DB connection**: Shows the graph structure from disk only
+
+```bash
+prisma-next migration status [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+**Options:**
+- `--db <url>`: Database connection string (enables online mode)
+- `--config <path>`: Path to `prisma-next.config.ts`
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output
+- `--timestamps`: Add timestamps to output
+
+**What it does:**
+1. Reads migration packages from disk and reconstructs the DAG
+2. If a DB connection is available, reads the marker to determine applied/pending status
+3. Displays the graph as a linear chain with `◄ DB` and `◄ Contract` markers
+4. Shows operation summaries with destructive operation highlighting
+5. Falls back to offline mode if DB connection fails
+
+**Known limitation:** Branched DAGs (multiple leaves) produce an error. Only linear chains are visualized.
+
 ### `prisma-next migration apply`
 
 Apply planned migrations to the database. Executes previously planned migrations (created by `migration plan`). Compares the database marker against the migration DAG to determine which migrations are pending, then executes them sequentially. Each migration runs in its own transaction. Does not plan new migrations — run `migration plan` first.
@@ -1272,6 +1300,7 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/commands/contract-emit`**: Exports `createContractEmitCommand`
 - **`@prisma-next/cli/commands/migration-plan`**: Exports `createMigrationPlanCommand`
 - **`@prisma-next/cli/commands/migration-show`**: Exports `createMigrationShowCommand`
+- **`@prisma-next/cli/commands/migration-status`**: Exports `createMigrationStatusCommand`
 - **`@prisma-next/cli/commands/migration-apply`**: Exports `createMigrationApplyCommand`
 - **`@prisma-next/cli/commands/migration-verify`**: Exports `createMigrationVerifyCommand`
 - **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function

@@ -97,6 +97,10 @@
       "types": "./dist/commands/migration-show.d.mts",
       "import": "./dist/commands/migration-show.mjs"
     },
+    "./commands/migration-status": {
+      "types": "./dist/commands/migration-status.d.mts",
+      "import": "./dist/commands/migration-status.mjs"
+    },
     "./commands/migration-verify": {
       "types": "./dist/commands/migration-verify.d.mts",
       "import": "./dist/commands/migration-verify.mjs"
