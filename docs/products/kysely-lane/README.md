@@ -108,7 +108,7 @@ If the limit is non-numeric at transform time, the lane may collect a parameter/
 
 #### Projection is intentionally narrow
 
-Selections are expected to resolve to **column refs** (and `selectAll` expansions). Many Kysely projection features are not supported yet, including computed expressions and arbitrary SQL fragments, because the transformer validates refs against the contract’s `storage.tables.`*.
+Selections are expected to resolve to **column refs** (and `selectAll` expansions). Many Kysely projection features are not supported yet, including computed expressions and arbitrary SQL fragments, because the transformer validates refs against `contract.storage.tables.*`.
 
 ### WHERE / expression limitations
 
