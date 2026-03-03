@@ -72,6 +72,8 @@ Duplicate default-function names and duplicate generator ids are hard errors dur
 
 This registry is the primary mechanism for vocabulary-driven authoring surfaces to validate defaults deterministically.
 
+PSL authoring packages consume this registry as an input; assembly ownership lives in composition layers (for example SQL family/control orchestration), not in PSL provider/interpreter packages.
+
 ### 4) Preserve TS-first escape hatches (opt-in validation)
 
 TS-first authoring may express:
@@ -80,6 +82,15 @@ TS-first authoring may express:
 - application-specific overrides for a specific column (may bypass applicability validation intentionally).
 
 This is not a guided UX path; it is an explicit “trust me” contract authoring decision. When used, the author must still provide a runtime implementation for any referenced generator ids through lower-level runtime wiring (e.g. a runtime extension pack).
+
+### 5) Keep generator metadata single-sourced and contributor-owned
+
+Generator-owned storage-shape metadata (including parameterized behavior such as `nanoid(size)`) is defined once in contributor-owned metadata and reused across:
+
+- TS authoring helper construction,
+- emit-time generator descriptors consumed by PSL interpretation.
+
+Runtime generator implementations remain contributor-owned and are resolved only through composed runtime contributors.
 
 ## Consequences
 
