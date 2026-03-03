@@ -1,6 +1,10 @@
 import { notOk, ok } from '@prisma-next/utils/result';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { errorConfigFileNotFound, errorMarkerMissing } from '../../src/utils/cli-errors';
+import {
+  CliStructuredError,
+  errorConfigFileNotFound,
+  errorMarkerMissing,
+} from '../../src/utils/cli-errors';
 import { handleResult } from '../../src/utils/result-handler';
 
 describe('result handler', () => {
@@ -48,6 +52,21 @@ describe('result handler', () => {
     const output = (console.error as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect(output).toBeDefined();
     expect(() => JSON.parse(output as string)).not.toThrow();
+  });
+
+  it('omits fix from JSON envelope when fix equals why', () => {
+    const error = new CliStructuredError('4999', 'Unexpected error', {
+      why: 'Same message',
+      fix: 'Same message',
+    });
+    const result = notOk(error);
+
+    handleResult(result, { json: 'object' });
+
+    const output = (console.error as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const envelope = JSON.parse(output as string) as { why?: string; fix?: string };
+    expect(envelope.why).toBe('Same message');
+    expect(envelope.fix).toBeUndefined();
   });
 
   it('outputs human-readable error when json flag is not set', () => {
