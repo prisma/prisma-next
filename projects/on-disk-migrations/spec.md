@@ -295,47 +295,73 @@ Terminology note: "attestation" (hashing migration content → `edgeId`), "signi
 
 ## RD-18: Parent-edge linking (`parentEdgeId`)
 
+### Two structures, not one
+
+The migration system maintains two distinct structures that serve different purposes:
+
+1. **The contract graph** (ADR 001): Nodes are contract storage hashes, edges are migrations with `from`/`to` hashes. This is the *semantic* model — it describes schema evolution and answers "how do I get from state A to state B?" The `from`/`to` relationship encodes what a migration *does*.
+
+2. **The edge chain**: A singly-linked list of migrations via `parentEdgeId`. This is the *operational* model — it describes planning history and answers "what order were these migrations created in?" and "which one is the latest?" The `parentEdgeId` relationship encodes when a migration was *planned*.
+
+Both are necessary. The contract graph alone cannot determine ordering when contract hashes are revisited (a valid scenario — see below). The edge chain alone cannot determine schema relationships. Together they provide a complete picture: `from`/`to` for the graph, `parentEdgeId` for the chain.
+
+This is analogous to git, where commits serve as both a linked list (via parent pointers) and a snapshot graph (via tree hashes). The key mappings:
+
+| Git | Migrations |
+|-----|-----------|
+| Commit | Migration edge |
+| Tree hash (snapshot of working tree) | Contract storage hash (snapshot of schema) |
+| Parent commit SHA | `parentEdgeId` |
+| Commit SHA | `edgeId` |
+| HEAD | DAG leaf (edge with no children) |
+| Working tree | Current `contract.json` |
+| Two branches from same commit | Two edges with same `parentEdgeId` (`AMBIGUOUS_LEAF`) |
+
+One important difference: in git, the parent pointer is part of the commit hash. In our model, `parentEdgeId` is explicitly *excluded* from the `edgeId` computation. This means `edgeId` stays purely structural (same ops + same from/to = same content hash), and future squash/rebase operations can reassign `parentEdgeId` without changing the content identity of the migration. Git does not have this property — rebasing changes the commit SHA.
+
 ### Problem
 
-The DAG model treats contract storage hashes as nodes and migrations as edges. `findLeaf` determines the "current" state by finding nodes with no outgoing edges, and `findPath` uses BFS with a visited-nodes set. This breaks when a migration returns to a previously-seen contract hash — a valid scenario (e.g., add a column, then remove it):
+The contract graph (structure 1) treats contract storage hashes as nodes. `findLeaf` determines the "current" state by finding nodes with no outgoing edges, and `findPath` uses BFS with a visited-nodes set. This breaks when a migration returns to a previously-seen contract hash — for example, adding a column, deploying, then rolling back:
 
 ```
-edge1: empty → hash-a   (create table)
-edge2: hash-a → hash-b  (add column)
-edge3: hash-b → hash-a  (drop column)
+edge1: empty → C1   (create table)
+edge2: C1 → C2      (add column)
+edge3: C2 → C1      (drop column — rollback)
 ```
 
-Here `hash-a` has an outgoing edge (edge2), so `findLeaf` doesn't consider it a leaf — even though edge3 is the chronologically latest migration. `findPath` with visited-nodes would also short-circuit at `hash-a` on first visit and never reconstruct the full 3-edge chain.
+At the node level, `C1` has an outgoing edge (edge2), so `findLeaf` doesn't consider it a leaf — even though edge3 is chronologically latest. `findPath` with visited-nodes would short-circuit at `C1` on first visit and never reach edge3.
 
-Using timestamps to resolve ordering was considered but rejected: in a team collaboration scenario where two developers plan migrations from the same contract state, timestamp-based ordering would silently pick the earlier one and orphan the other. The current `AMBIGUOUS_LEAF` error is the correct behavior for branches — it forces explicit resolution.
+**Why `from`/`to` alone cannot solve this:** `from` could serve as an implicit parent pointer in simple cases — find the edge whose `to` matches my `from`. But when contract hashes are revisited, `from` becomes ambiguous. After the sequence above, if the user plans a new migration from C1 → C3, there are *two* edges with `to: C1` (edge1 and edge3). We cannot determine from `from` alone whether the new migration follows edge1 (branching off the initial state) or edge3 (continuing after the rollback).
+
+**Why timestamps cannot solve this:** In a team collaboration scenario where two developers plan migrations from the same contract state, timestamp-based ordering would silently pick the earlier one and orphan the other. Timestamps also cannot structurally distinguish branches from continuations.
 
 ### Decision
 
 Add a required `parentEdgeId` field to `MigrationManifest`. This is the `edgeId` of the migration that this migration follows in the chain, or `null` for the first migration (whose `from` is `sha256:empty`).
 
 ```
-edge1: empty → hash-a   parentEdgeId: null
-edge2: hash-a → hash-b  parentEdgeId: edge1.edgeId
-edge3: hash-b → hash-a  parentEdgeId: edge2.edgeId
+edge1: empty → C1   parentEdgeId: null
+edge2: C1 → C2      parentEdgeId: edge1.edgeId
+edge3: C2 → C1      parentEdgeId: edge2.edgeId
 ```
 
-The parent chain is `edge1 → edge2 → edge3` regardless of contract hash revisits. Chain reconstruction follows parent pointers, not node-level graph analysis.
+The edge chain is `edge1 → edge2 → edge3` regardless of contract hash revisits. Chain reconstruction follows parent pointers, not node-level graph analysis.
 
 **Key properties:**
 
-- **Leaf**: An edge whose `edgeId` is not referenced as `parentEdgeId` by any other edge. Equivalent to "the edge with no children."
-- **Branch detection**: Two edges with the same `parentEdgeId` = a branch = `AMBIGUOUS_LEAF`. This is structurally detectable without timestamps.
-- **Path reconstruction**: Follow the parent chain from the leaf backward to the root, then reverse. No visited-nodes set needed; revisited contract hashes are handled naturally.
-- **Content-addressing**: `parentEdgeId` is metadata for chain ordering. It is stripped from the hash input when computing `edgeId`, the same way `edgeId` and `signature` are stripped. This means `edgeId` remains purely structural (same ops + same from/to = same content hash). Future squash/rebase operations can reassign `parentEdgeId` without changing the content identity of the migration itself.
-- **Team collaboration**: Two developers planning from the same leaf produce edges with the same `parentEdgeId`. The system detects this as a branch and surfaces `AMBIGUOUS_LEAF`, requiring explicit resolution (squash, rebase, or `--from`).
+- **Leaf**: An edge whose `edgeId` is not referenced as `parentEdgeId` by any other edge. Equivalent to "the edge with no children in the edge chain."
+- **Branch detection**: Two edges with the same `parentEdgeId` = a branch = `AMBIGUOUS_LEAF`. This is structurally detectable without timestamps or heuristics, analogous to two git commits sharing a parent.
+- **Path reconstruction**: Follow the parent chain from the leaf backward to the root, then reverse. No visited-nodes set needed; revisited contract hashes are handled naturally because the chain operates on edges, not nodes.
+- **Content-addressing**: `parentEdgeId` is metadata for the edge chain. It is stripped from the hash input when computing `edgeId`, the same way `edgeId` and `signature` are stripped. This keeps the contract graph and the edge chain cleanly separated: `edgeId` is determined by what the migration *does* (ops, from/to), not by where it sits in the planning history.
+- **Team collaboration**: Two developers planning from the same leaf produce edges with the same `parentEdgeId`. The system detects this as a branch and surfaces `AMBIGUOUS_LEAF`, requiring explicit resolution. This is the prerequisite for future rebase tooling — knowing the common parent makes automated re-planning possible (see RD-19).
 
 **`parentEdgeId` is a required field.** There are no existing production users, so backward compatibility is not a concern.
 
 ### Consequences
 
 - `migration plan` must look up the leaf edge's `edgeId` and write it as `parentEdgeId` on the new manifest.
-- `findLeaf` is rewritten to walk the parent chain from root, not analyze node-level outgoing edges.
-- `findPath` is rewritten to traverse the edge chain via parent pointers, not BFS over nodes.
+- `findLeaf` is rewritten to walk the edge chain from root, not analyze node-level outgoing edges in the contract graph.
+- `findPath` is rewritten to traverse the edge chain via parent pointers, not BFS over contract graph nodes.
 - `reconstructGraph` adds a `childEdges` index (mapping `parentEdgeId → edge[]`) for efficient chain walking.
 - `MigrationGraphEdge` gains a `parentEdgeId` field.
 
