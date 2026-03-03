@@ -123,11 +123,12 @@ export function detectDestructiveChanges(
 ): readonly MigrationPlannerConflict[] {
   if (!from) return [];
 
+  const hasOwn = (value: object, key: string): boolean => Object.hasOwn(value, key);
+
   const conflicts: MigrationPlannerConflict[] = [];
 
   for (const tableName of Object.keys(from.tables)) {
-    const toTable = to.tables[tableName];
-    if (!toTable) {
+    if (!hasOwn(to.tables, tableName)) {
       conflicts.push({
         kind: 'tableRemoved',
         summary: `Table "${tableName}" was removed`,
@@ -135,11 +136,12 @@ export function detectDestructiveChanges(
       continue;
     }
 
+    const toTable = to.tables[tableName] as StorageTable;
     const fromTable = from.tables[tableName];
     if (!fromTable) continue;
 
     for (const columnName of Object.keys(fromTable.columns)) {
-      if (!toTable.columns[columnName]) {
+      if (!hasOwn(toTable.columns, columnName)) {
         conflicts.push({
           kind: 'columnRemoved',
           summary: `Column "${tableName}"."${columnName}" was removed`,

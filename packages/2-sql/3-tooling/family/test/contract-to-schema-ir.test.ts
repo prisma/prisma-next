@@ -501,4 +501,46 @@ describe('detectDestructiveChanges', () => {
     expect(kinds).toContain('columnRemoved');
     expect(kinds).toContain('tableRemoved');
   });
+
+  it('detects removed table with prototype-name identifier', () => {
+    const from: SqlStorage = {
+      tables: {
+        toString: table({ columns: { id: col({ nativeType: 'text' }) } }),
+      },
+    };
+    const to: SqlStorage = { tables: {} };
+
+    const conflicts = detectDestructiveChanges(from, to);
+    expect(conflicts).toEqual([
+      {
+        kind: 'tableRemoved',
+        summary: 'Table "toString" was removed',
+      },
+    ]);
+  });
+
+  it('detects removed column with prototype-name identifier', () => {
+    const from: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            toString: col({ nativeType: 'text' }),
+          },
+        }),
+      },
+    };
+    const to: SqlStorage = {
+      tables: {
+        T: table({ columns: {} }),
+      },
+    };
+
+    const conflicts = detectDestructiveChanges(from, to);
+    expect(conflicts).toEqual([
+      {
+        kind: 'columnRemoved',
+        summary: 'Column "T"."toString" was removed',
+      },
+    ]);
+  });
 });
