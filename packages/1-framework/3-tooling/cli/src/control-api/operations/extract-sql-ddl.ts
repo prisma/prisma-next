@@ -27,6 +27,10 @@ function hasExecuteSteps(
   );
 }
 
+/**
+ * Extracts a best-effort SQL DDL preview for CLI plan output.
+ * This helper is presentation-only and is never used to decide migration correctness.
+ */
 export function extractSqlDdl(operations: readonly MigrationPlanOperation[]): string[] {
   const statements: string[] = [];
   for (const operation of operations) {
