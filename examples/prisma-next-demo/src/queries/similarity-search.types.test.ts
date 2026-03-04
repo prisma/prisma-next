@@ -6,9 +6,13 @@ import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
-import { expectTypeOf, test } from 'vitest';
+import { test } from 'vitest';
 import type { Contract } from '../prisma/contract.d';
 import contractJson from '../prisma/contract.json' with { type: 'json' };
+
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type Expect<T extends true> = T;
 
 /**
  * Type test to verify that ResultType correctly infers the distance column as number
@@ -39,8 +43,12 @@ test('ResultType correctly infers number for cosineDistance operation result', (
 
   type Row = ResultType<typeof _plan>;
 
-  // Verify that distance is correctly inferred as number
-  expectTypeOf<Row['distance']>().toEqualTypeOf<number>();
-  expectTypeOf<Row['id']>().toEqualTypeOf<Char<36>>();
-  expectTypeOf<Row['title']>().toEqualTypeOf<string>();
+  // Compile-time assertions
+  type Assertions = [
+    Expect<Equal<Row['distance'], number>>,
+    Expect<Equal<Row['id'], Char<36>>>,
+    Expect<Equal<Row['title'], string>>,
+  ];
+  const assertions = null as unknown as Assertions;
+  void assertions;
 });

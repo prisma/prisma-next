@@ -1,5 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
@@ -11,7 +12,7 @@ export const stack = createSqlExecutionStack({
   target: postgresTarget,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensionPacks: [pgvector],
 });
 
 export const context = createExecutionContext({

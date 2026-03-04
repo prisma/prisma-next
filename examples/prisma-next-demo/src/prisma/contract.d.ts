@@ -27,16 +27,14 @@ import type {
   SqlStorage,
   SqlMappings,
   ModelDefinition,
-  ContractWithTypeMaps,
-  TypeMaps as TypeMapsType,
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:cdb433bb52596aa07ffa5997dd8bdddf01de87bb7e7df82ba8fc1e1bb9088148'>;
+  StorageHashBase<'sha256:43f728c37e9b8f369b2b8acefa387906afd4555646a08528254eceee247342d7'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:630618d96f7674c186a027d1295bfc5d688c4168c5a023a1aea01553820387dc'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:ba9d575fa1cddbd70ebe61671f203b6771010052872a41edda627b93e230293f'>;
+  ProfileHashBase<'sha256:83d66b1cce776c9ec9e6d168086e5bd1030ccf461823b9eef39cf49f1833c6dd'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -49,9 +47,7 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
     : Encoded
   : Encoded;
 
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
-
-type ContractBase = SqlContract<
+export type Contract = SqlContract<
   {
     readonly tables: {
       readonly user: {
@@ -119,7 +115,6 @@ type ContractBase = SqlContract<
           {
             readonly columns: readonly ['userId'];
             readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
-            readonly name: 'post_userId_fkey';
             readonly constraint: true;
             readonly index: true;
           },
@@ -132,9 +127,24 @@ type ContractBase = SqlContract<
         readonly nativeType: 'user_type';
         readonly typeParams: { readonly values: readonly ['admin', 'user'] };
       };
+      readonly Embedding1536: {
+        readonly codecId: 'pg/vector@1';
+        readonly nativeType: 'vector';
+        readonly typeParams: { readonly length: 1536 };
+      };
     };
   },
   {
+    readonly Post: {
+      storage: { readonly table: 'post' };
+      fields: {
+        readonly id: Char<36>;
+        readonly title: CodecTypes['pg/text@1']['output'];
+        readonly userId: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly embedding: Vector<1536> | null;
+      };
+    };
     readonly User: {
       storage: { readonly table: 'user' };
       fields: {
@@ -144,28 +154,8 @@ type ContractBase = SqlContract<
         readonly kind: 'admin' | 'user';
       };
     };
-    readonly Post: {
-      storage: { readonly table: 'post' };
-      fields: {
-        readonly id: Char<36>;
-        readonly title: CodecTypes['pg/text@1']['output'];
-        readonly userId: CodecTypes['pg/text@1']['output'];
-        readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
-        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-      };
-    };
   },
   {
-    readonly user: {
-      readonly posts: {
-        readonly to: 'Post';
-        readonly cardinality: '1:N';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['userId'];
-        };
-      };
-    };
     readonly post: {
       readonly user: {
         readonly to: 'User';
@@ -176,59 +166,57 @@ type ContractBase = SqlContract<
         };
       };
     };
+    readonly user: {
+      readonly posts: {
+        readonly to: 'Post';
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly parentCols: readonly ['id'];
+          readonly childCols: readonly ['userId'];
+        };
+      };
+    };
   },
   {
-    modelToTable: { readonly User: 'user'; readonly Post: 'post' };
-    tableToModel: { readonly user: 'User'; readonly post: 'Post' };
+    modelToTable: { readonly Post: 'post'; readonly User: 'user' };
+    tableToModel: { readonly post: 'Post'; readonly user: 'User' };
     fieldToColumn: {
+      readonly Post: {
+        readonly id: 'id';
+        readonly title: 'title';
+        readonly userId: 'userId';
+        readonly createdAt: 'createdAt';
+        readonly embedding: 'embedding';
+      };
       readonly User: {
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
         readonly kind: 'kind';
       };
-      readonly Post: {
+    };
+    columnToField: {
+      readonly post: {
         readonly id: 'id';
         readonly title: 'title';
         readonly userId: 'userId';
-        readonly embedding: 'embedding';
         readonly createdAt: 'createdAt';
+        readonly embedding: 'embedding';
       };
-    };
-    columnToField: {
       readonly user: {
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
         readonly kind: 'kind';
       };
-      readonly post: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly userId: 'userId';
-        readonly embedding: 'embedding';
-        readonly createdAt: 'createdAt';
-      };
     };
+    codecTypes: PgTypes & PgVectorTypes;
+    operationTypes: PgVectorOperationTypes;
   },
   StorageHash,
   ExecutionHash,
   ProfileHash
-> & {
-  readonly target: 'postgres';
-  readonly capabilities: {
-    readonly postgres: {
-      readonly lateral: true;
-      readonly jsonAgg: true;
-      readonly returning: true;
-      readonly 'pgvector/cosine': true;
-      readonly 'defaults.now': true;
-    };
-  };
-  readonly extensionPacks: { readonly pgvector: {} };
-};
-
-export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
+>;
 
 export type Tables = Contract['storage']['tables'];
 export type Models = Contract['models'];

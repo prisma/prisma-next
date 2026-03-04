@@ -56,7 +56,9 @@ export async function initTestDatabase(options: {
   try {
     const initResult = await client.dbInit({ contractIR: options.contractIR, mode: 'apply' });
     if (!initResult.ok) {
-      throw new Error(`dbInit failed: ${initResult.failure.summary}`);
+      throw new Error(
+        `dbInit failed: ${initResult.failure.summary}\n\n${JSON.stringify(initResult.failure, null, 2)}`,
+      );
     }
   } finally {
     await client.close();
