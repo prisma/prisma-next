@@ -12,6 +12,7 @@ import {
   isColumnBuilder,
   isOperationExpr,
 } from '@prisma-next/sql-relational-core/utils/guards';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
 describe('guards', () => {
@@ -93,7 +94,7 @@ describe('guards', () => {
       expect(result).toEqual([]);
     });
 
-    it('collects ColumnRefs from nested OperationExpr', { timeout: 1_000 }, () => {
+    it('collects ColumnRefs from nested OperationExpr', { timeout: timeouts.default }, () => {
       const col1: ColumnRef = createColumnRef('user', 'id');
       const col2: ColumnRef = createColumnRef('user', 'email');
       const operation: OperationExpr = {
