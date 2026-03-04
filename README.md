@@ -18,23 +18,34 @@
 
 ---
 
-> **Early Preview**: Prisma Next is under active development. APIs will change. Not recommended for production use yet. We'd love for you to explore the source and follow along.
+> **In Development (Not a Product Release)**: Prisma Next is an active engineering project and a public look at where Prisma is heading. It is not ready for production  yet: APIs will change, and it’s not recommended for production use.
+>
+> Prisma 7 remains the recommended version of Prisma for production applications.
 
-## What is Prisma Next?
+## Prisma Next at a glance
 
-Prisma Next is a new data access layer for TypeScript that treats your database schema as a **verifiable contract**: not just a schema file. Instead of generating a heavy client, it emits lightweight types and a deterministic JSON contract, then gives you a composable query DSL at runtime.
+- **A TypeScript rewrite of Prisma ORM**: Rebuilt end-to-end to unlock new capabilities and a more composable architecture.
+- **Extensible by default**: Add extension packs in `prisma-next.config.ts` to unlock new schema attributes and new query capabilities.
+- **Two query APIs**:
+  - **ORM Client** (`db.orm`): model collections with fluent `where/include/select` composition
+  - **Query builder** (`db.sql`): type-safe SQL plan builder for when you want lower-level control
+- **Designed for AI-assisted workflows**: deterministic contracts, structured plans, stable diagnostics, and guardrails that help agents (and humans) iterate safely.
 
-Read more about the vision in [The Next Evolution of Prisma ORM](https://www.prisma.io/blog/the-next-evolution-of-prisma-orm).
+Read the deep dive in [`blog-post.md`](./blog-post.md) and the announcement blog post: [The Next Evolution of Prisma ORM](https://www.prisma.io/blog/the-next-evolution-of-prisma-orm).
 
-## Why Prisma Next?
+## Schema as a contract
 
-- **Lightweight generation**: Emit types and a contract JSON instead of a full client. No more waiting for codegen on every schema change.
-- **Composable query DSL**: Write queries inline with `sql().from(...).select(...)`. Chain, compose, and inspect: no magic methods.
-- **Verifiable contracts**: Every contract has a cryptographic hash. Detect schema drift before your app hits production.
-- **Plugin guardrails**: Add query budgets, linting rules, and telemetry as composable plugins. Catch `SELECT *` and missing `WHERE` clauses at compile time.
-- **AI-native**: Machine-readable contract JSON and structured query plans that AI coding assistants can understand, generate, and verify.
+In Prisma Next, your schema becomes a **verifiable contract**: a deterministic artifact (`contract.json` + TypeScript types) that describes which models, tables, and fields exist.
 
-## Quick Example
+That contract is used to:
+
+- **Verify at runtime**: detect schema drift before a query runs
+- **Type your queries**: keep results and query operators fully type-safe
+- **Power tooling + agents**: contracts, plans, and diagnostics are structured data—easy to inspect, diff, and reason about
+
+For architecture details, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+## Quick example
 
 **1. Define your schema:**
 
@@ -66,22 +77,86 @@ const db = postgres<Contract>({
   url: process.env['DATABASE_URL']!,
 })
 
-const { tables } = db.schema
-
-const users = await db.sql
-  .from(tables.user)
-  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
-  .limit(10)
-  .execute()
+const users = await db.orm.users
+  .select('id', 'email')
+  .take(10)
+  .all()
+  .toArray()
 
 // users: Array<{ id: number; email: string }>
 ```
+
+`all()` returns an async-iterable result, so you can also stream:
+
+```typescript
+for await (const user of db.orm.users.select('id', 'email').all()) {
+  // process(user)
+}
+```
+
+## Query APIs
+
+### ORM Client (`db.orm`)
+
+Use the ORM Client for model-centric queries, relation traversal, and model-level writes.
+
+### Query builder (`db.sql`)
+
+When you want lower-level control, use the type-safe query builder to assemble a plan and execute it through the runtime:
+
+```typescript
+const plan = db.sql
+  .from(db.schema.tables.user)
+  .select({
+    id: db.schema.tables.user.columns.id,
+    email: db.schema.tables.user.columns.email,
+  })
+  .limit(10)
+  .build()
+
+const rows = await db.runtime().execute(plan).toArray()
+```
+
+## Extensibility (extension packs)
+
+Prisma Next is designed to be extended. Add an extension pack in `prisma-next.config.ts`, and you can use it in your schema and your queries.
+
+For example, enabling `pgvector` makes the `@pgvector.*` schema attributes and vector query operators available:
+
+```ts
+// prisma-next.config.ts
+import { defineConfig } from '@prisma-next/cli/config-types'
+import pgvector from '@prisma-next/extension-pgvector/control'
+
+export default defineConfig({
+  // ...
+  extensionPacks: [pgvector],
+})
+```
+
+```prisma
+model Document {
+  id        Int    @id
+  title     String
+  embedding Bytes  @pgvector.column(length: 1536)
+}
+```
+
+## Designed for AI-assisted workflows
+
+Prisma Next is built for agent-assisted development:
+
+- **Fast, predictable feedback**: type-state APIs and capability checks catch mistakes early
+- **Machine-readable artifacts**: contracts, query plans, and diagnostics are structured data
+- **Guardrails you can compose**: plugins can enforce budgets, policies, and telemetry
+
+See [`blog-post.md`](./blog-post.md) for the full rationale and examples.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 24 LTS or Bun 1.3.x
+- Node.js 24 LTS (or newer)
 - pnpm
 - PostgreSQL
 
@@ -103,7 +178,7 @@ Prisma Next follows a three-step **contract-first** workflow:
 
 1. **Define** your schema in PSL (Prisma Schema Language)
 2. **Emit** a deterministic contract (JSON) and TypeScript types: no executable code generated
-3. **Query** using a composable DSL that compiles to SQL at runtime, verified against the contract
+3. **Query** using either `db.orm` (ORM Client) or `db.sql` (query builder), verified against the contract
 
 The contract is the single source of truth. It's diffable, hashable, and machine-readable. Your app, your migrations, and your tools all reference the same artifact.
 
@@ -111,7 +186,7 @@ For a deep dive into the architecture, package organization, and design decision
 
 ## Status
 
-Prisma Next is in **early preview**. Here's what to expect:
+Prisma Next is in development. Here's what to expect:
 
 | Area | Status |
 |------|--------|
@@ -126,7 +201,7 @@ Prisma Next is in **early preview**. Here's what to expect:
 
 (*) Working, but not feature-complete or production-ready.
 
-APIs are subject to breaking changes. We're iterating fast and will stabilize before a public release.
+APIs are subject to breaking changes.
 
 ## Community
 
