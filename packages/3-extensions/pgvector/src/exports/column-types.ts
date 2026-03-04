@@ -23,7 +23,7 @@ export const vectorColumn = {
  * @example
  * ```typescript
  * .column('embedding', { type: vector(1536), nullable: false })
- * // Produces: nativeType: 'vector(1536)', typeParams: { length: 1536 }
+ * // Produces: nativeType: 'vector', typeParams: { length: 1536 }
  * ```
  *
  * @param length - The dimension of the vector (e.g., 1536 for OpenAI embeddings)
@@ -40,7 +40,7 @@ export function vector<N extends number>(
   }
   return {
     codecId: VECTOR_CODEC_ID,
-    nativeType: `vector(${length})`,
+    nativeType: 'vector',
     typeParams: { length },
   } as const;
 }
