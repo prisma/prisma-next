@@ -628,6 +628,16 @@ function hasSameSpan(a: PslSpan, b: ContractSourceDiagnosticSpan): boolean {
   );
 }
 
+function compareStrings(left: string, right: string): -1 | 0 | 1 {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+}
+
 function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceDiagnostic[] {
   return document.diagnostics.map((diagnostic) => ({
     code: diagnostic.code,
@@ -1292,6 +1302,15 @@ export function interpretPslDocumentToSqlContractIR(
         if (!referencedColumns) {
           continue;
         }
+        if (localColumns.length !== referencedColumns.length) {
+          diagnostics.push({
+            code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+            message: `Relation field "${model.name}.${relationAttribute.field.name}" must provide the same number of fields and references`,
+            sourceId,
+            span: relationAttribute.relation.span,
+          });
+          continue;
+        }
 
         const onDelete = parsedRelation.onDelete
           ? normalizeReferentialAction({
@@ -1431,15 +1450,16 @@ export function interpretPslDocumentToSqlContractIR(
   }
 
   const sortedModels = [...resolvedModels].sort((left, right) => {
-    if (left.mapping.tableName === right.mapping.tableName) {
-      return left.model.name.localeCompare(right.model.name);
+    const tableComparison = compareStrings(left.mapping.tableName, right.mapping.tableName);
+    if (tableComparison === 0) {
+      return compareStrings(left.model.name, right.model.name);
     }
-    return left.mapping.tableName.localeCompare(right.mapping.tableName);
+    return tableComparison;
   });
 
   for (const entry of sortedModels) {
     const relationEntries = [...(modelRelations.get(entry.model.name) ?? [])].sort((left, right) =>
-      left.fieldName.localeCompare(right.fieldName),
+      compareStrings(left.fieldName, right.fieldName),
     );
     builder = builder.model(
       entry.model.name,
