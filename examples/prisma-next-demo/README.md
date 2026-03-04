@@ -16,7 +16,7 @@ This demo shows:
 ## Comparison
 
 - **`prisma-next-demo`** (this example): Shows Prisma Next native APIs
-- **`prisma-orm-demo`**: Shows using Prisma Next via the compatibility layer (mimics legacy Prisma Client API)
+- **`prisma-orm-demo`**: Shows using Prisma Next via the compatibility layer (mimics Prisma Client (Prisma 7) API)
 
 ## Workflows
 
