@@ -10,7 +10,7 @@ This architecture focuses on three outcomes:
 - **Explicit, machine-readable contracts:** The data contract sets the system boundary, describing schema, capabilities, and policies for both queries and migrations
 - **Guardrails with frequent feedback:** Authoring tools, PPg, and the runtime surface the intent, validation, and policy impact of each operation before it can cause drift
 
-Prisma Next also addresses the largest weakness in Prisma ORM (Prisma 7): a monolithic, tightly coupled codebase. By modularizing responsibilities, new behaviors are introduced by composing modules and capability packs instead of patching core implementation.
+Prisma Next also addresses the largest weakness in Prisma 7: a monolithic, tightly coupled codebase. By modularizing responsibilities, new behaviors are introduced by composing modules and capability packs instead of patching core implementation.
 
 ## Guiding Principles
 
@@ -250,7 +250,7 @@ sequenceDiagram
 | Post-feedback    | PPg ledger, drift detectors, and diagnostics inform authors.     | Policy outcomes and drift indicators feed back to authoring tools. |
 ## Modularity and Extensibility
 
-Prisma ORM (Prisma 7) required touching multiple layers of a monolithic Rust/TypeScript codebase to add features. Prisma Next treats the core as a stable execution kernel and exposes extension hooks instead.
+Prisma 7 required touching multiple layers of a monolithic Rust/TypeScript codebase to add features. Prisma Next treats the core as a stable execution kernel and exposes extension hooks instead.
 
 - **Extension packs** supply capabilities, migration operations, codecs, and policies in manifest-driven bundles
 - **Adapters** implement database-specific behavior behind capability interfaces
