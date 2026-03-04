@@ -235,6 +235,87 @@ describe('buildKyselyPlan', () => {
     });
   });
 
+  it('emits join sources with lateral metadata', () => {
+    const query = {
+      query: {
+        kind: 'SelectQueryNode',
+        from: {
+          kind: 'FromNode',
+          froms: [{ kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } }],
+        },
+        joins: [
+          {
+            kind: 'JoinNode',
+            joinType: 'LateralLeftJoinNode',
+            table: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'post' } },
+            on: {
+              kind: 'OnNode',
+              on: {
+                kind: 'BinaryOperationNode',
+                leftOperand: {
+                  kind: 'ReferenceNode',
+                  table: {
+                    kind: 'TableNode',
+                    table: { kind: 'IdentifierNode', name: 'user' },
+                  },
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'id' },
+                  },
+                },
+                operator: { kind: 'OperatorNode', operator: '=' },
+                rightOperand: {
+                  kind: 'ReferenceNode',
+                  table: {
+                    kind: 'TableNode',
+                    table: { kind: 'IdentifierNode', name: 'post' },
+                  },
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'userId' },
+                  },
+                },
+              },
+            },
+          },
+        ],
+        selections: [
+          {
+            kind: 'SelectionNode',
+            selection: {
+              kind: 'ReferenceNode',
+              table: {
+                kind: 'TableNode',
+                table: { kind: 'IdentifierNode', name: 'user' },
+              },
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+              },
+            },
+          },
+        ],
+      },
+      queryId: {} as never,
+      sql: 'select "user"."id" from "user" left join lateral "post" on ...',
+      parameters: [],
+    } as unknown as CompiledQuery<unknown>;
+
+    const plan = buildKyselyPlan(contract, query);
+    expect(plan.ast.kind).toBe('select');
+    if (plan.ast.kind !== 'select') {
+      throw new Error('expected select ast');
+    }
+    expect(plan.ast.joins).toEqual([
+      expect.objectContaining({
+        kind: 'join',
+        joinType: 'left',
+        lateral: true,
+        source: { kind: 'table', name: 'post' },
+      }),
+    ]);
+  });
+
   it('fails fast on unsupported query kinds', () => {
     const unsupported = {
       query: { kind: 'RawNode' },

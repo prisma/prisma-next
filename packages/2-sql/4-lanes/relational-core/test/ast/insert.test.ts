@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
+import {
+  createColumnRef,
+  createDefaultValueExpr,
+  createParamRef,
+  createTableRef,
+} from '../../src/ast/common';
 import { createInsertAst } from '../../src/ast/insert';
-import type { ColumnRef, ParamRef, TableRef } from '../../src/ast/types';
+import type { ColumnRef, InsertValue, ParamRef, TableRef } from '../../src/ast/types';
 
 describe('ast/insert', () => {
   describe('createInsertAst', () => {
@@ -12,16 +17,16 @@ describe('ast/insert', () => {
         email: createParamRef(1, 'email'),
       };
 
-      const insertAst = createInsertAst({ table, values });
+      const insertAst = createInsertAst({ table, rows: [values] });
 
       expect(insertAst).toEqual({
         kind: 'insert',
         table,
-        values,
+        rows: [values],
       });
       expect(insertAst.kind).toBe('insert');
       expect(insertAst.table).toBe(table);
-      expect(insertAst.values).toBe(values);
+      expect(insertAst.rows).toEqual([values]);
       expect(insertAst.returning).toBeUndefined();
     });
 
@@ -36,12 +41,12 @@ describe('ast/insert', () => {
         createColumnRef('user', 'email'),
       ];
 
-      const insertAst = createInsertAst({ table, values, returning });
+      const insertAst = createInsertAst({ table, rows: [values], returning });
 
       expect(insertAst).toEqual({
         kind: 'insert',
         table,
-        values,
+        rows: [values],
         returning,
       });
       expect(insertAst.returning).toBe(returning);
@@ -55,11 +60,11 @@ describe('ast/insert', () => {
         email: createParamRef(0, 'email'),
       };
 
-      const insertAst = createInsertAst({ table, values });
+      const insertAst = createInsertAst({ table, rows: [values] });
 
-      expect(insertAst.values).toBe(values);
-      expect(insertAst.values['id']).toEqual(createColumnRef('user', 'id'));
-      expect(insertAst.values['email']).toEqual(createParamRef(0, 'email'));
+      expect(insertAst.rows[0]).toEqual(values);
+      expect(insertAst.rows[0]?.['id']).toEqual(createColumnRef('user', 'id'));
+      expect(insertAst.rows[0]?.['email']).toEqual(createParamRef(0, 'email'));
     });
 
     it('creates insert ast without returning clause', () => {
@@ -69,7 +74,7 @@ describe('ast/insert', () => {
         content: createParamRef(1, 'content'),
       };
 
-      const insertAst = createInsertAst({ table, values });
+      const insertAst = createInsertAst({ table, rows: [values] });
 
       expect(insertAst.returning).toBeUndefined();
     });
@@ -81,7 +86,7 @@ describe('ast/insert', () => {
       };
       const returning: ColumnRef[] = [createColumnRef('user', 'id')];
 
-      const insertAst = createInsertAst({ table, values, returning });
+      const insertAst = createInsertAst({ table, rows: [values], returning });
 
       expect(insertAst.returning).toHaveLength(1);
       expect(insertAst.returning?.[0]).toEqual(createColumnRef('user', 'id'));
@@ -89,11 +94,58 @@ describe('ast/insert', () => {
 
     it('creates insert ast with empty values object', () => {
       const table: TableRef = createTableRef('user');
-      const values: Record<string, ColumnRef | ParamRef> = {};
+      const values: Record<string, InsertValue> = {};
 
-      const insertAst = createInsertAst({ table, values });
+      const insertAst = createInsertAst({ table, rows: [values] });
 
-      expect(insertAst.values).toEqual({});
+      expect(insertAst.rows).toEqual([{}]);
+    });
+
+    it('creates insert ast with multiple rows and explicit defaults', () => {
+      const table: TableRef = createTableRef('user');
+      const rows: ReadonlyArray<Record<string, InsertValue>> = [
+        {
+          id: createParamRef(0, 'id'),
+          email: createParamRef(1, 'email'),
+        },
+        {
+          id: createParamRef(2, 'id2'),
+          email: createDefaultValueExpr(),
+        },
+      ];
+
+      const insertAst = createInsertAst({ table, rows });
+
+      expect(insertAst.rows).toEqual(rows);
+      expect(insertAst.rows[1]?.['email']).toEqual(createDefaultValueExpr());
+    });
+
+    it('creates insert ast with onConflict update clause', () => {
+      const table: TableRef = createTableRef('user');
+      const values: Record<string, ColumnRef | ParamRef> = {
+        id: createParamRef(0, 'id'),
+        email: createParamRef(1, 'email'),
+      };
+
+      const insertAst = createInsertAst({
+        table,
+        rows: [values],
+        onConflict: {
+          columns: [createColumnRef('user', 'id')],
+          action: {
+            kind: 'doUpdateSet',
+            set: { email: createParamRef(2, 'updatedEmail') },
+          },
+        },
+      });
+
+      expect(insertAst.onConflict).toEqual({
+        columns: [createColumnRef('user', 'id')],
+        action: {
+          kind: 'doUpdateSet',
+          set: { email: createParamRef(2, 'updatedEmail') },
+        },
+      });
     });
   });
 });

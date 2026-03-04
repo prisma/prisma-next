@@ -7,6 +7,7 @@ import type {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import {
+  createDefaultValueExpr,
   createParamRef,
   createTableRef,
   createUpdateAst,
@@ -91,6 +92,155 @@ describe('createPostgresAdapter', () => {
     });
   });
 
+  it('lowers select AST with DISTINCT ON, GROUP BY, HAVING, and OFFSET', () => {
+    const adapter = createPostgresAdapter();
+
+    const ast: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [
+        { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+        { alias: 'email', expr: { kind: 'col', table: 'user', column: 'email' } },
+      ],
+      distinctOn: [{ kind: 'col', table: 'user', column: 'email' }],
+      groupBy: [{ kind: 'col', table: 'user', column: 'id' }],
+      having: {
+        kind: 'bin',
+        op: 'gt',
+        left: { kind: 'col', table: 'user', column: 'id' },
+        right: { kind: 'param', index: 1, name: 'minId' },
+      },
+      orderBy: [{ expr: { kind: 'col', table: 'user', column: 'email' }, dir: 'asc' }],
+      offset: 3,
+    };
+
+    const lowered = adapter.lower(ast, { contract, params: [0] });
+
+    expect(lowered.body.sql).toContain('SELECT DISTINCT ON ("user"."email")');
+    expect(lowered.body.sql).toContain('GROUP BY "user"."id"');
+    expect(lowered.body.sql).toContain('HAVING "user"."id" > $1');
+    expect(lowered.body.sql).toContain('OFFSET 3');
+  });
+
+  it('lowers jsonObject expression projections', () => {
+    const adapter = createPostgresAdapter();
+
+    const ast: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [
+        {
+          alias: 'payload',
+          expr: {
+            kind: 'jsonObject',
+            entries: [
+              {
+                key: 'id',
+                value: { kind: 'col', table: 'user', column: 'id' },
+              },
+              {
+                key: 'email',
+                value: { kind: 'col', table: 'user', column: 'email' },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const lowered = adapter.lower(ast, { contract, params: [] });
+
+    expect(lowered.body.sql).toContain(
+      `json_build_object('id', "user"."id", 'email', "user"."email") AS "payload"`,
+    );
+  });
+
+  it('lowers jsonArrayAgg with and without empty-array fallback', () => {
+    const adapter = createPostgresAdapter();
+
+    const nullOnEmptyAst: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [
+        {
+          alias: 'ids',
+          expr: {
+            kind: 'jsonArrayAgg',
+            expr: { kind: 'col', table: 'user', column: 'id' },
+            onEmpty: 'null',
+          },
+        },
+      ],
+    };
+    const nullOnEmpty = adapter.lower(nullOnEmptyAst, { contract, params: [] });
+    expect(nullOnEmpty.body.sql).toContain('json_agg("user"."id") AS "ids"');
+
+    const emptyArrayAst: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [
+        {
+          alias: 'ids',
+          expr: {
+            kind: 'jsonArrayAgg',
+            expr: { kind: 'col', table: 'user', column: 'id' },
+            onEmpty: 'emptyArray',
+          },
+        },
+      ],
+    };
+    const emptyArray = adapter.lower(emptyArrayAst, { contract, params: [] });
+    expect(emptyArray.body.sql).toContain(
+      'coalesce(json_agg("user"."id"), json_build_array()) AS "ids"',
+    );
+  });
+
+  it('lowers jsonArrayAgg with aggregate-local orderBy', () => {
+    const adapter = createPostgresAdapter();
+
+    const ast: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [
+        {
+          alias: 'ids',
+          expr: {
+            kind: 'jsonArrayAgg',
+            expr: { kind: 'col', table: 'user', column: 'id' },
+            onEmpty: 'emptyArray',
+            orderBy: [{ expr: { kind: 'col', table: 'user', column: 'createdAt' }, dir: 'desc' }],
+          },
+        },
+      ],
+    };
+
+    const lowered = adapter.lower(ast, { contract, params: [] });
+
+    expect(lowered.body.sql).toContain(
+      'coalesce(json_agg("user"."id" ORDER BY "user"."createdAt" DESC), json_build_array()) AS "ids"',
+    );
+  });
+
+  it('lowers aggregate expressions in HAVING contexts', () => {
+    const adapter = createPostgresAdapter();
+
+    const ast: SelectAst = {
+      kind: 'select',
+      from: { kind: 'table', name: 'user' },
+      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+      groupBy: [{ kind: 'col', table: 'user', column: 'id' }],
+      having: {
+        kind: 'bin',
+        op: 'gt',
+        left: { kind: 'aggregate', fn: 'count' },
+        right: { kind: 'literal', value: 1 },
+      },
+    };
+
+    const lowered = adapter.lower(ast, { contract, params: [] });
+    expect(lowered.body.sql).toContain('HAVING COUNT(*) > 1');
+  });
+
   it('renders gt operator correctly', () => {
     const adapter = createPostgresAdapter();
 
@@ -171,274 +321,126 @@ describe('createPostgresAdapter', () => {
     expect(lowered.body.sql).toContain('"user"."id" <= $1');
   });
 
-  describe('includeMany with LATERAL + json_agg', () => {
-    it('renders LATERAL + json_agg correctly', () => {
+  describe('derived joins and subquery projections', () => {
+    it('renders LATERAL derived joins correctly', () => {
       const adapter = createPostgresAdapter();
 
       const ast: SelectAst = {
         kind: 'select',
         from: { kind: 'table', name: 'user' },
-        includes: [
+        joins: [
           {
-            kind: 'includeMany',
-            alias: 'posts',
-            child: {
-              table: { kind: 'table', name: 'post' },
-              on: {
-                kind: 'eqCol',
-                left: { kind: 'col', table: 'user', column: 'id' },
-                right: { kind: 'col', table: 'post', column: 'userId' },
+            kind: 'join',
+            joinType: 'left',
+            lateral: true,
+            source: {
+              kind: 'derivedTable',
+              alias: 'posts_lateral',
+              query: {
+                kind: 'select',
+                from: { kind: 'table', name: 'post' },
+                project: [{ alias: 'posts', expr: { kind: 'col', table: 'post', column: 'id' } }],
               },
-              project: [
-                { alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } },
-                { alias: 'title', expr: { kind: 'col', table: 'post', column: 'title' } },
-              ],
             },
+            on: { kind: 'and', exprs: [] },
           },
         ],
         project: [
           { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-          { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
+          { alias: 'posts', expr: { kind: 'col', table: 'posts_lateral', column: 'posts' } },
         ],
       };
 
       const result = adapter.lower(ast, { contract, params: [] });
-
       expect(result.body.sql).toContain('LEFT JOIN LATERAL');
-      expect(result.body.sql).toContain('json_agg');
-      expect(result.body.sql).toContain('json_build_object');
-      expect(result.body.sql).toContain('AS "posts"');
-      expect(result.body.sql).toContain('ON true');
+      expect(result.body.sql).toContain('AS "posts_lateral"');
+      expect(result.body.sql).toContain('"posts_lateral"."posts" AS "posts"');
+      expect(result.body.sql).toContain('ON TRUE');
     });
 
-    it('includes ORDER BY in lateral subquery', () => {
+    it('renders correlated projection subqueries with DISTINCT ON and OFFSET', () => {
       const adapter = createPostgresAdapter();
 
       const ast: SelectAst = {
         kind: 'select',
         from: { kind: 'table', name: 'user' },
-        includes: [
-          {
-            kind: 'includeMany',
-            alias: 'posts',
-            child: {
-              table: { kind: 'table', name: 'post' },
-              on: {
-                kind: 'eqCol',
-                left: { kind: 'col', table: 'user', column: 'id' },
-                right: { kind: 'col', table: 'post', column: 'userId' },
-              },
-              orderBy: [
-                {
-                  expr: { kind: 'col', table: 'post', column: 'createdAt' },
-                  dir: 'desc',
-                },
-              ],
-              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
-            },
-          },
-        ],
         project: [
           { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-          { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
+          {
+            alias: 'posts',
+            expr: {
+              kind: 'subquery',
+              query: {
+                kind: 'select',
+                from: { kind: 'table', name: 'post' },
+                distinctOn: [{ kind: 'col', table: 'post', column: 'id' }],
+                offset: 1,
+                project: [{ alias: 'posts', expr: { kind: 'col', table: 'post', column: 'id' } }],
+              },
+            },
+          },
         ],
       };
 
       const result = adapter.lower(ast, { contract, params: [] });
-
-      expect(result.body.sql).toContain('ORDER BY');
-      expect(result.body.sql).toContain('"post"."createdAt"');
-      expect(result.body.sql).toContain('DESC');
+      expect(result.body.sql).toContain('(SELECT DISTINCT ON ("post"."id")');
+      expect(result.body.sql).toContain('OFFSET 1');
+      expect(result.body.sql).not.toContain('LEFT JOIN LATERAL');
     });
 
-    it('includes LIMIT in lateral subquery', () => {
+    it('renders scalar subquery expressions in predicates', () => {
       const adapter = createPostgresAdapter();
 
       const ast: SelectAst = {
         kind: 'select',
         from: { kind: 'table', name: 'user' },
-        includes: [
-          {
-            kind: 'includeMany',
-            alias: 'posts',
-            child: {
-              table: { kind: 'table', name: 'post' },
-              on: {
-                kind: 'eqCol',
-                left: { kind: 'col', table: 'user', column: 'id' },
-                right: { kind: 'col', table: 'post', column: 'userId' },
-              },
-              limit: 10,
+        project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: {
+            kind: 'subquery',
+            query: {
+              kind: 'select',
+              from: { kind: 'table', name: 'post' },
               project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
             },
           },
-        ],
-        project: [
-          { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-          { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
-        ],
+          right: { kind: 'literal', value: 1 },
+        },
       };
 
       const result = adapter.lower(ast, { contract, params: [] });
-
-      expect(result.body.sql).toContain('LIMIT');
-      expect(result.body.sql).toContain('10');
+      expect(result.body.sql).toContain('(SELECT');
+      expect(result.body.sql).toContain('= 1');
     });
 
-    it('uses column aliases in ORDER BY when LIMIT is present and column is in SELECT list', () => {
+    it('rejects subquery expressions that project multiple columns', () => {
       const adapter = createPostgresAdapter();
-
       const ast: SelectAst = {
         kind: 'select',
         from: { kind: 'table', name: 'user' },
-        includes: [
+        project: [
           {
-            kind: 'includeMany',
             alias: 'posts',
-            child: {
-              table: { kind: 'table', name: 'post' },
-              on: {
-                kind: 'eqCol',
-                left: { kind: 'col', table: 'user', column: 'id' },
-                right: { kind: 'col', table: 'post', column: 'userId' },
+            expr: {
+              kind: 'subquery',
+              query: {
+                kind: 'select',
+                from: { kind: 'table', name: 'post' },
+                project: [
+                  { alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } },
+                  { alias: 'title', expr: { kind: 'col', table: 'post', column: 'title' } },
+                ],
               },
-              limit: 10,
-              orderBy: [
-                {
-                  expr: { kind: 'col', table: 'post', column: 'id' },
-                  dir: 'desc',
-                },
-              ],
-              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
             },
           },
         ],
-        project: [
-          { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-          { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
-        ],
       };
 
-      const result = adapter.lower(ast, { contract, params: [] });
-
-      // When ORDER BY column is in SELECT list, it should use the column alias
-      expect(result.body.sql).toContain('ORDER BY "id" DESC');
-      expect(result.body.sql).toContain('LIMIT 10');
-    });
-
-    it('uses full column reference in ORDER BY when LIMIT is present and column is not in SELECT list', () => {
-      const adapter = createPostgresAdapter();
-
-      const ast: SelectAst = {
-        kind: 'select',
-        from: { kind: 'table', name: 'user' },
-        includes: [
-          {
-            kind: 'includeMany',
-            alias: 'posts',
-            child: {
-              table: { kind: 'table', name: 'post' },
-              on: {
-                kind: 'eqCol',
-                left: { kind: 'col', table: 'user', column: 'id' },
-                right: { kind: 'col', table: 'post', column: 'userId' },
-              },
-              limit: 10,
-              orderBy: [
-                {
-                  expr: { kind: 'col', table: 'post', column: 'createdAt' },
-                  dir: 'desc',
-                },
-              ],
-              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
-            },
-          },
-        ],
-        project: [
-          { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-          { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
-        ],
-      };
-
-      const result = adapter.lower(ast, { contract, params: [] });
-
-      // When ORDER BY column is NOT in SELECT list, it should use full column reference
-      expect(result.body.sql).toContain('ORDER BY "post"."createdAt" DESC');
-      expect(result.body.sql).toContain('LIMIT 10');
-    });
-
-    it('includes WHERE in lateral subquery', () => {
-      const adapter = createPostgresAdapter();
-
-      const ast: SelectAst = {
-        kind: 'select',
-        from: { kind: 'table', name: 'user' },
-        includes: [
-          {
-            kind: 'includeMany',
-            alias: 'posts',
-            child: {
-              table: { kind: 'table', name: 'post' },
-              on: {
-                kind: 'eqCol',
-                left: { kind: 'col', table: 'user', column: 'id' },
-                right: { kind: 'col', table: 'post', column: 'userId' },
-              },
-              where: {
-                kind: 'bin',
-                op: 'eq',
-                left: { kind: 'col', table: 'post', column: 'published' },
-                right: { kind: 'param', index: 1, name: 'published' },
-              },
-              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
-            },
-          },
-        ],
-        project: [
-          { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-          { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
-        ],
-      };
-
-      const result = adapter.lower(ast, { contract, params: [true] });
-
-      expect(result.body.sql).toContain('WHERE');
-      expect(result.body.sql).toContain('"post"."published"');
-      expect(result.body.sql).toContain('$1');
-    });
-
-    it('parent projection selects include alias', () => {
-      const adapter = createPostgresAdapter();
-
-      const ast: SelectAst = {
-        kind: 'select',
-        from: { kind: 'table', name: 'user' },
-        includes: [
-          {
-            kind: 'includeMany',
-            alias: 'posts',
-            child: {
-              table: { kind: 'table', name: 'post' },
-              on: {
-                kind: 'eqCol',
-                left: { kind: 'col', table: 'user', column: 'id' },
-                right: { kind: 'col', table: 'post', column: 'userId' },
-              },
-              project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
-            },
-          },
-        ],
-        project: [
-          { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-          { alias: 'email', expr: { kind: 'col', table: 'user', column: 'email' } },
-          { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
-        ],
-      };
-
-      const result = adapter.lower(ast, { contract, params: [] });
-
-      expect(result.body.sql).toContain('"posts"');
-      expect(result.body.sql).toContain('AS "posts"');
+      expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
+        'Subquery expressions must project exactly one column',
+      );
     });
   });
 
@@ -450,10 +452,12 @@ describe('createPostgresAdapter', () => {
         const ast: InsertAst = {
           kind: 'insert',
           table: { kind: 'table', name: 'user' },
-          values: {
-            email: { kind: 'param', index: 1, name: 'email' },
-            createdAt: { kind: 'param', index: 2, name: 'createdAt' },
-          },
+          rows: [
+            {
+              email: { kind: 'param', index: 1, name: 'email' },
+              createdAt: { kind: 'param', index: 2, name: 'createdAt' },
+            },
+          ],
         };
 
         const lowered = adapter.lower(ast, {
@@ -473,10 +477,12 @@ describe('createPostgresAdapter', () => {
         const ast: InsertAst = {
           kind: 'insert',
           table: { kind: 'table', name: 'user' },
-          values: {
-            email: { kind: 'param', index: 1, name: 'email' },
-            createdAt: { kind: 'param', index: 2, name: 'createdAt' },
-          },
+          rows: [
+            {
+              email: { kind: 'param', index: 1, name: 'email' },
+              createdAt: { kind: 'param', index: 2, name: 'createdAt' },
+            },
+          ],
           returning: [
             { kind: 'col', table: 'user', column: 'id' },
             { kind: 'col', table: 'user', column: 'email' },
@@ -500,10 +506,12 @@ describe('createPostgresAdapter', () => {
         const ast: InsertAst = {
           kind: 'insert',
           table: { kind: 'table', name: 'user' },
-          values: {
-            email: { kind: 'param', index: 1, name: 'email' },
-            copyFrom: { kind: 'col', table: 'user', column: 'otherColumn' },
-          },
+          rows: [
+            {
+              email: { kind: 'param', index: 1, name: 'email' },
+              copyFrom: { kind: 'col', table: 'user', column: 'otherColumn' },
+            },
+          ],
         };
 
         const lowered = adapter.lower(ast, {
@@ -523,14 +531,233 @@ describe('createPostgresAdapter', () => {
         const ast = {
           kind: 'insert' as const,
           table: { kind: 'table' as const, name: 'user' },
-          values: {
-            email: { kind: 'invalid' as 'param', index: 1 },
-          },
+          rows: [
+            {
+              email: { kind: 'invalid' as 'param', index: 1 },
+            },
+          ],
         } as InsertAst;
 
         expect(() => {
           adapter.lower(ast, { contract, params: ['test@example.com'] });
         }).toThrow('Unsupported value kind in INSERT');
+      });
+
+      it('lowers insert AST with ON CONFLICT DO UPDATE', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          rows: [
+            {
+              email: { kind: 'param', index: 1, name: 'email' },
+            },
+          ],
+          onConflict: {
+            columns: [{ kind: 'col', table: 'user', column: 'email' }],
+            action: {
+              kind: 'doUpdateSet',
+              set: {
+                email: { kind: 'param', index: 2, name: 'updatedEmail' },
+              },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: ['test@example.com', 'updated@example.com'],
+        });
+
+        expect(lowered.body.sql).toContain('ON CONFLICT ("email") DO UPDATE SET "email" = $2');
+      });
+
+      it('lowers insert AST with ON CONFLICT EXCLUDED references', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          rows: [
+            {
+              email: { kind: 'param', index: 1, name: 'email' },
+            },
+          ],
+          onConflict: {
+            columns: [{ kind: 'col', table: 'user', column: 'email' }],
+            action: {
+              kind: 'doUpdateSet',
+              set: {
+                email: { kind: 'col', table: 'excluded', column: 'email' },
+              },
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: ['test@example.com'],
+        });
+
+        expect(lowered.body.sql).toContain(
+          'ON CONFLICT ("email") DO UPDATE SET "email" = excluded."email"',
+        );
+      });
+
+      it('lowers insert AST with ON CONFLICT DO NOTHING', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          rows: [
+            {
+              email: { kind: 'param', index: 1, name: 'email' },
+            },
+          ],
+          onConflict: {
+            columns: [{ kind: 'col', table: 'user', column: 'email' }],
+            action: {
+              kind: 'doNothing',
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: ['test@example.com'],
+        });
+
+        expect(lowered.body.sql).toContain('ON CONFLICT ("email") DO NOTHING');
+      });
+
+      it('lowers multi-row insert AST into a single VALUES clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          rows: [
+            {
+              email: { kind: 'param', index: 1, name: 'email1' },
+              createdAt: { kind: 'param', index: 2, name: 'createdAt1' },
+            },
+            {
+              email: { kind: 'param', index: 3, name: 'email2' },
+              createdAt: { kind: 'param', index: 4, name: 'createdAt2' },
+            },
+          ],
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: [
+            'first@example.com',
+            new Date('2024-01-01'),
+            'second@example.com',
+            new Date('2024-01-02'),
+          ],
+        });
+
+        expect(lowered.body.sql).toBe(
+          'INSERT INTO "user" ("email", "createdAt") VALUES ($1, $2), ($3, $4)',
+        );
+      });
+
+      it('renders DEFAULT for missing cells in multi-row insert AST', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          rows: [
+            {
+              email: { kind: 'param', index: 1, name: 'email1' },
+              createdAt: createDefaultValueExpr(),
+            },
+            {
+              email: { kind: 'param', index: 2, name: 'email2' },
+              createdAt: { kind: 'param', index: 3, name: 'createdAt2' },
+            },
+          ],
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: ['first@example.com', 'second@example.com', new Date('2024-01-02')],
+        });
+
+        expect(lowered.body.sql).toBe(
+          'INSERT INTO "user" ("email", "createdAt") VALUES ($1, DEFAULT), ($2, $3)',
+        );
+      });
+
+      it('lowers multi-row insert AST with returning clause', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          rows: [
+            {
+              email: { kind: 'param', index: 1, name: 'email1' },
+              createdAt: { kind: 'param', index: 2, name: 'createdAt1' },
+            },
+            {
+              email: { kind: 'param', index: 3, name: 'email2' },
+              createdAt: { kind: 'param', index: 4, name: 'createdAt2' },
+            },
+          ],
+          returning: [{ kind: 'col', table: 'user', column: 'id' }],
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: [
+            'first@example.com',
+            new Date('2024-01-01'),
+            'second@example.com',
+            new Date('2024-01-02'),
+          ],
+        });
+
+        expect(lowered.body.sql).toBe(
+          'INSERT INTO "user" ("email", "createdAt") VALUES ($1, $2), ($3, $4) RETURNING "user"."id"',
+        );
+      });
+
+      it('lowers multi-row all-default insert AST as a single statement', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          rows: [{}, {}],
+        };
+
+        const lowered = adapter.lower(ast, {
+          contract,
+          params: [],
+        });
+
+        expect(lowered.body.sql).toBe(
+          'INSERT INTO "user" ("id", "email", "createdAt") VALUES (DEFAULT, DEFAULT, DEFAULT), (DEFAULT, DEFAULT, DEFAULT)',
+        );
+      });
+
+      it('throws for insert AST without rows', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: InsertAst = {
+          kind: 'insert',
+          table: { kind: 'table', name: 'user' },
+          rows: [],
+        };
+
+        expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
+          'INSERT requires at least one row',
+        );
       });
     });
 
@@ -1035,7 +1262,7 @@ describe('createPostgresAdapter', () => {
         expect(lowered.body.sql).toContain('AS "normalized"');
       });
 
-      it('lowers SELECT with operation expression in include ORDER BY', () => {
+      it('lowers SELECT with operation expression in derived subquery ORDER BY', () => {
         const adapter = createPostgresAdapter();
 
         const operationExpr = {
@@ -1056,25 +1283,27 @@ describe('createPostgresAdapter', () => {
         const ast: SelectAst = {
           kind: 'select',
           from: { kind: 'table', name: 'user' },
-          includes: [
+          joins: [
             {
-              kind: 'includeMany',
-              alias: 'posts',
-              child: {
-                table: { kind: 'table', name: 'post' },
-                on: {
-                  kind: 'eqCol',
-                  left: { kind: 'col', table: 'user', column: 'id' },
-                  right: { kind: 'col', table: 'post', column: 'userId' },
+              kind: 'join',
+              joinType: 'left',
+              lateral: true,
+              source: {
+                kind: 'derivedTable',
+                alias: 'posts_lateral',
+                query: {
+                  kind: 'select',
+                  from: { kind: 'table', name: 'post' },
+                  project: [{ alias: 'posts', expr: { kind: 'col', table: 'post', column: 'id' } }],
+                  orderBy: [{ expr: operationExpr, dir: 'asc' }],
                 },
-                project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
-                orderBy: [{ expr: operationExpr, dir: 'asc' }],
               },
+              on: { kind: 'and', exprs: [] },
             },
           ],
           project: [
             { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-            { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
+            { alias: 'posts', expr: { kind: 'col', table: 'posts_lateral', column: 'posts' } },
           ],
         };
 
@@ -1119,9 +1348,11 @@ describe('createPostgresAdapter', () => {
       const ast: InsertAst = {
         kind: 'insert',
         table: { kind: 'table', name: 'user' },
-        values: {
-          vector: { kind: 'param', index: 1, name: 'vector' },
-        },
+        rows: [
+          {
+            vector: { kind: 'param', index: 1, name: 'vector' },
+          },
+        ],
       };
 
       const lowered = adapter.lower(ast, {
@@ -1226,9 +1457,11 @@ describe('createPostgresAdapter', () => {
       const ast: InsertAst = {
         kind: 'insert',
         table: { kind: 'table', name: 'event' },
-        values: {
-          payload: { kind: 'param', index: 1, name: 'payload' },
-        },
+        rows: [
+          {
+            payload: { kind: 'param', index: 1, name: 'payload' },
+          },
+        ],
       };
 
       const lowered = adapter.lower(ast, {
@@ -1304,7 +1537,7 @@ describe('createPostgresAdapter', () => {
 
       const lowered = adapter.lower(ast, { contract, params: [] });
 
-      expect(lowered.body.sql).toContain('{"key":"value","num":42}');
+      expect(lowered.body.sql).toContain(`'{"key":"value","num":42}'`);
     });
 
     it('renders nested array literals', () => {
@@ -1330,6 +1563,25 @@ describe('createPostgresAdapter', () => {
       const lowered = adapter.lower(ast, { contract, params: [] });
 
       expect(lowered.body.sql).toContain('ARRAY[');
+    });
+
+    it('renders Date literals as SQL strings', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'user', column: 'createdAt' },
+          right: { kind: 'literal', value: new Date('2024-01-01T00:00:00.000Z') },
+        },
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: [] });
+      expect(lowered.body.sql).toContain(`"user"."createdAt" = '2024-01-01T00:00:00.000Z'`);
     });
   });
 

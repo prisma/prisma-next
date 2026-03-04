@@ -17,11 +17,12 @@ describe('Join AST types', () => {
     expect(onExpr.right.column).toBe('userId');
   });
 
-  it('defines JoinAst with join type and table', () => {
+  it('defines JoinAst with join type and source', () => {
     const joinAst: JoinAst = {
       kind: 'join',
       joinType: 'inner',
-      table: { kind: 'table', name: 'post' },
+      source: { kind: 'table', name: 'post' },
+      lateral: false,
       on: {
         kind: 'eqCol',
         left: createColumnRef('user', 'id'),
@@ -31,7 +32,7 @@ describe('Join AST types', () => {
 
     expect(joinAst.kind).toBe('join');
     expect(joinAst.joinType).toBe('inner');
-    expect(joinAst.table.name).toBe('post');
+    expect(joinAst.source).toMatchObject({ kind: 'table', name: 'post' });
     expect(joinAst.on.kind).toBe('eqCol');
   });
 
@@ -43,7 +44,8 @@ describe('Join AST types', () => {
         {
           kind: 'join',
           joinType: 'inner',
-          table: { kind: 'table', name: 'post' },
+          source: { kind: 'table', name: 'post' },
+          lateral: false,
           on: {
             kind: 'eqCol',
             left: createColumnRef('user', 'id'),
@@ -81,7 +83,8 @@ describe('Join AST types', () => {
       const joinAst: JoinAst = {
         kind: 'join',
         joinType,
-        table: { kind: 'table', name: 'post' },
+        source: { kind: 'table', name: 'post' },
+        lateral: false,
         on: {
           kind: 'eqCol',
           left: createColumnRef('user', 'id'),

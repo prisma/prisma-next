@@ -33,6 +33,10 @@ describe('Collection construction', () => {
     const collection = new PostCollection({ contract, runtime }, 'Post');
     const scoped = collection.popular();
     expect(scoped.state.filters).toHaveLength(1);
-    expect(scoped.state.filters[0]).toMatchObject({ kind: 'bin', op: 'gt' });
+    expect(scoped.state.filters[0]).toMatchObject({
+      expr: { kind: 'bin', op: 'gt' },
+      params: [],
+      paramDescriptors: [],
+    });
   });
 });

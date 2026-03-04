@@ -6,7 +6,11 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry, createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import {
+  createCodecRegistry,
+  createColumnRef,
+  createTableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -181,7 +185,8 @@ describe('SQL builder joins', () => {
       {
         kind: 'join',
         joinType: 'inner',
-        table: { kind: 'table', name: 'post' },
+        source: createTableRef('post'),
+        lateral: false,
         on: {
           kind: 'eqCol',
           left: createColumnRef('user', 'id'),
@@ -215,7 +220,8 @@ describe('SQL builder joins', () => {
       {
         kind: 'join',
         joinType: 'inner',
-        table: { kind: 'table', name: 'post' },
+        source: createTableRef('post'),
+        lateral: false,
         on: {
           kind: 'eqCol',
           left: createColumnRef('user', 'id'),
@@ -225,7 +231,8 @@ describe('SQL builder joins', () => {
       {
         kind: 'join',
         joinType: 'left',
-        table: { kind: 'table', name: 'comment' },
+        source: createTableRef('comment'),
+        lateral: false,
         on: {
           kind: 'eqCol',
           left: createColumnRef('post', 'id'),

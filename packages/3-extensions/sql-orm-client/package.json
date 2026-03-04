@@ -22,9 +22,7 @@
     "@prisma-next/runtime-executor": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
-    "@prisma-next/sql-runtime": "workspace:*",
-    "@prisma-next/utils": "workspace:*",
-    "kysely": "catalog:"
+    "@prisma-next/sql-runtime": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",

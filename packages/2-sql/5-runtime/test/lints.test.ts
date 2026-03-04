@@ -9,6 +9,7 @@ import type {
 import {
   createColumnRef,
   createDeleteAst,
+  createDerivedTableSource,
   createSelectAst,
   createTableRef,
   createUpdateAst,
@@ -159,6 +160,31 @@ describe('lints plugin', () => {
 
       await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
+    });
+
+    it('warns for derived-table selects without assuming a plain table source', async () => {
+      const selectAst = createSelectAst({
+        from: createDerivedTableSource(
+          'user_ids',
+          createSelectAst({
+            from: userTable,
+            project: [{ alias: 'id', expr: idCol }],
+          }),
+        ),
+        project: [{ alias: 'id', expr: createColumnRef('user_ids', 'id') }],
+      });
+      const plan = createPlan({ ast: selectAst });
+      const plugin = lints();
+      const ctx = createPluginContext();
+
+      await plugin.beforeExecute?.(plan, ctx);
+      expect(ctx.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'LINT.NO_LIMIT',
+          message: expect.stringContaining('Unbounded SELECT'),
+          details: { table: 'user_ids' },
+        }),
+      );
     });
 
     it('throws when noLimit severity is error', async () => {

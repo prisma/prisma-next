@@ -1,9 +1,9 @@
-import type { ColumnRef, DeleteAst, TableRef, WhereExpr } from './types';
+import type { ColumnRef, DeleteAst, TableSource, WhereExpr } from './types';
 import { compact } from './util';
 
 export interface CreateDeleteAstOptions {
-  readonly table: TableRef;
-  readonly where: WhereExpr;
+  readonly table: TableSource;
+  readonly where?: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 
