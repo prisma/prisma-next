@@ -48,8 +48,7 @@ This is a deliberate “strict subset” choice: PSL v1 is bounded by the curren
   - relation naming via `@relation("Name")` and `@relation(name: "Name")` for disambiguation
 - PSL v1 emits deterministic relation metadata in `contract.relations` for both sides of a lowered 1:N relation (FK side + navigation list side).
 - PSL v1 still does **not** support implicit many-to-many (list fields on both sides without an explicit join model).
-
-Many-to-many **can** be represented structurally with an explicit join model (two foreign keys), but without list navigation fields.
+- Explicit many-to-many via a join model is supported as two 1:N relations: each FK side uses `@relation(fields: [...], references: [...])`, and matching navigation list fields can be lowered into `contract.relations` when they meet the same navigation-list constraints above.
 
 ### Defaults
 

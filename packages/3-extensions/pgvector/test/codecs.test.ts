@@ -1,13 +1,18 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { codecDefinitions } from '../src/core/codecs';
 
 describe('pgvector codecs', () => {
-  it('has vector codec registered', () => {
-    const vectorDef = codecDefinitions.vector;
-    expect(vectorDef).toBeDefined();
-    expect(vectorDef.typeId).toBe('pg/vector@1');
-    expect(vectorDef.codec.targetTypes).toEqual(['vector']);
-  }, 1_000);
+  it(
+    'has vector codec registered',
+    () => {
+      const vectorDef = codecDefinitions.vector;
+      expect(vectorDef).toBeDefined();
+      expect(vectorDef.typeId).toBe('pg/vector@1');
+      expect(vectorDef.codec.targetTypes).toEqual(['vector']);
+    },
+    timeouts.default,
+  );
 
   it('encodes number array to PostgreSQL vector format', () => {
     const vectorCodec = codecDefinitions.vector.codec;
