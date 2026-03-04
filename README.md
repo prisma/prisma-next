@@ -1,20 +1,6 @@
-<p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a>
-  <a href="https://pris.ly/discord"><img src="https://img.shields.io/discord/937751382725886062?color=5865F2&label=Discord&logo=discord&logoColor=white" alt="Discord" /></a>
-  <a href="https://twitter.com/prisma"><img src="https://img.shields.io/twitter/follow/prisma?style=social" alt="Follow @prisma" /></a>
-</p>
 
-<p align="center">
-  <a href="https://www.prisma.io/docs">Docs</a>
-  <span>&nbsp;&nbsp;|&nbsp;&nbsp;</span>
-  <a href="https://pris.ly/discord">Discord</a>
-  <span>&nbsp;&nbsp;|&nbsp;&nbsp;</span>
-  <a href="https://twitter.com/prisma">X</a>
-  <span>&nbsp;&nbsp;|&nbsp;&nbsp;</span>
-  <a href="https://www.prisma.io/blog">Blog</a>
-  <span>&nbsp;&nbsp;|&nbsp;&nbsp;</span>
-  <a href="./ARCHITECTURE.md">Architecture</a>
-</p>
+
+[Docs](https://www.prisma.io/docs)  |  [Discord](https://pris.ly/discord)  |  [X](https://twitter.com/prisma)  |  [Blog](https://www.prisma.io/blog)  |  [Architecture](./ARCHITECTURE.md)
 
 ---
 
@@ -31,7 +17,17 @@
   - **Query builder** (`db.sql`): type-safe SQL plan builder for when you want lower-level control
 - **Designed for AI-assisted workflows**: deterministic contracts, structured plans, stable diagnostics, and guardrails that help agents (and humans) iterate safely.
 
-Read the deep dive in [`blog-post.md`](./blog-post.md) and the announcement blog post: [The Next Evolution of Prisma ORM](https://www.prisma.io/blog/the-next-evolution-of-prisma-orm).
+Read the deep dive in `[blog-post.md](./blog-post.md)` and the announcement blog post: [The Next Evolution of Prisma ORM](https://www.prisma.io/blog/the-next-evolution-of-prisma-orm).
+
+## Designed for AI-assisted workflows
+
+Prisma Next is built for agent-assisted development:
+
+- **Fast, predictable feedback**: type-state APIs and capability checks catch mistakes early
+- **Machine-readable artifacts**: contracts, query plans, and diagnostics are structured data
+- **Guardrails you can compose**: plugins can enforce budgets, policies, and telemetry
+
+See `[blog-post.md](./blog-post.md)` for the full rationale and examples.
 
 ## Schema as a contract
 
@@ -81,7 +77,6 @@ const users = await db.orm.users
   .select('id', 'email')
   .take(10)
   .all()
-  .toArray()
 
 // users: Array<{ id: number; email: string }>
 ```
@@ -142,16 +137,6 @@ model Document {
 }
 ```
 
-## Designed for AI-assisted workflows
-
-Prisma Next is built for agent-assisted development:
-
-- **Fast, predictable feedback**: type-state APIs and capability checks catch mistakes early
-- **Machine-readable artifacts**: contracts, query plans, and diagnostics are structured data
-- **Guardrails you can compose**: plugins can enforce budgets, policies, and telemetry
-
-See [`blog-post.md`](./blog-post.md) for the full rationale and examples.
-
 ## Getting Started
 
 ### Prerequisites
@@ -188,16 +173,18 @@ For a deep dive into the architecture, package organization, and design decision
 
 Prisma Next is in development. Here's what to expect:
 
-| Area | Status |
-|------|--------|
+
+| Area                    | Status   |
+| ----------------------- | -------- |
 | Schema definition (PSL) | Working* |
-| Contract emission | Working* |
-| SQL query DSL | Working* |
-| ORM-style queries | Working* |
-| Postgres adapter | Working* |
-| Plugin system | Working* |
-| Migrations | Minimal |
-| MySQL / SQLite | Not yet |
+| Contract emission       | Working* |
+| SQL query DSL           | Working* |
+| ORM-style queries       | Working* |
+| Postgres adapter        | Working* |
+| Plugin system           | Working* |
+| Migrations              | Minimal  |
+| MySQL / SQLite          | Not yet  |
+
 
 (*) Working, but not feature-complete or production-ready.
 
