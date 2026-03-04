@@ -329,9 +329,11 @@ describe('mutation builder generated defaults', () => {
 
     expect(plan.ast).toMatchObject({
       kind: 'insert',
-      values: expect.objectContaining({
-        id: expect.any(Object),
-      }),
+      rows: [
+        expect.objectContaining({
+          id: expect.any(Object),
+        }),
+      ],
     });
     expect(plan.params).toHaveLength(2);
   });

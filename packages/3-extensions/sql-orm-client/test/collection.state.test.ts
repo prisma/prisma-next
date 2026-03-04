@@ -10,6 +10,11 @@ describe('Collection', () => {
   const contract = baseContract;
   const userCol = (column: string) => ({ kind: 'col' as const, table: 'users', column });
   const literal = (value: unknown) => ({ kind: 'literal' as const, value });
+  const bound = (expr: Record<string, unknown>, params: readonly unknown[] = []) => ({
+    expr,
+    params,
+    paramDescriptors: params.map((_, index) => ({ source: 'lane' as const, index: index + 1 })),
+  });
   const eq = (
     column: string,
     right: { kind: 'literal'; value: unknown } | { kind: 'param'; index: number },
@@ -24,7 +29,7 @@ describe('Collection', () => {
       const { collection } = createCollection();
       const filtered = collection.where((u) => u.name.eq('Alice'));
       expect(filtered.state.filters).toHaveLength(1);
-      expect(filtered.state.filters[0]).toEqual(eq('name', literal('Alice')));
+      expect(filtered.state.filters[0]).toEqual(bound(eq('name', literal('Alice'))));
       // Original is not mutated
       expect(collection.state.filters).toHaveLength(0);
     });
@@ -47,7 +52,13 @@ describe('Collection', () => {
         }),
       }));
 
-      expect(filtered.state.filters).toEqual([eq('name', literal('Alice'))]);
+      expect(filtered.state.filters).toEqual([
+        {
+          expr: eq('name', { kind: 'param', index: 1 }),
+          params: ['Alice'],
+          paramDescriptors: [{ source: 'lane', index: 1 }],
+        },
+      ]);
     });
 
     it('where() rejects bare WhereExpr with ParamRef', () => {
@@ -61,10 +72,12 @@ describe('Collection', () => {
       const { collection } = createCollection();
       const filtered = collection.where({ name: 'Alice', email: 'alice@example.com' });
       expect(filtered.state.filters).toHaveLength(1);
-      expect(filtered.state.filters[0]).toEqual({
-        kind: 'and',
-        exprs: [eq('name', literal('Alice')), eq('email', literal('alice@example.com'))],
-      });
+      expect(filtered.state.filters[0]).toEqual(
+        bound({
+          kind: 'and',
+          exprs: [eq('name', literal('Alice')), eq('email', literal('alice@example.com'))],
+        }),
+      );
     });
 
     it('where() converts null and ignores undefined in shorthand filters', () => {
@@ -75,11 +88,13 @@ describe('Collection', () => {
       });
 
       expect(filtered.state.filters).toHaveLength(1);
-      expect(filtered.state.filters[0]).toEqual({
-        kind: 'nullCheck',
-        expr: { kind: 'col', table: 'users', column: 'email' },
-        isNull: true,
-      });
+      expect(filtered.state.filters[0]).toEqual(
+        bound({
+          kind: 'nullCheck',
+          expr: { kind: 'col', table: 'users', column: 'email' },
+          isNull: true,
+        }),
+      );
     });
 
     it('where({}) is identity', () => {
@@ -177,12 +192,14 @@ describe('Collection', () => {
       );
       const inc = withPosts.state.includes[0]!;
       expect(inc.nested.filters).toHaveLength(1);
-      expect(inc.nested.filters[0]).toEqual({
-        kind: 'bin',
-        op: 'gt',
-        left: { kind: 'col', table: 'posts', column: 'views' },
-        right: { kind: 'literal', value: 100 },
-      });
+      expect(inc.nested.filters[0]).toEqual(
+        bound({
+          kind: 'bin',
+          op: 'gt',
+          left: { kind: 'col', table: 'posts', column: 'views' },
+          right: { kind: 'literal', value: 100 },
+        }),
+      );
       expect(inc.nested.limit).toBe(5);
     });
 

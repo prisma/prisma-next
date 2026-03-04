@@ -1,6 +1,6 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { CompiledQuery } from 'kysely';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { stitchIncludes } from './collection-dispatch';
 import {
   acquireRuntimeScope,
@@ -9,13 +9,13 @@ import {
   mapStorageRowToModelFields,
   stripHiddenMappedFields,
 } from './collection-runtime';
-import { executeCompiledQuery } from './raw-compiled-query';
+import { executeQueryPlan } from './execute-query-plan';
 import type { CollectionContext, IncludeExpr } from './types';
 
 interface DispatchMutationRowsOptions<Row> {
   readonly contract: SqlContract<SqlStorage>;
   readonly runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
-  readonly compiled: CompiledQuery;
+  readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
   readonly includes: readonly IncludeExpr[];
   readonly hiddenColumns: readonly string[];
@@ -26,12 +26,9 @@ export function dispatchMutationRows<Row>(
   options: DispatchMutationRowsOptions<Row>,
 ): AsyncIterableResult<Row> {
   const { contract, runtime, compiled, tableName, includes, hiddenColumns, mapRow } = options;
-  const typedCompiled = compiled as CompiledQuery<Record<string, unknown>>;
 
   if (includes.length === 0) {
-    const source = executeCompiledQuery<Record<string, unknown>>(runtime, contract, typedCompiled, {
-      lane: 'orm-client',
-    });
+    const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
 
     return mapResultRows(source, (rawRow) => {
       const mapped = mapStorageRowToModelFields(contract, tableName, rawRow);
@@ -45,14 +42,7 @@ export function dispatchMutationRows<Row>(
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
-      const rawRows = await executeCompiledQuery<Record<string, unknown>>(
-        scope,
-        contract,
-        typedCompiled,
-        {
-          lane: 'orm-client',
-        },
-      ).toArray();
+      const rawRows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
       if (rawRows.length === 0) {
         return;
       }
@@ -79,7 +69,7 @@ export function dispatchMutationRows<Row>(
 interface ExecuteSingleMutationOptions<Row> {
   readonly contract: SqlContract<SqlStorage>;
   readonly runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
-  readonly compiled: CompiledQuery;
+  readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
   readonly includes: readonly IncludeExpr[];
   readonly hiddenColumns: readonly string[];
@@ -100,17 +90,9 @@ export async function executeMutationReturningSingleRow<Row>(
     mapRow,
     onMissingRowMessage,
   } = options;
-  const typedCompiled = compiled as CompiledQuery<Record<string, unknown>>;
 
   if (includes.length === 0) {
-    const rows = await executeCompiledQuery<Record<string, unknown>>(
-      runtime,
-      contract,
-      typedCompiled,
-      {
-        lane: 'orm-client',
-      },
-    ).toArray();
+    const rows = await executeQueryPlan<Record<string, unknown>>(runtime, compiled).toArray();
     const first = rows[0];
     if (!first) {
       return null;
@@ -125,14 +107,7 @@ export async function executeMutationReturningSingleRow<Row>(
 
   const { scope, release } = await acquireRuntimeScope(runtime);
   try {
-    const rows = await executeCompiledQuery<Record<string, unknown>>(
-      scope,
-      contract,
-      typedCompiled,
-      {
-        lane: 'orm-client',
-      },
-    ).toArray();
+    const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
     const first = rows[0];
     if (!first) {
       return null;

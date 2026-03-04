@@ -1,9 +1,7 @@
 export {
   compileAggregate,
   compileGroupedAggregate,
-  compileHavingMetricColumn,
-  GROUPED_HAVING_TABLE,
-} from './kysely-compiler-aggregate';
+} from './query-plan-aggregate';
 export {
   compileDeleteCount,
   compileDeleteReturning,
@@ -12,9 +10,9 @@ export {
   compileUpdateCount,
   compileUpdateReturning,
   compileUpsertReturning,
-} from './kysely-compiler-mutations';
+} from './query-plan-mutations';
 export {
   compileRelationSelect,
   compileSelect,
   compileSelectWithIncludeStrategy,
-} from './kysely-compiler-select';
+} from './query-plan-select';

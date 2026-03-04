@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCollectionFor } from './collection-fixtures';
-import { getTestContract } from './helpers';
+import { getTestContract, isSelectAst } from './helpers';
 
 describe('GroupedCollection', () => {
   it('groupBy().aggregate() maps grouped columns back to model fields', async () => {
@@ -27,8 +27,20 @@ describe('GroupedCollection', () => {
       }));
 
     expect(rows).toEqual([{ userId: 1, totalViews: 50 }]);
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('having count(*) >=');
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('sum("posts"."views")');
+    const firstAst = runtime.executions[0]?.plan.ast;
+    expect(isSelectAst(firstAst)).toBe(true);
+    if (!isSelectAst(firstAst)) {
+      throw new Error('Expected first execution plan to be a select SQL query plan');
+    }
+    expect(firstAst.having?.kind).toBe('bin');
+    if (firstAst.having?.kind === 'bin') {
+      expect(firstAst.having.left).toMatchObject({ kind: 'aggregate', fn: 'count' });
+    }
+    const totalViewsProjection = firstAst.project.find((item) => item.alias === 'totalViews');
+    expect(totalViewsProjection?.expr.kind).toBe('aggregate');
+    if (totalViewsProjection?.expr.kind === 'aggregate') {
+      expect(totalViewsProjection.expr.fn).toBe('sum');
+    }
   });
 
   it('groupBy().aggregate() validates selector shape and non-empty spec', async () => {
@@ -83,13 +95,23 @@ describe('GroupedCollection', () => {
       .having((having) => having.count().lte(2))
       .aggregate((aggregate) => ({ count: aggregate.count() }));
 
-    const sqls = runtime.executions.map((entry) => entry.plan.sql.toLowerCase()).join('\n');
-    expect(sqls).toContain('sum("posts"."views") =');
-    expect(sqls).toContain('avg("posts"."views") !=');
-    expect(sqls).toContain('min("posts"."views") >');
-    expect(sqls).toContain('max("posts"."views") <');
-    expect(sqls).toContain('count(*) >=');
-    expect(sqls).toContain('count(*) <=');
+    const havingComparisons = runtime.executions
+      .map((entry) => {
+        if (!isSelectAst(entry.plan.ast)) {
+          return undefined;
+        }
+        const having = entry.plan.ast.having;
+        if (!having || having.kind !== 'bin' || having.left.kind !== 'aggregate') {
+          return undefined;
+        }
+        return `${having.left.fn}:${having.op}`;
+      })
+      .filter((comparison): comparison is string => comparison !== undefined);
+
+    expect(havingComparisons).toHaveLength(6);
+    expect(new Set(havingComparisons)).toEqual(
+      new Set(['sum:eq', 'avg:neq', 'min:gt', 'max:lt', 'count:gte', 'count:lte']),
+    );
   });
 
   it('groupBy().aggregate() coerces aggregate value types from runtime rows', async () => {
@@ -190,11 +212,22 @@ describe('GroupedCollection', () => {
         max: aggregate.max(numericField),
       }));
 
-    const sql = runtime.executions.map((entry) => entry.plan.sql.toLowerCase()).join('\n');
-    expect(sql).toContain('sum("posts"."userid")');
-    expect(sql).toContain('avg("posts"."userid")');
-    expect(sql).toContain('min("posts"."userid")');
-    expect(sql).toContain('max("posts"."userid")');
+    const metricColumns = runtime.executions
+      .map((entry) => {
+        if (!isSelectAst(entry.plan.ast)) {
+          return undefined;
+        }
+        const having = entry.plan.ast.having;
+        if (!having || having.kind !== 'bin' || having.left.kind !== 'aggregate') {
+          return undefined;
+        }
+        return having.left.expr?.kind === 'col'
+          ? `${having.left.expr.table}:${having.left.expr.column}`
+          : undefined;
+      })
+      .filter((column): column is string => column !== undefined);
+
+    expect(metricColumns).toContain('posts:userId');
   });
 
   it('only exposes grouped operations at runtime', () => {

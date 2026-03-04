@@ -143,7 +143,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       // BinaryBuilder - has 'left' and 'right' properties
       // args.where.left is Expression (already converted at builder creation time)
       const leftExpr: Expression = args.where.left;
-      if (isOperationExpr(leftExpr)) {
+      if (isOperationExpr(leftExpr) || leftExpr.kind === 'subquery') {
         const allRefs = collectColumnRefs(leftExpr);
         for (const ref of allRefs) {
           refsColumns.set(`${ref.table}.${ref.column}`, {
@@ -151,7 +151,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
             column: ref.column,
           });
         }
-      } else {
+      } else if (leftExpr.kind === 'col') {
         // leftExpr is ColumnRef
         refsColumns.set(`${leftExpr.table}.${leftExpr.column}`, {
           table: leftExpr.table,
@@ -170,7 +170,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
   if (args.orderBy) {
     // args.orderBy.expr is Expression (already converted at builder creation time)
     const orderByExpr: Expression = args.orderBy.expr;
-    if (isOperationExpr(orderByExpr)) {
+    if (isOperationExpr(orderByExpr) || orderByExpr.kind === 'subquery') {
       const allRefs = collectColumnRefs(orderByExpr);
       for (const ref of allRefs) {
         refsColumns.set(`${ref.table}.${ref.column}`, {
@@ -178,7 +178,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
           column: ref.column,
         });
       }
-    } else {
+    } else if (orderByExpr.kind === 'col') {
       // orderByExpr is ColumnRef
       refsColumns.set(`${orderByExpr.table}.${orderByExpr.column}`, {
         table: orderByExpr.table,

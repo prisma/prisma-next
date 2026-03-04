@@ -11,6 +11,16 @@ function toWhereExpr(expr: BoundWhereExpr): WhereArg {
 const col = (table: string, column: string) => ({ kind: 'col' as const, table, column });
 const param = (index: number) => ({ kind: 'param' as const, index });
 const literal = (value: unknown) => ({ kind: 'literal' as const, value });
+const descriptor = (index: number) => ({ source: 'lane' as const, index });
+const bound = (
+  expr: WhereExpr,
+  params: readonly unknown[] = [],
+  paramDescriptors = params.map((_, index) => descriptor(index + 1)),
+): BoundWhereExpr => ({
+  expr,
+  params: [...params],
+  paramDescriptors,
+});
 const op = (
   self: ReturnType<typeof col>,
   args: Array<ReturnType<typeof col> | ReturnType<typeof param> | ReturnType<typeof literal>>,
@@ -38,19 +48,17 @@ describe('where interop', () => {
     expect(() => normalizeWhereArg(null as unknown as WhereArg)).toThrow(/cannot be null/i);
   });
 
-  it('normalizes bound params into literals', () => {
+  it('preserves bound params for runtime/adapter handling', () => {
     const arg = toWhereExpr({
       expr: eq(col('users', 'name'), param(1)),
       params: ['Alice'],
       paramDescriptors: [{ source: 'lane' }],
     });
 
-    expect(normalizeWhereArg(arg)).toEqual({
-      ...eq(col('users', 'name'), literal('Alice')),
-    });
+    expect(normalizeWhereArg(arg)).toEqual(bound(eq(col('users', 'name'), param(1)), ['Alice']));
   });
 
-  it('normalizes nested and/or/exists branches', () => {
+  it('preserves nested and/or/exists params', () => {
     const arg = toWhereExpr({
       expr: {
         kind: 'and',
@@ -84,34 +92,39 @@ describe('where interop', () => {
       paramDescriptors: [{ source: 'lane' }, { source: 'lane' }, { source: 'lane' }],
     });
 
-    expect(normalizeWhereArg(arg)).toEqual({
-      kind: 'and',
-      exprs: [
+    expect(normalizeWhereArg(arg)).toEqual(
+      bound(
         {
-          ...eq(col('users', 'id'), literal(1)),
-        },
-        {
-          kind: 'or',
+          kind: 'and',
           exprs: [
             {
-              ...eq(col('users', 'email'), literal('a@b.c')),
+              ...eq(col('users', 'id'), param(1)),
             },
             {
-              kind: 'exists',
-              not: false,
-              subquery: {
-                kind: 'select',
-                from: { kind: 'table', name: 'posts' },
-                project: [{ alias: 'id', expr: col('posts', 'id') }],
-                where: {
-                  ...eq(col('posts', 'user_id'), literal(99)),
+              kind: 'or',
+              exprs: [
+                {
+                  ...eq(col('users', 'email'), param(2)),
                 },
-              },
+                {
+                  kind: 'exists',
+                  not: false,
+                  subquery: {
+                    kind: 'select',
+                    from: { kind: 'table', name: 'posts' },
+                    project: [{ alias: 'id', expr: col('posts', 'id') }],
+                    where: {
+                      ...eq(col('posts', 'user_id'), param(3)),
+                    },
+                  },
+                },
+              ],
             },
           ],
         },
-      ],
-    });
+        [1, 'a@b.c', 99],
+      ),
+    );
   });
 
   it('rejects bare WhereExpr with ParamRef', () => {
@@ -122,7 +135,7 @@ describe('where interop', () => {
 
   it('accepts bare WhereExpr when param-free', () => {
     const expr: WhereExpr = eq(col('users', 'kind'), literal('admin'));
-    expect(normalizeWhereArg(expr)).toEqual(expr);
+    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
   });
 
   it('accepts bare WhereExpr with expression comparables when param-free', () => {
@@ -132,7 +145,7 @@ describe('where interop', () => {
       left: col('users', 'email'),
       right: op(col('users', 'email'), [col('users', 'id'), literal('x')]),
     };
-    expect(normalizeWhereArg(expr)).toEqual(expr);
+    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
   });
 
   it('accepts bare exists with join predicates and listLiteral comparables', () => {
@@ -146,7 +159,8 @@ describe('where interop', () => {
           {
             kind: 'join',
             joinType: 'left',
-            table: { kind: 'table', name: 'posts' },
+            source: { kind: 'table', name: 'posts' },
+            lateral: false,
             on: {
               kind: 'eqCol',
               left: col('users', 'id'),
@@ -156,7 +170,8 @@ describe('where interop', () => {
           {
             kind: 'join',
             joinType: 'inner',
-            table: { kind: 'table', name: 'profiles' },
+            source: { kind: 'table', name: 'profiles' },
+            lateral: false,
             on: {
               kind: 'bin',
               op: 'eq',
@@ -174,7 +189,7 @@ describe('where interop', () => {
         },
       },
     };
-    expect(normalizeWhereArg(expr)).toEqual(expr);
+    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
   });
 
   it('rejects bare nullCheck expression containing ParamRef in operation args', () => {
@@ -252,7 +267,7 @@ describe('where interop', () => {
       paramDescriptors: [],
     });
 
-    expect(normalizeWhereArg(arg)).toEqual(eq(col('users', 'kind'), literal('admin')));
+    expect(normalizeWhereArg(arg)).toEqual(bound(eq(col('users', 'kind'), literal('admin'))));
   });
 
   it('rejects bound payloads with params when expr contains no ParamRef', () => {
@@ -267,7 +282,7 @@ describe('where interop', () => {
     expect(() => normalizeWhereArg(arg)).toThrow(/does not contain ParamRef/i);
   });
 
-  it('normalizes operation and listLiteral payloads in binary comparable values', () => {
+  it('preserves operation and listLiteral params in binary comparable values', () => {
     const arg = toWhereExpr({
       expr: {
         kind: 'and',
@@ -290,26 +305,54 @@ describe('where interop', () => {
       paramDescriptors: [{ source: 'lane' }, { source: 'lane' }, { source: 'lane' }],
     });
 
-    expect(normalizeWhereArg(arg)).toEqual({
-      kind: 'and',
-      exprs: [
+    expect(normalizeWhereArg(arg)).toEqual(
+      bound(
         {
-          kind: 'bin',
-          op: 'eq',
-          left: {
-            ...op(col('users', 'email'), [literal('prefix'), literal('@example.com')]),
-          },
-          right: {
-            ...op(col('users', 'email'), [literal('rhs')]),
-          },
+          kind: 'and',
+          exprs: [
+            {
+              kind: 'bin',
+              op: 'eq',
+              left: {
+                ...op(col('users', 'email'), [param(1), literal('@example.com')]),
+              },
+              right: {
+                ...op(col('users', 'email'), [param(2)]),
+              },
+            },
+            {
+              kind: 'bin',
+              op: 'in',
+              left: col('users', 'id'),
+              right: { kind: 'listLiteral', values: [param(3), literal('u2')] },
+            },
+          ],
         },
-        {
-          kind: 'bin',
-          op: 'in',
-          left: col('users', 'id'),
-          right: { kind: 'listLiteral', values: [literal('u1'), literal('u2')] },
-        },
-      ],
+        ['prefix', 'rhs', 'u1'],
+      ),
+    );
+  });
+
+  it('preserves ParamRef inside operation args', () => {
+    const arg = toWhereExpr({
+      expr: {
+        kind: 'nullCheck',
+        isNull: false,
+        expr: op(col('users', 'email'), [col('users', 'email'), param(1), literal('x')]),
+      },
+      params: ['needle'],
+      paramDescriptors: [{ source: 'lane' }],
     });
+
+    expect(normalizeWhereArg(arg)).toEqual(
+      bound(
+        {
+          kind: 'nullCheck',
+          isNull: false,
+          expr: op(col('users', 'email'), [col('users', 'email'), param(1), literal('x')]),
+        },
+        ['needle'],
+      ),
+    );
   });
 });
