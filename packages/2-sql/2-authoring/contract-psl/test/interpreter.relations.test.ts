@@ -144,4 +144,73 @@ model Member {
       },
     });
   });
+
+  it('matches self-referential backrelations when disambiguated by relation name', () => {
+    const document = parsePslDocument({
+      schema: `model Employee {
+  id Int @id
+  managerId Int?
+  manager Employee? @relation("Manages", fields: [managerId], references: [id])
+  reports Employee[] @relation("Manages")
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.relations).toMatchObject({
+      employee: {
+        manager: {
+          to: 'Employee',
+          cardinality: 'N:1',
+          on: {
+            parentCols: ['managerId'],
+            childCols: ['id'],
+          },
+        },
+        reports: {
+          to: 'Employee',
+          cardinality: '1:N',
+          on: {
+            parentCols: ['id'],
+            childCols: ['managerId'],
+          },
+        },
+      },
+    });
+  });
+
+  it('returns diagnostics for ambiguous self-referential backrelations without a relation name', () => {
+    const document = parsePslDocument({
+      schema: `model Employee {
+  id Int @id
+  managerId Int?
+  mentorId Int?
+  manager Employee? @relation(fields: [managerId], references: [id])
+  mentor Employee? @relation(fields: [mentorId], references: [id])
+  reports Employee[]
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+          message: expect.stringContaining('Employee.reports'),
+        }),
+      ]),
+    );
+  });
 });
