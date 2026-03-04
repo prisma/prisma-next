@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { getPrisma } from '../src/prisma/client';
 
 async function main() {
-  // Seed script uses Prisma Client based on USE_COMPAT env var (defaults to legacy)
+  // Seed script uses Prisma Client based on USE_COMPAT env var (defaults to Prisma 7)
   const prisma = await getPrisma();
 
   // Use individual creates since createMany is not implemented in compat layer MVP

@@ -2,7 +2,7 @@
 
 ## Context
 
-- The legacy ORM often mapped a single high-level call to multiple database round-trips
+- Prisma ORM (Prisma 7) often mapped a single high-level call to multiple database round-trips
   - Examples include relation loading, pagination with count, and follow-up reads for computed results
 - Hidden multi-statement behavior makes performance unpredictable, complicates guardrails, and is hard for agents to reason about
 - Our runtime plugins, budgets, and preflight checks work best when a query has a single, verifiable statement boundary
@@ -86,7 +86,7 @@
 
 ## Backwards compatibility and migration
 
-- For legacy code that relied on multi-query relation loading, provide an ORM extension that lowers includes to single statements where feasible
+- For Prisma 7 codebases that relied on multi-query relation loading, provide an ORM extension that lowers includes to single statements where feasible
 - Where not feasible, offer recipes to move to explicit transaction pipelines or to server-side routines via TypedSQL
 - Document common rewrites with examples and performance guidance
 

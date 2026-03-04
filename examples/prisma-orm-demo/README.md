@@ -1,6 +1,6 @@
 # Prisma ORM Demo
 
-Minimal Prisma ORM example app with simple read and write queries. This app demonstrates both legacy Prisma Client and Prisma Next compatibility layer side-by-side.
+Minimal Prisma ORM example app with simple read and write queries. This app demonstrates both Prisma Client (Prisma 7) and Prisma Next compatibility layer side-by-side.
 
 ## Setup
 
@@ -53,9 +53,9 @@ pnpm start -- read clxxxxxxxxxxxxx
 
 ## Switching Between Prisma ORM and Prisma Next
 
-This demo is set up to easily switch between using legacy Prisma Client and the Prisma Next compatibility layer using an environment variable.
+This demo is set up to easily switch between using Prisma Client (Prisma 7) and the Prisma Next compatibility layer using an environment variable.
 
-### Using Legacy Prisma Client (Default)
+### Using Prisma Client (Prisma 7) (Default)
 
 The default configuration uses `@prisma/client`. Simply run your commands without any special configuration:
 
@@ -89,7 +89,7 @@ pnpm start -- read <user-id>
 ### How It Works
 
 The `getPrisma()` function automatically checks the `USE_COMPAT` environment variable:
-- If `USE_COMPAT` is not set or `false` - Uses legacy Prisma Client
+- If `USE_COMPAT` is not set or `false` - Uses Prisma Client (Prisma 7)
 - If `USE_COMPAT=true` - Uses Prisma Next compatibility layer
 
 ## Architecture
