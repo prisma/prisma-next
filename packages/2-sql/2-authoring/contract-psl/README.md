@@ -25,6 +25,9 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 - Return `notOk` with structured diagnostics for unsupported constructs
 - Keep interpretation deterministic for equivalent AST inputs
 
+Determinism note:
+- Relation metadata emission is intentionally **sorted by storage table name, then model name, then relation field name** (not PSL declaration order) so `contract.json` snapshots and hashes are stable across environments.
+
 ## Non-responsibilities
 
 - Canonical artifact emission (`contract.json`, `contract.d.ts`) and hashing
