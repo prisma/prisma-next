@@ -1,69 +1,56 @@
 ## Sources
-
 - Spec: [projects/psl-contract-authoring/specs/Follow-up - Pack-provided mutation default functions registry.spec.md](../Follow-up%20-%20Pack-provided%20mutation%20default%20functions%20registry.spec.md)
 - ADR: [docs/architecture docs/adrs/ADR 169 - Declared applicability for mutation default generators.md](../../../../docs/architecture%20docs/adrs/ADR%20169%20-%20Declared%20applicability%20for%20mutation%20default%20generators.md)
 - Review range: `origin/main...HEAD`
 
 ## Summary
+This change set makes mutation defaults **fully composition-owned** end-to-end:
 
-This change set establishes a clean, end-to-end composition seam for mutation defaults: emit-time PSL lowering uses a composed default-function registry plus declared applicability metadata, and runtime mutation-default execution resolves generator ids through a composed registry (with stable missing-id failures).
+- **Control plane**: target/adapter/packs contribute the default-function lowering vocabulary and generator descriptors (incl. applicability + generated-column resolution) and pass them into PSL interpretation.
+- **Execution plane**: runtime resolves generator ids from composed contributors and fails with stable errors when missing.
+
+This matches the tightened spec constraint: vocabulary-driven authoring packages (PSL) contain **no built-in maps**, **no default target**, and **no generator-id special casing**.
 
 ## Design alignment with spec / ADR
-
-- **Two coordinated registries**: control-plane “default-function lowering + applicability descriptors” and runtime “generator id → implementation” are represented as two explicit surfaces.
-  - Control-plane SPI + assembly: [packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts (L10–L589)](../../../../packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts:10-589)
-  - Runtime registry + lookup + stable missing-id error: [packages/2-sql/5-runtime/src/sql-context.ts (L375–L422)](../../../../packages/2-sql/5-runtime/src/sql-context.ts:375-422)
-- **Applicability is declared, not inferred**: PSL checks applicability using declared `applicableCodecIds` rather than any type-level inference.
-  - Applicability validation: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L323–L345)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:323-345)
-- **Composability**: “built-ins” are provided via normal component descriptors (e.g. Postgres adapter), matching ADR 169’s “no implicit fallback wiring”.
-  - Control: [packages/3-targets/6-adapters/postgres/src/exports/control.ts (L10–L17)](../../../../packages/3-targets/6-adapters/postgres/src/exports/control.ts:10-17)
-  - Runtime: [packages/3-targets/6-adapters/postgres/src/exports/runtime.ts (L65–L75)](../../../../packages/3-targets/6-adapters/postgres/src/exports/runtime.ts:65-75)
-- **Duplicate handling**: assembly fails fast on duplicates (hard errors), per the plan’s locked decision.
-  - Control-plane assembly errors: [packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts (L537–L577)](../../../../packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts:537-577)
-  - Family control-plane assembly errors (determinism + collisions): [packages/2-sql/3-tooling/family/src/core/assembly.ts (L255–L283)](../../../../packages/2-sql/3-tooling/family/src/core/assembly.ts:255-283)
+- **Two coordinated registries**:
+  - **Emit-time** lowering vocabulary + generator descriptors: [packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts (L32–L62)](../../../../packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts:32-62)
+  - **Runtime** generator implementations resolved from composition: [packages/2-sql/5-runtime/src/sql-context.ts (L352–L399)](../../../../packages/2-sql/5-runtime/src/sql-context.ts:352-399)
+- **Applicability is declared** via `applicableCodecIds` and validated during lowering: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L275–L294)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:275-294)
+- **Baseline built-ins are normal contributors**:
+  - Control (baseline vocabulary + descriptors): [packages/3-targets/6-adapters/postgres/src/core/control-mutation-defaults.ts (L1–L120)](../../../../packages/3-targets/6-adapters/postgres/src/core/control-mutation-defaults.ts:1-120)
+  - Runtime (baseline generators): [packages/3-targets/6-adapters/postgres/src/exports/runtime.ts (L48–L56)](../../../../packages/3-targets/6-adapters/postgres/src/exports/runtime.ts:48-56)
+- **Deterministic duplicate handling** is enforced by family assembly: [packages/2-sql/3-tooling/family/src/core/assembly.ts (L255–L283)](../../../../packages/2-sql/3-tooling/family/src/core/assembly.ts:255-283)
 
 ## Architecture review
 
 ### Control plane: vocabulary + applicability registry
-
-- **Control-plane SPI shape looks minimal and stable**:
-  - Handler input includes spans and contextual labels (source/model/field), and exposes `columnCodecId` for future applicability/UX.
-  - Handler output is either storage default, execution default, or a structured diagnostic with code+span.
-  - SPI types: [packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts (L10–L52)](../../../../packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts:10-52)
-- **PSL is properly registry-driven**: interpreter doesn’t embed function-name branching; it parses `@default(...)` into a call and delegates lowering to the registry.
-  - Call parsing + lowering: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L250–L322)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:250-322)
-- **Applicability enforcement is localized and deterministic**: check is explicitly “descriptor exists” then “codecId is listed”.
-  - Applicability validation: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L323–L345)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:323-345)
+- **PSL interpreter is target/registry-driven**: it requires a target + scalar type descriptors as inputs (no default target; no embedded scalar maps).
+  - Interpreter inputs: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L33–L39)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:33-39)
+- **Lowering is registry-driven** and applicability validation is deterministic:
+  - Lowering + applicability: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L202–L297)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:202-297)
+- **Generated-column typing is registry-owned** (including parameterized behaviors like nanoid sizing):
+  - Interpreter consumption: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L523–L531)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:523-531)
+  - Baseline metadata source (ids): [packages/1-framework/2-authoring/ids/src/index.ts (L15–L101)](../../../../packages/1-framework/2-authoring/ids/src/index.ts:15-101)
 
 ### Runtime: generator resolution and safety
-
-- **Registry construction matches the runtime composition model** (target + adapter + extension packs).
-  - Registry assembly: [packages/2-sql/5-runtime/src/sql-context.ts (L375–L401)](../../../../packages/2-sql/5-runtime/src/sql-context.ts:375-401)
-- **Missing generator behavior is stable and targeted**, which is important for contract/runtime mismatch debugging and safe failures.
-  - Stable error: [packages/2-sql/5-runtime/src/sql-context.ts (L403–L422)](../../../../packages/2-sql/5-runtime/src/sql-context.ts:403-422)
+- **Registry construction matches the runtime composition model** (target + adapter + extension packs), with duplicate-owner metadata.
+  - Registry assembly: [packages/2-sql/5-runtime/src/sql-context.ts (L352–L379)](../../../../packages/2-sql/5-runtime/src/sql-context.ts:352-379)
+- **Missing generator behavior is stable and targeted**:
+  - Stable error: [packages/2-sql/5-runtime/src/sql-context.ts (L381–L399)](../../../../packages/2-sql/5-runtime/src/sql-context.ts:381-399)
 
 ### Determinism and composition boundaries
-
-- **Determinism**: the registries are derived from ordered contributor lists and use explicit duplicate detection; the family assembly test ensures deterministic ordering for keys.
+- **Determinism**: registries are derived from ordered contributor lists and reject duplicates.
   - Test evidence: [packages/2-sql/3-tooling/family/test/mutation-default-assembly.test.ts (L20–L77)](../../../../packages/2-sql/3-tooling/family/test/mutation-default-assembly.test.ts:20-77)
-- **Boundary correctness**: PSL interpreter remains generic; the provider helper is responsible for passing composition state (`frameworkComponents`) into interpretation.
-  - Provider wiring: [packages/2-sql/2-authoring/contract-psl/src/provider.ts (L55–L76)](../../../../packages/2-sql/2-authoring/contract-psl/src/provider.ts:55-76)
+- **Boundary correctness**: `sql-contract-psl` provider consumes preassembled inputs; assembly stays in control-plane composition/orchestration.
+  - Provider options: [packages/2-sql/2-authoring/contract-psl/src/provider.ts (L11–L24)](../../../../packages/2-sql/2-authoring/contract-psl/src/provider.ts:11-24)
 
 ## Diagnostics and UX
-
-- **Span-based diagnostics preserved** for unknown defaults and invalid args (and new applicability failures).
-  - Unknown/default arg diagnostics: [packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts (L591–L611)](../../../../packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts:591-611)
-  - Applicability diagnostics: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L323–L345)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:323-345)
+- **Span-based diagnostics preserved** for unknown defaults, invalid args, and applicability failures.
+  - Unknown-function diagnostics include registry-derived supported signatures: [packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts (L220–L252)](../../../../packages/2-sql/2-authoring/contract-psl/src/default-function-registry.ts:220-252)
+  - Applicability diagnostics: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L275–L294)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:275-294)
 - **Namespace wording** follows the repo preference (“unrecognized namespace … add extension pack …”).
   - Example: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts (L467–L475)](../../../../packages/2-sql/2-authoring/contract-psl/src/interpreter.ts:467-475)
 
 ## Risks / follow-ups (design-level)
-
-- **Registry signature metadata**: unknown-function errors list “supported functions” by enumerating registry keys, but contributed handlers may have non-`()`
-signatures. Consider an optional “usage strings” contribution alongside handlers to keep UX accurate for contributed functions.
-- **Assembly ownership (clarified expectation)**: `sql-contract-psl` should not own assembly; the composed mutation-default registry should be an **input** to PSL interpretation/provider wiring.
-  - Today, `sql-contract-psl` contains assembly helpers (for example `assembleControlMutationDefaults(...)`) and the provider helper assembles from `frameworkComponents` before calling the interpreter.
-  - Follow-up: treat `family-sql` (or a control-plane orchestration layer) as the canonical owner of assembly, and keep `sql-contract-psl` focused on **interpretation given registries**.
-- **Observability**: current duplicate errors and missing-generator errors include ids, but do not consistently include both “existing owner” and “incoming owner” metadata across planes.
-Tightening the meta payload could make conflict resolution more inspectable without changing behavior.
+- None noted beyond normal follow-ups for pack author ergonomics and expanding conformance fixtures over time.
 
