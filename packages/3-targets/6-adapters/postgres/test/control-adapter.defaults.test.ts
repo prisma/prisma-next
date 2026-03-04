@@ -1,4 +1,5 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
 import { parsePostgresDefault } from '../src/core/default-normalizer';
@@ -49,183 +50,187 @@ const createMockDriver = (
 });
 
 describe('PostgresControlAdapter column defaults', () => {
-  it('stores raw default expressions from database', { timeout: 1_000 }, async () => {
-    const adapter = new PostgresControlAdapter();
-    const mockDriver = createMockDriver([
-      {
-        column_name: 'id',
-        data_type: 'integer',
-        udt_name: 'int4',
-        is_nullable: 'NO',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: "nextval('user_id_seq'::regclass)",
-      },
-      {
-        column_name: 'created_at',
-        data_type: 'timestamp',
-        udt_name: 'timestamp',
-        is_nullable: 'NO',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: 'now()',
-      },
-      {
-        column_name: 'updated_at',
-        data_type: 'timestamp',
-        udt_name: 'timestamp',
-        is_nullable: 'NO',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: 'CURRENT_TIMESTAMP',
-      },
-      {
-        column_name: 'tracked_at',
-        data_type: 'timestamp',
-        udt_name: 'timestamp',
-        is_nullable: 'NO',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: 'clock_timestamp()',
-      },
-      {
-        column_name: 'uuid',
-        data_type: 'uuid',
-        udt_name: 'uuid',
-        is_nullable: 'NO',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: 'gen_random_uuid()',
-      },
-      {
-        column_name: 'active',
-        data_type: 'boolean',
-        udt_name: 'bool',
-        is_nullable: 'NO',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: 'true',
-      },
-      {
-        column_name: 'disabled',
-        data_type: 'boolean',
-        udt_name: 'bool',
-        is_nullable: 'NO',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: 'false',
-      },
-      {
-        column_name: 'count',
-        data_type: 'integer',
-        udt_name: 'int4',
-        is_nullable: 'NO',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: '42',
-      },
-      {
-        column_name: 'ratio',
-        data_type: 'numeric',
-        udt_name: 'numeric',
-        is_nullable: 'NO',
-        character_maximum_length: null,
-        numeric_precision: 10,
-        numeric_scale: 2,
-        column_default: '3.14',
-      },
-      {
-        column_name: 'name',
-        data_type: 'character varying',
-        udt_name: 'varchar',
-        is_nullable: 'NO',
-        character_maximum_length: 255,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: "'Hello''s'::text",
-      },
-      {
-        column_name: 'note',
-        data_type: 'text',
-        udt_name: 'text',
-        is_nullable: 'YES',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: "'plain text'",
-      },
-      {
-        column_name: 'fallback',
-        data_type: 'text',
-        udt_name: 'text',
-        is_nullable: 'YES',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: 'uuid_generate_v4()',
-      },
-      {
-        column_name: 'no_default',
-        data_type: 'text',
-        udt_name: 'text',
-        is_nullable: 'YES',
-        character_maximum_length: null,
-        numeric_precision: null,
-        numeric_scale: null,
-        column_default: null,
-      },
-    ]);
+  it(
+    'stores raw default expressions from database',
+    { timeout: timeouts.databaseOperation },
+    async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        {
+          column_name: 'id',
+          data_type: 'integer',
+          udt_name: 'int4',
+          is_nullable: 'NO',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: "nextval('user_id_seq'::regclass)",
+        },
+        {
+          column_name: 'created_at',
+          data_type: 'timestamp',
+          udt_name: 'timestamp',
+          is_nullable: 'NO',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: 'now()',
+        },
+        {
+          column_name: 'updated_at',
+          data_type: 'timestamp',
+          udt_name: 'timestamp',
+          is_nullable: 'NO',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: 'CURRENT_TIMESTAMP',
+        },
+        {
+          column_name: 'tracked_at',
+          data_type: 'timestamp',
+          udt_name: 'timestamp',
+          is_nullable: 'NO',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: 'clock_timestamp()',
+        },
+        {
+          column_name: 'uuid',
+          data_type: 'uuid',
+          udt_name: 'uuid',
+          is_nullable: 'NO',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: 'gen_random_uuid()',
+        },
+        {
+          column_name: 'active',
+          data_type: 'boolean',
+          udt_name: 'bool',
+          is_nullable: 'NO',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: 'true',
+        },
+        {
+          column_name: 'disabled',
+          data_type: 'boolean',
+          udt_name: 'bool',
+          is_nullable: 'NO',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: 'false',
+        },
+        {
+          column_name: 'count',
+          data_type: 'integer',
+          udt_name: 'int4',
+          is_nullable: 'NO',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: '42',
+        },
+        {
+          column_name: 'ratio',
+          data_type: 'numeric',
+          udt_name: 'numeric',
+          is_nullable: 'NO',
+          character_maximum_length: null,
+          numeric_precision: 10,
+          numeric_scale: 2,
+          column_default: '3.14',
+        },
+        {
+          column_name: 'name',
+          data_type: 'character varying',
+          udt_name: 'varchar',
+          is_nullable: 'NO',
+          character_maximum_length: 255,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: "'Hello''s'::text",
+        },
+        {
+          column_name: 'note',
+          data_type: 'text',
+          udt_name: 'text',
+          is_nullable: 'YES',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: "'plain text'",
+        },
+        {
+          column_name: 'fallback',
+          data_type: 'text',
+          udt_name: 'text',
+          is_nullable: 'YES',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: 'uuid_generate_v4()',
+        },
+        {
+          column_name: 'no_default',
+          data_type: 'text',
+          udt_name: 'text',
+          is_nullable: 'YES',
+          character_maximum_length: null,
+          numeric_precision: null,
+          numeric_scale: null,
+          column_default: null,
+        },
+      ]);
 
-    const result = await adapter.introspect(mockDriver);
-    const columns = result.tables['user']?.columns ?? {};
+      const result = await adapter.introspect(mockDriver);
+      const columns = result.tables['user']?.columns ?? {};
 
-    // Defaults are stored as raw strings from the database
-    expect(columns['id']).toMatchObject({
-      default: "nextval('user_id_seq'::regclass)",
-    });
-    expect(columns['created_at']).toMatchObject({
-      default: 'now()',
-    });
-    expect(columns['updated_at']).toMatchObject({
-      default: 'CURRENT_TIMESTAMP',
-    });
-    expect(columns['tracked_at']).toMatchObject({
-      default: 'clock_timestamp()',
-    });
-    expect(columns['uuid']).toMatchObject({
-      default: 'gen_random_uuid()',
-    });
-    expect(columns['active']).toMatchObject({
-      default: 'true',
-    });
-    expect(columns['disabled']).toMatchObject({
-      default: 'false',
-    });
-    expect(columns['count']).toMatchObject({
-      default: '42',
-    });
-    expect(columns['ratio']).toMatchObject({
-      default: '3.14',
-    });
-    expect(columns['name']).toMatchObject({
-      default: "'Hello''s'::text",
-    });
-    expect(columns['note']).toMatchObject({
-      default: "'plain text'",
-    });
-    expect(columns['fallback']).toMatchObject({
-      default: 'uuid_generate_v4()',
-    });
-    expect(columns['no_default']).not.toHaveProperty('default');
-  });
+      // Defaults are stored as raw strings from the database
+      expect(columns['id']).toMatchObject({
+        default: "nextval('user_id_seq'::regclass)",
+      });
+      expect(columns['created_at']).toMatchObject({
+        default: 'now()',
+      });
+      expect(columns['updated_at']).toMatchObject({
+        default: 'CURRENT_TIMESTAMP',
+      });
+      expect(columns['tracked_at']).toMatchObject({
+        default: 'clock_timestamp()',
+      });
+      expect(columns['uuid']).toMatchObject({
+        default: 'gen_random_uuid()',
+      });
+      expect(columns['active']).toMatchObject({
+        default: 'true',
+      });
+      expect(columns['disabled']).toMatchObject({
+        default: 'false',
+      });
+      expect(columns['count']).toMatchObject({
+        default: '42',
+      });
+      expect(columns['ratio']).toMatchObject({
+        default: '3.14',
+      });
+      expect(columns['name']).toMatchObject({
+        default: "'Hello''s'::text",
+      });
+      expect(columns['note']).toMatchObject({
+        default: "'plain text'",
+      });
+      expect(columns['fallback']).toMatchObject({
+        default: 'uuid_generate_v4()',
+      });
+      expect(columns['no_default']).not.toHaveProperty('default');
+    },
+  );
 });
 
 describe('parsePostgresDefault normalizer', () => {
