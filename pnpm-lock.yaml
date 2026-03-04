@@ -118,6 +118,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../packages/2-sql/1-core/contract
+      '@prisma-next/sql-contract-psl':
+        specifier: workspace:*
+        version: link:../../packages/2-sql/2-authoring/contract-psl
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../packages/2-sql/2-authoring/contract-ts
