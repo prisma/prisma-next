@@ -87,4 +87,50 @@ describe('integration/create', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'create() and createAll() reject when returning capability is disabled',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await expect(
+          users.create({
+            id: 30,
+            name: 'NoReturn',
+            email: 'noreturn@example.com',
+            invitedById: null,
+          }),
+        ).rejects.toThrow(/requires contract capability "returning"/);
+
+        expect(() =>
+          users.createAll([
+            {
+              id: 31,
+              name: 'NoReturn2',
+              email: 'noreturn2@example.com',
+              invitedById: null,
+            },
+          ]),
+        ).toThrow(/requires contract capability "returning"/);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'createAll([]) is a no-op and executes nothing',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        runtime.resetExecutions();
+        const rows = await users.createAll([]);
+
+        expect(rows).toEqual([]);
+        expect(runtime.executions).toHaveLength(0);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
 });

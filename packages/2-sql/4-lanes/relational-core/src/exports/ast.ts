@@ -1,4 +1,5 @@
 export * from '../ast/adapter-types';
+export * from '../ast/builders';
 export * from '../ast/codec-types';
 export * from '../ast/common';
 export * from '../ast/delete';

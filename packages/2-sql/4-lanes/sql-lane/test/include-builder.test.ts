@@ -9,7 +9,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createOrderBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { buildIncludeAst, IncludeChildBuilderImpl } from '../src/sql/include-builder';
+import { buildIncludeJoinArtifact, IncludeChildBuilderImpl } from '../src/sql/include-builder';
 import type { Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -177,7 +177,7 @@ describe('IncludeChildBuilderImpl', () => {
   });
 });
 
-describe('buildIncludeAst', () => {
+describe('buildIncludeJoinArtifact', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
   const context = createTestContext(contract, adapter);
@@ -203,20 +203,13 @@ describe('buildIncludeAst', () => {
       childLimit: 10,
     };
 
-    const ast = buildIncludeAst(includeState, contract, { userId: 42 }, [], []);
+    const artifact = buildIncludeJoinArtifact(includeState, contract, { userId: 42 }, [], []);
 
-    expect({
-      kind: ast.kind,
-      alias: ast.alias,
-      hasWhere: ast.child.where !== undefined,
-      hasOrderBy: ast.child.orderBy !== undefined,
-      limit: ast.child.limit,
-    }).toMatchObject({
-      kind: 'includeMany',
+    expect(artifact.join.lateral).toBe(true);
+    expect(artifact.join.source.kind).toBe('derivedTable');
+    expect(artifact.projection).toMatchObject({
       alias: 'posts',
-      hasWhere: true,
-      hasOrderBy: true,
-      limit: 10,
+      expr: { kind: 'col', table: 'posts_lateral', column: 'posts' },
     });
   });
 
@@ -235,21 +228,9 @@ describe('buildIncludeAst', () => {
       },
     };
 
-    const ast = buildIncludeAst(includeState, contract, {}, [], []);
-
-    expect({
-      kind: ast.kind,
-      alias: ast.alias,
-      where: ast.child.where,
-      orderBy: ast.child.orderBy,
-      limit: ast.child.limit,
-    }).toMatchObject({
-      kind: 'includeMany',
-      alias: 'posts',
-      where: undefined,
-      orderBy: undefined,
-      limit: undefined,
-    });
+    const artifact = buildIncludeJoinArtifact(includeState, contract, {}, [], []);
+    expect(artifact.join.lateral).toBe(true);
+    expect(artifact.join.source.kind).toBe('derivedTable');
   });
 
   it('throws when column is missing for alias', () => {
@@ -267,7 +248,7 @@ describe('buildIncludeAst', () => {
       },
     };
 
-    expect(() => buildIncludeAst(includeState, contract, {}, [], [])).toThrow(
+    expect(() => buildIncludeJoinArtifact(includeState, contract, {}, [], [])).toThrow(
       'Missing column for alias',
     );
   });
@@ -287,7 +268,7 @@ describe('buildIncludeAst', () => {
       },
     };
 
-    expect(() => buildIncludeAst(includeState, contract, {}, [], [])).toThrow(
+    expect(() => buildIncludeJoinArtifact(includeState, contract, {}, [], [])).toThrow(
       'Missing column for alias',
     );
   });
@@ -326,14 +307,18 @@ describe('buildIncludeAst', () => {
       childOrderBy,
     };
 
-    const ast = buildIncludeAst(includeState, contract, {}, [], []);
-
-    expect(ast.child.orderBy).toBeDefined();
-    // When orderExpr is an OperationExpr, extractBaseColumnRef extracts the base column
-    expect(ast.child.orderBy?.[0]?.expr).toMatchObject({
-      kind: 'col',
-      table: 'user',
-      column: 'id',
-    });
+    const artifact = buildIncludeJoinArtifact(includeState, contract, {}, [], []);
+    expect(artifact.join.source.kind).toBe('derivedTable');
+    if (artifact.join.source.kind === 'derivedTable') {
+      const rowsSource = artifact.join.source.query.from;
+      expect(rowsSource.kind).toBe('derivedTable');
+      if (rowsSource.kind === 'derivedTable') {
+        expect(rowsSource.query.orderBy?.[0]?.expr).toMatchObject({
+          kind: 'col',
+          table: 'user',
+          column: 'id',
+        });
+      }
+    }
   });
 });

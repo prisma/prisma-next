@@ -3,7 +3,7 @@ import {
   createColumnRef,
   createJoin,
   createJoinOnExpr,
-  createTableRef,
+  createTableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { JoinState } from '../utils/state';
 
@@ -14,5 +14,5 @@ export function buildJoinAst(join: JoinState): JoinAst {
   const leftCol = createColumnRef(onLeft.table, onLeft.column);
   const rightCol = createColumnRef(onRight.table, onRight.column);
   const onExpr = createJoinOnExpr(leftCol, rightCol);
-  return createJoin(join.joinType, createTableRef(join.table.name), onExpr);
+  return createJoin(join.joinType, createTableSource(join.table.name, join.table.alias), onExpr, false);
 }

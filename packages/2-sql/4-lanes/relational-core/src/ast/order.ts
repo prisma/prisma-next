@@ -1,9 +1,9 @@
-import type { ColumnRef, Direction, OperationExpr } from './types';
+import type { Expression, OrderByItem } from './types';
 
 export function createOrderByItem(
-  expr: ColumnRef | OperationExpr,
+  expr: Expression,
   dir: 'asc' | 'desc',
-): { expr: ColumnRef | OperationExpr; dir: Direction } {
+): OrderByItem {
   return {
     expr,
     dir,

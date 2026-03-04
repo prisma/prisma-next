@@ -95,5 +95,33 @@ describe('ast/insert', () => {
 
       expect(insertAst.values).toEqual({});
     });
+
+    it('creates insert ast with onConflict update clause', () => {
+      const table: TableRef = createTableRef('user');
+      const values: Record<string, ColumnRef | ParamRef> = {
+        id: createParamRef(0, 'id'),
+        email: createParamRef(1, 'email'),
+      };
+
+      const insertAst = createInsertAst({
+        table,
+        values,
+        onConflict: {
+          columns: [createColumnRef('user', 'id')],
+          action: {
+            kind: 'doUpdateSet',
+            set: { email: createParamRef(2, 'updatedEmail') },
+          },
+        },
+      });
+
+      expect(insertAst.onConflict).toEqual({
+        columns: [createColumnRef('user', 'id')],
+        action: {
+          kind: 'doUpdateSet',
+          set: { email: createParamRef(2, 'updatedEmail') },
+        },
+      });
+    });
   });
 });

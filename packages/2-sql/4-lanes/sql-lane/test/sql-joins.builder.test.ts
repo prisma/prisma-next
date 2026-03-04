@@ -179,7 +179,8 @@ describe('SQL builder joins', () => {
       {
         kind: 'join',
         joinType: 'inner',
-        table: { kind: 'table', name: 'post' },
+        source: { kind: 'table', name: 'post' },
+        lateral: false,
         on: {
           kind: 'eqCol',
           left: createColumnRef('user', 'id'),
@@ -213,7 +214,8 @@ describe('SQL builder joins', () => {
       {
         kind: 'join',
         joinType: 'inner',
-        table: { kind: 'table', name: 'post' },
+        source: { kind: 'table', name: 'post' },
+        lateral: false,
         on: {
           kind: 'eqCol',
           left: createColumnRef('user', 'id'),
@@ -223,7 +225,8 @@ describe('SQL builder joins', () => {
       {
         kind: 'join',
         joinType: 'left',
-        table: { kind: 'table', name: 'comment' },
+        source: { kind: 'table', name: 'comment' },
+        lateral: false,
         on: {
           kind: 'eqCol',
           left: createColumnRef('post', 'id'),

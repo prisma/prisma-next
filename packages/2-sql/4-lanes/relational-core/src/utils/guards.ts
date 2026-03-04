@@ -3,9 +3,12 @@ import type {
   ColumnRef,
   Expression,
   ExpressionSource,
+  ListLiteralExpr,
   LiteralExpr,
   OperationExpr,
   ParamRef,
+  SelectAst,
+  WhereExpr,
 } from '../ast/types';
 import type {
   AnyColumnBuilder,
@@ -51,7 +54,12 @@ export function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef
   if (expr.kind === 'col') {
     return expr;
   }
-  return extractBaseColumnRef(expr.self);
+  if (expr.self.kind === 'col' || expr.self.kind === 'operation') {
+    return extractBaseColumnRef(expr.self);
+  }
+  throw new Error(
+    `Operation expression self cannot be ${expr.self.kind} when extracting base column`,
+  );
 }
 
 /**
@@ -59,19 +67,88 @@ export function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef
  * Handles nested OperationExpr structures by traversing both self and args.
  */
 export function collectColumnRefs(
-  expr: ColumnRef | ParamRef | LiteralExpr | OperationExpr,
+  expr: Expression | ParamRef | LiteralExpr | ListLiteralExpr,
 ): ColumnRef[] {
-  if (expr.kind === 'col') {
-    return [expr];
-  }
-  if (expr.kind === 'operation') {
-    const refs: ColumnRef[] = collectColumnRefs(expr.self);
-    for (const arg of expr.args) {
-      refs.push(...collectColumnRefs(arg));
+  switch (expr.kind) {
+    case 'col':
+      return [expr];
+    case 'listLiteral':
+      return expr.values.flatMap((value) => collectColumnRefs(value));
+    case 'subquery':
+      return collectColumnRefsFromSelect(expr.query);
+    case 'operation': {
+      const refs: ColumnRef[] = collectColumnRefs(expr.self);
+      for (const arg of expr.args) {
+        refs.push(...collectColumnRefs(arg));
+      }
+      return refs;
     }
-    return refs;
+    case 'aggregate':
+      return expr.expr ? collectColumnRefs(expr.expr) : [];
+    case 'jsonArrayAgg':
+      return [
+        ...collectColumnRefs(expr.expr),
+        ...(expr.orderBy ?? []).flatMap((orderBy) => collectColumnRefs(orderBy.expr)),
+      ];
+    case 'jsonObject':
+      return expr.entries.flatMap((entry) => collectColumnRefs(entry.value));
+    case 'param':
+    case 'literal':
+      return [];
+    default: {
+      const neverExpr: never = expr;
+      throw new Error(`Unsupported expression kind: ${String(neverExpr)}`);
+    }
   }
-  return [];
+}
+
+function collectColumnRefsFromWhere(expr: WhereExpr): ColumnRef[] {
+  if (expr.kind === 'bin') {
+    return [...collectColumnRefs(expr.left), ...collectColumnRefs(expr.right)];
+  }
+  if (expr.kind === 'nullCheck') {
+    return collectColumnRefs(expr.expr);
+  }
+  if (expr.kind === 'and' || expr.kind === 'or') {
+    return expr.exprs.flatMap((item) => collectColumnRefsFromWhere(item));
+  }
+  return collectColumnRefsFromSelect(expr.subquery);
+}
+
+function collectColumnRefsFromSelect(ast: SelectAst): ColumnRef[] {
+  const refs: ColumnRef[] = [];
+  for (const item of ast.project) {
+    refs.push(...collectColumnRefs(item.expr));
+  }
+  if (ast.where) {
+    refs.push(...collectColumnRefsFromWhere(ast.where));
+  }
+  if (ast.having) {
+    refs.push(...collectColumnRefsFromWhere(ast.having));
+  }
+  for (const orderItem of ast.orderBy ?? []) {
+    refs.push(...collectColumnRefs(orderItem.expr));
+  }
+  for (const distinctExpr of ast.distinctOn ?? []) {
+    refs.push(...collectColumnRefs(distinctExpr));
+  }
+  for (const groupByExpr of ast.groupBy ?? []) {
+    refs.push(...collectColumnRefs(groupByExpr));
+  }
+  for (const join of ast.joins ?? []) {
+    if (join.on.kind !== 'eqCol') {
+      refs.push(...collectColumnRefsFromWhere(join.on));
+    } else {
+      refs.push(join.on.left, join.on.right);
+    }
+    if (join.source.kind === 'derivedTable') {
+      refs.push(...collectColumnRefsFromSelect(join.source.query));
+    }
+  }
+  if (ast.from.kind === 'derivedTable') {
+    refs.push(...collectColumnRefsFromSelect(ast.from.query));
+  }
+  return refs;
 }
 
 /**

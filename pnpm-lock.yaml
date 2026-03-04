@@ -1521,9 +1521,6 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/utils
-      kysely:
-        specifier: 'catalog:'
-        version: 0.28.10
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

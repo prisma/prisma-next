@@ -1,14 +1,17 @@
 import type {
   BoundWhereExpr,
   Expression,
+  FromSource,
   JoinOnExpr,
   ListLiteralExpr,
+  LiteralExpr,
   ParamRef,
   SelectAst,
   ToWhereExpr,
   WhereArg,
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { createLiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export function normalizeWhereArg(arg: undefined): undefined;
@@ -93,6 +96,13 @@ function assertBareWhereExprIsParamFree(expr: WhereExpr): void {
   }
 }
 
+function sourceContainsParamRef(source: FromSource): boolean {
+  if (source.kind === 'table') {
+    return false;
+  }
+  return selectContainsParamRef(source.query);
+}
+
 function whereExprContainsParamRef(expr: WhereExpr): boolean {
   switch (expr.kind) {
     case 'bin':
@@ -114,27 +124,31 @@ function whereExprContainsParamRef(expr: WhereExpr): boolean {
 
 function selectContainsParamRef(ast: SelectAst): boolean {
   const whereHasParams = ast.where ? whereExprContainsParamRef(ast.where) : false;
+  const havingHasParams = ast.having ? whereExprContainsParamRef(ast.having) : false;
+  const fromHasParams = sourceContainsParamRef(ast.from);
   const projectHasParams = ast.project.some((p) => {
-    if (p.expr.kind === 'includeRef' || p.expr.kind === 'literal') {
+    if (p.expr.kind === 'literal') {
       return false;
     }
     return expressionContainsParamRef(p.expr);
   });
+  const distinctOnHasParams = (ast.distinctOn ?? []).some((expr) => expressionContainsParamRef(expr));
+  const groupByHasParams = (ast.groupBy ?? []).some((expr) => expressionContainsParamRef(expr));
   const orderByHasParams = (ast.orderBy ?? []).some((order) =>
     expressionContainsParamRef(order.expr),
   );
-  const joinsHaveParams = (ast.joins ?? []).some((join) => joinOnContainsParamRef(join.on));
-  const includesHaveParams = (ast.includes ?? []).some((inc) => {
-    const child = inc.child;
-    const childWhereHasParams = child.where ? whereExprContainsParamRef(child.where) : false;
-    const childOrderHasParams = (child.orderBy ?? []).some((order) =>
-      expressionContainsParamRef(order.expr),
-    );
-    const childProjectHasParams = child.project.some((p) => expressionContainsParamRef(p.expr));
-    return childWhereHasParams || childOrderHasParams || childProjectHasParams;
-  });
+  const joinsHaveParams = (ast.joins ?? []).some(
+    (join) => joinOnContainsParamRef(join.on) || sourceContainsParamRef(join.source),
+  );
   return (
-    whereHasParams || projectHasParams || orderByHasParams || joinsHaveParams || includesHaveParams
+    fromHasParams ||
+    whereHasParams ||
+    havingHasParams ||
+    projectHasParams ||
+    distinctOnHasParams ||
+    groupByHasParams ||
+    orderByHasParams ||
+    joinsHaveParams
   );
 }
 
@@ -146,25 +160,47 @@ function joinOnContainsParamRef(joinOn: JoinOnExpr): boolean {
 }
 
 function expressionContainsParamRef(expr: Expression): boolean {
-  if (expr.kind !== 'operation') {
-    return false;
-  }
-  if (expressionContainsParamRef(expr.self)) {
-    return true;
-  }
-  return expr.args.some((arg) => {
-    if (arg.kind === 'param') {
-      return true;
-    }
-    if (arg.kind === 'literal') {
+  switch (expr.kind) {
+    case 'col':
       return false;
+    case 'subquery':
+      return selectContainsParamRef(expr.query);
+    case 'aggregate':
+      return expr.expr ? expressionContainsParamRef(expr.expr) : false;
+    case 'jsonArrayAgg':
+      return (
+        expressionContainsParamRef(expr.expr) ||
+        (expr.orderBy ?? []).some((order) => expressionContainsParamRef(order.expr))
+      );
+    case 'jsonObject':
+      return expr.entries.some((entry) => {
+        if (entry.value.kind === 'literal') {
+          return false;
+        }
+        return expressionContainsParamRef(entry.value);
+      });
+    case 'operation':
+      if (expressionContainsParamRef(expr.self)) {
+        return true;
+      }
+      return expr.args.some((arg) => {
+        if (arg.kind === 'param') {
+          return true;
+        }
+        if (arg.kind === 'literal') {
+          return false;
+        }
+        return expressionContainsParamRef(arg);
+      });
+    default: {
+      const neverExpr: never = expr;
+      throw new Error(`Unsupported expression kind: ${String(neverExpr)}`);
     }
-    return expressionContainsParamRef(arg);
-  });
+  }
 }
 
 function sqlComparableContainsParamRef(
-  value: Expression | ParamRef | ListLiteralExpr | { kind: 'literal'; value: unknown },
+  value: Expression | ParamRef | ListLiteralExpr | LiteralExpr,
 ): boolean {
   if (value.kind === 'param') {
     return true;
@@ -214,37 +250,25 @@ function replaceBoundParams(expr: WhereExpr, params: readonly unknown[]): WhereE
   }
 }
 
+function replaceParamsInFromSource(source: FromSource, params: readonly unknown[]): FromSource {
+  if (source.kind === 'table') {
+    return source;
+  }
+  return {
+    ...source,
+    query: replaceParamsInSelect(source.query, params),
+  };
+}
+
 function replaceParamsInSelect(ast: SelectAst, params: readonly unknown[]): SelectAst {
+  const from = replaceParamsInFromSource(ast.from, params);
   const joins = ast.joins?.map((join) => ({
     ...join,
+    source: replaceParamsInFromSource(join.source, params),
     on: replaceParamsInJoinOn(join.on, params),
   }));
-  const includes = ast.includes?.map((inc) => {
-    const child = {
-      ...inc.child,
-      ...ifDefined(
-        'where',
-        inc.child.where ? replaceBoundParams(inc.child.where, params) : undefined,
-      ),
-      ...ifDefined(
-        'orderBy',
-        inc.child.orderBy?.map((order) => ({
-          ...order,
-          expr: replaceParamsInExpression(order.expr, params),
-        })),
-      ),
-      project: inc.child.project.map((projection) => ({
-        ...projection,
-        expr: replaceParamsInExpression(projection.expr, params),
-      })),
-    };
-    return {
-      ...inc,
-      child,
-    };
-  });
   const project = ast.project.map((projection) => {
-    if (projection.expr.kind === 'includeRef' || projection.expr.kind === 'literal') {
+    if (projection.expr.kind === 'literal') {
       return projection;
     }
     return {
@@ -253,20 +277,27 @@ function replaceParamsInSelect(ast: SelectAst, params: readonly unknown[]): Sele
     };
   });
   const where = ast.where ? replaceBoundParams(ast.where, params) : undefined;
+  const having = ast.having ? replaceBoundParams(ast.having, params) : undefined;
   const orderBy = ast.orderBy?.map((order) => ({
     ...order,
     expr: replaceParamsInExpression(order.expr, params),
   }));
+  const distinctOn = ast.distinctOn?.map((expr) => replaceParamsInExpression(expr, params));
+  const groupBy = ast.groupBy?.map((expr) => replaceParamsInExpression(expr, params));
 
   return {
     kind: ast.kind,
-    from: ast.from,
+    from,
     project,
     ...ifDefined('joins', joins),
-    ...ifDefined('includes', includes),
     ...ifDefined('where', where),
+    ...ifDefined('having', having),
     ...ifDefined('orderBy', orderBy),
+    ...ifDefined('distinct', ast.distinct),
+    ...ifDefined('distinctOn', distinctOn),
+    ...ifDefined('groupBy', groupBy),
     ...ifDefined('limit', ast.limit),
+    ...ifDefined('offset', ast.offset),
     ...ifDefined('selectAllIntent', ast.selectAllIntent),
   };
 }
@@ -279,28 +310,68 @@ function replaceParamsInJoinOn(joinOn: JoinOnExpr, params: readonly unknown[]): 
 }
 
 function replaceParamsInExpression(expr: Expression, params: readonly unknown[]): Expression {
-  if (expr.kind !== 'operation') {
-    return expr;
+  switch (expr.kind) {
+    case 'col':
+      return expr;
+    case 'subquery':
+      return {
+        ...expr,
+        query: replaceParamsInSelect(expr.query, params),
+      };
+    case 'aggregate':
+      return {
+        ...expr,
+        ...ifDefined('expr', expr.expr ? replaceParamsInExpression(expr.expr, params) : undefined),
+      };
+    case 'jsonArrayAgg':
+      return {
+        ...expr,
+        expr: replaceParamsInExpression(expr.expr, params),
+        ...(expr.orderBy
+          ? {
+              orderBy: expr.orderBy.map((order) => ({
+                ...order,
+                expr: replaceParamsInExpression(order.expr, params),
+              })),
+            }
+          : {}),
+      };
+    case 'jsonObject':
+      return {
+        ...expr,
+        entries: expr.entries.map((entry) => ({
+          ...entry,
+          value:
+            entry.value.kind === 'literal'
+              ? entry.value
+              : replaceParamsInExpression(entry.value, params),
+        })),
+      };
+    case 'operation':
+      return {
+        ...expr,
+        self: replaceParamsInExpression(expr.self, params),
+        args: expr.args.map((arg) => {
+          if (arg.kind === 'param') {
+            return paramRefToLiteral(arg, params);
+          }
+          if (arg.kind === 'literal') {
+            return arg;
+          }
+          return replaceParamsInExpression(arg, params);
+        }),
+      };
+    default: {
+      const neverExpr: never = expr;
+      throw new Error(`Unsupported expression kind: ${String(neverExpr)}`);
+    }
   }
-  return {
-    ...expr,
-    self: replaceParamsInExpression(expr.self, params),
-    args: expr.args.map((arg) => {
-      if (arg.kind === 'param') {
-        return paramRefToLiteral(arg, params);
-      }
-      if (arg.kind === 'literal') {
-        return arg;
-      }
-      return replaceParamsInExpression(arg, params);
-    }),
-  };
 }
 
 function replaceParamsInComparable(
-  value: Expression | ParamRef | ListLiteralExpr | { kind: 'literal'; value: unknown },
+  value: Expression | ParamRef | ListLiteralExpr | LiteralExpr,
   params: readonly unknown[],
-): Expression | { kind: 'literal'; value: unknown } | ListLiteralExpr {
+): Expression | LiteralExpr | ListLiteralExpr {
   if (value.kind === 'param') {
     return paramRefToLiteral(value, params);
   }
@@ -321,7 +392,7 @@ function replaceParamsInComparable(
 function paramRefToLiteral(
   paramRef: ParamRef,
   params: readonly unknown[],
-): { kind: 'literal'; value: unknown } {
+): LiteralExpr {
   const idx = paramRef.index - 1;
   /* c8 ignore start -- validated in assertBoundPayload before replacement */
   if (idx < 0 || idx >= params.length) {
@@ -330,17 +401,14 @@ function paramRefToLiteral(
     );
   }
   /* c8 ignore stop */
-  return {
-    kind: 'literal',
-    value: params[idx],
-  };
+  return createLiteralExpr(params[idx]);
 }
 
 function collectParamRefIndexes(expr: WhereExpr): number[] {
   const indexes: number[] = [];
 
   const visitComparable = (
-    value: Expression | ParamRef | ListLiteralExpr | { kind: 'literal'; value: unknown },
+    value: Expression | ParamRef | ListLiteralExpr | LiteralExpr,
   ): void => {
     if (value.kind === 'param') {
       indexes.push(value.index);
@@ -361,15 +429,43 @@ function collectParamRefIndexes(expr: WhereExpr): number[] {
   };
 
   const visitExpression = (value: Expression): void => {
-    if (value.kind !== 'operation') {
-      return;
-    }
-    visitExpression(value.self);
-    for (const arg of value.args) {
-      if (arg.kind === 'param') {
-        indexes.push(arg.index);
-      } else if (arg.kind !== 'literal') {
-        visitExpression(arg);
+    switch (value.kind) {
+      case 'col':
+        return;
+      case 'subquery':
+        visitSelect(value.query);
+        return;
+      case 'aggregate':
+        if (value.expr) {
+          visitExpression(value.expr);
+        }
+        return;
+      case 'jsonArrayAgg':
+        visitExpression(value.expr);
+        for (const order of value.orderBy ?? []) {
+          visitExpression(order.expr);
+        }
+        return;
+      case 'jsonObject':
+        for (const entry of value.entries) {
+          if (entry.value.kind !== 'literal') {
+            visitExpression(entry.value);
+          }
+        }
+        return;
+      case 'operation':
+        visitExpression(value.self);
+        for (const arg of value.args) {
+          if (arg.kind === 'param') {
+            indexes.push(arg.index);
+          } else if (arg.kind !== 'literal') {
+            visitExpression(arg);
+          }
+        }
+        return;
+      default: {
+        const neverExpr: never = value;
+        throw new Error(`Unsupported expression kind: ${String(neverExpr)}`);
       }
     }
   };
@@ -381,32 +477,37 @@ function collectParamRefIndexes(expr: WhereExpr): number[] {
     visitWhere(joinOn);
   };
 
+  const visitSource = (source: FromSource): void => {
+    if (source.kind === 'derivedTable') {
+      visitSelect(source.query);
+    }
+  };
+
   const visitSelect = (ast: SelectAst): void => {
+    visitSource(ast.from);
     if (ast.where) {
       visitWhere(ast.where);
     }
+    if (ast.having) {
+      visitWhere(ast.having);
+    }
     for (const projection of ast.project) {
-      if (projection.expr.kind !== 'includeRef' && projection.expr.kind !== 'literal') {
+      if (projection.expr.kind !== 'literal') {
         visitExpression(projection.expr);
       }
+    }
+    for (const distinctOnExpr of ast.distinctOn ?? []) {
+      visitExpression(distinctOnExpr);
+    }
+    for (const groupByExpr of ast.groupBy ?? []) {
+      visitExpression(groupByExpr);
     }
     for (const orderBy of ast.orderBy ?? []) {
       visitExpression(orderBy.expr);
     }
     for (const join of ast.joins ?? []) {
+      visitSource(join.source);
       visitJoinOn(join.on);
-    }
-    for (const include of ast.includes ?? []) {
-      const child = include.child;
-      if (child.where) {
-        visitWhere(child.where);
-      }
-      for (const childProjection of child.project) {
-        visitExpression(childProjection.expr);
-      }
-      for (const childOrderBy of child.orderBy ?? []) {
-        visitExpression(childOrderBy.expr);
-      }
     }
   };
 

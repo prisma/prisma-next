@@ -1,4 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { createBinaryExpr, createColumnRef, createLiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import type { BinaryOp, WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { mapStorageRowToModelFields } from './collection-runtime';
@@ -6,9 +7,9 @@ import {
   compileGroupedAggregate,
   compileHavingMetricColumn,
   GROUPED_HAVING_TABLE,
-} from './kysely-compiler';
-import { combineWhereFilters } from './kysely-compiler-where';
-import { executeCompiledQuery } from './raw-compiled-query';
+} from './query-plan';
+import { combineWhereFilters } from './where-utils';
+import { executeQueryPlan } from './execute-query-plan';
 import type {
   AggregateBuilder,
   AggregateResult,
@@ -90,18 +91,14 @@ export class GroupedCollection<
     }
 
     const compiled = compileGroupedAggregate(
+      this.ctx.contract,
       this.tableName,
       this.baseFilters,
       this.groupByColumns,
       aggregateSpec,
       combineWhereFilters(this.havingFilters),
     );
-    const rows = await executeCompiledQuery<Record<string, unknown>>(
-      this.ctx.runtime,
-      this.ctx.contract,
-      compiled,
-      { lane: 'orm-client' },
-    ).toArray();
+    const rows = await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
 
     return rows.map((row) => {
       const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, row);
@@ -152,19 +149,12 @@ function createHavingBuilder<TContract extends SqlContract<SqlStorage>, ModelNam
 }
 
 function createHavingComparisonMethods(metric: string): HavingComparisonMethods<number | null> {
-  const buildBinaryExpr = (op: BinaryOp, value: unknown): WhereExpr => ({
-    kind: 'bin',
-    op,
-    left: {
-      kind: 'col',
-      table: GROUPED_HAVING_TABLE,
-      column: metric,
-    },
-    right: {
-      kind: 'literal',
-      value,
-    },
-  });
+  const buildBinaryExpr = (op: BinaryOp, value: unknown): WhereExpr =>
+    createBinaryExpr(
+      op,
+      createColumnRef(GROUPED_HAVING_TABLE, metric),
+      createLiteralExpr(value),
+    );
 
   return {
     eq(value) {

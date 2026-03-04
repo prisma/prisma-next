@@ -1,7 +1,11 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { Pool } from 'pg';
 import type { RuntimeQueryable } from '../../src/types';
+import { createTestContract } from '../helpers';
+// @ts-ignore Importing adapter source keeps integration tests aligned with current branch changes.
+import { createPostgresAdapter } from '../../../../3-targets/6-adapters/postgres/src/core/adapter';
 
 interface SeedUser {
   id: number;
@@ -46,6 +50,28 @@ export async function createPgIntegrationRuntime(
   await pool.query('select 1');
 
   const executions: ExecutionPlan[] = [];
+  const adapter = createPostgresAdapter();
+  const contract = createTestContract() as Parameters<typeof adapter.lower>[1]['contract'];
+
+  const toExecutionPlan = <Row>(
+    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): ExecutionPlan<Row> => {
+    if ('sql' in plan) {
+      return plan;
+    }
+
+    const lowered = adapter.lower(plan.ast, {
+      contract,
+      params: plan.params,
+    });
+
+    return {
+      sql: lowered.body.sql,
+      params: lowered.body.params ?? plan.params,
+      ast: plan.ast,
+      meta: plan.meta,
+    };
+  };
 
   const runtime: PgIntegrationRuntime = {
     executions,
@@ -62,10 +88,13 @@ export async function createPgIntegrationRuntime(
     async close() {
       await pool.end();
     },
-    execute<Row>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row> {
-      executions.push(plan as ExecutionPlan);
+    execute<Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterableResult<Row> {
+      const executablePlan = toExecutionPlan(plan);
+      executions.push(executablePlan as ExecutionPlan);
 
-      const runQuery = pool.query<Record<string, unknown>>(plan.sql, [...plan.params]);
+      const runQuery = pool.query<Record<string, unknown>>(executablePlan.sql, [
+        ...executablePlan.params,
+      ]);
       const generator = async function* (): AsyncGenerator<Row, void, unknown> {
         const result = await runQuery;
         for (const row of result.rows) {

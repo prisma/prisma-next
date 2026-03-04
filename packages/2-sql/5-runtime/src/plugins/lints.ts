@@ -3,6 +3,7 @@ import type { Plugin, PluginContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
 import type {
   DeleteAst,
+  FromSource,
   QueryAst,
   SelectAst,
   UpdateAst,
@@ -55,6 +56,13 @@ function lintError(code: string, message: string, details?: Record<string, unkno
   });
 }
 
+function getFromSourceTableDetail(source: FromSource): string | undefined {
+  if (source.kind === 'table') {
+    return source.name;
+  }
+  return source.alias;
+}
+
 function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
   const findings: LintFinding[] = [];
 
@@ -87,11 +95,12 @@ function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
   if (ast.kind === 'select') {
     const selectAst = ast as SelectAst;
     if (selectAst.limit === undefined) {
+      const table = getFromSourceTableDetail(selectAst.from);
       findings.push({
         code: 'LINT.NO_LIMIT',
         severity: 'warn',
         message: 'Unbounded SELECT may return large result sets',
-        details: { table: selectAst.from.name },
+        ...ifDefined('details', table !== undefined ? { table } : undefined),
       });
     }
     const hasSelectAllIntent =

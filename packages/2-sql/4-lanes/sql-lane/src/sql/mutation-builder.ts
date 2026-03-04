@@ -3,11 +3,11 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ColumnRef, ParamRef, TableRef } from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
-  createDeleteAst,
-  createInsertAst,
+  createDeleteAstBuilder,
+  createInsertAstBuilder,
   createParamRef,
   createTableRef,
-  createUpdateAst,
+  createUpdateAstBuilder,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -181,11 +181,10 @@ export class InsertBuilderImpl<
       return createColumnRef(c.table, c.column);
     });
 
-    const ast = createInsertAst({
-      table: createTableRef(this.table.name),
-      values,
-      returning,
-    });
+    const ast = createInsertAstBuilder(createTableRef(this.table.name))
+      .values(values)
+      .returning(returning)
+      .build();
 
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
@@ -372,12 +371,11 @@ export class UpdateBuilderImpl<
       return createColumnRef(c.table, c.column);
     });
 
-    const ast = createUpdateAst({
-      table: createTableRef(this.table.name),
-      set,
-      where: whereExpr,
-      returning,
-    });
+    const ast = createUpdateAstBuilder(createTableRef(this.table.name))
+      .set(set)
+      .where(whereExpr)
+      .returning(returning)
+      .build();
 
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
@@ -501,11 +499,10 @@ export class DeleteBuilderImpl<
       return createColumnRef(c.table, c.column);
     });
 
-    const ast = createDeleteAst({
-      table: createTableRef(this.table.name),
-      where: whereExpr,
-      returning,
-    });
+    const ast = createDeleteAstBuilder(createTableRef(this.table.name))
+      .where(whereExpr)
+      .returning(returning)
+      .build();
 
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {

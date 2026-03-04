@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createPostsCollection, timeouts, withCollectionRuntime } from './helpers';
 import { seedPosts } from './runtime-helpers';
+
+function isSelectAst(ast: unknown): ast is SelectAst {
+  return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
+}
 
 describe('integration/groupBy', () => {
   it(
@@ -56,7 +61,12 @@ describe('integration/groupBy', () => {
 
         expect(grouped).toEqual([{ userId: 1, count: 2 }]);
         expect(runtime.executions).toHaveLength(1);
-        expect(runtime.executions[0]?.sql.toLowerCase()).toContain('having count(*) >');
+        const ast = runtime.executions[0]?.ast;
+        expect(isSelectAst(ast)).toBe(true);
+        if (!isSelectAst(ast)) {
+          throw new Error('Expected grouped query to emit a select AST plan');
+        }
+        expect(ast.having?.kind).toBe('bin');
       });
     },
     timeouts.spinUpPpgDev,

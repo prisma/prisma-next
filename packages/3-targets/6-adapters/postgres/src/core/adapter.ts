@@ -1,22 +1,29 @@
 import type {
+  AggregateExpr,
   Adapter,
   AdapterProfile,
   BinaryExpr,
   CodecParamsDescriptor,
   ColumnRef,
   DeleteAst,
-  IncludeRef,
+  Expression,
+  FromSource,
   InsertAst,
+  JsonArrayAggExpr,
+  JsonObjectExpr,
   JoinAst,
   JoinOnExpr,
   ListLiteralExpr,
   LiteralExpr,
   LowererContext,
   NullCheckExpr,
+  OrderByItem,
   OperationExpr,
   ParamRef,
+  ProjectionItem,
   QueryAst,
   SelectAst,
+  SubqueryExpr,
   UpdateAst,
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -128,58 +135,99 @@ class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, Postgre
 }
 
 function renderSelect(ast: SelectAst, contract?: PostgresContract): string {
-  const selectClause = `SELECT ${renderProjection(ast, contract)}`;
-  const fromClause = `FROM ${quoteIdentifier(ast.from.name)}`;
+  const selectClause = `SELECT ${renderDistinctPrefix(ast.distinct, ast.distinctOn, contract)}${renderProjection(
+    ast.project,
+    contract,
+  )}`;
+  const fromClause = `FROM ${renderSource(ast.from, contract)}`;
 
   const joinsClause = ast.joins?.length
     ? ast.joins.map((join) => renderJoin(join, contract)).join(' ')
     : '';
-  const includesClause = ast.includes?.length
-    ? ast.includes.map((include) => renderInclude(include, contract)).join(' ')
-    : '';
 
-  const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where, contract)}` : '';
+  const whereClause = ast.where ? `WHERE ${renderWhere(ast.where, contract)}` : '';
+  const groupByClause = ast.groupBy?.length
+    ? `GROUP BY ${ast.groupBy.map((expr) => renderExpr(expr, contract)).join(', ')}`
+    : '';
+  const havingClause = ast.having ? `HAVING ${renderWhere(ast.having, contract)}` : '';
   const orderClause = ast.orderBy?.length
-    ? ` ORDER BY ${ast.orderBy
+    ? `ORDER BY ${ast.orderBy
         .map((order) => {
-          const expr = renderExpr(order.expr as ColumnRef | OperationExpr, contract);
+          const expr = renderExpr(order.expr, contract);
           return `${expr} ${order.dir.toUpperCase()}`;
         })
         .join(', ')}`
     : '';
-  const limitClause = typeof ast.limit === 'number' ? ` LIMIT ${ast.limit}` : '';
+  const limitClause = typeof ast.limit === 'number' ? `LIMIT ${ast.limit}` : '';
+  const offsetClause = typeof ast.offset === 'number' ? `OFFSET ${ast.offset}` : '';
 
-  const clauses = [joinsClause, includesClause].filter(Boolean).join(' ');
-  return `${selectClause} ${fromClause}${clauses ? ` ${clauses}` : ''}${whereClause}${orderClause}${limitClause}`.trim();
+  const clauses = [
+    selectClause,
+    fromClause,
+    joinsClause,
+    whereClause,
+    groupByClause,
+    havingClause,
+    orderClause,
+    limitClause,
+    offsetClause,
+  ]
+    .filter((part) => part.length > 0)
+    .join(' ');
+  return clauses.trim();
 }
 
-function renderProjection(ast: SelectAst, contract?: PostgresContract): string {
-  return ast.project
+function renderProjection(
+  project: ReadonlyArray<ProjectionItem>,
+  contract?: PostgresContract,
+): string {
+  return project
     .map((item) => {
-      const expr = item.expr as ColumnRef | IncludeRef | OperationExpr | LiteralExpr;
-      if (expr.kind === 'includeRef') {
-        // For include references, select the column from the LATERAL join alias
-        // The LATERAL subquery returns a single column (the JSON array) with the alias
-        // The table is aliased as {alias}_lateral, and the column inside is aliased as the include alias
-        // We select it using table_alias.column_alias
-        const tableAlias = `${expr.alias}_lateral`;
-        return `${quoteIdentifier(tableAlias)}.${quoteIdentifier(expr.alias)} AS ${quoteIdentifier(item.alias)}`;
-      }
-      if (expr.kind === 'operation') {
-        const operation = renderOperation(expr, contract);
-        const alias = quoteIdentifier(item.alias);
-        return `${operation} AS ${alias}`;
-      }
-      if (expr.kind === 'literal') {
-        const literal = renderLiteral(expr);
-        const alias = quoteIdentifier(item.alias);
-        return `${literal} AS ${alias}`;
-      }
-      const column = renderColumn(expr as ColumnRef);
       const alias = quoteIdentifier(item.alias);
-      return `${column} AS ${alias}`;
+      if (item.expr.kind === 'literal') {
+        return `${renderLiteral(item.expr)} AS ${alias}`;
+      }
+      return `${renderExpr(item.expr, contract)} AS ${alias}`;
     })
     .join(', ');
+}
+
+function renderDistinctPrefix(
+  distinct: true | undefined,
+  distinctOn: ReadonlyArray<Expression> | undefined,
+  contract?: PostgresContract,
+): string {
+  if (distinctOn && distinctOn.length > 0) {
+    const rendered = distinctOn.map((expr) => renderExpr(expr, contract)).join(', ');
+    return `DISTINCT ON (${rendered}) `;
+  }
+  if (distinct) {
+    return 'DISTINCT ';
+  }
+  return '';
+}
+
+function renderSource(source: FromSource, contract?: PostgresContract): string {
+  if (source.kind === 'table') {
+    const table = quoteIdentifier(source.name);
+    if (!source.alias) {
+      return table;
+    }
+    return `${table} AS ${quoteIdentifier(source.alias)}`;
+  }
+
+  return `(${renderSelect(source.query, contract)}) AS ${quoteIdentifier(source.alias)}`;
+}
+
+function assertScalarSubquery(query: SelectAst): void {
+  if (query.project.length !== 1) {
+    throw new Error('Subquery expressions must project exactly one column');
+  }
+}
+
+function renderSubqueryExpr(expr: SubqueryExpr, contract?: PostgresContract): string {
+  assertScalarSubquery(expr.query);
+  return `(${renderSelect(expr.query, contract)})`;
 }
 
 function renderWhere(expr: WhereExpr, contract?: PostgresContract): string {
@@ -207,9 +255,8 @@ function renderWhere(expr: WhereExpr, contract?: PostgresContract): string {
 }
 
 function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract): string {
-  const rendered = renderExpr(expr.expr as ColumnRef | OperationExpr, contract);
-  // Only wrap in parentheses if it's an operation expression
-  const renderedExpr = isOperationExpr(expr.expr) ? `(${rendered})` : rendered;
+  const rendered = renderExpr(expr.expr, contract);
+  const renderedExpr = isOperationExpr(expr.expr) || expr.expr.kind === 'subquery' ? `(${rendered})` : rendered;
   return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
 }
 
@@ -223,9 +270,9 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
     }
   }
 
-  const leftExpr = expr.left as ColumnRef | OperationExpr;
+  const leftExpr = expr.left;
   const left = renderExpr(leftExpr, contract);
-  const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;
+  const leftRendered = isOperationExpr(leftExpr) || leftExpr.kind === 'subquery' ? `(${left})` : left;
   const leftCol = leftExpr.kind === 'col' ? leftExpr : undefined;
 
   const rightExpr = expr.right;
@@ -243,10 +290,8 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
     right = renderColumn(rightExpr);
   } else if (rightExpr.kind === 'param') {
     right = renderParam(rightExpr, contract, leftCol?.table, leftCol?.column);
-  } else if (rightExpr.kind === 'operation') {
-    right = renderOperation(rightExpr, contract);
   } else {
-    right = renderColumn(rightExpr as ColumnRef);
+    right = renderExpr(rightExpr, contract);
   }
 
   const operatorMap: Record<BinaryExpr['op'], string> = {
@@ -286,11 +331,67 @@ function renderColumn(ref: ColumnRef): string {
   return `${quoteIdentifier(ref.table)}.${quoteIdentifier(ref.column)}`;
 }
 
-function renderExpr(expr: ColumnRef | OperationExpr, contract?: PostgresContract): string {
-  if (isOperationExpr(expr)) {
-    return renderOperation(expr, contract);
+function renderAggregateExpr(expr: AggregateExpr, contract?: PostgresContract): string {
+  const fn = expr.fn.toUpperCase();
+  if (!expr.expr) {
+    return `${fn}(*)`;
   }
-  return renderColumn(expr);
+  return `${fn}(${renderExpr(expr.expr, contract)})`;
+}
+
+function renderJsonObjectExpr(expr: JsonObjectExpr, contract?: PostgresContract): string {
+  const args = expr.entries
+    .flatMap((entry): [string, string] => {
+      const key = `'${escapeLiteral(entry.key)}'`;
+      if (entry.value.kind === 'literal') {
+        return [key, renderLiteral(entry.value)];
+      }
+      return [key, renderExpr(entry.value, contract)];
+    })
+    .join(', ');
+  return `json_build_object(${args})`;
+}
+
+function renderOrderByItems(
+  items: ReadonlyArray<OrderByItem>,
+  contract?: PostgresContract,
+): string {
+  return items
+    .map((item) => `${renderExpr(item.expr, contract)} ${item.dir.toUpperCase()}`)
+    .join(', ');
+}
+
+function renderJsonArrayAggExpr(expr: JsonArrayAggExpr, contract?: PostgresContract): string {
+  const aggregateOrderBy =
+    expr.orderBy && expr.orderBy.length > 0
+      ? ` ORDER BY ${renderOrderByItems(expr.orderBy, contract)}`
+      : '';
+  const aggregated = `json_agg(${renderExpr(expr.expr, contract)}${aggregateOrderBy})`;
+  if (expr.onEmpty === 'emptyArray') {
+    return `coalesce(${aggregated}, json_build_array())`;
+  }
+  return aggregated;
+}
+
+function renderExpr(expr: Expression, contract?: PostgresContract): string {
+  switch (expr.kind) {
+    case 'col':
+      return renderColumn(expr);
+    case 'operation':
+      return renderOperation(expr, contract);
+    case 'subquery':
+      return renderSubqueryExpr(expr, contract);
+    case 'aggregate':
+      return renderAggregateExpr(expr, contract);
+    case 'jsonObject':
+      return renderJsonObjectExpr(expr, contract);
+    case 'jsonArrayAgg':
+      return renderJsonArrayAggExpr(expr, contract);
+    default: {
+      const exhaustive: never = expr;
+      throw new Error(`Unsupported expression kind: ${String((exhaustive as { kind?: string }).kind)}`);
+    }
+  }
 }
 
 function renderParam(
@@ -314,35 +415,49 @@ function renderLiteral(expr: LiteralExpr): string {
   if (typeof expr.value === 'number' || typeof expr.value === 'boolean') {
     return String(expr.value);
   }
+  if (typeof expr.value === 'bigint') {
+    return String(expr.value);
+  }
   if (expr.value === null) {
     return 'NULL';
+  }
+  if (expr.value === undefined) {
+    return 'NULL';
+  }
+  if (expr.value instanceof Date) {
+    return `'${escapeLiteral(expr.value.toISOString())}'`;
   }
   if (Array.isArray(expr.value)) {
     return `ARRAY[${expr.value.map((v: unknown) => renderLiteral({ kind: 'literal', value: v })).join(', ')}]`;
   }
-  return JSON.stringify(expr.value);
+  const json = JSON.stringify(expr.value);
+  if (json === undefined) {
+    return 'NULL';
+  }
+  return `'${escapeLiteral(json)}'`;
 }
 
 function renderOperation(expr: OperationExpr, contract?: PostgresContract): string {
   const self = renderExpr(expr.self, contract);
   // For vector operations, cast param arguments to vector type
   const isVectorOperation = expr.forTypeId === VECTOR_CODEC_ID;
-  const args = expr.args.map((arg: ColumnRef | ParamRef | LiteralExpr | OperationExpr) => {
-    if (arg.kind === 'col') {
-      return renderColumn(arg);
+  const args = expr.args.map((arg) => {
+    switch (arg.kind) {
+      case 'param':
+        // Cast vector operation parameters to vector type
+        return isVectorOperation ? `$${arg.index}::vector` : renderParam(arg, contract);
+      case 'literal':
+        return renderLiteral(arg);
+      case 'col':
+      case 'operation':
+      case 'subquery':
+      case 'aggregate':
+      case 'jsonObject':
+      case 'jsonArrayAgg':
+        return renderExpr(arg, contract);
+      default:
+        throw new Error(`Unsupported argument kind: ${(arg as { kind?: string }).kind ?? 'unknown'}`);
     }
-    if (arg.kind === 'param') {
-      // Cast vector operation parameters to vector type
-      return isVectorOperation ? `$${arg.index}::vector` : renderParam(arg, contract);
-    }
-    if (arg.kind === 'literal') {
-      return renderLiteral(arg);
-    }
-    if (arg.kind === 'operation') {
-      return renderOperation(arg, contract);
-    }
-    const _exhaustive: never = arg;
-    throw new Error(`Unsupported argument kind: ${(_exhaustive as { kind: string }).kind}`);
   });
 
   let result = expr.lowering.template;
@@ -360,9 +475,10 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
 
 function renderJoin(join: JoinAst, contract?: PostgresContract): string {
   const joinType = join.joinType.toUpperCase();
-  const table = quoteIdentifier(join.table.name);
+  const lateral = join.lateral ? 'LATERAL ' : '';
+  const source = renderSource(join.source, contract);
   const onClause = renderJoinOn(join.on, contract);
-  return `${joinType} JOIN ${table} ON ${onClause}`;
+  return `${joinType} JOIN ${lateral}${source} ON ${onClause}`;
 }
 
 function renderJoinOn(on: JoinOnExpr, contract?: PostgresContract): string {
@@ -372,102 +488,6 @@ function renderJoinOn(on: JoinOnExpr, contract?: PostgresContract): string {
     return `${left} = ${right}`;
   }
   return renderWhere(on, contract);
-}
-
-function renderInclude(
-  include: NonNullable<SelectAst['includes']>[number],
-  contract?: PostgresContract,
-): string {
-  const alias = include.alias;
-
-  // Build the lateral subquery
-  const childProjection = include.child.project
-    .map((item: { alias: string; expr: ColumnRef | OperationExpr }) => {
-      const expr = renderExpr(item.expr, contract);
-      return `'${item.alias}', ${expr}`;
-    })
-    .join(', ');
-
-  const jsonBuildObject = `json_build_object(${childProjection})`;
-
-  // Build the ON condition from the include's ON clause - this goes in the WHERE clause
-  const onCondition = renderJoinOn(include.child.on, contract);
-
-  // Build WHERE clause: combine ON condition with any additional WHERE clauses
-  let whereClause = ` WHERE ${onCondition}`;
-  if (include.child.where) {
-    whereClause += ` AND ${renderWhere(include.child.where, contract)}`;
-  }
-
-  // Add ORDER BY if present - it goes inside json_agg() call
-  const childOrderBy = include.child.orderBy?.length
-    ? ` ORDER BY ${include.child.orderBy
-        .map(
-          (order: { expr: ColumnRef | OperationExpr; dir: string }) =>
-            `${renderExpr(order.expr, contract)} ${order.dir.toUpperCase()}`,
-        )
-        .join(', ')}`
-    : '';
-
-  // Add LIMIT if present
-  const childLimit = typeof include.child.limit === 'number' ? ` LIMIT ${include.child.limit}` : '';
-
-  // Build the lateral subquery
-  // When ORDER BY is present without LIMIT, it goes inside json_agg() call: json_agg(expr ORDER BY ...)
-  // When LIMIT is present (with or without ORDER BY), we need to wrap in a subquery
-  const childTable = quoteIdentifier(include.child.table.name);
-  let subquery: string;
-  if (typeof include.child.limit === 'number') {
-    // With LIMIT, we need to wrap in a subquery
-    // Select individual columns in inner query, then aggregate
-    // Create a map of column references to their aliases for ORDER BY
-    // Only ColumnRef can be mapped (OperationExpr doesn't have table/column properties)
-    const columnAliasMap = new Map<string, string>();
-    for (const item of include.child.project) {
-      if (item.expr.kind === 'col') {
-        const columnKey = `${item.expr.table}.${item.expr.column}`;
-        columnAliasMap.set(columnKey, item.alias);
-      }
-    }
-
-    const innerColumns = include.child.project
-      .map((item: { alias: string; expr: ColumnRef | OperationExpr }) => {
-        const expr = renderExpr(item.expr, contract);
-        return `${expr} AS ${quoteIdentifier(item.alias)}`;
-      })
-      .join(', ');
-
-    // For ORDER BY, use column aliases if the column is in the SELECT list
-    const childOrderByWithAliases = include.child.orderBy?.length
-      ? ` ORDER BY ${include.child.orderBy
-          .map((order: { expr: ColumnRef | OperationExpr; dir: string }) => {
-            if (order.expr.kind === 'col') {
-              const columnKey = `${order.expr.table}.${order.expr.column}`;
-              const alias = columnAliasMap.get(columnKey);
-              if (alias) {
-                return `${quoteIdentifier(alias)} ${order.dir.toUpperCase()}`;
-              }
-            }
-            return `${renderExpr(order.expr, contract)} ${order.dir.toUpperCase()}`;
-          })
-          .join(', ')}`
-      : '';
-
-    const innerSelect = `SELECT ${innerColumns} FROM ${childTable}${whereClause}${childOrderByWithAliases}${childLimit}`;
-    subquery = `(SELECT json_agg(row_to_json(sub.*)) AS ${quoteIdentifier(alias)} FROM (${innerSelect}) sub)`;
-  } else if (childOrderBy) {
-    // With ORDER BY but no LIMIT, ORDER BY goes inside json_agg()
-    subquery = `(SELECT json_agg(${jsonBuildObject}${childOrderBy}) AS ${quoteIdentifier(alias)} FROM ${childTable}${whereClause})`;
-  } else {
-    // No ORDER BY or LIMIT
-    subquery = `(SELECT json_agg(${jsonBuildObject}) AS ${quoteIdentifier(alias)} FROM ${childTable}${whereClause})`;
-  }
-
-  // Return the LATERAL join with ON true (the condition is in the WHERE clause)
-  // The subquery returns a single column (the JSON array) with the alias
-  // We use a different alias for the table to avoid ambiguity when selecting the column
-  const tableAlias = `${alias}_lateral`;
-  return `LEFT JOIN LATERAL ${subquery} AS ${quoteIdentifier(tableAlias)} ON true`;
 }
 
 function quoteIdentifier(identifier: string): string {
@@ -493,11 +513,39 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
     columns.length === 0
       ? `INSERT INTO ${table} DEFAULT VALUES`
       : `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')})`;
+  const onConflictClause = ast.onConflict
+    ? (() => {
+        const conflictColumns = ast.onConflict.columns.map((col) => quoteIdentifier(col.column));
+        if (conflictColumns.length === 0) {
+          throw new Error('INSERT onConflict requires at least one conflict column');
+        }
+
+        if (ast.onConflict.action.kind === 'doNothing') {
+          return ` ON CONFLICT (${conflictColumns.join(', ')}) DO NOTHING`;
+        }
+
+        const updates = Object.entries(ast.onConflict.action.set).map(([colName, value]) => {
+          const target = quoteIdentifier(colName);
+          if (value.kind === 'param') {
+            const columnMeta = tableMeta?.columns[colName];
+            return `${target} = ${renderTypedParam(value.index, columnMeta?.codecId)}`;
+          }
+          if (value.kind === 'col') {
+            return `${target} = ${quoteIdentifier(value.table)}.${quoteIdentifier(value.column)}`;
+          }
+          const exhaustive: never = value;
+          throw new Error(
+            `Unsupported onConflict set value kind in INSERT: ${String((exhaustive as { kind?: string }).kind)}`,
+          );
+        });
+        return ` ON CONFLICT (${conflictColumns.join(', ')}) DO UPDATE SET ${updates.join(', ')}`;
+      })()
+    : '';
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';
 
-  return `${insertClause}${returningClause}`;
+  return `${insertClause}${onConflictClause}${returningClause}`;
 }
 
 function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {

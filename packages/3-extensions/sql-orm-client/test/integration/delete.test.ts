@@ -92,4 +92,20 @@ describe('integration/delete', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'delete() and deleteAll() reject when returning capability is disabled',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+        const filtered = users.where({ id: 1 });
+
+        await expect(filtered.delete()).rejects.toThrow(
+          /requires contract capability "returning"/,
+        );
+        expect(() => filtered.deleteAll()).toThrow(/requires contract capability "returning"/);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
 });

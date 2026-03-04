@@ -3,9 +3,9 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   BoundWhereExpr,
   Expression,
+  FromSource,
   JoinOnExpr,
   ListLiteralExpr,
-  OperationExpr,
   ParamRef,
   SelectAst,
   ToWhereExpr,
@@ -131,24 +131,67 @@ function remapExpressionParamIndexes(
   expr: Expression,
   remap: ReadonlyMap<number, number>,
 ): Expression {
-  if (expr.kind !== 'operation') {
-    return expr;
+  switch (expr.kind) {
+    case 'col':
+      return expr;
+    case 'operation':
+      return {
+        ...expr,
+        self: remapExpressionParamIndexes(expr.self, remap),
+        args: expr.args.map((arg) => {
+          if (arg.kind === 'param') {
+            return {
+              ...arg,
+              index: remapParamIndex(arg.index, remap),
+            };
+          }
+          if (arg.kind === 'literal') {
+            return arg;
+          }
+          return remapExpressionParamIndexes(arg, remap);
+        }),
+      };
+    case 'subquery':
+      return {
+        ...expr,
+        query: remapSelectParamIndexes(expr.query, remap),
+      };
+    case 'aggregate':
+      return expr.expr
+        ? {
+            ...expr,
+            expr: remapExpressionParamIndexes(expr.expr, remap),
+          }
+        : expr;
+    case 'jsonArrayAgg':
+      return {
+        ...expr,
+        expr: remapExpressionParamIndexes(expr.expr, remap),
+        ...(expr.orderBy
+          ? {
+              orderBy: expr.orderBy.map((order) => ({
+                ...order,
+                expr: remapExpressionParamIndexes(order.expr, remap),
+              })),
+            }
+          : {}),
+      };
+    case 'jsonObject':
+      return {
+        ...expr,
+        entries: expr.entries.map((entry) => ({
+          ...entry,
+          value:
+            entry.value.kind === 'literal'
+              ? entry.value
+              : remapExpressionParamIndexes(entry.value, remap),
+        })),
+      };
+    default: {
+      const neverExpr: never = expr;
+      throw new Error(`Unsupported expression kind: ${String(neverExpr)}`);
+    }
   }
-  return {
-    ...expr,
-    args: expr.args.map((arg) => {
-      if (arg.kind === 'param') {
-        return {
-          ...arg,
-          index: remapParamIndex(arg.index, remap),
-        };
-      }
-      if (arg.kind === 'literal') {
-        return arg;
-      }
-      return remapExpressionParamIndexes(arg, remap);
-    }),
-  } as OperationExpr;
 }
 
 function remapComparableParamIndexes(
@@ -175,32 +218,28 @@ function remapComparableParamIndexes(
   return remapExpressionParamIndexes(value, remap);
 }
 
+function remapFromSourceParamIndexes(
+  source: FromSource,
+  remap: ReadonlyMap<number, number>,
+): FromSource {
+  if (source.kind === 'table') {
+    return source;
+  }
+
+  return {
+    ...source,
+    query: remapSelectParamIndexes(source.query, remap),
+  };
+}
+
 function remapSelectParamIndexes(ast: SelectAst, remap: ReadonlyMap<number, number>): SelectAst {
   const joins = ast.joins?.map((join) => ({
     ...join,
+    source: remapFromSourceParamIndexes(join.source, remap),
     on: remapJoinOnParamIndexes(join.on, remap),
   }));
-  const includes = ast.includes?.map((inc) => ({
-    ...inc,
-    child: {
-      ...inc.child,
-      ...(inc.child.where ? { where: remapWhereParamIndexes(inc.child.where, remap) } : {}),
-      ...(inc.child.orderBy
-        ? {
-            orderBy: inc.child.orderBy.map((order) => ({
-              ...order,
-              expr: remapExpressionParamIndexes(order.expr, remap),
-            })),
-          }
-        : {}),
-      project: inc.child.project.map((projection) => ({
-        ...projection,
-        expr: remapExpressionParamIndexes(projection.expr, remap),
-      })),
-    },
-  }));
   const project = ast.project.map((projection) => {
-    if (projection.expr.kind === 'includeRef' || projection.expr.kind === 'literal') {
+    if (projection.expr.kind === 'literal') {
       return projection;
     }
     return {
@@ -209,20 +248,27 @@ function remapSelectParamIndexes(ast: SelectAst, remap: ReadonlyMap<number, numb
     };
   });
   const where = ast.where ? remapWhereParamIndexes(ast.where, remap) : undefined;
+  const having = ast.having ? remapWhereParamIndexes(ast.having, remap) : undefined;
   const orderBy = ast.orderBy?.map((order) => ({
     ...order,
     expr: remapExpressionParamIndexes(order.expr, remap),
   }));
+  const distinctOn = ast.distinctOn?.map((expr) => remapExpressionParamIndexes(expr, remap));
+  const groupBy = ast.groupBy?.map((expr) => remapExpressionParamIndexes(expr, remap));
 
   return {
     kind: ast.kind,
-    from: ast.from,
+    from: remapFromSourceParamIndexes(ast.from, remap),
     project,
     ...(joins ? { joins } : {}),
-    ...(includes ? { includes } : {}),
     ...(where ? { where } : {}),
+    ...(having ? { having } : {}),
     ...(orderBy ? { orderBy } : {}),
+    ...(ast.distinct ? { distinct: ast.distinct } : {}),
+    ...(distinctOn ? { distinctOn } : {}),
+    ...(groupBy ? { groupBy } : {}),
     ...(ast.limit !== undefined ? { limit: ast.limit } : {}),
+    ...(ast.offset !== undefined ? { offset: ast.offset } : {}),
     ...(ast.selectAllIntent ? { selectAllIntent: ast.selectAllIntent } : {}),
   };
 }
@@ -259,26 +305,23 @@ function collectParamRefIndexes(expr: WhereExpr): number[] {
 }
 
 function collectSelectParamIndexes(ast: SelectAst): number[] {
+  const from = collectFromSourceParamIndexes(ast.from);
   const where = ast.where ? collectParamRefIndexes(ast.where) : [];
+  const having = ast.having ? collectParamRefIndexes(ast.having) : [];
   const project = ast.project.flatMap((projection) => {
-    if (projection.expr.kind === 'includeRef' || projection.expr.kind === 'literal') {
+    if (projection.expr.kind === 'literal') {
       return [];
     }
     return collectExpressionParamIndexes(projection.expr);
   });
   const orderBy = (ast.orderBy ?? []).flatMap((order) => collectExpressionParamIndexes(order.expr));
-  const joins = (ast.joins ?? []).flatMap((join) => collectJoinOnParamIndexes(join.on));
-  const includes = (ast.includes ?? []).flatMap((include) => {
-    const childWhere = include.child.where ? collectParamRefIndexes(include.child.where) : [];
-    const childOrder = (include.child.orderBy ?? []).flatMap((order) =>
-      collectExpressionParamIndexes(order.expr),
-    );
-    const childProject = include.child.project.flatMap((projection) =>
-      collectExpressionParamIndexes(projection.expr),
-    );
-    return [...childWhere, ...childOrder, ...childProject];
-  });
-  return [...where, ...project, ...orderBy, ...joins, ...includes];
+  const distinctOn = (ast.distinctOn ?? []).flatMap((expr) => collectExpressionParamIndexes(expr));
+  const groupBy = (ast.groupBy ?? []).flatMap((expr) => collectExpressionParamIndexes(expr));
+  const joins = (ast.joins ?? []).flatMap((join) => [
+    ...collectFromSourceParamIndexes(join.source),
+    ...collectJoinOnParamIndexes(join.on),
+  ]);
+  return [...from, ...where, ...having, ...project, ...orderBy, ...distinctOn, ...groupBy, ...joins];
 }
 
 function collectJoinOnParamIndexes(joinOn: JoinOnExpr): number[] {
@@ -289,18 +332,47 @@ function collectJoinOnParamIndexes(joinOn: JoinOnExpr): number[] {
 }
 
 function collectExpressionParamIndexes(expr: Expression): number[] {
-  if (expr.kind !== 'operation') {
+  switch (expr.kind) {
+    case 'col':
+      return [];
+    case 'operation':
+      return [
+        ...collectExpressionParamIndexes(expr.self),
+        ...expr.args.flatMap((arg) => {
+          if (arg.kind === 'param') {
+            return [arg.index];
+          }
+          if (arg.kind === 'literal') {
+            return [];
+          }
+          return collectExpressionParamIndexes(arg);
+        }),
+      ];
+    case 'subquery':
+      return collectSelectParamIndexes(expr.query);
+    case 'aggregate':
+      return expr.expr ? collectExpressionParamIndexes(expr.expr) : [];
+    case 'jsonArrayAgg':
+      return [
+        ...collectExpressionParamIndexes(expr.expr),
+        ...(expr.orderBy ?? []).flatMap((order) => collectExpressionParamIndexes(order.expr)),
+      ];
+    case 'jsonObject':
+      return expr.entries.flatMap((entry) =>
+        entry.value.kind === 'literal' ? [] : collectExpressionParamIndexes(entry.value),
+      );
+    default: {
+      const neverExpr: never = expr;
+      throw new Error(`Unsupported expression kind: ${String(neverExpr)}`);
+    }
+  }
+}
+
+function collectFromSourceParamIndexes(source: FromSource): number[] {
+  if (source.kind === 'table') {
     return [];
   }
-  return expr.args.flatMap((arg) => {
-    if (arg.kind === 'param') {
-      return [arg.index];
-    }
-    if (arg.kind === 'literal') {
-      return [];
-    }
-    return collectExpressionParamIndexes(arg);
-  });
+  return collectSelectParamIndexes(source.query);
 }
 
 function collectComparableParamIndexes(

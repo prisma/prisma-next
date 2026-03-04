@@ -146,7 +146,8 @@ describe('where interop', () => {
           {
             kind: 'join',
             joinType: 'left',
-            table: { kind: 'table', name: 'posts' },
+            source: { kind: 'table', name: 'posts' },
+            lateral: false,
             on: {
               kind: 'eqCol',
               left: col('users', 'id'),
@@ -156,7 +157,8 @@ describe('where interop', () => {
           {
             kind: 'join',
             joinType: 'inner',
-            table: { kind: 'table', name: 'profiles' },
+            source: { kind: 'table', name: 'profiles' },
+            lateral: false,
             on: {
               kind: 'bin',
               op: 'eq',

@@ -104,7 +104,8 @@ describe('ast/join', () => {
       expect(join).toEqual({
         kind: 'join',
         joinType: 'inner',
-        table,
+        source: table,
+        lateral: false,
         on,
       });
     });

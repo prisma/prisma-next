@@ -1,5 +1,10 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  createBinaryExpr,
+  createColumnRef,
+  createLiteralExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { resolveModelTableName, resolvePrimaryKeyColumn } from './collection-contract';
 import {
   acquireRuntimeScope,
@@ -12,8 +17,8 @@ import {
   compileSelect,
   compileUpdateCount,
   compileUpdateReturning,
-} from './kysely-compiler';
-import { executeCompiledQuery } from './raw-compiled-query';
+} from './query-plan';
+import { executeQueryPlan } from './execute-query-plan';
 import {
   createRelationMutator,
   isRelationMutationCallback,
@@ -232,13 +237,14 @@ async function updateFirstGraph(
     }
 
     const tableName = resolveModelTableName(contract, modelName);
-    const compiled = compileUpdateReturning(tableName, mappedUpdateData, [pkWhere], undefined);
-    const updatedRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
-      scope,
+    const compiled = compileUpdateReturning(
       contract,
-      compiled,
-      { lane: 'orm-client' },
-    ).toArray();
+      tableName,
+      mappedUpdateData,
+      [pkWhere],
+      undefined,
+    );
+    const updatedRowsRaw = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
     const updatedRaw = updatedRowsRaw[0];
     if (updatedRaw) {
@@ -534,19 +540,13 @@ function buildChildJoinWhere(
   const exprs: WhereExpr[] = [];
 
   for (const [childColumn, parentValue] of childValues.entries()) {
-    exprs.push({
-      kind: 'bin',
-      op: 'eq',
-      left: {
-        kind: 'col',
-        table: relation.relatedTableName,
-        column: childColumn,
-      },
-      right: {
-        kind: 'literal',
-        value: parentValue,
-      },
-    });
+    exprs.push(
+      createBinaryExpr(
+        'eq',
+        createColumnRef(relation.relatedTableName, childColumn),
+        createLiteralExpr(parentValue),
+      ),
+    );
   }
 
   const first = exprs[0];
@@ -565,10 +565,8 @@ async function insertSingleRow(
 ): Promise<Record<string, unknown>> {
   const tableName = resolveModelTableName(contract, modelName);
   const mappedData = mapModelDataToStorageRow(contract, modelName, data);
-  const compiled = compileInsertReturning(tableName, [mappedData], undefined);
-  const rows = await executeCompiledQuery<Record<string, unknown>>(scope, contract, compiled, {
-    lane: 'orm-client',
-  }).toArray();
+  const compiled = compileInsertReturning(contract, tableName, mappedData, undefined);
+  const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
   const firstRow = rows[0];
   if (!firstRow) {
@@ -599,10 +597,8 @@ async function findRowByCriterion(
     filters: [whereExpr],
     limit: 1,
   };
-  const compiled = compileSelect(tableName, state);
-  const rows = await executeCompiledQuery<Record<string, unknown>>(scope, contract, compiled, {
-    lane: 'orm-client',
-  }).toArray();
+  const compiled = compileSelect(contract, tableName, state);
+  const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
   const firstRow = rows[0];
   if (!firstRow) {
@@ -624,10 +620,8 @@ async function findFirstByFilters(
     filters,
     limit: 1,
   };
-  const compiled = compileSelect(tableName, state);
-  const rows = await executeCompiledQuery<Record<string, unknown>>(scope, contract, compiled, {
-    lane: 'orm-client',
-  }).toArray();
+  const compiled = compileSelect(contract, tableName, state);
+  const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
   const firstRow = rows[0];
   if (!firstRow) {
@@ -644,10 +638,8 @@ async function executeUpdateCount(
   setValues: Record<string, unknown>,
   filters: readonly WhereExpr[],
 ): Promise<void> {
-  const compiled = compileUpdateCount(tableName, setValues, filters);
-  await executeCompiledQuery<Record<string, unknown>>(scope, contract, compiled, {
-    lane: 'orm-client',
-  }).toArray();
+  const compiled = compileUpdateCount(contract, tableName, setValues, filters);
+  await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 }
 
 function getRelationDefinitions(

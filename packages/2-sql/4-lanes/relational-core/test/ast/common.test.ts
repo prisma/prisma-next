@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createAggregateExpr,
+  createJsonArrayAggExpr,
+  createJsonObjectEntry,
+  createJsonObjectExpr,
   createColumnRef,
+  createFunctionOperationExpr,
   createLiteralExpr,
   createOperationExpr,
   createParamRef,
@@ -117,6 +122,110 @@ describe('ast/common', () => {
       const result = createOperationExpr(operationExpr);
       expect(result).toBe(operationExpr);
       expect(result.args).toHaveLength(1);
+    });
+  });
+
+  describe('createFunctionOperationExpr', () => {
+    it('creates function operation expression with default empty args', () => {
+      const expr = createFunctionOperationExpr({
+        method: 'lower',
+        forTypeId: 'pg/text@1',
+        self: createColumnRef('user', 'email'),
+        returns: { kind: 'builtin', type: 'string' },
+        template: 'lower(${self})',
+      });
+
+      expect(expr).toEqual({
+        kind: 'operation',
+        method: 'lower',
+        forTypeId: 'pg/text@1',
+        self: createColumnRef('user', 'email'),
+        args: [],
+        returns: { kind: 'builtin', type: 'string' },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: 'lower(${self})',
+        },
+      });
+    });
+  });
+
+  describe('createAggregateExpr', () => {
+    it('creates count aggregate without expr', () => {
+      const expr = createAggregateExpr('count');
+
+      expect(expr).toEqual({
+        kind: 'aggregate',
+        fn: 'count',
+      });
+    });
+
+    it('creates aggregate with target expr', () => {
+      const expr = createAggregateExpr('sum', createColumnRef('post', 'likes'));
+
+      expect(expr).toEqual({
+        kind: 'aggregate',
+        fn: 'sum',
+        expr: createColumnRef('post', 'likes'),
+      });
+    });
+  });
+
+  describe('createJsonObjectExpr', () => {
+    it('creates json object expression with entries', () => {
+      const expr = createJsonObjectExpr([
+        createJsonObjectEntry('id', createColumnRef('user', 'id')),
+        createJsonObjectEntry('name', createLiteralExpr('Alice')),
+      ]);
+
+      expect(expr).toEqual({
+        kind: 'jsonObject',
+        entries: [
+          { key: 'id', value: createColumnRef('user', 'id') },
+          { key: 'name', value: createLiteralExpr('Alice') },
+        ],
+      });
+    });
+  });
+
+  describe('createJsonArrayAggExpr', () => {
+    it('creates json array aggregate with default onEmpty null', () => {
+      const expr = createJsonArrayAggExpr(createColumnRef('post', 'id'));
+      expect(expr).toEqual({
+        kind: 'jsonArrayAgg',
+        expr: createColumnRef('post', 'id'),
+        onEmpty: 'null',
+      });
+    });
+
+    it('creates json array aggregate with explicit emptyArray fallback', () => {
+      const expr = createJsonArrayAggExpr(createColumnRef('post', 'id'), 'emptyArray');
+      expect(expr).toEqual({
+        kind: 'jsonArrayAgg',
+        expr: createColumnRef('post', 'id'),
+        onEmpty: 'emptyArray',
+      });
+    });
+
+    it('creates json array aggregate with aggregate-local orderBy', () => {
+      const expr = createJsonArrayAggExpr(createColumnRef('post', 'id'), 'emptyArray', [
+        {
+          expr: createColumnRef('post', 'createdAt'),
+          dir: 'desc',
+        },
+      ]);
+      expect(expr).toEqual({
+        kind: 'jsonArrayAgg',
+        expr: createColumnRef('post', 'id'),
+        onEmpty: 'emptyArray',
+        orderBy: [
+          {
+            expr: createColumnRef('post', 'createdAt'),
+            dir: 'desc',
+          },
+        ],
+      });
     });
   });
 

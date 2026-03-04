@@ -169,17 +169,24 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast.includes).toMatchObject([
-      {
-        kind: 'includeMany',
-        alias: 'post',
-        child: {
-          table: { name: 'post' },
-          project: expect.any(Array),
-        },
-      },
-    ]);
-    expect(ast.includes?.[0]?.child.project).toHaveLength(2);
+    const includeJoin = ast.joins?.find(
+      (join) => join.lateral && join.source.kind === 'derivedTable' && join.source.alias === 'post_lateral',
+    );
+    expect(includeJoin).toBeDefined();
+    if (includeJoin?.source.kind === 'derivedTable') {
+      const includeProjection = includeJoin.source.query.project[0];
+      expect(includeProjection?.expr.kind).toBe('jsonArrayAgg');
+      if (includeProjection?.expr.kind === 'jsonArrayAgg') {
+        expect(includeProjection.expr.onEmpty).toBe('emptyArray');
+        expect(includeProjection.expr.expr.kind).toBe('jsonObject');
+      }
+    }
+    const postsProjection = ast.project.find((item) => item.alias === 'post');
+    expect(postsProjection?.expr).toMatchObject({
+      kind: 'col',
+      table: 'post_lateral',
+      column: 'post',
+    });
   });
 
   it('builds a plan with includeMany using custom alias', () => {
@@ -201,11 +208,11 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast.includes).toMatchObject([
-      {
-        alias: 'posts',
-      },
-    ]);
+    const includeJoin = ast.joins?.find(
+      (join) =>
+        join.lateral && join.source.kind === 'derivedTable' && join.source.alias === 'posts_lateral',
+    );
+    expect(includeJoin).toBeDefined();
   });
 
   it('builds a plan with includeMany with child where clause', () => {
@@ -229,11 +236,18 @@ describe('SQL builder includeMany', () => {
       .build({ params: { title: 'Test' } });
 
     const ast = plan.ast as SelectAst;
-    expect(ast.includes?.[0]?.child).toMatchObject({
-      where: {
-        kind: 'bin',
-      },
-    });
+    const includeJoin = ast.joins?.find(
+      (join) =>
+        join.lateral && join.source.kind === 'derivedTable' && join.source.alias === 'posts_lateral',
+    );
+    expect(includeJoin?.source.kind).toBe('derivedTable');
+    if (includeJoin?.source.kind === 'derivedTable') {
+      const rowsQuery = includeJoin.source.query.from;
+      expect(rowsQuery.kind).toBe('derivedTable');
+      if (rowsQuery.kind === 'derivedTable') {
+        expect(rowsQuery.query.where?.kind).toBe('and');
+      }
+    }
   });
 
   it('builds a plan with includeMany with child orderBy clause', () => {
@@ -257,14 +271,29 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast.includes?.[0]?.child).toMatchObject({
-      orderBy: [
-        {
-          dir: 'desc',
-        },
-      ],
-    });
-    expect(ast.includes?.[0]?.child.orderBy).toHaveLength(1);
+    const includeJoin = ast.joins?.find(
+      (join) =>
+        join.lateral && join.source.kind === 'derivedTable' && join.source.alias === 'posts_lateral',
+    );
+    expect(includeJoin?.source.kind).toBe('derivedTable');
+    if (includeJoin?.source.kind === 'derivedTable') {
+      const includeProjection = includeJoin.source.query.project[0];
+      expect(includeProjection?.expr.kind).toBe('jsonArrayAgg');
+      if (includeProjection?.expr.kind === 'jsonArrayAgg') {
+        expect(includeProjection.expr.orderBy).toEqual([
+          {
+            expr: { kind: 'col', table: 'posts__rows', column: 'posts__order_0' },
+            dir: 'desc',
+          },
+        ]);
+      }
+      const rowsQuery = includeJoin.source.query.from;
+      expect(rowsQuery.kind).toBe('derivedTable');
+      if (rowsQuery.kind === 'derivedTable') {
+        expect(rowsQuery.query.orderBy?.[0]?.dir).toBe('desc');
+        expect(rowsQuery.query.project.map((item) => item.alias)).toContain('posts__order_0');
+      }
+    }
   });
 
   it('builds a plan with includeMany with child limit clause', () => {
@@ -285,7 +314,18 @@ describe('SQL builder includeMany', () => {
       .build();
 
     const ast = plan.ast as SelectAst;
-    expect(ast?.includes?.[0]?.child.limit).toBe(10);
+    const includeJoin = ast.joins?.find(
+      (join) =>
+        join.lateral && join.source.kind === 'derivedTable' && join.source.alias === 'posts_lateral',
+    );
+    expect(includeJoin?.source.kind).toBe('derivedTable');
+    if (includeJoin?.source.kind === 'derivedTable') {
+      const rowsQuery = includeJoin.source.query.from;
+      expect(rowsQuery.kind).toBe('derivedTable');
+      if (rowsQuery.kind === 'derivedTable') {
+        expect(rowsQuery.query.limit).toBe(10);
+      }
+    }
   });
 
   it('builds a plan with includeMany with all optional fields (where, orderBy, limit)', () => {
@@ -311,16 +351,30 @@ describe('SQL builder includeMany', () => {
       .build({ params: { title: 'Test' } });
 
     const ast = plan.ast as SelectAst;
-    expect(ast.includes?.[0]?.child).toMatchObject({
-      where: {
-        kind: 'bin',
-      },
-      orderBy: [
-        {
-          dir: 'desc',
-        },
-      ],
-      limit: 5,
-    });
+    const includeJoin = ast.joins?.find(
+      (join) =>
+        join.lateral && join.source.kind === 'derivedTable' && join.source.alias === 'posts_lateral',
+    );
+    expect(includeJoin?.source.kind).toBe('derivedTable');
+    if (includeJoin?.source.kind === 'derivedTable') {
+      const includeProjection = includeJoin.source.query.project[0];
+      expect(includeProjection?.expr.kind).toBe('jsonArrayAgg');
+      if (includeProjection?.expr.kind === 'jsonArrayAgg') {
+        expect(includeProjection.expr.orderBy).toEqual([
+          {
+            expr: { kind: 'col', table: 'posts__rows', column: 'posts__order_0' },
+            dir: 'desc',
+          },
+        ]);
+      }
+      const rowsQuery = includeJoin.source.query.from;
+      expect(rowsQuery.kind).toBe('derivedTable');
+      if (rowsQuery.kind === 'derivedTable') {
+        expect(rowsQuery.query.where?.kind).toBe('and');
+        expect(rowsQuery.query.orderBy?.[0]?.dir).toBe('desc');
+        expect(rowsQuery.query.limit).toBe(5);
+        expect(rowsQuery.query.project.map((item) => item.alias)).toContain('posts__order_0');
+      }
+    }
   });
 });

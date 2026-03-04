@@ -54,7 +54,7 @@ import {
   compileUpdateCount,
   compileUpdateReturning,
   compileUpsertReturning,
-} from './kysely-compiler';
+} from './query-plan';
 import { createModelAccessor } from './model-accessor';
 import {
   buildPrimaryKeyFilterFromRow,
@@ -62,7 +62,7 @@ import {
   executeNestedUpdateMutation,
   hasNestedMutationCallbacks,
 } from './mutation-executor';
-import { executeCompiledQuery } from './raw-compiled-query';
+import { executeQueryPlan } from './execute-query-plan';
 import type {
   AggregateBuilder,
   AggregateResult,
@@ -559,13 +559,13 @@ export class Collection<
       }
     }
 
-    const compiled = compileAggregate(this.tableName, this.state.filters, aggregateSpec);
-    const rows = await executeCompiledQuery<Record<string, unknown>>(
-      this.ctx.runtime,
+    const compiled = compileAggregate(
       this.ctx.contract,
-      compiled,
-      { lane: 'orm-client' },
-    ).toArray();
+      this.tableName,
+      this.state.filters,
+      aggregateSpec,
+    );
+    const rows = await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
     return normalizeAggregateResult(aggregateSpec, rows[0] ?? {});
   }
 
@@ -625,16 +625,34 @@ export class Collection<
       this.state.selectedFields,
       parentJoinColumns,
     );
-    const compiled = compileInsertReturning(this.tableName, mappedRows, selectedForInsert);
-    return dispatchMutationRows<Row>({
-      contract: this.ctx.contract,
-      runtime: this.ctx.runtime,
-      compiled,
-      tableName: this.tableName,
-      includes: this.state.includes,
-      hiddenColumns,
-      mapRow: (mapped) => mapped as Row,
-    });
+
+    const generator = async function* (
+      self: Collection<TContract, ModelName, Row, State>,
+    ): AsyncGenerator<Row, void, unknown> {
+      for (const mappedRow of mappedRows) {
+        const compiled = compileInsertReturning(
+          self.ctx.contract,
+          self.tableName,
+          mappedRow,
+          selectedForInsert,
+        );
+        const rows = await dispatchMutationRows<Row>({
+          contract: self.ctx.contract,
+          runtime: self.ctx.runtime,
+          compiled,
+          tableName: self.tableName,
+          includes: self.state.includes,
+          hiddenColumns,
+          mapRow: (mapped) => mapped as Row,
+        }).toArray();
+
+        for (const row of rows) {
+          yield row;
+        }
+      }
+    };
+
+    return new AsyncIterableResult(generator(this));
   }
 
   async createCount(data: readonly CreateInput<TContract, ModelName>[]): Promise<number> {
@@ -645,15 +663,10 @@ export class Collection<
     const mappedRows = data.map((row) =>
       mapModelDataToStorageRow(this.ctx.contract, this.modelName, row),
     );
-    const compiled = compileInsertCount(this.tableName, mappedRows);
-    await executeCompiledQuery<Record<string, unknown>>(
-      this.ctx.runtime,
-      this.ctx.contract,
-      compiled,
-      {
-        lane: 'orm-client',
-      },
-    ).toArray();
+    for (const mappedRow of mappedRows) {
+      const compiled = compileInsertCount(this.ctx.contract, this.tableName, mappedRow);
+      await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
+    }
     return data.length;
   }
 
@@ -687,6 +700,7 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileUpsertReturning(
+      this.ctx.contract,
       this.tableName,
       createValues,
       updateValues,
@@ -773,6 +787,7 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileUpdateReturning(
+      this.ctx.contract,
       this.tableName,
       mappedData,
       this.state.filters,
@@ -803,23 +818,14 @@ export class Collection<
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
     };
-    const countCompiled = compileSelect(this.tableName, countState);
-    const matchingRows = await executeCompiledQuery<Record<string, unknown>>(
+    const countCompiled = compileSelect(this.ctx.contract, this.tableName, countState);
+    const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
-      this.ctx.contract,
       countCompiled,
-      { lane: 'orm-client' },
     ).toArray();
 
-    const compiled = compileUpdateCount(this.tableName, mappedData, this.state.filters);
-    await executeCompiledQuery<Record<string, unknown>>(
-      this.ctx.runtime,
-      this.ctx.contract,
-      compiled,
-      {
-        lane: 'orm-client',
-      },
-    ).toArray();
+    const compiled = compileUpdateCount(this.ctx.contract, this.tableName, mappedData, this.state.filters);
+    await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
 
     return matchingRows.length;
   }
@@ -842,7 +848,12 @@ export class Collection<
       this.state.selectedFields,
       parentJoinColumns,
     );
-    const compiled = compileDeleteReturning(this.tableName, this.state.filters, selectedForDelete);
+    const compiled = compileDeleteReturning(
+      this.ctx.contract,
+      this.tableName,
+      this.state.filters,
+      selectedForDelete,
+    );
     return dispatchMutationRows<Row>({
       contract: this.ctx.contract,
       runtime: this.ctx.runtime,
@@ -863,23 +874,14 @@ export class Collection<
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
     };
-    const countCompiled = compileSelect(this.tableName, countState);
-    const matchingRows = await executeCompiledQuery<Record<string, unknown>>(
+    const countCompiled = compileSelect(this.ctx.contract, this.tableName, countState);
+    const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
-      this.ctx.contract,
       countCompiled,
-      { lane: 'orm-client' },
     ).toArray();
 
-    const compiled = compileDeleteCount(this.tableName, this.state.filters);
-    await executeCompiledQuery<Record<string, unknown>>(
-      this.ctx.runtime,
-      this.ctx.contract,
-      compiled,
-      {
-        lane: 'orm-client',
-      },
-    ).toArray();
+    const compiled = compileDeleteCount(this.ctx.contract, this.tableName, this.state.filters);
+    await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
 
     return matchingRows.length;
   }

@@ -1,17 +1,26 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  ColumnRef,
-  IncludeAst,
-  OperationExpr,
+  Expression,
+  JoinAst,
+  ProjectionItem,
   TableRef,
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
+  createAndExpr,
+  createBinaryExpr,
   createColumnRef,
-  createJoinOnExpr,
+  createDerivedTableSource,
+  createJsonArrayAggExpr,
+  createJsonObjectEntry,
+  createJsonObjectExpr,
+  createJoin,
   createOrderByItem,
-  createTableRef,
+  createProjectionItem,
+  createSelectAstBuilder,
+  createTableSource,
+  createTrueExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
@@ -22,10 +31,7 @@ import type {
   NestedProjection,
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
-import {
-  extractBaseColumnRef,
-  isOperationExpr,
-} from '@prisma-next/sql-relational-core/utils/guards';
+import { extractBaseColumnRef, isOperationExpr } from '@prisma-next/sql-relational-core/utils/guards';
 import {
   errorChildProjectionMustBeSpecified,
   errorLimitMustBeNonNegativeInteger,
@@ -181,23 +187,45 @@ export class IncludeChildBuilderImpl<
   }
 }
 
-export function buildIncludeAst(
+function createJsonBuildObjectExpr(
+  rowAlias: string,
+  projectItems: ReadonlyArray<ProjectionItem>,
+): Expression {
+  if (projectItems.length === 0) {
+    throw new Error('include child projection must contain at least one field');
+  }
+
+  return createJsonObjectExpr(
+    projectItems.map((item) =>
+      createJsonObjectEntry(item.alias, createColumnRef(rowAlias, item.alias)),
+    ),
+  );
+}
+
+function createJsonAggExpr(
+  inputExpr: Expression,
+  orderBy?: ReadonlyArray<{ expr: Expression; dir: 'asc' | 'desc' }>,
+): Expression {
+  return createJsonArrayAggExpr(inputExpr, 'emptyArray', orderBy);
+}
+
+function buildIncludeOrderArtifacts(
   include: IncludeState,
-  contract: SqlContract<SqlStorage>,
-  paramsMap: Record<string, unknown>,
-  paramDescriptors: ParamDescriptor[],
-  paramValues: unknown[],
-): IncludeAst {
+  rowsAlias: string,
+): {
+  readonly childOrderBy: ReadonlyArray<{ expr: Expression; dir: 'asc' | 'desc' }> | undefined;
+  readonly hiddenOrderProjection: ReadonlyArray<ProjectionItem>;
+  readonly aggregateOrderBy: ReadonlyArray<{ expr: Expression; dir: 'asc' | 'desc' }> | undefined;
+} {
   const childOrderBy = include.childOrderBy
     ? (() => {
         const orderBy = include.childOrderBy as OrderBuilder<string, StorageColumn, unknown>;
         const orderExpr = orderBy.expr;
-        const expr: ColumnRef | OperationExpr = (() => {
+        const expr = (() => {
           if (isOperationExpr(orderExpr)) {
             const baseCol = extractBaseColumnRef(orderExpr);
             return createColumnRef(baseCol.table, baseCol.column);
           }
-          // orderExpr is ColumnBuilder - TypeScript can't narrow properly
           const colBuilder = orderExpr as { table: string; column: string };
           return createColumnRef(colBuilder.table, colBuilder.column);
         })();
@@ -205,6 +233,54 @@ export function buildIncludeAst(
       })()
     : undefined;
 
+  if (!childOrderBy || childOrderBy.length === 0) {
+    return {
+      childOrderBy: undefined,
+      hiddenOrderProjection: [],
+      aggregateOrderBy: undefined,
+    };
+  }
+
+  const hiddenOrderProjection = childOrderBy.map((orderItem, index) =>
+    createProjectionItem(`${include.alias}__order_${index}`, orderItem.expr),
+  );
+  const aggregateOrderBy = hiddenOrderProjection.map((projection, index) => {
+    const orderItem = childOrderBy[index];
+    if (!orderItem) {
+      throw new Error(`Missing include order metadata at index ${index}`);
+    }
+    return createOrderByItem(createColumnRef(rowsAlias, projection.alias), orderItem.dir);
+  });
+
+  return {
+    childOrderBy,
+    hiddenOrderProjection,
+    aggregateOrderBy,
+  };
+}
+
+function buildChildProjectionItems(include: IncludeState): ProjectionItem[] {
+  return include.childProjection.aliases.map((alias, idx) => {
+    const column = include.childProjection.columns[idx];
+    if (!column || !alias) {
+      errorMissingColumnForAlias(alias ?? 'unknown', idx);
+    }
+    return createProjectionItem(alias, column.toExpr());
+  });
+}
+
+export interface IncludeJoinArtifact {
+  readonly join: JoinAst;
+  readonly projection: ProjectionItem;
+}
+
+export function buildIncludeJoinArtifact(
+  include: IncludeState,
+  contract: SqlContract<SqlStorage>,
+  paramsMap: Record<string, unknown>,
+  paramDescriptors: ParamDescriptor[],
+  paramValues: unknown[],
+): IncludeJoinArtifact {
   let childWhere: WhereExpr | undefined;
   if (include.childWhere) {
     const whereResult = buildWhereExpr(
@@ -219,30 +295,48 @@ export function buildIncludeAst(
 
   const onLeft = include.on.left as { table: string; column: string };
   const onRight = include.on.right as { table: string; column: string };
-  const leftCol = createColumnRef(onLeft.table, onLeft.column);
-  const rightCol = createColumnRef(onRight.table, onRight.column);
-  const onExpr = createJoinOnExpr(leftCol, rightCol);
+  const onExpr = createBinaryExpr(
+    'eq',
+    createColumnRef(onLeft.table, onLeft.column),
+    createColumnRef(onRight.table, onRight.column),
+  );
+  const rowsWhere = childWhere ? createAndExpr([onExpr, childWhere]) : onExpr;
+
+  const childProjectItems = buildChildProjectionItems(include);
+  const rowsAlias = `${include.alias}__rows`;
+  const { childOrderBy, hiddenOrderProjection, aggregateOrderBy } = buildIncludeOrderArtifacts(
+    include,
+    rowsAlias,
+  );
+  const childRowsBuilder = createSelectAstBuilder(createTableSource(include.table.name)).project([
+    ...childProjectItems,
+    ...hiddenOrderProjection,
+  ]);
+  childRowsBuilder.where(rowsWhere);
+  if (childOrderBy) {
+    childRowsBuilder.orderBy(childOrderBy);
+  }
+  if (typeof include.childLimit === 'number') {
+    childRowsBuilder.limit(include.childLimit);
+  }
+
+  const aggregatedAlias = `${include.alias}_lateral`;
+  const jsonObjectExpr = createJsonBuildObjectExpr(rowsAlias, childProjectItems);
+  const jsonAggExpr = createJsonAggExpr(jsonObjectExpr, aggregateOrderBy);
+
+  const aggregateSelect = createSelectAstBuilder(
+    createDerivedTableSource(rowsAlias, childRowsBuilder.build()),
+  )
+    .project([createProjectionItem(include.alias, jsonAggExpr)])
+    .build();
 
   return {
-    kind: 'includeMany' as const,
-    alias: include.alias,
-    child: {
-      table: createTableRef(include.table.name),
-      on: onExpr,
-      ...(childWhere ? { where: childWhere } : {}),
-      ...(childOrderBy ? { orderBy: childOrderBy } : {}),
-      ...(typeof include.childLimit === 'number' ? { limit: include.childLimit } : {}),
-      project: include.childProjection.aliases.map((alias, idx) => {
-        const column = include.childProjection.columns[idx];
-        if (!column || !alias) {
-          errorMissingColumnForAlias(alias ?? 'unknown', idx);
-        }
-
-        return {
-          alias,
-          expr: column.toExpr(),
-        };
-      }),
-    },
+    join: createJoin(
+      'left',
+      createDerivedTableSource(aggregatedAlias, aggregateSelect),
+      createTrueExpr(),
+      true,
+    ),
+    projection: createProjectionItem(include.alias, createColumnRef(aggregatedAlias, include.alias)),
   };
 }

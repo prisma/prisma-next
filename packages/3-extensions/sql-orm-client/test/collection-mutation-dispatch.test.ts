@@ -1,4 +1,4 @@
-import type { CompiledQuery } from 'kysely';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import {
   dispatchMutationRows,
@@ -8,12 +8,21 @@ import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
 import { createMockRuntime, createTestContract } from './helpers';
 
-function makeCompiled(sqlText = 'select 1'): CompiledQuery<Record<string, unknown>> {
+function makeCompiled(sqlText = 'select 1'): SqlQueryPlan<Record<string, unknown>> {
   return {
-    queryId: {} as never,
-    sql: sqlText,
-    parameters: [],
-    query: {} as never,
+    ast: {
+      kind: 'select',
+      from: { kind: 'table', name: 'users' },
+      project: [{ alias: '_sql', expr: { kind: 'literal', value: sqlText } }],
+    },
+    params: [],
+    meta: {
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      lane: 'orm-client',
+      paramDescriptors: [],
+    },
   };
 }
 

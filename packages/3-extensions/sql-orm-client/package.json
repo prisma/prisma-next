@@ -20,8 +20,7 @@
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
-    "@prisma-next/utils": "workspace:*",
-    "kysely": "catalog:"
+    "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",

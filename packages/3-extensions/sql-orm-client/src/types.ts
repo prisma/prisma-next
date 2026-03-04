@@ -7,6 +7,7 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { RowSelection } from './collection-internal-types';
 
@@ -109,7 +110,9 @@ export type DefaultCollectionTypeState = {
 // ---------------------------------------------------------------------------
 
 export interface RuntimeScope {
-  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row>;
+  execute<Row = Record<string, unknown>>(
+    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): AsyncIterableResult<Row>;
 }
 
 export interface RuntimeConnection extends RuntimeScope {

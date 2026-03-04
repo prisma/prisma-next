@@ -7,10 +7,21 @@ import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
 export type Direction = 'asc' | 'desc';
 
-export interface TableRef {
+export interface TableSource {
   readonly kind: 'table';
   readonly name: string;
+  readonly alias?: string;
 }
+
+export type TableRef = TableSource;
+
+export interface DerivedTableSource {
+  readonly kind: 'derivedTable';
+  readonly alias: string;
+  readonly query: SelectAst;
+}
+
+export type FromSource = TableSource | DerivedTableSource;
 
 export interface ColumnRef {
   readonly kind: 'col';
@@ -29,6 +40,26 @@ export interface LiteralExpr {
   readonly value: unknown;
 }
 
+export interface SubqueryExpr {
+  readonly kind: 'subquery';
+  readonly query: SelectAst;
+}
+
+export interface JsonObjectExpr {
+  readonly kind: 'jsonObject';
+  readonly entries: ReadonlyArray<{
+    readonly key: string;
+    readonly value: Expression | LiteralExpr;
+  }>;
+}
+
+export interface JsonArrayAggExpr {
+  readonly kind: 'jsonArrayAgg';
+  readonly expr: Expression;
+  readonly onEmpty: 'null' | 'emptyArray';
+  readonly orderBy?: ReadonlyArray<OrderByItem>;
+}
+
 export interface OperationExpr {
   readonly kind: 'operation';
   readonly method: string;
@@ -43,7 +74,13 @@ export interface OperationExpr {
  * Unified expression type - the canonical AST representation for column references
  * and operation expressions. This is what all builders convert to via toExpr().
  */
-export type Expression = ColumnRef | OperationExpr;
+export type Expression =
+  | ColumnRef
+  | OperationExpr
+  | SubqueryExpr
+  | AggregateExpr
+  | JsonObjectExpr
+  | JsonArrayAggExpr;
 
 /**
  * Interface for any builder that can produce an Expression.
@@ -135,53 +172,68 @@ export type JoinOnExpr =
 export interface JoinAst {
   readonly kind: 'join';
   readonly joinType: 'inner' | 'left' | 'right' | 'full';
-  readonly table: TableRef;
+  readonly source: FromSource;
+  readonly lateral: boolean;
   readonly on: JoinOnExpr;
 }
 
-export interface IncludeRef {
-  readonly kind: 'includeRef';
-  readonly alias: string;
+export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
+
+export interface AggregateExpr {
+  readonly kind: 'aggregate';
+  readonly fn: AggregateFn;
+  readonly expr?: Expression;
 }
 
-export interface IncludeAst {
-  readonly kind: 'includeMany';
+export interface ProjectionItem {
   readonly alias: string;
-  readonly child: {
-    readonly table: TableRef;
-    readonly on: JoinOnExpr;
-    readonly where?: WhereExpr;
-    readonly orderBy?: ReadonlyArray<{ expr: Expression; dir: Direction }>;
-    readonly limit?: number;
-    readonly project: ReadonlyArray<{ alias: string; expr: Expression }>;
-  };
+  readonly expr: Expression | LiteralExpr;
+}
+
+export interface OrderByItem {
+  readonly expr: Expression;
+  readonly dir: Direction;
 }
 
 export interface SelectAst {
   readonly kind: 'select';
-  readonly from: TableRef;
+  readonly from: FromSource;
   readonly joins?: ReadonlyArray<JoinAst>;
-  readonly includes?: ReadonlyArray<IncludeAst>;
-  readonly project: ReadonlyArray<{
-    alias: string;
-    expr: Expression | IncludeRef | LiteralExpr;
-  }>;
+  readonly project: ReadonlyArray<ProjectionItem>;
   readonly where?: WhereExpr;
-  readonly orderBy?: ReadonlyArray<{ expr: Expression; dir: Direction }>;
+  readonly orderBy?: ReadonlyArray<OrderByItem>;
+  readonly distinct?: true;
+  readonly distinctOn?: ReadonlyArray<Expression>;
+  readonly groupBy?: ReadonlyArray<Expression>;
+  readonly having?: WhereExpr;
   readonly limit?: number;
+  readonly offset?: number;
   readonly selectAllIntent?: { table?: string };
+}
+
+export interface InsertOnConflictAst {
+  readonly columns: ReadonlyArray<ColumnRef>;
+  readonly action:
+    | {
+        readonly kind: 'doNothing';
+      }
+    | {
+        readonly kind: 'doUpdateSet';
+        readonly set: Record<string, ColumnRef | ParamRef>;
+      };
 }
 
 export interface InsertAst {
   readonly kind: 'insert';
-  readonly table: TableRef;
+  readonly table: TableSource;
   readonly values: Record<string, ColumnRef | ParamRef>;
+  readonly onConflict?: InsertOnConflictAst;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 
 export interface UpdateAst {
   readonly kind: 'update';
-  readonly table: TableRef;
+  readonly table: TableSource;
   readonly set: Record<string, ColumnRef | ParamRef>;
   readonly where?: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
@@ -189,7 +241,7 @@ export interface UpdateAst {
 
 export interface DeleteAst {
   readonly kind: 'delete';
-  readonly table: TableRef;
+  readonly table: TableSource;
   readonly where?: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }

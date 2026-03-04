@@ -1,6 +1,7 @@
 import type { ExecutionPlan, StorageHashBase } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { RuntimeQueryable } from '../src/types';
 
 // ---- helpers to build a minimal contract for tests ----
@@ -304,7 +305,7 @@ export function createTestContract(): TestContract {
 }
 
 export interface MockExecution {
-  plan: ExecutionPlan;
+  plan: ExecutionPlan | SqlQueryPlan<unknown>;
   rows: Record<string, unknown>[];
 }
 
@@ -322,9 +323,12 @@ export function createMockRuntime(): MockRuntime {
     setNextResults(results: Record<string, unknown>[][]) {
       nextResult = [...results];
     },
-    execute<Row>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row> {
+    execute<Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterableResult<Row> {
       const rows = (nextResult.shift() ?? []) as Row[];
-      executions.push({ plan: plan as ExecutionPlan, rows: rows as Record<string, unknown>[] });
+      executions.push({
+        plan: plan as ExecutionPlan | SqlQueryPlan<unknown>,
+        rows: rows as Record<string, unknown>[],
+      });
       const gen = async function* (): AsyncGenerator<Row, void, unknown> {
         for (const row of rows) {
           yield row;

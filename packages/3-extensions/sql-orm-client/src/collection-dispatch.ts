@@ -15,8 +15,8 @@ import {
   compileRelationSelect,
   compileSelect,
   compileSelectWithIncludeStrategy,
-} from './kysely-compiler';
-import { executeCompiledQuery } from './raw-compiled-query';
+} from './query-plan';
+import { executeQueryPlan } from './execute-query-plan';
 import type {
   CollectionContext,
   CollectionState,
@@ -35,10 +35,8 @@ export function dispatchCollectionRows<Row>(options: {
   const { contract, runtime, state, tableName } = options;
 
   if (state.includes.length === 0) {
-    const compiled = compileSelect(tableName, state);
-    const source = executeCompiledQuery<Record<string, unknown>>(runtime, contract, compiled, {
-      lane: 'orm-client',
-    });
+    const compiled = compileSelect(contract, tableName, state);
+    const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
     return mapResultRows(
       source,
       (rawRow) => mapStorageRowToModelFields(contract, tableName, rawRow) as Row,
@@ -94,6 +92,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
       const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
       const compiled = compileSelectWithIncludeStrategy(
+        contract,
         tableName,
         {
           ...state,
@@ -102,12 +101,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
         strategy,
       );
 
-      const parentRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
-        scope,
-        contract,
-        compiled,
-        { lane: 'orm-client' },
-      ).toArray();
+      const parentRowsRaw = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
       if (parentRowsRaw.length === 0) {
         return;
       }
@@ -162,16 +156,14 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
       const parentJoinColumns = state.includes.map((include) => include.parentPkColumn);
       const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
-      const parentCompiled = compileSelect(tableName, {
+      const parentCompiled = compileSelect(contract, tableName, {
         ...state,
         includes: [],
         selectedFields: parentSelectedForQuery,
       });
-      const parentRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+      const parentRowsRaw = await executeQueryPlan<Record<string, unknown>>(
         scope,
-        contract,
         parentCompiled,
-        { lane: 'orm-client' },
       ).toArray();
       if (parentRowsRaw.length === 0) {
         return;
@@ -340,6 +332,7 @@ async function resolveRowsByParent(
     augmentSelectionForJoinColumns(state.selectedFields, [include.fkColumn]);
 
   const childCompiled = compileRelationSelect(
+    contract,
     include.relatedTableName,
     include.fkColumn,
     parentJoinValues,
@@ -348,12 +341,7 @@ async function resolveRowsByParent(
       selectedFields: childSelectedForQuery,
     },
   );
-  const childRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
-    scope,
-    contract,
-    childCompiled,
-    { lane: 'orm-client' },
-  ).toArray();
+  const childRowsRaw = await executeQueryPlan<Record<string, unknown>>(scope, childCompiled).toArray();
   const childRows = childRowsRaw.map((row) =>
     createRowEnvelope(contract, include.relatedTableName, row),
   );
@@ -397,6 +385,7 @@ async function resolveScalarByParent(
   );
 
   const childCompiled = compileRelationSelect(
+    contract,
     include.relatedTableName,
     include.fkColumn,
     parentJoinValues,
@@ -406,12 +395,7 @@ async function resolveScalarByParent(
       includes: [],
     },
   );
-  const childRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
-    scope,
-    contract,
-    childCompiled,
-    { lane: 'orm-client' },
-  ).toArray();
+  const childRowsRaw = await executeQueryPlan<Record<string, unknown>>(scope, childCompiled).toArray();
 
   const rowsByParent = new Map<unknown, Record<string, unknown>[]>();
   for (const row of childRowsRaw) {

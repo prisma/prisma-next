@@ -2,25 +2,26 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AndExpr,
   BinaryExpr,
-  ColumnRef,
-  LiteralExpr,
   OrExpr,
   WhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
+import {
+  createAndExpr,
+  createBinaryExpr,
+  createColumnRef,
+  createLiteralExpr,
+  createNullCheckExpr,
+  createOrExpr,
+  createTrueExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ShorthandWhereFilter } from './types';
 
 export function and(...exprs: WhereExpr[]): AndExpr {
-  return {
-    kind: 'and',
-    exprs,
-  };
+  return createAndExpr(exprs);
 }
 
 export function or(...exprs: WhereExpr[]): OrExpr {
-  return {
-    kind: 'or',
-    exprs,
-  };
+  return createOrExpr(exprs);
 }
 
 export function not(expr: WhereExpr): WhereExpr {
@@ -28,15 +29,9 @@ export function not(expr: WhereExpr): WhereExpr {
     case 'bin':
       return negateBinary(expr);
     case 'and':
-      return {
-        kind: 'or',
-        exprs: expr.exprs.map(not),
-      };
+      return createOrExpr(expr.exprs.map(not));
     case 'or':
-      return {
-        kind: 'and',
-        exprs: expr.exprs.map(not),
-      };
+      return createAndExpr(expr.exprs.map(not));
     case 'exists':
       return {
         ...expr,
@@ -55,10 +50,7 @@ export function not(expr: WhereExpr): WhereExpr {
 }
 
 export function all(): WhereExpr {
-  return {
-    kind: 'and',
-    exprs: [],
-  };
+  return createTrueExpr();
 }
 
 export function shorthandToWhereExpr<
@@ -88,31 +80,14 @@ export function shorthandToWhereExpr<
     }
 
     const columnName = fieldToColumn[fieldName] ?? fieldName;
-    const left: ColumnRef = {
-      kind: 'col',
-      table: tableName,
-      column: columnName,
-    };
+    const left = createColumnRef(tableName, columnName);
 
     if (value === null) {
-      exprs.push({
-        kind: 'nullCheck',
-        expr: left,
-        isNull: true,
-      });
+      exprs.push(createNullCheckExpr(left, true));
       continue;
     }
 
-    const right: LiteralExpr = {
-      kind: 'literal',
-      value,
-    };
-    exprs.push({
-      kind: 'bin',
-      op: 'eq',
-      left,
-      right,
-    });
+    exprs.push(createBinaryExpr('eq', left, createLiteralExpr(value)));
   }
 
   if (exprs.length === 0) {
