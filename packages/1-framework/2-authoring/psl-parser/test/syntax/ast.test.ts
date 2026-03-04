@@ -531,3 +531,254 @@ describe('DocumentAst', () => {
     expect(decls[1]).toBeInstanceOf(EnumDeclarationAst);
   });
 });
+
+describe('EnumDeclarationAst', () => {
+  function buildEnum() {
+    const b = new GreenNodeBuilder();
+    b.startNode('EnumDeclaration');
+    b.token('Ident', 'enum');
+    b.token('Whitespace', ' ');
+    b.startNode('Identifier');
+    b.token('Ident', 'Role');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('LBrace', '{');
+    b.token('Newline', '\n');
+    b.token('Whitespace', '  ');
+    b.startNode('EnumValueDeclaration');
+    b.startNode('Identifier');
+    b.token('Ident', 'ADMIN');
+    b.finishNode();
+    b.finishNode();
+    b.token('Newline', '\n');
+    b.token('Whitespace', '  ');
+    b.startNode('EnumValueDeclaration');
+    b.startNode('Identifier');
+    b.token('Ident', 'USER');
+    b.finishNode();
+    b.finishNode();
+    b.token('Newline', '\n');
+    b.token('RBrace', '}');
+    return b.finishNode();
+  }
+
+  it('exposes keyword, name, braces', () => {
+    const root = createSyntaxTree(buildEnum());
+    const decl = EnumDeclarationAst.cast(root)!;
+    expect(decl.keyword()?.text).toBe('enum');
+    expect(decl.name()?.token()?.text).toBe('Role');
+    expect(decl.lbrace()?.text).toBe('{');
+    expect(decl.rbrace()?.text).toBe('}');
+  });
+
+  it('iterates values', () => {
+    const root = createSyntaxTree(buildEnum());
+    const decl = EnumDeclarationAst.cast(root)!;
+    const values = Array.from(decl.values());
+    expect(values).toHaveLength(2);
+    expect(values[0]!.name()?.token()?.text).toBe('ADMIN');
+    expect(values[1]!.name()?.token()?.text).toBe('USER');
+  });
+});
+
+describe('TypesBlockAst', () => {
+  function buildTypesBlock() {
+    const b = new GreenNodeBuilder();
+    b.startNode('TypesBlock');
+    b.token('Ident', 'type');
+    b.token('Whitespace', ' ');
+    b.token('LBrace', '{');
+    b.token('Newline', '\n');
+    b.token('Whitespace', '  ');
+    b.startNode('NamedTypeDeclaration');
+    b.startNode('Identifier');
+    b.token('Ident', 'UserId');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('Equals', '=');
+    b.token('Whitespace', ' ');
+    b.startNode('TypeAnnotation');
+    b.token('Ident', 'Int');
+    b.finishNode();
+    b.finishNode();
+    b.token('Newline', '\n');
+    b.token('RBrace', '}');
+    return b.finishNode();
+  }
+
+  it('exposes keyword, braces', () => {
+    const root = createSyntaxTree(buildTypesBlock());
+    const decl = TypesBlockAst.cast(root)!;
+    expect(decl.keyword()?.text).toBe('type');
+    expect(decl.lbrace()?.text).toBe('{');
+    expect(decl.rbrace()?.text).toBe('}');
+  });
+
+  it('iterates declarations', () => {
+    const root = createSyntaxTree(buildTypesBlock());
+    const decl = TypesBlockAst.cast(root)!;
+    const namedTypes = Array.from(decl.declarations());
+    expect(namedTypes).toHaveLength(1);
+    expect(namedTypes[0]!.name()?.token()?.text).toBe('UserId');
+  });
+});
+
+describe('NamedTypeDeclarationAst', () => {
+  function buildNamedType() {
+    const b = new GreenNodeBuilder();
+    b.startNode('NamedTypeDeclaration');
+    b.startNode('Identifier');
+    b.token('Ident', 'UserId');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('Equals', '=');
+    b.token('Whitespace', ' ');
+    b.startNode('TypeAnnotation');
+    b.startNode('Identifier');
+    b.token('Ident', 'Int');
+    b.finishNode();
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.startNode('FieldAttribute');
+    b.token('At', '@');
+    b.startNode('Identifier');
+    b.token('Ident', 'db');
+    b.finishNode();
+    b.finishNode();
+    return b.finishNode();
+  }
+
+  it('exposes name, equals, typeAnnotation, attributes', () => {
+    const root = createSyntaxTree(buildNamedType());
+    const decl = NamedTypeDeclarationAst.cast(root)!;
+    expect(decl.name()?.token()?.text).toBe('UserId');
+    expect(decl.equals()?.text).toBe('=');
+    expect(decl.typeAnnotation()?.name()?.token()?.text).toBe('Int');
+    const attrs = Array.from(decl.attributes());
+    expect(attrs).toHaveLength(1);
+    expect(attrs[0]!.name()?.token()?.text).toBe('db');
+  });
+});
+
+describe('BlockDeclarationAst', () => {
+  function buildBlock() {
+    const b = new GreenNodeBuilder();
+    b.startNode('BlockDeclaration');
+    b.token('Ident', 'datasource');
+    b.token('Whitespace', ' ');
+    b.startNode('Identifier');
+    b.token('Ident', 'db');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('LBrace', '{');
+    b.token('Newline', '\n');
+    b.token('Whitespace', '  ');
+    b.startNode('KeyValuePair');
+    b.startNode('Identifier');
+    b.token('Ident', 'provider');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('Equals', '=');
+    b.token('Whitespace', ' ');
+    b.startNode('StringLiteralExpr');
+    b.token('StringLiteral', '"postgresql"');
+    b.finishNode();
+    b.finishNode();
+    b.token('Newline', '\n');
+    b.token('RBrace', '}');
+    return b.finishNode();
+  }
+
+  it('exposes keyword, name, braces', () => {
+    const root = createSyntaxTree(buildBlock());
+    const decl = BlockDeclarationAst.cast(root)!;
+    expect(decl.keyword()?.text).toBe('datasource');
+    expect(decl.name()?.token()?.text).toBe('db');
+    expect(decl.lbrace()?.text).toBe('{');
+    expect(decl.rbrace()?.text).toBe('}');
+  });
+
+  it('iterates entries', () => {
+    const root = createSyntaxTree(buildBlock());
+    const decl = BlockDeclarationAst.cast(root)!;
+    const entries = Array.from(decl.entries());
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.key()?.token()?.text).toBe('provider');
+  });
+});
+
+describe('FieldDeclarationAst.attributes', () => {
+  it('iterates field attributes', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('FieldDeclaration');
+    b.startNode('Identifier');
+    b.token('Ident', 'id');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.startNode('TypeAnnotation');
+    b.token('Ident', 'Int');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.startNode('FieldAttribute');
+    b.token('At', '@');
+    b.startNode('Identifier');
+    b.token('Ident', 'id');
+    b.finishNode();
+    b.finishNode();
+    const root = createSyntaxTree(b.finishNode());
+    const field = FieldDeclarationAst.cast(root)!;
+    const attrs = Array.from(field.attributes());
+    expect(attrs).toHaveLength(1);
+    expect(attrs[0]!.name()?.token()?.text).toBe('id');
+  });
+});
+
+describe('FunctionCallAst', () => {
+  it('exposes name, parens, and args', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('FunctionCall');
+    b.startNode('Identifier');
+    b.token('Ident', 'autoincrement');
+    b.finishNode();
+    b.token('LParen', '(');
+    b.token('RParen', ')');
+    const root = createSyntaxTree(b.finishNode());
+    const fn = FunctionCallAst.cast(root)!;
+    expect(fn.name()?.token()?.text).toBe('autoincrement');
+    expect(fn.lparen()?.text).toBe('(');
+    expect(fn.rparen()?.text).toBe(')');
+    expect(Array.from(fn.args())).toHaveLength(0);
+  });
+});
+
+describe('ModelAttributeAst.argList', () => {
+  it('exposes argList with args', () => {
+    // @@unique([email])
+    const b = new GreenNodeBuilder();
+    b.startNode('ModelAttribute');
+    b.token('DoubleAt', '@@');
+    b.startNode('Identifier');
+    b.token('Ident', 'unique');
+    b.finishNode();
+    b.startNode('AttributeArgList');
+    b.token('LParen', '(');
+    b.startNode('AttributeArg');
+    b.startNode('ArrayLiteral');
+    b.token('LBracket', '[');
+    b.startNode('Identifier');
+    b.token('Ident', 'email');
+    b.finishNode();
+    b.token('RBracket', ']');
+    b.finishNode();
+    b.finishNode();
+    b.token('RParen', ')');
+    b.finishNode();
+    const root = createSyntaxTree(b.finishNode());
+    const attr = ModelAttributeAst.cast(root)!;
+    const argList = attr.argList();
+    expect(argList).toBeDefined();
+    expect(argList!.lparen()?.text).toBe('(');
+    const args = Array.from(argList!.args());
+    expect(args).toHaveLength(1);
+  });
+});
