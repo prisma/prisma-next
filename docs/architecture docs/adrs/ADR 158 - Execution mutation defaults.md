@@ -202,6 +202,6 @@ flowchart TD
 ## Related
 
 - ADR 021 — Contract Marker Storage
-- ADR 004 — Core Hash vs Profile Hash (this ADR proposes an evolution beyond that split)
+- ADR 004 — Storage Hash vs Profile Hash (this ADR proposes an evolution beyond that split)
 - ADR 155 — Driver/Codec boundary value representation and responsibilities (codecId-based compatibility reasoning)
 
