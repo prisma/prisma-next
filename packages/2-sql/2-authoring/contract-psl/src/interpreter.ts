@@ -558,7 +558,7 @@ function collectResolvedFields(
           if (length !== undefined) {
             descriptor = {
               codecId: 'pg/vector@1',
-              nativeType: `vector(${length})`,
+              nativeType: 'vector',
               typeParams: { length },
             };
           }
@@ -1160,12 +1160,12 @@ export function interpretPslDocumentToSqlContractIR(
       }
       namedTypeDescriptors.set(declaration.name, {
         codecId: 'pg/vector@1',
-        nativeType: `vector(${length})`,
-        typeRef: declaration.name,
+        nativeType: 'vector',
+        typeParams: { length },
       });
       builder = builder.storageType(declaration.name, {
         codecId: 'pg/vector@1',
-        nativeType: `vector(${length})`,
+        nativeType: 'vector',
         typeParams: { length },
       });
       continue;
