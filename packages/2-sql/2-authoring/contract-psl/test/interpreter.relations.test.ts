@@ -213,4 +213,38 @@ model Member {
       ]),
     );
   });
+
+  it('accepts Prisma relation map argument and records foreign key constraint name', () => {
+    const document = parsePslDocument({
+      schema: `model Team {
+  id Int @id @map("team_id")
+  members Member[]
+  @@map("org_team")
+}
+
+model Member {
+  id Int @id @map("member_id")
+  teamId Int @map("team_ref")
+  team Team @relation(fields: [teamId], references: [id], map: "team_member_team_ref_fkey")
+
+  @@map("team_member")
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = result.value.storage as unknown as {
+      readonly tables: Record<string, { readonly foreignKeys?: readonly unknown[] }>;
+    };
+    const memberTable = storage.tables['team_member'];
+    expect(memberTable).toBeDefined();
+    const fks = memberTable?.foreignKeys ?? [];
+    expect(fks.length).toBe(1);
+    expect(fks[0]).toMatchObject({ name: 'team_member_team_ref_fkey' });
+  });
 });

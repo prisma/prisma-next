@@ -290,6 +290,63 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     expect(sql).toContain('"duration" interval(6)');
   });
 
+  it('renders pgvector vector(N) column types in DDL', () => {
+    const planner = createPostgresMigrationPlanner();
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: coreHash('sha256:contract'),
+      profileHash: 'sha256:profile' as never,
+      storage: {
+        tables: {
+          documents: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              embedding: {
+                nativeType: 'vector',
+                codecId: 'pg/vector@1',
+                nullable: true,
+                typeParams: { length: 1536 },
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {
+        codecTypes: {},
+        operationTypes: {},
+      },
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      sources: {},
+    };
+
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+    const createTable = result.plan.operations.find((op) => op.id === 'table.documents');
+    expect(createTable).toBeDefined();
+    const sql = createTable?.execute[0]?.sql ?? '';
+    expect(sql).toContain('"embedding" vector(1536)');
+    expect(sql).not.toContain('"embedding" "vector(1536)"');
+  });
+
   it('skips dependency install when dependency already satisfied', () => {
     const planner = createPostgresMigrationPlanner();
     const frameworkComponents = [createFrameworkComponent()];
