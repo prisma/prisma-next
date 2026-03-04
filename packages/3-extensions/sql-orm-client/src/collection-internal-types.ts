@@ -108,7 +108,7 @@ export type IncludeRefinementValue<
 > = RefinedResult extends RowSelection<infer V>
   ? // IncludeScalar / IncludeCombine carry a final value that must not be
     // cardinality-wrapped; Collection carries a raw row that still needs it.
-    RefinedResult extends { readonly kind: string }
+    RefinedResult extends { readonly kind: 'includeScalar' | 'includeCombine' }
     ? V
     : IncludeRelationValue<TContract, ParentModelName, RelName, V>
   : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
