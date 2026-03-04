@@ -27,7 +27,7 @@ This demo includes two runtime implementations demonstrating different approache
 Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-liner client:
 
 - **Files**: `src/prisma/db.ts`, `src/main.ts`
-- **Contract source**: `src/prisma/contract.json` (emitted from `prisma/contract.ts`)
+- **Contract source**: `src/prisma/contract.json` (emitted from `prisma/schema.prisma`)
 - **Usage**: `pnpm start -- [command]`
 - **Benefits**:
   - Contract is validated and normalized at emit time
@@ -144,7 +144,8 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
 
 ## Key Files
 
-- `prisma/contract.ts` - Contract definition (source of truth)
+- `prisma/schema.prisma` - Prisma schema (source of truth for emitted workflow)
+- `prisma/contract.ts` - TypeScript contract (used by no-emit workflow)
 - `src/prisma/contract.json` - Emitted contract (emit workflow only)
 - `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
 - `src/prisma/db.ts` - One-liner Postgres client + query roots (emit workflow)
