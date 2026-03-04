@@ -1588,9 +1588,6 @@ importers:
       arktype:
         specifier: ^2.0.0
         version: 2.1.29
-      uniku:
-        specifier: ^0.0.12
-        version: 0.0.12
     devDependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
