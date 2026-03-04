@@ -152,6 +152,42 @@ describe('SyntaxNode.nextSibling / prevSibling', () => {
     expect(root.nextSibling).toBeUndefined();
     expect(root.prevSibling).toBeUndefined();
   });
+
+  it('navigates prevSibling from last child back', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    b.startNode('Identifier');
+    b.token('Ident', 'A');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.startNode('Identifier');
+    b.token('Ident', 'B');
+    b.finishNode();
+    const green = b.finishNode();
+    const root = createSyntaxTree(green);
+
+    // Get the last child node (Identifier "B")
+    const children = Array.from(root.children());
+    const lastNode = children[2]; // Identifier "B"
+    expect(lastNode).toBeInstanceOf(SyntaxNode);
+    if (lastNode instanceof SyntaxNode) {
+      const prev = lastNode.prevSibling;
+      expect(prev).toBeDefined();
+      expect(prev).not.toBeInstanceOf(SyntaxNode);
+      if (prev && !(prev instanceof SyntaxNode)) {
+        expect(prev.kind).toBe('Whitespace');
+      }
+    }
+  });
+});
+
+describe('SyntaxNode.textLength', () => {
+  it('returns total text length of the subtree', () => {
+    const source = 'model User {\n  id Int @id\n}';
+    const green = buildSampleTree();
+    const root = createSyntaxTree(green);
+    expect(root.textLength).toBe(source.length);
+  });
 });
 
 describe('SyntaxNode.ancestors', () => {
