@@ -24,6 +24,8 @@
 
 Prisma Next is a new data access layer for TypeScript that treats your database schema as a **verifiable contract**: not just a schema file. Instead of generating a heavy client, it emits lightweight types and a deterministic JSON contract, then gives you a composable query DSL at runtime.
 
+Read more about the vision in [The Next Evolution of Prisma ORM](https://www.prisma.io/blog/the-next-evolution-of-prisma-orm).
+
 ## Why Prisma Next?
 
 - **Lightweight generation**: Emit types and a contract JSON instead of a full client. No more waiting for codegen on every schema change.
