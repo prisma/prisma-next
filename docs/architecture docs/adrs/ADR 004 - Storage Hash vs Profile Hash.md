@@ -1,4 +1,4 @@
-# ADR 004 — Core Hash vs Profile Hash
+# ADR 004 — Storage Hash vs Profile Hash (formerly “core hash”)
 
 ## Context
 
@@ -10,41 +10,50 @@
 ## Decision
 
 - Split hashing into two layers
-- **coreHash**: hash of the meaningful schema and mappings that define rows and relations
-- **profileHash (pinned)**: contract-derived hash of declared capability profile and optional adapter pins that affect execution but not meaning
+- **storageHash** (previously referred to as “coreHash” in early docs): a deterministic hash of the contract’s `storage` section plus target headers
+- **profileHash (pinned)**: a deterministic hash of the contract’s declared capability requirements (`capabilities`) plus target headers
 - Store both in artifacts and in the database marker
-- Use coreHash for applicability of migrations and query verification
+- Use storageHash for applicability of migrations and plan verification
 - Use profileHash to enforce capability parity with the database marker; runtime compares equality to the marker, not a freshly computed runtime profile
 
 ## Details
 
-### What contributes to coreHash
+### What contributes to storageHash
 
-- Models, fields, and nullability
-- Relations and their join conditions
-- Storage shape: tables, columns, PK/UK/FK sets
-- Column logical type and semantic defaults (e.g., autoincrement, now)
-- Model↔storage mappings and rename hints that change meaning
+`storageHash` is computed from a canonicalized object that includes:
+
+- `schemaVersion`
+- `targetFamily`
+- `target`
+- `storage`
+
+It intentionally excludes `models`, `relations`, `capabilities`, `extensionPacks`, and `meta`.
 
 ### What contributes to profileHash
 
-- Index methods and fill factors
-- Constraint names and non-semantic identifiers
-- Execution capabilities and toggles (e.g., lateral, jsonAgg, vector)
-- Planner hints and non-semantic storage parameters
-- Collation or encoding when declared as physical preference, not when it changes the logical comparison semantics we rely on
+`profileHash` is computed from a canonicalized object that includes:
+
+- `schemaVersion`
+- `targetFamily`
+- `target`
+- `capabilities`
+
+It intentionally excludes `storage`, `models`, `relations`, `extensionPacks`, and `meta`.
 
 ### Emission and storage
 
-- Emitter produces `contract.json` and computes both hashes via canonicalization (including contract-declared capabilities for `profileHash`)
-- Database marker stores coreHash, profileHash, marker version, and a ledger of applied edges
+- Emitter produces `contract.json` and computes both hashes via canonicalization:
+  - `storageHash = sha256(canonicalize({ schemaVersion, targetFamily, target, storage }))`
+  - `profileHash = sha256(canonicalize({ schemaVersion, targetFamily, target, capabilities }))`
+- Database marker stores both hashes (plus optional diagnostic JSON and metadata)
+  - Note: the Postgres marker table column is still named `core_hash`, but it stores the **contract `storageHash`**
 - Migration edges store complete fromContract and toContract JSON alongside hashes
-- Runtime embeds coreHash into each Plan's meta and verifies on execute; it reads marker `profile_hash` and enforces equality with the contract's `profileHash`
+- Runtime embeds `storageHash` into each Plan's meta and verifies on execute; it reads marker `profile_hash` and enforces equality with the contract's `profileHash`
 - Preflight surfaces differences in both hashes with actionable guidance
 
 ### Behavior on mismatch
 
-#### coreHash mismatch
+#### storageHash mismatch
 - **Migrations**: edge is inapplicable and must be re-planned
 - **Runtime**: block or warn per environment policy
 
@@ -55,12 +64,10 @@
 
 ### Example changes and their effects
 
-- Add nullable column → new coreHash
-- Add GIN index on existing column → new profileHash only
-- Enable jsonAgg capability flag → new profileHash only
-- Change varchar(255) to text where semantics are identical for our purposes → profileHash only
-- Change column nullability → new coreHash
-- Change collation to one that alters comparison semantics we depend on → new coreHash
+- Add nullable column (DDL/storage changes) → new storageHash
+- Add an index (DDL/storage changes) → new storageHash
+- Enable a declared capability flag (capabilities change) → new profileHash
+- Change a physical storage attribute represented in `storage` → new storageHash
 
 ## Alternatives considered
 
@@ -87,7 +94,7 @@
 
 - Define canonicalization rules and implement both hashes in emitter
 - Persist both hashes in the database marker and artifacts
-- Runtime verification against coreHash and warnings for profileHash drift
+- Runtime verification against storageHash and errors for profileHash drift
 - Preflight diagnostics for both categories
 
 ### Out of scope for MVP
@@ -109,6 +116,6 @@
 
 ## Decision record
 
-- Adopt a two-layer hashing scheme with coreHash for meaning and profileHash for physical profile
-- Verify coreHash for applicability and safety, surface profileHash as drift with advisor guidance
+- Adopt a two-layer hashing scheme with storageHash for storage identity and profileHash for pinned capability profile
+- Verify storageHash for applicability and safety, surface profileHash drift with advisor guidance
 - Persist both in artifacts and database markers to support deterministic planning, safe execution, and platform insights
