@@ -13,6 +13,9 @@ coverage
 packages/e2e-tests/.tmp-output
 /wip
 .pnpm-store
+.cursor/rules
+.cursor/commands
+.cursor
 
 # Generated contract files in test fixtures
 test/**/fixtures/generated/

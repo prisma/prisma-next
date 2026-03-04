@@ -32,7 +32,6 @@ This prevents runtime mismatches (for example: a contract that declares extensio
 
 Commands that enforce wiring validation:
 - **`db verify`**
-- **`db introspect`** (when a contract is provided)
 - **`db sign`**
 - **`db init`**
 - **`db update`**
@@ -838,21 +837,150 @@ The `contract.output` field specifies the path to `contract.json`. This is the c
 - `contract.json`: Includes `_generated` metadata field indicating it's a generated artifact (excluded from canonicalization/hashing)
 - `contract.d.ts`: Includes warning header comments indicating it's a generated file
 
+### `prisma-next migration plan`
+
+Plan a migration from contract changes. Compares the emitted contract against the latest on-disk migration state and produces a new migration package with the required operations. No database connection is needed — fully offline.
+
+```bash
+prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+**Options:**
+- `--config <path>`: Path to `prisma-next.config.ts`
+- `--name <slug>`: Name slug for the migration directory (default: `migration`)
+- `--from <hash>`: Explicit starting contract hash (overrides latest chain leaf detection)
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `--timestamps`: Add timestamps to output
+
+**What it does:**
+1. Loads config and reads `contract.json` (the "to" contract)
+2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
+3. Reconstructs the migration chain and finds the leaf (current state)
+4. Diffs the leaf contract against the new contract using the target's migration planner (same planner as `db init`)
+5. Writes a new migration package (`migration.json` + `ops.json`) and attests the `migrationId`
+
+### `prisma-next migration show`
+
+Display a migration package's operations, DDL preview, and metadata. Accepts a directory path, a hash prefix (git-style matching against `migrationId`), or defaults to the latest migration.
+
+```bash
+prisma-next migration show [target] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+**Options:**
+- `[target]`: Migration directory path or migrationId hash prefix (defaults to latest)
+- `--config <path>`: Path to `prisma-next.config.ts`
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output
+- `--timestamps`: Add timestamps to output
+
+**What it does:**
+1. If `target` is a path (contains `/` or `\`), reads that directory directly
+2. If `target` is a hash prefix, scans all attested migrations and matches against `migrationId`
+3. If no target, defaults to the latest migration (chain leaf)
+4. Displays operations with operation class badges, destructive warnings, and DDL preview
+
+**Destructive warnings:** When a migration contains destructive operations (e.g., `DROP TABLE`, `ALTER COLUMN TYPE`), the output includes a prominent `⚠` warning about potential data loss.
+
+### `prisma-next migration status`
+
+Show the migration graph and applied status. Adapts based on context:
+
+- **With DB connection**: Shows applied/pending markers and "you are here" indicators
+- **Without DB connection**: Shows the graph structure from disk only
+
+```bash
+prisma-next migration status [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+**Options:**
+- `--db <url>`: Database connection string (enables online mode)
+- `--config <path>`: Path to `prisma-next.config.ts`
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output
+- `--timestamps`: Add timestamps to output
+
+**What it does:**
+1. Reads migration packages from disk and reconstructs the chain
+2. If a DB connection is available, reads the marker to determine applied/pending status
+3. Displays the graph as a linear chain with `◄ DB` and `◄ Contract` markers
+4. Shows operation summaries with destructive operation highlighting
+5. Falls back to offline mode if DB connection fails
+
+**Known limitation:** Branched migration graphs (multiple leaves) produce an error. Only linear chains are visualized.
+
+### `prisma-next migration apply`
+
+Apply planned migrations to the database. Executes previously planned migrations (created by `migration plan`). Compares the database marker against the migration chain to determine which migrations are pending, then executes them sequentially. Each migration runs in its own transaction. Does not plan new migrations — run `migration plan` first.
+
+```bash
+prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+**Options:**
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection`)
+- `--config <path>`: Path to `prisma-next.config.ts`
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `--timestamps`: Add timestamps to output
+
+**What it does:**
+1. Reads attested migration packages from `config.migrations.dir`
+2. Reconstructs the migration chain (skips drafts with `migrationId: null`)
+3. Reads the current contract hash from `contract.json`
+4. Connects to the database and reads the current marker hash
+5. Finds the path from the marker hash to the current contract hash
+6. Executes each pending migration in order using the target's `MigrationRunner`
+7. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
+8. After each migration, the runner verifies the schema and updates the marker/ledger
+
+**Config requirements:** Requires `driver` and `db.connection` (or `--db`). `migrations.dir` is optional and defaults to `migrations/`.
+
+**Resume semantics:** If a migration fails, previously applied migrations are preserved. Re-running `migration apply` resumes from the last successful migration.
+
+**Planning requirement:** `migration apply` now requires the current contract hash to exist in attested on-disk migrations. If the contract has changed and no migration was planned, apply exits with an error and asks you to run `migration plan`.
+
+### `prisma-next migration verify`
+
+Verify a migration package's integrity by recomputing the content-addressed `migrationId`.
+
+```bash
+prisma-next migration verify --dir <path>
+```
+
+- **Verified**: stored `migrationId` matches recomputed value
+- **Draft**: `migrationId` is null — automatically attests the package
+- **Mismatch**: package has been modified since attestation (command exits non-zero)
+
 ## Architecture
 
 ```mermaid
 flowchart TD
     CLI[CLI Entry Point]
-    CMD[Emit Command]
+    CMD_EMIT[Emit Command]
+    CMD_DB[DB Commands]
+    CMD_MIG[Migration Commands]
     LOAD[TS Contract Loader]
     EMIT[Emitter]
+    CTRL[Control Client]
+    MIG_TOOLS["@prisma-next/migration-tools"]
     FS[File System]
 
-    CLI --> CMD
-    CMD --> LOAD
+    CLI --> CMD_EMIT
+    CLI --> CMD_DB
+    CLI --> CMD_MIG
+    CMD_EMIT --> LOAD
     LOAD --> EMIT
-    EMIT --> CMD
-    CMD --> FS
+    CMD_DB --> CTRL
+    CMD_MIG --> CTRL
+    CMD_MIG --> MIG_TOOLS
+    MIG_TOOLS --> FS
+    CTRL --> FS
 ```
 
 ## Config Validation and Normalization
@@ -1010,6 +1138,8 @@ export default defineConfig({
 - **`commander`**: CLI argument parsing and command routing
 - **`esbuild`**: Bundling TypeScript contract files with import allowlisting
 - **`@prisma-next/emitter`**: Contract emission engine (returns strings)
+- **`@prisma-next/migration-tools`**: On-disk migration I/O, attestation, and chain reconstruction
+- **`@prisma-next/core-control-plane`**: Config types, migration operation types, error types, control plane stack
 
 ## Design Decisions
 
@@ -1117,22 +1247,26 @@ try {
 |--------|-------------|
 | `connect(url)` | Establishes database connection |
 | `close()` | Closes connection (idempotent) |
+| `readMarker()` | Reads contract marker from database (null if none) |
 | `verify(options)` | Verifies database marker matches contract |
 | `schemaVerify(options)` | Verifies database schema satisfies contract |
 | `sign(options)` | Writes contract marker to database |
 | `dbInit(options)` | Initializes database schema from contract |
 | `dbUpdate(options)` | Updates database schema to match contract |
+| `migrationApply(options)` | Applies pre-planned migration edges to database |
 | `introspect(options)` | Introspects database schema |
 
 ### Result Types
 
 Operations return structured result types:
 
+- `readMarker()` → `ContractMarkerRecord | null`
 - `verify()` → `VerifyDatabaseResult`
 - `schemaVerify()` → `VerifyDatabaseSchemaResult`
 - `sign()` → `SignDatabaseResult`
 - `dbInit()` → `Result<DbInitSuccess, DbInitFailure>` (uses Result pattern)
 - `dbUpdate()` → `Result<DbUpdateSuccess, DbUpdateFailure>` (uses Result pattern)
+- `migrationApply()` → `Result<MigrationApplySuccess, MigrationApplyFailure>` (uses Result pattern)
 - `introspect()` → Schema IR (family-specific)
 
 ### Error Handling
@@ -1165,6 +1299,11 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/commands/db-sign`**: Exports `createDbSignCommand`
 - **`@prisma-next/cli/commands/db-verify`**: Exports `createDbVerifyCommand`
 - **`@prisma-next/cli/commands/contract-emit`**: Exports `createContractEmitCommand`
+- **`@prisma-next/cli/commands/migration-plan`**: Exports `createMigrationPlanCommand`
+- **`@prisma-next/cli/commands/migration-show`**: Exports `createMigrationShowCommand`
+- **`@prisma-next/cli/commands/migration-status`**: Exports `createMigrationStatusCommand`
+- **`@prisma-next/cli/commands/migration-apply`**: Exports `createMigrationApplyCommand`
+- **`@prisma-next/cli/commands/migration-verify`**: Exports `createMigrationVerifyCommand`
 - **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
 
 **Important**: `loadContractFromTs` is exported from the main package (`@prisma-next/cli`). See `.cursor/rules/cli-package-exports.mdc` for import patterns.

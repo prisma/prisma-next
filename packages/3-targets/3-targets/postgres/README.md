@@ -19,6 +19,7 @@ Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI c
 - **Multi-Plane Support**: Provides both migration-plane (control) and runtime-plane entry points for the Postgres target
 - **Planner Factory**: Implements `migrations.createPlanner()` to create Postgres-specific migration planners
 - **Runner Factory**: Implements `migrations.createRunner()` to create Postgres-specific migration runners
+- **Contract-to-Schema**: Implements `migrations.contractToSchema()` which converts a contract's `SqlStorage` to `SqlSchemaIR` via the SQL family's `contractToSchemaIR`. Used by `migration plan` for offline planning without a database connection
 - **Schema Verification Normalization**: Normalizes Postgres default expressions (for example, `nextval(...)`, `now()`) when verifying the post-apply schema
 - **Postgres-Only Contract Extensions**: Defines Postgres-specific column defaults (e.g., sequences) used by the migration planner
 - **Generated Defaults Policy**: Treats client-generated defaults as non-DB defaults when emitting DDL

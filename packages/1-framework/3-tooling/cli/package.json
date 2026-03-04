@@ -25,6 +25,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0",
     "c12": "^3.3.2",
@@ -45,8 +46,8 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "@types/node": "catalog:",
     "@prisma-next/tsdown": "workspace:*",
+    "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -87,6 +88,26 @@
     "./commands/contract-emit": {
       "types": "./dist/commands/contract-emit.d.mts",
       "import": "./dist/commands/contract-emit.mjs"
+    },
+    "./commands/migration-plan": {
+      "types": "./dist/commands/migration-plan.d.mts",
+      "import": "./dist/commands/migration-plan.mjs"
+    },
+    "./commands/migration-show": {
+      "types": "./dist/commands/migration-show.d.mts",
+      "import": "./dist/commands/migration-show.mjs"
+    },
+    "./commands/migration-status": {
+      "types": "./dist/commands/migration-status.d.mts",
+      "import": "./dist/commands/migration-status.mjs"
+    },
+    "./commands/migration-verify": {
+      "types": "./dist/commands/migration-verify.d.mts",
+      "import": "./dist/commands/migration-verify.mjs"
+    },
+    "./commands/migration-apply": {
+      "types": "./dist/commands/migration-apply.d.mts",
+      "import": "./dist/commands/migration-apply.mjs"
     },
     "./config-loader": {
       "types": "./dist/config-loader.d.mts",

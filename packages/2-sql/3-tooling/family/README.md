@@ -16,6 +16,8 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
 - **Component Database Dependencies**: Consumes database dependencies declared by framework components (target/adapter/extension packs). Callers pass the active `frameworkComponents` list into planning/execution/verification; SQL layers structurally narrow to components that declare `databaseDependencies` and use their pure verification hooks (no fuzzy matching against `contract.extensionPacks`).
+- **Contract-to-SchemaIR Conversion**: Converts `SqlStorage` from a contract into `SqlSchemaIR` for offline migration planning, enabling `migration plan` to work without a database connection
+- **Destructive Change Detection**: Compares two `SqlStorage` values and identifies destructive changes (dropped tables/columns) for migration policy enforcement
 - **Storage Type Control Hooks**: Extracts codec-owned control hooks for planning/verification/introspection of `storage.types` without adding enum-specific fields to shared IR
 - **Codec Ownership**: Enforces a single owner per `codecId` for parameterized renderers and control-plane hooks to prevent ambiguous conflicts during assembly
 - **Parameterized Type Verification**: Expands contract `typeParams` into expected native type strings during schema verification and flags missing parameters as type mismatches
@@ -104,6 +106,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations
 - **`src/core/migrations/`**: Migration IR helpers plus planner and runner SPI types (`MigrationPlanner`, `MigrationRunner`, `SqlControlTargetDescriptor`). Runners return `MigrationRunnerResult` which is a union of success/failure.
+- **`src/core/migrations/contract-to-schema-ir.ts`**: `contractToSchemaIR(storage)` converts a contract's `SqlStorage` to `SqlSchemaIR` for offline migration planning (used by `migration plan` to synthesize the "from" schema without a database connection). Also exports `detectDestructiveChanges(from, to)` which compares two `SqlStorage` values and returns a list of destructive changes (dropped tables, dropped columns) for migration policy enforcement.
 
 ### Migration Runner Error Codes
 
