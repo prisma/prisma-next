@@ -2,6 +2,7 @@ import type {
   ContractSourceDiagnostics,
   ContractSourceProvider,
 } from '@prisma-next/config/config-types';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,
@@ -61,6 +62,7 @@ export interface ControlClientOptions {
 export type ControlActionName =
   | 'dbInit'
   | 'dbUpdate'
+  | 'migrationApply'
   | 'verify'
   | 'schemaVerify'
   | 'sign'
@@ -420,6 +422,95 @@ export interface EmitFailure {
 export type EmitResult = Result<EmitSuccess, EmitFailure>;
 
 // ============================================================================
+// Migration Apply Types
+// ============================================================================
+
+/**
+ * A pre-planned migration step ready for execution.
+ * Contains the manifest metadata and the serialized operations from ops.json.
+ */
+export interface MigrationApplyStep {
+  readonly dirName: string;
+  readonly from: string;
+  readonly to: string;
+  readonly toContract: unknown;
+  readonly operations: ReadonlyArray<{
+    readonly id: string;
+    readonly label: string;
+    readonly operationClass: string;
+    readonly [key: string]: unknown;
+  }>;
+}
+
+/**
+ * Options for the migrationApply operation.
+ */
+export interface MigrationApplyOptions {
+  /**
+   * Hash of the database state this apply path starts from.
+   * This is resolved by the caller (typically the CLI orchestration layer).
+   */
+  readonly originHash: string;
+  /**
+   * Hash of the target contract this apply path must reach.
+   * This is resolved by the caller (typically the CLI orchestration layer).
+   */
+  readonly destinationHash: string;
+  /**
+   * Ordered list of migrations to execute from originHash to destinationHash.
+   * The execution layer does not choose defaults; it only executes this explicit path.
+   */
+  readonly pendingMigrations: readonly MigrationApplyStep[];
+  /**
+   * Database connection. If provided, migrationApply will connect before executing.
+   * If omitted, the client must already be connected.
+   */
+  readonly connection?: unknown;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
+}
+
+/**
+ * Record of a successfully applied migration.
+ */
+export interface MigrationApplyAppliedEntry {
+  readonly dirName: string;
+  readonly from: string;
+  readonly to: string;
+  readonly operationsExecuted: number;
+}
+
+/**
+ * Successful migrationApply result.
+ */
+export interface MigrationApplySuccess {
+  readonly migrationsApplied: number;
+  readonly markerHash: string;
+  readonly applied: readonly MigrationApplyAppliedEntry[];
+  readonly summary: string;
+}
+
+/**
+ * Failure codes for migrationApply operation.
+ */
+export type MigrationApplyFailureCode = 'RUNNER_FAILED' | 'MIGRATION_PATH_NOT_FOUND';
+
+/**
+ * Failure details for migrationApply operation.
+ */
+export interface MigrationApplyFailure {
+  readonly code: MigrationApplyFailureCode;
+  readonly summary: string;
+  readonly why: string | undefined;
+  readonly meta: Record<string, unknown> | undefined;
+}
+
+/**
+ * Result type for migrationApply operation.
+ */
+export type MigrationApplyResult = Result<MigrationApplySuccess, MigrationApplyFailure>;
+
+// ============================================================================
 // Standalone Contract Emit Types
 // ============================================================================
 
@@ -546,6 +637,27 @@ export interface ControlClient {
    * @throws If not connected, target doesn't support migrations, or infrastructure failure
    */
   dbUpdate(options: DbUpdateOptions): Promise<DbUpdateResult>;
+
+  /**
+   * Reads the contract marker from the database.
+   * Returns null if no marker exists (fresh database).
+   *
+   * @throws If not connected or infrastructure failure
+   */
+  readMarker(): Promise<ContractMarkerRecord | null>;
+
+  /**
+   * Applies pre-planned on-disk migrations to the database.
+   * Each migration runs in its own transaction with full execution checks.
+   * Resume-safe: re-running after failure picks up from the last applied migration.
+   *
+   * @param options.originHash - Explicit source hash for the apply path
+   * @param options.destinationHash - Explicit destination hash for the apply path
+   * @param options.pendingMigrations - Ordered migrations to execute
+   * @returns Result pattern: Ok with applied details, NotOk with failure details
+   * @throws If not connected, target doesn't support migrations, or infrastructure failure
+   */
+  migrationApply(options: MigrationApplyOptions): Promise<MigrationApplyResult>;
 
   /**
    * Introspects the database schema.

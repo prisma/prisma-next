@@ -1,5 +1,10 @@
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { maskConnectionUrl, sanitizeErrorMessage } from '../../src/utils/command-helpers';
+import {
+  maskConnectionUrl,
+  resolveContractPath,
+  sanitizeErrorMessage,
+} from '../../src/utils/command-helpers';
 
 describe('maskConnectionUrl', () => {
   it('masks username and password in standard PostgreSQL URL', () => {
@@ -46,6 +51,23 @@ describe('maskConnectionUrl', () => {
     expect(masked).toContain('user=****');
     expect(masked).toContain('host=localhost');
     expect(masked).toContain('dbname=mydb');
+  });
+});
+
+describe('resolveContractPath', () => {
+  it('uses config.contract.output when provided', () => {
+    const result = resolveContractPath({ contract: { output: '/custom/path/contract.json' } });
+    expect(result).toBe(resolve('/custom/path/contract.json'));
+  });
+
+  it('falls back to src/prisma/contract.json when no output configured', () => {
+    const result = resolveContractPath({});
+    expect(result).toBe(resolve('src/prisma/contract.json'));
+  });
+
+  it('falls back when contract config exists but output is undefined', () => {
+    const result = resolveContractPath({ contract: {} });
+    expect(result).toBe(resolve('src/prisma/contract.json'));
   });
 });
 

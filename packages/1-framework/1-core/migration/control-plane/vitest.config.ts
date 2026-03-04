@@ -19,6 +19,7 @@ export default defineConfig({
         '**/*.config.ts',
         '**/exports/**',
         'src/types.ts', // Type-only re-exports
+        'src/constants.ts', // Constant definitions, no logic
         'src/migrations.ts', // Type-only migration interfaces
         'src/schema-view.ts', // Type-only schema view interfaces
         'src/emission/**', // Emission utilities - tested via emitter package

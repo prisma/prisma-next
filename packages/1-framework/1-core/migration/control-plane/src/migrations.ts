@@ -10,6 +10,7 @@
  */
 
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { Result } from '@prisma-next/utils/result';
 import type { ControlDriverInstance, ControlFamilyInstance } from './types';
 
@@ -48,6 +49,10 @@ export interface MigrationPlanOperation {
   /** The class of operation (additive, widening, destructive). */
   readonly operationClass: MigrationOperationClass;
 }
+
+// ============================================================================
+// Plan Types (Display-Oriented)
+// ============================================================================
 
 /**
  * A migration plan for display purposes.
@@ -252,4 +257,12 @@ export interface TargetMigrationsCapability<
 > {
   createPlanner(family: TFamilyInstance): MigrationPlanner<TFamilyId, TTargetId>;
   createRunner(family: TFamilyInstance): MigrationRunner<TFamilyId, TTargetId>;
+  /**
+   * Synthesizes a family-specific schema IR from a contract for offline planning.
+   * The returned schema can be passed to `planner.plan({ schema })` as the "from" state.
+   *
+   * @param contract - The contract to convert, or null for a new project (empty schema).
+   * @returns Family-specific schema IR (e.g., `SqlSchemaIR` for SQL targets).
+   */
+  contractToSchema(contract: ContractIR | null): unknown;
 }
