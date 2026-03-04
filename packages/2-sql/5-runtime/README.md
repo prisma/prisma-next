@@ -150,7 +150,7 @@ const runtime = createRuntime({
 The SQL runtime composes runtime-executor with SQL-specific implementations. Descriptors implement `SqlStaticContributions` so `ExecutionContext` can be derived from the descriptors-only stack without instantiation.
 
 1. **ExecutionStack**: Descriptors-only stack (from `@prisma-next/core-execution-plane`)
-2. **SqlStaticContributions**: Codecs, operation signatures, and parameterized codecs contributed by each descriptor
+2. **SqlStaticContributions**: Codecs, operation signatures, parameterized codecs, and mutation default generators contributed by each descriptor
 3. **ExecutionContext**: Built from contract + stack descriptors (no instantiation)
 4. **ExecutionStackInstance**: Instantiated components used at runtime for execution
 5. **SqlRuntime**: Wraps `RuntimeCore` and adds SQL-specific encoding/decoding
