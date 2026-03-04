@@ -60,17 +60,13 @@ export type IncludeRefinementTerminals =
 
 export type IncludeRefinementScalarMethods = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'combine';
 
-type OmitKeepSymbols<T, K extends string> = {
-  [P in keyof T as P extends K ? never : P]: T[P];
-};
-
 export type IncludeRefinementCollection<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
   Row,
   State extends CollectionTypeState,
   IsToMany extends boolean,
-> = OmitKeepSymbols<
+> = Omit<
   Collection<TContract, ModelName, Row, State>,
   IncludeRefinementTerminals | (IsToMany extends true ? never : IncludeRefinementScalarMethods)
 >;
