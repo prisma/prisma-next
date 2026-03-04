@@ -78,11 +78,11 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           else
             echo "No version provided, calculating..."
-            node scripts/determine-version.ts
+            bun scripts/determine-version.ts
           fi
 
       - name: Set package versions
-        run: node scripts/set-version.ts "${{ steps.version.outputs.version }}"
+        run: bun scripts/set-version.ts "${{ steps.version.outputs.version }}"
 
       - name: Build packages
         run: pnpm build
