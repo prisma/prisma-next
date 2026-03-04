@@ -146,6 +146,12 @@ type ModelRelationMetadata = {
   readonly childColumns: readonly string[];
 };
 
+type ResolvedModelEntry = {
+  readonly model: PslModel;
+  readonly mapping: ModelNameMapping;
+  readonly resolvedFields: readonly ResolvedField[];
+};
+
 function fkRelationPairKey(declaringModelName: string, targetModelName: string): string {
   // NOTE: We assume PSL model identifiers do not contain the `::` separator.
   return `${declaringModelName}::${targetModelName}`;
@@ -632,6 +638,145 @@ function compareStrings(left: string, right: string): -1 | 0 | 1 {
     return 1;
   }
   return 0;
+}
+
+function indexFkRelations(input: { readonly fkRelationMetadata: readonly FkRelationMetadata[] }): {
+  readonly modelRelations: Map<string, ModelRelationMetadata[]>;
+  readonly fkRelationsByPair: Map<string, FkRelationMetadata[]>;
+} {
+  const modelRelations = new Map<string, ModelRelationMetadata[]>();
+  const fkRelationsByPair = new Map<string, FkRelationMetadata[]>();
+
+  for (const relation of input.fkRelationMetadata) {
+    const existing = modelRelations.get(relation.declaringModelName);
+    const current = existing ?? [];
+    if (!existing) {
+      modelRelations.set(relation.declaringModelName, current);
+    }
+    current.push({
+      fieldName: relation.declaringFieldName,
+      toModel: relation.targetModelName,
+      toTable: relation.targetTableName,
+      cardinality: 'N:1',
+      parentTable: relation.declaringTableName,
+      parentColumns: relation.localColumns,
+      childTable: relation.targetTableName,
+      childColumns: relation.referencedColumns,
+    });
+
+    const pairKey = fkRelationPairKey(relation.declaringModelName, relation.targetModelName);
+    const pairRelations = fkRelationsByPair.get(pairKey);
+    if (!pairRelations) {
+      fkRelationsByPair.set(pairKey, [relation]);
+      continue;
+    }
+    pairRelations.push(relation);
+  }
+
+  return { modelRelations, fkRelationsByPair };
+}
+
+function applyBackrelationCandidates(input: {
+  readonly backrelationCandidates: readonly ModelBackrelationCandidate[];
+  readonly fkRelationsByPair: Map<string, readonly FkRelationMetadata[]>;
+  readonly modelRelations: Map<string, ModelRelationMetadata[]>;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}): void {
+  for (const candidate of input.backrelationCandidates) {
+    const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
+    const pairMatches = input.fkRelationsByPair.get(pairKey) ?? [];
+    const matches = candidate.relationName
+      ? pairMatches.filter((relation) => relation.relationName === candidate.relationName)
+      : [...pairMatches];
+
+    if (matches.length === 0) {
+      input.diagnostics.push({
+        code: 'PSL_ORPHANED_BACKRELATION_LIST',
+        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+        sourceId: input.sourceId,
+        span: candidate.field.span,
+      });
+      continue;
+    }
+    if (matches.length > 1) {
+      input.diagnostics.push({
+        code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
+        sourceId: input.sourceId,
+        span: candidate.field.span,
+      });
+      continue;
+    }
+
+    invariant(matches.length === 1, 'Backrelation matching requires exactly one match');
+    const matched = matches[0];
+    assertDefined(matched, 'Backrelation matching requires a defined relation match');
+
+    const existing = input.modelRelations.get(candidate.modelName);
+    const current = existing ?? [];
+    if (!existing) {
+      input.modelRelations.set(candidate.modelName, current);
+    }
+    current.push({
+      fieldName: candidate.field.name,
+      toModel: matched.declaringModelName,
+      toTable: matched.declaringTableName,
+      cardinality: '1:N',
+      parentTable: candidate.tableName,
+      parentColumns: matched.referencedColumns,
+      childTable: matched.declaringTableName,
+      childColumns: matched.localColumns,
+    });
+  }
+}
+
+function emitModelsWithRelations(input: {
+  readonly builder: DynamicContractBuilder;
+  readonly resolvedModels: ResolvedModelEntry[];
+  readonly modelRelations: Map<string, readonly ModelRelationMetadata[]>;
+}): DynamicContractBuilder {
+  let nextBuilder = input.builder;
+
+  const sortedModels = input.resolvedModels.sort((left, right) => {
+    const tableComparison = compareStrings(left.mapping.tableName, right.mapping.tableName);
+    if (tableComparison === 0) {
+      return compareStrings(left.model.name, right.model.name);
+    }
+    return tableComparison;
+  });
+
+  for (const entry of sortedModels) {
+    const relationEntries = [...(input.modelRelations.get(entry.model.name) ?? [])].sort(
+      (left, right) => compareStrings(left.fieldName, right.fieldName),
+    );
+    nextBuilder = nextBuilder.model(
+      entry.model.name,
+      entry.mapping.tableName,
+      (modelBuilder: DynamicModelBuilder) => {
+        let next = modelBuilder;
+        for (const resolvedField of entry.resolvedFields) {
+          next = next.field(resolvedField.field.name, resolvedField.columnName);
+        }
+        for (const relation of relationEntries) {
+          next = next.relation(relation.fieldName, {
+            toModel: relation.toModel,
+            toTable: relation.toTable,
+            cardinality: relation.cardinality,
+            on: {
+              parentTable: relation.parentTable,
+              parentColumns: relation.parentColumns,
+              childTable: relation.childTable,
+              childColumns: relation.childColumns,
+            },
+          });
+        }
+        return next;
+      },
+    );
+  }
+
+  return nextBuilder;
 }
 
 function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceDiagnostic[] {
@@ -1359,118 +1504,19 @@ export function interpretPslDocumentToSqlContractIR(
     });
   }
 
-  const modelRelations = new Map<string, ModelRelationMetadata[]>();
-  const fkRelationsByPair = new Map<string, FkRelationMetadata[]>();
-  for (const relation of fkRelationMetadata) {
-    const existing = modelRelations.get(relation.declaringModelName);
-    const current = existing ?? [];
-    if (!existing) {
-      modelRelations.set(relation.declaringModelName, current);
-    }
-    current.push({
-      fieldName: relation.declaringFieldName,
-      toModel: relation.targetModelName,
-      toTable: relation.targetTableName,
-      cardinality: 'N:1',
-      parentTable: relation.declaringTableName,
-      parentColumns: relation.localColumns,
-      childTable: relation.targetTableName,
-      childColumns: relation.referencedColumns,
-    });
-
-    const pairKey = fkRelationPairKey(relation.declaringModelName, relation.targetModelName);
-    const pairRelations = fkRelationsByPair.get(pairKey);
-    if (!pairRelations) {
-      fkRelationsByPair.set(pairKey, [relation]);
-      continue;
-    }
-    pairRelations.push(relation);
-  }
-
-  for (const candidate of backrelationCandidates) {
-    const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
-    const pairMatches = fkRelationsByPair.get(pairKey) ?? [];
-    const matches = candidate.relationName
-      ? pairMatches.filter((relation) => relation.relationName === candidate.relationName)
-      : [...pairMatches];
-
-    if (matches.length === 0) {
-      diagnostics.push({
-        code: 'PSL_ORPHANED_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
-        sourceId,
-        span: candidate.field.span,
-      });
-      continue;
-    }
-    if (matches.length > 1) {
-      diagnostics.push({
-        code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
-        sourceId,
-        span: candidate.field.span,
-      });
-      continue;
-    }
-
-    invariant(matches.length === 1, 'Backrelation matching requires exactly one match');
-    const matched = matches[0];
-    assertDefined(matched, 'Backrelation matching requires a defined relation match');
-
-    const existing = modelRelations.get(candidate.modelName);
-    const current = existing ?? [];
-    if (!existing) {
-      modelRelations.set(candidate.modelName, current);
-    }
-    current.push({
-      fieldName: candidate.field.name,
-      toModel: matched.declaringModelName,
-      toTable: matched.declaringTableName,
-      cardinality: '1:N',
-      parentTable: candidate.tableName,
-      parentColumns: matched.referencedColumns,
-      childTable: matched.declaringTableName,
-      childColumns: matched.localColumns,
-    });
-  }
-
-  const sortedModels = [...resolvedModels].sort((left, right) => {
-    const tableComparison = compareStrings(left.mapping.tableName, right.mapping.tableName);
-    if (tableComparison === 0) {
-      return compareStrings(left.model.name, right.model.name);
-    }
-    return tableComparison;
+  const { modelRelations, fkRelationsByPair } = indexFkRelations({ fkRelationMetadata });
+  applyBackrelationCandidates({
+    backrelationCandidates,
+    fkRelationsByPair,
+    modelRelations,
+    diagnostics,
+    sourceId,
   });
-
-  for (const entry of sortedModels) {
-    const relationEntries = [...(modelRelations.get(entry.model.name) ?? [])].sort((left, right) =>
-      compareStrings(left.fieldName, right.fieldName),
-    );
-    builder = builder.model(
-      entry.model.name,
-      entry.mapping.tableName,
-      (modelBuilder: DynamicModelBuilder) => {
-        let next = modelBuilder;
-        for (const resolvedField of entry.resolvedFields) {
-          next = next.field(resolvedField.field.name, resolvedField.columnName);
-        }
-        for (const relation of relationEntries) {
-          next = next.relation(relation.fieldName, {
-            toModel: relation.toModel,
-            toTable: relation.toTable,
-            cardinality: relation.cardinality,
-            on: {
-              parentTable: relation.parentTable,
-              parentColumns: relation.parentColumns,
-              childTable: relation.childTable,
-              childColumns: relation.childColumns,
-            },
-          });
-        }
-        return next;
-      },
-    );
-  }
+  builder = emitModelsWithRelations({
+    builder,
+    resolvedModels,
+    modelRelations,
+  });
 
   if (diagnostics.length > 0) {
     const dedupedDiagnostics = diagnostics.filter(
