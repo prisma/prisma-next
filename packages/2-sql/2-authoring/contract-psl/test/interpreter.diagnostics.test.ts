@@ -27,7 +27,7 @@ model Document {
       types: {
         Embedding1536: {
           codecId: 'pg/vector@1',
-          nativeType: 'vector(1536)',
+          nativeType: 'vector',
           typeParams: { length: 1536 },
         },
       },
@@ -53,7 +53,7 @@ model Document {
           columns: {
             embedding: {
               codecId: 'pg/vector@1',
-              nativeType: 'vector(1536)',
+              nativeType: 'vector',
               typeParams: { length: 1536 },
             },
           },
