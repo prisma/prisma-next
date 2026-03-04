@@ -32,7 +32,7 @@ Full semantic validation happens in target/family migration planners and runners
 
 ```mermaid
 graph TD
-    CLI["CLI commands<br/>(migration plan, apply, verify)"] --> IO["io.ts<br/>File I/O"]
+    CLI["CLI commands<br/>(migration plan, apply, verify, show, status)"] --> IO["io.ts<br/>File I/O"]
     CLI --> ATT["attestation.ts<br/>Migration attestation"]
     CLI --> DAG["dag.ts<br/>Chain operations"]
     IO --> TYPES["types.ts<br/>MigrationManifest, etc."]
