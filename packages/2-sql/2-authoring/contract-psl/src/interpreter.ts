@@ -14,6 +14,7 @@ import type {
   PslSpan,
 } from '@prisma-next/psl-parser';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
@@ -146,15 +147,8 @@ type ModelRelationMetadata = {
 };
 
 function fkRelationPairKey(declaringModelName: string, targetModelName: string): string {
+  // NOTE: We assume PSL model identifiers do not contain the `::` separator.
   return `${declaringModelName}::${targetModelName}`;
-}
-
-function fkRelationPairNameKey(
-  declaringModelName: string,
-  targetModelName: string,
-  relationName: string,
-): string {
-  return `${declaringModelName}::${targetModelName}::${relationName}`;
 }
 
 type ModelNameMapping = {
@@ -274,6 +268,8 @@ function unquoteStringLiteral(value: string): string {
 
 function parseQuotedStringLiteral(value: string): string | undefined {
   const trimmed = value.trim();
+  // This intentionally accepts either '...' or "..." and relies on PSL's
+  // own string literal rules to disallow unescaped interior delimiters.
   const match = trimmed.match(/^(['"])(.*)\1$/);
   if (!match) {
     return undefined;
@@ -1365,9 +1361,12 @@ export function interpretPslDocumentToSqlContractIR(
 
   const modelRelations = new Map<string, ModelRelationMetadata[]>();
   const fkRelationsByPair = new Map<string, FkRelationMetadata[]>();
-  const fkRelationsByPairAndName = new Map<string, FkRelationMetadata[]>();
   for (const relation of fkRelationMetadata) {
-    const current = modelRelations.get(relation.declaringModelName) ?? [];
+    const existing = modelRelations.get(relation.declaringModelName);
+    const current = existing ?? [];
+    if (!existing) {
+      modelRelations.set(relation.declaringModelName, current);
+    }
     current.push({
       fieldName: relation.declaringFieldName,
       toModel: relation.targetModelName,
@@ -1378,38 +1377,22 @@ export function interpretPslDocumentToSqlContractIR(
       childTable: relation.targetTableName,
       childColumns: relation.referencedColumns,
     });
-    modelRelations.set(relation.declaringModelName, current);
 
     const pairKey = fkRelationPairKey(relation.declaringModelName, relation.targetModelName);
-    const pairRelations = fkRelationsByPair.get(pairKey) ?? [];
-    pairRelations.push(relation);
-    fkRelationsByPair.set(pairKey, pairRelations);
-
-    if (relation.relationName) {
-      const pairNameKey = fkRelationPairNameKey(
-        relation.declaringModelName,
-        relation.targetModelName,
-        relation.relationName,
-      );
-      const pairNameRelations = fkRelationsByPairAndName.get(pairNameKey) ?? [];
-      pairNameRelations.push(relation);
-      fkRelationsByPairAndName.set(pairNameKey, pairNameRelations);
+    const pairRelations = fkRelationsByPair.get(pairKey);
+    if (!pairRelations) {
+      fkRelationsByPair.set(pairKey, [relation]);
+      continue;
     }
+    pairRelations.push(relation);
   }
 
   for (const candidate of backrelationCandidates) {
     const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
+    const pairMatches = fkRelationsByPair.get(pairKey) ?? [];
     const matches = candidate.relationName
-      ? [
-          ...(fkRelationsByPairAndName.get(
-            fkRelationPairNameKey(
-              candidate.targetModelName,
-              candidate.modelName,
-              candidate.relationName,
-            ),
-          ) ?? []),
-        ]
-      : [...(fkRelationsByPair.get(pairKey) ?? [])];
+      ? pairMatches.filter((relation) => relation.relationName === candidate.relationName)
+      : [...pairMatches];
 
     if (matches.length === 0) {
       diagnostics.push({
@@ -1430,12 +1413,15 @@ export function interpretPslDocumentToSqlContractIR(
       continue;
     }
 
+    invariant(matches.length === 1, 'Backrelation matching requires exactly one match');
     const matched = matches[0];
-    if (!matched) {
-      continue;
-    }
+    assertDefined(matched, 'Backrelation matching requires a defined relation match');
 
-    const current = modelRelations.get(candidate.modelName) ?? [];
+    const existing = modelRelations.get(candidate.modelName);
+    const current = existing ?? [];
+    if (!existing) {
+      modelRelations.set(candidate.modelName, current);
+    }
     current.push({
       fieldName: candidate.field.name,
       toModel: matched.declaringModelName,
@@ -1446,7 +1432,6 @@ export function interpretPslDocumentToSqlContractIR(
       childTable: matched.declaringTableName,
       childColumns: matched.localColumns,
     });
-    modelRelations.set(candidate.modelName, current);
   }
 
   const sortedModels = [...resolvedModels].sort((left, right) => {
