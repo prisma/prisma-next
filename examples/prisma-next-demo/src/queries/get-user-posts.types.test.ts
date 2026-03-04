@@ -1,4 +1,5 @@
 import type { Char } from '@prisma-next/adapter-postgres/codec-types';
+import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -6,9 +7,14 @@ import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
-import { expectTypeOf, test } from 'vitest';
+import { test } from 'vitest';
 import type { Contract } from '../prisma/contract.d';
 import contractJson from '../prisma/contract.json' with { type: 'json' };
+
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type Expect<T extends true> = T;
+type NotNever<T> = [T] extends [never] ? false : true;
 
 /**
  * Type test to verify that ResultType correctly infers number[] | null for nullable vector column.
@@ -37,11 +43,14 @@ test('ResultType correctly infers number[] | null for nullable embedding column'
 
   type Row = ResultType<typeof _plan>;
 
-  // Verify that embedding is correctly inferred as number[] | null (nullable vector column)
-  expectTypeOf<Row['embedding']>().toEqualTypeOf<number[] | null>();
-  expectTypeOf<Row['id']>().toEqualTypeOf<Char<36>>();
-  expectTypeOf<Row['title']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['userId']>().toEqualTypeOf<string>();
-  // Note: createdAt type depends on codec definition - checking it's not never
-  expectTypeOf<Row['createdAt']>().not.toEqualTypeOf<never>();
+  // Compile-time assertions
+  type Assertions = [
+    Expect<Equal<Row['embedding'], Vector<1536> | null>>,
+    Expect<Equal<Row['id'], Char<36>>>,
+    Expect<Equal<Row['title'], string>>,
+    Expect<Equal<Row['userId'], string>>,
+    Expect<NotNever<Row['createdAt']>>,
+  ];
+  const assertions = null as unknown as Assertions;
+  void assertions;
 });
