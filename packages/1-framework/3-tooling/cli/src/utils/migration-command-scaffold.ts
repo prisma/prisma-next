@@ -14,7 +14,7 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from './cli-errors';
-import { maskConnectionUrl } from './command-helpers';
+import { maskConnectionUrl, resolveContractPath } from './command-helpers';
 import type { GlobalFlags } from './global-flags';
 import { formatStyledHeader } from './output';
 import { createProgressAdapter } from './progress-adapter';
@@ -61,9 +61,7 @@ export async function prepareMigrationContext(
   const configPath = options.config
     ? relative(process.cwd(), resolve(options.config))
     : 'prisma-next.config.ts';
-  const contractPathAbsolute = config.contract?.output
-    ? resolve(config.contract.output)
-    : resolve('src/prisma/contract.json');
+  const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
   // Output header

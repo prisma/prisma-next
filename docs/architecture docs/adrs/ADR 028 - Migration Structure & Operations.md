@@ -144,7 +144,12 @@ migrations/
 }
 ```
 
-edgeId = sha256(canonicalize(migration.json without edgeId/signature) + canonicalize(ops.json) + canonicalize(fromContract) + canonicalize(toContract))
+edgeId = sha256(canonicalize([
+  sha256(canonicalize(migration.json without edgeId/signature)),
+  sha256(canonicalize(ops.json)),
+  sha256(canonicalize(fromContract)),
+  sha256(canonicalize(toContract))
+]))
 
 ### Edge attestation (hash and optional signature)
 

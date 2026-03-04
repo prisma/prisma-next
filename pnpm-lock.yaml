@@ -577,6 +577,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../migration
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../1-core/shared/utils
@@ -727,6 +730,40 @@ importers:
       eslint:
         specifier: ^9.0.0
         version: 9.39.2(jiti@2.6.1)
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/1-framework/3-tooling/migration:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-core/shared/contract
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../../1-core/migration/control-plane
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-core/shared/utils
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
+    devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
@@ -1785,6 +1822,9 @@ importers:
       '@prisma-next/ids':
         specifier: workspace:*
         version: link:../../packages/1-framework/2-authoring/ids
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/3-tooling/migration
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/shared/operations

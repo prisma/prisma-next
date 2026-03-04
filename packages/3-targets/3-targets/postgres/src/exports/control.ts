@@ -1,3 +1,5 @@
+import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   ControlTargetInstance,
   MigrationPlanner,
@@ -7,6 +9,8 @@ import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
+import { contractToSchemaIR } from '@prisma-next/family-sql/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
@@ -16,17 +20,16 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
   {
     ...postgresTargetDescriptorMeta,
     operationSignatures: () => [],
-    /**
-     * Migrations capability for CLI to access planner/runner via core types.
-     * The SQL-specific planner/runner types are compatible with the generic
-     * MigrationPlanner/MigrationRunner interfaces at runtime.
-     */
     migrations: {
       createPlanner(_family: SqlControlFamilyInstance) {
         return createPostgresMigrationPlanner() as MigrationPlanner<'sql', 'postgres'>;
       },
       createRunner(family) {
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
+      },
+      contractToSchema(contract: ContractIR | null) {
+        const storage = contract ? (contract.storage as SqlStorage) : { tables: {} };
+        return contractToSchemaIR(storage, expandParameterizedNativeType);
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {

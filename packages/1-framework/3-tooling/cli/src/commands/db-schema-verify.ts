@@ -15,7 +15,11 @@ import {
   errorJsonFormatNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { maskConnectionUrl, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  maskConnectionUrl,
+  resolveContractPath,
+  setCommandDescriptions,
+} from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -54,9 +58,7 @@ async function executeDbSchemaVerifyCommand(
   const configPath = options.config
     ? relative(process.cwd(), resolve(options.config))
     : 'prisma-next.config.ts';
-  const contractPathAbsolute = config.contract?.output
-    ? resolve(config.contract.output)
-    : resolve('src/prisma/contract.json');
+  const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
   // Output header

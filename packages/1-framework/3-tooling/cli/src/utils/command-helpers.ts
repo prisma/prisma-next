@@ -1,4 +1,5 @@
 import type { Command } from 'commander';
+import { resolve } from 'pathe';
 
 const longDescriptions = new WeakMap<Command, string>();
 
@@ -44,6 +45,16 @@ export interface MigrationCommandOptions {
   readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+}
+
+/**
+ * Resolves the absolute path to contract.json from the config.
+ * Centralises the fallback logic shared by every command that reads the contract.
+ */
+export function resolveContractPath(config: { contract?: { output?: string } }): string {
+  return config.contract?.output
+    ? resolve(config.contract.output)
+    : resolve('src/prisma/contract.json');
 }
 
 /**

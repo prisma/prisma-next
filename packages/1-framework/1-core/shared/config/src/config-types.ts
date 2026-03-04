@@ -77,6 +77,13 @@ export interface PrismaNextConfig<
    * Required for emit command; optional for other commands that only read artifacts.
    */
   readonly contract?: ContractConfig;
+  /**
+   * Migration configuration. Controls where on-disk migration packages are stored.
+   */
+  readonly migrations?: {
+    /** Directory for migration packages, relative to config file. Defaults to 'migrations'. */
+    readonly dir?: string;
+  };
 }
 
 /**
@@ -93,6 +100,10 @@ const ContractConfigSchema = type({
  * Arktype schema for PrismaNextConfig validation.
  * Note: This validates structure only. Descriptor objects (family, target, adapter) are validated separately.
  */
+const MigrationsConfigSchema = type({
+  'dir?': 'string',
+});
+
 const PrismaNextConfigSchema = type({
   family: 'unknown', // ControlFamilyDescriptor - validated separately
   target: 'unknown', // ControlTargetDescriptor - validated separately
@@ -101,6 +112,7 @@ const PrismaNextConfigSchema = type({
   'driver?': 'unknown', // ControlDriverDescriptor - validated separately (optional)
   'db?': 'unknown',
   'contract?': ContractConfigSchema,
+  'migrations?': MigrationsConfigSchema,
 });
 
 /**
