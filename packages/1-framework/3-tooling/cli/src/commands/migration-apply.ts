@@ -221,6 +221,15 @@ async function executeMigrationApplyCommand(
           }),
         );
       }
+    } catch (error) {
+      if (CliStructuredError.is(error)) {
+        return notOk(error);
+      }
+      return notOk(
+        errorUnexpected(error instanceof Error ? error.message : String(error), {
+          why: `Unexpected error during migration apply: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+      );
     } finally {
       await client.close();
     }
