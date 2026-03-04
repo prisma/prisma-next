@@ -1,25 +1,31 @@
-// This is illustrative only. The actual contract is in prisma/contract.ts.
-
-generator client {
-  provider = "prisma-client-js"
+types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
 }
 
-datasource db {
-  provider = "postgresql"
+enum user_type {
+  admin
+  user
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
+  id        String    @id @default(uuid())
+  email     String
+  createdAt DateTime  @default(now())
+  kind      user_type
   posts     Post[]
+
+  @@map("user")
 }
 
 model Post {
-  id        String   @id @default(uuid())
+  id        String        @id @default(uuid())
   title     String
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
+  embedding Embedding1536?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("post")
 }
 
