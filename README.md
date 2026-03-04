@@ -1,599 +1,201 @@
-# Prisma Next
 
-Define your data layer as a verifiable contract. Sign your database and application with the contract to guarantee compatibility. Plan and apply migrations to safely evolve your schema.
 
-## What Is This?
+[Docs](https://www.prisma.io/docs)  |  [Discord](https://pris.ly/discord)  |  [X](https://twitter.com/prisma)  |  [Blog](https://www.prisma.io/blog)  |  [Architecture](./ARCHITECTURE.md)
 
-Prisma Next is a new production data access layer that replaces traditional ORMs with a "contract-first" approach. It follows a similar workflow to Prisma ORM but with key differences:
+---
 
-- **Defines your database schema as a verifiable contract** (not just a schema)
-- **Generates lightweight types instead of heavy client code**
-- **Uses a composable DSL for queries instead of generated methods**
-- **Supports extension packs for domain-specific capabilities** (vector search, geospatial, etc.)
-- **Works seamlessly with AI coding assistants** (machine-readable, composable APIs)
+> **In Development (Not a Product Release)**: Prisma Next is an active engineering project and a public look at where Prisma is heading. It is not ready for production  yet: APIs will change, and it’s not recommended for production use.
+>
+> Prisma 7 remains the recommended version of Prisma for production applications.
 
-**Think of it as**: "An ORM designed for agentic workflows: with guardrails and verifications, tight feedback loops and simple, deterministic operations."
+## Prisma Next at a glance
 
-## Docs
+- **A TypeScript rewrite of Prisma ORM**: Rebuilt end-to-end to unlock new capabilities and a more composable architecture.
+- **Extensible by default**: Add extension packs in `prisma-next.config.ts` to unlock new schema attributes and new query capabilities.
+- **Two query APIs**:
+  - **ORM Client** (`db.orm`): model collections with fluent `where/include/select` composition
+  - **Query builder** (`db.sql`): type-safe SQL plan builder for when you want lower-level control
+- **Designed for AI-assisted workflows**: deterministic contracts, structured plans, stable diagnostics, and guardrails that help agents (and humans) iterate safely.
 
-- Start here: [`docs/README.md`](docs/README.md)
-- Agent/human onboarding entrypoint: [`AGENTS.md`](AGENTS.md)
+Read the announcement blog post: [The Next Evolution of Prisma ORM](https://pris.ly/pn-anouncement).
 
-## Quick Demo
+## Designed for AI-assisted workflows
 
-```bash
-# 1. Clone and install
-git clone <repo>
-cd prisma-next
-pnpm install && pnpm build
+Prisma Next is built for agent-assisted development:
 
-# 2. Start database
-pnpx prisma dev
+- **Fast, predictable feedback**: type-state APIs and capability checks catch mistakes early
+- **Machine-readable artifacts**: contracts, query plans, and diagnostics are structured data
+- **Guardrails you can compose**: plugins can enforce budgets, policies, and telemetry
 
-# 3. Set up and run the demo
-cd examples/prisma-next-demo
+## Schema as a contract
 
-# Create .env file with your database connection
-echo 'DATABASE_URL=<tcp string from prisma dev>' > .env
+In Prisma Next, your schema becomes a **verifiable contract**: a deterministic artifact (`contract.json` + TypeScript types) that describes which models, tables, and fields exist.
 
-# Emit the contract (generates contract.json and contract.d.ts)
-pnpm emit
+That contract is used to:
 
-# Seed the database
-pnpm seed
+- **Verify at runtime**: detect schema drift before a query runs
+- **Type your queries**: keep results and query operators fully type-safe
+- **Power tooling + agents**: contracts, plans, and diagnostics are structured data—easy to inspect, diff, and reason about
 
-# Run example queries
-pnpm start -- users 10           # Get users with limit
-pnpm start -- user 1             # Get user by ID
-pnpm start -- users-with-posts   # Get users with nested posts
-pnpm start -- budget-violation   # Demonstrate budget enforcement
+For architecture details, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-# Or run the integration tests
-pnpm test
-```
+## Quick example
 
-What you'll see: Type-safe queries, contract verification, budget enforcement, and vector similarity search in action.
-
-## Why This Matters
-
-### 1. IR + Types Replace the Client as Source of Truth
-- Deterministic JSON contract plus TypeScript types replace heavy runtime codegen
-- Open, inspectable artifacts; no opaque generated methods
-
-### 2. Machine‑Readable by Design
-- Contract JSON is consumable by tools/agents
-- Hashes enable verification and drift detection
-
-### 3. Composable DSL Instead of Generated Client
-- Write queries inline with a minimal DSL (`sql().from(...).select(...)`)
-- Plans are verifiable and transparent; no hidden multi‑query behaviors
-
-### 4. Future‑Oriented Architecture
-- Extension packs, capability gating, and plugin guardrails
-- Safer migrations and runtime checks built on the contract
-
-## Motivation
-
-Prisma's current ORM architecture tightly couples three layers — the Prisma Schema Language (PSL), the generated client, and runtime execution. This coupling introduces rigidity, rebuild cost, and conceptual opacity.
-
-Prisma Next rethinks Prisma's data layer around a **contract-first model**, where the schema is a stable, versioned artifact describing the database structure — not fuel for codegen, but a data contract.
-
-## Agent-Accessible Design
-
-Modern developer agents (Cursor, Windsurf, v0.dev) increasingly read, reason about, and modify codebases. For a data access layer to be truly idiomatic in this environment, it must be:
-
-- **Machine-navigable**: Understandable through static analysis without executing code
-- **Composable**: Usable as an API surface agents can call directly or generate code against
-- **Predictable**: Deterministic output with no hidden side effects or black-box codegen
-
-The existing Prisma ORM is opaque to agents because schema → client codegen hides SQL semantics and many behaviors are runtime-generated.
-
-Prisma Next addresses these shortcomings:
-
-1. **PSL as explicit contract**: The IR is a deterministic JSON artifact — machine-readable, diffable, and stable
-2. **Stable query DSL**: Queries are typed, composable ASTs that agents can statically analyze or synthesize
-3. **Runtime integration surface**: Structured hooks around compile/execute events for verification, profiling, and policy enforcement
-4. **Structured plans**: Every query results in a Plan object with AST, referenced columns, and contract hash
-
-Agents can read the schema (IR), generate valid queries (DSL), and verify them (runtime) — all through open, structured artifacts with no black-box client to reverse engineer.
-
-## Core Goals
-
-### 1. Contract-First Architecture
-- PSL defines a verifiable data contract, not just a schema
-- IR includes `contractHash` to cryptographically tie all artifacts to a specific schema version
-- Single source of truth for query validation, policy enforcement, and compatibility
-
-### 2. Composable Query Layer
-- Replace monolithic generated client with runtime-compiled query DSL (`@prisma/sql`)
-- Queries written inline in TypeScript, compiled to SQL ASTs at runtime
-- Dialect-agnostic design supports multiple targets (Postgres, MySQL, SQLite) without regeneration
-
-### 3. Modular Package Architecture
-- `@prisma/relational-ir`: Schema contract definition and validation
-- `@prisma/sql`: Query builder and SQL compiler
-- `@prisma/runtime`: Execution engine with plugin hooks
-- Each package evolves independently and composes cleanly
-
-### 4. Runtime Query Compilation
-- Only PSL → IR → Types emission happens at build time
-- Query compilation at runtime enables interactive development without client regeneration
-- Verifiable Plans include metadata: referenced tables, columns, dialect, and contract hash
-
-### 5. Extensible Plugin Framework
-- First-class hook system for Plan lifecycle events (`beforeCompile`, `afterExecute`, `onError`)
-- Composable linting, telemetry, query budgets, and policy enforcement
-- No entanglement with core runtime logic
-
-### 6. Type-Safe Query Shapes
-- Result types derived from schema IR and explicit `select()` projection
-- Correct nullability handling for left joins and nullable relations
-- Type system ensures queries are both safe and accurate
-
-
-## Architectural Design in docs/
-
-The `docs/` directory contains the complete architectural design for Prisma Next. Use it to understand the long‑term model (data contract, plan model, runtime plugin framework, adapters, packs, migration plane).
-
-This repository implements the initial production version; some details still differ from the full design:
-
-- Hashing: the current implementation uses a single `contractHash`. In the design, this corresponds to `storageHash`; optional `executionHash` (execution defaults) and `profileHash` (capability pinning) are not implemented here.
-- CLI: use `pnpm exec prisma-next generate schema.psl -o .prisma`. Some design docs reference different CLI verbs.
-- Scope: migrations and ORM features are intentionally minimal in this release; the design includes richer planner/runner and extension packs.
-
-Start with the [Architecture Overview](./docs/Architecture%20Overview.md) for a description of the design's goals and subsystems involved.
-
-## Side‑by‑Side Comparison
-
-| Feature | Prisma ORM | Prisma Next | Why It Matters |
-|----------|-------------|------------|----------------|
-| Schema Model | Codegen for runtime client | Contract IR + TypeScript types | Verifiable, inspectable schema |
-| Code Generation | Heavy, runtime-bound | Minimal, build-time only | Faster iterations |
-| Query Interface | Generated methods | Composable DSL | Transparent, flexible |
-| Machine Readability | Opaque client code | Structured IR JSON | Tool/agent-friendly |
-| Verification | None | Contract hash + runtime checks | Drift detection |
-| Extensibility | Monolithic client | Plugin and hook system | Guardrails and budgets |
-| Migration Logic | Sequential scripts | Contract-based, deterministic | Reproducible |
-
-## Workflow Comparison
-
-**Prisma ORM Workflow:**
-1. Write `schema.prisma`
-2. Run `prisma generate` → generates executable client code
-3. Write application code using generated methods: `prisma.user.findMany()`
-
-**Prisma Next Workflow:**
-1. Write `schema.psl`
-2. Run `prisma-next contract emit` → generates lightweight types + contract
-  - In the future this will likely be replaced by a Vite plugin or equivalent
-3. Write application code using composable DSL: `sql().from(t.user).select(...)`
-
-Key difference: Prisma Next emits types and a contract rather than generating an executable client.
-
-## Clean Architecture Layers
-
-Prisma Next follows Clean Architecture principles, organizing packages by **Domains → Layers → Planes**:
-
-- **Domains**: Framework (target-agnostic) vs target families (SQL, document, etc.)
-- **Layers**: Core → Authoring → Targets → Lanes → Runtime Core → Family Runtime → Adapters
-- **Planes**: Migration (authoring, tooling, targets) vs Runtime (lanes, runtime, adapters)
-
-### Layer Structure
-
-Dependencies flow downward (toward core); lateral dependencies within the same layer are permitted:
-
-```
-Core → Authoring → Targets → Lanes → Runtime Core → Family Runtime → Adapters
-         (lateral deps allowed within each layer)
-```
-
-### Layer Diagram
-
-```mermaid
-graph LR
-  Core[Core] --> Authoring
-  Authoring --> Targets
-  Targets --> Lanes
-  Lanes --> RuntimeCore[Runtime Core]
-  RuntimeCore --> FamilyRuntime[Family Runtime]
-  FamilyRuntime --> Adapters
-
-  %% lateral relationships (same layer) shown as loops
-  Core --> Core
-  Authoring --> Authoring
-  Targets --> Targets
-  Lanes --> Lanes
-  RuntimeCore --> RuntimeCore
-  FamilyRuntime --> FamilyRuntime
-  Adapters --> Adapters
-
-  style Core fill:#e1f5ff,stroke:#01579b,stroke-width:2px
-  style Authoring fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-  style Targets fill:#fff3e0,stroke:#e65100,stroke-width:2px
-  style Lanes fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
-  style RuntimeCore fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-  style FamilyRuntime fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-  style Adapters fill:#e0f2f1,stroke:#004d40,stroke-width:2px
-```
-
-For detailed information about package layering, see:
-- [ADR 140 - Package Layering & Target-Family Namespacing](docs/architecture%20docs/adrs/ADR%20140%20-%20Package%20Layering%20&%20Target-Family%20Namespacing.md)
-- [Package Layering Guide](docs/architecture%20docs/Package-Layering.md)
-
-## Packages
-
-### Framework Domain (Target-Agnostic)
-
-- **`@prisma-next/contract`** - Core contract types (`ContractBase`, `Source`)
-- **`@prisma-next/plan`** - Plan helpers, diagnostics, and shared errors
-- **`@prisma-next/operations`** - Target-neutral operation registry and capability helpers
-- **`@prisma-next/contract-authoring`** - TS builders, canonicalization, schema DSL
-- **`@prisma-next/cli`** - CLI tooling for contract emission
-- **`@prisma-next/emitter`** - Contract emission engine
-- **`@prisma-next/runtime-executor`** - Target-agnostic execution engine (verification, plugin lifecycle, telemetry)
-
-### SQL Family Domain
-
-- **`@prisma-next/sql-contract-ts`** - SQL-specific TypeScript contract authoring surface
-- **`@prisma-next/sql-contract`** - SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
-- **`@prisma-next/sql-operations`** - SQL-specific operation definitions and assembly
-- **`@prisma-next/sql-contract-emitter`** - SQL emitter hook implementation
-- **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types
-- **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers
-- **`@prisma-next/sql-lane-query-builder`** - Query builder lane
-- **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-executor with SQL adapters
-- **`@prisma-next/adapter-postgres`** - Postgres adapter implementation
-- **`@prisma-next/driver-postgres`** - Postgres driver (low-level connection)
-
-### Test Packages (located in `test/` directory)
-
-- **`@prisma-next/integration-tests`** - Integration tests that verify end-to-end flows across packages (located at `test/integration/`)
-- **`@prisma-next/e2e-tests`** - End-to-end tests using the CLI to emit contracts and execute queries against a real database (located at `test/e2e/framework/`)
-- **`@prisma-next/test-utils`** - Shared test utilities for all test suites (located at `test/utils/`)
-
-## Quick Start
-
-**First time here?** Start with the Quick Demo above, then explore the example app.
-
-### Prerequisites
-- Node.js 24.13.0 (managed via `mise` + `.tool-versions`)
-- pnpm 9.x
-- PostgreSQL (for running the example)
-
-To set up Node locally with `mise`:
-```bash
-curl https://mise.run | sh
-echo 'eval "$($HOME/.local/bin/mise activate zsh)"' >> "$HOME/.zshrc"
-mise install
-```
-
-### Installation & Setup
-
-```bash
-# Install Node from .tool-versions
-mise install
-
-# Install dependencies and build
-pnpm install && pnpm build
-
-# Start PostgreSQL (Docker)
-docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:15
-
-# Create database table
-psql -h localhost -U postgres -c "CREATE TABLE \"user\" (id SERIAL PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, active BOOLEAN DEFAULT true, \"createdAt\" TIMESTAMP DEFAULT NOW());"
-
-# Run the example
-cd examples/prisma-next-demo
-pnpm emit && pnpm seed && pnpm start -- users 10
-```
-
-## Common Commands
-
-### All Packages
-
-**Tests:**
-- `pnpm test` - Run all tests via Turbo
-- `pnpm test:all` - Run all test suites explicitly (packages → examples → integration → e2e)
-- `pnpm test:packages` - Test only source packages (excludes examples and test suites)
-- `pnpm test:examples` - Test only example apps
-- `pnpm test:integration` - Test only integration tests
-- `pnpm test:e2e` - Test only e2e tests
-- `pnpm test:coverage` - Run tests with coverage
-- `pnpm coverage:packages` - Coverage for packages only (excludes examples and test suites)
-
-**Type Checking:**
-- `pnpm typecheck` - Type check all packages
-- `pnpm typecheck:packages` - Type check packages only
-- `pnpm typecheck:examples` - Type check examples only
-- `pnpm typecheck:all` - Alias for typecheck (includes examples)
-
-**Linting:**
-- `pnpm lint` - Lint all packages
-- `pnpm lint:packages` - Lint packages only
-- `pnpm lint:examples` - Lint examples only
-- `pnpm lint:all` - Alias for lint
-
-**Build:**
-- `pnpm build` - Build all packages
-
-### Specific Package
-
-Run commands for a specific package using pnpm's filter:
-
-- `pnpm --filter <package-name> test` - Test specific package
-- `pnpm --filter <package-name> test:coverage` - Run tests with coverage for specific package
-- `pnpm --filter <package-name> typecheck` - Typecheck specific package
-- `pnpm --filter <package-name> lint` - Lint specific package
-
-**Examples:**
-```bash
-pnpm --filter @prisma-next/sql-query test
-pnpm --filter @prisma-next/sql-query test:coverage
-pnpm --filter @prisma-next/sql-query typecheck
-pnpm --filter @prisma-next/sql-query lint
-```
-
-## Usage Example
-
-### 1. Define Schema (schema.psl)
+**1. Define your schema:**
 
 ```prisma
+// schema.psl
 model User {
-  id        Int        @id @default(autoincrement())
-  email     String     @unique
-  active    Boolean    @default(true)
-  createdAt DateTime   @default(now())
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String?
 }
 ```
 
-### 2. Generate Contract and Types
+**2. Emit the contract:**
 
 ```bash
-# Using CLI
-pnpm exec prisma-next generate schema.psl -o .prisma
-
-# Or programmatically
-import { parse } from '@prisma/psl';
-import { emitContractAndTypes } from '@prisma/schema-emitter';
-
-const ast = parse(pslContent);
-const { contract, contractTypes } = await emitContractAndTypes(ast);
+prisma-next contract emit schema.psl -o .prisma
+# Generates: .prisma/contract.json + .prisma/contract.d.ts
 ```
 
-### 3. Build Type-Safe Queries
+**3. Query with full type safety:**
 
 ```typescript
-import { sql, makeT } from '@prisma/sql';
-import { createRuntime } from '@prisma/runtime';
-import contract from './.prisma/contract.json' assert { type: 'json' };
-
-// Create runtime with contract verification
-const runtime = createRuntime({
-  ir: contract,
-  driver: postgresDriver,
-  verify: 'onFirstUse'
-});
-
-// Type-safe query with Column objects
-const t = makeT(contract);
-
-const query = sql()
-  .from('user')
-  .where(t.user.active.eq(true))
-  .select({ id: t.user.id, email: t.user.email });
-
-// Return type is inferred as Array<{ id: number; email: string }>
-const results = await runtime.execute(query);
-```
-
-### 4. Runtime Plugin System
-
-```typescript
-import { lint } from '@prisma/runtime/plugins';
-
-// Add guardrails as composable plugins
-const runtime = createRuntime({
-  ir: contract,
-  driver: postgresDriver,
-  plugins: [
-    lint({
-      rules: {
-        'no-select-star': 'error',
-        'mutation-requires-where': 'error',
-        'no-missing-limit': 'warn'
-      }
-    })
-  ]
-});
-```
-
-## Type Safety Features
-
-### Column-Based API
-
-The query builder uses Column objects that provide type-safe field access and automatic type inference:
-
-```typescript
-// Type-safe field access: t.user.id has type Column<number>
-// Type-safe expressions: t.user.active.eq(true) returns Expression<boolean>
-// Automatic type inference: Select results are typed based on Column types
-
-const activeUsers = sql()
-  .from('user')
-  .where(t.user.active.eq(true))
-  .select({ id: t.user.id, email: t.user.email });
-// Returns: Array<{ id: number; email: string }>
-```
-
-### Generated Artifacts
-
-The schema emitter generates:
-
-```typescript
-// Generated contract.d.ts
-export interface User {
-  id: number;
-  email: string;
-  active?: boolean;
-  createdAt?: Date;
-}
-
-export const t: Tables = {
-  user: {
-    id: { table: 'user', name: 'id', eq: (value: number) => ... },
-    email: { table: 'user', name: 'email', eq: (value: string) => ... },
-    // ... other fields
-  }
-};
-```
-
-```json
-// Generated contract.json
-{
-  "version": 3,
-  "target": "postgres",
-  "contractHash": "sha256:abc123...",
-  "tables": {
-    "user": {
-      "columns": {
-        "id": { "type": "int4", "pk": true },
-        "email": { "type": "text", "unique": true },
-        "active": { "type": "bool", "default": true },
-        "createdAt": { "type": "timestamp", "default": "now()" }
-      }
-    }
-  }
-}
-```
-
-## Testing
-
-```bash
-# Test all packages
-pnpm test
-
-# Test specific package
-cd packages/sql && pnpm test
-
-# Example app tests
-cd examples/prisma-next-demo && pnpm test
-# Or run example queries
-cd examples/prisma-next-demo && pnpm start -- users 10
-```
-
-## Troubleshooting
-
-### Build Errors
-```bash
-# Clean and rebuild
-rm -rf node_modules packages/*/node_modules
-pnpm install
-pnpm build
-```
-
-### Migration Issues
-```bash
-# Reset everything and start fresh
-cd examples/prisma-next-demo
-# Drop and recreate tables manually, then:
-pnpm seed
-```
-
-### Type Errors
-```bash
-# Regenerate contract and types
-cd examples/prisma-next-demo
-pnpm emit
-pnpm typecheck
-```
-
-Integration tests spin up PostgreSQL, create tables, execute type-safe queries, and verify return types and error handling.
-
-## CI/CD
-
-The repository uses GitHub Actions for continuous integration. The workflow runs on every push and pull request and includes:
-
-- **Type checking** - TypeScript type checking for all packages and examples
-- **Linting** - ESLint validation for all packages and examples
-- **Build** - Builds all packages
-- **Tests** - Runs unit and integration tests (requires Postgres)
-- **E2E Tests** - Runs end-to-end tests (requires Postgres)
-- **Coverage** - Generates and reports test coverage (requires Postgres)
-
-All jobs run in parallel where possible for faster feedback. See `.github/workflows/ci.yml` for the complete workflow configuration.
-
-## Development
-
-### Project Structure
-
-```
-prisma-next/
-├── packages/
-│   ├── relational-ir/     # IR types and validators
-│   ├── psl/               # PSL parser and CLI
-│   ├── schema-emitter/    # AST → IR + TypeScript generation
-│   ├── sql/               # Query builder and SQL compiler
-│   └── runtime/           # Database runtime
-├── examples/
-│   ├── prisma-next-demo/  # Native Prisma Next demo with integration tests
-│   └── prisma-orm-demo/   # Prisma ORM compatibility layer demo
-```
-
-### Available Scripts
-
-See the [Common Commands](#common-commands) section above for a complete list of available commands for running tests, typechecks, and lints across all packages or specific packages.
-
-Key commands:
-- `pnpm build` - Build all packages
-- `pnpm test` - Run all tests
-- `pnpm typecheck` - Type check all packages
-- `pnpm lint` - Lint all packages
-
-## API Reference
-
-### Query Builder
-
-```typescript
-// Create a query builder
-const query = sql().from('tableName');
-
-// Add conditions and select fields
-query.where(t.table.column.eq(value))
-     .select({ alias: t.table.column })
-     .orderBy('column', 'ASC')
-     .limit(10);
-
-// Execute with runtime
-const results = await runtime.execute(query);
-```
-
-### Column Expressions
-
-```typescript
-// Equality and comparison
-t.user.id.eq(1)
-t.user.id.gt(5)
-t.user.id.lt(10)
-t.user.email.ne('test@example.com')
-
-// Membership
-t.user.id.in([1, 2, 3])
-```
-
-### Runtime Connection
-
-Use `postgres()` from `@prisma-next/postgres/runtime` for the one-liner client, or compose manually:
-
-```typescript
-import postgres from '@prisma-next/postgres/runtime';
-import type { Contract } from './contract.d';
-import contractJson from './contract.json' with { type: 'json' };
+import postgres from '@prisma-next/postgres/runtime'
+import type { Contract } from './.prisma/contract.d'
+import contractJson from './.prisma/contract.json' with { type: 'json' }
 
 const db = postgres<Contract>({
   contractJson,
-  url: process.env.DATABASE_URL!,
-});
+  url: process.env['DATABASE_URL']!,
+})
 
-const runtime = await db.runtime();
-const results = await Array.fromAsync(runtime.execute(query));
+const users = await db.orm.users
+  .select('id', 'email')
+  .take(10)
+  .all()
+
+// users: Array<{ id: number; email: string }>
 ```
+
+`all()` returns an async-iterable result, so you can also stream:
+
+```typescript
+for await (const user of db.orm.users.select('id', 'email').all()) {
+  // process(user)
+}
+```
+
+## Query APIs
+
+### ORM Client (`db.orm`)
+
+Use the ORM Client for model-centric queries, relation traversal, and model-level writes.
+
+### Query builder (`db.sql`)
+
+When you want lower-level control, use the type-safe query builder to assemble a plan and execute it through the runtime:
+
+```typescript
+const plan = db.sql
+  .from(db.schema.tables.user)
+  .select({
+    id: db.schema.tables.user.columns.id,
+    email: db.schema.tables.user.columns.email,
+  })
+  .limit(10)
+  .build()
+
+const rows = await db.runtime().execute(plan).toArray()
+```
+
+## Extensibility (extension packs)
+
+Prisma Next is designed to be extended. Add an extension pack in `prisma-next.config.ts`, and you can use it in your schema and your queries.
+
+For example, enabling `pgvector` makes the `@pgvector.*` schema attributes and vector query operators available:
+
+```ts
+// prisma-next.config.ts
+import { defineConfig } from '@prisma-next/cli/config-types'
+import pgvector from '@prisma-next/extension-pgvector/control'
+
+export default defineConfig({
+  // ...
+  extensionPacks: [pgvector],
+})
+```
+
+```prisma
+model Document {
+  id        Int    @id
+  title     String
+  embedding Bytes  @pgvector.column(length: 1536)
+}
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 24 LTS (or newer)
+- pnpm
+- PostgreSQL
+
+### Try the demo
+
+```bash
+git clone https://github.com/prisma/prisma-next.git
+cd prisma-next
+pnpm install && pnpm build
+
+cd examples/prisma-next-demo
+# Create .env with your DATABASE_URL, then:
+pnpm emit && pnpm seed && pnpm start
+```
+
+## How It Works
+
+Prisma Next follows a three-step **contract-first** workflow:
+
+1. **Define** your schema in PSL (Prisma Schema Language)
+2. **Emit** a deterministic contract (JSON) and TypeScript types: no executable code generated
+3. **Query** using either `db.orm` (ORM Client) or `db.sql` (query builder), verified against the contract
+
+The contract is the single source of truth. It's diffable, hashable, and machine-readable. Your app, your migrations, and your tools all reference the same artifact.
+
+For a deep dive into the architecture, package organization, and design decisions, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+## Status
+
+Prisma Next is in development. Here's what to expect:
+
+
+| Area                    | Status   |
+| ----------------------- | -------- |
+| Schema definition (PSL) | Working* |
+| Contract emission       | Working* |
+| SQL query DSL           | Working* |
+| ORM-style queries       | Working* |
+| Postgres adapter        | Working* |
+| Plugin system           | Working* |
+| Migrations              | Minimal  |
+| MySQL / SQLite          | Not yet  |
+
+
+(*) Working, but not feature-complete or production-ready.
+
+APIs are subject to breaking changes.
+
+## Community
+
+- **Discord**: Join the conversation at [pris.ly/discord](https://pris.ly/discord)
+- **X**: Follow [@prisma](https://twitter.com/prisma) for updates
+- **Blog**: Read about our journey at [prisma.io/blog](https://www.prisma.io/blog)
+
+Prisma Next is not open to external contributions at this time. See [CONTRIBUTORS.md](./CONTRIBUTORS.md) for details. We plan to open contributions in the future: star and watch this repo to stay in the loop.
+
+## License
+
+Prisma Next is licensed under [Apache 2.0](./LICENSE).
