@@ -100,10 +100,10 @@ export function errorAmbiguousLeaf(leaves: readonly string[]): MigrationToolsErr
   });
 }
 
-export function errorNoLeaf(nodes: readonly string[]): MigrationToolsError {
-  return new MigrationToolsError('MIGRATION.NO_LEAF', 'Migration graph has no leaf', {
-    why: `No root migration found in the migration graph (nodes: ${nodes.join(', ')}). Every migration references a parentMigrationId that does not exist, or the graph is empty.`,
-    fix: 'Inspect the migrations directory for corrupted migration.json files. Each migration must have a valid parentMigrationId (or null for the first migration).',
+export function errorNoRoot(nodes: readonly string[]): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.NO_ROOT', 'Migration graph has no root', {
+    why: `No root migration found in the migration graph (nodes: ${nodes.join(', ')}). Every migration references a parentMigrationId that does not exist, or the graph contains a cycle in parent pointers.`,
+    fix: 'Inspect the migrations directory for corrupted migration.json files. Exactly one migration must have parentMigrationId set to null (the first migration).',
     details: { nodes },
   });
 }

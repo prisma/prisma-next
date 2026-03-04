@@ -2,7 +2,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import {
   errorAmbiguousLeaf,
   errorDuplicateMigrationId,
-  errorNoLeaf,
+  errorNoRoot,
   errorSelfLoop,
 } from './errors';
 import type { MigrationChainEntry, MigrationGraph, MigrationPackage } from './types';
@@ -79,7 +79,7 @@ export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry 
 
   const roots = graph.childrenByParentId.get(null);
   if (!roots || roots.length === 0) {
-    throw errorNoLeaf([...graph.nodes].sort());
+    throw errorNoRoot([...graph.nodes].sort());
   }
 
   if (roots.length > 1) {
@@ -88,7 +88,7 @@ export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry 
 
   let current = roots[0];
   if (!current) {
-    throw errorNoLeaf([...graph.nodes].sort());
+    throw errorNoRoot([...graph.nodes].sort());
   }
 
   for (let depth = 0; depth < graph.migrationById.size + 1 && current; depth++) {
@@ -106,7 +106,7 @@ export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry 
     current = children[0];
   }
 
-  throw errorNoLeaf([...graph.nodes].sort());
+  throw errorNoRoot([...graph.nodes].sort());
 }
 
 /**

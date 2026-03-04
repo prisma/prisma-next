@@ -168,7 +168,7 @@ describe('findLeaf', () => {
     }
   });
 
-  it('errors with MIGRATION.NO_LEAF when no root edges exist', () => {
+  it('errors with MIGRATION.NO_ROOT when no root edges exist', () => {
     const p1 = pkg('A', 'B', 'm1', 'sha256:nonexistent');
     const graph = reconstructGraph([p1]);
     try {
@@ -177,7 +177,7 @@ describe('findLeaf', () => {
     } catch (e) {
       expect(MigrationToolsError.is(e)).toBe(true);
       const mte = e as MigrationToolsError;
-      expect(mte.code).toBe('MIGRATION.NO_LEAF');
+      expect(mte.code).toBe('MIGRATION.NO_ROOT');
       expect(mte.category).toBe('MIGRATION');
       expect(mte.details).toHaveProperty('nodes');
     }
