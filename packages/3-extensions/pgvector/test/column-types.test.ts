@@ -21,7 +21,7 @@ describe('pgvector column-types', () => {
       const descriptor = vector(1536);
       expect(descriptor).toMatchObject({
         codecId: 'pg/vector@1',
-        nativeType: 'vector(1536)',
+        nativeType: 'vector',
         typeParams: { length: 1536 },
       });
     });
@@ -32,13 +32,13 @@ describe('pgvector column-types', () => {
 
       expect(descriptor768).toMatchObject({
         codecId: 'pg/vector@1',
-        nativeType: 'vector(768)',
+        nativeType: 'vector',
         typeParams: { length: 768 },
       });
 
       expect(descriptor384).toMatchObject({
         codecId: 'pg/vector@1',
-        nativeType: 'vector(384)',
+        nativeType: 'vector',
         typeParams: { length: 384 },
       });
     });
@@ -49,13 +49,13 @@ describe('pgvector column-types', () => {
 
       expect(small).toMatchObject({
         codecId: 'pg/vector@1',
-        nativeType: 'vector(1536)',
+        nativeType: 'vector',
         typeParams: { length: 1536 },
       });
 
       expect(large).toMatchObject({
         codecId: 'pg/vector@1',
-        nativeType: 'vector(3072)',
+        nativeType: 'vector',
         typeParams: { length: 3072 },
       });
     });
