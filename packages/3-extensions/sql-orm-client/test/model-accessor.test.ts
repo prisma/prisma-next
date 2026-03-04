@@ -181,15 +181,12 @@ describe('createModelAccessor', () => {
     });
   });
 
-  it('creates none() and every() filters without child predicates', () => {
+  it('creates none() filters without child predicates and treats every({}) as vacuously true', () => {
     const accessor = createModelAccessor(contract, 'User');
 
-    expect(accessor['posts']!.every({})).toMatchObject({
-      kind: 'exists',
-      not: true,
-      subquery: {
-        where: { kind: 'bin', op: 'eq' },
-      },
+    expect(accessor['posts']!.every({})).toEqual({
+      kind: 'and',
+      exprs: [],
     });
 
     expect(accessor['posts']!.none()).toMatchObject({

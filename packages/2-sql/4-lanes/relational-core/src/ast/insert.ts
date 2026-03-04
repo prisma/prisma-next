@@ -1,17 +1,22 @@
-import type { ColumnRef, InsertAst, ParamRef, TableRef } from './types';
-import { compact } from './util';
+import { ifDefined } from '@prisma-next/utils/defined';
+import type { ColumnRef, InsertAst, InsertOnConflictAst, InsertValue, TableSource } from './types';
 
 export interface CreateInsertAstOptions {
-  readonly table: TableRef;
-  readonly values: Record<string, ColumnRef | ParamRef>;
+  readonly table: TableSource;
+  readonly rows: ReadonlyArray<Record<string, InsertValue>>;
+  readonly onConflict?: InsertOnConflictAst;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 
 export function createInsertAst(options: CreateInsertAstOptions): InsertAst {
-  return compact({
+  return {
     kind: 'insert',
     table: options.table,
-    values: options.values,
-    returning: options.returning,
-  }) as InsertAst;
+    rows: options.rows,
+    ...ifDefined('onConflict', options.onConflict),
+    ...ifDefined(
+      'returning',
+      options.returning && options.returning.length > 0 ? options.returning : undefined,
+    ),
+  };
 }

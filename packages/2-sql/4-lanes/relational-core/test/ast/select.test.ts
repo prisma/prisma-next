@@ -40,7 +40,6 @@ describe('ast/select', () => {
       expect(selectAst.from).toBe(from);
       expect(selectAst.project).toBe(project);
       expect(selectAst.joins).toBeUndefined();
-      expect(selectAst.includes).toBeUndefined();
       expect(selectAst.where).toBeUndefined();
       expect(selectAst.orderBy).toBeUndefined();
       expect(selectAst.limit).toBeUndefined();
@@ -132,6 +131,30 @@ describe('ast/select', () => {
       const selectAst = createSelectAst({ from, project, limit });
 
       expect(selectAst.limit).toBe(10);
+    });
+
+    it('creates select ast with distinct/distinctOn/groupBy/having/offset', () => {
+      const from: TableRef = createTableRef('user');
+      const idExpr = createColumnRef('user', 'id');
+      const emailExpr = createColumnRef('user', 'email');
+      const project = [{ alias: 'id', expr: idExpr as ColumnRef }];
+      const having = createBinaryExpr('gt', idExpr, createParamRef(1, 'minId'));
+
+      const selectAst = createSelectAst({
+        from,
+        project,
+        distinct: true,
+        distinctOn: [emailExpr],
+        groupBy: [idExpr],
+        having,
+        offset: 3,
+      });
+
+      expect(selectAst.distinct).toBe(true);
+      expect(selectAst.distinctOn).toEqual([emailExpr]);
+      expect(selectAst.groupBy).toEqual([idExpr]);
+      expect(selectAst.having).toEqual(having);
+      expect(selectAst.offset).toBe(3);
     });
 
     it('creates select ast with all optional fields', () => {
@@ -230,7 +253,6 @@ describe('ast/select', () => {
       const selectAst = createSelectAst({ from, project });
 
       expect('joins' in selectAst).toBe(false);
-      expect('includes' in selectAst).toBe(false);
       expect('where' in selectAst).toBe(false);
       expect('orderBy' in selectAst).toBe(false);
       expect('limit' in selectAst).toBe(false);

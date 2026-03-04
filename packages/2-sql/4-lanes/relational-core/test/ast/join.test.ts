@@ -5,8 +5,9 @@ import {
   textColumn as textColumnType,
 } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createTableRef } from '../../src/ast/common';
+import { createColumnRef, createDerivedTableSource, createTableRef } from '../../src/ast/common';
 import { createJoin, createJoinOnBuilder, createJoinOnExpr } from '../../src/ast/join';
+import { createSelectAst } from '../../src/ast/select';
 import type { JoinOnExpr, TableRef } from '../../src/ast/types';
 import { schema } from '../../src/schema';
 import { createStubAdapter, createTestContext } from '../utils';
@@ -104,7 +105,8 @@ describe('ast/join', () => {
       expect(join).toEqual({
         kind: 'join',
         joinType: 'inner',
-        table,
+        source: table,
+        lateral: false,
         on,
       });
     });
@@ -143,6 +145,42 @@ describe('ast/join', () => {
       const join = createJoin('full', table, on);
 
       expect(join.joinType).toBe('full');
+    });
+
+    it('rejects lateral joins for table sources', () => {
+      const table: TableRef = createTableRef('post');
+      const on: JoinOnExpr = createJoinOnExpr(
+        createColumnRef('user', 'id'),
+        createColumnRef('post', 'userId'),
+      );
+
+      expect(() => createJoin('inner', table, on, true)).toThrow(
+        'LATERAL is only valid for derived tables',
+      );
+    });
+
+    it('creates lateral joins for derived tables', () => {
+      const derived = createDerivedTableSource(
+        'post_subquery',
+        createSelectAst({
+          from: createTableRef('post'),
+          project: [{ alias: 'userId', expr: createColumnRef('post', 'userId') }],
+        }),
+      );
+      const on: JoinOnExpr = createJoinOnExpr(
+        createColumnRef('user', 'id'),
+        createColumnRef('post_subquery', 'userId'),
+      );
+
+      const join = createJoin('inner', derived, on, true);
+
+      expect(join).toEqual({
+        kind: 'join',
+        joinType: 'inner',
+        source: derived,
+        lateral: true,
+        on,
+      });
     });
   });
 

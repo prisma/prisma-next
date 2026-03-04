@@ -2,7 +2,6 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   ColumnRef,
   Expression,
-  IncludeRef,
   JoinAst,
   LiteralExpr,
   SelectAst,
@@ -89,7 +88,7 @@ export function transformSelections(
   ctx: TransformContext,
   fromTable: string,
 ): SelectAst['project'] {
-  const project: Array<{ alias: string; expr: Expression | IncludeRef | LiteralExpr }> = [];
+  const project: Array<{ alias: string; expr: Expression | LiteralExpr }> = [];
 
   if (!selections || selections.length === 0) {
     return expandSelectAll(fromTable, ctx.contract).map(({ alias, expr }) => ({ alias, expr }));
@@ -161,6 +160,24 @@ function mapJoinType(joinType: string): JoinAst['joinType'] {
   }
 }
 
+function isLateralJoinType(joinType: string): boolean {
+  switch (joinType) {
+    case 'LateralInnerJoinNode':
+    case 'LateralInnerJoin':
+    case 'LateralLeftJoinNode':
+    case 'LateralLeftJoin':
+    case 'LateralCrossJoinNode':
+    case 'LateralCrossJoin':
+    case 'CrossApplyNode':
+    case 'CrossApply':
+    case 'OuterApplyNode':
+    case 'OuterApply':
+      return true;
+    default:
+      return false;
+  }
+}
+
 export function transformSelect(node: SelectQueryNode, ctx: TransformContext): SelectAst {
   if (!node.from || node.from.froms.length === 0) {
     throw new KyselyTransformError(
@@ -212,7 +229,8 @@ export function transformSelect(node: SelectQueryNode, ctx: TransformContext): S
     joins.push({
       kind: 'join',
       joinType: mapJoinType(joinNode.joinType as string),
-      table: tableRef,
+      source: tableRef,
+      lateral: isLateralJoinType(joinNode.joinType as string),
       on: onExpr,
     });
   }

@@ -2,13 +2,18 @@ import type {
   ColumnRef,
   DeleteAst,
   InsertAst,
+  InsertOnConflictAst,
+  InsertValue,
   ParamRef,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { createDefaultValueExpr } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
+  DefaultInsertValueNode,
   type DeleteQueryNode,
   type InsertQueryNode,
+  type OnConflictNode,
   PrimitiveValueListNode,
   ReferenceNode,
   type ReturningNode,
@@ -20,6 +25,8 @@ import {
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
 import {
   getColumnName,
+  getTableName,
+  isOperationNode,
   isSelectAllReference,
   unwrapAliasNode,
   unwrapSelectionNode,
@@ -77,6 +84,111 @@ function transformReturning(
   return refs.length > 0 ? refs : undefined;
 }
 
+function transformOnConflictUpdateValue(
+  node: unknown,
+  ctx: TransformContext,
+  tableName: string,
+  columnName: string,
+): ColumnRef | ParamRef {
+  if (isOperationNode(node) && ReferenceNode.is(node)) {
+    const refTable = getTableName(node);
+    const refColumn = getColumnName(node);
+
+    if (refTable === 'excluded') {
+      if (!refColumn) {
+        throw new KyselyTransformError(
+          'Could not resolve EXCLUDED column name',
+          KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
+        );
+      }
+
+      validateColumn(ctx.contract, tableName, refColumn);
+      return { kind: 'col', table: 'excluded', column: refColumn };
+    }
+
+    return resolveColumnRef(node, ctx, tableName);
+  }
+
+  return assertParamRef(
+    transformValue(node, ctx, {
+      table: tableName,
+      column: columnName,
+    }),
+  );
+}
+
+function transformOnConflict(
+  node: OnConflictNode | undefined,
+  ctx: TransformContext,
+  tableName: string,
+): InsertOnConflictAst | undefined {
+  if (!node) {
+    return undefined;
+  }
+
+  if (node.constraint || node.indexExpression || node.indexWhere || node.updateWhere) {
+    throw new KyselyTransformError(
+      'Only column-based ON CONFLICT clauses are supported in Kysely transform lane',
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { nodeKind: node.kind },
+    );
+  }
+
+  const columns = (node.columns ?? []).map((columnNode) =>
+    resolveColumnRef(columnNode, ctx, tableName),
+  );
+  if (columns.length === 0) {
+    throw new KyselyTransformError(
+      'ON CONFLICT requires at least one conflict column',
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { nodeKind: node.kind },
+    );
+  }
+
+  if (node.doNothing === true) {
+    return {
+      columns,
+      action: { kind: 'doNothing' },
+    };
+  }
+
+  if (node.updates && node.updates.length > 0) {
+    const set: Record<string, ColumnRef | ParamRef> = {};
+
+    for (const updateNode of node.updates) {
+      const columnName = getColumnName(updateNode.column);
+      if (!columnName) {
+        throw new KyselyTransformError(
+          'Could not resolve ON CONFLICT update column name',
+          KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
+        );
+      }
+
+      validateColumn(ctx.contract, tableName, columnName);
+      set[columnName] = transformOnConflictUpdateValue(
+        updateNode.value,
+        ctx,
+        tableName,
+        columnName,
+      );
+    }
+
+    return {
+      columns,
+      action: {
+        kind: 'doUpdateSet',
+        set,
+      },
+    };
+  }
+
+  throw new KyselyTransformError(
+    'Unsupported ON CONFLICT action',
+    KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+    { nodeKind: node.kind },
+  );
+}
+
 export function transformInsert(node: InsertQueryNode, ctx: TransformContext): InsertAst {
   if (!node.into) {
     throw new KyselyTransformError(
@@ -86,73 +198,93 @@ export function transformInsert(node: InsertQueryNode, ctx: TransformContext): I
   }
 
   const tableRef = transformTableRef(node.into, ctx);
+  const insertOnConflict = transformOnConflict(node.onConflict, ctx, tableRef.name);
 
   if (!node.values || !ValuesNode.is(node.values)) {
+    if (node.defaultValues === true) {
+      const insertReturning = transformReturning(node.returning, ctx, tableRef.name);
+
+      return {
+        kind: 'insert',
+        table: tableRef,
+        rows: [{}],
+        ...ifDefined('onConflict', insertOnConflict),
+        ...ifDefined(
+          'returning',
+          insertReturning && insertReturning.length > 0 ? insertReturning : undefined,
+        ),
+      };
+    }
+
     throw new KyselyTransformError(
       'INSERT query requires VALUES',
       KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
     );
   }
 
-  const valuesRecord: Record<string, ColumnRef | ParamRef> = {};
-  const firstRow = node.values.values[0];
-  if (node.values.values.length > 1) {
-    throw new KyselyTransformError(
-      'Multi-row INSERT values are not supported; use single-row INSERT or batch via separate plans',
-      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-      { rowCount: node.values.values.length },
-    );
-  }
+  const rows: Array<Record<string, InsertValue>> = [];
 
-  if (firstRow && (!node.columns || node.columns.length === 0)) {
+  if (node.values.values[0] && (!node.columns || node.columns.length === 0)) {
     throw new KyselyTransformError(
       'INSERT query requires column list for VALUES transformation',
       KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
     );
   }
 
-  if (firstRow && node.columns && node.columns.length > 0) {
-    const rowValues = PrimitiveValueListNode.is(firstRow)
-      ? firstRow.values
-      : ValueListNode.is(firstRow)
-        ? firstRow.values
-        : undefined;
+  if (node.columns && node.columns.length > 0) {
+    for (const rowNode of node.values.values) {
+      const rowValues = PrimitiveValueListNode.is(rowNode)
+        ? rowNode.values
+        : ValueListNode.is(rowNode)
+          ? rowNode.values
+          : undefined;
 
-    if (!rowValues) {
-      throw new KyselyTransformError(
-        `Unsupported insert row node: ${firstRow.kind}`,
-        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-        { nodeKind: firstRow.kind },
-      );
-    }
-
-    for (let index = 0; index < node.columns.length; index++) {
-      const columnNode = node.columns[index];
-      const columnName = getColumnName(columnNode);
-      if (!columnName) {
+      if (!rowValues) {
         throw new KyselyTransformError(
-          'Could not resolve INSERT column name',
-          KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
+          `Unsupported insert row node: ${rowNode.kind}`,
+          KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+          { nodeKind: rowNode.kind },
         );
       }
 
-      const valueNode = rowValues[index];
-      if (valueNode === undefined) {
-        continue;
+      const valuesRecord: Record<string, InsertValue> = {};
+
+      for (let index = 0; index < node.columns.length; index++) {
+        const columnNode = node.columns[index];
+        const columnName = getColumnName(columnNode);
+        if (!columnName) {
+          throw new KyselyTransformError(
+            'Could not resolve INSERT column name',
+            KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
+          );
+        }
+
+        validateColumn(ctx.contract, tableRef.name, columnName);
+        ctx.refsTables.add(tableRef.name);
+        ctx.refsColumns.set(`${tableRef.name}.${columnName}`, {
+          table: tableRef.name,
+          column: columnName,
+        });
+
+        const valueNode = rowValues[index];
+        if (valueNode === undefined) {
+          valuesRecord[columnName] = createDefaultValueExpr();
+          continue;
+        }
+
+        if (isOperationNode(valueNode) && DefaultInsertValueNode.is(valueNode)) {
+          valuesRecord[columnName] = createDefaultValueExpr();
+          continue;
+        }
+
+        const transformed = transformValue(valueNode, ctx, {
+          table: tableRef.name,
+          column: columnName,
+        });
+        valuesRecord[columnName] = assertParamRef(transformed);
       }
 
-      validateColumn(ctx.contract, tableRef.name, columnName);
-      ctx.refsTables.add(tableRef.name);
-      ctx.refsColumns.set(`${tableRef.name}.${columnName}`, {
-        table: tableRef.name,
-        column: columnName,
-      });
-
-      const transformed = transformValue(valueNode, ctx, {
-        table: tableRef.name,
-        column: columnName,
-      });
-      valuesRecord[columnName] = assertParamRef(transformed);
+      rows.push(valuesRecord);
     }
   }
 
@@ -161,7 +293,8 @@ export function transformInsert(node: InsertQueryNode, ctx: TransformContext): I
   return {
     kind: 'insert',
     table: tableRef,
-    values: valuesRecord,
+    rows,
+    ...ifDefined('onConflict', insertOnConflict),
     ...ifDefined(
       'returning',
       insertReturning && insertReturning.length > 0 ? insertReturning : undefined,

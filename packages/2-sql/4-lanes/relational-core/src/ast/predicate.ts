@@ -1,4 +1,6 @@
+import { createLiteralExpr } from './common';
 import type {
+  AndExpr,
   BinaryExpr,
   BinaryOp,
   ExistsExpr,
@@ -6,8 +8,10 @@ import type {
   ListLiteralExpr,
   LiteralExpr,
   NullCheckExpr,
+  OrExpr,
   ParamRef,
   SelectAst,
+  WhereExpr,
 } from './types';
 
 export function createBinaryExpr(
@@ -37,4 +41,39 @@ export function createNullCheckExpr(expr: Expression, isNull: boolean): NullChec
     expr,
     isNull,
   };
+}
+
+export function createAndExpr(exprs: ReadonlyArray<WhereExpr>): AndExpr {
+  return {
+    kind: 'and',
+    exprs,
+  };
+}
+
+export function createOrExpr(exprs: ReadonlyArray<WhereExpr>): OrExpr {
+  return {
+    kind: 'or',
+    exprs,
+  };
+}
+
+export function createListLiteralExpr(
+  values: ReadonlyArray<ParamRef | LiteralExpr>,
+): ListLiteralExpr {
+  return {
+    kind: 'listLiteral',
+    values,
+  };
+}
+
+export function createTrueExpr(): AndExpr {
+  return createAndExpr([]);
+}
+
+export function createFalseExpr(): OrExpr {
+  return createOrExpr([]);
+}
+
+export function createLiteralListFromValues(values: ReadonlyArray<unknown>): ListLiteralExpr {
+  return createListLiteralExpr(values.map((value) => createLiteralExpr(value)));
 }

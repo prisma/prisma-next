@@ -1,8 +1,8 @@
-import type { ColumnRef, ParamRef, TableRef, UpdateAst, WhereExpr } from './types';
+import type { ColumnRef, ParamRef, TableSource, UpdateAst, WhereExpr } from './types';
 import { compact } from './util';
 
 export interface CreateUpdateAstOptions {
-  readonly table: TableRef;
+  readonly table: TableSource;
   readonly set: Record<string, ColumnRef | ParamRef>;
   readonly where?: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;

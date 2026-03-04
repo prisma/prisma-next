@@ -1,20 +1,12 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
-import type {
-  ColumnRef,
-  Direction,
-  IncludeAst,
-  IncludeRef,
-  JoinAst,
-  OperationExpr,
-  TableRef,
-  WhereExpr,
-} from '@prisma-next/sql-relational-core/ast';
+import type { ProjectionItem, TableRef } from '@prisma-next/sql-relational-core/ast';
 import {
   createJoinOnBuilder,
   createOrderByItem,
-  createSelectAst,
-  createTableRef,
+  createProjectionItem,
+  createSelectAstBuilder,
+  createTableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -47,7 +39,7 @@ import {
 } from '../utils/errors';
 import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
 import {
-  buildIncludeAst,
+  buildIncludeJoinArtifact,
   type IncludeChildBuilder,
   IncludeChildBuilderImpl,
 } from './include-builder';
@@ -323,15 +315,16 @@ export class SelectBuilderImpl<
         })()
       : undefined;
 
-    const joins = this.state.joins?.map((join) => buildJoinAst(join));
-
-    const includes = this.state.includes?.map((include) =>
-      buildIncludeAst(include, this.contract, paramsMap, paramDescriptors, paramValues),
+    const joins = this.state.joins?.map((join) => buildJoinAst(join)) ?? [];
+    const includeArtifacts =
+      this.state.includes?.map((include) =>
+        buildIncludeJoinArtifact(include, this.contract, paramsMap, paramDescriptors, paramValues),
+      ) ?? [];
+    const includeProjectionByAlias = new Map(
+      includeArtifacts.map((artifact) => [artifact.projection.alias, artifact.projection]),
     );
 
-    // Build projection with support for includeRef and OperationExpr
-    const projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }> =
-      [];
+    const projectEntries: ProjectionItem[] = [];
     for (let i = 0; i < projection.aliases.length; i++) {
       const alias = projection.aliases[i];
       if (!alias) {
@@ -339,48 +332,31 @@ export class SelectBuilderImpl<
       }
       const column = projection.columns[i];
 
-      // Check if this alias matches an include alias first
-      // Include placeholders have null columns
-      const matchingInclude = this.state.includes?.find((inc) => inc.alias === alias);
-      if (matchingInclude) {
-        // This is an include reference - column can be null for placeholders
-        projectEntries.push({
-          alias,
-          expr: { kind: 'includeRef', alias },
-        });
+      const includeProjection = includeProjectionByAlias.get(alias);
+      if (includeProjection) {
+        projectEntries.push(includeProjection);
       } else if (column && isExpressionBuilder(column)) {
-        // This is an ExpressionBuilder (operation result) - use its expr
-        projectEntries.push({
-          alias,
-          expr: column.expr,
-        });
+        projectEntries.push(createProjectionItem(alias, column.expr));
       } else if (column) {
-        // This is a regular ColumnBuilder - use toExpr() to get ColumnRef
-        const columnRef = column.toExpr();
-        projectEntries.push({
-          alias,
-          expr: columnRef,
-        });
+        projectEntries.push(createProjectionItem(alias, column.toExpr()));
       }
     }
 
-    const ast = createSelectAst({
-      from: createTableRef(table.name),
-      joins,
-      includes,
-      project: projectEntries,
-      where: whereExpr,
-      orderBy: orderByClause,
-      limit: this.state.limit,
-    } as {
-      from: TableRef;
-      joins?: ReadonlyArray<JoinAst>;
-      includes?: ReadonlyArray<IncludeAst>;
-      project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
-      where?: WhereExpr;
-      orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
-      limit?: number;
-    });
+    const astBuilder = createSelectAstBuilder(createTableSource(table.name, table.alias))
+      .project(projectEntries)
+      .where(whereExpr);
+
+    const allJoins = [...joins, ...includeArtifacts.map((artifact) => artifact.join)];
+    if (allJoins.length > 0) {
+      astBuilder.joins(allJoins);
+    }
+    if (orderByClause) {
+      astBuilder.orderBy(orderByClause);
+    }
+    if (this.state.limit !== undefined) {
+      astBuilder.limit(this.state.limit);
+    }
+    const ast = astBuilder.build();
 
     const planMeta = buildMeta({
       contract: this.contract,

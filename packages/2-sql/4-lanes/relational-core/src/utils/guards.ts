@@ -3,10 +3,12 @@ import type {
   ColumnRef,
   Expression,
   ExpressionSource,
-  LiteralExpr,
   OperationExpr,
-  ParamRef,
+  SelectAst,
+  WhereExpr,
 } from '../ast/types';
+import type { SqlComparable } from '../ast/visitors';
+import { foldExpressionDeep } from '../ast/visitors';
 import type {
   AnyColumnBuilder,
   AnyExpressionSource,
@@ -51,27 +53,34 @@ export function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef
   if (expr.kind === 'col') {
     return expr;
   }
-  return extractBaseColumnRef(expr.self);
+  if (expr.self.kind === 'col' || expr.self.kind === 'operation') {
+    return extractBaseColumnRef(expr.self);
+  }
+  throw new Error(
+    `Operation expression self cannot be ${expr.self.kind} when extracting base column`,
+  );
 }
+
+const columnRefFolder = foldExpressionDeep<ColumnRef[]>({
+  empty: [],
+  combine: (a, b) => [...a, ...b],
+  col: (col) => [col],
+});
 
 /**
  * Recursively collects all ColumnRef nodes from an expression tree.
  * Handles nested OperationExpr structures by traversing both self and args.
  */
-export function collectColumnRefs(
-  expr: ColumnRef | ParamRef | LiteralExpr | OperationExpr,
-): ColumnRef[] {
-  if (expr.kind === 'col') {
-    return [expr];
-  }
-  if (expr.kind === 'operation') {
-    const refs: ColumnRef[] = collectColumnRefs(expr.self);
-    for (const arg of expr.args) {
-      refs.push(...collectColumnRefs(arg));
-    }
-    return refs;
-  }
-  return [];
+export function collectColumnRefs(expr: SqlComparable): ColumnRef[] {
+  return columnRefFolder.comparable(expr);
+}
+
+export function collectColumnRefsFromWhere(expr: WhereExpr): ColumnRef[] {
+  return columnRefFolder.where(expr);
+}
+
+export function collectColumnRefsFromSelect(ast: SelectAst): ColumnRef[] {
+  return columnRefFolder.select(ast);
 }
 
 /**

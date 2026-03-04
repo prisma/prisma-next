@@ -1,17 +1,23 @@
 import { planInvalid } from '@prisma-next/plan';
 import type { AnyColumnBuilder, JoinOnBuilder, JoinOnPredicate } from '../types';
 import { isColumnBuilder } from '../types';
-import type { ColumnRef, JoinAst, JoinOnExpr, TableRef } from './types';
+import type { ColumnRef, FromSource, JoinAst, JoinOnExpr } from './types';
 
 export function createJoin(
   joinType: 'inner' | 'left' | 'right' | 'full',
-  table: TableRef,
+  source: FromSource,
   on: JoinOnExpr,
+  lateral = false,
 ): JoinAst {
+  if (lateral && source.kind !== 'derivedTable') {
+    throw planInvalid('LATERAL is only valid for derived tables');
+  }
+
   return {
     kind: 'join',
     joinType,
-    table,
+    source,
+    lateral,
     on,
   };
 }

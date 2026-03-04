@@ -1,9 +1,15 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { RuntimeQueryable } from '../src/types';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
+
+export function isSelectAst(ast: unknown): ast is SelectAst {
+  return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
+}
 
 const baseTestContract = validateContract<Contract>(contractJson);
 
@@ -14,7 +20,7 @@ export function getTestContract(): TestContract {
 }
 
 export interface MockExecution {
-  plan: ExecutionPlan;
+  plan: ExecutionPlan | SqlQueryPlan<unknown>;
   rows: Record<string, unknown>[];
 }
 
@@ -32,9 +38,12 @@ export function createMockRuntime(): MockRuntime {
     setNextResults(results: Record<string, unknown>[][]) {
       nextResult = [...results];
     },
-    execute<Row>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row> {
+    execute<Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterableResult<Row> {
       const rows = (nextResult.shift() ?? []) as Row[];
-      executions.push({ plan: plan as ExecutionPlan, rows: rows as Record<string, unknown>[] });
+      executions.push({
+        plan: plan as ExecutionPlan | SqlQueryPlan<unknown>,
+        rows: rows as Record<string, unknown>[],
+      });
       const gen = async function* (): AsyncGenerator<Row, void, unknown> {
         for (const row of rows) {
           yield row;
