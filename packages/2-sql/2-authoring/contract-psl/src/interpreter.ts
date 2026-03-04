@@ -1103,7 +1103,7 @@ export function interpretPslDocumentToSqlContractIR(
     generatorDescriptorById.set(descriptor.id, descriptor);
   }
 
-  let builder = defineContract().target(input.target) as unknown as DynamicContractBuilder;
+  let builder = defineContract().target(input.target) as DynamicContractBuilder;
   const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
   const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
   const namedTypeBaseTypes = new Map<string, string>();

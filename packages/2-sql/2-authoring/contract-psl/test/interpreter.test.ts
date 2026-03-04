@@ -29,6 +29,7 @@ describe('interpretPslDocumentToSqlContractIR', () => {
       sourceId: 'schema.prisma',
     });
 
+    // Intentionally bypasses strict input typing to verify missing target diagnostics.
     const result = interpretPslDocumentToSqlContractIRInternal({
       document,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,

@@ -3,9 +3,11 @@ import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type BuiltinGeneratorId,
-  builtinGeneratorIds,
+  builtinGeneratorIds as builtinGeneratorIdsInternal,
   type IdGeneratorOptionsById,
 } from './generators';
+
+export const builtinGeneratorIds = builtinGeneratorIdsInternal;
 
 export type GeneratedColumnDescriptor = {
   readonly type: ColumnTypeDescriptor;
@@ -114,7 +116,7 @@ function createGeneratedSpec<TId extends BuiltinGeneratorId>(
   const params = options as Record<string, unknown> | undefined;
   const resolvedDescriptor = resolveBuiltinGeneratedColumnDescriptor({
     id,
-    ...(params ? { params } : {}),
+    ...ifDefined('params', params),
   });
   return {
     type: resolvedDescriptor.type,
@@ -140,4 +142,3 @@ export const cuid2 = (options?: IdGeneratorOptionsById['cuid2']): GeneratedColum
   createGeneratedSpec('cuid2', options);
 export const ksuid = (options?: IdGeneratorOptionsById['ksuid']): GeneratedColumnSpec =>
   createGeneratedSpec('ksuid', options);
-export { builtinGeneratorIds };
