@@ -17,7 +17,7 @@
   - **Query builder** (`db.sql`): type-safe SQL plan builder for when you want lower-level control
 - **Designed for AI-assisted workflows**: deterministic contracts, structured plans, stable diagnostics, and guardrails that help agents (and humans) iterate safely.
 
-Read the deep dive in `[blog-post.md](./blog-post.md)` and the announcement blog post: [The Next Evolution of Prisma ORM](https://www.prisma.io/blog/the-next-evolution-of-prisma-orm).
+Read the announcement blog post: [The Next Evolution of Prisma ORM](https://www.prisma.io/blog/the-next-evolution-of-prisma-orm).
 
 ## Designed for AI-assisted workflows
 
@@ -26,8 +26,6 @@ Prisma Next is built for agent-assisted development:
 - **Fast, predictable feedback**: type-state APIs and capability checks catch mistakes early
 - **Machine-readable artifacts**: contracts, query plans, and diagnostics are structured data
 - **Guardrails you can compose**: plugins can enforce budgets, policies, and telemetry
-
-See `[blog-post.md](./blog-post.md)` for the full rationale and examples.
 
 ## Schema as a contract
 
