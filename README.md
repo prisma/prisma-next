@@ -17,7 +17,7 @@
   - **Query builder** (`db.sql`): type-safe SQL plan builder for when you want lower-level control
 - **Designed for AI-assisted workflows**: deterministic contracts, structured plans, stable diagnostics, and guardrails that help agents (and humans) iterate safely.
 
-Read the announcement blog post: [The Next Evolution of Prisma ORM](https://www.prisma.io/blog/the-next-evolution-of-prisma-orm).
+Read the announcement blog post: [The Next Evolution of Prisma ORM](https://pris.ly/pn-anouncement).
 
 ## Designed for AI-assisted workflows
 
