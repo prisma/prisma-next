@@ -1,19 +1,24 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { BoundWhereExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  createBinaryExpr,
+  createColumnRef,
+  createLiteralExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { resolveModelTableName, resolvePrimaryKeyColumn } from './collection-contract';
 import {
   acquireRuntimeScope,
   mapModelDataToStorageRow,
   mapStorageRowToModelFields,
 } from './collection-runtime';
+import { executeQueryPlan } from './execute-query-plan';
 import { and, shorthandToWhereExpr } from './filters';
 import {
   compileInsertReturning,
   compileSelect,
   compileUpdateCount,
   compileUpdateReturning,
-} from './kysely-compiler';
-import { executeCompiledQuery } from './raw-compiled-query';
+} from './query-plan';
 import {
   createRelationMutator,
   isRelationMutationCallback,
@@ -30,6 +35,7 @@ import type {
   RuntimeScope,
 } from './types';
 import { emptyState } from './types';
+import { createBoundWhereExpr, ensureBoundWhereExpr } from './where-utils';
 
 interface RelationDefinition {
   readonly relationName: string;
@@ -85,11 +91,17 @@ export async function executeNestedUpdateMutation(options: {
   contract: SqlContract<SqlStorage>;
   runtime: RuntimeQueryable;
   modelName: string;
-  filters: readonly WhereExpr[];
+  filters: readonly (BoundWhereExpr | WhereExpr)[];
   data: MutationUpdateInput<SqlContract<SqlStorage>, string>;
 }): Promise<Record<string, unknown> | null> {
   return withMutationScope(options.runtime, async (scope) =>
-    updateFirstGraph(scope, options.contract, options.modelName, options.filters, options.data),
+    updateFirstGraph(
+      scope,
+      options.contract,
+      options.modelName,
+      options.filters.map(ensureBoundWhereExpr),
+      options.data,
+    ),
   );
 }
 
@@ -193,7 +205,7 @@ async function updateFirstGraph(
   scope: RuntimeScope,
   contract: SqlContract<SqlStorage>,
   modelName: string,
-  filters: readonly WhereExpr[],
+  filters: readonly BoundWhereExpr[],
   input: MutationUpdateInput<SqlContract<SqlStorage>, string>,
 ): Promise<Record<string, unknown> | null> {
   const existingRow = await findFirstByFilters(scope, contract, modelName, filters);
@@ -232,12 +244,16 @@ async function updateFirstGraph(
     }
 
     const tableName = resolveModelTableName(contract, modelName);
-    const compiled = compileUpdateReturning(tableName, mappedUpdateData, [pkWhere], undefined);
-    const updatedRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
-      scope,
+    const compiled = compileUpdateReturning(
       contract,
+      tableName,
+      mappedUpdateData,
+      [createBoundWhereExpr(pkWhere)],
+      undefined,
+    );
+    const updatedRowsRaw = await executeQueryPlan<Record<string, unknown>>(
+      scope,
       compiled,
-      { lane: 'orm-client' },
     ).toArray();
 
     const updatedRaw = updatedRowsRaw[0];
@@ -460,7 +476,7 @@ async function applyChildOwnedMutation(
       }
 
       await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
-        criterionWhere,
+        createBoundWhereExpr(criterionWhere),
       ]);
     }
     return;
@@ -474,7 +490,7 @@ async function applyChildOwnedMutation(
   if (!mutation.criteria || mutation.criteria.length === 0) {
     const parentJoinWhere = buildChildJoinWhere(relation, parentValues);
     await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
-      parentJoinWhere,
+      createBoundWhereExpr(parentJoinWhere),
     ]);
     return;
   }
@@ -493,7 +509,7 @@ async function applyChildOwnedMutation(
 
     const parentJoinWhere = buildChildJoinWhere(relation, parentValues);
     await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
-      and(parentJoinWhere, criterionWhere),
+      createBoundWhereExpr(and(parentJoinWhere, criterionWhere)),
     ]);
   }
 }
@@ -534,19 +550,13 @@ function buildChildJoinWhere(
   const exprs: WhereExpr[] = [];
 
   for (const [childColumn, parentValue] of childValues.entries()) {
-    exprs.push({
-      kind: 'bin',
-      op: 'eq',
-      left: {
-        kind: 'col',
-        table: relation.relatedTableName,
-        column: childColumn,
-      },
-      right: {
-        kind: 'literal',
-        value: parentValue,
-      },
-    });
+    exprs.push(
+      createBinaryExpr(
+        'eq',
+        createColumnRef(relation.relatedTableName, childColumn),
+        createLiteralExpr(parentValue),
+      ),
+    );
   }
 
   const first = exprs[0];
@@ -565,10 +575,8 @@ async function insertSingleRow(
 ): Promise<Record<string, unknown>> {
   const tableName = resolveModelTableName(contract, modelName);
   const mappedData = mapModelDataToStorageRow(contract, modelName, data);
-  const compiled = compileInsertReturning(tableName, [mappedData], undefined);
-  const rows = await executeCompiledQuery<Record<string, unknown>>(scope, contract, compiled, {
-    lane: 'orm-client',
-  }).toArray();
+  const compiled = compileInsertReturning(contract, tableName, [mappedData], undefined);
+  const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
   const firstRow = rows[0];
   if (!firstRow) {
@@ -596,13 +604,11 @@ async function findRowByCriterion(
   const tableName = resolveModelTableName(contract, modelName);
   const state: CollectionState = {
     ...emptyState(),
-    filters: [whereExpr],
+    filters: [createBoundWhereExpr(whereExpr)],
     limit: 1,
   };
-  const compiled = compileSelect(tableName, state);
-  const rows = await executeCompiledQuery<Record<string, unknown>>(scope, contract, compiled, {
-    lane: 'orm-client',
-  }).toArray();
+  const compiled = compileSelect(contract, tableName, state);
+  const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
   const firstRow = rows[0];
   if (!firstRow) {
@@ -616,7 +622,7 @@ async function findFirstByFilters(
   scope: RuntimeScope,
   contract: SqlContract<SqlStorage>,
   modelName: string,
-  filters: readonly WhereExpr[],
+  filters: readonly BoundWhereExpr[],
 ): Promise<Record<string, unknown> | null> {
   const tableName = resolveModelTableName(contract, modelName);
   const state: CollectionState = {
@@ -624,10 +630,8 @@ async function findFirstByFilters(
     filters,
     limit: 1,
   };
-  const compiled = compileSelect(tableName, state);
-  const rows = await executeCompiledQuery<Record<string, unknown>>(scope, contract, compiled, {
-    lane: 'orm-client',
-  }).toArray();
+  const compiled = compileSelect(contract, tableName, state);
+  const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
   const firstRow = rows[0];
   if (!firstRow) {
@@ -642,12 +646,10 @@ async function executeUpdateCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly WhereExpr[],
+  filters: readonly BoundWhereExpr[],
 ): Promise<void> {
-  const compiled = compileUpdateCount(tableName, setValues, filters);
-  await executeCompiledQuery<Record<string, unknown>>(scope, contract, compiled, {
-    lane: 'orm-client',
-  }).toArray();
+  const compiled = compileUpdateCount(contract, tableName, setValues, filters);
+  await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 }
 
 function getRelationDefinitions(

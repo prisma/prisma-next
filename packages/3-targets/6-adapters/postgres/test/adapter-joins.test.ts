@@ -58,7 +58,8 @@ describe('Postgres adapter join rendering', () => {
         {
           kind: 'join',
           joinType: 'inner',
-          table: { kind: 'table', name: 'post' },
+          source: { kind: 'table', name: 'post' },
+          lateral: false,
           on: {
             kind: 'eqCol',
             left: { kind: 'col', table: 'user', column: 'id' },
@@ -89,7 +90,8 @@ describe('Postgres adapter join rendering', () => {
         {
           kind: 'join',
           joinType: 'left',
-          table: { kind: 'table', name: 'post' },
+          source: { kind: 'table', name: 'post' },
+          lateral: false,
           on: {
             kind: 'eqCol',
             left: { kind: 'col', table: 'user', column: 'id' },
@@ -117,7 +119,8 @@ describe('Postgres adapter join rendering', () => {
         {
           kind: 'join',
           joinType: 'right',
-          table: { kind: 'table', name: 'post' },
+          source: { kind: 'table', name: 'post' },
+          lateral: false,
           on: {
             kind: 'eqCol',
             left: { kind: 'col', table: 'user', column: 'id' },
@@ -145,7 +148,8 @@ describe('Postgres adapter join rendering', () => {
         {
           kind: 'join',
           joinType: 'full',
-          table: { kind: 'table', name: 'post' },
+          source: { kind: 'table', name: 'post' },
+          lateral: false,
           on: {
             kind: 'eqCol',
             left: { kind: 'col', table: 'user', column: 'id' },
@@ -173,7 +177,8 @@ describe('Postgres adapter join rendering', () => {
         {
           kind: 'join',
           joinType: 'inner',
-          table: { kind: 'table', name: 'post' },
+          source: { kind: 'table', name: 'post' },
+          lateral: false,
           on: {
             kind: 'eqCol',
             left: { kind: 'col', table: 'user', column: 'id' },
@@ -183,7 +188,8 @@ describe('Postgres adapter join rendering', () => {
         {
           kind: 'join',
           joinType: 'left',
-          table: { kind: 'table', name: 'comment' },
+          source: { kind: 'table', name: 'comment' },
+          lateral: false,
           on: {
             kind: 'eqCol',
             left: { kind: 'col', table: 'post', column: 'id' },
@@ -211,7 +217,8 @@ describe('Postgres adapter join rendering', () => {
         {
           kind: 'join',
           joinType: 'inner',
-          table: { kind: 'table', name: 'post' },
+          source: { kind: 'table', name: 'post' },
+          lateral: false,
           on: {
             kind: 'eqCol',
             left: { kind: 'col', table: 'user', column: 'id' },
@@ -246,7 +253,8 @@ describe('Postgres adapter join rendering', () => {
         {
           kind: 'join',
           joinType: 'inner',
-          table: { kind: 'table', name: 'post' },
+          source: { kind: 'table', name: 'post' },
+          lateral: false,
           on: {
             kind: 'eqCol',
             left: { kind: 'col', table: 'user', column: 'id' },

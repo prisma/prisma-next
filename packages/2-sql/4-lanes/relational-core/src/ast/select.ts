@@ -1,40 +1,44 @@
 import type {
-  ColumnRef,
-  Direction,
-  IncludeAst,
-  IncludeRef,
+  Expression,
+  FromSource,
   JoinAst,
-  OperationExpr,
+  OrderByItem,
+  ProjectionItem,
   SelectAst,
-  TableRef,
   WhereExpr,
 } from './types';
-import { compact } from './util';
 
 export interface CreateSelectAstOptions {
-  readonly from: TableRef;
+  readonly from: FromSource;
   readonly joins?: ReadonlyArray<JoinAst>;
-  readonly includes?: ReadonlyArray<IncludeAst>;
-  readonly project: ReadonlyArray<{
-    alias: string;
-    expr: ColumnRef | IncludeRef | OperationExpr;
-  }>;
+  readonly project: ReadonlyArray<ProjectionItem>;
   readonly where?: WhereExpr;
-  readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
+  readonly orderBy?: ReadonlyArray<OrderByItem>;
+  readonly distinct?: true;
+  readonly distinctOn?: ReadonlyArray<Expression>;
+  readonly groupBy?: ReadonlyArray<Expression>;
+  readonly having?: WhereExpr;
   readonly limit?: number;
+  readonly offset?: number;
   readonly selectAllIntent?: { table?: string };
 }
 
 export function createSelectAst(options: CreateSelectAstOptions): SelectAst {
-  return compact({
+  return {
     kind: 'select',
     from: options.from,
-    joins: options.joins,
-    includes: options.includes,
     project: options.project,
-    where: options.where,
-    orderBy: options.orderBy,
-    limit: options.limit,
-    selectAllIntent: options.selectAllIntent,
-  }) as SelectAst;
+    ...(options.joins && options.joins.length > 0 ? { joins: options.joins } : {}),
+    ...(options.where ? { where: options.where } : {}),
+    ...(options.orderBy && options.orderBy.length > 0 ? { orderBy: options.orderBy } : {}),
+    ...(options.distinct ? { distinct: options.distinct } : {}),
+    ...(options.distinctOn && options.distinctOn.length > 0
+      ? { distinctOn: options.distinctOn }
+      : {}),
+    ...(options.groupBy && options.groupBy.length > 0 ? { groupBy: options.groupBy } : {}),
+    ...(options.having ? { having: options.having } : {}),
+    ...(options.limit !== undefined ? { limit: options.limit } : {}),
+    ...(options.offset !== undefined ? { offset: options.offset } : {}),
+    ...(options.selectAllIntent ? { selectAllIntent: options.selectAllIntent } : {}),
+  };
 }

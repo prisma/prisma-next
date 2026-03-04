@@ -156,7 +156,7 @@ describe('ast/predicate', () => {
       const existsExpr = createExistsExpr(false, subquery);
 
       expect(existsExpr.subquery).toBe(subquery);
-      expect(existsExpr.subquery.from.name).toBe('post');
+      expect(existsExpr.subquery.from).toMatchObject({ kind: 'table', name: 'post' });
     });
   });
 });

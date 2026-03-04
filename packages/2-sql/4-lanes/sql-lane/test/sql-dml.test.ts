@@ -73,10 +73,12 @@ describe('DML builders', () => {
       expect(plan.ast).toMatchObject({
         kind: 'insert',
         table: { name: 'user' },
-        values: {
-          email: { kind: 'param', name: 'email', index: 1 },
-          createdAt: { kind: 'param', name: 'createdAt', index: 2 },
-        },
+        rows: [
+          {
+            email: { kind: 'param', name: 'email', index: 1 },
+            createdAt: { kind: 'param', name: 'createdAt', index: 2 },
+          },
+        ],
       });
 
       expect(plan.params).toEqual(['test@example.com', new Date('2024-01-01')]);
@@ -104,10 +106,12 @@ describe('DML builders', () => {
       expect(plan.ast).toMatchObject({
         kind: 'insert',
         table: { name: 'user' },
-        values: {
-          email: { kind: 'param', name: 'email', index: 1 },
-          createdAt: { kind: 'param', name: 'createdAt', index: 2 },
-        },
+        rows: [
+          {
+            email: { kind: 'param', name: 'email', index: 1 },
+            createdAt: { kind: 'param', name: 'createdAt', index: 2 },
+          },
+        ],
         returning: [createColumnRef('user', 'id'), createColumnRef('user', 'email')],
       });
     });

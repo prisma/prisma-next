@@ -42,6 +42,9 @@ function extractRefsFromAst(ast: QueryAst): PlanRefs {
       return;
     }
     if (kind === 'col' && typeof table === 'string' && typeof column === 'string') {
+      if (table === 'excluded') {
+        return;
+      }
       tables.add(table);
       const key = `${table}.${column}`;
       if (!columnKeys.has(key)) {

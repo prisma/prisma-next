@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { Collection } from '../../src/collection';
+import { getTestContract, isSelectAst } from '../helpers';
 import {
   createPostsCollection,
   createUsersCollection,
@@ -6,6 +8,27 @@ import {
   withCollectionRuntime,
 } from './helpers';
 import { seedComments, seedPosts, seedProfiles, seedUsers } from './runtime-helpers';
+
+function createUsersCollectionWithCapabilities(
+  runtime: Parameters<typeof createUsersCollection>[0],
+  capabilities: Record<string, unknown>,
+) {
+  const base = getTestContract();
+  const contract = {
+    ...base,
+    capabilities: {
+      ...base.capabilities,
+      ...capabilities,
+    },
+  } as typeof base;
+
+  return new Collection({ contract, runtime }, 'User');
+}
+
+type NumericPostField = import('../../src/types').NumericFieldNames<
+  ReturnType<typeof getTestContract>,
+  'Post'
+>;
 
 describe('integration/include', () => {
   it(
@@ -109,7 +132,7 @@ describe('integration/include', () => {
         ]);
 
         runtime.resetExecutions();
-        const numericField = 'views' as never;
+        const numericField: NumericPostField = 'views';
         const rows = await users
           .orderBy((user) => user.id.asc())
           .include('posts', (posts) => posts.sum(numericField))
@@ -144,7 +167,7 @@ describe('integration/include', () => {
         ]);
 
         runtime.resetExecutions();
-        const numericField = 'views' as never;
+        const numericField: NumericPostField = 'views';
         const rows = await users
           .orderBy((user) => user.id.asc())
           .include('posts', (posts) =>
@@ -238,6 +261,336 @@ describe('integration/include', () => {
           },
         ]);
         expect(runtime.executions).toHaveLength(4);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'single-query include uses lateral strategy when lateral and jsonAgg are enabled',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {
+          lateral: { enabled: true },
+          jsonAgg: { enabled: true },
+        });
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 1, views: 200 },
+          { id: 12, title: 'Post C', userId: 2, views: 300 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('posts', (posts) =>
+            posts
+              .orderBy((post) => post.id.asc())
+              .skip(1)
+              .take(1),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            posts: [{ id: 11, title: 'Post B', userId: 1, views: 200 }],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            posts: [],
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
+
+        const plan = runtime.executions[0];
+        const ast = plan?.ast;
+        expect(isSelectAst(ast)).toBe(true);
+        if (!isSelectAst(ast)) {
+          throw new Error('Expected select AST for lateral include query');
+        }
+        const includeJoin = ast.joins?.find(
+          (join) =>
+            join.lateral &&
+            join.source.kind === 'derivedTable' &&
+            join.source.alias === 'posts_lateral',
+        );
+        expect(includeJoin).toBeDefined();
+        if (includeJoin?.source.kind === 'derivedTable') {
+          const includeAggregateProjection = includeJoin.source.query.project[0];
+          expect(includeAggregateProjection?.expr.kind).toBe('jsonArrayAgg');
+          if (includeAggregateProjection?.expr.kind === 'jsonArrayAgg') {
+            expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
+            expect(includeAggregateProjection.expr.expr.kind).toBe('jsonObject');
+            expect(includeAggregateProjection.expr.orderBy).toEqual([
+              {
+                expr: { kind: 'col', table: 'posts__rows', column: 'posts__order_0' },
+                dir: 'asc',
+              },
+            ]);
+          }
+          const rowsSource = includeJoin.source.query.from;
+          expect(rowsSource.kind).toBe('derivedTable');
+          if (rowsSource.kind === 'derivedTable') {
+            expect(rowsSource.query.limit).toBe(1);
+            expect(rowsSource.query.offset).toBe(1);
+            expect(rowsSource.query.project.map((item) => item.alias)).toContain('posts__order_0');
+          }
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'single-query lateral include correlates self-relations with child alias',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {
+          lateral: { enabled: true },
+          jsonAgg: { enabled: true },
+        });
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+          { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1 },
+          { id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('invitedUsers', (invitedUsers) =>
+            invitedUsers.orderBy((invitedUser) => invitedUser.id.asc()),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            invitedUsers: [
+              { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+              { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1 },
+            ],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: 1,
+            invitedUsers: [{ id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2 }],
+          },
+          {
+            id: 3,
+            name: 'Cara',
+            email: 'cara@example.com',
+            invitedById: 1,
+            invitedUsers: [],
+          },
+          {
+            id: 4,
+            name: 'Dan',
+            email: 'dan@example.com',
+            invitedById: 2,
+            invitedUsers: [],
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
+        const plan = runtime.executions[0];
+        const ast = plan?.ast;
+        expect(isSelectAst(ast)).toBe(true);
+        if (!isSelectAst(ast)) {
+          throw new Error('Expected select AST for lateral self-relation include query');
+        }
+        const includeJoin = ast.joins?.find(
+          (join) =>
+            join.lateral &&
+            join.source.kind === 'derivedTable' &&
+            join.source.alias === 'invitedUsers_lateral',
+        );
+        expect(includeJoin).toBeDefined();
+        if (includeJoin?.source.kind === 'derivedTable') {
+          const includeAggregateProjection = includeJoin.source.query.project[0];
+          expect(includeAggregateProjection?.expr.kind).toBe('jsonArrayAgg');
+          if (includeAggregateProjection?.expr.kind === 'jsonArrayAgg') {
+            expect(includeAggregateProjection.expr.orderBy).toEqual([
+              {
+                expr: {
+                  kind: 'col',
+                  table: 'invitedUsers__rows',
+                  column: 'invitedUsers__order_0',
+                },
+                dir: 'asc',
+              },
+            ]);
+          }
+          const rowsSource = includeJoin.source.query.from;
+          expect(rowsSource.kind).toBe('derivedTable');
+          if (rowsSource.kind === 'derivedTable') {
+            expect(rowsSource.query.project.map((item) => item.alias)).toContain(
+              'invitedUsers__order_0',
+            );
+          }
+        }
+        const sql = runtime.executions[0]?.sql;
+        expect(sql).toContain('"invitedUsers__child"."invited_by_id" = "users"."id"');
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'single-query include uses correlated strategy when only jsonAgg is enabled',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {
+          jsonAgg: { enabled: true },
+        });
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedPosts(runtime, [{ id: 10, title: 'Post A', userId: 1, views: 100 }]);
+
+        runtime.resetExecutions();
+        const rows = await users.include('posts').all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            posts: [{ id: 10, title: 'Post A', userId: 1, views: 100 }],
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
+
+        const plan = runtime.executions[0];
+        const ast = plan?.ast;
+        expect(isSelectAst(ast)).toBe(true);
+        if (!isSelectAst(ast)) {
+          throw new Error('Expected select AST for correlated include query');
+        }
+        expect(ast.joins ?? []).toHaveLength(0);
+        const postsProjection = ast.project.find((item) => item.alias === 'posts');
+        expect(postsProjection?.expr.kind).toBe('subquery');
+        if (postsProjection?.expr.kind === 'subquery') {
+          const includeAggregateProjection = postsProjection.expr.query.project[0];
+          expect(includeAggregateProjection?.expr.kind).toBe('jsonArrayAgg');
+          if (includeAggregateProjection?.expr.kind === 'jsonArrayAgg') {
+            expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
+            expect(includeAggregateProjection.expr.expr.kind).toBe('jsonObject');
+          }
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'single-query correlated include correlates self-relations with child alias',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {
+          jsonAgg: { enabled: true },
+        });
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+          { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1 },
+          { id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('invitedUsers', (invitedUsers) =>
+            invitedUsers.orderBy((invitedUser) => invitedUser.id.asc()),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            invitedUsers: [
+              { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+              { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1 },
+            ],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: 1,
+            invitedUsers: [{ id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2 }],
+          },
+          {
+            id: 3,
+            name: 'Cara',
+            email: 'cara@example.com',
+            invitedById: 1,
+            invitedUsers: [],
+          },
+          {
+            id: 4,
+            name: 'Dan',
+            email: 'dan@example.com',
+            invitedById: 2,
+            invitedUsers: [],
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
+        const plan = runtime.executions[0];
+        const ast = plan?.ast;
+        expect(isSelectAst(ast)).toBe(true);
+        if (!isSelectAst(ast)) {
+          throw new Error('Expected select AST for correlated self-relation include query');
+        }
+        const invitedUsersProjection = ast.project.find((item) => item.alias === 'invitedUsers');
+        expect(invitedUsersProjection?.expr.kind).toBe('subquery');
+        if (invitedUsersProjection?.expr.kind === 'subquery') {
+          const includeAggregateProjection = invitedUsersProjection.expr.query.project[0];
+          expect(includeAggregateProjection?.expr.kind).toBe('jsonArrayAgg');
+          if (includeAggregateProjection?.expr.kind === 'jsonArrayAgg') {
+            expect(includeAggregateProjection.expr.orderBy).toEqual([
+              {
+                expr: {
+                  kind: 'col',
+                  table: 'invitedUsers__rows',
+                  column: 'invitedUsers__order_0',
+                },
+                dir: 'asc',
+              },
+            ]);
+          }
+          const rowsSource = invitedUsersProjection.expr.query.from;
+          expect(rowsSource.kind).toBe('derivedTable');
+          if (rowsSource.kind === 'derivedTable') {
+            expect(rowsSource.query.project.map((item) => item.alias)).toContain(
+              'invitedUsers__order_0',
+            );
+          }
+        }
+        const sql = runtime.executions[0]?.sql;
+        expect(sql).toContain('"invitedUsers__child"."invited_by_id" = "users"."id"');
       });
     },
     timeouts.spinUpPpgDev,

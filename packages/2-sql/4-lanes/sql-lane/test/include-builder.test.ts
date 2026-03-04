@@ -6,10 +6,13 @@ import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import { createOrderBuilder } from '@prisma-next/sql-relational-core/types';
+import {
+  type AnyColumnBuilderBase,
+  createOrderBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { buildIncludeAst, IncludeChildBuilderImpl } from '../src/sql/include-builder';
+import { buildIncludeJoinArtifact, IncludeChildBuilderImpl } from '../src/sql/include-builder';
 import type { Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -176,13 +179,40 @@ describe('IncludeChildBuilderImpl', () => {
   });
 });
 
-describe('buildIncludeAst', () => {
+describe('buildIncludeJoinArtifact', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
   const context = createTestContext(contract, adapter);
   const tables = schema<Contract>(context).tables;
   const userColumns = tables.user.columns;
   const postTableRef = createTableRef('post');
+
+  function createAliasedColumn(
+    table: string,
+    column: string,
+    columnMeta: AnyColumnBuilderBase['columnMeta'],
+  ): AnyColumnBuilderBase {
+    const notImplemented = (): never => {
+      throw new Error('Test helper only supports toExpr()');
+    };
+
+    return {
+      kind: 'column',
+      table,
+      column,
+      columnMeta,
+      eq: notImplemented,
+      neq: notImplemented,
+      gt: notImplemented,
+      lt: notImplemented,
+      gte: notImplemented,
+      lte: notImplemented,
+      asc: notImplemented,
+      desc: notImplemented,
+      toExpr: () => createColumnRef(table, column),
+      __jsType: undefined,
+    };
+  }
 
   it('builds include AST with all optional fields', () => {
     const includeState = {
@@ -202,20 +232,13 @@ describe('buildIncludeAst', () => {
       childLimit: 10,
     };
 
-    const ast = buildIncludeAst(includeState, contract, { userId: 42 }, [], []);
+    const artifact = buildIncludeJoinArtifact(includeState, contract, { userId: 42 }, [], []);
 
-    expect({
-      kind: ast.kind,
-      alias: ast.alias,
-      hasWhere: ast.child.where !== undefined,
-      hasOrderBy: ast.child.orderBy !== undefined,
-      limit: ast.child.limit,
-    }).toMatchObject({
-      kind: 'includeMany',
+    expect(artifact.join.lateral).toBe(true);
+    expect(artifact.join.source.kind).toBe('derivedTable');
+    expect(artifact.projection).toMatchObject({
       alias: 'posts',
-      hasWhere: true,
-      hasOrderBy: true,
-      limit: 10,
+      expr: { kind: 'col', table: 'posts_lateral', column: 'posts' },
     });
   });
 
@@ -234,21 +257,47 @@ describe('buildIncludeAst', () => {
       },
     };
 
-    const ast = buildIncludeAst(includeState, contract, {}, [], []);
+    const artifact = buildIncludeJoinArtifact(includeState, contract, {}, [], []);
+    expect(artifact.join.lateral).toBe(true);
+    expect(artifact.join.source.kind).toBe('derivedTable');
+  });
 
-    expect({
-      kind: ast.kind,
-      alias: ast.alias,
-      where: ast.child.where,
-      orderBy: ast.child.orderBy,
-      limit: ast.child.limit,
-    }).toMatchObject({
-      kind: 'includeMany',
+  it('preserves the child table alias in the inner include rows query', () => {
+    const aliasedPostTableRef = createTableRef('post', 'child_post');
+    const childIdColumn = createAliasedColumn('child_post', 'id', userColumns.id.columnMeta);
+    const childUserIdColumn = createAliasedColumn(
+      'child_post',
+      'userId',
+      userColumns.id.columnMeta,
+    );
+
+    const includeState = {
       alias: 'posts',
-      where: undefined,
-      orderBy: undefined,
-      limit: undefined,
-    });
+      table: aliasedPostTableRef,
+      on: {
+        kind: 'join-on' as const,
+        left: userColumns.id,
+        right: childUserIdColumn,
+      },
+      childProjection: {
+        aliases: ['id'],
+        columns: [childIdColumn],
+      },
+    } satisfies Parameters<typeof buildIncludeJoinArtifact>[0];
+
+    const artifact = buildIncludeJoinArtifact(includeState, contract, {}, [], []);
+    expect(artifact.join.source.kind).toBe('derivedTable');
+    if (artifact.join.source.kind === 'derivedTable') {
+      const rowsSource = artifact.join.source.query.from;
+      expect(rowsSource.kind).toBe('derivedTable');
+      if (rowsSource.kind === 'derivedTable') {
+        expect(rowsSource.query.from).toMatchObject({
+          kind: 'table',
+          name: 'post',
+          alias: 'child_post',
+        });
+      }
+    }
   });
 
   it('throws when column is missing for alias', () => {
@@ -266,7 +315,7 @@ describe('buildIncludeAst', () => {
       },
     };
 
-    expect(() => buildIncludeAst(includeState, contract, {}, [], [])).toThrow(
+    expect(() => buildIncludeJoinArtifact(includeState, contract, {}, [], [])).toThrow(
       'Missing column for alias',
     );
   });
@@ -287,7 +336,7 @@ describe('buildIncludeAst', () => {
       },
     };
 
-    expect(() => buildIncludeAst(includeState, contract, {}, [], [])).toThrow(
+    expect(() => buildIncludeJoinArtifact(includeState, contract, {}, [], [])).toThrow(
       'Missing column for alias',
     );
   });
@@ -326,14 +375,18 @@ describe('buildIncludeAst', () => {
       childOrderBy,
     };
 
-    const ast = buildIncludeAst(includeState, contract, {}, [], []);
-
-    expect(ast.child.orderBy).toBeDefined();
-    // When orderExpr is an OperationExpr, extractBaseColumnRef extracts the base column
-    expect(ast.child.orderBy?.[0]?.expr).toMatchObject({
-      kind: 'col',
-      table: 'user',
-      column: 'id',
-    });
+    const artifact = buildIncludeJoinArtifact(includeState, contract, {}, [], []);
+    expect(artifact.join.source.kind).toBe('derivedTable');
+    if (artifact.join.source.kind === 'derivedTable') {
+      const rowsSource = artifact.join.source.query.from;
+      expect(rowsSource.kind).toBe('derivedTable');
+      if (rowsSource.kind === 'derivedTable') {
+        expect(rowsSource.query.orderBy?.[0]?.expr).toEqual(operationExpr);
+        expect(rowsSource.query.project).toContainEqual({
+          alias: 'posts__order_0',
+          expr: operationExpr,
+        });
+      }
+    }
   });
 });

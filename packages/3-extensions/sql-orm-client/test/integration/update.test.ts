@@ -99,4 +99,40 @@ describe('integration/update', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'update() and updateAll() reject when returning capability is disabled',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+        const filtered = users.where({ id: 1 });
+
+        await expect(filtered.update({ name: 'Blocked' })).rejects.toThrow(
+          /requires contract capability "returning"/,
+        );
+        expect(() => filtered.updateAll({ name: 'Blocked' })).toThrow(
+          /requires contract capability "returning"/,
+        );
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'updateAll({}) and updateCount({}) are no-ops',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        runtime.resetExecutions();
+        const updated = await users.where({ id: 1 }).updateAll({});
+        const count = await users.where({ id: 1 }).updateCount({});
+
+        expect(updated).toEqual([]);
+        expect(count).toBe(0);
+        expect(runtime.executions).toHaveLength(0);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
