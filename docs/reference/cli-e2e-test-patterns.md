@@ -23,7 +23,7 @@ There are two approaches to CLI testing:
 - **Pros**: Tests real CLI behavior, catches ESM/CJS issues
 - **Cons**: Slower, requires build first, harder to mock
 
-**Recommendation**: Use in-process tests for fast iteration during development, but add subprocess tests for critical CLI flows. See task 7.2 in `agent-os/specs/2025-12-05-db-init-command/tasks.md` for cleanup plans.
+**Recommendation**: Use in-process tests for fast iteration during development, but add subprocess tests for critical CLI flows.
 
 ## Structure
 

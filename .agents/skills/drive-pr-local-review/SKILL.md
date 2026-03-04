@@ -79,7 +79,7 @@ Preferred inputs:
 1. If the user provided an **in-repo** spec file path (repo-relative or workspace-absolute) and it exists on this branch, treat it as canonical.
 2. Else, if the GitHub PR body links to or mentions an **in-repo** spec file path that exists on this branch, treat it as canonical.
 3. Else, search the branch for spec-like docs and pick the best match:
-   - Prefer: `agent-os/specs/**/spec.md`, `specs/**/spec.md`, `projects/**/spec.md`
+   - Prefer: `specs/**/spec.md`, `projects/**/spec.md`
    - Also consider: `**/spec.md`, `**/requirements.md`, `**/design.md` (especially if added/changed in the diff)
 
 Then choose where artifacts go:

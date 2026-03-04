@@ -76,7 +76,6 @@ flowchart TD
 
 ## Related Docs
 
-- Spec: `agent-os/specs/2026-02-10-postgres-one-liner-lazy-client/spec.md`
 - Architecture: `docs/Architecture Overview.md`
 - Subsystem: `docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md`
 - Subsystem: `docs/architecture docs/subsystems/5. Adapters & Targets.md`
