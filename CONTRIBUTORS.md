@@ -14,6 +14,16 @@ At the moment:
 
 When the major design decisions have settled and the public APIs have stabilized, we plan to open the project up to external contributions and we’ll update this document accordingly.
 
+### AI-authored contributions (future policy)
+
+When we open the project up to external contributions, we will require that any PR containing **AI-authored or AI-generated changes** includes the **intent artifact** used to produce the change, such as:
+
+- the prompt(s) you used
+- a short spec/plan you gave the model
+- the instructions you provided to the tool/agent
+
+The goal is to preserve intent and reviewability, not to police tooling. If you used AI as a collaborator, include enough of the inputs that a maintainer can understand *why* the change exists and what constraints it was written under.
+
 ### Feedback / discussion
 
 If you’d like to discuss the direction, ask questions, or share feedback, we’d love to hear from you in our [**Discord server**](https://pris.ly/discord)
