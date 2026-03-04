@@ -2,7 +2,7 @@
 
 ## Context
 
-- Prisma ORM (Prisma 7) often mapped a single high-level call to multiple database round-trips
+- Prisma 7 often mapped a single high-level call to multiple database round-trips
   - Examples include relation loading, pagination with count, and follow-up reads for computed results
 - Hidden multi-statement behavior makes performance unpredictable, complicates guardrails, and is hard for agents to reason about
 - Our runtime plugins, budgets, and preflight checks work best when a query has a single, verifiable statement boundary

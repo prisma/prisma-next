@@ -2,7 +2,7 @@
 
 ## Context
 
-- Prisma ORM (Prisma 7) intertwined cross-cutting logic with dialect details, making changes risky and contributions difficult
+- Prisma 7 intertwined cross-cutting logic with dialect details, making changes risky and contributions difficult
 - We need a small, stable center that defines contracts and lifecycle semantics, while pushing dialect and engine specifics to replaceable adapters
 - The design must support SQL family today and a Mongo family later without inventing an over-abstract common denominator
 
