@@ -4,5 +4,6 @@ export {
   findLatestMigration,
   findLeaf,
   findPath,
+  findReachableLeaves,
   reconstructGraph,
 } from '../dag';

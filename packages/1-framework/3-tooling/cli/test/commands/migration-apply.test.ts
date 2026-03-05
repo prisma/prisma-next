@@ -53,7 +53,6 @@ async function writeAttestedMigration(
   opts: {
     from: string;
     to: string;
-    parentMigrationId?: string | null;
     fromContract: ContractIR | null;
     toContract: ContractIR;
     ops: MigrationPlanOperation[];
@@ -67,7 +66,6 @@ async function writeAttestedMigration(
     from: opts.from,
     to: opts.to,
     migrationId: null,
-    parentMigrationId: opts.parentMigrationId ?? null,
     kind: 'regular',
     fromContract: opts.fromContract,
     toContract: opts.toContract,
@@ -158,7 +156,7 @@ describe(
         },
       });
 
-      const m1 = await writeAttestedMigration(migrationsDir, {
+      await writeAttestedMigration(migrationsDir, {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         fromContract: null,
@@ -171,7 +169,6 @@ describe(
       await writeAttestedMigration(migrationsDir, {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        parentMigrationId: m1.migrationId,
         fromContract: contractA,
         toContract: contractB,
         ops: [createTableOp('post')],
@@ -222,7 +219,7 @@ describe(
         },
       });
 
-      const m1 = await writeAttestedMigration(migrationsDir, {
+      await writeAttestedMigration(migrationsDir, {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         fromContract: null,
@@ -235,7 +232,6 @@ describe(
       await writeAttestedMigration(migrationsDir, {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        parentMigrationId: m1.migrationId,
         fromContract: contractA,
         toContract: contractB,
         ops: [createTableOp('post')],
@@ -319,7 +315,6 @@ describe(
         from: 'sha256:hash-a',
         to: EMPTY_CONTRACT_HASH,
         migrationId: null,
-        parentMigrationId: null,
         kind: 'regular',
         fromContract: createTestContract(),
         toContract: createTestContract(),
@@ -371,7 +366,7 @@ describe(
         },
       });
 
-      const m1 = await writeAttestedMigration(migrationsDir, {
+      await writeAttestedMigration(migrationsDir, {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         fromContract: null,
@@ -384,7 +379,6 @@ describe(
       await writeAttestedMigration(migrationsDir, {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        parentMigrationId: m1.migrationId,
         fromContract: contractA,
         toContract: contractB,
         ops: [createTableOp('post')],
@@ -423,7 +417,6 @@ describe(
       const m2 = await writeAttestedMigration(migrationsDir, {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        parentMigrationId: m1.migrationId,
         fromContract: contractA,
         toContract: contractB,
         ops: [createTableOp('post')],
