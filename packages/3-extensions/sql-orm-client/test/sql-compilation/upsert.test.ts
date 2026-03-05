@@ -11,31 +11,40 @@ import { normalizeSql, serializePlans } from './helpers';
 describe('sql-compilation/upsert', () => {
   it('upsert() inserts or updates and returns a row', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
-    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'alice@example.com', invited_by_id: null }],
+    ]);
 
     const upserted = await collection.upsert({
-      create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+      create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
       update: { name: 'Alice Updated' },
       conflictOn: { id: 1 },
     });
 
-    expect(upserted).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
+    expect(upserted).toEqual({
+      id: 1,
+      name: 'Alice',
+      email: 'alice@example.com',
+      invitedById: null,
+    });
     expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
-      'insert into "users" ("id", "name", "email") values ($1, $2, $3) on conflict ("id") do update set "name" = $4 returning *',
+      'insert into "users" ("id", "name", "email", "invited_by_id") values ($1, $2, $3, $4) on conflict ("id") do update set "name" = $5 returning *',
     );
   });
 
   it('upsert() defaults conflict columns to primary key', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
-    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'alice@example.com', invited_by_id: null }],
+    ]);
 
     await collection.upsert({
-      create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+      create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
       update: { name: 'Alice Updated' },
     });
 
     expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
-      'insert into "users" ("id", "name", "email") values ($1, $2, $3) on conflict ("id") do update set "name" = $4 returning *',
+      'insert into "users" ("id", "name", "email", "invited_by_id") values ($1, $2, $3, $4) on conflict ("id") do update set "name" = $5 returning *',
     );
   });
 
@@ -90,7 +99,7 @@ describe('sql-compilation/upsert', () => {
 
     await expect(
       collection.upsert({
-        create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+        create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
         update: { name: 'Alice Updated' },
       }),
     ).rejects.toThrow(/requires contract capability "returning"/);
@@ -107,7 +116,7 @@ describe('sql-compilation/upsert', () => {
       .select('name')
       .include('posts')
       .upsert({
-        create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+        create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
         update: { name: 'Alice Updated' },
       });
 
@@ -127,7 +136,7 @@ describe('sql-compilation/upsert', () => {
 
     await expect(
       collection.upsert({
-        create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+        create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
         update: { name: 'Alice Updated' },
       }),
     ).rejects.toThrow(/requires conflict columns/);
@@ -139,7 +148,7 @@ describe('sql-compilation/upsert', () => {
 
     await expect(
       collection.upsert({
-        create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+        create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
         update: { name: 'Alice Updated' },
       }),
     ).rejects.toThrow(/did not return a row/);
@@ -147,10 +156,12 @@ describe('sql-compilation/upsert', () => {
 
   it('captures upsert plan snapshots', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
-    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'alice@example.com', invited_by_id: null }],
+    ]);
 
     await collection.upsert({
-      create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+      create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
       update: { name: 'Alice Updated' },
     });
 
@@ -162,9 +173,10 @@ describe('sql-compilation/upsert', () => {
             1,
             "Alice",
             "alice@example.com",
+            null,
             "Alice Updated",
           ],
-          "sql": "insert into "users" ("id", "name", "email") values ($1, $2, $3) on conflict ("id") do update set "name" = $4 returning *",
+          "sql": "insert into "users" ("id", "name", "email", "invited_by_id") values ($1, $2, $3, $4) on conflict ("id") do update set "name" = $5 returning *",
         },
       ]
     `);

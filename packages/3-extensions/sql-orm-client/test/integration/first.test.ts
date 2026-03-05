@@ -20,7 +20,12 @@ describe('integration/first', () => {
 
         expect(found).not.toBeNull();
         expect(found?.name).toBe('Alice');
-        expect(foundByFn).toEqual({ id: 2, name: 'Alice', email: 'alice2@example.com' });
+        expect(foundByFn).toEqual({
+          id: 2,
+          name: 'Alice',
+          email: 'alice2@example.com',
+          invitedById: null,
+        });
         expect(missing).toBeNull();
       });
     },
@@ -44,7 +49,12 @@ describe('integration/first', () => {
           .orderBy((user) => user.id.desc())
           .first();
 
-        expect(found).toEqual({ id: 2, name: 'Bob', email: 'bob-2@example.com' });
+        expect(found).toEqual({
+          id: 2,
+          name: 'Bob',
+          email: 'bob-2@example.com',
+          invitedById: null,
+        });
       });
     },
     timeouts.spinUpPpgDev,

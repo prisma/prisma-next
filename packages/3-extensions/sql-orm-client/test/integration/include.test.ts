@@ -36,6 +36,7 @@ describe('integration/include', () => {
             id: 1,
             name: 'Alice',
             email: 'alice@example.com',
+            invitedById: null,
             posts: [
               { id: 10, title: 'Post A', userId: 1, views: 100 },
               { id: 11, title: 'Post B', userId: 1, views: 200 },
@@ -46,6 +47,7 @@ describe('integration/include', () => {
             id: 2,
             name: 'Bob',
             email: 'bob@example.com',
+            invitedById: null,
             posts: [{ id: 12, title: 'Post C', userId: 2, views: 300 }],
             profile: null,
           },
@@ -114,9 +116,9 @@ describe('integration/include', () => {
           .all();
 
         expect(rows).toEqual([
-          { id: 1, name: 'Alice', email: 'alice@example.com', posts: 300 },
-          { id: 2, name: 'Bob', email: 'bob@example.com', posts: 300 },
-          { id: 3, name: 'Cara', email: 'cara@example.com', posts: null },
+          { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null, posts: 300 },
+          { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: null, posts: 300 },
+          { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: null, posts: null },
         ]);
         expect(runtime.executions).toHaveLength(2);
       });
@@ -159,18 +161,21 @@ describe('integration/include', () => {
             id: 1,
             name: 'Alice',
             email: 'alice@example.com',
+            invitedById: null,
             posts: { avgViews: 150, minViews: 100, maxViews: 200 },
           },
           {
             id: 2,
             name: 'Bob',
             email: 'bob@example.com',
+            invitedById: null,
             posts: { avgViews: 300, minViews: 300, maxViews: 300 },
           },
           {
             id: 3,
             name: 'Cara',
             email: 'cara@example.com',
+            invitedById: null,
             posts: { avgViews: null, minViews: null, maxViews: null },
           },
         ]);
@@ -213,6 +218,7 @@ describe('integration/include', () => {
             id: 1,
             name: 'Alice',
             email: 'alice@example.com',
+            invitedById: null,
             posts: {
               popular: [{ id: 11, title: 'Post B', userId: 1, views: 250 }],
               latestOne: [{ id: 11, title: 'Post B', userId: 1, views: 250 }],
@@ -223,6 +229,7 @@ describe('integration/include', () => {
             id: 2,
             name: 'Bob',
             email: 'bob@example.com',
+            invitedById: null,
             posts: {
               popular: [{ id: 12, title: 'Post C', userId: 2, views: 300 }],
               latestOne: [{ id: 12, title: 'Post C', userId: 2, views: 300 }],
