@@ -12,7 +12,7 @@ export async function ormCreateUser(
 ) {
   const id = generateId({ id: 'uuidv4' });
   const db = createOrmClient(runtime);
-  const created = await db.users.create({
+  const created = await db.User.create({
     id: toUserId(id),
     email: data.email,
     createdAt: toUserCreatedAt(data.createdAt),
@@ -23,13 +23,13 @@ export async function ormCreateUser(
 
 export async function ormUpdateUser(userId: string, newEmail: string, runtime: Runtime) {
   const db = createOrmClient(runtime);
-  const updated = await db.users.where({ id: toUserId(userId) }).update({ email: newEmail });
+  const updated = await db.User.where({ id: toUserId(userId) }).update({ email: newEmail });
   return updated ? 1 : 0;
 }
 
 export async function ormDeleteUser(userId: string, runtime: Runtime) {
   const db = createOrmClient(runtime);
-  const deleted = await db.users.where({ id: toUserId(userId) }).delete();
+  const deleted = await db.User.where({ id: toUserId(userId) }).delete();
   return deleted ? 1 : 0;
 }
 

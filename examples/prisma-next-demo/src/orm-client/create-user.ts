@@ -14,7 +14,7 @@ export interface OrmClientCreateUserInput {
 
 export async function ormClientCreateUser(data: OrmClientCreateUserInput, runtime: Runtime) {
   const db = createOrmClient(runtime);
-  return db.users.select('id', 'email', 'kind').create({
+  return db.User.select('id', 'email', 'kind').create({
     id: toUserId(data.id),
     email: data.email,
     kind: data.kind,

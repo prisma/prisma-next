@@ -15,19 +15,19 @@ const db = orm({
   contract,
   runtime,
   collections: {
-    posts: PostCollection,
+    Post: PostCollection,
     // Use default collections for the rest of the model
   }
 });
 
-const posts = await db.posts.popular().all().toArray()
+const posts = await db.Post.popular().all().toArray()
 ```
 
 ## Filter parent records by child records
 
 ```typescript
 const users = await db
-  .users
+  .User
   .where((u) => u.posts.some((p) => p.popular()))
   .all()
   .toArray()
@@ -37,7 +37,7 @@ const users = await db
 
 ```typescript
 db
-  .users
+  .User
   .where(conditions)
   .include('posts', (p) =>
     p.where(conditions).include('comments')
@@ -51,7 +51,7 @@ We're not awaiting `first()`, instead using `.comments` to drop to a `comments` 
 
 ```typescript
  db
-  .posts
+  .Post
   .where({ id: postId })
   .first()
   .comments

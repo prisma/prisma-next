@@ -21,12 +21,6 @@ type ModelNames<TContract extends SqlContract<SqlStorage>> = CollectionModelName
 
 type AnyCollectionClass = new (...args: never[]) => object;
 
-type LowercaseFirst<Name extends string> = Name extends `${infer Head}${infer Tail}`
-  ? `${Lowercase<Head>}${Tail}`
-  : Name;
-
-type ModelAliasKeys<Name extends string> = Name | LowercaseFirst<Name> | `${LowercaseFirst<Name>}s`;
-
 type CustomCollectionForKey<
   Collections extends Partial<Record<string, AnyCollectionClass>>,
   Key extends string,
@@ -36,28 +30,19 @@ type CustomCollectionForKey<
     : never
   : never;
 
-type CustomCollectionForModel<
-  TContract extends SqlContract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass>>,
-  ModelName extends ModelNames<TContract>,
-> =
-  | CustomCollectionForKey<Collections, ModelName>
-  | CustomCollectionForKey<Collections, LowercaseFirst<ModelName>>
-  | CustomCollectionForKey<Collections, `${LowercaseFirst<ModelName>}s`>;
-
 type ModelCollection<
   TContract extends SqlContract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
   ModelName extends ModelNames<TContract>,
-> = [CustomCollectionForModel<TContract, Collections, ModelName>] extends [never]
+> = [CustomCollectionForKey<Collections, ModelName>] extends [never]
   ? Collection<TContract, ModelName, DefaultModelRow<TContract, ModelName>>
-  : CustomCollectionForModel<TContract, Collections, ModelName>;
+  : CustomCollectionForKey<Collections, ModelName>;
 
 type ModelCollectionMap<
   TContract extends SqlContract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
 > = {
-  [K in ModelNames<TContract> as ModelAliasKeys<K>]: ModelCollection<TContract, Collections, K>;
+  [K in ModelNames<TContract>]: ModelCollection<TContract, Collections, K>;
 };
 
 type OrmClient<
@@ -71,8 +56,8 @@ export function orm<
 >(options: OrmOptions<TContract, Collections>): OrmClient<TContract, Collections> {
   const { contract, runtime, collections } = options;
   const ctx: CollectionContext<TContract> = { contract, runtime };
-  const modelAliases = createModelAliases(contract);
-  const collectionRegistry = createCollectionRegistry(contract, collections, modelAliases);
+  const modelNames = new Set(Object.keys(contract.models as Record<string, unknown>));
+  const collectionRegistry = createCollectionRegistry(contract, collections);
   const cache = new Map<
     ModelNames<TContract>,
     Collection<TContract, string, unknown, CollectionTypeState>
@@ -84,12 +69,13 @@ export function orm<
         return undefined;
       }
 
-      const modelName = resolveModelName(prop, modelAliases);
-      if (!modelName) {
+      if (!modelNames.has(prop)) {
         throw new Error(
-          `No model found for '${prop}'. Available models: ${Object.keys(contract.models as Record<string, unknown>).join(', ')}`,
+          `No model found for '${prop}'. Available models: ${[...modelNames].join(', ')}`,
         );
       }
+
+      const modelName = prop as ModelNames<TContract>;
 
       const cached = cache.get(modelName);
       if (cached) {
@@ -97,8 +83,7 @@ export function orm<
       }
 
       const CollectionClass =
-        collectionRegistry.get(modelName as ModelNames<TContract>) ??
-        (Collection as unknown as AnyCollectionClass);
+        collectionRegistry.get(modelName) ?? (Collection as unknown as AnyCollectionClass);
       const CollectionCtor = CollectionClass as unknown as new (
         ctx: CollectionContext<TContract>,
         modelName: string,
@@ -108,40 +93,12 @@ export function orm<
         registry: collectionRegistry,
       }) as ModelCollection<TContract, Collections, ModelNames<TContract>>;
       cache.set(
-        modelName as ModelNames<TContract>,
+        modelName,
         collection as unknown as Collection<TContract, string, unknown, CollectionTypeState>,
       );
       return collection;
     },
   });
-}
-
-function createModelAliases<TContract extends SqlContract<SqlStorage>>(
-  contract: TContract,
-): Map<string, ModelNames<TContract>> {
-  const aliases = new Map<string, ModelNames<TContract>>();
-  const modelNames = Object.keys(
-    contract.models as Record<string, unknown>,
-  ) as ModelNames<TContract>[];
-  const modelToTable = contract.mappings.modelToTable ?? {};
-
-  for (const modelName of modelNames) {
-    const lowerModel = lowercaseFirst(modelName);
-
-    aliases.set(modelName, modelName);
-    aliases.set(lowerModel, modelName);
-    aliases.set(`${lowerModel}s`, modelName);
-
-    const tableName = modelToTable[modelName];
-    if (tableName) {
-      aliases.set(tableName, modelName);
-      if (!tableName.endsWith('s')) {
-        aliases.set(`${tableName}s`, modelName);
-      }
-    }
-  }
-
-  return aliases;
 }
 
 function createCollectionRegistry<
@@ -150,13 +107,13 @@ function createCollectionRegistry<
 >(
   contract: TContract,
   collections: Collections | undefined,
-  aliases: Map<string, ModelNames<TContract>>,
 ): Map<ModelNames<TContract>, AnyCollectionClass> {
   const registry = new Map<ModelNames<TContract>, AnyCollectionClass>();
   if (!collections) {
     return registry;
   }
 
+  const models = contract.models as Record<string, unknown>;
   for (const [key, collectionClass] of Object.entries(collections)) {
     if (!collectionClass) {
       continue;
@@ -166,13 +123,12 @@ function createCollectionRegistry<
         `Custom collection '${key}' must be a Collection class (constructor), not an instance`,
       );
     }
-    const modelName = resolveModelName(key, aliases);
-    if (!modelName) {
+    if (!(key in models)) {
       throw new Error(
-        `No model found for custom collection '${key}'. Available models: ${Object.keys(contract.models as Record<string, unknown>).join(', ')}`,
+        `No model found for custom collection '${key}'. Available models: ${Object.keys(models).join(', ')}`,
       );
     }
-    registry.set(modelName, collectionClass as AnyCollectionClass);
+    registry.set(key as ModelNames<TContract>, collectionClass as AnyCollectionClass);
   }
 
   return registry;
@@ -187,27 +143,4 @@ function isCollectionClass(value: unknown): value is AnyCollectionClass {
     return false;
   }
   return candidate.prototype instanceof Collection;
-}
-
-function resolveModelName<ModelName extends string>(
-  key: string,
-  aliases: Map<string, ModelName>,
-): ModelName | undefined {
-  const exact = aliases.get(key);
-  if (exact) {
-    return exact;
-  }
-
-  if (key.endsWith('s')) {
-    return aliases.get(key.slice(0, -1));
-  }
-
-  return undefined;
-}
-
-function lowercaseFirst(value: string): string {
-  if (value.length === 0) {
-    return value;
-  }
-  return value.charAt(0).toLowerCase() + value.slice(1);
 }

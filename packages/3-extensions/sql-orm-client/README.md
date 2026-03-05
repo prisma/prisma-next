@@ -12,7 +12,7 @@ This package provides a high-level ORM client surface on top of the runtime that
 - Compile collection state into executable SQL plans using Kysely compilation
 - Execute and stitch include trees across multiple plan executions
 - Map storage-column rows back to model-field row shapes
-- Expose an `orm()` client with typed collection keys (for example `db.posts`)
+- Expose an `orm()` client with typed collection keys (for example `db.Post`)
 
 ## Dependency Boundaries
 
@@ -43,7 +43,7 @@ flowchart LR
 ```ts
 const db = orm({ contract, runtime });
 
-const posts = await db.posts
+const posts = await db.Post
   .where((post) => post.userId.eq(userId))
   .take(10)
   .all();
