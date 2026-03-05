@@ -1,12 +1,19 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig } from '@prisma-next/config/config-types';
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
 import { createBuiltinDefaultFunctionRegistry } from './default-function-registry';
 import { interpretPslDocumentToSqlContractIR } from './interpreter';
+
+type CapabilityMatrix = ContractIR['capabilities'];
+
+export interface CapabilitySource {
+  readonly capabilities?: CapabilityMatrix;
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -43,21 +50,34 @@ function sortDeep(value: unknown): unknown {
   return next;
 }
 
+function sortDeepTyped<T>(value: T): T {
+  return sortDeep(value) as T;
+}
+
 function mergeCapabilitiesFromSources(
-  sources: readonly unknown[] | undefined,
-): Record<string, unknown> {
+  sources: readonly CapabilitySource[] | undefined,
+): CapabilityMatrix {
   if (!sources || sources.length === 0) {
     return {};
   }
 
-  let merged: Record<string, unknown> = {};
+  let merged: CapabilityMatrix = {};
   for (const source of sources) {
-    if (!isPlainObject(source)) continue;
-    const caps = source['capabilities'];
-    if (!isPlainObject(caps)) continue;
-    merged = mergePlainObjects(merged, caps);
+    if (!source.capabilities) continue;
+    merged = mergeCapabilities(merged, source.capabilities);
   }
   return merged;
+}
+
+function mergeCapabilities(left: CapabilityMatrix, right: CapabilityMatrix): CapabilityMatrix {
+  const next: CapabilityMatrix = { ...left };
+  for (const [namespace, capabilities] of Object.entries(right)) {
+    next[namespace] = {
+      ...(left[namespace] ?? {}),
+      ...capabilities,
+    };
+  }
+  return next;
 }
 
 export interface PrismaContractOptions {
@@ -88,7 +108,7 @@ export interface PrismaContractOptions {
    * When set, the provider will merge all available capabilities and emit them deterministically.
    * Sources are expected to expose a `capabilities` object (for example descriptor meta objects).
    */
-  readonly capabilitySources?: readonly unknown[];
+  readonly capabilitySources?: readonly CapabilitySource[];
 }
 
 export function prismaContract(
@@ -131,24 +151,19 @@ export function prismaContract(
         return interpreted;
       }
 
-      const base = interpreted.value as unknown as {
-        readonly capabilities?: Record<string, unknown> | undefined;
-        readonly extensionPacks?: Record<string, unknown> | undefined;
-      };
-
       const extensionPacks = options?.extensionPacks
-        ? mergePlainObjects(base.extensionPacks ?? {}, options.extensionPacks)
-        : (base.extensionPacks ?? {});
+        ? mergePlainObjects(interpreted.value.extensionPacks, options.extensionPacks)
+        : interpreted.value.extensionPacks;
 
-      const mergedCapabilities = mergePlainObjects(
-        base.capabilities ?? {},
+      const mergedCapabilities = mergeCapabilities(
+        interpreted.value.capabilities,
         mergeCapabilitiesFromSources(options?.capabilitySources),
       );
 
       return ok({
         ...interpreted.value,
-        extensionPacks: sortDeep(extensionPacks) as never,
-        capabilities: sortDeep(mergedCapabilities) as never,
+        extensionPacks: sortDeepTyped(extensionPacks),
+        capabilities: sortDeepTyped(mergedCapabilities),
       });
     },
     ...ifDefined('output', options?.output),
