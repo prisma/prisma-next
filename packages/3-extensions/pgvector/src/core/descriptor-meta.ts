@@ -1,3 +1,4 @@
+import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
@@ -14,6 +15,16 @@ const cosineDistanceOperation = Object.freeze({
   returns: { kind: 'builtin', type: 'number' },
   lowering: cosineLowering,
 } as const);
+
+const vectorControlPlaneHooks: CodecControlHooks = {
+  expandNativeType: ({ nativeType, typeParams }) => {
+    const length = typeParams?.['length'];
+    if (typeof length === 'number' && Number.isInteger(length) && length > 0) {
+      return `${nativeType}(${length})`;
+    }
+    return nativeType;
+  },
+};
 
 export const pgvectorOperationSignature: SqlOperationSignature = {
   forTypeId: pgvectorTypeId,
@@ -37,6 +48,9 @@ export const pgvectorPackMeta = {
         package: '@prisma-next/extension-pgvector/codec-types',
         named: 'CodecTypes',
         alias: 'PgVectorTypes',
+      },
+      controlPlaneHooks: {
+        [pgvectorTypeId]: vectorControlPlaneHooks,
       },
       typeImports: [
         {
