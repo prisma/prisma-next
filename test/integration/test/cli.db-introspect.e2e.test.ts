@@ -12,15 +12,34 @@ import {
 // Fixture subdirectory for db-introspect e2e tests
 const fixtureSubdir = 'db-introspect';
 
+/**
+ * Returns only the stdout lines from consoleOutput by filtering out stderr decoration.
+ * The test mock pushes stderr writes to both consoleErrors and consoleOutput,
+ * so removing consoleErrors entries yields stdout-only content.
+ */
+function stdoutOnly(consoleOutput: string[], consoleErrors: string[]): string[] {
+  const stderrBag = [...consoleErrors];
+  return consoleOutput.filter((line) => {
+    const idx = stderrBag.indexOf(line);
+    if (idx !== -1) {
+      stderrBag.splice(idx, 1);
+      return false;
+    }
+    return true;
+  });
+}
+
 withTempDir(({ createTempDir }) => {
   describe('db introspect command (e2e)', () => {
     let consoleOutput: string[] = [];
+    let consoleErrors: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       // Set up console and process.exit mocks
       const mocks = setupCommandMocks();
       consoleOutput = mocks.consoleOutput;
+      consoleErrors = mocks.consoleErrors;
       cleanupMocks = mocks.cleanup;
     });
 
@@ -75,8 +94,13 @@ withTempDir(({ createTempDir }) => {
           const output = consoleOutput.join('\n');
           const stripped = stripAnsi(output);
 
-          // Normalize database URL (port number) in output for snapshot
-          const normalized = stripped.replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX');
+          // Normalize database URL (port number), spinner timings, and intermediate
+          // Clack spinner frames (◒, ◐, ◓, ◑) that appear before final ◇ result
+          const normalized = stripped
+            .replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX')
+            .replace(/\(\d+ms\)/g, '(Xms)')
+            .replace(/^[◒◐◓◑].*$/gm, '')
+            .replace(/\n{3,}/g, '\n\n');
 
           // Snapshot test for tree output
           expect(normalized).toMatchSnapshot();
@@ -117,8 +141,8 @@ withTempDir(({ createTempDir }) => {
             process.chdir(originalCwd);
           }
 
-          // Get output and parse JSON
-          const output = consoleOutput.join('\n');
+          // Get stdout-only output (exclude stderr decoration) and parse JSON
+          const output = stdoutOnly(consoleOutput, consoleErrors).join('\n');
           const jsonOutput = JSON.parse(output);
 
           // Normalize non-deterministic values (dbUrl and timing) for snapshot

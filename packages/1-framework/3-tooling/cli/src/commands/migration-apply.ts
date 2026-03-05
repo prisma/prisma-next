@@ -31,6 +31,7 @@ import {
   formatStyledHeader,
 } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationApplyCommandOptions {
   readonly db?: string;
@@ -40,11 +41,13 @@ interface MigrationApplyCommandOptions {
   readonly q?: boolean;
   readonly verbose?: boolean;
   readonly v?: boolean;
-  readonly vv?: boolean;
   readonly trace?: boolean;
-  readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+  readonly interactive?: boolean;
+  readonly 'no-interactive'?: boolean;
+  readonly yes?: boolean;
+  readonly y?: boolean;
 }
 
 export interface MigrationApplyResult {
@@ -161,7 +164,9 @@ async function executeMigrationApplyCommand(
     );
   }
 
-  if (flags.json !== 'object' && !flags.quiet) {
+  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'migrations', value: migrationsRelative },
@@ -176,7 +181,7 @@ async function executeMigrationApplyCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Read migrations and build migration chain model (offline — no DB needed)
@@ -343,9 +348,9 @@ async function executeMigrationApplyCommand(
       pendingMigrations.push(packageToStep(pkg));
     }
 
-    if (!flags.quiet && flags.json !== 'object') {
+    if (!flags.quiet && !flags.json) {
       for (const migration of pendingMigrations) {
-        console.log(`  Applying ${migration.dirName}...`);
+        ui.step(`Applying ${migration.dirName}...`);
       }
     }
 
@@ -403,24 +408,28 @@ export function createMigrationApplyCommand(): Command {
     })
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object)', false)
+    .option('--json', 'Output as JSON')
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
+    .option('--trace', 'Trace output: deep internals, stack traces')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
+    .option('--interactive', 'Force interactive mode')
+    .option('--no-interactive', 'Disable interactive prompts')
+    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: MigrationApplyCommandOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
       const result = await executeMigrationApplyCommand(options, flags, startTime);
 
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
       const exitCode = handleResult(result, flags, (applyResult) => {
-        if (flags.json === 'object') {
-          console.log(JSON.stringify(applyResult, null, 2));
+        if (flags.json) {
+          ui.output(JSON.stringify(applyResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationApplyCommandOutput(applyResult, flags));
+          ui.log(formatMigrationApplyCommandOutput(applyResult, flags));
         }
       });
 

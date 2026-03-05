@@ -7,7 +7,6 @@ import {
   CliStructuredError,
   errorContractValidationFailed,
   errorDestructiveChanges,
-  errorJsonFormatNotSupported,
   errorMigrationPlanningFailed,
   errorRunnerFailed,
   errorUnexpected,
@@ -27,6 +26,7 @@ import {
   type MigrationCommandResult,
 } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 type DbUpdateOptions = MigrationCommandOptions & {
   readonly acceptDataLoss?: boolean;
@@ -187,29 +187,19 @@ export function createDbUpdateCommand(): Command {
     const flags = parseGlobalFlags(options);
     const startTime = Date.now();
 
-    if (flags.json === 'ndjson') {
-      const result = notOk(
-        errorJsonFormatNotSupported({
-          command: 'db update',
-          format: 'ndjson',
-          supportedFormats: ['object'],
-        }),
-      );
-      const exitCode = handleResult(result, flags);
-      process.exit(exitCode);
-    }
+    const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
     const result = await executeDbUpdateCommand(options, flags, startTime);
     const exitCode = handleResult(result, flags, (dbUpdateResult) => {
-      if (flags.json === 'object') {
-        console.log(formatMigrationJson(dbUpdateResult));
+      if (flags.json) {
+        ui.output(formatMigrationJson(dbUpdateResult));
       } else {
         const output =
           dbUpdateResult.mode === 'plan'
             ? formatMigrationPlanOutput(dbUpdateResult, flags)
             : formatMigrationApplyOutput(dbUpdateResult, flags);
         if (output) {
-          console.log(output);
+          ui.log(output);
         }
       }
     });

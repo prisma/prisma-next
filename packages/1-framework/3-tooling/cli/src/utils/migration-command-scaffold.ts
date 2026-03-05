@@ -18,6 +18,7 @@ import { maskConnectionUrl, resolveContractPath } from './command-helpers';
 import type { GlobalFlags } from './global-flags';
 import { formatStyledHeader } from './output';
 import { createProgressAdapter } from './progress-adapter';
+import { TerminalUI } from './terminal-ui';
 
 /**
  * Resolved context for a migration command.
@@ -56,6 +57,8 @@ export async function prepareMigrationContext(
   flags: GlobalFlags,
   descriptor: MigrationCommandDescriptor,
 ): Promise<Result<MigrationContext, CliStructuredError>> {
+  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -64,8 +67,8 @@ export async function prepareMigrationContext(
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
-  // Output header
-  if (flags.json !== 'object' && !flags.quiet) {
+  // Output header to stderr (decoration)
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
@@ -83,7 +86,7 @@ export async function prepareMigrationContext(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Load contract file
@@ -180,11 +183,13 @@ export function addMigrationCommandOptions(command: Command): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--plan', 'Preview planned operations without applying', false)
-    .option('--json [format]', 'Output as JSON (object)', false)
+    .option('--json', 'Output as JSON')
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
+    .option('--trace', 'Trace output: deep internals, stack traces')
     .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output');
+    .option('--no-color', 'Disable color output')
+    .option('--interactive', 'Force interactive mode')
+    .option('--no-interactive', 'Disable interactive prompts')
+    .option('-y, --yes', 'Auto-accept prompts');
 }

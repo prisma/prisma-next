@@ -6,7 +6,6 @@ import type { DbInitFailure } from '../control-api/types';
 import {
   CliStructuredError,
   errorContractValidationFailed,
-  errorJsonFormatNotSupported,
   errorMigrationPlanningFailed,
   errorRunnerFailed,
   errorRuntime,
@@ -27,6 +26,7 @@ import {
   type MigrationCommandResult,
 } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 type DbInitOptions = MigrationCommandOptions;
 
@@ -211,31 +211,20 @@ export function createDbInitCommand(): Command {
     const flags = parseGlobalFlags(options);
     const startTime = Date.now();
 
-    // Validate JSON format option
-    if (flags.json === 'ndjson') {
-      const result = notOk(
-        errorJsonFormatNotSupported({
-          command: 'db init',
-          format: 'ndjson',
-          supportedFormats: ['object'],
-        }),
-      );
-      const exitCode = handleResult(result, flags);
-      process.exit(exitCode);
-    }
+    const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
     const result = await executeDbInitCommand(options, flags, startTime);
 
     const exitCode = handleResult(result, flags, (dbInitResult) => {
-      if (flags.json === 'object') {
-        console.log(formatMigrationJson(dbInitResult));
+      if (flags.json) {
+        ui.output(formatMigrationJson(dbInitResult));
       } else {
         const output =
           dbInitResult.mode === 'plan'
             ? formatMigrationPlanOutput(dbInitResult, flags)
             : formatMigrationApplyOutput(dbInitResult, flags);
         if (output) {
-          console.log(output);
+          ui.log(output);
         }
       }
     });

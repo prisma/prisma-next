@@ -15,7 +15,6 @@ import {
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
-  errorJsonFormatNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
@@ -34,6 +33,7 @@ import {
 } from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 interface DbSignOptions {
   readonly db?: string;
@@ -43,11 +43,13 @@ interface DbSignOptions {
   readonly q?: boolean;
   readonly verbose?: boolean;
   readonly v?: boolean;
-  readonly vv?: boolean;
   readonly trace?: boolean;
-  readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+  readonly interactive?: boolean;
+  readonly 'no-interactive'?: boolean;
+  readonly yes?: boolean;
+  readonly y?: boolean;
 }
 
 /**
@@ -65,6 +67,8 @@ async function executeDbSignCommand(
   options: DbSignOptions,
   flags: GlobalFlags,
 ): Promise<Result<SignDatabaseResult, DbSignFailure>> {
+  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -74,7 +78,7 @@ async function executeDbSignCommand(
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
   // Output header
-  if (flags.json !== 'object' && !flags.quiet) {
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
@@ -89,7 +93,7 @@ async function executeDbSignCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Load contract file
@@ -162,10 +166,6 @@ async function executeDbSignCommand(
 
     // If schema verification failed, return as failure
     if (!schemaVerifyResult.ok) {
-      // Add blank line after all async operations if spinners were shown
-      if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
-        console.log('');
-      }
       return notOk(schemaVerifyResult);
     }
 
@@ -176,11 +176,6 @@ async function executeDbSignCommand(
       configPath,
       onProgress,
     });
-
-    // Add blank line after all async operations if spinners were shown
-    if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
-      console.log('');
-    }
 
     return ok(signResult);
   } catch (error) {
@@ -227,39 +222,30 @@ export function createDbSignCommand(): Command {
     })
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object)', false)
+    .option('--json', 'Output as JSON')
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
+    .option('--trace', 'Trace output: deep internals, stack traces')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
+    .option('--interactive', 'Force interactive mode')
+    .option('--no-interactive', 'Disable interactive prompts')
+    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: DbSignOptions) => {
       const flags = parseGlobalFlags(options);
 
-      // Validate JSON format option
-      if (flags.json === 'ndjson') {
-        const result = notOk(
-          errorJsonFormatNotSupported({
-            command: 'db sign',
-            format: 'ndjson',
-            supportedFormats: ['object'],
-          }),
-        );
-        const exitCode = handleResult(result, flags);
-        process.exit(exitCode);
-      }
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
       const result = await executeDbSignCommand(options, flags);
 
       if (result.ok) {
         // Success - format sign output
-        if (flags.json === 'object') {
-          console.log(formatSignJson(result.value));
+        if (flags.json) {
+          ui.output(formatSignJson(result.value));
         } else {
           const output = formatSignOutput(result.value, flags);
           if (output) {
-            console.log(output);
+            ui.log(output);
           }
         }
         process.exit(0);
@@ -275,12 +261,12 @@ export function createDbSignCommand(): Command {
       }
 
       // Schema verification failed - format and print schema verification output
-      if (flags.json === 'object') {
-        console.log(formatSchemaVerifyJson(failure));
+      if (flags.json) {
+        ui.output(formatSchemaVerifyJson(failure));
       } else {
         const output = formatSchemaVerifyOutput(failure, flags);
         if (output) {
-          console.log(output);
+          ui.log(output);
         }
       }
       process.exit(1);

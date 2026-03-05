@@ -18,7 +18,7 @@ describe('progress adapter', () => {
   });
 
   it('is no-op when json output is enabled', () => {
-    const adapter = createProgressAdapter({ flags: { json: 'object' } });
+    const adapter = createProgressAdapter({ flags: { json: true } });
     const event: ControlProgressEvent = {
       action: 'dbInit',
       kind: 'spanStart',
@@ -181,13 +181,13 @@ describe('progress adapter', () => {
     }
   });
 
-  it('prints nested spans as lines instead of spinners', () => {
-    // Mock process.stdout.isTTY
+  it('prints nested spans to stderr instead of spinners', () => {
+    // Mock process.stdout.isTTY for interactive mode
     const originalIsTTY = process.stdout.isTTY;
     process.stdout.isTTY = true;
 
-    // Mock console.log
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // Mock process.stderr.write (clack writes to stderr)
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     try {
       const adapter = createProgressAdapter({ flags: {} });
@@ -201,10 +201,12 @@ describe('progress adapter', () => {
 
       adapter(event);
 
-      // Should log the operation as a line
-      expect(consoleLogSpy).toHaveBeenCalledWith('  → Create table users...');
+      // Nested spans write to stderr via clack.log.step
+      expect(stderrSpy).toHaveBeenCalled();
+      const output = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
+      expect(output).toContain('Create table users');
     } finally {
-      consoleLogSpy.mockRestore();
+      stderrSpy.mockRestore();
       process.stdout.isTTY = originalIsTTY;
     }
   });

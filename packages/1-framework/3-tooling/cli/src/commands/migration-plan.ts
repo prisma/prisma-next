@@ -34,6 +34,7 @@ import { assertFrameworkComponentsCompatible } from '../utils/framework-componen
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { formatCommandHelp, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationPlanOptions {
   readonly config?: string;
@@ -44,11 +45,13 @@ interface MigrationPlanOptions {
   readonly q?: boolean;
   readonly verbose?: boolean;
   readonly v?: boolean;
-  readonly vv?: boolean;
   readonly trace?: boolean;
-  readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+  readonly interactive?: boolean;
+  readonly 'no-interactive'?: boolean;
+  readonly yes?: boolean;
+  readonly y?: boolean;
 }
 
 export interface MigrationPlanResult {
@@ -102,7 +105,9 @@ async function executeMigrationPlanCommand(
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
-  if (flags.json !== 'object' && !flags.quiet) {
+  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
@@ -121,7 +126,7 @@ async function executeMigrationPlanCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Load contract file (the "to" contract)
@@ -348,24 +353,27 @@ export function createMigrationPlanCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--name <slug>', 'Name slug for the migration directory', 'migration')
     .option('--from <hash>', 'Explicit starting contract hash (overrides migration chain leaf)')
-    .option('--json [format]', 'Output as JSON (object)', false)
+    .option('--json', 'Output as JSON')
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
+    .option('--trace', 'Trace output: deep internals, stack traces')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
+    .option('--interactive', 'Force interactive mode')
+    .option('--no-interactive', 'Disable interactive prompts')
+    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: MigrationPlanOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
       const result = await executeMigrationPlanCommand(options, flags, startTime);
 
       const exitCode = handleResult(result, flags, (planResult) => {
-        if (flags.json === 'object') {
-          console.log(JSON.stringify(planResult, null, 2));
+        if (flags.json) {
+          ui.output(JSON.stringify(planResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationPlanOutput(planResult, flags));
+          ui.log(formatMigrationPlanOutput(planResult, flags));
         }
       });
 

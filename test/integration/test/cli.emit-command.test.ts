@@ -160,7 +160,7 @@ describe('emit command', () => {
         }
 
         // Parse JSON error output and verify structure
-        const errorOutput = consoleErrors.join('\n');
+        const errorOutput = consoleOutput.join('\n');
         expect(() => JSON.parse(errorOutput)).not.toThrow();
 
         const parsed = JSON.parse(errorOutput);

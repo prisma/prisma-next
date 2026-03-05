@@ -9,7 +9,6 @@ import {
   CliStructuredError,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
-  errorJsonFormatNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
 import { maskConnectionUrl, setCommandDescriptions } from '../utils/command-helpers';
@@ -22,6 +21,7 @@ import {
 } from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 interface DbIntrospectOptions {
   readonly db?: string;
@@ -31,11 +31,13 @@ interface DbIntrospectOptions {
   readonly q?: boolean;
   readonly verbose?: boolean;
   readonly v?: boolean;
-  readonly vv?: boolean;
   readonly trace?: boolean;
-  readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+  readonly interactive?: boolean;
+  readonly 'no-interactive'?: boolean;
+  readonly yes?: boolean;
+  readonly y?: boolean;
 }
 
 interface DbIntrospectCommandResult {
@@ -51,6 +53,8 @@ async function executeDbIntrospectCommand(
   flags: GlobalFlags,
   startTime: number,
 ): Promise<Result<DbIntrospectCommandResult, CliStructuredError>> {
+  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -58,7 +62,7 @@ async function executeDbIntrospectCommand(
     : 'prisma-next.config.ts';
 
   // Output header
-  if (flags.json !== 'object' && !flags.quiet) {
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
     ];
@@ -74,7 +78,7 @@ async function executeDbIntrospectCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Resolve database connection (--db flag or config.db.connection)
@@ -110,11 +114,6 @@ async function executeDbIntrospectCommand(
       connection: dbConnection,
       onProgress,
     });
-
-    // Add blank line after all async operations if spinners were shown
-    if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
-      console.log('');
-    }
 
     // Call toSchemaView to convert schema IR to CoreSchemaView for tree rendering
     const schemaView = client.toSchemaView(schemaIR);
@@ -178,41 +177,32 @@ export function createDbIntrospectCommand(): Command {
     })
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object)', false)
+    .option('--json', 'Output as JSON')
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
+    .option('--trace', 'Trace output: deep internals, stack traces')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
+    .option('--interactive', 'Force interactive mode')
+    .option('--no-interactive', 'Disable interactive prompts')
+    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: DbIntrospectOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
-      // Validate JSON format option
-      if (flags.json === 'ndjson') {
-        const result = notOk(
-          errorJsonFormatNotSupported({
-            command: 'db introspect',
-            format: 'ndjson',
-            supportedFormats: ['object'],
-          }),
-        );
-        const exitCode = handleResult(result, flags);
-        process.exit(exitCode);
-      }
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
       const result = await executeDbIntrospectCommand(options, flags, startTime);
 
       // Handle result - formats output and returns exit code
       const exitCode = handleResult(result, flags, (value) => {
         const { introspectResult, schemaView } = value;
-        if (flags.json === 'object') {
-          console.log(formatIntrospectJson(introspectResult));
+        if (flags.json) {
+          ui.output(formatIntrospectJson(introspectResult));
         } else {
           const output = formatIntrospectOutput(introspectResult, schemaView, flags);
           if (output) {
-            console.log(output);
+            ui.log(output);
           }
         }
       });

@@ -8,8 +8,12 @@ import {
 import { handleResult } from '../../src/utils/result-handler';
 
 describe('result handler', () => {
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
@@ -44,14 +48,16 @@ describe('result handler', () => {
     expect(exitCode).toBe(1);
   });
 
-  it('outputs JSON error when json flag is object', () => {
+  it('writes JSON error to stdout when json flag is set', () => {
     const error = errorConfigFileNotFound();
     const result = notOk(error);
-    handleResult(result, { json: 'object' });
-    expect(console.error).toHaveBeenCalled();
-    const output = (console.error as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    expect(output).toBeDefined();
-    expect(() => JSON.parse(output as string)).not.toThrow();
+    handleResult(result, { json: true });
+
+    // JSON data goes to stdout via ui.output()
+    const stdoutCalls = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+    const jsonOutput = stdoutCalls.find((s: string) => s.includes('{'));
+    expect(jsonOutput).toBeDefined();
+    expect(() => JSON.parse(jsonOutput!.trim())).not.toThrow();
   });
 
   it('omits fix from JSON envelope when fix equals why', () => {
@@ -61,31 +67,22 @@ describe('result handler', () => {
     });
     const result = notOk(error);
 
-    handleResult(result, { json: 'object' });
+    handleResult(result, { json: true });
 
-    const output = (console.error as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    const envelope = JSON.parse(output as string) as { why?: string; fix?: string };
+    const stdoutCalls = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+    const jsonOutput = stdoutCalls.find((s: string) => s.includes('{'));
+    expect(jsonOutput).toBeDefined();
+    const envelope = JSON.parse(jsonOutput!.trim()) as { why?: string; fix?: string };
     expect(envelope.why).toBe('Same message');
     expect(envelope.fix).toBeUndefined();
   });
 
-  it('outputs human-readable error when json flag is not set', () => {
+  it('writes error to stderr when json flag is not set', () => {
     const error = errorConfigFileNotFound();
     const result = notOk(error);
     handleResult(result, {});
-    expect(console.error).toHaveBeenCalled();
-    const output = (console.error as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    expect(output).toBeDefined();
-    expect(typeof output).toBe('string');
-  });
 
-  it('outputs human-readable error when json flag is ndjson', () => {
-    const error = errorConfigFileNotFound();
-    const result = notOk(error);
-    handleResult(result, { json: 'ndjson' });
-    expect(console.error).toHaveBeenCalled();
-    const output = (console.error as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    expect(output).toBeDefined();
-    expect(typeof output).toBe('string');
+    // Error goes to stderr via clack
+    expect(stderrSpy).toHaveBeenCalled();
   });
 });

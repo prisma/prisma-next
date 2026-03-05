@@ -9,13 +9,13 @@ const fixtureSubdir = 'db-init';
 
 withTempDir(({ createTempDir }) => {
   describe('db update command (e2e) - errors', () => {
-    let consoleErrors: string[] = [];
+    let _consoleErrors: string[] = [];
     let consoleOutput: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       const mocks = setupCommandMocks();
-      consoleErrors = mocks.consoleErrors;
+      _consoleErrors = mocks.consoleErrors;
       consoleOutput = mocks.consoleOutput;
       cleanupMocks = mocks.cleanup;
     });
@@ -39,30 +39,6 @@ withTempDir(({ createTempDir }) => {
           await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned');
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'rejects ndjson format',
-      async () => {
-        await withDevDatabase(async ({ connectionString }) => {
-          const { testSetup, configPath } = await setupDbUpdateFixture(
-            connectionString,
-            createTempDir,
-            fixtureSubdir,
-          );
-
-          await expect(
-            runDbUpdate(testSetup, ['--config', configPath, '--json', 'ndjson', '--no-color']),
-          ).rejects.toThrow();
-
-          const errorText = consoleErrors.join('\n').trim();
-          const errorJson = JSON.parse(errorText) as Record<string, unknown>;
-          expect(errorJson).toMatchObject({
-            domain: 'CLI',
-          });
         });
       },
       timeouts.spinUpPpgDev,

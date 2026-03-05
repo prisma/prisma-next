@@ -27,6 +27,7 @@ import {
   formatStyledHeader,
 } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationStatusOptions {
   readonly db?: string;
@@ -36,11 +37,13 @@ interface MigrationStatusOptions {
   readonly q?: boolean;
   readonly verbose?: boolean;
   readonly v?: boolean;
-  readonly vv?: boolean;
   readonly trace?: boolean;
-  readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+  readonly interactive?: boolean;
+  readonly 'no-interactive'?: boolean;
+  readonly yes?: boolean;
+  readonly y?: boolean;
 }
 
 export interface MigrationStatusEntry {
@@ -167,7 +170,9 @@ async function executeMigrationStatusCommand(
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
 
-  if (flags.json !== 'object' && !flags.quiet) {
+  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'migrations', value: migrationsRelative },
@@ -181,7 +186,7 @@ async function executeMigrationStatusCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   const diagnostics: StatusDiagnostic[] = [];
@@ -304,8 +309,8 @@ async function executeMigrationStatusCommand(
         await client.close();
       }
     } catch {
-      if (flags.json !== 'object' && !flags.quiet) {
-        console.log('  ⚠ Could not connect to database — showing offline status\n');
+      if (!flags.json && !flags.quiet) {
+        ui.warn('Could not connect to database — showing offline status');
       }
     }
   }
@@ -409,23 +414,27 @@ export function createMigrationStatusCommand(): Command {
     })
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object)', false)
+    .option('--json', 'Output as JSON')
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output')
-    .option('-vv, --trace', 'Trace output')
-    .option('--timestamps', 'Add timestamps to output')
+    .option('--trace', 'Trace output')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
+    .option('--interactive', 'Force interactive mode')
+    .option('--no-interactive', 'Disable interactive prompts')
+    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
 
       const result = await executeMigrationStatusCommand(options, flags);
 
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
       const exitCode = handleResult(result, flags, (statusResult) => {
-        if (flags.json === 'object') {
-          console.log(JSON.stringify(statusResult, null, 2));
+        if (flags.json) {
+          ui.output(JSON.stringify(statusResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationStatusOutput(statusResult, flags));
+          ui.log(formatMigrationStatusOutput(statusResult, flags));
         }
       });
 

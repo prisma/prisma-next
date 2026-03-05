@@ -13,6 +13,7 @@ import { setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { formatCommandHelp, formatMigrationShowOutput, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationShowOptions {
   readonly config?: string;
@@ -21,11 +22,13 @@ interface MigrationShowOptions {
   readonly q?: boolean;
   readonly verbose?: boolean;
   readonly v?: boolean;
-  readonly vv?: boolean;
   readonly trace?: boolean;
-  readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+  readonly interactive?: boolean;
+  readonly 'no-interactive'?: boolean;
+  readonly yes?: boolean;
+  readonly y?: boolean;
 }
 
 export interface MigrationShowResult {
@@ -96,7 +99,9 @@ async function executeMigrationShowCommand(
   );
   const migrationsRelative = relative(process.cwd(), migrationsDir);
 
-  if (flags.json !== 'object' && !flags.quiet) {
+  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'migrations', value: migrationsRelative },
@@ -110,7 +115,7 @@ async function executeMigrationShowCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   let pkg: MigrationPackage;
@@ -228,23 +233,27 @@ export function createMigrationShowCommand(): Command {
       'Migration directory path or migrationId hash prefix (defaults to latest)',
     )
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object)', false)
+    .option('--json', 'Output as JSON')
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output')
-    .option('-vv, --trace', 'Trace output')
-    .option('--timestamps', 'Add timestamps to output')
+    .option('--trace', 'Trace output')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
+    .option('--interactive', 'Force interactive mode')
+    .option('--no-interactive', 'Disable interactive prompts')
+    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (target: string | undefined, options: MigrationShowOptions) => {
       const flags = parseGlobalFlags(options);
+
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
       const result = await executeMigrationShowCommand(target, options, flags);
 
       const exitCode = handleResult(result, flags, (showResult) => {
-        if (flags.json === 'object') {
-          console.log(JSON.stringify(showResult, null, 2));
+        if (flags.json) {
+          ui.output(JSON.stringify(showResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationShowOutput(showResult, flags));
+          ui.log(formatMigrationShowOutput(showResult, flags));
         }
       });
 

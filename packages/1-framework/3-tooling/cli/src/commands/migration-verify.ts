@@ -12,6 +12,7 @@ import {
   formatStyledHeader,
 } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationVerifyOptions {
   readonly dir: string;
@@ -20,11 +21,13 @@ interface MigrationVerifyOptions {
   readonly q?: boolean;
   readonly verbose?: boolean;
   readonly v?: boolean;
-  readonly vv?: boolean;
   readonly trace?: boolean;
-  readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+  readonly interactive?: boolean;
+  readonly 'no-interactive'?: boolean;
+  readonly yes?: boolean;
+  readonly y?: boolean;
 }
 
 export interface MigrationVerifyResult {
@@ -42,15 +45,16 @@ async function executeMigrationVerifyCommand(
   flags: GlobalFlags,
 ): Promise<Result<MigrationVerifyResult, CliStructuredError>> {
   const dir = options.dir;
+  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-  if (flags.json !== 'object' && !flags.quiet) {
+  if (!flags.json && !flags.quiet) {
     const header = formatStyledHeader({
       command: 'migration verify',
       description: 'Verify migration package integrity',
       details: [{ label: 'dir', value: dir }],
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   try {
@@ -124,23 +128,26 @@ export function createMigrationVerifyCommand(): Command {
       },
     })
     .requiredOption('--dir <path>', 'Path to the migration package directory')
-    .option('--json [format]', 'Output as JSON (object)', false)
+    .option('--json', 'Output as JSON')
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output')
-    .option('-vv, --trace', 'Trace output')
-    .option('--timestamps', 'Add timestamps to output')
+    .option('--trace', 'Trace output')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
+    .option('--interactive', 'Force interactive mode')
+    .option('--no-interactive', 'Disable interactive prompts')
+    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: MigrationVerifyOptions) => {
       const flags = parseGlobalFlags(options);
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
       const result = await executeMigrationVerifyCommand(options, flags);
 
       const exitCode = handleResult(result, flags, (verifyResult) => {
-        if (flags.json === 'object') {
-          console.log(JSON.stringify(verifyResult, null, 2));
+        if (flags.json) {
+          ui.output(JSON.stringify(verifyResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationVerifyCommandOutput(verifyResult, flags));
+          ui.log(formatMigrationVerifyCommandOutput(verifyResult, flags));
         }
       });
 

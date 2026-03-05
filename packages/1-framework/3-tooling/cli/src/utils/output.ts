@@ -37,20 +37,6 @@ import type { GlobalFlags } from './global-flags';
 // ============================================================================
 
 /**
- * Formats a timestamp for output.
- */
-function formatTimestamp(): string {
-  return new Date().toISOString();
-}
-
-/**
- * Creates a prefix string if timestamps are enabled.
- */
-function createPrefix(flags: GlobalFlags): string {
-  return flags.timestamps ? `[${formatTimestamp()}] ` : '';
-}
-
-/**
  * Checks if verbose output is enabled at the specified level.
  */
 function isVerbose(flags: GlobalFlags, level: 1 | 2): boolean {
@@ -88,23 +74,22 @@ export function formatEmitOutput(result: EmitContractResult, flags: GlobalFlags)
   }
 
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
 
   // Convert absolute paths to relative paths from cwd
   const jsonPath = relative(process.cwd(), result.files.json);
   const dtsPath = relative(process.cwd(), result.files.dts);
 
-  lines.push(`${prefix}✔ Emitted contract.json → ${jsonPath}`);
-  lines.push(`${prefix}✔ Emitted contract.d.ts → ${dtsPath}`);
-  lines.push(`${prefix}  storageHash: ${result.storageHash}`);
+  lines.push(`✔ Emitted contract.json → ${jsonPath}`);
+  lines.push(`✔ Emitted contract.d.ts → ${dtsPath}`);
+  lines.push(`  storageHash: ${result.storageHash}`);
   if (result.executionHash) {
-    lines.push(`${prefix}  executionHash: ${result.executionHash}`);
+    lines.push(`  executionHash: ${result.executionHash}`);
   }
   if (result.profileHash) {
-    lines.push(`${prefix}  profileHash: ${result.profileHash}`);
+    lines.push(`  profileHash: ${result.profileHash}`);
   }
   if (isVerbose(flags, 1)) {
-    lines.push(`${prefix}  Total time: ${result.timings.total}ms`);
+    lines.push(`  Total time: ${result.timings.total}ms`);
   }
 
   return lines.join('\n');
@@ -136,24 +121,24 @@ export function formatEmitJson(result: EmitContractResult): string {
  */
 export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): string {
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
+
   const useColor = flags.color !== false;
   const formatRed = createColorFormatter(useColor, red);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  lines.push(`${prefix}${formatRed('✖')} ${error.summary} (${error.code})`);
+  lines.push(`${formatRed('✖')} ${error.summary} (${error.code})`);
 
   if (error.why) {
-    lines.push(`${prefix}${formatDimText(`  Why: ${error.why}`)}`);
+    lines.push(`${formatDimText(`  Why: ${error.why}`)}`);
   }
   if (error.fix) {
-    lines.push(`${prefix}${formatDimText(`  Fix: ${error.fix}`)}`);
+    lines.push(`${formatDimText(`  Fix: ${error.fix}`)}`);
   }
   if (error.where?.path) {
     const whereLine = error.where.line
       ? `${error.where.path}:${error.where.line}`
       : error.where.path;
-    lines.push(`${prefix}${formatDimText(`  Where: ${whereLine}`)}`);
+    lines.push(`${formatDimText(`  Where: ${whereLine}`)}`);
   }
   // Show conflicts list if present (always show a short list; show full list when verbose)
   if (error.meta?.['conflicts']) {
@@ -163,12 +148,12 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
       const header = isVerbose(flags, 1)
         ? '  Conflicts:'
         : `  Conflicts (showing ${maxToShow} of ${conflicts.length}):`;
-      lines.push(`${prefix}${formatDimText(header)}`);
+      lines.push(`${formatDimText(header)}`);
       for (const conflict of conflicts.slice(0, maxToShow)) {
-        lines.push(`${prefix}${formatDimText(`    - [${conflict.kind}] ${conflict.summary}`)}`);
+        lines.push(`${formatDimText(`    - [${conflict.kind}] ${conflict.summary}`)}`);
       }
       if (!isVerbose(flags, 1) && conflicts.length > maxToShow) {
-        lines.push(`${prefix}${formatDimText('  Re-run with -v/--verbose to see all conflicts')}`);
+        lines.push(`${formatDimText('  Re-run with -v/--verbose to see all conflicts')}`);
       }
     }
   }
@@ -180,14 +165,14 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
       const header = isVerbose(flags, 1)
         ? '  Issues:'
         : `  Issues (showing ${maxToShow} of ${issues.length}):`;
-      lines.push(`${prefix}${formatDimText(header)}`);
+      lines.push(`${formatDimText(header)}`);
       for (const issue of issues.slice(0, maxToShow)) {
         const kind = issue.kind ?? 'issue';
         const message = issue.message ?? '';
-        lines.push(`${prefix}${formatDimText(`    - [${kind}] ${message}`)}`);
+        lines.push(`${formatDimText(`    - [${kind}] ${message}`)}`);
       }
       if (!isVerbose(flags, 1) && issues.length > maxToShow) {
-        lines.push(`${prefix}${formatDimText('  Re-run with -v/--verbose to see all issues')}`);
+        lines.push(`${formatDimText('  Re-run with -v/--verbose to see all issues')}`);
       }
     }
   }
@@ -195,7 +180,7 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
     lines.push(formatDimText(error.docsUrl));
   }
   if (isVerbose(flags, 2) && error.meta) {
-    lines.push(`${prefix}${formatDimText(`  Meta: ${JSON.stringify(error.meta, null, 2)}`)}`);
+    lines.push(`${formatDimText(`  Meta: ${JSON.stringify(error.meta, null, 2)}`)}`);
   }
 
   return lines.join('\n');
@@ -221,29 +206,29 @@ export function formatVerifyOutput(result: VerifyDatabaseResult, flags: GlobalFl
   }
 
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
+
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   const formatRed = createColorFormatter(useColor, red);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   if (result.ok) {
-    lines.push(`${prefix}${formatGreen('✔')} ${result.summary}`);
-    lines.push(`${prefix}${formatDimText(`  storageHash: ${result.contract.storageHash}`)}`);
+    lines.push(`${formatGreen('✔')} ${result.summary}`);
+    lines.push(`${formatDimText(`  storageHash: ${result.contract.storageHash}`)}`);
     if (result.contract.profileHash) {
-      lines.push(`${prefix}${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
+      lines.push(`${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
     }
   } else {
-    lines.push(`${prefix}${formatRed('✖')} ${result.summary} (${result.code})`);
+    lines.push(`${formatRed('✖')} ${result.summary} (${result.code})`);
   }
 
   if (isVerbose(flags, 1)) {
     if (result.codecCoverageSkipped) {
       lines.push(
-        `${prefix}${formatDimText('  Codec coverage check skipped (helper returned no supported types)')}`,
+        `${formatDimText('  Codec coverage check skipped (helper returned no supported types)')}`,
       );
     }
-    lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+    lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
   }
 
   return lines.join('\n');
@@ -357,9 +342,9 @@ function renderSchemaTree(
             // "index name" or "unique index name" -> dim label prefix, cyan name
             const indexMatch = node.label.match(/^(unique\s+)?index\s+(.+)$/);
             if (indexMatch?.[2]) {
-              const prefix = indexMatch[1] ? `${dim('unique')} ` : '';
+              const indexPrefix = indexMatch[1] ? `${dim('unique')} ` : '';
               const name = indexMatch[2];
-              formattedLabel = `${prefix}${dim('index')} ${cyan(name)}`;
+              formattedLabel = `${indexPrefix}${dim('index')} ${cyan(name)}`;
             } else {
               formattedLabel = dim(node.label);
             }
@@ -393,7 +378,7 @@ function renderSchemaTree(
   } else {
     // Determine tree character for this node
     const treeChar = isLast ? '└' : '├';
-    const treePrefix = `${prefix}${formatDimText(treeChar)}─ `;
+    const treePrefix = `${formatDimText(treeChar)}─ `;
     // Root's direct children don't have │ prefix, other nodes do
     // But if prefix already contains │ (for nested children), don't add another
     const isRootChild = prefix === '';
@@ -414,7 +399,7 @@ function renderSchemaTree(
   if (node.children && node.children.length > 0) {
     // For root node, children start with no prefix (they'll add their own tree characters)
     // For other nodes, calculate child prefix based on whether this is last
-    const childPrefix = isRoot ? '' : isLast ? `${prefix}   ` : `${prefix}${formatDimText('│')}  `;
+    const childPrefix = isRoot ? '' : isLast ? '   ' : `${formatDimText('│')}  `;
     for (let i = 0; i < node.children.length; i++) {
       const child = node.children[i];
       if (!child) continue;
@@ -446,7 +431,7 @@ export function formatIntrospectOutput(
   }
 
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
+
   const useColor = flags.color !== false;
   const formatDimText = (text: string) => formatDim(useColor, text);
 
@@ -459,23 +444,21 @@ export function formatIntrospectOutput(
       formatDimText,
       isRoot: true,
     });
-    // Apply prefix (for timestamps) to each tree line
-    const prefixedTreeLines = treeLines.map((line) => `${prefix}${line}`);
-    lines.push(...prefixedTreeLines);
+    lines.push(...treeLines);
   } else {
     // Fallback: print summary when toSchemaView is not available
-    lines.push(`${prefix}✔ ${result.summary}`);
+    lines.push(`✔ ${result.summary}`);
     if (isVerbose(flags, 1)) {
-      lines.push(`${prefix}  Target: ${result.target.familyId}/${result.target.id}`);
+      lines.push(`  Target: ${result.target.familyId}/${result.target.id}`);
       if (result.meta?.dbUrl) {
-        lines.push(`${prefix}  Database: ${result.meta.dbUrl}`);
+        lines.push(`  Database: ${result.meta.dbUrl}`);
       }
     }
   }
 
   // Add timings in verbose mode
   if (isVerbose(flags, 1)) {
-    lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+    lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
   }
 
   return lines.join('\n');
@@ -657,7 +640,7 @@ function renderSchemaVerificationTree(
   } else {
     // Determine tree character for this node
     const treeChar = isLast ? '└' : '├';
-    const treePrefix = `${prefix}${formatDimText(treeChar)}─ `;
+    const treePrefix = `${formatDimText(treeChar)}─ `;
     // Root's direct children don't have │ prefix, other nodes do
     const isRootChild = prefix === '';
     // Check if prefix already contains │ (strip ANSI codes for comparison)
@@ -677,7 +660,7 @@ function renderSchemaVerificationTree(
   if (node.children && node.children.length > 0) {
     // For root node, children start with no prefix (they'll add their own tree characters)
     // For other nodes, calculate child prefix based on whether this is last
-    const childPrefix = isRoot ? '' : isLast ? `${prefix}   ` : `${prefix}${formatDimText('│')}  `;
+    const childPrefix = isRoot ? '' : isLast ? '   ' : `${formatDimText('│')}  `;
     for (let i = 0; i < node.children.length; i++) {
       const child = node.children[i];
       if (!child) continue;
@@ -708,7 +691,7 @@ export function formatSchemaVerifyOutput(
   }
 
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
+
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   const formatRed = createColorFormatter(useColor, red);
@@ -722,15 +705,13 @@ export function formatSchemaVerifyOutput(
     formatDimText,
     isRoot: true,
   });
-  // Apply prefix (for timestamps) to each tree line
-  const prefixedTreeLines = treeLines.map((line) => `${prefix}${line}`);
-  lines.push(...prefixedTreeLines);
+  lines.push(...treeLines);
 
   // Add counts and timings in verbose mode
   if (isVerbose(flags, 1)) {
-    lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+    lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
     lines.push(
-      `${prefix}${formatDimText(`  pass=${result.schema.counts.pass} warn=${result.schema.counts.warn} fail=${result.schema.counts.fail}`)}`,
+      `${formatDimText(`  pass=${result.schema.counts.pass} warn=${result.schema.counts.warn} fail=${result.schema.counts.fail}`)}`,
     );
   }
 
@@ -739,10 +720,10 @@ export function formatSchemaVerifyOutput(
 
   // Summary line at the end: summary with status glyph
   if (result.ok) {
-    lines.push(`${prefix}${formatGreen('✔')} ${result.summary}`);
+    lines.push(`${formatGreen('✔')} ${result.summary}`);
   } else {
     const codeText = result.code ? ` (${result.code})` : '';
-    lines.push(`${prefix}${formatRed('✖')} ${result.summary}${codeText}`);
+    lines.push(`${formatRed('✖')} ${result.summary}${codeText}`);
   }
 
   return lines.join('\n');
@@ -768,32 +749,32 @@ export function formatSignOutput(result: SignDatabaseResult, flags: GlobalFlags)
   }
 
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
+
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   if (result.ok) {
     // Main success message in white (not dimmed)
-    lines.push(`${prefix}${formatGreen('✔')} Database signed`);
+    lines.push(`${formatGreen('✔')} Database signed`);
 
     // Show from -> to hashes with clear labels
     const previousHash = result.marker.previous?.storageHash ?? 'none';
     const currentHash = result.contract.storageHash;
 
-    lines.push(`${prefix}${formatDimText(`  from: ${previousHash}`)}`);
-    lines.push(`${prefix}${formatDimText(`  to:   ${currentHash}`)}`);
+    lines.push(`${formatDimText(`  from: ${previousHash}`)}`);
+    lines.push(`${formatDimText(`  to:   ${currentHash}`)}`);
 
     if (isVerbose(flags, 1)) {
       if (result.contract.profileHash) {
-        lines.push(`${prefix}${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
+        lines.push(`${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
       }
       if (result.marker.previous?.profileHash) {
         lines.push(
-          `${prefix}${formatDimText(`  previous profileHash: ${result.marker.previous.profileHash}`)}`,
+          `${formatDimText(`  previous profileHash: ${result.marker.previous.profileHash}`)}`,
         );
       }
-      lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+      lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
     }
   }
 
@@ -856,19 +837,19 @@ export function formatMigrationPlanOutput(
   }
 
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
+
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   // Plan summary
   const operationCount = result.plan?.operations.length ?? 0;
-  lines.push(`${prefix}${formatGreen('✔')} Planned ${operationCount} operation(s)`);
+  lines.push(`${formatGreen('✔')} Planned ${operationCount} operation(s)`);
 
   // Show operations tree
   if (result.plan?.operations && result.plan.operations.length > 0) {
     const formatYellow = createColorFormatter(useColor, yellow);
-    lines.push(`${prefix}${formatDimText('│')}`);
+    lines.push(`${formatDimText('│')}`);
     for (let i = 0; i < result.plan.operations.length; i++) {
       const op = result.plan.operations[i];
       if (!op) continue;
@@ -878,53 +859,51 @@ export function formatMigrationPlanOutput(
         op.operationClass === 'destructive'
           ? formatYellow(`[${op.operationClass}]`)
           : formatDimText(`[${op.operationClass}]`);
-      lines.push(`${prefix}${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
+      lines.push(`${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
     }
 
     const hasDestructive = result.plan.operations.some((op) => op.operationClass === 'destructive');
     if (hasDestructive) {
-      lines.push(`${prefix}`);
+      lines.push('');
       lines.push(
-        `${prefix}${formatYellow('⚠')} This migration contains destructive operations that may cause data loss.`,
+        `${formatYellow('⚠')} This migration contains destructive operations that may cause data loss.`,
       );
     }
   }
 
   // Destination hash
   if (result.plan?.destination) {
-    lines.push(`${prefix}`);
-    lines.push(
-      `${prefix}${formatDimText(`Destination hash: ${result.plan.destination.storageHash}`)}`,
-    );
+    lines.push('');
+    lines.push(`${formatDimText(`Destination hash: ${result.plan.destination.storageHash}`)}`);
   }
 
   // SQL DDL preview (SQL family only)
   const planSql = result.plan?.sql;
   if (planSql) {
-    lines.push(`${prefix}`);
-    lines.push(`${prefix}${formatDimText('DDL preview')}`);
+    lines.push('');
+    lines.push(`${formatDimText('DDL preview')}`);
     if (planSql.length === 0) {
-      lines.push(`${prefix}${formatDimText('No DDL operations.')}`);
+      lines.push(`${formatDimText('No DDL operations.')}`);
     } else {
-      lines.push(`${prefix}`);
+      lines.push('');
       for (const statement of planSql) {
         const trimmed = statement.trim();
         if (!trimmed) continue;
         const line = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
-        lines.push(`${prefix}${line}`);
+        lines.push(`${line}`);
       }
     }
   }
 
   // Timings in verbose mode
   if (isVerbose(flags, 1)) {
-    lines.push(`${prefix}${formatDimText(`Total time: ${result.timings.total}ms`)}`);
+    lines.push(`${formatDimText(`Total time: ${result.timings.total}ms`)}`);
   }
 
   // Note about dry run
-  lines.push(`${prefix}`);
-  lines.push(`${prefix}${formatDimText('This is a dry run. No changes were applied.')}`);
-  lines.push(`${prefix}${formatDimText('Run without --plan to apply changes.')}`);
+  lines.push('');
+  lines.push(`${formatDimText('This is a dry run. No changes were applied.')}`);
+  lines.push(`${formatDimText('Run without --plan to apply changes.')}`);
 
   return lines.join('\n');
 }
@@ -1040,28 +1019,28 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
   }
 
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
+
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  lines.push(`${prefix}${formatGreen('✔')} ${result.dirName}`);
-  lines.push(`${prefix}${formatDimText(`  kind: ${result.kind}`)}`);
-  lines.push(`${prefix}${formatDimText(`  from: ${result.from}`)}`);
-  lines.push(`${prefix}${formatDimText(`  to:   ${result.to}`)}`);
+  lines.push(`${formatGreen('✔')} ${result.dirName}`);
+  lines.push(`${formatDimText(`  kind: ${result.kind}`)}`);
+  lines.push(`${formatDimText(`  from: ${result.from}`)}`);
+  lines.push(`${formatDimText(`  to:   ${result.to}`)}`);
   if (result.migrationId) {
-    lines.push(`${prefix}${formatDimText(`  migrationId: ${result.migrationId}`)}`);
+    lines.push(`${formatDimText(`  migrationId: ${result.migrationId}`)}`);
   } else {
-    lines.push(`${prefix}${formatYellow('  migrationId: (draft — not yet attested)')}`);
+    lines.push(`${formatYellow('  migrationId: (draft — not yet attested)')}`);
   }
-  lines.push(`${prefix}${formatDimText(`  created: ${result.createdAt}`)}`);
+  lines.push(`${formatDimText(`  created: ${result.createdAt}`)}`);
 
-  lines.push(`${prefix}`);
-  lines.push(`${prefix}${result.operations.length} operation(s)`);
+  lines.push('');
+  lines.push(`${result.operations.length} operation(s)`);
 
   if (result.operations.length > 0) {
-    lines.push(`${prefix}${formatDimText('│')}`);
+    lines.push(`${formatDimText('│')}`);
     for (let i = 0; i < result.operations.length; i++) {
       const op = result.operations[i]!;
       const isLast = i === result.operations.length - 1;
@@ -1070,27 +1049,27 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
         op.operationClass === 'destructive'
           ? formatYellow(`[${op.operationClass}]`)
           : formatDimText(`[${op.operationClass}]`);
-      lines.push(`${prefix}${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
+      lines.push(`${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
     }
 
     const hasDestructive = result.operations.some((op) => op.operationClass === 'destructive');
     if (hasDestructive) {
-      lines.push(`${prefix}`);
+      lines.push('');
       lines.push(
-        `${prefix}${formatYellow('⚠')} This migration contains destructive operations that may cause data loss.`,
+        `${formatYellow('⚠')} This migration contains destructive operations that may cause data loss.`,
       );
     }
   }
 
   if (result.sql.length > 0) {
-    lines.push(`${prefix}`);
-    lines.push(`${prefix}${formatDimText('DDL preview')}`);
-    lines.push(`${prefix}`);
+    lines.push('');
+    lines.push(`${formatDimText('DDL preview')}`);
+    lines.push('');
     for (const statement of result.sql) {
       const trimmed = statement.trim();
       if (!trimmed) continue;
       const line = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
-      lines.push(`${prefix}${line}`);
+      lines.push(`${line}`);
     }
   }
 
@@ -1132,7 +1111,7 @@ export function formatMigrationStatusOutput(
   }
 
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
+
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   const formatYellow = createColorFormatter(useColor, yellow);
@@ -1140,10 +1119,10 @@ export function formatMigrationStatusOutput(
   const formatCyan = createColorFormatter(useColor, cyan);
 
   if (result.migrations.length === 0) {
-    lines.push(`${prefix}${formatDimText('No migrations found')}`);
+    lines.push(`${formatDimText('No migrations found')}`);
   } else {
-    lines.push(`${prefix}${formatDimText('∅ (empty)')}`);
-    lines.push(`${prefix}${formatDimText('│')}`);
+    lines.push(`${formatDimText('∅ (empty)')}`);
+    lines.push(`${formatDimText('│')}`);
 
     for (let i = 0; i < result.migrations.length; i++) {
       const entry = result.migrations[i]!;
@@ -1173,35 +1152,35 @@ export function formatMigrationStatusOutput(
         marker += `  ${formatYellow('◄ Contract is ahead — run migration plan')}`;
       }
 
-      lines.push(`${prefix}${formatDimText(treeChar)}─ ${entry.dirName}${statusBadge}${marker}`);
+      lines.push(`${formatDimText(treeChar)}─ ${entry.dirName}${statusBadge}${marker}`);
 
       const opsSummary = entry.hasDestructive
         ? formatYellow(entry.operationSummary)
         : formatDimText(entry.operationSummary);
-      lines.push(`${prefix}${formatDimText(continueLine)}    ${opsSummary}`);
+      lines.push(`${formatDimText(continueLine)}    ${opsSummary}`);
 
       const hashDisplay = entry.to.length > 20 ? `${entry.to.slice(0, 20)}...` : entry.to;
-      lines.push(`${prefix}${formatDimText(continueLine)}    ${formatDimText(`→ ${hashDisplay}`)}`);
+      lines.push(`${formatDimText(continueLine)}    ${formatDimText(`→ ${hashDisplay}`)}`);
 
       if (!isLast) {
-        lines.push(`${prefix}${formatDimText('│')}`);
+        lines.push(`${formatDimText('│')}`);
       }
     }
 
-    lines.push(`${prefix}`);
+    lines.push('');
 
     if (result.mode === 'online') {
       const hasUnknown = result.migrations.some((e) => e.status === 'unknown');
       const pendingCount = result.migrations.filter((e) => e.status === 'pending').length;
       if (hasUnknown) {
-        lines.push(`${prefix}${formatYellow('⚠')} ${result.summary}`);
+        lines.push(`${formatYellow('⚠')} ${result.summary}`);
       } else if (pendingCount === 0) {
-        lines.push(`${prefix}${formatGreen('✔')} ${result.summary}`);
+        lines.push(`${formatGreen('✔')} ${result.summary}`);
       } else {
-        lines.push(`${prefix}${formatYellow('⧗')} ${result.summary}`);
+        lines.push(`${formatYellow('⧗')} ${result.summary}`);
       }
     } else {
-      lines.push(`${prefix}${result.summary}`);
+      lines.push(`${result.summary}`);
     }
   }
 
@@ -1209,9 +1188,9 @@ export function formatMigrationStatusOutput(
   if (warnings.length > 0) {
     lines.push('');
     for (const diag of warnings) {
-      lines.push(`${prefix}${formatYellow('⚠')} ${diag.message}`);
+      lines.push(`${formatYellow('⚠')} ${diag.message}`);
       for (const hint of diag.hints) {
-        lines.push(`${prefix}  ${formatDimText(hint)}`);
+        lines.push(`  ${formatDimText(hint)}`);
       }
     }
   }
@@ -1231,7 +1210,7 @@ export function formatMigrationApplyOutput(
   }
 
   const lines: string[] = [];
-  const prefix = createPrefix(flags);
+
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   const formatDimText = (text: string) => formatDim(useColor, text);
@@ -1240,22 +1219,22 @@ export function formatMigrationApplyOutput(
     // Success summary
     const executed = result.execution?.operationsExecuted ?? 0;
     if (executed === 0) {
-      lines.push(`${prefix}${formatGreen('✔')} Database already matches contract`);
+      lines.push(`${formatGreen('✔')} Database already matches contract`);
     } else {
-      lines.push(`${prefix}${formatGreen('✔')} Applied ${executed} operation(s)`);
+      lines.push(`${formatGreen('✔')} Applied ${executed} operation(s)`);
     }
 
     // Marker info
     if (result.marker) {
-      lines.push(`${prefix}${formatDimText(`  Signature: ${result.marker.storageHash}`)}`);
+      lines.push(`${formatDimText(`  Signature: ${result.marker.storageHash}`)}`);
       if (result.marker.profileHash) {
-        lines.push(`${prefix}${formatDimText(`  Profile hash: ${result.marker.profileHash}`)}`);
+        lines.push(`${formatDimText(`  Profile hash: ${result.marker.profileHash}`)}`);
       }
     }
 
     // Timings in verbose mode
     if (isVerbose(flags, 1)) {
-      lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+      lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
     }
   }
 
@@ -1425,9 +1404,9 @@ function renderCommandTree(options: {
 
     if (subcommands.length > 0) {
       // Command with subcommands - show command name, then tree-structured subcommands
-      const prefix = isLastCommand && !hasItemsAfter ? formatDimText('└') : formatDimText('├');
+      const treeChar = isLastCommand && !hasItemsAfter ? formatDimText('└') : formatDimText('├');
       // For top-level command, pad name to fixed width (accounting for "│ ├─ " = 5 chars)
-      const treePrefix = `${prefix}─ `;
+      const treePrefix = `${treeChar}─ `;
       const treePrefixWidth = stringWidth(stripAnsi(treePrefix));
       const remainingWidth = LEFT_COLUMN_WIDTH - treePrefixWidth;
       const commandNamePadded = padToFixedWidth(cmd.name(), remainingWidth);
@@ -1459,8 +1438,8 @@ function renderCommandTree(options: {
       }
     } else {
       // Standalone command - show command name and description on same line
-      const prefix = isLastCommand && !hasItemsAfter ? formatDimText('└') : formatDimText('├');
-      const treePrefix = `${prefix}─ `;
+      const treeChar = isLastCommand && !hasItemsAfter ? formatDimText('└') : formatDimText('├');
+      const treePrefix = `${treeChar}─ `;
       const treePrefixWidth = stringWidth(stripAnsi(treePrefix));
       const remainingWidth = LEFT_COLUMN_WIDTH - treePrefixWidth;
       const commandNamePadded = padToFixedWidth(cmd.name(), remainingWidth);
