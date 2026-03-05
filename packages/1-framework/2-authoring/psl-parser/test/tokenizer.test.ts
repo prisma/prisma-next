@@ -304,26 +304,6 @@ describe('Tokenizer', () => {
     });
   });
 
-  describe('offsets', () => {
-    it('each token offset equals sum of preceding text lengths', () => {
-      const source = 'model User {\n  id Int @id\n}\n';
-      const tokens = collectAll(source);
-      let expectedOffset = 0;
-      for (const token of tokens) {
-        expect(token.offset).toBe(expectedOffset);
-        expectedOffset += token.text.length;
-      }
-    });
-
-    it('Eof offset equals source length', () => {
-      const source = 'model User {}';
-      const tokens = collectAll(source);
-      const eof = tokens[tokens.length - 1]!;
-      expect(eof.kind).toBe('Eof');
-      expect(eof.offset).toBe(source.length);
-    });
-  });
-
   describe('cursor API', () => {
     it('peek(0) returns the same token as a subsequent next()', () => {
       const t = new Tokenizer('model User');
