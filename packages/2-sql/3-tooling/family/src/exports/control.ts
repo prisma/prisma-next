@@ -14,7 +14,10 @@ export type {
 export type { SqlControlDescriptorWithContributions } from '../core/assembly';
 export { extractCodecControlHooks } from '../core/assembly';
 export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/control-instance';
-export type { NativeTypeExpander } from '../core/migrations/contract-to-schema-ir';
+export type {
+  ContractToSchemaIROptions,
+  NativeTypeExpander,
+} from '../core/migrations/contract-to-schema-ir';
 // Contract → SchemaIR conversion for offline migration planning
 export {
   contractToSchemaIR,
