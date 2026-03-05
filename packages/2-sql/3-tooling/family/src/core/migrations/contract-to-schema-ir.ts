@@ -45,32 +45,11 @@ export type NativeTypeExpander = (input: {
  */
 export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => string;
 
-function fallbackRenderDefault(def: ColumnDefault): string {
-  if (def.kind === 'function') {
-    return def.expression;
-  }
-  const { value } = def;
-  if (typeof value === 'string') {
-    return `'${value.replaceAll("'", "''")}'`;
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  if (value === null) {
-    return 'NULL';
-  }
-  throw new Error(
-    'Cannot render structured default value without a target-specific DefaultRenderer. ' +
-      `Received ${typeof value === 'object' ? JSON.stringify(value) : String(value)}. ` +
-      'Pass a renderDefault callback to contractToSchemaIR.',
-  );
-}
-
 function convertColumn(
   name: string,
   column: StorageColumn,
-  expandNativeType?: NativeTypeExpander,
-  renderDefault?: DefaultRenderer,
+  expandNativeType: NativeTypeExpander | undefined,
+  renderDefault: DefaultRenderer,
 ): SqlColumnIR {
   const nativeType = expandNativeType
     ? expandNativeType({
@@ -79,17 +58,14 @@ function convertColumn(
         ...ifDefined('typeParams', column.typeParams),
       })
     : column.nativeType;
-  const renderedDefault =
-    column.default != null
-      ? renderDefault
-        ? renderDefault(column.default, column)
-        : fallbackRenderDefault(column.default)
-      : undefined;
   return {
     name,
     nativeType,
     nullable: column.nullable,
-    ...ifDefined('default', renderedDefault),
+    ...ifDefined(
+      'default',
+      column.default != null ? renderDefault(column.default, column) : undefined,
+    ),
   };
 }
 
@@ -120,8 +96,8 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
 function convertTable(
   name: string,
   table: StorageTable,
-  expandNativeType?: NativeTypeExpander,
-  renderDefault?: DefaultRenderer,
+  expandNativeType: NativeTypeExpander | undefined,
+  renderDefault: DefaultRenderer,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIR> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
@@ -197,8 +173,8 @@ export function detectDestructiveChanges(
  */
 export function contractToSchemaIR(
   storage: SqlStorage,
-  expandNativeType?: NativeTypeExpander,
-  renderDefault?: DefaultRenderer,
+  expandNativeType: NativeTypeExpander | undefined,
+  renderDefault: DefaultRenderer,
 ): SqlSchemaIR {
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
