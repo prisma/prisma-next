@@ -623,13 +623,13 @@ Initialize a database schema from the contract. This command plans and applies *
 
 **Command:**
 ```bash
-prisma-next db init [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next db init [--db <url>] [--config <path>] [--dry-run] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
 ```
 
 Options:
 - `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
-- `--plan`: Only show the migration plan, do not apply it
+- `--dry-run`: Only show the migration plan, do not apply it
 - `--json [format]`: Output as JSON (`object` only; `ndjson` is not supported for this command)
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
@@ -643,7 +643,7 @@ Examples:
 prisma-next db init
 
 # Preview migration plan without applying
-prisma-next db init --plan
+prisma-next db init --dry-run
 
 # Specify database URL
 prisma-next db init --db postgresql://user:pass@localhost/db
@@ -692,7 +692,7 @@ export default defineConfig({
 7. **Plan Migration**: Calls `planner.plan()` with the contract IR, schema IR, additive-only policy, and `frameworkComponents` (the active target/adapter/extension descriptors)
    - On conflict: Returns a structured failure with conflict list
    - On success: Returns a migration plan with operations
-8. **Apply Migration** (if not `--plan`):
+8. **Apply Migration** (if not `--dry-run`):
    - Calls `runner.execute()` to apply the plan
    - After execution, verifies schema matches contract
    - Writes contract marker (and records a ledger entry via the target runner)
@@ -715,7 +715,7 @@ prisma-next db init ➜ Bootstrap a database to match the current contract
 Destination hash: sha256:abc123...
 
 This is a dry run. No changes were applied.
-Run without --plan to apply changes.
+Run without --dry-run to apply changes.
 ```
 
 **Output Format (TTY - Apply Mode):**
@@ -775,7 +775,7 @@ Applying migration plan and verifying schema...
 **Behavior Notes:**
 
 - If the database already has a marker that matches the destination contract, `db init` succeeds as a noop (0 operations planned/executed).
-- If the database has a marker that does **not** match the destination contract, `db init` fails (including in `--plan` mode). Use `db init` for bootstrapping; use your migration workflow to reconcile existing databases.
+- If the database has a marker that does **not** match the destination contract, `db init` fails (including in `--dry-run` mode). Use `db init` for bootstrapping; use your migration workflow to reconcile existing databases.
 
 ### `prisma-next db update`
 
@@ -786,11 +786,11 @@ Update your database schema to match the currently emitted contract.
 - Works on any database, whether or not it has been initialized with `db init` (creates the signature table if missing)
 - Allows `additive`, `widening`, and `destructive` operation classes where supported by planner/runner
 - Disables per-operation runner execution checks by default (precheck/postcheck/idempotency)
-- In `--plan` mode for SQL targets, prints a DDL preview derived from planned operations
+- In `--dry-run` mode for SQL targets, prints a DDL preview derived from planned operations
 
 **Command:**
 ```bash
-prisma-next db update [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next db update [--db <url>] [--config <path>] [--dry-run] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
 ```
 
 **Error codes (additional to shared CLI/runtime codes):**

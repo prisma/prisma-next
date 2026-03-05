@@ -9,13 +9,11 @@ const fixtureSubdir = 'db-init';
 
 withTempDir(({ createTempDir }) => {
   describe('db update command (e2e) - errors', () => {
-    let _consoleErrors: string[] = [];
     let consoleOutput: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       const mocks = setupCommandMocks();
-      _consoleErrors = mocks.consoleErrors;
       consoleOutput = mocks.consoleOutput;
       cleanupMocks = mocks.cleanup;
     });
@@ -36,7 +34,7 @@ withTempDir(({ createTempDir }) => {
 
           // db update should work on a fresh database without db init
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned');
         });
@@ -64,7 +62,7 @@ withTempDir(({ createTempDir }) => {
 
           // db update should detect the extra column and plan a destructive drop
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('legacy_notes');
           expect(planOutput).toContain('destructive');

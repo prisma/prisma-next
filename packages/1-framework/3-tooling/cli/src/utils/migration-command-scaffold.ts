@@ -53,7 +53,7 @@ export interface MigrationCommandDescriptor {
  * Returns a Result with either the resolved context or a structured error.
  */
 export async function prepareMigrationContext(
-  options: { readonly db?: string; readonly config?: string; readonly plan?: boolean },
+  options: { readonly db?: string; readonly config?: string; readonly dryRun?: boolean },
   flags: GlobalFlags,
   ui: TerminalUI,
   descriptor: MigrationCommandDescriptor,
@@ -75,8 +75,8 @@ export async function prepareMigrationContext(
     if (options.db) {
       details.push({ label: 'database', value: maskConnectionUrl(options.db) });
     }
-    if (options.plan) {
-      details.push({ label: 'mode', value: 'plan (dry run)' });
+    if (options.dryRun) {
+      details.push({ label: 'mode', value: 'dry run' });
     }
     const header = formatStyledHeader({
       command: descriptor.commandName,
@@ -182,5 +182,5 @@ export function addMigrationCommandOptions(command: Command): Command {
   return command
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--plan', 'Preview planned operations without applying', false);
+    .option('--dry-run', 'Preview planned operations without applying', false);
 }

@@ -118,7 +118,7 @@ export function formatMigrationPlanOutput(
   // Note about dry run
   lines.push('');
   lines.push(`${formatDimText('This is a dry run. No changes were applied.')}`);
-  lines.push(`${formatDimText('Run without --plan to apply changes.')}`);
+  lines.push(`${formatDimText('Run without --dry-run to apply changes.')}`);
 
   return lines.join('\n');
 }

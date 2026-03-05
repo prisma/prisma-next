@@ -17,14 +17,12 @@ const fixtureSubdir = 'emit';
 withTempDir(({ createTempDir }) => {
   describe('contract emit command (e2e)', () => {
     let consoleOutput: string[] = [];
-    let _consoleErrors: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       // Set up console and process.exit mocks
       const mocks = setupCommandMocks();
       consoleOutput = mocks.consoleOutput;
-      _consoleErrors = mocks.consoleErrors;
       cleanupMocks = mocks.cleanup;
     });
 

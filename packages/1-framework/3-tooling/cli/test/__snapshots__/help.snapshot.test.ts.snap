@@ -96,7 +96,7 @@ exports[`help text snapshots > formats db update help 1`] = `
 │ -y, --yes             Auto-accept prompts
 │ --db <url>            Database connection string
 │ --config <path>       Path to prisma-next.config.ts
-│ --plan                Preview planned operations without applying
+│ --dry-run             Preview planned operations without applying
 │                       default: false
 │ --accept-data-loss    Confirm destructive operations (required when plan
 │                       includes drops or type changes)
@@ -104,13 +104,13 @@ exports[`help text snapshots > formats db update help 1`] = `
 │
 │ Examples:
 │   $ prisma-next db update --db $DATABASE_URL
-│   $ prisma-next db update --db $DATABASE_URL --plan
+│   $ prisma-next db update --db $DATABASE_URL --dry-run
 │
 │ Compares your database schema to the emitted contract and applies the
 │ necessary
 │ changes. Works on any database, whether or not it has been initialized with
 │ \`db init\`.
-│ Use --plan to preview operations before applying.
+│ Use --dry-run to preview operations before applying.
 └
 "
 `;

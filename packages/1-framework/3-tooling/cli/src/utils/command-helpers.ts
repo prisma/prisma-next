@@ -53,7 +53,7 @@ export function getCommandExamples(command: Command): readonly string[] | undefi
 export interface MigrationCommandOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly plan?: boolean;
+  readonly dryRun?: boolean;
 }
 
 /**

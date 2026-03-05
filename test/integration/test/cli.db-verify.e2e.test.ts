@@ -42,14 +42,12 @@ function extractJson(lines: string[]): unknown {
 withTempDir(({ createTempDir }) => {
   describe('db verify command (e2e)', () => {
     let consoleOutput: string[] = [];
-    let _consoleErrors: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       // Set up console and process.exit mocks
       const mocks = setupCommandMocks();
       consoleOutput = mocks.consoleOutput;
-      _consoleErrors = mocks.consoleErrors;
       cleanupMocks = mocks.cleanup;
     });
 

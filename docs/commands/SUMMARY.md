@@ -27,7 +27,7 @@ prisma-next db init --db $DATABASE_URL
 prisma-next contract emit --config prisma-next.config.ts
 
 # 4. Preview what db update would do
-prisma-next db update --db $DATABASE_URL --plan
+prisma-next db update --db $DATABASE_URL --dry-run
 
 # 5. Apply the update
 prisma-next db update --db $DATABASE_URL
@@ -52,7 +52,7 @@ prisma-next db update --db $DATABASE_URL
 
 Example: you added a `nickname` column to the `user` table in your contract.
 
-**Plan mode** (`--plan`):
+**Dry-run mode** (`--dry-run`):
 ```
 ✔ Planned 1 operation(s)
 │
@@ -61,7 +61,7 @@ Example: you added a `nickname` column to the `user` table in your contract.
 Destination hash: sha256:new-hash...
 
 This is a dry run. No changes were applied.
-Run without --plan to apply changes.
+Run without --dry-run to apply changes.
 ```
 
 For SQL targets, plan mode also prints a DDL preview derived from planned operations.
@@ -120,7 +120,7 @@ Both commands share the same flag surface:
 |------|-------------|
 | `--db <url>` | Database connection string |
 | `--config <path>` | Path to `prisma-next.config.ts` |
-| `--plan` | Preview planned operations without applying (dry run) |
+| `--dry-run` | Preview planned operations without applying |
 | `--json [format]` | Output as JSON (`object` format only) |
 | `-q, --quiet` | Quiet mode: errors only |
 | `-v, --verbose` | Verbose output: debug info, timings |

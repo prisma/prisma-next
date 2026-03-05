@@ -54,7 +54,7 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
   if (failure.code === 'DESTRUCTIVE_CHANGES') {
     return errorDestructiveChanges(failure.summary, {
       ...ifDefined('why', failure.why),
-      fix: 'Use `prisma-next db update --plan` to preview, then re-run with `--accept-data-loss` to apply destructive changes',
+      fix: 'Use `prisma-next db update --dry-run` to preview, then re-run with `--accept-data-loss` to apply destructive changes',
       ...ifDefined('meta', failure.meta),
     });
   }
@@ -87,7 +87,7 @@ async function executeDbUpdateCommand(
     // Call dbUpdate with connection and progress callback
     const result = await client.dbUpdate({
       contractIR: contractJson,
-      mode: options.plan ? 'plan' : 'apply',
+      mode: options.dryRun ? 'plan' : 'apply',
       connection: dbConnection,
       ...(options.acceptDataLoss ? { acceptDataLoss: true } : {}),
       onProgress,
@@ -173,11 +173,11 @@ export function createDbUpdateCommand(): Command {
     'Update your database schema to match your contract',
     'Compares your database schema to the emitted contract and applies the necessary\n' +
       'changes. Works on any database, whether or not it has been initialized with `db init`.\n' +
-      'Use --plan to preview operations before applying.',
+      'Use --dry-run to preview operations before applying.',
   );
   setCommandExamples(command, [
     'prisma-next db update --db $DATABASE_URL',
-    'prisma-next db update --db $DATABASE_URL --plan',
+    'prisma-next db update --db $DATABASE_URL --dry-run',
   ]);
   addMigrationCommandOptions(command);
   command.option(

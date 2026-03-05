@@ -59,7 +59,7 @@ withTempDir(({ createTempDir }) => {
 
           // Run db update immediately without changing the contract
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned 0 operation(s)');
 
@@ -95,7 +95,7 @@ withTempDir(({ createTempDir }) => {
           }
 
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned');
           expect(planOutput).toContain('nickname');
@@ -144,7 +144,13 @@ withTempDir(({ createTempDir }) => {
           }
 
           const outputStart = consoleOutput.length;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--json', '--no-color']);
+          await runDbUpdate(testSetup, [
+            '--config',
+            configPath,
+            '--dry-run',
+            '--json',
+            '--no-color',
+          ]);
           const output = consoleOutput.slice(outputStart).join('\n').trim();
           const payload = JSON.parse(output) as Record<string, unknown>;
 
@@ -223,7 +229,7 @@ withTempDir(({ createTempDir }) => {
 
           // db update should work on a fresh database without db init
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned');
         });
@@ -246,7 +252,7 @@ withTempDir(({ createTempDir }) => {
           await switchToContractV2(testSetup.testDir, configPath);
 
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
 
           expect(planOutput).toContain('Planned');
@@ -351,7 +357,7 @@ withTempDir(({ createTempDir }) => {
           });
 
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
 
           expect(planOutput).toContain('legacy_code');
@@ -486,7 +492,13 @@ withTempDir(({ createTempDir }) => {
           await switchToContractV2(testSetup.testDir, configPath);
 
           const outputStart = consoleOutput.length;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--json', '--no-color']);
+          await runDbUpdate(testSetup, [
+            '--config',
+            configPath,
+            '--dry-run',
+            '--json',
+            '--no-color',
+          ]);
           const output = consoleOutput.slice(outputStart).join('\n').trim();
           const payload = JSON.parse(output) as Record<string, unknown>;
 

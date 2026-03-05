@@ -117,7 +117,7 @@ async function executeDbInitCommand(
     // Call dbInit with connection and progress callback
     const result = await client.dbInit({
       contractIR: contractJson,
-      mode: options.plan ? 'plan' : 'apply',
+      mode: options.dryRun ? 'plan' : 'apply',
       connection: dbConnection,
       onProgress,
     });
@@ -201,12 +201,12 @@ export function createDbInitCommand(): Command {
     'Initializes a database to match your emitted contract using additive-only operations.\n' +
       'Creates any missing tables, columns, indexes, and constraints defined in your contract.\n' +
       'Leaves existing compatible structures in place, surfaces conflicts when destructive changes\n' +
-      'would be required, and signs the database to track contract state. Use --plan to\n' +
+      'would be required, and signs the database to track contract state. Use --dry-run to\n' +
       'preview changes without applying.',
   );
   setCommandExamples(command, [
     'prisma-next db init --db $DATABASE_URL',
-    'prisma-next db init --db $DATABASE_URL --plan',
+    'prisma-next db init --db $DATABASE_URL --dry-run',
   ]);
   addMigrationCommandOptions(command);
   command.action(async (options: DbInitOptions) => {
