@@ -23,6 +23,7 @@ import {
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
+  setCommandExamples,
 } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -218,6 +219,10 @@ export function createDbVerifyCommand(): Command {
     'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
       'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
   );
+  setCommandExamples(command, [
+    'prisma-next db verify --db $DATABASE_URL',
+    'prisma-next db verify --db $DATABASE_URL --json',
+  ]);
   command
     .configureHelp({
       formatHelp: (cmd) => {

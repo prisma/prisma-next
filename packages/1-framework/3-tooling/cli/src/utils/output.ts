@@ -29,7 +29,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import type { CliErrorConflict, CliErrorEnvelope } from './cli-errors';
-import { getLongDescription } from './command-helpers';
+import { getCommandExamples, getLongDescription } from './command-helpers';
 import type { GlobalFlags } from './global-flags';
 
 // ============================================================================
@@ -1674,6 +1674,16 @@ export function formatCommandHelp(options: {
         formatDimText,
       }),
     );
+  }
+
+  // Examples (copy-pastable)
+  const examples = getCommandExamples(command);
+  if (examples && examples.length > 0) {
+    lines.push(formatDimText('│'));
+    lines.push(`${formatDimText('│')} ${formatDimText('Examples:')}`);
+    for (const example of examples) {
+      lines.push(`${formatDimText('│')}   ${useColor ? dim('$') : '$'} ${example}`);
+    }
   }
 
   // Multi-line description (if present) - shown after all other content

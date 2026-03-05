@@ -9,7 +9,7 @@ import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import { setCommandDescriptions, setCommandExamples } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { formatCommandHelp, formatMigrationShowOutput, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
@@ -221,6 +221,10 @@ export function createMigrationShowCommand(): Command {
       'Accepts a directory path, a hash prefix (git-style), or defaults to the\n' +
       'latest migration.',
   );
+  setCommandExamples(command, [
+    'prisma-next migration show',
+    'prisma-next migration show sha256:a1b2c3',
+  ]);
   command
     .configureHelp({
       formatHelp: (cmd) => {

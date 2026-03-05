@@ -12,7 +12,11 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
-import { sanitizeErrorMessage, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  sanitizeErrorMessage,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   addMigrationCommandOptions,
@@ -171,6 +175,10 @@ export function createDbUpdateCommand(): Command {
       'changes. Works on any database, whether or not it has been initialized with `db init`.\n' +
       'Use --plan to preview operations before applying.',
   );
+  setCommandExamples(command, [
+    'prisma-next db update --db $DATABASE_URL',
+    'prisma-next db update --db $DATABASE_URL --plan',
+  ]);
   addMigrationCommandOptions(command);
   command.option(
     '--accept-data-loss',

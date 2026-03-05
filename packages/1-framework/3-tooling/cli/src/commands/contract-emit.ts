@@ -12,7 +12,7 @@ import {
   errorRuntime,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import { setCommandDescriptions, setCommandExamples } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   type EmitContractResult,
@@ -251,6 +251,10 @@ export function createContractEmitCommand(): Command {
       'contract.d.ts. The contract.json contains the canonical contract structure, and\n' +
       'contract.d.ts provides TypeScript types for type-safe query building.',
   );
+  setCommandExamples(command, [
+    'prisma-next contract emit',
+    'prisma-next contract emit --config ./custom-config.ts',
+  ]);
   command
     .configureHelp({
       formatHelp: (cmd) => {

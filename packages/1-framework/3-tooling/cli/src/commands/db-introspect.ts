@@ -11,7 +11,11 @@ import {
   errorDriverRequired,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { maskConnectionUrl, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  maskConnectionUrl,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -168,6 +172,10 @@ export function createDbIntrospectCommand(): Command {
       'does not check the schema against your contract - it only shows what exists in\n' +
       'the database. Use `db verify` or `db schema-verify` to compare against your contract.',
   );
+  setCommandExamples(command, [
+    'prisma-next db introspect --db $DATABASE_URL',
+    'prisma-next db introspect --db $DATABASE_URL --json',
+  ]);
   command
     .configureHelp({
       formatHelp: (cmd) => {

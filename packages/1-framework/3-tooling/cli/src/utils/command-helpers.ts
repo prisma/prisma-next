@@ -2,6 +2,7 @@ import type { Command } from 'commander';
 import { resolve } from 'pathe';
 
 const longDescriptions = new WeakMap<Command, string>();
+const commandExamples = new WeakMap<Command, readonly string[]>();
 
 /**
  * Sets both short and long descriptions for a command.
@@ -21,10 +22,25 @@ export function setCommandDescriptions(
 }
 
 /**
+ * Sets copy-pastable examples for a command, shown in help text.
+ */
+export function setCommandExamples(command: Command, examples: readonly string[]): Command {
+  commandExamples.set(command, examples);
+  return command;
+}
+
+/**
  * Gets the long description from a command if it was set via setCommandDescriptions.
  */
 export function getLongDescription(command: Command): string | undefined {
   return longDescriptions.get(command);
+}
+
+/**
+ * Gets examples from a command if set via setCommandExamples.
+ */
+export function getCommandExamples(command: Command): readonly string[] | undefined {
+  return commandExamples.get(command);
 }
 
 /**

@@ -21,6 +21,7 @@ import {
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
+  setCommandExamples,
 } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -213,6 +214,7 @@ export function createDbSignCommand(): Command {
       'in CI/deployment pipelines. The signature records that this database instance is aligned\n' +
       'with a specific contract version.',
   );
+  setCommandExamples(command, ['prisma-next db sign --db $DATABASE_URL']);
   command
     .configureHelp({
       formatHelp: (cmd) => {

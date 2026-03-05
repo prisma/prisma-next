@@ -19,6 +19,7 @@ import {
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
+  setCommandExamples,
 } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -405,6 +406,10 @@ export function createMigrationStatusCommand(): Command {
       'is available, shows which migrations are applied and which are pending.\n' +
       'Without a database connection, shows the chain from disk only.',
   );
+  setCommandExamples(command, [
+    'prisma-next migration status',
+    'prisma-next migration status --db $DATABASE_URL',
+  ]);
   command
     .configureHelp({
       formatHelp: (cmd) => {

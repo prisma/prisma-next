@@ -18,6 +18,7 @@ import {
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
+  setCommandExamples,
 } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -185,6 +186,10 @@ export function createDbSchemaVerifyCommand(): Command {
       'column types, constraints, and extensions. Reports any mismatches via a contract-shaped\n' +
       'verification tree. This is a read-only operation that does not modify the database.',
   );
+  setCommandExamples(command, [
+    'prisma-next db schema-verify --db $DATABASE_URL',
+    'prisma-next db schema-verify --db $DATABASE_URL --strict',
+  ]);
   command
     .configureHelp({
       formatHelp: (cmd) => {

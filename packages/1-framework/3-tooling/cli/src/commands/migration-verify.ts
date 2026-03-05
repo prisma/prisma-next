@@ -4,7 +4,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import { setCommandDescriptions, setCommandExamples } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -120,6 +120,7 @@ export function createMigrationVerifyCommand(): Command {
       'it against the stored value. Draft migrations (migrationId: null) are automatically\n' +
       'attested.',
   );
+  setCommandExamples(command, ['prisma-next migration verify --dir migrations/20250101-add-users']);
   command
     .configureHelp({
       formatHelp: (cmd) => {

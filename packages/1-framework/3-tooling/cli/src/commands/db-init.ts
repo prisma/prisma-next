@@ -12,7 +12,11 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
-import { sanitizeErrorMessage, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  sanitizeErrorMessage,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   addMigrationCommandOptions,
@@ -200,6 +204,10 @@ export function createDbInitCommand(): Command {
       'would be required, and signs the database to track contract state. Use --plan to\n' +
       'preview changes without applying.',
   );
+  setCommandExamples(command, [
+    'prisma-next db init --db $DATABASE_URL',
+    'prisma-next db init --db $DATABASE_URL --plan',
+  ]);
   addMigrationCommandOptions(command);
   command.configureHelp({
     formatHelp: (cmd) => {

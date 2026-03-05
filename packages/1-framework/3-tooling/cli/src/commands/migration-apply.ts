@@ -23,6 +23,7 @@ import {
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
+  setCommandExamples,
 } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -399,6 +400,10 @@ export function createMigrationApplyCommand(): Command {
       'migrations are pending, then executes them sequentially. Each migration runs\n' +
       'in its own transaction. Does not plan new migrations — run `migration plan` first.',
   );
+  setCommandExamples(command, [
+    'prisma-next migration apply --db $DATABASE_URL',
+    'prisma-next migration apply --db $DATABASE_URL --yes',
+  ]);
   command
     .configureHelp({
       formatHelp: (cmd) => {

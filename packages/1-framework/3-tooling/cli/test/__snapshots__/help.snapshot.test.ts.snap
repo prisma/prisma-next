@@ -14,6 +14,10 @@ exports[`help text snapshots > formats contract emit help 1`] = `
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
 │
+│ Examples:
+│   $ prisma-next contract emit
+│   $ prisma-next contract emit --config ./custom-config.ts
+│
 │ Reads your contract source (TypeScript or Prisma schema) and emits
 │ contract.json and
 │ contract.d.ts. The contract.json contains the canonical contract structure,
@@ -36,6 +40,10 @@ exports[`help text snapshots > formats contract emit help with no color 1`] = `
 │ --interactive         Force interactive mode
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
+│
+│ Examples:
+│   $ prisma-next contract emit
+│   $ prisma-next contract emit --config ./custom-config.ts
 │
 │ Reads your contract source (TypeScript or Prisma schema) and emits
 │ contract.json and
@@ -60,6 +68,10 @@ exports[`help text snapshots > formats db introspect help 1`] = `
 │ --interactive         Force interactive mode
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
+│
+│ Examples:
+│   $ prisma-next db introspect --db $DATABASE_URL
+│   $ prisma-next db introspect --db $DATABASE_URL --json
 │
 │ Reads the live database schema and displays it as a tree structure. This
 │ command
@@ -90,6 +102,10 @@ exports[`help text snapshots > formats db update help 1`] = `
 │                       includes drops or type changes)
 │                       default: false
 │
+│ Examples:
+│   $ prisma-next db update --db $DATABASE_URL
+│   $ prisma-next db update --db $DATABASE_URL --plan
+│
 │ Compares your database schema to the emitted contract and applies the
 │ necessary
 │ changes. Works on any database, whether or not it has been initialized with
@@ -113,6 +129,10 @@ exports[`help text snapshots > formats db verify help 1`] = `
 │ --interactive         Force interactive mode
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
+│
+│ Examples:
+│   $ prisma-next db verify --db $DATABASE_URL
+│   $ prisma-next db verify --db $DATABASE_URL --json
 │
 │ Verifies that your database schema matches the emitted contract. Checks table
 │ structures,

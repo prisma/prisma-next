@@ -29,7 +29,11 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { resolveContractPath, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  resolveContractPath,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { formatCommandHelp, formatStyledHeader } from '../utils/output';
@@ -343,6 +347,10 @@ export function createMigrationPlanCommand(): Command {
       'produces a new migration package with the required operations. No database\n' +
       'connection is needed — this is a fully offline operation.',
   );
+  setCommandExamples(command, [
+    'prisma-next migration plan',
+    'prisma-next migration plan --name add-users-table',
+  ]);
   command
     .configureHelp({
       formatHelp: (cmd) => {
