@@ -24,7 +24,6 @@ export function createTestManifest(overrides: Partial<MigrationManifest> = {}): 
     from: 'sha256:empty',
     to: 'sha256:abc123',
     migrationId: null,
-    parentMigrationId: null,
     kind: 'regular',
     fromContract: null,
     toContract,

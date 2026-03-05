@@ -168,7 +168,6 @@ async function executeMigrationPlanCommand(
   // Read existing migrations and determine "from" contract
   let fromContract: ContractIR | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
-  let parentMigrationId: string | null = null;
 
   try {
     const allPackages = await readMigrationsDir(migrationsDir);
@@ -189,10 +188,8 @@ async function executeMigrationPlanCommand(
         );
       }
       fromContract = sourcePkg.manifest.toContract;
-      parentMigrationId = sourcePkg.manifest.migrationId;
     } else if (leafHash !== EMPTY_CONTRACT_HASH && latestMigration) {
       fromHash = leafHash;
-      parentMigrationId = latestMigration.migrationId;
       const leafPkg = packages.find((p) => p.manifest.migrationId === latestMigration.migrationId);
       if (leafPkg) {
         fromContract = leafPkg.manifest.toContract;
@@ -286,7 +283,6 @@ async function executeMigrationPlanCommand(
     from: fromHash,
     to: toStorageHash,
     migrationId: null,
-    parentMigrationId,
     kind: 'regular',
     fromContract,
     toContract: toContractJson,

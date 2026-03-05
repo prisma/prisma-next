@@ -1,10 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import {
-  errorAmbiguousLeaf,
-  errorDuplicateMigrationId,
-  errorNoRoot,
-  errorSelfLoop,
-} from './errors';
+import { errorAmbiguousLeaf, errorDuplicateMigrationId, errorSelfLoop } from './errors';
 import type { MigrationChainEntry, MigrationGraph, MigrationPackage } from './types';
 
 export function reconstructGraph(packages: readonly MigrationPackage[]): MigrationGraph {
@@ -12,7 +7,6 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
   const forwardChain = new Map<string, MigrationChainEntry[]>();
   const reverseChain = new Map<string, MigrationChainEntry[]>();
   const migrationById = new Map<string, MigrationChainEntry>();
-  const childrenByParentId = new Map<string | null, MigrationChainEntry[]>();
 
   for (const pkg of packages) {
     const { from, to } = pkg.manifest;
@@ -28,7 +22,6 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
       from,
       to,
       migrationId: pkg.manifest.migrationId,
-      parentMigrationId: pkg.manifest.parentMigrationId,
       dirName: pkg.dirName,
       createdAt: pkg.manifest.createdAt,
       labels: pkg.manifest.labels,
@@ -39,14 +32,6 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
         throw errorDuplicateMigrationId(migration.migrationId);
       }
       migrationById.set(migration.migrationId, migration);
-    }
-
-    const parentId = migration.parentMigrationId;
-    const siblings = childrenByParentId.get(parentId);
-    if (siblings) {
-      siblings.push(migration);
-    } else {
-      childrenByParentId.set(parentId, [migration]);
     }
 
     const fwd = forwardChain.get(from);
@@ -64,68 +49,39 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
     }
   }
 
-  return { nodes, forwardChain, reverseChain, migrationById, childrenByParentId };
+  return { nodes, forwardChain, reverseChain, migrationById };
+}
+
+const LABEL_PRIORITY: Record<string, number> = { main: 0, default: 1, feature: 2 };
+
+function labelPriority(labels: readonly string[]): number {
+  let best = 3;
+  for (const l of labels) {
+    const p = LABEL_PRIORITY[l];
+    if (p !== undefined && p < best) best = p;
+  }
+  return best;
+}
+
+function sortedNeighbors(edges: readonly MigrationChainEntry[]): readonly MigrationChainEntry[] {
+  return [...edges].sort((a, b) => {
+    const lp = labelPriority(a.labels) - labelPriority(b.labels);
+    if (lp !== 0) return lp;
+    const ca = a.createdAt.localeCompare(b.createdAt);
+    if (ca !== 0) return ca;
+    const tc = a.to.localeCompare(b.to);
+    if (tc !== 0) return tc;
+    return (a.migrationId ?? '').localeCompare(b.migrationId ?? '');
+  });
 }
 
 /**
- * Walk the parent-migration chain to find the latest migration.
- * Returns the migration with no children, or null for an empty graph.
- * Throws AMBIGUOUS_LEAF if the chain branches.
- */
-export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry | null {
-  if (graph.nodes.size === 0) {
-    return null;
-  }
-
-  const roots = graph.childrenByParentId.get(null);
-  if (!roots || roots.length === 0) {
-    throw errorNoRoot([...graph.nodes].sort());
-  }
-
-  if (roots.length > 1) {
-    throw errorAmbiguousLeaf(roots.map((e) => e.to));
-  }
-
-  let current = roots[0];
-  if (!current) {
-    throw errorNoRoot([...graph.nodes].sort());
-  }
-
-  for (let depth = 0; depth < graph.migrationById.size + 1 && current; depth++) {
-    const children: readonly MigrationChainEntry[] | undefined =
-      current.migrationId !== null ? graph.childrenByParentId.get(current.migrationId) : undefined;
-
-    if (!children || children.length === 0) {
-      return current;
-    }
-
-    if (children.length > 1) {
-      throw errorAmbiguousLeaf(children.map((e) => e.to));
-    }
-
-    current = children[0];
-  }
-
-  throw errorNoRoot([...graph.nodes].sort());
-}
-
-/**
- * Find the leaf contract hash of the migration chain.
- * Convenience wrapper around findLatestMigration.
- */
-export function findLeaf(graph: MigrationGraph): string {
-  const migration = findLatestMigration(graph);
-  return migration ? migration.to : EMPTY_CONTRACT_HASH;
-}
-
-/**
- * Find the ordered chain of migrations from `fromHash` to `toHash` by walking the
- * parent-migration chain. Returns the sub-sequence of migrations whose cumulative path
- * goes from `fromHash` to `toHash`.
+ * Find the shortest path from `fromHash` to `toHash` using BFS over the
+ * contract-hash graph. Returns the ordered list of edges, or null if no path
+ * exists. Returns an empty array when `fromHash === toHash` (no-op).
  *
- * This reconstructs the full chain from root to leaf via parent pointers, then
- * extracts the segment between the two hashes. This correctly handles revisited
- * contract hashes (e.g. A→B→A) because it operates on migrations, not nodes.
+ * Neighbor ordering is deterministic via the tie-break sort key:
+ * label priority → createdAt → to → migrationId.
  */
 export function findPath(
   graph: MigrationGraph,
@@ -134,58 +90,118 @@ export function findPath(
 ): readonly MigrationChainEntry[] | null {
   if (fromHash === toHash) return [];
 
-  const chain = buildChain(graph);
-  if (!chain) return null;
+  const visited = new Set<string>();
+  const parent = new Map<string, { node: string; edge: MigrationChainEntry }>();
+  const queue: string[] = [fromHash];
+  visited.add(fromHash);
 
-  let startIdx = -1;
-  if (chain.length > 0 && chain[0]?.from === fromHash) {
-    startIdx = 0;
-  } else {
-    for (let i = chain.length - 1; i >= 0; i--) {
-      if (chain[i]?.to === fromHash) {
-        startIdx = i + 1;
-        break;
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === undefined) break;
+
+    if (current === toHash) {
+      const path: MigrationChainEntry[] = [];
+      let node = toHash;
+      let entry = parent.get(node);
+      while (entry) {
+        const { node: prev, edge } = entry;
+        path.push(edge);
+        node = prev;
+        entry = parent.get(node);
+      }
+      path.reverse();
+      return path;
+    }
+
+    const outgoing = graph.forwardChain.get(current);
+    if (!outgoing) continue;
+
+    for (const edge of sortedNeighbors(outgoing)) {
+      if (!visited.has(edge.to)) {
+        visited.add(edge.to);
+        parent.set(edge.to, { node: current, edge });
+        queue.push(edge.to);
       }
     }
   }
 
-  if (startIdx === -1) return null;
-
-  let endIdx = -1;
-  for (let i = chain.length - 1; i >= startIdx; i--) {
-    if (chain[i]?.to === toHash) {
-      endIdx = i + 1;
-      break;
-    }
-  }
-
-  if (endIdx === -1) return null;
-
-  return chain.slice(startIdx, endIdx);
+  return null;
 }
 
 /**
- * Build the full ordered chain of migrations from root to leaf by following
- * parent pointers. Returns null if the chain cannot be reconstructed
- * (e.g. missing root, branches).
+ * Find all leaf nodes reachable from `fromHash` via forward edges.
+ * A leaf is a node with no outgoing edges in the graph.
  */
-function buildChain(graph: MigrationGraph): readonly MigrationChainEntry[] | null {
-  const roots = graph.childrenByParentId.get(null);
-  if (!roots || roots.length !== 1) return null;
+export function findReachableLeaves(graph: MigrationGraph, fromHash: string): readonly string[] {
+  const visited = new Set<string>();
+  const queue: string[] = [fromHash];
+  visited.add(fromHash);
+  const leaves: string[] = [];
 
-  const chain: MigrationChainEntry[] = [];
-  let current: MigrationChainEntry | undefined = roots[0];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === undefined) break;
+    const outgoing = graph.forwardChain.get(current);
 
-  for (let depth = 0; depth < graph.migrationById.size + 1 && current; depth++) {
-    chain.push(current);
-    const children =
-      current.migrationId !== null ? graph.childrenByParentId.get(current.migrationId) : undefined;
-    if (!children || children.length === 0) break;
-    if (children.length > 1) return null;
-    current = children[0];
+    if (!outgoing || outgoing.length === 0) {
+      leaves.push(current);
+    } else {
+      for (const edge of outgoing) {
+        if (!visited.has(edge.to)) {
+          visited.add(edge.to);
+          queue.push(edge.to);
+        }
+      }
+    }
   }
 
-  return chain;
+  return leaves;
+}
+
+/**
+ * Find the leaf contract hash of the migration graph reachable from
+ * EMPTY_CONTRACT_HASH. Throws AMBIGUOUS_LEAF if multiple leaves exist.
+ */
+export function findLeaf(graph: MigrationGraph): string {
+  if (graph.nodes.size === 0) {
+    return EMPTY_CONTRACT_HASH;
+  }
+
+  const leaves = findReachableLeaves(graph, EMPTY_CONTRACT_HASH);
+
+  if (leaves.length === 0) {
+    return EMPTY_CONTRACT_HASH;
+  }
+
+  if (leaves.length > 1) {
+    throw errorAmbiguousLeaf(leaves);
+  }
+
+  const leaf = leaves[0];
+  return leaf !== undefined ? leaf : EMPTY_CONTRACT_HASH;
+}
+
+/**
+ * Find the latest migration entry by traversing from EMPTY_CONTRACT_HASH
+ * to the single leaf. Returns null for an empty graph.
+ * Throws AMBIGUOUS_LEAF if the graph has multiple leaves.
+ */
+export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry | null {
+  if (graph.nodes.size === 0) {
+    return null;
+  }
+
+  const leafHash = findLeaf(graph);
+  if (leafHash === EMPTY_CONTRACT_HASH) {
+    return null;
+  }
+
+  const path = findPath(graph, EMPTY_CONTRACT_HASH, leafHash);
+  if (!path || path.length === 0) {
+    return null;
+  }
+
+  return path[path.length - 1] ?? null;
 }
 
 export function detectCycles(graph: MigrationGraph): readonly string[][] {
@@ -194,7 +210,7 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
   const BLACK = 2;
 
   const color = new Map<string, number>();
-  const parent = new Map<string, string | null>();
+  const parentMap = new Map<string, string | null>();
   const cycles: string[][] = [];
 
   for (const node of graph.nodes) {
@@ -209,17 +225,16 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
       for (const edge of outgoing) {
         const v = edge.to;
         if (color.get(v) === GRAY) {
-          // Back edge found — reconstruct cycle
           const cycle: string[] = [v];
           let cur = u;
           while (cur !== v) {
             cycle.push(cur);
-            cur = parent.get(cur) ?? v;
+            cur = parentMap.get(cur) ?? v;
           }
           cycle.reverse();
           cycles.push(cycle);
         } else if (color.get(v) === WHITE) {
-          parent.set(v, u);
+          parentMap.set(v, u);
           dfs(v);
         }
       }
@@ -230,7 +245,7 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
 
   for (const node of graph.nodes) {
     if (color.get(node) === WHITE) {
-      parent.set(node, null);
+      parentMap.set(node, null);
       dfs(node);
     }
   }
@@ -242,15 +257,25 @@ export function detectOrphans(graph: MigrationGraph): readonly MigrationChainEnt
   if (graph.nodes.size === 0) return [];
 
   const reachable = new Set<string>();
-  const rootMigrations = graph.childrenByParentId.get(null) ?? [];
-  const emptyRootExists = rootMigrations.some(
-    (migration) => migration.from === EMPTY_CONTRACT_HASH,
-  );
-  const rootHashes = emptyRootExists
-    ? [EMPTY_CONTRACT_HASH]
-    : [...new Set(rootMigrations.map((migration) => migration.from))];
-  const queue: string[] = rootHashes.length > 0 ? rootHashes : [EMPTY_CONTRACT_HASH];
+  const startNodes: string[] = [];
 
+  if (graph.forwardChain.has(EMPTY_CONTRACT_HASH)) {
+    startNodes.push(EMPTY_CONTRACT_HASH);
+  } else {
+    const allTargets = new Set<string>();
+    for (const edges of graph.forwardChain.values()) {
+      for (const edge of edges) {
+        allTargets.add(edge.to);
+      }
+    }
+    for (const node of graph.nodes) {
+      if (!allTargets.has(node)) {
+        startNodes.push(node);
+      }
+    }
+  }
+
+  const queue = [...startNodes];
   for (const hash of queue) {
     reachable.add(hash);
   }
