@@ -1,5 +1,6 @@
 import * as clack from '@clack/prompts';
 import { bold, cyan, dim, green, red, yellow } from 'colorette';
+import { shutdownSignal } from './shutdown';
 
 /**
  * Composable CLI output abstraction.
@@ -148,6 +149,20 @@ export class TerminalUI {
         timer = undefined;
       }
     };
+
+    // Cancel the spinner if a shutdown signal fires
+    const onAbort = () => {
+      if (!settled) {
+        settled = true;
+        ensureCleared();
+        if (inner) {
+          inner.cancel('Interrupted');
+        }
+      }
+    };
+    if (!shutdownSignal.aborted) {
+      shutdownSignal.addEventListener('abort', onAbort, { once: true });
+    }
 
     return {
       start(msg?: string) {

@@ -1,5 +1,10 @@
 import { Command } from 'commander';
 import { createContractEmitCommand } from './commands/contract-emit';
+import { installShutdownHandlers } from './utils/shutdown';
+
+// Install SIGINT/SIGTERM handlers before anything else
+installShutdownHandlers();
+
 import { createDbInitCommand } from './commands/db-init';
 import { createDbIntrospectCommand } from './commands/db-introspect';
 import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
