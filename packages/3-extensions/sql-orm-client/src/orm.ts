@@ -113,7 +113,7 @@ function createCollectionRegistry<
     return registry;
   }
 
-  const models = contract.models as Record<string, unknown>;
+  const models = contract.models;
   for (const [key, collectionClass] of Object.entries(collections)) {
     if (!collectionClass) {
       continue;
