@@ -1,10 +1,23 @@
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
+  CodecControlHooks,
   ComponentDatabaseDependencies,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { pgvectorOperationSignature, pgvectorPackMeta } from '../core/descriptor-meta';
+
+const PGVECTOR_CODEC_ID = 'pg/vector@1' as const;
+
+const vectorControlPlaneHooks: CodecControlHooks = {
+  expandNativeType: ({ nativeType, typeParams }) => {
+    const length = typeParams?.['length'];
+    if (typeof length === 'number' && Number.isInteger(length) && length > 0) {
+      return `${nativeType}(${length})`;
+    }
+    return nativeType;
+  },
+};
 
 function verifyVectorExtensionInstalled(schema: SqlSchemaIR): readonly SchemaIssue[] {
   if (!schema.extensions.includes('vector')) {
@@ -58,6 +71,15 @@ const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
 
 const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   ...pgvectorPackMeta,
+  types: {
+    ...pgvectorPackMeta.types,
+    codecTypes: {
+      ...pgvectorPackMeta.types.codecTypes,
+      controlPlaneHooks: {
+        [PGVECTOR_CODEC_ID]: vectorControlPlaneHooks,
+      },
+    },
+  },
   operationSignatures: () => [pgvectorOperationSignature],
   databaseDependencies: pgvectorDatabaseDependencies,
   create: () => ({
