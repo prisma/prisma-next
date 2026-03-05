@@ -32,6 +32,8 @@ export interface SqlControlStaticContributions {
 export interface ComponentDatabaseDependency<TTargetDetails> {
   readonly id: string;
   readonly label: string;
+  /** Database extension name this dependency requires (e.g. `'vector'`). */
+  readonly extension?: string;
   readonly install: readonly SqlMigrationPlanOperation<TTargetDetails>[];
   readonly verifyDatabaseDependencyInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
 }

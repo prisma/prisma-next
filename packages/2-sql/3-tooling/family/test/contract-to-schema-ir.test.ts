@@ -1,10 +1,34 @@
-import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type {
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import {
   contractToSchemaIR,
   detectDestructiveChanges,
 } from '../src/core/migrations/contract-to-schema-ir';
+
+function wrap(storage: SqlStorage): SqlContract<SqlStorage> {
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    storageHash: coreHash('sha256:test'),
+    profileHash: profileHash('sha256:test'),
+    storage,
+    models: {},
+    relations: {},
+    mappings: { codecTypes: {}, operationTypes: {} },
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    sources: {},
+  };
+}
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
@@ -27,8 +51,7 @@ function table(
 
 describe('contractToSchemaIR', () => {
   it('converts empty storage to empty schema IR', () => {
-    const storage: SqlStorage = { tables: {} };
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(null);
 
     expect(result).toEqual<SqlSchemaIR>({
       tables: {},
@@ -49,7 +72,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
 
     expect(result.tables['User']).toBeDefined();
     expect(result.tables['User']!.name).toBe('User');
@@ -76,7 +99,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     const column = result.tables['T']!.columns['a']!;
 
     expect(column).toEqual({ name: 'a', nativeType: 'vector', nullable: false });
@@ -112,7 +135,7 @@ describe('contractToSchemaIR', () => {
       return input.nativeType;
     };
 
-    const result = contractToSchemaIR(storage, expand);
+    const result = contractToSchemaIR(wrap(storage), { expandNativeType: expand });
     expect(result.tables['T']!.columns['id']!.nativeType).toBe('character(36)');
     expect(result.tables['T']!.columns['name']!.nativeType).toBe('text');
   });
@@ -132,7 +155,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['id']!.nativeType).toBe('character');
   });
 
@@ -150,7 +173,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['status']!.default).toBe("'active'");
   });
 
@@ -168,7 +191,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['author']!.default).toBe("'O''Reilly'");
   });
 
@@ -186,7 +209,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['textValue']!.default).toBe("'a''b''''c'");
   });
 
@@ -204,7 +227,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['createdAt']!.default).toBe('now()');
   });
 
@@ -219,7 +242,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['name']!.default).toBeUndefined();
     expect('default' in result.tables['T']!.columns['name']!).toBe(false);
   });
@@ -236,7 +259,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.primaryKey).toEqual({ columns: ['id'], name: 'T_pkey' });
   });
 
@@ -252,7 +275,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.uniques).toEqual([{ columns: ['email'], name: 'T_email_key' }]);
   });
 
@@ -268,7 +291,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.indexes).toEqual([
       { columns: ['email'], name: 'T_email_idx', unique: false },
     ]);
@@ -294,7 +317,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['Post']!.foreignKeys).toEqual([
       {
         columns: ['authorId'],
@@ -317,12 +340,12 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(Object.keys(result.tables)).toEqual(expect.arrayContaining(['User', 'Post']));
     expect(Object.keys(result.tables)).toHaveLength(2);
   });
 
-  it('ignores SqlStorage.types (codec metadata)', () => {
+  it('propagates storage types into annotations', () => {
     const storage: SqlStorage = {
       tables: {
         T: table({
@@ -340,9 +363,16 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.extensions).toEqual([]);
     expect(result.tables['T']!.columns['embedding']!.nativeType).toBe('vector');
+    expect(result.annotations?.['pg']?.['storageTypes']).toEqual({
+      Embedding: {
+        codecId: 'pgvector/vector@1',
+        nativeType: 'vector',
+        typeParams: { dimensions: 1536 },
+      },
+    });
   });
 
   it('sets extensions to empty array', () => {
@@ -354,7 +384,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.extensions).toEqual([]);
   });
 
@@ -371,7 +401,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.uniques[0]).toEqual({ columns: ['a', 'b'] });
   });
 
@@ -392,7 +422,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['Post']!.foreignKeys[0]).toEqual({
       columns: ['authorId'],
       referencedTable: 'User',

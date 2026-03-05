@@ -245,7 +245,7 @@ async function executeMigrationPlanCommand(
     [config.target, config.adapter, ...(config.extensionPacks ?? [])],
   );
   const planner = migrations.createPlanner(familyInstance);
-  const fromSchemaIR = migrations.contractToSchema(fromContract);
+  const fromSchemaIR = migrations.contractToSchema(fromContract, frameworkComponents);
   const plannerResult = planner.plan({
     contract: toContractJson,
     schema: fromSchemaIR,
