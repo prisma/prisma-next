@@ -24,7 +24,6 @@ export type TokenKind =
 export interface Token {
   readonly kind: TokenKind;
   readonly text: string;
-  readonly offset: number;
 }
 
 export class Tokenizer {
@@ -40,7 +39,7 @@ export class Tokenizer {
 
   next(): Token {
     const token = this.#buffer.shift() ?? scan(this.#source, this.#pos);
-    this.#pos = token.offset + token.text.length;
+    this.#pos += token.text.length;
     return token;
   }
 
@@ -50,7 +49,7 @@ export class Tokenizer {
       if (last?.kind === 'Eof') {
         break;
       }
-      const scanPos = last !== undefined ? last.offset + last.text.length : this.#pos;
+      const scanPos = this.#buffer.reduce((pos, t) => pos + t.text.length, this.#pos);
       this.#buffer.push(scan(this.#source, scanPos));
     }
     return (
@@ -61,7 +60,7 @@ export class Tokenizer {
 
 function scan(source: string, pos: number): Token {
   if (pos >= source.length) {
-    return { kind: 'Eof', text: '', offset: source.length };
+    return { kind: 'Eof', text: '' };
   }
 
   return (
@@ -75,7 +74,6 @@ function scan(source: string, pos: number): Token {
     scanPunctuation(source, pos) ?? {
       kind: 'Invalid' as const,
       text: readChar(source, pos),
-      offset: pos,
     }
   );
 }
@@ -84,9 +82,9 @@ function scanNewline(source: string, pos: number): Token | undefined {
   const ch = source.charAt(pos);
   if (ch !== '\r' && ch !== '\n') return undefined;
   if (ch === '\r' && source.charAt(pos + 1) === '\n') {
-    return { kind: 'Newline', text: '\r\n', offset: pos };
+    return { kind: 'Newline', text: '\r\n' };
   }
-  return { kind: 'Newline', text: ch, offset: pos };
+  return { kind: 'Newline', text: ch };
 }
 
 function scanWhitespace(source: string, pos: number): Token | undefined {
@@ -98,7 +96,7 @@ function scanWhitespace(source: string, pos: number): Token | undefined {
     if (c !== ' ' && c !== '\t') break;
     end++;
   }
-  return { kind: 'Whitespace', text: source.slice(pos, end), offset: pos };
+  return { kind: 'Whitespace', text: source.slice(pos, end) };
 }
 
 function scanComment(source: string, pos: number): Token | undefined {
@@ -109,15 +107,15 @@ function scanComment(source: string, pos: number): Token | undefined {
     if (c === '\n' || c === '\r') break;
     end++;
   }
-  return { kind: 'Comment', text: source.slice(pos, end), offset: pos };
+  return { kind: 'Comment', text: source.slice(pos, end) };
 }
 
 function scanAt(source: string, pos: number): Token | undefined {
   if (source.charAt(pos) !== '@') return undefined;
   if (source.charAt(pos + 1) === '@') {
-    return { kind: 'DoubleAt', text: '@@', offset: pos };
+    return { kind: 'DoubleAt', text: '@@' };
   }
-  return { kind: 'At', text: '@', offset: pos };
+  return { kind: 'At', text: '@' };
 }
 
 function scanIdent(source: string, pos: number): Token | undefined {
@@ -132,7 +130,7 @@ function scanIdent(source: string, pos: number): Token | undefined {
       break;
     }
   }
-  return { kind: 'Ident', text: source.slice(pos, end), offset: pos };
+  return { kind: 'Ident', text: source.slice(pos, end) };
 }
 
 function scanNumber(source: string, pos: number): Token | undefined {
@@ -153,7 +151,7 @@ function scanNumber(source: string, pos: number): Token | undefined {
       end++;
     }
   }
-  return { kind: 'NumberLiteral', text: source.slice(pos, end), offset: pos };
+  return { kind: 'NumberLiteral', text: source.slice(pos, end) };
 }
 
 function scanString(source: string, pos: number): Token | undefined {
@@ -167,22 +165,22 @@ function scanString(source: string, pos: number): Token | undefined {
     }
     if (c === '"') {
       end++; // include closing quote
-      return { kind: 'StringLiteral', text: source.slice(pos, end), offset: pos };
+      return { kind: 'StringLiteral', text: source.slice(pos, end) };
     }
     if (c === '\n' || c === '\r') {
       // Unterminated: stop before newline
-      return { kind: 'StringLiteral', text: source.slice(pos, end), offset: pos };
+      return { kind: 'StringLiteral', text: source.slice(pos, end) };
     }
     end++;
   }
   // Unterminated at EOF
-  return { kind: 'StringLiteral', text: source.slice(pos, end), offset: pos };
+  return { kind: 'StringLiteral', text: source.slice(pos, end) };
 }
 
 function scanPunctuation(source: string, pos: number): Token | undefined {
   const kind = PUNCTUATION[source.charAt(pos)];
   if (kind === undefined) return undefined;
-  return { kind, text: source.charAt(pos), offset: pos };
+  return { kind, text: source.charAt(pos) };
 }
 
 function readChar(source: string, pos: number): string {
