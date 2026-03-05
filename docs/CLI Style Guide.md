@@ -35,10 +35,10 @@ The CLI follows the Unix convention of separating human-readable decoration from
 ### Rules
 
 1. **All `TerminalUI` methods except `output()` write to stderr** via Clack's `{ output: process.stderr }` option — but only in interactive mode.
-2. **`ui.output(data)` writes to stdout only when piped** — it checks `process.stdout.isTTY` and is a no-op in interactive terminals (the human already sees the data via decoration on stderr).
+2. **`ui.output(data)` always writes to stdout** — call it only when there is data to emit (e.g., `--json` responses). Commands gate `ui.output()` behind `if (flags.json)`.
 3. **When stdout is piped, ALL decoration is suppressed** — `isInteractive` (`process.stdout.isTTY`) gates every decoration method. Only `ui.output()` writes in piped mode. This keeps `prisma-next db verify | jq` completely silent.
 4. **Action commands** (sign, init) produce no stdout data — they are purely decorative.
-5. **Data commands** (verify, emit, introspect, status) call both decoration (stderr) and `ui.output()` (stdout). In interactive mode, only decoration is visible. In pipes/scripts, only the raw data is captured.
+5. **Data commands** (verify, emit, introspect, status) call both decoration (stderr) and `ui.output()` (stdout). In interactive mode, decoration is visible on stderr; `ui.output()` writes to stdout only when the command has data to emit (gated by `--json`).
 6. **Never write data to stderr** — decoration methods are for human context only.
 7. **Never write decoration to stdout** — it breaks pipes, `$(...)` captures, and `> file` redirects.
 
@@ -46,7 +46,7 @@ The CLI follows the Unix convention of separating human-readable decoration from
 
 The CLI checks `process.stdout.isTTY` once at startup to determine the output mode:
 
-- **Interactive** (`stdout` is TTY): decoration visible on stderr, `ui.output()` is a no-op.
+- **Interactive** (`stdout` is TTY): decoration visible on stderr. `ui.output()` writes to stdout when called (commands gate it behind `--json`).
 - **Piped** (`stdout` is NOT TTY): decoration suppressed, `ui.output()` writes raw data to stdout.
 
 ## Verbosity & Flags
@@ -56,6 +56,7 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 - JSON: `--json` outputs single JSON object to stdout.
 - Interactivity: `--interactive`/`--no-interactive`. Defaults to `process.stdout.isTTY`. `-y/--yes` accepts prompts.
 - Env toggles: `PRISMA_NEXT_DEBUG=1` ≅ `-v`, `PRISMA_NEXT_TRACE=1` ≅ `--trace`.
+- CLI flags take precedence over env vars.
 
 > **Future**: When streaming commands (`preflight`, `apply`) are implemented, `--json` may auto‑select NDJSON for those commands, and `--json=object|ndjson` override syntax can be re‑introduced.
 
@@ -63,7 +64,7 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 - **Styled Help Output**: Help output uses the same styled format as normal command output for consistency:
   - Root help (`prisma-next --help`): Shows "prisma next" title with subcommands listed
   - Command help (`prisma-next db verify --help`): Shows "next <command> ➜ <description>" with options, subcommands, and docs URLs
-  - Help formatters are in `packages/1-framework/3-tooling/cli/src/utils/output.ts` and use `configureHelp()` in `cli.ts`
+  - Help formatters are in `packages/1-framework/3-tooling/cli/src/utils/formatters/` (multiple focused modules)
 - **Fixed-Width Columns**: All two-column output (help, styled headers) uses fixed 20-character left column width for consistent alignment
 - **Text Wrapping**: Right column wraps at 90 characters using `wrap-ansi` for ANSI-aware wrapping that preserves color codes
 - **Default Values**: Options with default values display `default: <value>` on the following line (dimmed)
@@ -72,6 +73,11 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 - Include 1–2 copy‑pastable examples by default.
 - Show aliases and defaults inline for options.
 - Enable "Did you mean …" command suggestions.
+
+## Command Suggestions
+- When an unknown command is entered, the CLI suggests the closest match using Levenshtein distance.
+- Suggestions appear only when the edit distance is within 40% of the input length (minimum 2).
+- Up to 3 tied suggestions are shown.
 
 ## Errors
 - Codes: `PN-<DOMAIN>-<NNNN>` (e.g., `PN-CLI-4002`, `PN-MIG-2001`, `PN-RTM-3005`, `PN-CON-1001`, `PN-SCHEMA-0001`).
@@ -113,9 +119,8 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 - All errors include PN codes; CI should match on PN codes rather than exit code granularity.
 
 ## JSON Semantics
-- `--json` outputs a single JSON object for the command result.
-- In interactive mode (TTY), JSON output is suppressed (the user sees decoration on stderr instead).
-- When piped (`!isTTY`), only JSON data is written to stdout; no decoration is visible.
+- `--json` outputs a single JSON object for the command result to stdout regardless of TTY mode.
+- When piped (`!isTTY`), no decoration is visible — only JSON data on stdout.
 
 > **Future**: When streaming commands are implemented, NDJSON event streams (`--json=ndjson`) will be supported for commands like `migration preflight` and `migration apply`.
 
@@ -164,8 +169,15 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 ## Loading Indicators & Spinners
 - **When to use**: Show spinners for remote operations (database connections, network requests) that may take time.
 - **Implementation**: Use `@clack/prompts` spinner on stderr via `TerminalUI.spinner()`. Spinners are automatically suppressed when piped (`!isTTY`), in `--quiet` mode, or with `--json` output.
+- **Delay threshold**: Spinners use a 100ms delay threshold — they only appear if the operation takes longer, avoiding flicker for fast operations.
 - **Output format**: Success message with elapsed time: `✔ Operation name (123ms)`. Failure: `✖ Operation name (failed)`.
 - **Nested operations**: Rendered as step lines via `ui.step()` rather than separate spinners.
+
+## Graceful Shutdown
+- SIGINT (Ctrl+C) and SIGTERM are handled at CLI startup via a shared AbortController.
+- First signal: aborts in-flight operations, starts a 3-second grace period for `finally` blocks to close connections.
+- Second signal: force-exits immediately with code 130.
+- Active spinners auto-cancel with "Interrupted" message on abort.
 
 ## Testing & Accessibility
 - Width/wrapping: measure visible width, wrap long lines (use `string-width`, `wrap-ansi`, `strip-ansi`).
@@ -185,6 +197,14 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
   - `migration apply --yes`
   - `db verify --db $DATABASE_URL`
   - `db sign --db $DATABASE_URL --force`
+
+## Internal Architecture
+- **TerminalUI** (`src/utils/terminal-ui.ts`): Composable output abstraction. All decoration goes to stderr via `@clack/prompts`, data goes to stdout. Accepts `color` and `interactive` overrides.
+- **GlobalFlags / CommonCommandOptions** (`src/utils/global-flags.ts`): Parsed flags shared by all commands. `CommonCommandOptions` is the base interface for command option types.
+- **addGlobalOptions()** (`src/utils/command-helpers.ts`): Registers global flags and help formatter on any Command. All commands use this instead of inline `.option()` calls.
+- **Shutdown** (`src/utils/shutdown.ts`): Global AbortController for SIGINT/SIGTERM. Exposes `shutdownSignal` for cancellable async operations.
+- **Formatters** (`src/utils/formatters/`): Output formatting split into focused modules — `emit.ts`, `errors.ts`, `verify.ts`, `migrations.ts`, `styled.ts`, `help.ts`, and shared `helpers.ts`.
+- **Progress Adapter** (`src/utils/progress-adapter.ts`): Converts control-api progress events into Clack spinners on stderr.
 
 ---
 
