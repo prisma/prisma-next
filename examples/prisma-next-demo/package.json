@@ -8,12 +8,15 @@
   "scripts": {
     "dev": "vite",
     "emit": "prisma-next contract emit",
+    "emit:psl": "prisma-next contract emit --config prisma-next.config.ts",
+    "emit:ts": "prisma-next contract emit --config prisma-next.config.ts-contract.ts",
     "db:init": "prisma-next db init",
     "db:drop": "tsx scripts/drop-db.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/main.ts",
     "start:no-emit": "tsx src/main-no-emit.ts",
     "test": "vitest run --config vitest.config.ts",
+    "test:dual-mode": "pnpm emit:psl && pnpm test && pnpm emit:ts && pnpm test && pnpm emit:psl",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --error-on-warnings"
   },

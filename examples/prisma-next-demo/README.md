@@ -42,6 +42,19 @@ pnpm seed
 pnpm start -- users
 ```
 
+#### Dual-mode emit validation (TS vs PSL)
+
+This repo maintains two emit configs:
+
+- **PSL emit (default)**: `prisma-next.config.ts`
+- **TypeScript emit**: `prisma-next.config.ts-contract.ts`
+
+To prove the demo test suite passes in both modes:
+
+```bash
+pnpm test:dual-mode
+```
+
 ### 2. No-Emit Workflow
 
 Uses contract directly from TypeScript:
