@@ -87,19 +87,27 @@ export type IncludeRefinementResult<
       ? IncludeScalar<unknown> | IncludeCombine<Record<string, unknown>>
       : never);
 
+export declare const RowType: unique symbol;
+
+export interface RowSelection<T> {
+  [RowType]: T;
+}
+
+export type StripRowType<T> = Omit<T, typeof RowType>;
+
 export type IncludeRefinementValue<
   TContract extends SqlContract<SqlStorage>,
   ParentModelName extends string,
   RelName extends string,
   DefaultIncludedRow,
   RefinedResult,
-> = RefinedResult extends IncludeScalar<infer ScalarResult>
-  ? ScalarResult
-  : RefinedResult extends IncludeCombine<infer CombinedResult>
-    ? CombinedResult
-    : RefinedResult extends Collection<TContract, string, infer IncludedRow, CollectionTypeState>
-      ? IncludeRelationValue<TContract, ParentModelName, RelName, IncludedRow>
-      : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
+> = RefinedResult extends RowSelection<infer V>
+  ? // IncludeScalar / IncludeCombine carry a final value that must not be
+    // cardinality-wrapped; Collection carries a raw row that still needs it.
+    RefinedResult extends { readonly kind: 'includeScalar' | 'includeCombine' }
+    ? V
+    : IncludeRelationValue<TContract, ParentModelName, RelName, V>
+  : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
 
 export type WhereInput<TContract extends SqlContract<SqlStorage>, ModelName extends string> =
   | ((model: ModelAccessor<TContract, ModelName>) => WhereExpr)
