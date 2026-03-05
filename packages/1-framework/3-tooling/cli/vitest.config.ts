@@ -29,6 +29,8 @@ export default defineConfig({
         'src/cli.ts',
         // Exclude formatting/wrangling files - these are tested via e2e tests
         'src/utils/output.ts',
+        'src/utils/formatters/**',
+        'src/utils/terminal-ui.ts',
         'src/utils/command-helpers.ts',
         'src/utils/global-flags.ts',
         // Exclude command files - mostly Commander.js setup and delegation to family instance,
@@ -49,9 +51,10 @@ export default defineConfig({
         'src/utils/cli-errors.ts',
         // Exclude config loader - mostly file I/O and error handling, tested via e2e tests
         'src/config-loader.ts',
-        // Exclude spinner and progress utilities - UI/UX code that's hard to test meaningfully
+        // Exclude spinner, progress, and shutdown utilities - UI/UX and process-level code
         'src/utils/spinner.ts',
         'src/utils/progress-adapter.ts',
+        'src/utils/shutdown.ts',
         // Exclude migration command scaffold - orchestration code tested via e2e tests
         'src/utils/migration-command-scaffold.ts',
         // Exclude defensive error handling branches that are hard to test meaningfully
