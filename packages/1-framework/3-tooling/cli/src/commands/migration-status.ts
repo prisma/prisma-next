@@ -3,6 +3,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
   MigrationChainEntry,
   MigrationGraph,
@@ -32,6 +33,7 @@ import { TerminalUI } from '../utils/terminal-ui';
 interface MigrationStatusOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
+  readonly ref?: string;
 }
 
 export interface MigrationStatusEntry {
@@ -59,6 +61,8 @@ export interface MigrationStatusResult {
   readonly markerHash?: string;
   readonly leafHash: string;
   readonly contractHash: string;
+  readonly refName?: string;
+  readonly refHash?: string;
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
 }
@@ -159,6 +163,28 @@ async function executeMigrationStatusCommand(
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
 
+  let refName: string | undefined;
+  let refHash: string | undefined;
+  if (options.ref) {
+    refName = options.ref;
+    const refsPath = resolve(migrationsDir, 'refs.json');
+    try {
+      const refs = await readRefs(refsPath);
+      refHash = resolveRef(refs, refName);
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(
+          errorRuntime(error.message, {
+            why: error.why,
+            fix: error.fix,
+            meta: { code: error.code },
+          }),
+        );
+      }
+      throw error;
+    }
+  }
+
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
@@ -166,6 +192,9 @@ async function executeMigrationStatusCommand(
     ];
     if (dbConnection && hasDriver) {
       details.push({ label: 'database', value: maskConnectionUrl(String(dbConnection)) });
+    }
+    if (refName) {
+      details.push({ label: 'ref', value: refName });
     }
     const header = formatStyledHeader({
       command: 'migration status',
@@ -317,6 +346,22 @@ async function executeMigrationStatusCommand(
   if (mode === 'online') {
     if (!markerInChain) {
       summary = `Database marker does not match any migration — was the database managed with 'db update'?`;
+    } else if (refHash && markerHash !== undefined) {
+      if (markerHash === refHash) {
+        summary = `At ref "${refName}" target`;
+      } else {
+        const pathToRef = findPath(graph, markerHash, refHash);
+        if (pathToRef) {
+          summary = `${pathToRef.length} edge(s) behind ref "${refName}"`;
+        } else {
+          const pathFromRef = findPath(graph, refHash, markerHash);
+          if (pathFromRef) {
+            summary = `${pathFromRef.length} edge(s) ahead of ref "${refName}"`;
+          } else {
+            summary = `No path between marker and ref "${refName}" target`;
+          }
+        }
+      }
     } else {
       const pendingCount = entries.filter((e) => e.status === 'pending').length;
       const appliedCount = entries.filter((e) => e.status === 'applied').length;
@@ -379,6 +424,8 @@ async function executeMigrationStatusCommand(
     summary,
     diagnostics,
     ...(markerHash !== undefined ? { markerHash } : {}),
+    ...(refName !== undefined ? { refName } : {}),
+    ...(refHash !== undefined ? { refHash } : {}),
   };
   return ok(result);
 }
@@ -399,6 +446,7 @@ export function createMigrationStatusCommand(): Command {
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
+    .option('--ref <name>', 'Target ref name from migrations/refs.json')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
 
