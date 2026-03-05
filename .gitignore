@@ -16,6 +16,9 @@ packages/e2e-tests/.tmp-output
 .cursor/rules
 .cursor/commands
 .cursor
+.claude/settings.local.json
+.claude/worktrees
+CLAUDE.local.md
 
 # Generated contract files in test fixtures
 test/**/fixtures/generated/
