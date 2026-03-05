@@ -23,7 +23,6 @@ import {
   prepareMigrationContext,
 } from '../utils/migration-command-scaffold';
 import {
-  formatCommandHelp,
   formatMigrationApplyOutput,
   formatMigrationJson,
   formatMigrationPlanOutput,
@@ -100,10 +99,11 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
 async function executeDbInitCommand(
   options: DbInitOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<MigrationCommandResult, CliStructuredError>> {
   // Prepare shared migration context (config, contract, connection, client)
-  const ctxResult = await prepareMigrationContext(options, flags, {
+  const ctxResult = await prepareMigrationContext(options, flags, ui, {
     commandName: 'db init',
     description: 'Bootstrap a database to match the current contract',
     url: 'https://pris.ly/db-init',
@@ -209,19 +209,13 @@ export function createDbInitCommand(): Command {
     'prisma-next db init --db $DATABASE_URL --plan',
   ]);
   addMigrationCommandOptions(command);
-  command.configureHelp({
-    formatHelp: (cmd) => {
-      const flags = parseGlobalFlags({});
-      return formatCommandHelp({ command: cmd, flags });
-    },
-  });
   command.action(async (options: DbInitOptions) => {
     const flags = parseGlobalFlags(options);
     const startTime = Date.now();
 
     const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-    const result = await executeDbInitCommand(options, flags, startTime);
+    const result = await executeDbInitCommand(options, flags, ui, startTime);
 
     const exitCode = handleResult(result, flags, (dbInitResult) => {
       if (flags.json) {

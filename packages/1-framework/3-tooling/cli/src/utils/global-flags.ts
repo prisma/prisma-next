@@ -7,7 +7,11 @@ export interface GlobalFlags {
   readonly yes?: boolean;
 }
 
-export interface CliOptions {
+/**
+ * Common options parsed by Commander.js for every command.
+ * Extend this for command-specific options instead of duplicating these fields.
+ */
+export interface CommonCommandOptions {
   readonly json?: string | boolean;
   readonly quiet?: boolean;
   readonly q?: boolean;
@@ -21,6 +25,9 @@ export interface CliOptions {
   readonly yes?: boolean;
   readonly y?: boolean;
 }
+
+/** @deprecated Use CommonCommandOptions instead */
+export type CliOptions = CommonCommandOptions;
 
 /**
  * Parses global flags from CLI options.

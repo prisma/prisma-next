@@ -66,12 +66,6 @@ exports[`db introspect command (e2e) > outputs tree structure with real database
 └
 
 │
-◇  Connecting to database... (Xms)
-
-│
-◇  Introspecting database schema... (Xms)
-
-│
 │  contract
 │  ├─ table post
 │  ├─ columns

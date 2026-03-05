@@ -30,32 +30,22 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
+  addGlobalOptions,
   resolveContractPath,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import { formatCommandHelp, formatStyledHeader } from '../utils/output';
+import { formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface MigrationPlanOptions {
+interface MigrationPlanOptions extends CommonCommandOptions {
   readonly config?: string;
   readonly name?: string;
   readonly from?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly trace?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-  readonly interactive?: boolean;
-  readonly 'no-interactive'?: boolean;
-  readonly yes?: boolean;
-  readonly y?: boolean;
 }
 
 export interface MigrationPlanResult {
@@ -93,6 +83,7 @@ function mapMigrationToolsError(error: unknown): CliStructuredError {
 async function executeMigrationPlanCommand(
   options: MigrationPlanOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<MigrationPlanResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
@@ -108,8 +99,6 @@ async function executeMigrationPlanCommand(
 
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
-
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
@@ -351,31 +340,16 @@ export function createMigrationPlanCommand(): Command {
     'prisma-next migration plan',
     'prisma-next migration plan --name add-users-table',
   ]);
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const flags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags });
-      },
-    })
+  addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--name <slug>', 'Name slug for the migration directory', 'migration')
     .option('--from <hash>', 'Explicit starting contract hash (overrides migration chain leaf)')
-    .option('--json', 'Output as JSON')
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('--trace', 'Trace output: deep internals, stack traces')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .option('--interactive', 'Force interactive mode')
-    .option('--no-interactive', 'Disable interactive prompts')
-    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: MigrationPlanOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
-      const result = await executeMigrationPlanCommand(options, flags, startTime);
+      const result = await executeMigrationPlanCommand(options, flags, ui, startTime);
 
       const exitCode = handleResult(result, flags, (planResult) => {
         if (flags.json) {

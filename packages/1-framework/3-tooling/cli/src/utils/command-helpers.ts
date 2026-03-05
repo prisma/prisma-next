@@ -1,5 +1,8 @@
 import type { Command } from 'commander';
 import { resolve } from 'pathe';
+import type { CommonCommandOptions } from './global-flags';
+import { parseGlobalFlags } from './global-flags';
+import { formatCommandHelp } from './output';
 
 const longDescriptions = new WeakMap<Command, string>();
 const commandExamples = new WeakMap<Command, readonly string[]>();
@@ -47,22 +50,10 @@ export function getCommandExamples(command: Command): readonly string[] | undefi
  * Shared CLI options interface for migration commands (db init, db update).
  * These are the Commander.js parsed options common to both commands.
  */
-export interface MigrationCommandOptions {
+export interface MigrationCommandOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly plan?: boolean;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly trace?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-  readonly interactive?: boolean;
-  readonly 'no-interactive'?: boolean;
-  readonly yes?: boolean;
-  readonly y?: boolean;
 }
 
 /**
@@ -130,4 +121,30 @@ export function sanitizeErrorMessage(message: string, connectionUrl?: string): s
       .replace(/password\s*=\s*\S+/gi, 'password=****')
       .replace(/user\s*=\s*\S+/gi, 'user=****');
   }
+}
+
+/**
+ * Registers the global CLI options shared by every command:
+ * --json, -q/--quiet, -v/--verbose, --trace, --color, --no-color,
+ * --interactive, --no-interactive, -y/--yes.
+ *
+ * Also sets up the styled help formatter.
+ */
+export function addGlobalOptions(command: Command): Command {
+  return command
+    .configureHelp({
+      formatHelp: (cmd) => {
+        const flags = parseGlobalFlags({});
+        return formatCommandHelp({ command: cmd, flags });
+      },
+    })
+    .option('--json', 'Output as JSON')
+    .option('-q, --quiet', 'Quiet mode: errors only')
+    .option('-v, --verbose', 'Verbose output: debug info, timings')
+    .option('--trace', 'Trace output: deep internals, stack traces')
+    .option('--color', 'Force color output')
+    .option('--no-color', 'Disable color output')
+    .option('--interactive', 'Force interactive mode')
+    .option('--no-interactive', 'Disable interactive prompts')
+    .option('-y, --yes', 'Auto-accept prompts');
 }

@@ -23,7 +23,6 @@ import {
   prepareMigrationContext,
 } from '../utils/migration-command-scaffold';
 import {
-  formatCommandHelp,
   formatMigrationApplyOutput,
   formatMigrationJson,
   formatMigrationPlanOutput,
@@ -70,10 +69,11 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
 async function executeDbUpdateCommand(
   options: DbUpdateOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<MigrationCommandResult, CliStructuredError>> {
   // Prepare shared migration context (config, contract, connection, client)
-  const ctxResult = await prepareMigrationContext(options, flags, {
+  const ctxResult = await prepareMigrationContext(options, flags, ui, {
     commandName: 'db update',
     description: 'Update your database schema to match your contract',
     url: 'https://pris.ly/db-update',
@@ -185,19 +185,13 @@ export function createDbUpdateCommand(): Command {
     'Confirm destructive operations (required when plan includes drops or type changes)',
     false,
   );
-  command.configureHelp({
-    formatHelp: (cmd) => {
-      const flags = parseGlobalFlags({});
-      return formatCommandHelp({ command: cmd, flags });
-    },
-  });
   command.action(async (options: DbUpdateOptions) => {
     const flags = parseGlobalFlags(options);
     const startTime = Date.now();
 
     const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-    const result = await executeDbUpdateCommand(options, flags, startTime);
+    const result = await executeDbUpdateCommand(options, flags, ui, startTime);
     const exitCode = handleResult(result, flags, (dbUpdateResult) => {
       if (flags.json) {
         ui.output(formatMigrationJson(dbUpdateResult));

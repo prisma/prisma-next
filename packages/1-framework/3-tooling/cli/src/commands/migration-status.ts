@@ -16,35 +16,21 @@ import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import {
+  addGlobalOptions,
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import {
-  formatCommandHelp,
-  formatMigrationStatusOutput,
-  formatStyledHeader,
-} from '../utils/output';
+import { formatMigrationStatusOutput, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface MigrationStatusOptions {
+interface MigrationStatusOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly trace?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-  readonly interactive?: boolean;
-  readonly 'no-interactive'?: boolean;
-  readonly yes?: boolean;
-  readonly y?: boolean;
 }
 
 export interface MigrationStatusEntry {
@@ -156,6 +142,7 @@ export function buildMigrationEntries(
 async function executeMigrationStatusCommand(
   options: MigrationStatusOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -170,8 +157,6 @@ async function executeMigrationStatusCommand(
 
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
-
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
@@ -410,30 +395,15 @@ export function createMigrationStatusCommand(): Command {
     'prisma-next migration status',
     'prisma-next migration status --db $DATABASE_URL',
   ]);
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const defaultFlags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags: defaultFlags });
-      },
-    })
+  addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json', 'Output as JSON')
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output')
-    .option('--trace', 'Trace output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .option('--interactive', 'Force interactive mode')
-    .option('--no-interactive', 'Disable interactive prompts')
-    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
 
-      const result = await executeMigrationStatusCommand(options, flags);
-
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
+      const result = await executeMigrationStatusCommand(options, flags, ui);
 
       const exitCode = handleResult(result, flags, (statusResult) => {
         if (flags.json) {

@@ -12,36 +12,21 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
+  addGlobalOptions,
   maskConnectionUrl,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import {
-  formatCommandHelp,
-  formatIntrospectJson,
-  formatIntrospectOutput,
-  formatStyledHeader,
-} from '../utils/output';
+import { formatIntrospectJson, formatIntrospectOutput, formatStyledHeader } from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface DbIntrospectOptions {
+interface DbIntrospectOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly trace?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-  readonly interactive?: boolean;
-  readonly 'no-interactive'?: boolean;
-  readonly yes?: boolean;
-  readonly y?: boolean;
 }
 
 interface DbIntrospectCommandResult {
@@ -55,10 +40,9 @@ interface DbIntrospectCommandResult {
 async function executeDbIntrospectCommand(
   options: DbIntrospectOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<DbIntrospectCommandResult, CliStructuredError>> {
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
-
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -176,31 +160,16 @@ export function createDbIntrospectCommand(): Command {
     'prisma-next db introspect --db $DATABASE_URL',
     'prisma-next db introspect --db $DATABASE_URL --json',
   ]);
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const flags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags });
-      },
-    })
+  addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json', 'Output as JSON')
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('--trace', 'Trace output: deep internals, stack traces')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .option('--interactive', 'Force interactive mode')
-    .option('--no-interactive', 'Disable interactive prompts')
-    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: DbIntrospectOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const result = await executeDbIntrospectCommand(options, flags, startTime);
+      const result = await executeDbIntrospectCommand(options, flags, ui, startTime);
 
       // Handle result - formats output and returns exit code
       const exitCode = handleResult(result, flags, (value) => {

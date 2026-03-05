@@ -20,35 +20,21 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
+  addGlobalOptions,
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import {
-  formatCommandHelp,
-  formatMigrationApplyCommandOutput,
-  formatStyledHeader,
-} from '../utils/output';
+import { formatMigrationApplyCommandOutput, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface MigrationApplyCommandOptions {
+interface MigrationApplyCommandOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly trace?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-  readonly interactive?: boolean;
-  readonly 'no-interactive'?: boolean;
-  readonly yes?: boolean;
-  readonly y?: boolean;
 }
 
 export interface MigrationApplyResult {
@@ -102,6 +88,7 @@ function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
 async function executeMigrationApplyCommand(
   options: MigrationApplyCommandOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
@@ -164,8 +151,6 @@ async function executeMigrationApplyCommand(
       }),
     );
   }
-
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
@@ -404,31 +389,16 @@ export function createMigrationApplyCommand(): Command {
     'prisma-next migration apply --db $DATABASE_URL',
     'prisma-next migration apply --db $DATABASE_URL --yes',
   ]);
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const defaultFlags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags: defaultFlags });
-      },
-    })
+  addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json', 'Output as JSON')
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('--trace', 'Trace output: deep internals, stack traces')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .option('--interactive', 'Force interactive mode')
-    .option('--no-interactive', 'Disable interactive prompts')
-    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: MigrationApplyCommandOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
-      const result = await executeMigrationApplyCommand(options, flags, startTime);
-
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
+      const result = await executeMigrationApplyCommand(options, flags, ui, startTime);
 
       const exitCode = handleResult(result, flags, (applyResult) => {
         if (flags.json) {

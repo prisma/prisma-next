@@ -4,30 +4,19 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
-import { setCommandDescriptions, setCommandExamples } from '../utils/command-helpers';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
-  formatCommandHelp,
-  formatMigrationVerifyCommandOutput,
-  formatStyledHeader,
-} from '../utils/output';
+  addGlobalOptions,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
+import type { CommonCommandOptions } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { formatMigrationVerifyCommandOutput, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface MigrationVerifyOptions {
+interface MigrationVerifyOptions extends CommonCommandOptions {
   readonly dir: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly trace?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-  readonly interactive?: boolean;
-  readonly 'no-interactive'?: boolean;
-  readonly yes?: boolean;
-  readonly y?: boolean;
 }
 
 export interface MigrationVerifyResult {
@@ -43,9 +32,9 @@ export interface MigrationVerifyResult {
 async function executeMigrationVerifyCommand(
   options: MigrationVerifyOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
 ): Promise<Result<MigrationVerifyResult, CliStructuredError>> {
   const dir = options.dir;
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
   if (!flags.json && !flags.quiet) {
     const header = formatStyledHeader({
@@ -121,28 +110,13 @@ export function createMigrationVerifyCommand(): Command {
       'attested.',
   );
   setCommandExamples(command, ['prisma-next migration verify --dir migrations/20250101-add-users']);
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const defaultFlags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags: defaultFlags });
-      },
-    })
+  addGlobalOptions(command)
     .requiredOption('--dir <path>', 'Path to the migration package directory')
-    .option('--json', 'Output as JSON')
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output')
-    .option('--trace', 'Trace output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .option('--interactive', 'Force interactive mode')
-    .option('--no-interactive', 'Disable interactive prompts')
-    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: MigrationVerifyOptions) => {
       const flags = parseGlobalFlags(options);
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const result = await executeMigrationVerifyCommand(options, flags);
+      const result = await executeMigrationVerifyCommand(options, flags, ui);
 
       const exitCode = handleResult(result, flags, (verifyResult) => {
         if (flags.json) {

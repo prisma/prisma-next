@@ -15,14 +15,15 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
+  addGlobalOptions,
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
-  formatCommandHelp,
   formatSchemaVerifyJson,
   formatSchemaVerifyOutput,
   formatStyledHeader,
@@ -31,22 +32,10 @@ import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface DbSchemaVerifyOptions {
+interface DbSchemaVerifyOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly json?: string | boolean;
   readonly strict?: boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly trace?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-  readonly interactive?: boolean;
-  readonly 'no-interactive'?: boolean;
-  readonly yes?: boolean;
-  readonly y?: boolean;
 }
 
 /**
@@ -55,6 +44,7 @@ interface DbSchemaVerifyOptions {
 async function executeDbSchemaVerifyCommand(
   options: DbSchemaVerifyOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
 ): Promise<Result<VerifyDatabaseSchemaResult, CliStructuredError>> {
   // Load config
   const config = await loadConfig(options.config);
@@ -63,9 +53,6 @@ async function executeDbSchemaVerifyCommand(
     : 'prisma-next.config.ts';
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
-
-  // Output header
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
@@ -190,31 +177,16 @@ export function createDbSchemaVerifyCommand(): Command {
     'prisma-next db schema-verify --db $DATABASE_URL',
     'prisma-next db schema-verify --db $DATABASE_URL --strict',
   ]);
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const flags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags });
-      },
-    })
+  addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json', 'Output as JSON')
     .option('--strict', 'Strict mode: extra schema elements cause failures', false)
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('--trace', 'Trace output: deep internals, stack traces')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .option('--interactive', 'Force interactive mode')
-    .option('--no-interactive', 'Disable interactive prompts')
-    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: DbSchemaVerifyOptions) => {
       const flags = parseGlobalFlags(options);
 
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const result = await executeDbSchemaVerifyCommand(options, flags);
+      const result = await executeDbSchemaVerifyCommand(options, flags, ui);
 
       // Handle result - formats output and returns exit code
       const exitCode = handleResult(result, flags, (schemaVerifyResult) => {

@@ -12,11 +12,15 @@ import {
   errorRuntime,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { setCommandDescriptions, setCommandExamples } from '../utils/command-helpers';
+import {
+  addGlobalOptions,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   type EmitContractResult,
-  formatCommandHelp,
   formatEmitJson,
   formatEmitOutput,
   formatStyledHeader,
@@ -26,20 +30,8 @@ import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface ContractEmitOptions {
+interface ContractEmitOptions extends CommonCommandOptions {
   readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly trace?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-  readonly interactive?: boolean;
-  readonly 'no-interactive'?: boolean;
-  readonly yes?: boolean;
-  readonly y?: boolean;
 }
 
 function mapDiagnosticsToIssues(
@@ -101,10 +93,9 @@ function mapEmitFailure(
 async function executeContractEmitCommand(
   options: ContractEmitOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<EmitContractResult, CliStructuredError>> {
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
-
   // Load config
   let config: Awaited<ReturnType<typeof loadConfig>>;
   try {
@@ -255,29 +246,14 @@ export function createContractEmitCommand(): Command {
     'prisma-next contract emit',
     'prisma-next contract emit --config ./custom-config.ts',
   ]);
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const flags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags });
-      },
-    })
+  addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json', 'Output as JSON')
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('--trace', 'Trace output: deep internals, stack traces')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .option('--interactive', 'Force interactive mode')
-    .option('--no-interactive', 'Disable interactive prompts')
-    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (options: ContractEmitOptions) => {
       const flags = parseGlobalFlags(options);
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
       const startTime = Date.now();
 
-      const result = await executeContractEmitCommand(options, flags, startTime);
+      const result = await executeContractEmitCommand(options, flags, ui, startTime);
 
       // Handle result - formats output and returns exit code
       const exitCode = handleResult(result, flags, (emitResult) => {

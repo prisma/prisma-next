@@ -9,26 +9,19 @@ import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
-import { setCommandDescriptions, setCommandExamples } from '../utils/command-helpers';
+import {
+  addGlobalOptions,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import { formatCommandHelp, formatMigrationShowOutput, formatStyledHeader } from '../utils/output';
+import { formatMigrationShowOutput, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface MigrationShowOptions {
+interface MigrationShowOptions extends CommonCommandOptions {
   readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly trace?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-  readonly interactive?: boolean;
-  readonly 'no-interactive'?: boolean;
-  readonly yes?: boolean;
-  readonly y?: boolean;
 }
 
 export interface MigrationShowResult {
@@ -87,6 +80,7 @@ async function executeMigrationShowCommand(
   target: string | undefined,
   options: MigrationShowOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
 ): Promise<Result<MigrationShowResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -98,8 +92,6 @@ async function executeMigrationShowCommand(
     config.migrations?.dir ?? 'migrations',
   );
   const migrationsRelative = relative(process.cwd(), migrationsDir);
-
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
@@ -225,33 +217,18 @@ export function createMigrationShowCommand(): Command {
     'prisma-next migration show',
     'prisma-next migration show sha256:a1b2c3',
   ]);
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const defaultFlags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags: defaultFlags });
-      },
-    })
+  addGlobalOptions(command)
     .argument(
       '[target]',
       'Migration directory path or migrationId hash prefix (defaults to latest)',
     )
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json', 'Output as JSON')
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output')
-    .option('--trace', 'Trace output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .option('--interactive', 'Force interactive mode')
-    .option('--no-interactive', 'Disable interactive prompts')
-    .option('-y, --yes', 'Auto-accept prompts')
     .action(async (target: string | undefined, options: MigrationShowOptions) => {
       const flags = parseGlobalFlags(options);
 
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const result = await executeMigrationShowCommand(target, options, flags);
+      const result = await executeMigrationShowCommand(target, options, flags, ui);
 
       const exitCode = handleResult(result, flags, (showResult) => {
         if (flags.json) {

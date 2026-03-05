@@ -3,7 +3,6 @@
 exports[`help text snapshots > formats contract emit help 1`] = `
 "prisma-next emit → Emit your contract artifacts
 │
-│ --config <path>       Path to prisma-next.config.ts
 │ --json                Output as JSON
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
@@ -13,6 +12,7 @@ exports[`help text snapshots > formats contract emit help 1`] = `
 │ --interactive         Force interactive mode
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
+│ --config <path>       Path to prisma-next.config.ts
 │
 │ Examples:
 │   $ prisma-next contract emit
@@ -30,7 +30,6 @@ exports[`help text snapshots > formats contract emit help 1`] = `
 exports[`help text snapshots > formats contract emit help with no color 1`] = `
 "prisma-next emit → Emit your contract artifacts
 │
-│ --config <path>       Path to prisma-next.config.ts
 │ --json                Output as JSON
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
@@ -40,6 +39,7 @@ exports[`help text snapshots > formats contract emit help with no color 1`] = `
 │ --interactive         Force interactive mode
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
+│ --config <path>       Path to prisma-next.config.ts
 │
 │ Examples:
 │   $ prisma-next contract emit
@@ -57,8 +57,6 @@ exports[`help text snapshots > formats contract emit help with no color 1`] = `
 exports[`help text snapshots > formats db introspect help 1`] = `
 "prisma-next introspect → Inspect the database schema
 │
-│ --db <url>            Database connection string
-│ --config <path>       Path to prisma-next.config.ts
 │ --json                Output as JSON
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
@@ -68,6 +66,8 @@ exports[`help text snapshots > formats db introspect help 1`] = `
 │ --interactive         Force interactive mode
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
+│ --db <url>            Database connection string
+│ --config <path>       Path to prisma-next.config.ts
 │
 │ Examples:
 │   $ prisma-next db introspect --db $DATABASE_URL
@@ -85,10 +85,6 @@ exports[`help text snapshots > formats db introspect help 1`] = `
 exports[`help text snapshots > formats db update help 1`] = `
 "prisma-next update → Update your database schema to match your contract
 │
-│ --db <url>            Database connection string
-│ --config <path>       Path to prisma-next.config.ts
-│ --plan                Preview planned operations without applying
-│                       default: false
 │ --json                Output as JSON
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
@@ -98,6 +94,10 @@ exports[`help text snapshots > formats db update help 1`] = `
 │ --interactive         Force interactive mode
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
+│ --db <url>            Database connection string
+│ --config <path>       Path to prisma-next.config.ts
+│ --plan                Preview planned operations without applying
+│                       default: false
 │ --accept-data-loss    Confirm destructive operations (required when plan
 │                       includes drops or type changes)
 │                       default: false
@@ -118,8 +118,6 @@ exports[`help text snapshots > formats db update help 1`] = `
 exports[`help text snapshots > formats db verify help 1`] = `
 "prisma-next verify → Check whether the database has been signed with your contract
 │
-│ --db <url>            Database connection string
-│ --config <path>       Path to prisma-next.config.ts
 │ --json                Output as JSON
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
@@ -129,6 +127,8 @@ exports[`help text snapshots > formats db verify help 1`] = `
 │ --interactive         Force interactive mode
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
+│ --db <url>            Database connection string
+│ --config <path>       Path to prisma-next.config.ts
 │
 │ Examples:
 │   $ prisma-next db verify --db $DATABASE_URL

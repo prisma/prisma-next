@@ -14,11 +14,11 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from './cli-errors';
-import { maskConnectionUrl, resolveContractPath } from './command-helpers';
+import { addGlobalOptions, maskConnectionUrl, resolveContractPath } from './command-helpers';
 import type { GlobalFlags } from './global-flags';
 import { formatStyledHeader } from './output';
 import { createProgressAdapter } from './progress-adapter';
-import { TerminalUI } from './terminal-ui';
+import type { TerminalUI } from './terminal-ui';
 
 /**
  * Resolved context for a migration command.
@@ -55,10 +55,9 @@ export interface MigrationCommandDescriptor {
 export async function prepareMigrationContext(
   options: { readonly db?: string; readonly config?: string; readonly plan?: boolean },
   flags: GlobalFlags,
+  ui: TerminalUI,
   descriptor: MigrationCommandDescriptor,
 ): Promise<Result<MigrationContext, CliStructuredError>> {
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
-
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -179,17 +178,9 @@ export async function prepareMigrationContext(
  * Registers the shared CLI options for migration commands (db init, db update).
  */
 export function addMigrationCommandOptions(command: Command): Command {
+  addGlobalOptions(command);
   return command
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--plan', 'Preview planned operations without applying', false)
-    .option('--json', 'Output as JSON')
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('--trace', 'Trace output: deep internals, stack traces')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .option('--interactive', 'Force interactive mode')
-    .option('--no-interactive', 'Disable interactive prompts')
-    .option('-y, --yes', 'Auto-accept prompts');
+    .option('--plan', 'Preview planned operations without applying', false);
 }
