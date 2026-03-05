@@ -128,6 +128,74 @@ export function findPath(
   return null;
 }
 
+export interface PathDecision {
+  readonly selectedPath: readonly MigrationChainEntry[];
+  readonly fromHash: string;
+  readonly toHash: string;
+  readonly alternativeCount: number;
+  readonly tieBreakReasons: readonly string[];
+  readonly refName?: string;
+  readonly refHash?: string;
+}
+
+/**
+ * Find the shortest path from `fromHash` to `toHash` and return structured
+ * path-decision metadata for machine-readable output.
+ */
+export function findPathWithDecision(
+  graph: MigrationGraph,
+  fromHash: string,
+  toHash: string,
+  ref?: { name: string; hash: string },
+): PathDecision | null {
+  if (fromHash === toHash) {
+    return {
+      selectedPath: [],
+      fromHash,
+      toHash,
+      alternativeCount: 0,
+      tieBreakReasons: [],
+      ...(ref ? { refName: ref.name, refHash: ref.hash } : {}),
+    };
+  }
+
+  const path = findPath(graph, fromHash, toHash);
+  if (!path) return null;
+
+  const tieBreakReasons: string[] = [];
+  let alternativeCount = 0;
+
+  for (const edge of path) {
+    const outgoing = graph.forwardChain.get(edge.from);
+    if (outgoing && outgoing.length > 1) {
+      const reachable = outgoing.filter((e) => {
+        const pathFromE = findPath(graph, e.to, toHash);
+        return pathFromE !== null || e.to === toHash;
+      });
+      if (reachable.length > 1) {
+        alternativeCount += reachable.length - 1;
+        const sorted = sortedNeighbors(reachable);
+        if (sorted[0] && sorted[0].migrationId === edge.migrationId) {
+          if (reachable.some((e) => e.migrationId !== edge.migrationId)) {
+            tieBreakReasons.push(
+              `at ${edge.from}: ${reachable.length} candidates, selected by tie-break`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    selectedPath: path,
+    fromHash,
+    toHash,
+    alternativeCount,
+    tieBreakReasons,
+    ...(ref ? { refName: ref.name, refHash: ref.hash } : {}),
+  };
+}
+
 /**
  * Find all leaf nodes reachable from `fromHash` via forward edges.
  * A leaf is a node with no outgoing edges in the graph.
