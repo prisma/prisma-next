@@ -1,7 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
-import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import {
+  findLeaf,
+  findPath,
+  findPathWithDecision,
+  reconstructGraph,
+} from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
@@ -72,6 +77,14 @@ export interface MigrationStatusResult {
   readonly contractHash: string;
   readonly refName?: string;
   readonly refHash?: string;
+  readonly pathDecision?: {
+    readonly fromHash: string;
+    readonly toHash: string;
+    readonly alternativeCount: number;
+    readonly tieBreakReasons: readonly string[];
+    readonly refName?: string;
+    readonly refHash?: string;
+  };
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
 }
@@ -423,6 +436,27 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  let pathDecision: MigrationStatusResult['pathDecision'];
+  if (mode === 'online' && markerHash !== undefined) {
+    const target = refHash ?? leafHash;
+    const decision = findPathWithDecision(
+      graph,
+      markerHash,
+      target,
+      refName && refHash ? { name: refName, hash: refHash } : undefined,
+    );
+    if (decision) {
+      pathDecision = {
+        fromHash: decision.fromHash,
+        toHash: decision.toHash,
+        alternativeCount: decision.alternativeCount,
+        tieBreakReasons: decision.tieBreakReasons,
+        ...(decision.refName ? { refName: decision.refName } : {}),
+        ...(decision.refHash ? { refHash: decision.refHash } : {}),
+      };
+    }
+  }
+
   const result: MigrationStatusResult = {
     ok: true,
     mode,
@@ -434,6 +468,7 @@ async function executeMigrationStatusCommand(
     ...(markerHash !== undefined ? { markerHash } : {}),
     ...(refName !== undefined ? { refName } : {}),
     ...(refHash !== undefined ? { refHash } : {}),
+    ...(pathDecision ? { pathDecision } : {}),
   };
   return ok(result);
 }

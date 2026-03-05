@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findPathWithDecision, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type { MigrationGraph, MigrationPackage } from '@prisma-next/migration-tools/types';
@@ -61,6 +61,14 @@ export interface MigrationApplyResult {
     readonly operationsExecuted: number;
   }[];
   readonly summary: string;
+  readonly pathDecision?: {
+    readonly fromHash: string;
+    readonly toHash: string;
+    readonly alternativeCount: number;
+    readonly tieBreakReasons: readonly string[];
+    readonly refName?: string;
+    readonly refHash?: string;
+  };
   readonly timings: {
     readonly total: number;
   };
@@ -325,8 +333,13 @@ async function executeMigrationApplyCommand(
       );
     }
 
-    const pendingPath = findPath(graph, markerHash, destinationHash);
-    if (!pendingPath) {
+    const decision = findPathWithDecision(
+      graph,
+      markerHash,
+      destinationHash,
+      refName ? { name: refName, hash: destinationHash } : undefined,
+    );
+    if (!decision) {
       return notOk(
         errorRuntime('No migration path from current state to target', {
           why: `Cannot find a path from marker hash "${markerHash}" to target "${destinationHash}"`,
@@ -336,6 +349,16 @@ async function executeMigrationApplyCommand(
       );
     }
 
+    const pendingPath = decision.selectedPath;
+    const pathDecision = {
+      fromHash: decision.fromHash,
+      toHash: decision.toHash,
+      alternativeCount: decision.alternativeCount,
+      tieBreakReasons: decision.tieBreakReasons,
+      ...(decision.refName ? { refName: decision.refName } : {}),
+      ...(decision.refHash ? { refHash: decision.refHash } : {}),
+    };
+
     if (pendingPath.length === 0) {
       return ok({
         ok: true,
@@ -344,6 +367,7 @@ async function executeMigrationApplyCommand(
         markerHash,
         applied: [],
         summary: 'Already up to date',
+        pathDecision,
         timings: { total: Date.now() - startTime },
       });
     }
@@ -389,6 +413,7 @@ async function executeMigrationApplyCommand(
       markerHash: value.markerHash,
       applied: value.applied,
       summary: value.summary,
+      pathDecision,
       timings: { total: Date.now() - startTime },
     });
   } catch (error) {
