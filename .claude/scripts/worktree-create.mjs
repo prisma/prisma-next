@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { text } from 'node:stream/consumers';
 import { resolve } from 'node:path';
 
-const input = JSON.parse(readFileSync(0, 'utf-8'));
+const input = JSON.parse(await text(process.stdin));
 
 const name = input.name;
 const cwd = input.cwd;
