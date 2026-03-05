@@ -70,13 +70,6 @@ describe('computeMigrationId', () => {
     expect(computeMigrationId(m1, ops)).not.toBe(computeMigrationId(m2, ops));
   });
 
-  it('changes when parentMigrationId changes', () => {
-    const ops = createTestOps();
-    const root = createTestManifest({ parentMigrationId: null });
-    const child = createTestManifest({ parentMigrationId: 'sha256:parent' });
-    expect(computeMigrationId(root, ops)).not.toBe(computeMigrationId(child, ops));
-  });
-
   it('uses framed tuple hashing for edge input parts', () => {
     const manifest = createTestManifest();
     const ops = createTestOps();

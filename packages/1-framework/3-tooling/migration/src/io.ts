@@ -29,7 +29,6 @@ const MigrationManifestSchema = type({
   from: 'string',
   to: 'string',
   migrationId: 'string | null',
-  parentMigrationId: 'string | null',
   kind: "'regular' | 'baseline'",
   fromContract: 'object | null',
   toContract: 'object',
