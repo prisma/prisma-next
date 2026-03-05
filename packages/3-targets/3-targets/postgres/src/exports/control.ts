@@ -17,7 +17,7 @@ import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner, renderDefaultLiteral } from '../core/migrations/planner';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 
-function postgresRenderDefault(def: ColumnDefault, column: StorageColumn): string {
+export function postgresRenderDefault(def: ColumnDefault, column: StorageColumn): string {
   if (def.kind === 'function') {
     return def.expression;
   }

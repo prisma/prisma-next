@@ -1,8 +1,6 @@
 import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
-import type { ColumnDefault } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MigrationPlannerResult } from '@prisma-next/core-control-plane/types';
-import type { DefaultRenderer } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR, detectDestructiveChanges } from '@prisma-next/family-sql/control';
 import type {
   SqlContract,
@@ -11,15 +9,8 @@ import type {
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import {
-  createPostgresMigrationPlanner,
-  renderDefaultLiteral,
-} from '../../src/core/migrations/planner';
-
-const postgresRenderDefault: DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => {
-  if (def.kind === 'function') return def.expression;
-  return renderDefaultLiteral(def.value, column);
-};
+import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import { postgresRenderDefault } from '../../src/exports/control';
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
