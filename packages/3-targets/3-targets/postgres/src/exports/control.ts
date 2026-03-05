@@ -1,5 +1,6 @@
 import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   ControlTargetInstance,
   MigrationPlanner,
@@ -10,11 +11,18 @@ import type {
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR } from '@prisma-next/family-sql/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
-import { createPostgresMigrationPlanner } from '../core/migrations/planner';
+import { createPostgresMigrationPlanner, renderDefaultLiteral } from '../core/migrations/planner';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
+
+function postgresRenderDefault(def: ColumnDefault, column: StorageColumn): string {
+  if (def.kind === 'function') {
+    return def.expression;
+  }
+  return renderDefaultLiteral(def.value, column);
+}
 
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
   {
@@ -29,7 +37,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       },
       contractToSchema(contract: ContractIR | null) {
         const storage = contract ? (contract.storage as SqlStorage) : { tables: {} };
-        return contractToSchemaIR(storage, expandParameterizedNativeType);
+        return contractToSchemaIR(storage, expandParameterizedNativeType, postgresRenderDefault);
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {

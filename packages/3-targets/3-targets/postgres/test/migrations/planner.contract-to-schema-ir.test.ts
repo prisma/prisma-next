@@ -1,6 +1,8 @@
 import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MigrationPlannerResult } from '@prisma-next/core-control-plane/types';
+import type { DefaultRenderer } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR, detectDestructiveChanges } from '@prisma-next/family-sql/control';
 import type {
   SqlContract,
@@ -9,7 +11,15 @@ import type {
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import {
+  createPostgresMigrationPlanner,
+  renderDefaultLiteral,
+} from '../../src/core/migrations/planner';
+
+const postgresRenderDefault: DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => {
+  if (def.kind === 'function') return def.expression;
+  return renderDefaultLiteral(def.value, column);
+};
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
@@ -54,7 +64,11 @@ function createTestContract(
 
 function planFromStorages(from: SqlStorage | null, to: SqlStorage): MigrationPlannerResult {
   const toContract = createTestContract(to);
-  const fromSchemaIR = contractToSchemaIR(from ?? { tables: {} }, expandParameterizedNativeType);
+  const fromSchemaIR = contractToSchemaIR(
+    from ?? { tables: {} },
+    expandParameterizedNativeType,
+    postgresRenderDefault,
+  );
   const planner = createPostgresMigrationPlanner();
   return planner.plan({
     contract: toContract,
@@ -83,7 +97,11 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(storage);
-    const schemaIR = contractToSchemaIR(storage, expandParameterizedNativeType);
+    const schemaIR = contractToSchemaIR(
+      storage,
+      expandParameterizedNativeType,
+      postgresRenderDefault,
+    );
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -116,7 +134,11 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(storage);
-    const emptySchemaIR = contractToSchemaIR({ tables: {} }, expandParameterizedNativeType);
+    const emptySchemaIR = contractToSchemaIR(
+      { tables: {} },
+      expandParameterizedNativeType,
+      postgresRenderDefault,
+    );
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -174,7 +196,11 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(toStorage);
-    const fromSchemaIR = contractToSchemaIR(fromStorage, expandParameterizedNativeType);
+    const fromSchemaIR = contractToSchemaIR(
+      fromStorage,
+      expandParameterizedNativeType,
+      postgresRenderDefault,
+    );
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -223,7 +249,68 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(storage);
-    const schemaIR = contractToSchemaIR(storage, expandParameterizedNativeType);
+    const schemaIR = contractToSchemaIR(
+      storage,
+      expandParameterizedNativeType,
+      postgresRenderDefault,
+    );
+    const planner = createPostgresMigrationPlanner();
+
+    const result = planner.plan({
+      contract,
+      schema: schemaIR,
+      policy: { allowedOperationClasses: ['additive'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind === 'success') {
+      expect(result.plan.operations).toHaveLength(0);
+    }
+  });
+
+  it('produces no ops for structured defaults when both sides match', () => {
+    const storage: SqlStorage = {
+      tables: {
+        item: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            metadata: {
+              nativeType: 'jsonb',
+              codecId: 'pg/jsonb@1',
+              nullable: false,
+              default: { kind: 'literal', value: { foo: 'bar' } },
+            },
+            bigId: {
+              nativeType: 'int8',
+              codecId: 'pg/int8@1',
+              nullable: false,
+              default: {
+                kind: 'literal',
+                value: { $type: 'bigint' as const, value: '9007199254740993' },
+              },
+            },
+            tags: {
+              nativeType: 'jsonb',
+              codecId: 'pg/jsonb@1',
+              nullable: false,
+              default: { kind: 'literal', value: [1, 2, 3] },
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    };
+
+    const contract = createTestContract(storage);
+    const schemaIR = contractToSchemaIR(
+      storage,
+      expandParameterizedNativeType,
+      postgresRenderDefault,
+    );
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({

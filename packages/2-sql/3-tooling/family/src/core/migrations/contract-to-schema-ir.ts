@@ -18,16 +18,6 @@ import type {
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 
-function convertDefault(def: ColumnDefault): string {
-  if (def.kind === 'function') {
-    return def.expression;
-  }
-  if (typeof def.value === 'string') {
-    return `'${def.value.replaceAll("'", "''")}'`;
-  }
-  return String(def.value);
-}
-
 /**
  * Target-specific callback that expands a column's base `nativeType` and optional
  * `typeParams` into the fully-qualified type string used by the database
@@ -44,10 +34,43 @@ export type NativeTypeExpander = (input: {
   readonly typeParams?: Record<string, unknown>;
 }) => string;
 
+/**
+ * Target-specific callback that renders a `ColumnDefault` into the raw SQL literal
+ * string stored in `SqlColumnIR.default`.
+ *
+ * Default value serialization is target-specific (quoting, casting, type syntax vary
+ * between Postgres, MySQL, SQLite, …). This callback follows the same IoC pattern as
+ * `NativeTypeExpander`: the target provides its renderer when calling
+ * `contractToSchemaIR`, keeping the family layer target-agnostic.
+ */
+export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => string;
+
+function fallbackRenderDefault(def: ColumnDefault): string {
+  if (def.kind === 'function') {
+    return def.expression;
+  }
+  const { value } = def;
+  if (typeof value === 'string') {
+    return `'${value.replaceAll("'", "''")}'`;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (value === null) {
+    return 'NULL';
+  }
+  throw new Error(
+    'Cannot render structured default value without a target-specific DefaultRenderer. ' +
+      `Received ${typeof value === 'object' ? JSON.stringify(value) : String(value)}. ` +
+      'Pass a renderDefault callback to contractToSchemaIR.',
+  );
+}
+
 function convertColumn(
   name: string,
   column: StorageColumn,
   expandNativeType?: NativeTypeExpander,
+  renderDefault?: DefaultRenderer,
 ): SqlColumnIR {
   const nativeType = expandNativeType
     ? expandNativeType({
@@ -56,11 +79,17 @@ function convertColumn(
         ...ifDefined('typeParams', column.typeParams),
       })
     : column.nativeType;
+  const renderedDefault =
+    column.default != null
+      ? renderDefault
+        ? renderDefault(column.default, column)
+        : fallbackRenderDefault(column.default)
+      : undefined;
   return {
     name,
     nativeType,
     nullable: column.nullable,
-    ...(column.default != null ? { default: convertDefault(column.default) } : {}),
+    ...ifDefined('default', renderedDefault),
   };
 }
 
@@ -92,10 +121,11 @@ function convertTable(
   name: string,
   table: StorageTable,
   expandNativeType?: NativeTypeExpander,
+  renderDefault?: DefaultRenderer,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIR> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
-    columns[colName] = convertColumn(colName, colDef, expandNativeType);
+    columns[colName] = convertColumn(colName, colDef, expandNativeType, renderDefault);
   }
 
   return {
@@ -168,10 +198,11 @@ export function detectDestructiveChanges(
 export function contractToSchemaIR(
   storage: SqlStorage,
   expandNativeType?: NativeTypeExpander,
+  renderDefault?: DefaultRenderer,
 ): SqlSchemaIR {
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
-    tables[tableName] = convertTable(tableName, tableDef, expandNativeType);
+    tables[tableName] = convertTable(tableName, tableDef, expandNativeType, renderDefault);
   }
 
   return {

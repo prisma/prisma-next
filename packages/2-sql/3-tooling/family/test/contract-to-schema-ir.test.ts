@@ -1,10 +1,44 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
+import type { DefaultRenderer } from '../src/core/migrations/contract-to-schema-ir';
 import {
   contractToSchemaIR,
   detectDestructiveChanges,
 } from '../src/core/migrations/contract-to-schema-ir';
+
+function isTaggedBigInt(v: unknown): v is { $type: 'bigint'; value: string } {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    '$type' in v &&
+    (v as Record<string, unknown>)['$type'] === 'bigint'
+  );
+}
+
+function isTaggedRaw(v: unknown): v is { $type: 'raw'; value: unknown } {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    '$type' in v &&
+    (v as Record<string, unknown>)['$type'] === 'raw'
+  );
+}
+
+const testRenderer: DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => {
+  if (def.kind === 'function') return def.expression;
+  const { value } = def;
+  const isJsonColumn = column.nativeType === 'json' || column.nativeType === 'jsonb';
+  if (isTaggedBigInt(value)) return value.value;
+  if (isTaggedRaw(value)) return String(value.value);
+  if (typeof value === 'string') return `'${value.replaceAll("'", "''")}'`;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value === null) return 'NULL';
+  const json = JSON.stringify(value);
+  if (isJsonColumn) return `'${json}'::${column.nativeType}`;
+  return `'${json}'`;
+};
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
@@ -188,6 +222,116 @@ describe('contractToSchemaIR', () => {
 
     const result = contractToSchemaIR(storage);
     expect(result.tables['T']!.columns['textValue']!.default).toBe("'a''b''''c'");
+  });
+
+  it('converts object literal defaults to JSON string via renderer', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            metadata: col({
+              nativeType: 'jsonb',
+              default: { kind: 'literal', value: { foo: 'bar' } },
+            }),
+          },
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(storage, undefined, testRenderer);
+    expect(result.tables['T']!.columns['metadata']!.default).toBe('\'{"foo":"bar"}\'::jsonb');
+  });
+
+  it('converts array literal defaults to JSON string via renderer', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            tags: col({
+              nativeType: 'jsonb',
+              default: { kind: 'literal', value: [1, 2, 3] },
+            }),
+          },
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(storage, undefined, testRenderer);
+    expect(result.tables['T']!.columns['tags']!.default).toBe("'[1,2,3]'::jsonb");
+  });
+
+  it('converts TaggedBigInt defaults to unquoted numeric string via renderer', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            bigId: col({
+              nativeType: 'int8',
+              default: { kind: 'literal', value: { $type: 'bigint' as const, value: '42' } },
+            }),
+          },
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(storage, undefined, testRenderer);
+    expect(result.tables['T']!.columns['bigId']!.default).toBe('42');
+  });
+
+  it('converts TaggedRaw defaults to raw expression via renderer', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            computed: col({
+              nativeType: 'int4',
+              default: {
+                kind: 'literal',
+                value: { $type: 'raw' as const, value: "nextval('my_seq')" },
+              },
+            }),
+          },
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(storage, undefined, testRenderer);
+    expect(result.tables['T']!.columns['computed']!.default).toBe("nextval('my_seq')");
+  });
+
+  it('converts nested object defaults to JSON string via renderer', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            config: col({
+              nativeType: 'jsonb',
+              default: { kind: 'literal', value: { a: { b: [1, 2] } } },
+            }),
+          },
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(storage, undefined, testRenderer);
+    expect(result.tables['T']!.columns['config']!.default).toBe('\'{"a":{"b":[1,2]}}\'::jsonb');
+  });
+
+  it('throws for structured defaults without a renderer', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            metadata: col({
+              nativeType: 'jsonb',
+              default: { kind: 'literal', value: { foo: 'bar' } },
+            }),
+          },
+        }),
+      },
+    };
+
+    expect(() => contractToSchemaIR(storage)).toThrow('Cannot render structured default value');
   });
 
   it('converts function column defaults', () => {
