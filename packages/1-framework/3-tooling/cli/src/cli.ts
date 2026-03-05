@@ -19,6 +19,20 @@ import { createMigrationVerifyCommand } from './commands/migration-verify';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { parseGlobalFlags } from './utils/global-flags';
 import { formatCommandHelp, formatRootHelp } from './utils/output';
+import { suggestCommands } from './utils/suggest-command';
+
+/**
+ * Formats the "Did you mean ...?" hint for an unknown command.
+ */
+function formatSuggestion(input: string, candidates: readonly string[]): string {
+  const suggestions = suggestCommands(
+    input,
+    candidates.map((c) => c),
+  );
+  if (suggestions.length === 0) return '';
+  if (suggestions.length === 1) return `\nDid you mean ${suggestions[0]}?\n`;
+  return `\nDid you mean one of these?\n${suggestions.map((s) => `  ${s}`).join('\n')}\n`;
+}
 
 const program = new Command();
 
@@ -75,11 +89,17 @@ program.exitOverride((err) => {
         : undefined;
 
       if (parentCommand && commandName !== firstArg) {
-        process.stderr.write(`Unknown command: ${commandName}\n\n`);
+        const subNames = parentCommand.commands.map((c) => c.name());
+        process.stderr.write(
+          `Unknown command: ${commandName}${formatSuggestion(commandName!, subNames)}\n`,
+        );
         const helpText = formatCommandHelp({ command: parentCommand, flags });
         process.stderr.write(`${helpText}\n`);
       } else {
-        process.stderr.write(`Unknown command: ${commandName}\n\n`);
+        const topNames = program.commands.map((c) => c.name());
+        process.stderr.write(
+          `Unknown command: ${commandName}${formatSuggestion(commandName!, topNames)}\n`,
+        );
         const helpText = formatRootHelp({ program, flags });
         process.stderr.write(`${helpText}\n`);
       }
@@ -267,7 +287,10 @@ if (args.length > 0) {
     if (!command) {
       // Unrecognized command → exit 2 (CLI usage error)
       const flags = parseGlobalFlags({});
-      process.stderr.write(`Unknown command: ${commandName}\n\n`);
+      const topNames = program.commands.map((c) => c.name());
+      process.stderr.write(
+        `Unknown command: ${commandName}${formatSuggestion(commandName!, topNames)}\n`,
+      );
       const helpText = formatRootHelp({ program, flags });
       process.stderr.write(`${helpText}\n`);
       process.exit(2);
