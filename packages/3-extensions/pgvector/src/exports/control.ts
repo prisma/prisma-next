@@ -1,8 +1,21 @@
 import type {
+  CodecControlHooks,
   ComponentDatabaseDependencies,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import { pgvectorOperationSignature, pgvectorPackMeta } from '../core/descriptor-meta';
+
+const PGVECTOR_CODEC_ID = 'pg/vector@1' as const;
+
+const vectorControlPlaneHooks: CodecControlHooks = {
+  expandNativeType: ({ nativeType, typeParams }) => {
+    const length = typeParams?.['length'];
+    if (typeof length === 'number' && Number.isInteger(length) && length > 0) {
+      return `${nativeType}(${length})`;
+    }
+    return nativeType;
+  },
+};
 
 const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
   init: [
@@ -42,6 +55,15 @@ const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
 
 const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   ...pgvectorPackMeta,
+  types: {
+    ...pgvectorPackMeta.types,
+    codecTypes: {
+      ...pgvectorPackMeta.types.codecTypes,
+      controlPlaneHooks: {
+        [PGVECTOR_CODEC_ID]: vectorControlPlaneHooks,
+      },
+    },
+  },
   operationSignatures: () => [pgvectorOperationSignature],
   databaseDependencies: pgvectorDatabaseDependencies,
   create: () => ({
