@@ -55,9 +55,10 @@ export function parseGlobalFlags(options: CliOptions): GlobalFlags {
   }
 
   // Verbosity: -v = 1, --trace = 2
-  if (options.trace) {
+  // Env toggles: PRISMA_NEXT_TRACE=1 ≅ --trace, PRISMA_NEXT_DEBUG=1 ≅ -v
+  if (options.trace || process.env['PRISMA_NEXT_TRACE'] === '1') {
     flags.verbose = 2;
-  } else if (options.verbose || options.v) {
+  } else if (options.verbose || options.v || process.env['PRISMA_NEXT_DEBUG'] === '1') {
     flags.verbose = 1;
   } else {
     flags.verbose = 0;
