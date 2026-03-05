@@ -308,11 +308,9 @@ model Document {
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', {
         composedExtensionPacks: ['pgvector'],
-        // Intentionally not typed yet; provider will accept this in a follow-up milestone.
-        // This test captures the desired behavior.
         extensionPacks: { pgvector: pgvectorPack },
         capabilitySources: [postgresAdapterMeta, pgvectorPack],
-      } as unknown as never);
+      });
 
       const result = await contract.source();
       expect(result.ok).toBe(true);
