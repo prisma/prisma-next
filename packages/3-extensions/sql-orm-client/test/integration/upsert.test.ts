@@ -34,7 +34,7 @@ describe('integration/upsert', () => {
         const users = createReturningUsersCollection(runtime);
 
         const inserted = await users.upsert({
-          create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+          create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
           update: {},
         });
 
@@ -42,10 +42,11 @@ describe('integration/upsert', () => {
           id: 1,
           name: 'Alice',
           email: 'alice@example.com',
+          invitedById: null,
         });
 
         const existing = await users.upsert({
-          create: { id: 1, name: 'Ignored', email: 'ignored@example.com' },
+          create: { id: 1, name: 'Ignored', email: 'ignored@example.com', invitedById: null },
           update: {},
         });
 
@@ -53,19 +54,15 @@ describe('integration/upsert', () => {
           id: 1,
           name: 'Alice',
           email: 'alice@example.com',
+          invitedById: null,
         });
 
-        const rows = await runtime.query<{ id: number; name: string; email: string }>(
-          'select id, name, email from users where id = $1',
-          [1],
-        );
-        expect(rows).toEqual([
-          {
-            id: 1,
-            name: 'Alice',
-            email: 'alice@example.com',
-          },
-        ]);
+        expect(await users.first({ id: 1 })).toEqual({
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          invitedById: null,
+        });
       });
     },
     timeouts.spinUpPpgDev,
