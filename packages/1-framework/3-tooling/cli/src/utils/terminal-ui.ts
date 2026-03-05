@@ -115,23 +115,88 @@ export class TerminalUI {
   }
 
   /**
-   * Create a Clack spinner on stderr. Returns a no-op spinner when piped.
+   * Create a Clack spinner on stderr with a 100ms delay threshold.
+   * The spinner only appears if the operation takes longer than the threshold,
+   * avoiding flicker for fast operations. Returns a no-op spinner when not interactive.
    */
-  spinner(): clack.SpinnerResult {
+  spinner(delayMs = 100): clack.SpinnerResult {
+    const noop: clack.SpinnerResult = {
+      start: () => {},
+      stop: () => {},
+      cancel: () => {},
+      error: () => {},
+      message: () => {},
+      clear: () => {},
+      get isCancelled() {
+        return false;
+      },
+    };
+
     if (!this.isInteractive) {
-      return {
-        start: () => {},
-        stop: () => {},
-        cancel: () => {},
-        error: () => {},
-        message: () => {},
-        clear: () => {},
-        get isCancelled() {
-          return false;
-        },
-      };
+      return noop;
     }
-    return clack.spinner(TerminalUI.stderrOpts);
+
+    // Wrap the real spinner with a delay: only show it after `delayMs`
+    let inner: clack.SpinnerResult | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pendingMsg: string | undefined;
+    let settled = false;
+
+    const ensureCleared = () => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+    };
+
+    return {
+      start(msg?: string) {
+        pendingMsg = msg;
+        timer = setTimeout(() => {
+          if (!settled) {
+            inner = clack.spinner(TerminalUI.stderrOpts);
+            inner.start(pendingMsg);
+          }
+        }, delayMs);
+      },
+      stop(msg?: string) {
+        settled = true;
+        ensureCleared();
+        if (inner) {
+          inner.stop(msg);
+        }
+      },
+      cancel(msg?: string) {
+        settled = true;
+        ensureCleared();
+        if (inner) {
+          inner.cancel(msg);
+        }
+      },
+      error(msg?: string) {
+        settled = true;
+        ensureCleared();
+        if (inner) {
+          inner.error(msg);
+        }
+      },
+      message(msg?: string) {
+        pendingMsg = msg;
+        if (inner) {
+          inner.message(msg);
+        }
+      },
+      clear() {
+        settled = true;
+        ensureCleared();
+        if (inner) {
+          inner.clear();
+        }
+      },
+      get isCancelled() {
+        return inner?.isCancelled ?? false;
+      },
+    };
   }
 
   /**
