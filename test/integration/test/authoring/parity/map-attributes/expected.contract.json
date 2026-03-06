@@ -31,7 +31,18 @@
       }
     }
   },
-  "relations": {},
+  "relations": {
+    "team_member": {
+      "team": {
+        "cardinality": "N:1",
+        "on": {
+          "childCols": ["team_id"],
+          "parentCols": ["team_ref"]
+        },
+        "to": "Team"
+      }
+    }
+  },
   "storage": {
     "tables": {
       "org_team": {

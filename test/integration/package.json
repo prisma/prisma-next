@@ -23,6 +23,8 @@
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/ids": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/postgres": "workspace:*",
     "@prisma-next/psl-parser": "workspace:*",

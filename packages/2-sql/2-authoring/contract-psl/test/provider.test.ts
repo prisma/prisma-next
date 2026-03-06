@@ -1,6 +1,6 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 
@@ -49,6 +49,54 @@ describe('prismaContract provider helper', () => {
         },
       });
     });
+
+    it('interprets relation backrelation lists and emits relation metadata', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  posts Post[]
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value.relations).toMatchObject({
+        user: {
+          posts: {
+            cardinality: '1:N',
+            on: {
+              parentCols: ['id'],
+              childCols: ['userId'],
+            },
+          },
+        },
+        post: {
+          user: {
+            cardinality: 'N:1',
+            on: {
+              parentCols: ['userId'],
+              childCols: ['id'],
+            },
+          },
+        },
+      });
+    });
   });
 
   describe('given unsupported constructs in schema', () => {
@@ -79,6 +127,49 @@ describe('prismaContract provider helper', () => {
           expect.objectContaining({
             code: 'PSL_UNSUPPORTED_FIELD_LIST',
             sourceId: './schema.prisma',
+            message: expect.stringContaining('scalar/storage list type'),
+            span: expect.objectContaining({
+              start: expect.objectContaining({ line: 3 }),
+            }),
+          }),
+        ]),
+      );
+    });
+
+    it('returns diagnostics when navigation list fields declare unsupported attributes', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  posts Post[] @unique
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source();
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+
+      expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+            sourceId: './schema.prisma',
+            message: expect.stringContaining('User.posts'),
             span: expect.objectContaining({
               start: expect.objectContaining({ line: 3 }),
             }),
@@ -150,13 +241,113 @@ model Document {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.storage['types']).toMatchObject({
-        Embedding1536: {
-          codecId: 'pg/vector@1',
-          nativeType: 'vector(1536)',
-          typeParams: { length: 1536 },
+      expect(result.value.storage).toMatchObject({
+        types: {
+          Embedding1536: {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector(1536)',
+            typeParams: { length: 1536 },
+          },
         },
       });
+    });
+  });
+
+  describe('given supported default functions in schema', () => {
+    it('maps function defaults to execution or storage defaults', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  cuid2 String @default(cuid(2))
+  uuidV7 String @default(uuid(7))
+  nanoid16 String @default(nanoid(16))
+  dbExpr String @default(dbgenerated("gen_random_uuid()"))
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source();
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value.execution).toMatchObject({
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'cuid2' },
+              onCreate: { kind: 'generator', id: 'cuid2' },
+            },
+            {
+              ref: { table: 'user', column: 'nanoid16' },
+              onCreate: { kind: 'generator', id: 'nanoid', params: { size: 16 } },
+            },
+            {
+              ref: { table: 'user', column: 'uuidV7' },
+              onCreate: { kind: 'generator', id: 'uuidv7' },
+            },
+          ],
+        },
+      });
+      expect(result.value.storage).toMatchObject({
+        tables: {
+          user: {
+            columns: {
+              dbExpr: {
+                default: {
+                  kind: 'function',
+                  expression: 'gen_random_uuid()',
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+  });
+
+  describe('given unsupported default functions', () => {
+    it('returns actionable default function diagnostics with spans', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  cuidValue String @default(cuid())
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source();
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+
+      expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
+            sourceId: './schema.prisma',
+            message: expect.stringContaining('cuid(2)'),
+            span: expect.objectContaining({
+              start: expect.objectContaining({ line: 3 }),
+            }),
+          }),
+        ]),
+      );
     });
   });
 

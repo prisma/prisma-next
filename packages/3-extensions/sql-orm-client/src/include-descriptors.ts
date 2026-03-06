@@ -1,3 +1,4 @@
+import type { StripRowType } from './collection-internal-types';
 import type { CollectionState, IncludeCombine, IncludeCombineBranch, IncludeScalar } from './types';
 
 interface CollectionStateCarrier {
@@ -11,19 +12,12 @@ export function createIncludeScalar<Result>(
   state: CollectionState,
   column?: string,
 ): IncludeScalar<Result> {
-  const base = {
+  return {
     kind: 'includeScalar',
     fn,
-    column,
     state,
-  } as const;
-
-  if (column === undefined) {
-    const { column: _column, ...withoutColumn } = base;
-    return withoutColumn as IncludeScalar<Result>;
-  }
-
-  return base as IncludeScalar<Result>;
+    ...(column !== undefined ? { column } : {}),
+  } satisfies StripRowType<IncludeScalar<Result>> as IncludeScalar<Result>;
 }
 
 export function createIncludeCombine<ResultShape extends Record<string, unknown>>(
@@ -32,7 +26,7 @@ export function createIncludeCombine<ResultShape extends Record<string, unknown>
   return {
     kind: 'includeCombine',
     branches,
-  };
+  } satisfies StripRowType<IncludeCombine<ResultShape>> as IncludeCombine<ResultShape>;
 }
 
 export function isIncludeScalar(value: unknown): value is IncludeScalar<unknown> {

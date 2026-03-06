@@ -2,7 +2,7 @@
 
 ## Context
 
-- The legacy ORM forces an explicit generate step and ships native binaries, slowing inner loops
+- Prisma 7 forces an explicit generate step and ships native binaries, slowing inner loops
 - Our contract-first design needs deterministic artifacts for hashing, migrations, and PPg preflight
 - Developers want "it just works" in dev, while CI needs reproducible, auditable outputs
 

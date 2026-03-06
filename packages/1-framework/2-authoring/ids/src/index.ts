@@ -49,7 +49,15 @@ function createGeneratedSpec<TId extends GeneratedValueSpec['id']>(
   id: TId,
   options?: IdGeneratorOptionsById[TId],
 ): GeneratedColumnSpec {
-  const { type, typeParams } = generatedColumnDescriptors[id];
+  const { type } = generatedColumnDescriptors[id];
+  const typeParams =
+    id === 'nanoid' &&
+    typeof options === 'object' &&
+    options !== null &&
+    'size' in options &&
+    typeof options.size === 'number'
+      ? { length: options.size }
+      : generatedColumnDescriptors[id].typeParams;
   const params = options as Record<string, unknown> | undefined;
   return {
     type,

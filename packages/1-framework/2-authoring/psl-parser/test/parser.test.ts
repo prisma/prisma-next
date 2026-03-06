@@ -232,8 +232,11 @@ model Post {
     });
 
     expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+
     const postModel = result.ast.models.find((model) => model.name === 'Post');
-    expect(postModel?.attributes.find((attribute) => attribute.name === 'index')).toMatchObject({
+    const indexAttribute = postModel?.attributes.find((attribute) => attribute.name === 'index');
+    expect(indexAttribute).toMatchObject({
       kind: 'attribute',
       target: 'model',
       name: 'index',
@@ -242,6 +245,66 @@ model Post {
         { kind: 'named', name: 'map', value: '"post_user_idx"' },
       ],
     });
+  });
+
+  it('parses relation name arguments in positional and named forms with spans', () => {
+    const schema = `
+model User {
+  id Int @id
+  posts Post[] @relation("UserPosts")
+  authored Post[] @relation(name: "AuthorPosts")
+}
+
+model Post {
+  id Int @id
+  userId Int
+  authorId Int
+  user User @relation("UserPosts", fields: [userId], references: [id])
+  author User @relation(name: "AuthorPosts", fields: [authorId], references: [id])
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+
+    const userModel = result.ast.models.find((model) => model.name === 'User');
+    const postsField = userModel?.fields.find((field) => field.name === 'posts');
+    const authoredField = userModel?.fields.find((field) => field.name === 'authored');
+
+    const postsRelation = postsField?.attributes.find((attribute) => attribute.name === 'relation');
+    const authoredRelation = authoredField?.attributes.find(
+      (attribute) => attribute.name === 'relation',
+    );
+
+    expect(postsRelation?.args).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'positional',
+          value: '"UserPosts"',
+          span: expect.objectContaining({
+            start: expect.objectContaining({ line: 4 }),
+          }),
+        }),
+      ]),
+    );
+
+    expect(authoredRelation?.args).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'named',
+          name: 'name',
+          value: '"AuthorPosts"',
+          span: expect.objectContaining({
+            start: expect.objectContaining({ line: 5 }),
+          }),
+        }),
+      ]),
+    );
   });
 
   it('is deterministic for identical input', () => {
@@ -284,6 +347,91 @@ model Post {
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
     expect(result.ast.models.map((model) => model.name)).toEqual(['User', 'Post']);
+  });
+
+  it('parses default function expressions used for ID parity fixtures', () => {
+    const schema = `
+model Defaults {
+  id Int @id
+  uuidDefault String @default(uuid())
+  uuidV4 String @default(uuid(4))
+  uuidV7 String @default(uuid(7))
+  ulidDefault String @default(ulid())
+  nanoidDefault String @default(nanoid())
+  nanoidSized String @default(nanoid(16))
+  dbExpr String @default(dbgenerated("gen_random_uuid()"))
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+
+    const defaultsModel = result.ast.models.find((model) => model.name === 'Defaults');
+    expect(defaultsModel).toBeDefined();
+
+    const byFieldName = new Map(defaultsModel?.fields.map((field) => [field.name, field]));
+    const expressionByField: Record<string, string> = {
+      uuidDefault: 'uuid()',
+      uuidV4: 'uuid(4)',
+      uuidV7: 'uuid(7)',
+      ulidDefault: 'ulid()',
+      nanoidDefault: 'nanoid()',
+      nanoidSized: 'nanoid(16)',
+      dbExpr: 'dbgenerated("gen_random_uuid()")',
+    };
+
+    for (const [fieldName, expression] of Object.entries(expressionByField)) {
+      const field = byFieldName.get(fieldName);
+      const defaultAttribute = field?.attributes.find((attribute) => attribute.name === 'default');
+      expect(defaultAttribute).toMatchObject({
+        kind: 'attribute',
+        target: 'field',
+        name: 'default',
+        args: [{ kind: 'positional', value: expression }],
+      });
+      expect(defaultAttribute?.span.start.line).toBeGreaterThan(1);
+      expect(defaultAttribute?.span.end.line).toBe(defaultAttribute?.span.start.line);
+    }
+  });
+
+  it('returns diagnostics for malformed default expressions with spans', () => {
+    const schema = `
+model BrokenDefaults {
+  id Int @id
+  missingParen String @default(uuid(
+  unterminatedString String @default(dbgenerated("gen_random_uuid()))
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          sourceId: 'schema.prisma',
+          span: expect.objectContaining({
+            start: expect.objectContaining({ line: 4 }),
+          }),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          sourceId: 'schema.prisma',
+          span: expect.objectContaining({
+            start: expect.objectContaining({ line: 5 }),
+          }),
+        }),
+      ]),
+    );
   });
 
   it('returns diagnostics when named types collide with scalar or model names', () => {

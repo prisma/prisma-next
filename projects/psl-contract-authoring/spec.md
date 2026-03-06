@@ -56,6 +56,7 @@ Key constraints:
 - Deterministic artifacts: emitting twice from the same inputs produces equivalent output.
 - Clear failure modes: unsupported PSL features fail with a targeted error explaining (a) what’s unsupported and (b) how to express the same intent using supported constructs (when possible).
 - Keep the layering boundaries intact (PSL parsing and normalization lives in authoring/emitter/tooling layers; runtime/query layers should not need to change except to consume the existing artifacts as they already do).
+- Keep framework core packages cohesive: config typing/validation and contract-source provider interfaces used by `prisma-next.config.ts` should not be coupled to migration-plane concerns (see `TML-2018`).
 
 ## Non-goals
 
@@ -168,11 +169,26 @@ These are the v1 supported features. They also form the initial parity/conforman
 
 Anything outside the supported set must fail with a strict, targeted error (not warnings), including (examples; not exhaustive):
 
+- List fields:
+  - Scalar lists like `String[]`
+  - Relation navigation lists like `Post[]` (one-to-many backrelation fields)
+  - Implicit Prisma ORM many-to-many (which relies on list relation fields)
+  - Represent many-to-many using an explicit join model (two foreign keys) and omit list navigation fields.
 - Namespaced extension-pack attributes / blocks (pack-specific syntax; see ADR 104) beyond the initial conformance set (pgvector column typing)
 - Features that require storage primitives Prisma Next doesn’t model today (e.g. dialect-specific index methods/predicates if not representable)
 - PSL constructs whose semantics can’t be expressed in the existing TS authoring surface/contract model without inventing new primitives
 
 **Decision:** unsupported PSL features are **strict errors**. We prefer predictability over partial/ignored interpretation.
+
+## Planned follow-up requirement: relation navigation lists + consistent `contract.relations`
+
+As a follow-up slice after v1, we plan to support **relation navigation list fields** (e.g. `User.posts Post[]`) while continuing to **strictly reject scalar list types** (e.g. `String[]`).
+
+Requirements for the follow-up:
+
+- Accept relation navigation lists (1:N backrelation fields) when they correspond to an existing foreign-key-side relation.
+- Keep scalar lists strictly unsupported.
+- Populate `contract.relations` consistently so both sides of a relation (N:1 and 1:N) are represented in a stable, deterministic way.
 
 ## Error behavior
 
@@ -205,3 +221,4 @@ Remaining questions:
 - `packages/1-framework/3-tooling/cli/src/commands/contract-emit.ts`
 - `projects/psl-contract-authoring/plans/plan.md`
 - `projects/psl-contract-authoring/references/authoring-surface-gap-inventory.md`
+- Linear: `https://linear.app/prisma-company/issue/TML-2018/optional-split-up-1-coremigration`

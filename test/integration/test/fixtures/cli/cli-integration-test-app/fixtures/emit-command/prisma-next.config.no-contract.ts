@@ -9,6 +9,6 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   // contract is intentionally missing
 });

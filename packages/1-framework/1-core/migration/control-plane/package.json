@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Control plane domain actions, config types, validation, and error factories for Prisma Next",
+  "description": "Control-plane migration/emission primitives and structured error utilities",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
@@ -37,8 +37,7 @@
     "node": ">=20"
   },
   "exports": {
-    "./config-types": "./dist/config-types.mjs",
-    "./config-validation": "./dist/config-validation.mjs",
+    "./constants": "./dist/constants.mjs",
     "./emission": "./dist/emission.mjs",
     "./errors": "./dist/errors.mjs",
     "./schema-view": "./dist/schema-view.mjs",

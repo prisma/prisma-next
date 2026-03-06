@@ -11,7 +11,7 @@ export default {
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   // Missing output to test error path (defineConfig defaults are intentionally bypassed)
   contract: typescriptContract(contract),
 };

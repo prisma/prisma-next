@@ -25,9 +25,11 @@ import type {
   IncludeRefinementResult,
   IncludeRefinementValue,
   IsToManyRelation,
+  RowSelection,
   WithOrderByState,
   WithWhereState,
 } from './collection-internal-types';
+import { RowType } from './collection-internal-types';
 import {
   dispatchMutationRows,
   executeMutationReturningSingleRow,
@@ -120,7 +122,9 @@ export class Collection<
   ModelName extends string,
   Row = DefaultModelRow<TContract, ModelName>,
   State extends CollectionTypeState = DefaultCollectionTypeState,
-> {
+> implements RowSelection<Row>
+{
+  declare readonly [RowType]: Row;
   /** @internal */
   readonly ctx: CollectionContext<TContract>;
   /** @internal */
@@ -519,10 +523,12 @@ export class Collection<
     return this.#dispatch();
   }
 
-  async find(): Promise<Row | null>;
-  async find(filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg): Promise<Row | null>;
-  async find(filter: ShorthandWhereFilter<TContract, ModelName>): Promise<Row | null>;
-  async find(
+  async first(): Promise<Row | null>;
+  async first(
+    filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
+  ): Promise<Row | null>;
+  async first(filter: ShorthandWhereFilter<TContract, ModelName>): Promise<Row | null>;
+  async first(
     filter?:
       | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
       | ShorthandWhereFilter<TContract, ModelName>,
@@ -651,6 +657,11 @@ export class Collection<
     return data.length;
   }
 
+  /**
+   * Passing `update: {}` makes this behave like a conditional create.
+   * On conflict, `ON CONFLICT DO NOTHING RETURNING ...` may return zero rows,
+   * so this method may issue a follow-up reload query to return the existing row.
+   */
   async upsert(input: {
     create: CreateInput<TContract, ModelName>;
     update: Partial<DefaultModelRow<TContract, ModelName>>;
@@ -660,6 +671,7 @@ export class Collection<
 
     const createValues = mapModelDataToStorageRow(this.ctx.contract, this.modelName, input.create);
     const updateValues = mapModelDataToStorageRow(this.ctx.contract, this.modelName, input.update);
+    const hasUpdateValues = Object.keys(updateValues).length > 0;
     const conflictColumns = resolveUpsertConflictColumns(
       this.ctx.contract,
       this.modelName,
@@ -693,6 +705,17 @@ export class Collection<
     });
     if (row) {
       return row;
+    }
+
+    if (!hasUpdateValues) {
+      const conflictCriterion = this.#buildUpsertConflictCriterion(createValues, conflictColumns);
+      const existing = await this.#reloadMutationRowByCriterion(
+        conflictCriterion,
+        'upsert conflict',
+      );
+      if (existing) {
+        return existing;
+      }
     }
 
     throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
@@ -861,7 +884,35 @@ export class Collection<
     return matchingRows.length;
   }
 
+  #buildUpsertConflictCriterion(
+    createValues: Record<string, unknown>,
+    conflictColumns: readonly string[],
+  ): Record<string, unknown> {
+    const columnToField = this.ctx.contract.mappings.columnToField?.[this.tableName] ?? {};
+    const criterion: Record<string, unknown> = {};
+
+    for (const columnName of conflictColumns) {
+      if (!(columnName in createValues)) {
+        throw new Error(
+          `upsert() for model "${this.modelName}" requires create value for conflict column "${columnName}"`,
+        );
+      }
+
+      const fieldName = columnToField[columnName] ?? columnName;
+      criterion[fieldName] = createValues[columnName];
+    }
+
+    return criterion;
+  }
+
   async #reloadMutationRowByPrimaryKey(criterion: Record<string, unknown>): Promise<Row | null> {
+    return this.#reloadMutationRowByCriterion(criterion, 'primary key');
+  }
+
+  async #reloadMutationRowByCriterion(
+    criterion: Record<string, unknown>,
+    criterionLabel: string,
+  ): Promise<Row | null> {
     const whereExpr = shorthandToWhereExpr(
       this.ctx.contract,
       this.modelName,
@@ -869,7 +920,7 @@ export class Collection<
     );
     if (!whereExpr) {
       throw new Error(
-        `Failed to build primary key filter for mutation result on model "${this.modelName}"`,
+        `Failed to build ${criterionLabel} filter for mutation result on model "${this.modelName}"`,
       );
     }
 

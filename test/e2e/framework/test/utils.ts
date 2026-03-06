@@ -114,9 +114,6 @@ async function getPlannedDdlSql(options: {
 }): Promise<string> {
   const { connectionString, contractIR } = options;
   const controlClient = createControlClientForTests(connectionString);
-  type OperationWithSqlSteps = {
-    readonly execute: ReadonlyArray<{ readonly sql: string }>;
-  };
 
   try {
     const result = await controlClient.dbInit({
@@ -128,11 +125,8 @@ async function getPlannedDdlSql(options: {
       throw new Error(`dbInit plan failed: ${result.failure.summary}`);
     }
 
-    const operations = result.value.plan
-      .operations as unknown as ReadonlyArray<OperationWithSqlSteps>;
-    return operations
-      .flatMap((operation) => operation.execute.map((step) => step.sql))
-      .join(';\n\n');
+    const sqlStatements = result.value.plan.sql ?? [];
+    return sqlStatements.join(';\n\n');
   } finally {
     await controlClient.close();
   }

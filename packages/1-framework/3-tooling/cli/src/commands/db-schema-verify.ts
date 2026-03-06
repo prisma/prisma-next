@@ -5,6 +5,7 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
+import { ContractValidationError } from '../control-api/errors';
 import {
   CliStructuredError,
   errorContractValidationFailed,
@@ -14,7 +15,11 @@ import {
   errorJsonFormatNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import {
+  maskConnectionUrl,
+  resolveContractPath,
+  setCommandDescriptions,
+} from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -53,9 +58,7 @@ async function executeDbSchemaVerifyCommand(
   const configPath = options.config
     ? relative(process.cwd(), resolve(options.config))
     : 'prisma-next.config.ts';
-  const contractPathAbsolute = config.contract?.output
-    ? resolve(config.contract.output)
-    : resolve('src/prisma/contract.json');
+  const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
   // Output header
@@ -65,7 +68,7 @@ async function executeDbSchemaVerifyCommand(
       { label: 'contract', value: contractPath },
     ];
     if (options.db) {
-      details.push({ label: 'database', value: options.db });
+      details.push({ label: 'database', value: maskConnectionUrl(options.db) });
     }
     const header = formatStyledHeader({
       command: 'db schema-verify',
@@ -154,6 +157,14 @@ async function executeDbSchemaVerifyCommand(
     // Driver already throws CliStructuredError for connection failures
     if (error instanceof CliStructuredError) {
       return notOk(error);
+    }
+
+    if (error instanceof ContractValidationError) {
+      return notOk(
+        errorContractValidationFailed(`Contract validation failed: ${error.message}`, {
+          where: { path: contractPathAbsolute },
+        }),
+      );
     }
 
     // Wrap unexpected errors

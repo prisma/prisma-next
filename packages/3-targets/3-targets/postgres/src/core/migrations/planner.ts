@@ -21,25 +21,27 @@ import {
   plannerFailure,
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
-import {
-  arraysEqual,
-  isIndexSatisfied,
-  isUniqueConstraintSatisfied,
-  verifySqlSchema,
-} from '@prisma-next/family-sql/schema-verify';
+import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type {
   ForeignKey,
   ReferentialAction,
-  SqlContract,
-  SqlStorage,
   StorageColumn,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
+import { buildReconciliationPlan } from './planner-reconciliation';
 
-type OperationClass = 'extension' | 'type' | 'table' | 'unique' | 'index' | 'foreignKey';
+export type OperationClass =
+  | 'extension'
+  | 'type'
+  | 'table'
+  | 'column'
+  | 'primaryKey'
+  | 'unique'
+  | 'index'
+  | 'foreignKey';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -73,6 +75,12 @@ interface PlannerConfig {
   readonly defaultSchema: string;
 }
 
+export interface PlanningMode {
+  readonly includeExtraObjects: boolean;
+  readonly allowWidening: boolean;
+  readonly allowDestructive: boolean;
+}
+
 const DEFAULT_PLANNER_CONFIG: PlannerConfig = {
   defaultSchema: 'public',
 };
@@ -96,10 +104,8 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return policyResult;
     }
 
-    const classification = this.classifySchema(options);
-    if (classification.kind === 'conflict') {
-      return plannerFailure(classification.conflicts);
-    }
+    const planningMode = this.resolvePlanningMode(options.policy);
+    const schemaIssues = this.collectSchemaIssues(options, planningMode.includeExtraObjects);
 
     // Extract codec control hooks once at entry point for reuse across all operations.
     // This avoids repeated iteration over frameworkComponents for each method that needs hooks.
@@ -107,34 +113,40 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
 
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
+    const reconciliationPlan = buildReconciliationPlan({
+      contract: options.contract,
+      issues: schemaIssues,
+      schemaName,
+      mode: planningMode,
+      policy: options.policy,
+    });
+    if (reconciliationPlan.conflicts.length > 0) {
+      return plannerFailure(reconciliationPlan.conflicts);
+    }
+
     const storageTypePlan = this.buildStorageTypeOperations(options, schemaName, codecHooks);
     if (storageTypePlan.conflicts.length > 0) {
       return plannerFailure(storageTypePlan.conflicts);
     }
 
+    // Sort table entries once for reuse across all additive operation builders.
+    const sortedTables = sortedEntries(options.contract.storage.tables);
+
+    // Pre-compute constraint lookups once per schema table for O(1) checks across all builders.
+    const schemaLookups = buildSchemaLookupMap(options.schema);
+
     // Build extension operations from component-owned database dependencies
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
       ...storageTypePlan.operations,
-      ...this.buildTableOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildColumnOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildPrimaryKeyOperations(
-        options.contract.storage.tables,
-        options.schema,
-        schemaName,
-      ),
-      ...this.buildUniqueOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildIndexOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildFkBackingIndexOperations(
-        options.contract.storage.tables,
-        options.schema,
-        schemaName,
-      ),
-      ...this.buildForeignKeyOperations(
-        options.contract.storage.tables,
-        options.schema,
-        schemaName,
-      ),
+      ...reconciliationPlan.operations,
+      ...this.buildTableOperations(sortedTables, options.schema, schemaName),
+      ...this.buildColumnOperations(sortedTables, options.schema, schemaName),
+      ...this.buildPrimaryKeyOperations(sortedTables, options.schema, schemaName),
+      ...this.buildUniqueOperations(sortedTables, schemaLookups, schemaName),
+      ...this.buildIndexOperations(sortedTables, schemaLookups, schemaName),
+      ...this.buildFkBackingIndexOperations(sortedTables, schemaLookups, schemaName),
+      ...this.buildForeignKeyOperations(sortedTables, schemaLookups, schemaName),
     );
 
     const plan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -155,8 +167,8 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return plannerFailure([
         {
           kind: 'unsupportedOperation',
-          summary: 'Init planner requires additive operations be allowed',
-          why: 'The init planner only emits additive operations. Update the policy to include "additive".',
+          summary: 'Migration planner requires additive operations be allowed',
+          why: 'The planner requires the "additive" operation class to be allowed in the policy.',
         },
       ]);
     }
@@ -269,12 +281,12 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   }
 
   private buildTableOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       if (schema.tables[tableName]) {
         continue;
       }
@@ -312,12 +324,12 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   }
 
   private buildColumnOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
       if (!schemaTable) {
         continue;
@@ -374,7 +386,12 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         ? [
             {
               description: `verify column "${columnName}" is NOT NULL`,
-              sql: columnIsNotNullCheck({ schema, table: tableName, column: columnName }),
+              sql: columnNullabilityCheck({
+                schema,
+                table: tableName,
+                column: columnName,
+                nullable: false,
+              }),
             },
           ]
         : []),
@@ -396,12 +413,12 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   }
 
   private buildPrimaryKeyOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       if (!table.primaryKey) {
         continue;
       }
@@ -445,15 +462,15 @@ PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
   }
 
   private buildUniqueOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
-    schema: SqlSchemaIR,
+    tables: ReadonlyArray<[string, StorageTable]>,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
-      const schemaTable = schema.tables[tableName];
+    for (const [tableName, table] of tables) {
+      const lookup = schemaLookups.get(tableName);
       for (const unique of table.uniques) {
-        if (schemaTable && hasUniqueConstraint(schemaTable, unique.columns)) {
+        if (lookup && hasUniqueConstraint(lookup, unique.columns)) {
           continue;
         }
         const constraintName = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
@@ -493,15 +510,15 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   }
 
   private buildIndexOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
-    schema: SqlSchemaIR,
+    tables: ReadonlyArray<[string, StorageTable]>,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
-      const schemaTable = schema.tables[tableName];
+    for (const [tableName, table] of tables) {
+      const lookup = schemaLookups.get(tableName);
       for (const index of table.indexes) {
-        if (schemaTable && hasIndex(schemaTable, index.columns)) {
+        if (lookup && hasIndex(lookup, index.columns)) {
           continue;
         }
         const indexName = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
@@ -546,13 +563,13 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
    * but only when no matching user-declared index exists in `contractTable.indexes`.
    */
   private buildFkBackingIndexOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
-    schema: SqlSchemaIR,
+    tables: ReadonlyArray<[string, StorageTable]>,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
-      const schemaTable = schema.tables[tableName];
+    for (const [tableName, table] of tables) {
+      const lookup = schemaLookups.get(tableName);
       // Collect column sets of user-declared indexes to avoid duplicates
       const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
 
@@ -561,7 +578,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
         // Skip if user already declared an index with these columns
         if (declaredIndexColumns.has(fk.columns.join(','))) continue;
         // Skip if the index already exists in the database
-        if (schemaTable && hasIndex(schemaTable, fk.columns)) continue;
+        if (lookup && hasIndex(lookup, fk.columns)) continue;
 
         const indexName = `${tableName}_${fk.columns.join('_')}_idx`;
         operations.push({
@@ -601,16 +618,16 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   }
 
   private buildForeignKeyOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
-    schema: SqlSchemaIR,
+    tables: ReadonlyArray<[string, StorageTable]>,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
-      const schemaTable = schema.tables[tableName];
+    for (const [tableName, table] of tables) {
+      const lookup = schemaLookups.get(tableName);
       for (const foreignKey of table.foreignKeys) {
         if (foreignKey.constraint === false) continue;
-        if (schemaTable && hasForeignKey(schemaTable, foreignKey)) {
+        if (lookup && hasForeignKey(lookup, foreignKey)) {
           continue;
         }
         const fkName = foreignKey.name ?? `${tableName}_${foreignKey.columns.join('_')}_fkey`;
@@ -657,87 +674,33 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     schema: string,
     table?: string,
   ): PostgresPlanTargetDetails {
-    return {
-      schema,
-      objectType,
-      name,
-      ...ifDefined('table', table),
-    };
+    return buildTargetDetails(objectType, name, schema, table);
   }
 
-  private classifySchema(options: PlannerOptionsWithComponents):
-    | { kind: 'ok' }
-    | {
-        kind: 'conflict';
-        conflicts: SqlPlannerConflict[];
-      } {
+  private resolvePlanningMode(policy: MigrationOperationPolicy): PlanningMode {
+    const allowWidening = policy.allowedOperationClasses.includes('widening');
+    const allowDestructive = policy.allowedOperationClasses.includes('destructive');
+    // `db init` uses additive-only policy and intentionally ignores extras.
+    // Any reconciliation-capable policy should inspect extras to reconcile strict equality.
+    const includeExtraObjects = allowWidening || allowDestructive;
+    return { includeExtraObjects, allowWidening, allowDestructive };
+  }
+
+  private collectSchemaIssues(
+    options: PlannerOptionsWithComponents,
+    strict: boolean,
+  ): readonly SchemaIssue[] {
     const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
       contract: options.contract,
       schema: options.schema,
-      strict: false,
+      strict,
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
       normalizeNativeType: normalizeSchemaNativeType,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
-
-    const conflicts = this.extractConflicts(verifyResult.schema.issues);
-    if (conflicts.length > 0) {
-      return { kind: 'conflict', conflicts };
-    }
-    return { kind: 'ok' };
-  }
-
-  private extractConflicts(issues: readonly SchemaIssue[]): SqlPlannerConflict[] {
-    const conflicts: SqlPlannerConflict[] = [];
-    for (const issue of issues) {
-      if (isAdditiveIssue(issue)) {
-        continue;
-      }
-      const conflict = this.convertIssueToConflict(issue);
-      if (conflict) {
-        conflicts.push(conflict);
-      }
-    }
-    return conflicts.sort(conflictComparator);
-  }
-
-  private convertIssueToConflict(issue: SchemaIssue): SqlPlannerConflict | null {
-    switch (issue.kind) {
-      case 'type_mismatch':
-        return this.buildConflict('typeMismatch', issue);
-      case 'nullability_mismatch':
-        return this.buildConflict('nullabilityConflict', issue);
-      case 'primary_key_mismatch':
-        return this.buildConflict('indexIncompatible', issue);
-      case 'unique_constraint_mismatch':
-        return this.buildConflict('indexIncompatible', issue);
-      case 'index_mismatch':
-        return this.buildConflict('indexIncompatible', issue);
-      case 'foreign_key_mismatch':
-        return this.buildConflict('foreignKeyConflict', issue);
-      default:
-        return null;
-    }
-  }
-
-  private buildConflict(kind: SqlPlannerConflict['kind'], issue: SchemaIssue): SqlPlannerConflict {
-    const location = buildConflictLocation(issue);
-    const meta =
-      issue.expected || issue.actual
-        ? Object.freeze({
-            ...ifDefined('expected', issue.expected),
-            ...ifDefined('actual', issue.actual),
-          })
-        : undefined;
-
-    return {
-      kind,
-      summary: issue.message,
-      ...ifDefined('location', location),
-      ...ifDefined('meta', meta),
-    };
+    return verifyResult.schema.issues;
   }
 }
 
@@ -797,10 +760,40 @@ function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): s
 }
 
 /**
+ * Pattern for safe PostgreSQL type names.
+ * Allows letters, digits, underscores, spaces (for "double precision", "character varying"),
+ * and trailing [] for array types.
+ */
+const SAFE_NATIVE_TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_ ]*(\[\])?$/;
+
+function assertSafeNativeType(nativeType: string): void {
+  if (!SAFE_NATIVE_TYPE_PATTERN.test(nativeType)) {
+    throw new Error(
+      `Unsafe native type name in contract: "${nativeType}". ` +
+        'Native type names must match /^[a-zA-Z][a-zA-Z0-9_ ]*(\\[\\])?$/',
+    );
+  }
+}
+
+/**
+ * Sanity check against accidental SQL injection from malformed contract files.
+ * Rejects semicolons, SQL comment tokens, and dollar-quoting.
+ * Not a comprehensive security boundary — the contract is developer-authored.
+ */
+function assertSafeDefaultExpression(expression: string): void {
+  if (expression.includes(';') || /--|\/\*|\$\$|\bSELECT\b/i.test(expression)) {
+    throw new Error(
+      `Unsafe default expression in contract: "${expression}". ` +
+        'Default expressions must not contain semicolons, SQL comment tokens, dollar-quoting, or subqueries.',
+    );
+  }
+}
+
+/**
  * Builds the column type SQL, handling autoincrement as a special case.
  * For autoincrement on int4/int8, we use SERIAL/BIGSERIAL types.
  */
-function buildColumnTypeSql(column: StorageColumn): string {
+export function buildColumnTypeSql(column: StorageColumn): string {
   const columnDefault = column.default;
 
   // For autoincrement, use SERIAL/BIGSERIAL types instead of int4/int8
@@ -820,6 +813,8 @@ function buildColumnTypeSql(column: StorageColumn): string {
     return quoteIdentifier(column.nativeType);
   }
 
+  // Validate nativeType before using it unquoted in DDL
+  assertSafeNativeType(column.nativeType);
   return renderParameterizedTypeSql(column) ?? column.nativeType;
 }
 
@@ -868,7 +863,8 @@ function buildColumnDefaultSql(
       if (columnDefault.expression === 'autoincrement()') {
         return '';
       }
-      return `DEFAULT ${columnDefault.expression}`;
+      assertSafeDefaultExpression(columnDefault.expression);
+      return `DEFAULT (${columnDefault.expression})`;
     }
     case 'sequence':
       // Sequence names use quoteIdentifier for safe identifier handling
@@ -907,11 +903,25 @@ function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
   return `'${escapeLiteral(json)}'`;
 }
 
-function qualifyTableName(schema: string, table: string): string {
+export function buildTargetDetails(
+  objectType: OperationClass,
+  name: string,
+  schema: string,
+  table?: string,
+): PostgresPlanTargetDetails {
+  return {
+    schema,
+    objectType,
+    name,
+    ...ifDefined('table', table),
+  };
+}
+
+export function qualifyTableName(schema: string, table: string): string {
   return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
 }
 
-function toRegclassLiteral(schema: string, name: string): string {
+export function toRegclassLiteral(schema: string, name: string): string {
   const regclass = `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
   return `'${escapeLiteral(regclass)}'`;
 }
@@ -920,7 +930,7 @@ function sortedEntries<V>(record: Readonly<Record<string, V>>): Array<[string, V
   return Object.entries(record).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, V]>;
 }
 
-function constraintExistsCheck({
+export function constraintExistsCheck({
   constraintName,
   schema,
   exists = true,
@@ -938,7 +948,7 @@ function constraintExistsCheck({
 )`;
 }
 
-function columnExistsCheck({
+export function columnExistsCheck({
   schema,
   table,
   column,
@@ -959,22 +969,25 @@ function columnExistsCheck({
 )`;
 }
 
-function columnIsNotNullCheck({
+export function columnNullabilityCheck({
   schema,
   table,
   column,
+  nullable,
 }: {
   schema: string;
   table: string;
   column: string;
+  nullable: boolean;
 }): string {
+  const expected = nullable ? 'YES' : 'NO';
   return `SELECT EXISTS (
   SELECT 1
   FROM information_schema.columns
   WHERE table_schema = '${escapeLiteral(schema)}'
     AND table_name = '${escapeLiteral(table)}'
     AND column_name = '${escapeLiteral(column)}'
-    AND is_nullable = 'NO'
+    AND is_nullable = '${expected}'
 )`;
 }
 
@@ -1022,102 +1035,52 @@ function tableHasPrimaryKeyCheck(
 }
 
 /**
- * Checks if table has a unique constraint satisfied by the given columns.
- * Uses shared semantic satisfaction predicate from verify-helpers.
+ * Pre-computed lookup sets for a schema table's constraints.
+ * Converts O(n*m) linear scans to O(1) Set lookups per constraint check.
  */
-function hasUniqueConstraint(
-  table: SqlSchemaIR['tables'][string],
-  columns: readonly string[],
-): boolean {
-  return isUniqueConstraintSatisfied(table.uniques, table.indexes, columns);
+interface SchemaTableLookup {
+  readonly uniqueKeys: Set<string>;
+  readonly indexKeys: Set<string>;
+  readonly uniqueIndexKeys: Set<string>;
+  readonly fkKeys: Set<string>;
 }
 
-/**
- * Checks if table has an index satisfied by the given columns.
- * Uses shared semantic satisfaction predicate from verify-helpers.
- */
-function hasIndex(table: SqlSchemaIR['tables'][string], columns: readonly string[]): boolean {
-  return isIndexSatisfied(table.indexes, table.uniques, columns);
+function buildSchemaLookupMap(schema: SqlSchemaIR): ReadonlyMap<string, SchemaTableLookup> {
+  const map = new Map<string, SchemaTableLookup>();
+  for (const [tableName, table] of Object.entries(schema.tables)) {
+    map.set(tableName, buildSchemaTableLookup(table));
+  }
+  return map;
 }
 
-function hasForeignKey(table: SqlSchemaIR['tables'][string], fk: ForeignKey): boolean {
-  return table.foreignKeys.some(
-    (candidate) =>
-      arraysEqual(candidate.columns, fk.columns) &&
-      candidate.referencedTable === fk.references.table &&
-      arraysEqual(candidate.referencedColumns, fk.references.columns),
+function buildSchemaTableLookup(table: SqlSchemaIR['tables'][string]): SchemaTableLookup {
+  const uniqueKeys = new Set(table.uniques.map((u) => u.columns.join(',')));
+  const indexKeys = new Set(table.indexes.map((i) => i.columns.join(',')));
+  const uniqueIndexKeys = new Set(
+    table.indexes.filter((i) => i.unique).map((i) => i.columns.join(',')),
   );
+  const fkKeys = new Set(
+    table.foreignKeys.map(
+      (fk) => `${fk.columns.join(',')}|${fk.referencedTable}|${fk.referencedColumns.join(',')}`,
+    ),
+  );
+  return { uniqueKeys, indexKeys, uniqueIndexKeys, fkKeys };
 }
 
-function isAdditiveIssue(issue: SchemaIssue): boolean {
-  switch (issue.kind) {
-    case 'type_missing':
-    case 'type_values_mismatch':
-    case 'missing_table':
-    case 'missing_column':
-    case 'extension_missing':
-      return true;
-    case 'primary_key_mismatch':
-      return issue.actual === undefined;
-    case 'unique_constraint_mismatch':
-    case 'index_mismatch':
-    case 'foreign_key_mismatch':
-      return issue.indexOrConstraint === undefined;
-    default:
-      return false;
-  }
+function hasUniqueConstraint(lookup: SchemaTableLookup, columns: readonly string[]): boolean {
+  const key = columns.join(',');
+  return lookup.uniqueKeys.has(key) || lookup.uniqueIndexKeys.has(key);
 }
 
-function buildConflictLocation(issue: SchemaIssue) {
-  const location: {
-    table?: string;
-    column?: string;
-    constraint?: string;
-  } = {};
-  if (issue.table) {
-    location.table = issue.table;
-  }
-  if (issue.column) {
-    location.column = issue.column;
-  }
-  if (issue.indexOrConstraint) {
-    location.constraint = issue.indexOrConstraint;
-  }
-  return Object.keys(location).length > 0 ? location : undefined;
+function hasIndex(lookup: SchemaTableLookup, columns: readonly string[]): boolean {
+  const key = columns.join(',');
+  return lookup.indexKeys.has(key) || lookup.uniqueKeys.has(key);
 }
 
-function conflictComparator(a: SqlPlannerConflict, b: SqlPlannerConflict): number {
-  if (a.kind !== b.kind) {
-    return a.kind < b.kind ? -1 : 1;
-  }
-  const aLocation = a.location ?? {};
-  const bLocation = b.location ?? {};
-  const tableCompare = compareStrings(aLocation.table, bLocation.table);
-  if (tableCompare !== 0) {
-    return tableCompare;
-  }
-  const columnCompare = compareStrings(aLocation.column, bLocation.column);
-  if (columnCompare !== 0) {
-    return columnCompare;
-  }
-  const constraintCompare = compareStrings(aLocation.constraint, bLocation.constraint);
-  if (constraintCompare !== 0) {
-    return constraintCompare;
-  }
-  return compareStrings(a.summary, b.summary);
-}
-
-function compareStrings(a?: string, b?: string): number {
-  if (a === b) {
-    return 0;
-  }
-  if (a === undefined) {
-    return -1;
-  }
-  if (b === undefined) {
-    return 1;
-  }
-  return a < b ? -1 : 1;
+function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
+  return lookup.fkKeys.has(
+    `${fk.columns.join(',')}|${fk.references.table}|${fk.references.columns.join(',')}`,
+  );
 }
 
 const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {

@@ -22,5 +22,20 @@ export const contract = defineContract<CodecTypes>()
       ),
   )
   .model('Team', 'org_team', (m) => m.field('id', 'team_id'))
-  .model('Member', 'team_member', (m) => m.field('id', 'member_id').field('teamId', 'team_ref'))
+  .model('Member', 'team_member', (m) =>
+    m
+      .field('id', 'member_id')
+      .field('teamId', 'team_ref')
+      .relation('team', {
+        toModel: 'Team',
+        toTable: 'org_team',
+        cardinality: 'N:1',
+        on: {
+          parentTable: 'team_member',
+          parentColumns: ['team_ref'],
+          childTable: 'org_team',
+          childColumns: ['team_id'],
+        },
+      }),
+  )
   .build();

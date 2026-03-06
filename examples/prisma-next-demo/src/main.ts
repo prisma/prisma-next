@@ -17,7 +17,7 @@
  * - repo-users-wherearg <kind> [positive-limit]
  *                              Users via ORM ToWhereExpr filter interop
  * - repo-admins [limit]        Admin users via custom collection scope
- * - repo-user <email>          Find a user by email via ORM client find()
+ * - repo-user <email>          Find a user by email via ORM client first()
  * - repo-posts <userId> [limit] Posts for a user via ORM client API
  * - repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser]
  *                              Compound filters + select/include via ORM client

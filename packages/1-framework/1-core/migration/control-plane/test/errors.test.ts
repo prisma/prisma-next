@@ -7,14 +7,17 @@ import {
   errorContractMissingExtensionPacks,
   errorContractValidationFailed,
   errorDatabaseConnectionRequired,
+  errorDestructiveChanges,
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorHashMismatch,
   errorJsonFormatNotSupported,
   errorMarkerMissing,
+  errorMarkerRequired,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
+  errorRunnerFailed,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorTargetMismatch,
@@ -74,6 +77,17 @@ describe('CliStructuredError', () => {
     expect(envelope.code).toBe('PN-RTM-3001');
     expect(envelope.domain).toBe('RTM');
     expect(envelope.summary).toBe('Test error');
+  });
+
+  it('normalizes fix when fix equals why', () => {
+    const error = new CliStructuredError('4001', 'Test error', {
+      why: 'Same message',
+      fix: 'Same message',
+    });
+    const envelope = error.toEnvelope();
+
+    expect(error.fix).toBeUndefined();
+    expect(envelope.fix).toBeUndefined();
   });
 
   describe('is() type guard', () => {
@@ -136,6 +150,12 @@ describe('CliStructuredError', () => {
 });
 
 describe('Config Errors', () => {
+  it('errorConfigFileNotFound without path omits where', () => {
+    const error = errorConfigFileNotFound();
+    expect(error.code).toBe('4001');
+    expect(error.where).toBeUndefined();
+  });
+
   it('errorConfigFileNotFound creates correct error', () => {
     const error = errorConfigFileNotFound('/path/to/config.ts');
     expect(error.code).toBe('4001');
@@ -147,6 +167,12 @@ describe('Config Errors', () => {
   it('errorConfigFileNotFound with custom why', () => {
     const error = errorConfigFileNotFound('/path/to/config.ts', { why: 'Custom reason' });
     expect(error.why).toBe('Custom reason');
+  });
+
+  it('errorConfigFileNotFound without configPath', () => {
+    const error = errorConfigFileNotFound();
+    expect(error.code).toBe('4001');
+    expect(error.where).toBeUndefined();
   });
 
   it('errorContractConfigMissing creates correct error', () => {
@@ -185,6 +211,15 @@ describe('Config Errors', () => {
   it('errorFileNotFound with custom why', () => {
     const error = errorFileNotFound('/path/to/file.ts', { why: 'Custom reason' });
     expect(error.why).toBe('Custom reason');
+  });
+
+  it('errorFileNotFound with custom fix and docsUrl', () => {
+    const error = errorFileNotFound('/path/to/file.ts', {
+      fix: 'Custom fix',
+      docsUrl: 'https://example.com/docs',
+    });
+    expect(error.fix).toBe('Custom fix');
+    expect(error.docsUrl).toBe('https://example.com/docs');
   });
 
   it('errorDatabaseConnectionRequired creates correct error', () => {
@@ -320,8 +355,8 @@ describe('Config Errors', () => {
 
   it('errorConfigValidation creates correct error', () => {
     const error = errorConfigValidation('family');
-    expect(error.code).toBe('4001');
-    expect(error.message).toBe('Config file not found');
+    expect(error.code).toBe('4009');
+    expect(error.message).toBe('Config validation error');
     expect(error.why).toBe('Config must have a "family" field');
   });
 
@@ -335,7 +370,7 @@ describe('Runtime Errors', () => {
   it('errorMarkerMissing creates correct error', () => {
     const error = errorMarkerMissing();
     expect(error.code).toBe('3001');
-    expect(error.message).toBe('Marker missing');
+    expect(error.message).toBe('Database not signed');
     expect(error.domain).toBe('RTM');
   });
 
@@ -357,9 +392,33 @@ describe('Runtime Errors', () => {
     expect(error.meta?.['actual']).toBe('hash2');
   });
 
+  it('errorHashMismatch with expected only', () => {
+    const error = errorHashMismatch({ expected: 'hash1' });
+    expect(error.meta?.['expected']).toBe('hash1');
+    expect(error.meta?.['actual']).toBeUndefined();
+  });
+
+  it('errorHashMismatch with actual only', () => {
+    const error = errorHashMismatch({ actual: 'hash2' });
+    expect(error.meta?.['expected']).toBeUndefined();
+    expect(error.meta?.['actual']).toBe('hash2');
+  });
+
   it('errorHashMismatch with custom why', () => {
     const error = errorHashMismatch({ why: 'Custom reason' });
     expect(error.why).toBe('Custom reason');
+  });
+
+  it('errorHashMismatch with only expected', () => {
+    const error = errorHashMismatch({ expected: 'hash1' });
+    expect(error.meta?.['expected']).toBe('hash1');
+    expect(error.meta?.['actual']).toBeUndefined();
+  });
+
+  it('errorHashMismatch with only actual', () => {
+    const error = errorHashMismatch({ actual: 'hash2' });
+    expect(error.meta?.['actual']).toBe('hash2');
+    expect(error.meta?.['expected']).toBeUndefined();
   });
 
   it('errorTargetMismatch creates correct error', () => {
@@ -376,6 +435,55 @@ describe('Runtime Errors', () => {
   it('errorTargetMismatch with custom why', () => {
     const error = errorTargetMismatch('postgres', 'mysql', { why: 'Custom reason' });
     expect(error.why).toBe('Custom reason');
+  });
+
+  it('errorMarkerRequired creates correct error', () => {
+    const error = errorMarkerRequired();
+    expect(error.code).toBe('3010');
+    expect(error.message).toBe('Database must be signed first');
+    expect(error.domain).toBe('RTM');
+  });
+
+  it('errorMarkerRequired with custom why and fix', () => {
+    const error = errorMarkerRequired({ why: 'Custom reason', fix: 'Custom fix' });
+    expect(error.why).toBe('Custom reason');
+    expect(error.fix).toBe('Custom fix');
+  });
+
+  it('errorRunnerFailed creates correct error', () => {
+    const error = errorRunnerFailed('Runner failed');
+    expect(error.code).toBe('3020');
+    expect(error.message).toBe('Runner failed');
+    expect(error.domain).toBe('RTM');
+  });
+
+  it('errorRunnerFailed with all options', () => {
+    const error = errorRunnerFailed('Runner failed', {
+      why: 'Custom why',
+      fix: 'Custom fix',
+      meta: { key: 'value' },
+    });
+    expect(error.why).toBe('Custom why');
+    expect(error.fix).toBe('Custom fix');
+    expect(error.meta).toEqual({ key: 'value' });
+  });
+
+  it('errorDestructiveChanges creates correct error', () => {
+    const error = errorDestructiveChanges('Destructive changes detected');
+    expect(error.code).toBe('3030');
+    expect(error.message).toBe('Destructive changes detected');
+    expect(error.domain).toBe('RTM');
+  });
+
+  it('errorDestructiveChanges with all options', () => {
+    const error = errorDestructiveChanges('Destructive changes detected', {
+      why: 'Custom why',
+      fix: 'Custom fix',
+      meta: { key: 'value' },
+    });
+    expect(error.why).toBe('Custom why');
+    expect(error.fix).toBe('Custom fix');
+    expect(error.meta).toEqual({ key: 'value' });
   });
 
   it('errorRuntime creates correct error', () => {

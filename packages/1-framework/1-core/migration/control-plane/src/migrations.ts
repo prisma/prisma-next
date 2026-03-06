@@ -10,6 +10,7 @@
  */
 
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { Result } from '@prisma-next/utils/result';
 import type { ControlDriverInstance, ControlFamilyInstance } from './types';
 
@@ -49,6 +50,10 @@ export interface MigrationPlanOperation {
   readonly operationClass: MigrationOperationClass;
 }
 
+// ============================================================================
+// Plan Types (Display-Oriented)
+// ============================================================================
+
 /**
  * A migration plan for display purposes.
  * Contains only the fields needed for CLI output (summary, JSON envelope).
@@ -56,6 +61,14 @@ export interface MigrationPlanOperation {
 export interface MigrationPlan {
   /** The target ID this plan is for (e.g., 'postgres'). */
   readonly targetId: string;
+  /**
+   * Origin contract identity that the plan expects the database to currently be at.
+   * If omitted or null, the runner skips origin validation entirely.
+   */
+  readonly origin?: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
+  } | null;
   /** Destination contract identity that the plan intends to reach. */
   readonly destination: {
     readonly storageHash: string;
@@ -244,4 +257,12 @@ export interface TargetMigrationsCapability<
 > {
   createPlanner(family: TFamilyInstance): MigrationPlanner<TFamilyId, TTargetId>;
   createRunner(family: TFamilyInstance): MigrationRunner<TFamilyId, TTargetId>;
+  /**
+   * Synthesizes a family-specific schema IR from a contract for offline planning.
+   * The returned schema can be passed to `planner.plan({ schema })` as the "from" state.
+   *
+   * @param contract - The contract to convert, or null for a new project (empty schema).
+   * @returns Family-specific schema IR (e.g., `SqlSchemaIR` for SQL targets).
+   */
+  contractToSchema(contract: ContractIR | null): unknown;
 }

@@ -4,7 +4,13 @@ import { createDbInitCommand } from './commands/db-init';
 import { createDbIntrospectCommand } from './commands/db-introspect';
 import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
 import { createDbSignCommand } from './commands/db-sign';
+import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
+import { createMigrationApplyCommand } from './commands/migration-apply';
+import { createMigrationPlanCommand } from './commands/migration-plan';
+import { createMigrationShowCommand } from './commands/migration-show';
+import { createMigrationStatusCommand } from './commands/migration-status';
+import { createMigrationVerifyCommand } from './commands/migration-verify';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { parseGlobalFlags } from './utils/global-flags';
 import { formatCommandHelp, formatRootHelp } from './utils/output';
@@ -175,6 +181,10 @@ dbCommand.addCommand(dbVerifyCommand);
 const dbInitCommand = createDbInitCommand();
 dbCommand.addCommand(dbInitCommand);
 
+// Add update subcommand to db
+const dbUpdateCommand = createDbUpdateCommand();
+dbCommand.addCommand(dbUpdateCommand);
+
 // Add introspect subcommand to db
 const dbIntrospectCommand = createDbIntrospectCommand();
 dbCommand.addCommand(dbIntrospectCommand);
@@ -189,6 +199,39 @@ dbCommand.addCommand(dbSignCommand);
 
 // Register db command
 program.addCommand(dbCommand);
+
+// Register migration subcommand
+const migrationCommand = new Command('migration');
+setCommandDescriptions(
+  migrationCommand,
+  'On-disk migration management commands',
+  'Plan, apply, verify, and scaffold on-disk migration packages. Migrations are\n' +
+    'contract-to-contract edges stored as versioned directories under migrations/.',
+);
+migrationCommand.configureHelp({
+  formatHelp: (cmd) => {
+    const flags = parseGlobalFlags({});
+    return formatCommandHelp({ command: cmd, flags });
+  },
+  subcommandDescription: () => '',
+});
+
+const migrationPlanCommand = createMigrationPlanCommand();
+migrationCommand.addCommand(migrationPlanCommand);
+
+const migrationShowCommand = createMigrationShowCommand();
+migrationCommand.addCommand(migrationShowCommand);
+
+const migrationStatusCommand = createMigrationStatusCommand();
+migrationCommand.addCommand(migrationStatusCommand);
+
+const migrationVerifyCommand = createMigrationVerifyCommand();
+migrationCommand.addCommand(migrationVerifyCommand);
+
+const migrationApplyCommand = createMigrationApplyCommand();
+migrationCommand.addCommand(migrationApplyCommand);
+
+program.addCommand(migrationCommand);
 
 // Create help command
 const helpCommand = new Command('help')

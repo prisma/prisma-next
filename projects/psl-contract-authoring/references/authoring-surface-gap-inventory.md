@@ -25,8 +25,8 @@ It records two related (but distinct) inventories:
   - ❌ Remaining: broader namespaced attribute surface across other packs/namespaces and richer attribute vocabularies.
 
 - **More default functions**
-  - TS can express additional default functions/expressions on columns beyond `autoincrement()` and `now()`.
-  - PSL v1 only supports `autoincrement()` and `now()` plus literal defaults.
+  - ✅ Implemented in Milestone 5: PSL parity for `uuid()`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(n)`, and `dbgenerated("...")` with registry-driven lowering to execution/storage defaults.
+  - ⚠️ Remaining out of scope: `cuid()` (v1 explicitly rejects cuid v1 with actionable diagnostics) and additional generator vocab beyond the milestone set.
 
 - **Storage mapping control**
   - ✅ Implemented in Milestone 4: `@@map("...")` (model → table) and `@map("...")` (field → column), including PK/unique/index/FK propagation over storage names.

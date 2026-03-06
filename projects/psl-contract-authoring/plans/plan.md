@@ -37,6 +37,19 @@ Make contract authoring sources pluggable by design. Instead of enumerating sour
   - No source-specific branching is required in the CLI/control plane
   - E2E conformance/parity coverage for provider-based emission boundaries
 
+### Addendum 1.1 (Optional): Split up overloaded core migration/control-plane package (TML-2018)
+
+This is an internal maintainability slice: `packages/1-framework/1-core/migration/control-plane` currently hosts both migration-plane domain concerns and config typing/validation used by `prisma-next.config.ts`. The goal is to split out **at least** one focused core package for config types + validation so the provider-based authoring work can evolve without dragging migration-plane dependencies along.
+
+**Spec:** `projects/psl-contract-authoring/specs/optional-split-up-1-core-migration.spec.md`
+
+**Tasks (proposed):**
+
+- Introduce a dedicated package for config types + validation (including `PrismaNextConfig`, `ContractConfig`, `defineConfig()`, `validateConfig()`, and `ContractSourceProvider` + diagnostics types).
+- Update CLI config loading and downstream authoring helpers (e.g. `@prisma-next/contract-ts`) to depend on the new package.
+- Keep the remainder of `@prisma-next/core-control-plane` focused on domain actions (verify/migrations/etc) and remove the moved symbols.
+- Add/adjust tests to ensure there is **no behavior change** in config validation and `contract emit` continues to work.
+
 ### Milestone 2: Reusable PSL parser package (`@prisma-next/psl-parser`)
 
 Implement a reusable PSL parser library that can be consumed by emit tooling and other tools (language tooling, external tooling), and that retains source spans for diagnostics.
@@ -140,12 +153,37 @@ Add PSL support for the ID-related default functions and variants that already e
 
 - Support TS-aligned default function vocabulary for IDs (and other fields where applicable), including:
   - `uuid()` (and any TS-supported variants)
-  - `cuid()` (and any TS-supported variants)
+  - `cuid(2)` (cuid v2)
   - `ulid()`
   - `nanoid()`
   - `dbgenerated("...")` (where TS authoring already emits it)
 - Add fixture-driven parity cases for each supported default function, asserting canonical `contract.json` + stable hashes vs TS fixtures.
 - Keep Mongo-only ID semantics (for example `@db.ObjectId` + `auto()`) out of scope for this project slice.
+
+### Milestone 7: PSL sql template literal syntax (follow-up)
+
+Introduce a PSL grammar extension for inline SQL literals using backticks (`sql\`...\``), with **no interpolation** and **single-line only** constraints, starting with storage defaults and designed to extend to future SQL embedding surfaces (views, special indexes).
+
+**Spec:** `projects/psl-contract-authoring/specs/Milestone 7 - PSL sql template literal syntax.spec.md`
+**ADR (proposed):** `projects/psl-contract-authoring/references/ADR - PSL sql template literals.md`
+
+### Milestone 8: Relation navigation list fields + `contract.relations` lowering (follow-up)
+
+Support PSL relation navigation list fields (e.g. `Post[]` backrelation fields) while continuing to reject scalar lists. This requires loosening the current “reject all lists” behavior to “reject scalar lists; accept relation navigation lists” and extending the PSL interpreter to populate `contract.relations` consistently for both sides of a relation.
+
+**Spec:** `projects/psl-contract-authoring/specs/Milestone 8 - Relation navigation list fields and contract.relations lowering.spec.md`
+**Execution Plan:** `projects/psl-contract-authoring/plans/Milestone 8 - Relation navigation list fields and contract.relations lowering-plan.md`
+
+**Tasks:**
+
+- Adjust list-field handling to:
+  - reject scalar lists like `String[]` (strict error), and
+  - accept relation navigation lists like `Post[]` when they refer to a model type (and are not backed by a scalar codec).
+- Extend interpretation/lowering to emit stable `contract.relations` entries for both sides of the relation (N:1 and 1:N), keyed deterministically.
+- Add fixture-driven parity coverage for:
+  - a basic 1:N relationship with the backrelation list present in PSL, and
+  - failure diagnostics for scalar list fields.
+- Update docs to reflect the new supported PSL relation surface and remaining many-to-many guidance (explicit join model).
 
 ### Milestone 6: Close-out (required)
 

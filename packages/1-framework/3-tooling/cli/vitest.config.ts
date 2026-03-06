@@ -38,13 +38,22 @@ export default defineConfig({
         'src/commands/db-introspect.ts',
         'src/commands/db-schema-verify.ts',
         'src/commands/db-sign.ts',
+        'src/commands/db-update.ts',
         'src/commands/db-verify.ts',
+        'src/commands/migration-apply.ts',
+        'src/commands/migration-plan.ts',
+        'src/commands/migration-show.ts',
+        'src/commands/migration-status.ts',
+        'src/commands/migration-verify.ts',
         // Exclude error factory functions - just constructors
         'src/utils/cli-errors.ts',
         // Exclude config loader - mostly file I/O and error handling, tested via e2e tests
         'src/config-loader.ts',
-        // Exclude spinner utility - UI/UX code that's hard to test meaningfully
+        // Exclude spinner and progress utilities - UI/UX code that's hard to test meaningfully
         'src/utils/spinner.ts',
+        'src/utils/progress-adapter.ts',
+        // Exclude migration command scaffold - orchestration code tested via e2e tests
+        'src/utils/migration-command-scaffold.ts',
         // Exclude defensive error handling branches that are hard to test meaningfully
         'src/api/emit-contract.ts', // Non-Error exception handling (lines 104-105)
         'src/load-ts-contract.ts', // Bundle content undefined and non-Error exceptions (lines 170-171, 211)

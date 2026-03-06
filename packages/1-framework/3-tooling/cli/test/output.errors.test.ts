@@ -5,6 +5,7 @@ import { parseGlobalFlags } from '../src/utils/global-flags';
 import { formatErrorOutput } from '../src/utils/output';
 
 const baseError: CliErrorEnvelope = {
+  ok: false,
   code: 'PN-CLI-4020',
   domain: 'CLI',
   severity: 'error',
@@ -22,6 +23,32 @@ const createConflicts = (): readonly CliErrorConflict[] => [
   { kind: 'index', summary: 'Third conflict' },
   { kind: 'constraint', summary: 'Fourth conflict' },
 ];
+
+describe('formatErrorOutput - why/fix rendering', () => {
+  it('shows Fix line when fix is identical to why', () => {
+    const error: CliErrorEnvelope = {
+      ...baseError,
+      why: 'Something went wrong',
+      fix: 'Something went wrong',
+    };
+
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatErrorOutput(error, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('Why: Something went wrong');
+    expect(stripped).toContain('Fix: Something went wrong');
+  });
+
+  it('shows both Why and Fix when they differ', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatErrorOutput(baseError, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('Why: Conflicts detected');
+    expect(stripped).toContain('Fix: Resolve conflicts');
+  });
+});
 
 describe('formatErrorOutput - conflicts', () => {
   it('shows truncated conflict list when not verbose', () => {

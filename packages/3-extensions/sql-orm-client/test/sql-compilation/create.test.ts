@@ -5,13 +5,20 @@ import { normalizeSql, serializePlans } from './helpers';
 describe('sql-compilation/create', () => {
   it('create() inserts a row and returns mapped model fields', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
-    runtime.setNextResults([[{ id: 5, name: 'Eve', email: 'eve@example.com' }]]);
+    runtime.setNextResults([
+      [{ id: 5, name: 'Eve', email: 'eve@example.com', invited_by_id: null }],
+    ]);
 
-    const created = await collection.create({ id: 5, name: 'Eve', email: 'eve@example.com' });
+    const created = await collection.create({
+      id: 5,
+      name: 'Eve',
+      email: 'eve@example.com',
+      invitedById: null,
+    });
 
-    expect(created).toEqual({ id: 5, name: 'Eve', email: 'eve@example.com' });
+    expect(created).toEqual({ id: 5, name: 'Eve', email: 'eve@example.com', invitedById: null });
     expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
-      'insert into "users" ("id", "name", "email") values ($1, $2, $3) returning *',
+      'insert into "users" ("id", "name", "email", "invited_by_id") values ($1, $2, $3, $4) returning *',
     );
   });
 
@@ -19,19 +26,19 @@ describe('sql-compilation/create', () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     runtime.setNextResults([
       [
-        { id: 1, name: 'Alice', email: 'alice@example.com' },
-        { id: 2, name: 'Bob', email: 'bob@example.com' },
+        { id: 1, name: 'Alice', email: 'alice@example.com', invited_by_id: null },
+        { id: 2, name: 'Bob', email: 'bob@example.com', invited_by_id: null },
       ],
     ]);
 
     const created = await collection.createAll([
-      { id: 1, name: 'Alice', email: 'alice@example.com' },
-      { id: 2, name: 'Bob', email: 'bob@example.com' },
+      { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
+      { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: null },
     ]);
 
     expect(created).toEqual([
-      { id: 1, name: 'Alice', email: 'alice@example.com' },
-      { id: 2, name: 'Bob', email: 'bob@example.com' },
+      { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
+      { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: null },
     ]);
   });
 
@@ -40,13 +47,13 @@ describe('sql-compilation/create', () => {
     runtime.setNextResults([[]]);
 
     const count = await collection.createCount([
-      { id: 1, name: 'Alice', email: 'alice@example.com' },
-      { id: 2, name: 'Bob', email: 'bob@example.com' },
+      { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
+      { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: null },
     ]);
 
     expect(count).toBe(2);
     expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
-      'insert into "users" ("id", "name", "email") values ($1, $2, $3), ($4, $5, $6)',
+      'insert into "users" ("id", "name", "email", "invited_by_id") values ($1, $2, $3, $4), ($5, $6, $7, $8)',
     );
   });
 
@@ -54,11 +61,13 @@ describe('sql-compilation/create', () => {
     const { collection } = createCollection();
 
     await expect(
-      collection.create({ id: 1, name: 'Alice', email: 'alice@example.com' }),
+      collection.create({ id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null }),
     ).rejects.toThrow(/requires contract capability "returning"/);
 
     expect(() =>
-      collection.createAll([{ id: 1, name: 'Alice', email: 'alice@example.com' }]),
+      collection.createAll([
+        { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
+      ]),
     ).toThrow(/requires contract capability "returning"/);
   });
 
@@ -72,7 +81,7 @@ describe('sql-compilation/create', () => {
     const created = await collection
       .select('name')
       .include('posts')
-      .create({ id: 1, name: 'Alice', email: 'alice@example.com' });
+      .create({ id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null });
 
     expect(created).toEqual({
       name: 'Alice',
@@ -95,7 +104,7 @@ describe('sql-compilation/create', () => {
     runtime.setNextResults([[]]);
 
     await expect(
-      collection.create({ id: 1, name: 'Alice', email: 'alice@example.com' }),
+      collection.create({ id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null }),
     ).rejects.toThrow(/did not return a row/);
   });
 
@@ -112,7 +121,7 @@ describe('sql-compilation/create', () => {
       await collection
         .select('name')
         .include('posts')
-        .create({ id: 1, name: 'Alice', email: 'alice@example.com' });
+        .create({ id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null });
 
       expect(serializePlans(runtime)).toMatchInlineSnapshot(`
       [
@@ -122,8 +131,9 @@ describe('sql-compilation/create', () => {
             1,
             "Alice",
             "alice@example.com",
+            null,
           ],
-          "sql": "insert into "users" ("id", "name", "email") values ($1, $2, $3) returning "name", "id"",
+          "sql": "insert into "users" ("id", "name", "email", "invited_by_id") values ($1, $2, $3, $4) returning "name", "id"",
         },
         {
           "lane": "orm-client",

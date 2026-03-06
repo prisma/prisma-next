@@ -3,6 +3,7 @@
  * This is the serialized form of a CliStructuredError.
  */
 export interface CliErrorEnvelope {
+  readonly ok: false;
   readonly code: string;
   readonly domain: string;
   readonly severity: 'error' | 'warn' | 'info';
@@ -66,7 +67,7 @@ export class CliStructuredError extends Error {
     this.domain = options?.domain ?? 'CLI';
     this.severity = options?.severity ?? 'error';
     this.why = options?.why;
-    this.fix = options?.fix;
+    this.fix = options?.fix === options?.why ? undefined : options?.fix;
     this.where = options?.where
       ? {
           path: options.where.path,
@@ -83,6 +84,7 @@ export class CliStructuredError extends Error {
   toEnvelope(): CliErrorEnvelope {
     const codePrefix = this.domain === 'CLI' ? 'PN-CLI-' : 'PN-RTM-';
     return {
+      ok: false as const,
       code: `${codePrefix}${this.code}`,
       domain: this.domain,
       severity: this.severity,
@@ -335,16 +337,16 @@ export function errorConfigValidation(
     readonly why?: string;
   },
 ): CliStructuredError {
-  return new CliStructuredError('4001', 'Config file not found', {
+  return new CliStructuredError('4009', 'Config validation error', {
     domain: 'CLI',
     why: options?.why ?? `Config must have a "${field}" field`,
-    fix: "Run 'prisma-next init' to create a config file",
+    fix: 'Check your prisma-next.config.ts and ensure all required fields are provided',
     docsUrl: 'https://prisma-next.dev/docs/cli/config',
   });
 }
 
 // ============================================================================
-// Runtime Errors (PN-RTM-3000-3003)
+// Runtime Errors (PN-RTM-3000-3030)
 // ============================================================================
 
 /**
@@ -354,10 +356,10 @@ export function errorMarkerMissing(options?: {
   readonly why?: string;
   readonly dbUrl?: string;
 }): CliStructuredError {
-  return new CliStructuredError('3001', 'Marker missing', {
+  return new CliStructuredError('3001', 'Database not signed', {
     domain: 'RTM',
-    why: options?.why ?? 'Contract marker not found in database',
-    fix: 'Run `prisma-next db sign --db <url>` to create marker',
+    why: options?.why ?? 'No database signature (marker) found',
+    fix: 'Run `prisma-next db sign --db <url>` to sign the database',
   });
 }
 
@@ -401,6 +403,59 @@ export function errorTargetMismatch(
       `Contract target does not match config target (expected: ${expected}, actual: ${actual})`,
     fix: 'Align contract target and config target',
     meta: { expected, actual },
+  });
+}
+
+/**
+ * Database marker is required but not found.
+ * Used by commands that require a pre-existing marker as a precondition.
+ */
+export function errorMarkerRequired(options?: {
+  readonly why?: string;
+  readonly fix?: string;
+}): CliStructuredError {
+  return new CliStructuredError('3010', 'Database must be signed first', {
+    domain: 'RTM',
+    why: options?.why ?? 'No database signature (marker) found',
+    fix: options?.fix ?? 'Run `prisma-next db init` first to sign the database',
+  });
+}
+
+/**
+ * Migration runner failed during execution.
+ */
+export function errorRunnerFailed(
+  summary: string,
+  options?: {
+    readonly why?: string;
+    readonly fix?: string;
+    readonly meta?: Record<string, unknown>;
+  },
+): CliStructuredError {
+  return new CliStructuredError('3020', summary, {
+    domain: 'RTM',
+    why: options?.why ?? 'Migration runner failed',
+    fix: options?.fix ?? 'Inspect the reported conflict and reconcile schema drift',
+    ...(options?.meta ? { meta: options.meta } : {}),
+  });
+}
+
+/**
+ * Destructive operations require explicit confirmation via --accept-data-loss.
+ */
+export function errorDestructiveChanges(
+  summary: string,
+  options?: {
+    readonly why?: string;
+    readonly fix?: string;
+    readonly meta?: Record<string, unknown>;
+  },
+): CliStructuredError {
+  return new CliStructuredError('3030', summary, {
+    domain: 'RTM',
+    why: options?.why ?? 'Planned operations include destructive changes that require confirmation',
+    fix: options?.fix ?? 'Use `--plan` to preview, then re-run with `--accept-data-loss`',
+    ...(options?.meta ? { meta: options.meta } : {}),
   });
 }
 

@@ -12,7 +12,7 @@ describe('integration/upsert', () => {
         await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
 
         const upserted = await users.upsert({
-          create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+          create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
           update: { name: 'Alice Updated' },
         });
 
@@ -20,6 +20,48 @@ describe('integration/upsert', () => {
           id: 1,
           name: 'Alice Updated',
           email: 'alice@example.com',
+          invitedById: null,
+        });
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'upsert() with empty update behaves as conditional create',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        const inserted = await users.upsert({
+          create: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
+          update: {},
+        });
+
+        expect(inserted).toEqual({
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          invitedById: null,
+        });
+
+        const existing = await users.upsert({
+          create: { id: 1, name: 'Ignored', email: 'ignored@example.com', invitedById: null },
+          update: {},
+        });
+
+        expect(existing).toEqual({
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          invitedById: null,
+        });
+
+        expect(await users.first({ id: 1 })).toEqual({
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          invitedById: null,
         });
       });
     },

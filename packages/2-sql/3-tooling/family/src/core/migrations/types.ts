@@ -127,8 +127,7 @@ export interface SqlMigrationPlanContractInfo {
 export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
   /**
    * Origin contract identity that the plan expects the database to currently be at.
-   * If omitted, the runner treats the origin as "no marker present" (empty database),
-   * and will only proceed if no marker exists (or if the marker already matches destination).
+   * If omitted or null, the runner skips origin validation entirely.
    */
   readonly origin?: SqlMigrationPlanContractInfo | null;
   /**

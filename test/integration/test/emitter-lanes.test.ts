@@ -259,130 +259,134 @@ describe('emitter → lanes integration', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('round-trip: IR → JSON → lanes → plan', async () => {
-    const ir: ContractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      extensionPacks: {
-        postgres: { version: '0.0.1' },
-      },
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
-          },
-          relations: {},
+  it(
+    'round-trip: IR → JSON → lanes → plan',
+    async () => {
+      const ir: ContractIR = {
+        schemaVersion: '1',
+        targetFamily: 'sql',
+        target: 'postgres',
+        extensionPacks: {
+          postgres: { version: '0.0.1' },
         },
-      },
-      relations: {},
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'email' },
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+            relations: {},
           },
         },
-      },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+        relations: {},
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        capabilities: {},
+        meta: {},
+        sources: {},
+      };
 
-    const {
-      adapter: adapterDescriptor,
-      target: targetDescriptor,
-      extensions: extensionDescriptors,
-      descriptors,
-    } = getSqlDescriptorBundle();
-    const operationRegistry = assembleOperationRegistry(descriptors);
-    const codecTypeImports = extractCodecTypeImports(descriptors);
-    const operationTypeImports = extractOperationTypeImports(descriptors);
-    const extensionIds = extractExtensionIds(
-      adapterDescriptor,
-      targetDescriptor,
-      extensionDescriptors,
-    );
-    const options: EmitOptions = {
-      outputDir: testDir,
-      operationRegistry,
-      codecTypeImports,
-      operationTypeImports,
-      extensionIds,
-    };
+      const {
+        adapter: adapterDescriptor,
+        target: targetDescriptor,
+        extensions: extensionDescriptors,
+        descriptors,
+      } = getSqlDescriptorBundle();
+      const operationRegistry = assembleOperationRegistry(descriptors);
+      const codecTypeImports = extractCodecTypeImports(descriptors);
+      const operationTypeImports = extractOperationTypeImports(descriptors);
+      const extensionIds = extractExtensionIds(
+        adapterDescriptor,
+        targetDescriptor,
+        extensionDescriptors,
+      );
+      const options: EmitOptions = {
+        outputDir: testDir,
+        operationRegistry,
+        codecTypeImports,
+        operationTypeImports,
+        extensionIds,
+      };
 
-    const result1 = await emit(ir, options, sqlTargetFamilyHook);
-    const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
-    const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson1);
+      const result1 = await emit(ir, options, sqlTargetFamilyHook);
+      const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
+      const validatedContract = validateContract<SqlContract<SqlStorage>>(contractJson1);
 
-    // Cast to ContractIR for the emitter (SqlContract has all required ContractIR fields)
-    const ir2 = validatedContract as unknown as ContractIR;
+      // Cast to ContractIR for the emitter (SqlContract has all required ContractIR fields)
+      const ir2 = validatedContract as unknown as ContractIR;
 
-    // Intentionally load extension packs independently a second time to ensure
-    // the emit -> validate -> re-emit flow produces consistent results
-    const descriptorsBundle2 = getSqlDescriptorBundle();
-    const operationRegistry2 = assembleOperationRegistry(descriptorsBundle2.descriptors);
-    const codecTypeImports2 = extractCodecTypeImports(descriptorsBundle2.descriptors);
-    const operationTypeImports2 = extractOperationTypeImports(descriptorsBundle2.descriptors);
-    const extensionIds2 = extractExtensionIds(
-      descriptorsBundle2.adapter,
-      descriptorsBundle2.target,
-      descriptorsBundle2.extensions,
-    );
-    const options2: EmitOptions = {
-      outputDir: testDir,
-      operationRegistry: operationRegistry2,
-      codecTypeImports: codecTypeImports2,
-      operationTypeImports: operationTypeImports2,
-      extensionIds: extensionIds2,
-    };
+      // Intentionally load extension packs independently a second time to ensure
+      // the emit -> validate -> re-emit flow produces consistent results
+      const descriptorsBundle2 = getSqlDescriptorBundle();
+      const operationRegistry2 = assembleOperationRegistry(descriptorsBundle2.descriptors);
+      const codecTypeImports2 = extractCodecTypeImports(descriptorsBundle2.descriptors);
+      const operationTypeImports2 = extractOperationTypeImports(descriptorsBundle2.descriptors);
+      const extensionIds2 = extractExtensionIds(
+        descriptorsBundle2.adapter,
+        descriptorsBundle2.target,
+        descriptorsBundle2.extensions,
+      );
+      const options2: EmitOptions = {
+        outputDir: testDir,
+        operationRegistry: operationRegistry2,
+        codecTypeImports: codecTypeImports2,
+        operationTypeImports: operationTypeImports2,
+        extensionIds: extensionIds2,
+      };
 
-    const result2 = await emit(ir2, options2, sqlTargetFamilyHook);
-    const contractJson2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
-    const contract2 = validateContract<SqlContract<SqlStorage>>(contractJson2);
+      const result2 = await emit(ir2, options2, sqlTargetFamilyHook);
+      const contractJson2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
+      const contract2 = validateContract<SqlContract<SqlStorage>>(contractJson2);
 
-    expect(result1.contractJson).toBe(result2.contractJson);
-    expect(result1.storageHash).toBe(result2.storageHash);
+      expect(result1.contractJson).toBe(result2.contractJson);
+      expect(result1.storageHash).toBe(result2.storageHash);
 
-    const adapter = createStubAdapter();
-    const context1 = createTestContext(validatedContract, adapter);
-    const context2 = createTestContext(contract2, adapter);
-    const tables1 = schema(context1).tables;
-    const userTable1 = tables1['user'];
-    if (!userTable1) throw new Error('user table not found');
+      const adapter = createStubAdapter();
+      const context1 = createTestContext(validatedContract, adapter);
+      const context2 = createTestContext(contract2, adapter);
+      const tables1 = schema(context1).tables;
+      const userTable1 = tables1['user'];
+      if (!userTable1) throw new Error('user table not found');
 
-    const tables2 = schema(context2).tables;
-    const userTable2 = tables2['user'];
-    if (!userTable2) throw new Error('user table not found');
+      const tables2 = schema(context2).tables;
+      const userTable2 = tables2['user'];
+      if (!userTable2) throw new Error('user table not found');
 
-    const plan1 = sql({ context: context1 })
-      .from(userTable1)
-      .select({
-        id: userTable1.columns['id']!,
-        email: userTable1.columns['email']!,
-      })
-      .build();
+      const plan1 = sql({ context: context1 })
+        .from(userTable1)
+        .select({
+          id: userTable1.columns['id']!,
+          email: userTable1.columns['email']!,
+        })
+        .build();
 
-    const plan2 = sql({ context: context2 })
-      .from(userTable2)
-      .select({
-        id: userTable2.columns['id']!,
-        email: userTable2.columns['email']!,
-      })
-      .build();
+      const plan2 = sql({ context: context2 })
+        .from(userTable2)
+        .select({
+          id: userTable2.columns['id']!,
+          email: userTable2.columns['email']!,
+        })
+        .build();
 
-    // SqlQueryPlan doesn't have sql property - lowering happens in runtime
-    expect(plan1.ast).toBeDefined();
-    expect(plan2.ast).toBeDefined();
-    expect(plan1.meta.storageHash).toBe(plan2.meta.storageHash);
-    expect(plan1.meta.storageHash).toBe(result1.storageHash);
-  });
+      // SqlQueryPlan doesn't have sql property - lowering happens in runtime
+      expect(plan1.ast).toBeDefined();
+      expect(plan2.ast).toBeDefined();
+      expect(plan1.meta.storageHash).toBe(plan2.meta.storageHash);
+      expect(plan1.meta.storageHash).toBe(result1.storageHash);
+    },
+    timeouts.typeScriptCompilation,
+  );
 });

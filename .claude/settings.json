@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/scripts/worktree-create.mjs"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(cat:*)",
+      "Skill(bumping-biome)",
+      "Bash(pnpm list:*)",
+      "mcp__ide__getDiagnostics",
+      "Skill(tsdown-package)",
+      "Bash(ls:*)",
+      "Bash(pnpm build:*)",
+      "Bash(gh pr view:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

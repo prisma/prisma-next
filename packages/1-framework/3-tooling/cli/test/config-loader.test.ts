@@ -32,6 +32,7 @@ describe('config loader', () => {
         id: 'sql',
         familyId: 'sql',
         version: '0.0.1',
+        manifest: { packageName: '@prisma-next/sql-family', version: '0.0.1' },
         hook: mockHook,
         create: () => ({
           familyId: 'sql',
@@ -40,10 +41,10 @@ describe('config loader', () => {
           introspect: async () => ({ tables: {}, extensions: [] }),
         }),
       },
-      target: { kind: 'target', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
-      adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
-      driver: { kind: 'driver', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', create: async () => ({ targetId: 'postgres', query: async () => ({ rows: [] }), close: async () => {} }) },
-      extensions: [],
+      target: { kind: 'target', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-target', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+      adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-adapter', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+      driver: { kind: 'driver', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-driver', version: '0.0.1' }, create: async () => ({ targetId: 'postgres', query: async () => ({ rows: [] }), close: async () => {} }) },
+      extensionPacks: [],
     };`;
   };
 
@@ -79,6 +80,7 @@ describe('config loader', () => {
             id: 'sql',
             familyId: 'sql',
             version: '0.0.1',
+            manifest: { packageName: '@prisma-next/sql-family', version: '0.0.1' },
             hook: mockHook,
             validateContractIR: (contract: unknown) => contract,
             create: () => ({
@@ -88,10 +90,10 @@ describe('config loader', () => {
               introspect: async () => ({ tables: {}, extensions: [] }),
             }),
           },
-          target: { kind: 'target', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
-          adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
-          driver: { kind: 'driver', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', create: async () => ({ targetId: 'postgres', query: async () => ({ rows: [] }), close: async () => {} }) },
-          extensions: [],
+          target: { kind: 'target', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-target', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+          adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-adapter', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+          driver: { kind: 'driver', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-driver', version: '0.0.1' }, create: async () => ({ targetId: 'postgres', query: async () => ({ rows: [] }), close: async () => {} }) },
+          extensionPacks: [],
         };
         export default config;`,
         'utf-8',
@@ -167,6 +169,48 @@ describe('config loader', () => {
       );
 
       await expect(loadConfig(configPath)).rejects.toThrow();
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'rejects malformed extensionPacks entries',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        `const mockHook = {
+          id: 'sql',
+          validateTypes: () => {},
+          validateStructure: () => {},
+          generateContractTypes: () => '',
+        };
+        export default {
+          family: {
+            kind: 'family',
+            id: 'sql',
+            familyId: 'sql',
+            version: '0.0.1',
+            manifest: { packageName: '@prisma-next/sql-family', version: '0.0.1' },
+            hook: mockHook,
+            create: () => ({
+              familyId: 'sql',
+              verify: async () => ({ ok: true, summary: 'test', contract: { storageHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),
+              schemaVerify: async () => ({ ok: true, summary: 'test', contract: { storageHash: 'test' }, target: { expected: 'postgres' }, schema: { issues: [] }, timings: { total: 0 } }),
+              introspect: async () => ({ tables: {}, extensionPacks: [] }),
+            }),
+          },
+          target: { kind: 'target', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-target', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+          adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-adapter', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
+          extensionPacks: [{ id: 'pgvector' }],
+        };`,
+        'utf-8',
+      );
+
+      await expect(loadConfig(configPath)).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        why: 'Config.extensionPacks items must have kind: "extension"',
+      });
     },
     timeouts.typeScriptCompilation,
   );

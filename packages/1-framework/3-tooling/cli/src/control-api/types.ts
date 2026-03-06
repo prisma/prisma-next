@@ -1,7 +1,8 @@
 import type {
   ContractSourceDiagnostics,
   ContractSourceProvider,
-} from '@prisma-next/core-control-plane/config-types';
+} from '@prisma-next/config/config-types';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,
@@ -60,6 +61,8 @@ export interface ControlClientOptions {
  */
 export type ControlActionName =
   | 'dbInit'
+  | 'dbUpdate'
+  | 'migrationApply'
   | 'verify'
   | 'schemaVerify'
   | 'sign'
@@ -190,6 +193,36 @@ export interface DbInitOptions {
 }
 
 /**
+ * Options for the dbUpdate operation.
+ */
+export interface DbUpdateOptions {
+  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  readonly contractIR: unknown;
+  /**
+   * Mode for the dbUpdate operation.
+   * - 'plan': Returns planned operations without applying
+   * - 'apply': Applies operations and writes marker/ledger
+   */
+  readonly mode: 'plan' | 'apply';
+  /**
+   * Database connection. If provided, dbUpdate will connect before executing.
+   * If omitted, the client must already be connected.
+   * The type is driver-specific (e.g., string URL for Postgres).
+   */
+  readonly connection?: unknown;
+  /**
+   * When true, allows applying plans that contain destructive operations
+   * (e.g., DROP TABLE, DROP COLUMN, ALTER TYPE).
+   * When false (default), the operation returns a failure if the plan
+   * includes destructive operations, prompting the user to use --plan
+   * to preview and then re-run with --accept-data-loss.
+   */
+  readonly acceptDataLoss?: boolean;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
+}
+
+/**
  * Options for the introspect operation.
  */
 export interface IntrospectOptions {
@@ -249,6 +282,11 @@ export interface DbInitSuccess {
       readonly label: string;
       readonly operationClass: string;
     }>;
+    readonly sql?: ReadonlyArray<string>;
+  };
+  readonly destination: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
   };
   readonly execution?: {
     readonly operationsPlanned: number;
@@ -292,6 +330,56 @@ export interface DbInitFailure {
 export type DbInitResult = Result<DbInitSuccess, DbInitFailure>;
 
 /**
+ * Successful dbUpdate result.
+ */
+export interface DbUpdateSuccess {
+  readonly mode: 'plan' | 'apply';
+  readonly plan: {
+    readonly operations: ReadonlyArray<{
+      readonly id: string;
+      readonly label: string;
+      readonly operationClass: string;
+    }>;
+    readonly sql?: ReadonlyArray<string>;
+  };
+  readonly destination: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
+  };
+  readonly execution?: {
+    readonly operationsPlanned: number;
+    readonly operationsExecuted: number;
+  };
+  readonly marker?: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
+  };
+  readonly summary: string;
+}
+
+/**
+ * Failure codes for dbUpdate operation.
+ */
+export type DbUpdateFailureCode = 'PLANNING_FAILED' | 'RUNNER_FAILED' | 'DESTRUCTIVE_CHANGES';
+
+/**
+ * Failure details for dbUpdate operation.
+ */
+export interface DbUpdateFailure {
+  readonly code: DbUpdateFailureCode;
+  readonly summary: string;
+  readonly why: string | undefined;
+  readonly conflicts: ReadonlyArray<MigrationPlannerConflict> | undefined;
+  readonly meta: Record<string, unknown> | undefined;
+}
+
+/**
+ * Result type for dbUpdate operation.
+ * Uses Result pattern: success returns DbUpdateSuccess, failure returns DbUpdateFailure.
+ */
+export type DbUpdateResult = Result<DbUpdateSuccess, DbUpdateFailure>;
+
+/**
  * Successful emit result.
  * Contains the hashes and paths of emitted files.
  */
@@ -311,7 +399,10 @@ export interface EmitSuccess {
 /**
  * Failure codes for emit operation.
  */
-export type EmitFailureCode = 'CONTRACT_SOURCE_INVALID' | 'EMIT_FAILED';
+export type EmitFailureCode =
+  | 'CONTRACT_SOURCE_INVALID'
+  | 'CONTRACT_VALIDATION_FAILED'
+  | 'EMIT_FAILED';
 
 /**
  * Failure details for emit operation.
@@ -329,6 +420,95 @@ export interface EmitFailure {
  * Uses Result pattern: success returns EmitSuccess, failure returns EmitFailure.
  */
 export type EmitResult = Result<EmitSuccess, EmitFailure>;
+
+// ============================================================================
+// Migration Apply Types
+// ============================================================================
+
+/**
+ * A pre-planned migration step ready for execution.
+ * Contains the manifest metadata and the serialized operations from ops.json.
+ */
+export interface MigrationApplyStep {
+  readonly dirName: string;
+  readonly from: string;
+  readonly to: string;
+  readonly toContract: unknown;
+  readonly operations: ReadonlyArray<{
+    readonly id: string;
+    readonly label: string;
+    readonly operationClass: string;
+    readonly [key: string]: unknown;
+  }>;
+}
+
+/**
+ * Options for the migrationApply operation.
+ */
+export interface MigrationApplyOptions {
+  /**
+   * Hash of the database state this apply path starts from.
+   * This is resolved by the caller (typically the CLI orchestration layer).
+   */
+  readonly originHash: string;
+  /**
+   * Hash of the target contract this apply path must reach.
+   * This is resolved by the caller (typically the CLI orchestration layer).
+   */
+  readonly destinationHash: string;
+  /**
+   * Ordered list of migrations to execute from originHash to destinationHash.
+   * The execution layer does not choose defaults; it only executes this explicit path.
+   */
+  readonly pendingMigrations: readonly MigrationApplyStep[];
+  /**
+   * Database connection. If provided, migrationApply will connect before executing.
+   * If omitted, the client must already be connected.
+   */
+  readonly connection?: unknown;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
+}
+
+/**
+ * Record of a successfully applied migration.
+ */
+export interface MigrationApplyAppliedEntry {
+  readonly dirName: string;
+  readonly from: string;
+  readonly to: string;
+  readonly operationsExecuted: number;
+}
+
+/**
+ * Successful migrationApply result.
+ */
+export interface MigrationApplySuccess {
+  readonly migrationsApplied: number;
+  readonly markerHash: string;
+  readonly applied: readonly MigrationApplyAppliedEntry[];
+  readonly summary: string;
+}
+
+/**
+ * Failure codes for migrationApply operation.
+ */
+export type MigrationApplyFailureCode = 'RUNNER_FAILED' | 'MIGRATION_PATH_NOT_FOUND';
+
+/**
+ * Failure details for migrationApply operation.
+ */
+export interface MigrationApplyFailure {
+  readonly code: MigrationApplyFailureCode;
+  readonly summary: string;
+  readonly why: string | undefined;
+  readonly meta: Record<string, unknown> | undefined;
+}
+
+/**
+ * Result type for migrationApply operation.
+ */
+export type MigrationApplyResult = Result<MigrationApplySuccess, MigrationApplyFailure>;
 
 // ============================================================================
 // Standalone Contract Emit Types
@@ -428,9 +608,9 @@ export interface ControlClient {
   schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult>;
 
   /**
-   * Signs the database with a contract marker.
-   * Writes or updates the contract marker if schema verification passes.
-   * Idempotent (no-op if marker already matches).
+   * Signs the database with a contract signature.
+   * Writes or updates the signature if schema verification passes.
+   * Idempotent (no-op if signature already matches).
    *
    * @returns Structured result
    * @throws If not connected or infrastructure failure
@@ -446,6 +626,38 @@ export interface ControlClient {
    * @throws If not connected, target doesn't support migrations, or infrastructure failure
    */
   dbInit(options: DbInitOptions): Promise<DbInitResult>;
+
+  /**
+   * Updates a database schema to match the current contract.
+   * Creates the signature table if it does not exist. No preconditions required.
+   * Allows additive, widening, and destructive operation classes.
+   *
+   * @param options.mode - 'plan' to preview, 'apply' to execute
+   * @returns Result pattern: Ok with planned/executed operations, NotOk with failure details
+   * @throws If not connected, target doesn't support migrations, or infrastructure failure
+   */
+  dbUpdate(options: DbUpdateOptions): Promise<DbUpdateResult>;
+
+  /**
+   * Reads the contract marker from the database.
+   * Returns null if no marker exists (fresh database).
+   *
+   * @throws If not connected or infrastructure failure
+   */
+  readMarker(): Promise<ContractMarkerRecord | null>;
+
+  /**
+   * Applies pre-planned on-disk migrations to the database.
+   * Each migration runs in its own transaction with full execution checks.
+   * Resume-safe: re-running after failure picks up from the last applied migration.
+   *
+   * @param options.originHash - Explicit source hash for the apply path
+   * @param options.destinationHash - Explicit destination hash for the apply path
+   * @param options.pendingMigrations - Ordered migrations to execute
+   * @returns Result pattern: Ok with applied details, NotOk with failure details
+   * @throws If not connected, target doesn't support migrations, or infrastructure failure
+   */
+  migrationApply(options: MigrationApplyOptions): Promise<MigrationApplyResult>;
 
   /**
    * Introspects the database schema.

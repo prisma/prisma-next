@@ -5,12 +5,14 @@ import type {
   ControlFamilyInstance,
   MigrationPlan,
   MigrationPlannerResult,
-  MigrationPlanOperation,
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types';
+import { extractSqlDdl } from './extract-sql-ddl';
+import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 /**
  * Options for executing dbInit operation.
@@ -114,7 +116,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     action: 'dbInit',
     kind: 'spanStart',
     spanId: checkMarkerSpanId,
-    label: 'Checking contract marker',
+    label: 'Checking database signature',
   });
   const existingMarker = await familyInstance.readMarker({ driver });
   if (existingMarker) {
@@ -134,15 +136,23 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       const result: DbInitSuccess = {
         mode,
         plan: { operations: [] },
-        ...(mode === 'apply'
-          ? {
-              execution: { operationsPlanned: 0, operationsExecuted: 0 },
-              marker: {
+        destination: {
+          storageHash: migrationPlan.destination.storageHash,
+          ...ifDefined('profileHash', migrationPlan.destination.profileHash),
+        },
+        ...ifDefined(
+          'execution',
+          mode === 'apply' ? { operationsPlanned: 0, operationsExecuted: 0 } : undefined,
+        ),
+        ...ifDefined(
+          'marker',
+          mode === 'apply'
+            ? {
                 storageHash: existingMarker.storageHash,
                 profileHash: existingMarker.profileHash,
-              },
-            }
-          : {}),
+              }
+            : undefined,
+        ),
         summary: 'Database already at target contract state',
       };
       return ok(result);
@@ -181,9 +191,18 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
 
   // Plan mode - don't execute
   if (mode === 'plan') {
+    const planSql =
+      familyInstance.familyId === 'sql' ? extractSqlDdl(migrationPlan.operations) : undefined;
     const result: DbInitSuccess = {
       mode: 'plan',
-      plan: { operations: migrationPlan.operations },
+      plan: {
+        operations: stripOperations(migrationPlan.operations),
+        ...ifDefined('sql', planSql),
+      },
+      destination: {
+        storageHash: migrationPlan.destination.storageHash,
+        ...ifDefined('profileHash', migrationPlan.destination.profileHash),
+      },
       summary: `Planned ${migrationPlan.operations.length} operation(s)`,
     };
     return ok(result);
@@ -198,34 +217,14 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     label: 'Applying migration plan',
   });
 
-  const callbacks = onProgress
-    ? {
-        onOperationStart: (op: MigrationPlanOperation) => {
-          onProgress({
-            action: 'dbInit',
-            kind: 'spanStart',
-            spanId: `operation:${op.id}`,
-            parentSpanId: applySpanId,
-            label: op.label,
-          });
-        },
-        onOperationComplete: (op: MigrationPlanOperation) => {
-          onProgress({
-            action: 'dbInit',
-            kind: 'spanEnd',
-            spanId: `operation:${op.id}`,
-            outcome: 'ok',
-          });
-        },
-      }
-    : undefined;
+  const callbacks = createOperationCallbacks(onProgress, 'dbInit', applySpanId);
 
   const runnerResult: MigrationRunnerResult = await runner.execute({
     plan: migrationPlan,
     driver,
     destinationContract: contractIR,
     policy,
-    ...(callbacks ? { callbacks } : {}),
+    ...ifDefined('callbacks', callbacks),
     // db init plans and applies back-to-back from a fresh introspection, so per-operation
     // pre/postchecks and the idempotency probe are usually redundant overhead. We still
     // enforce marker/origin compatibility and a full schema verification after apply.
@@ -264,7 +263,13 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
 
   const result: DbInitSuccess = {
     mode: 'apply',
-    plan: { operations: migrationPlan.operations },
+    plan: {
+      operations: stripOperations(migrationPlan.operations),
+    },
+    destination: {
+      storageHash: migrationPlan.destination.storageHash,
+      ...ifDefined('profileHash', migrationPlan.destination.profileHash),
+    },
     execution: {
       operationsPlanned: execution.operationsPlanned,
       operationsExecuted: execution.operationsExecuted,
@@ -275,7 +280,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
           profileHash: migrationPlan.destination.profileHash,
         }
       : { storageHash: migrationPlan.destination.storageHash },
-    summary: `Applied ${execution.operationsExecuted} operation(s), marker written`,
+    summary: `Applied ${execution.operationsExecuted} operation(s), database signed`,
   };
   return ok(result);
 }

@@ -1,4 +1,4 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { ExecutionPlan, StorageHashBase } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { RuntimeQueryable } from '../src/types';
@@ -38,8 +38,12 @@ export type TestContract = SqlContract<
         id: { column: 'id' };
         name: { column: 'name' };
         email: { column: 'email' };
+        invitedById: { column: 'invited_by_id' };
       };
-      relations: Record<string, never>;
+      relations: {
+        invitedBy: Record<string, never>;
+        invitedUsers: Record<string, never>;
+      };
     };
     Post: {
       storage: { table: 'posts' };
@@ -72,6 +76,22 @@ export type TestContract = SqlContract<
   },
   {
     users: {
+      invitedUsers: {
+        to: 'User';
+        cardinality: '1:N';
+        on: {
+          parentCols: ['id'];
+          childCols: ['invited_by_id'];
+        };
+      };
+      invitedBy: {
+        to: 'User';
+        cardinality: 'N:1';
+        on: {
+          parentCols: ['invited_by_id'];
+          childCols: ['id'];
+        };
+      };
       posts: {
         to: 'Post';
         cardinality: '1:N';
@@ -117,7 +137,7 @@ export function createTestContract(): TestContract {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:test',
+    storageHash: 'sha256:test' as StorageHashBase<string>,
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -129,6 +149,7 @@ export function createTestContract(): TestContract {
             id: col('int4', 'pg/int4@1'),
             name: col('text', 'pg/text@1'),
             email: col('text', 'pg/text@1'),
+            invited_by_id: col('int4', 'pg/int4@1', true),
           },
           ['id'],
         ),
@@ -166,8 +187,12 @@ export function createTestContract(): TestContract {
           id: { column: 'id' },
           name: { column: 'name' },
           email: { column: 'email' },
+          invitedById: { column: 'invited_by_id' },
         },
-        relations: {},
+        relations: {
+          invitedBy: {},
+          invitedUsers: {},
+        },
       },
       Post: {
         storage: { table: 'posts' },
@@ -200,6 +225,22 @@ export function createTestContract(): TestContract {
     },
     relations: {
       users: {
+        invitedUsers: {
+          to: 'User',
+          cardinality: '1:N',
+          on: {
+            parentCols: ['id'],
+            childCols: ['invited_by_id'],
+          },
+        },
+        invitedBy: {
+          to: 'User',
+          cardinality: 'N:1',
+          on: {
+            parentCols: ['invited_by_id'],
+            childCols: ['id'],
+          },
+        },
         posts: {
           to: 'Post',
           cardinality: '1:N',
@@ -242,13 +283,13 @@ export function createTestContract(): TestContract {
       modelToTable: { User: 'users', Post: 'posts', Comment: 'comments', Profile: 'profiles' },
       tableToModel: { users: 'User', posts: 'Post', comments: 'Comment', profiles: 'Profile' },
       fieldToColumn: {
-        User: { id: 'id', name: 'name', email: 'email' },
+        User: { id: 'id', name: 'name', email: 'email', invitedById: 'invited_by_id' },
         Post: { id: 'id', title: 'title', userId: 'user_id', views: 'views' },
         Comment: { id: 'id', body: 'body', postId: 'post_id' },
         Profile: { id: 'id', userId: 'user_id', bio: 'bio' },
       },
       columnToField: {
-        users: { id: 'id', name: 'name', email: 'email' },
+        users: { id: 'id', name: 'name', email: 'email', invited_by_id: 'invitedById' },
         posts: { id: 'id', title: 'title', user_id: 'userId', views: 'views' },
         comments: { id: 'id', body: 'body', post_id: 'postId' },
         profiles: { id: 'id', user_id: 'userId', bio: 'bio' },
@@ -259,7 +300,7 @@ export function createTestContract(): TestContract {
       },
       operationTypes: {},
     },
-  } as unknown as TestContract;
+  } satisfies TestContract;
 }
 
 export interface MockExecution {

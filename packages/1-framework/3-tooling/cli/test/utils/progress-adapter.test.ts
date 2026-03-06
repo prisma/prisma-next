@@ -30,6 +30,26 @@ describe('progress adapter', () => {
     adapter(event);
   });
 
+  it('is no-op when stdout is not a TTY', () => {
+    const originalIsTTY = process.stdout.isTTY;
+    process.stdout.isTTY = false;
+
+    try {
+      const adapter = createProgressAdapter({ flags: {} });
+      const event: ControlProgressEvent = {
+        action: 'dbInit',
+        kind: 'spanStart',
+        spanId: 'test',
+        label: 'Test',
+      };
+
+      // Should not throw
+      adapter(event);
+    } finally {
+      process.stdout.isTTY = originalIsTTY;
+    }
+  });
+
   it('handles spanStart and spanEnd events', { timeout: timeouts.default }, () => {
     // Mock process.stdout.isTTY
     const originalIsTTY = process.stdout.isTTY;

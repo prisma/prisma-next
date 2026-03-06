@@ -339,25 +339,30 @@ describe('@prisma-next/driver-postgres', () => {
     await expect(connection.release()).resolves.toBeUndefined();
   });
 
-  it('releases lease when direct acquireConnection fails', async () => {
-    const mockClient = {
-      _connection: undefined,
-      _ending: false,
-      connect: vi.fn(async () => {
-        throw new Error('connect failed');
-      }),
-      query: vi.fn(async () => ({ rows: [] })),
-      end: vi.fn(async () => {}),
-    };
-    const driver = createBoundDriverFromBinding(
-      { kind: 'pgClient', client: mockClient as unknown as Client },
-      undefined,
-    );
-    cleanups.push(async () => {
-      await driver.close();
-    });
+  it(
+    'releases lease when direct acquireConnection fails',
+    async () => {
+      const mockClient = {
+        _connection: undefined,
+        _ending: false,
+        connect: vi.fn(async () => {
+          throw new Error('connect failed');
+        }),
+        query: vi.fn(async () => ({ rows: [] })),
+        end: vi.fn(async () => {}),
+      };
+      const driver = createBoundDriverFromBinding(
+        { kind: 'pgClient', client: mockClient as unknown as Client },
+        undefined,
+      );
+      cleanups.push(async () => {
+        await driver.close();
+      });
 
-    await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
-    await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
-  });
+      await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
+      await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
+      expect(mockClient.connect).toHaveBeenCalledTimes(2);
+    },
+    timeouts.spinUpPpgDev,
+  );
 });

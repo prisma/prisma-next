@@ -40,6 +40,11 @@
     "dist",
     "src"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-extensions/postgres"
+  },
   "engines": {
     "node": ">=20"
   },

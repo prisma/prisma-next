@@ -434,22 +434,10 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   ): Result<void, SqlMigrationRunnerFailure> {
     const origin = plan.origin ?? null;
     if (!origin) {
-      if (!marker) {
-        return okVoid();
-      }
-      if (this.markerMatchesDestination(marker, plan)) {
-        return okVoid();
-      }
-      return runnerFailure(
-        'MARKER_ORIGIN_MISMATCH',
-        `Existing contract marker (${marker.storageHash}) does not match plan origin (no marker expected).`,
-        {
-          meta: {
-            markerStorageHash: marker.storageHash,
-            expectedOrigin: null,
-          },
-        },
-      );
+      // No origin assertion on the plan — the caller does not want origin validation.
+      // This is the case for `db update`, which introspects the live schema and does not
+      // rely on marker continuity. `db init` handles its own marker checks before the runner.
+      return okVoid();
     }
 
     if (!marker) {

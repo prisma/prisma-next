@@ -594,7 +594,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         default: { kind: 'function', expression: 'now()' },
       },
     });
-    expect(sql).toContain('"createdAt" timestamptz DEFAULT now() NOT NULL');
+    expect(sql).toContain('"createdAt" timestamptz DEFAULT (now()) NOT NULL');
   });
 
   it('generates DEFAULT gen_random_uuid() for uuid columns', () => {
@@ -606,7 +606,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         default: { kind: 'function', expression: 'gen_random_uuid()' },
       },
     });
-    expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid() NOT NULL');
+    expect(sql).toContain('"id" uuid DEFAULT (gen_random_uuid()) NOT NULL');
   });
 
   it('generates DEFAULT with literal values', () => {
@@ -665,7 +665,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         default: { kind: 'function', expression: "gen_random_uuid(INTERVAL '5500 years')" },
       },
     });
-    expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid(INTERVAL \'5500 years\') NOT NULL');
+    expect(sql).toContain('"id" uuid DEFAULT (gen_random_uuid(INTERVAL \'5500 years\')) NOT NULL');
   });
 
   it('renders JSONB default with $type key as JSON, not as tagged bigint', () => {

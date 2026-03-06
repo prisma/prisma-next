@@ -2,6 +2,7 @@
 
 import { execSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
+import { findNextPrBuildNumber } from './determine-version-utils.ts';
 
 const PACKAGE_NAME = process.argv[2] ?? '@prisma-next/contract';
 
@@ -42,21 +43,9 @@ function calculateNextStableVersion(latestStable: string): string {
   return `${major}.${minor + 1}.0`;
 }
 
-function extractBuildNumber(version: string, pattern: RegExp): number | undefined {
-  const match = version.match(pattern);
-  return match ? Number.parseInt(match[1], 10) : undefined;
-}
-
 function determinePrVersion(baseVersion: string, prNumber: string): VersionResult {
   const prVersions = getPrVersions();
-  const prPattern = new RegExp(`^\\d+\\.\\d+\\.\\d+-pr\\.${prNumber}\\.(\\d+)$`);
-
-  const matchingVersions = prVersions
-    .map((v) => extractBuildNumber(v, prPattern))
-    .filter((n) => n !== undefined);
-
-  const lastBuild = matchingVersions.length > 0 ? Math.max(...matchingVersions) : 0;
-  const buildNumber = lastBuild + 1;
+  const buildNumber = findNextPrBuildNumber(prVersions, prNumber);
 
   return {
     version: `${baseVersion}-pr.${prNumber}.${buildNumber}`,

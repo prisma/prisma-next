@@ -2,7 +2,7 @@
 
 ## Context
 
-- The legacy ORM intertwined cross-cutting logic with dialect details, making changes risky and contributions difficult
+- Prisma 7 intertwined cross-cutting logic with dialect details, making changes risky and contributions difficult
 - We need a small, stable center that defines contracts and lifecycle semantics, while pushing dialect and engine specifics to replaceable adapters
 - The design must support SQL family today and a Mongo family later without inventing an over-abstract common denominator
 
@@ -104,9 +104,9 @@ Adopt a thin core, fat targets architecture:
 
 ## Backwards compatibility and migration
 
-- Legacy projects can adopt the new runtime and SQL DSL incrementally while keeping existing databases
+- Prisma 7 projects can adopt the new runtime and SQL DSL incrementally while keeping existing databases
 - TypedSQL lane continues to work through a plan factory backed by the target adapter
-- No expectation of feature parity with the legacy ORM, but equivalent utility is the goal
+- No expectation of feature parity with Prisma 7, but equivalent utility is the goal
 
 ## Open questions
 

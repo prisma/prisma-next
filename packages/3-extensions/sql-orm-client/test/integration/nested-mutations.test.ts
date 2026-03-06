@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { RelationMutator } from '../../src/types';
-import type { TestContract } from '../helpers';
 import {
   createReturningPostsCollection,
   createReturningUsersCollection,
@@ -22,8 +20,7 @@ describe('integration/nested-mutations', () => {
             id: 1,
             name: 'Nested User',
             email: 'nested@example.com',
-            // TODO: why do we need the explicit type annotation? we don't want it
-            posts: (posts: RelationMutator<TestContract, 'Post'>) =>
+            posts: (posts) =>
               posts.create([
                 { id: 10, title: 'First nested post', views: 100 },
                 { id: 11, title: 'Second nested post', views: 200 },
@@ -34,6 +31,7 @@ describe('integration/nested-mutations', () => {
           id: 1,
           name: 'Nested User',
           email: 'nested@example.com',
+          invitedById: null,
           posts: [
             { id: 10, title: 'First nested post', userId: 1, views: 100 },
             { id: 11, title: 'Second nested post', userId: 1, views: 200 },
@@ -121,6 +119,7 @@ describe('integration/nested-mutations', () => {
           id: 1,
           name: 'Alice',
           email: 'alice@example.com',
+          invitedById: null,
           posts: [
             {
               id: 30,
@@ -159,6 +158,7 @@ describe('integration/nested-mutations', () => {
           id: 1,
           name: 'Alice',
           email: 'alice@example.com',
+          invitedById: null,
           posts: [{ id: 10, title: 'Keep', userId: 1, views: 10 }],
         });
 
@@ -194,6 +194,7 @@ describe('integration/nested-mutations', () => {
           id: 1,
           name: 'Alice',
           email: 'alice@example.com',
+          invitedById: null,
           profile: null,
         });
 

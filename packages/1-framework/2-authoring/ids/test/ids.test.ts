@@ -40,6 +40,7 @@ describe('@prisma-next/ids', () => {
 
   it('stores generator options in execution defaults', () => {
     const spec = nanoid({ size: 12 });
+    expect(spec.typeParams).toEqual({ length: 12 });
     expect(spec.generated.params).toEqual({ size: 12 });
   });
 

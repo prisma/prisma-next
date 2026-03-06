@@ -1,6 +1,6 @@
-// Re-export core-control-plane config types for convenience
+// Re-export config package types for convenience
 export type {
   ContractConfig,
   PrismaNextConfig,
-} from '@prisma-next/core-control-plane/config-types';
-export { defineConfig } from '@prisma-next/core-control-plane/config-types';
+} from '@prisma-next/config/config-types';
+export { defineConfig } from '@prisma-next/config/config-types';

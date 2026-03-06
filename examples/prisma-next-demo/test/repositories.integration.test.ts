@@ -277,7 +277,7 @@ describe('ORM client integration examples', () => {
   );
 
   it(
-    'ormClientFindUserById uses shorthand find({ id })',
+    'ormClientFindUserById uses shorthand first({ id })',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });

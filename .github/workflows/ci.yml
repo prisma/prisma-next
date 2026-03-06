@@ -199,20 +199,3 @@ jobs:
         run: pnpm build
       - name: Generate coverage and report
         run: node scripts/coverage-report.mjs
-      # - name: Upload coverage reports
-      #   uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-      #   with:
-      #     name: coverage-reports
-      #     path: |
-      #       **/coverage/**
-      #     retention-days: 7
-      - name: Coverage comment
-        if: github.event_name == 'pull_request'
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: |
-            **/coverage/coverage-final.json
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false

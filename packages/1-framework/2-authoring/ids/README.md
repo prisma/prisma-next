@@ -51,9 +51,9 @@ const idSpec = nanoid({ size: 12 });
 
 ## Generator-owned codec mapping
 
-- Each helper binds its own descriptor internally (today all helpers map to `pg/text@1`).
-- Different helpers can move to different codecs independently (e.g. `ulid` binary and `nanoid` char/varchar).
-- Parameterized codec metadata can be added per helper when adapter-side parameterized codecs are available.
+- Each helper binds its own descriptor internally (char-based SQL descriptors today).
+- Different helpers can move to different codecs independently (for example `ulid` binary and `nanoid` char/varchar).
+- `nanoid({ size })` also sets descriptor metadata to `character(size)` so contract shape matches generator output length.
 
 Runtime usage:
 

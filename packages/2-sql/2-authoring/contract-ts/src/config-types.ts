@@ -1,5 +1,5 @@
+import type { ContractConfig } from '@prisma-next/config/config-types';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ContractConfig } from '@prisma-next/core-control-plane/config-types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok } from '@prisma-next/utils/result';
 
