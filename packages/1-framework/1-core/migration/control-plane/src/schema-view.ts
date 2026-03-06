@@ -15,7 +15,7 @@
  * // SqlSchemaIR structure:
  * // {
  * //   tables: { user: { columns: {...}, primaryKey: {...}, ... }, ... },
- * //   extensions: ['pgvector'],
+ * //   dependencies: [{ id: 'postgres.extension.vector' }],
  * //   annotations: {...}
  * // }
  *

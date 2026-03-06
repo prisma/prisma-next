@@ -579,7 +579,6 @@ describe('planner — type and nullability change behavior', () => {
 const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
   id: 'postgres.extension.vector',
   label: 'Enable vector extension',
-  extension: 'vector',
   install: [
     {
       id: 'extension.vector',
@@ -607,18 +606,6 @@ const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
       ],
     },
   ],
-  verifyDatabaseDependencyInstalled: (schema) => {
-    if (schema.extensions.includes('vector')) {
-      return [];
-    }
-    return [
-      {
-        kind: 'extension_missing',
-        table: '',
-        message: 'Extension "vector" is missing from database',
-      },
-    ];
-  },
 };
 
 function createPgvectorComponent(): SqlControlExtensionDescriptor<'postgres'> {
@@ -869,12 +856,12 @@ describe('incremental migration with full contract surface (extensions, enums, F
     expect(opIds.some((id) => id.startsWith('table.'))).toBe(true);
   });
 
-  it('contractToSchemaIR derives extensions from framework components', () => {
+  it('contractToSchemaIR derives dependencies from framework components', () => {
     const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
       frameworkComponents,
     });
-    expect(schemaIR.extensions).toContain('vector');
+    expect(schemaIR.dependencies).toContainEqual({ id: 'postgres.extension.vector' });
   });
 
   it('contractToSchemaIR derives annotations from contract storage types', () => {
@@ -891,10 +878,10 @@ describe('incremental migration with full contract surface (extensions, enums, F
     });
   });
 
-  it('contractToSchemaIR defaults to empty extensions when no framework components given', () => {
+  it('contractToSchemaIR defaults to empty dependencies when no framework components given', () => {
     const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
     });
-    expect(schemaIR.extensions).toEqual([]);
+    expect(schemaIR.dependencies).toEqual([]);
   });
 });

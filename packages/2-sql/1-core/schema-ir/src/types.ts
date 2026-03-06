@@ -91,8 +91,12 @@ export type SqlTableIR = {
  */
 export type SqlSchemaIR = {
   readonly tables: Record<string, SqlTableIR>;
-  readonly extensions: readonly string[]; // logical extension ids or DB extension names
   readonly annotations?: SqlAnnotations; // extensible global metadata
+  readonly dependencies: readonly DependencyIR[];
+};
+
+export type DependencyIR = {
+  readonly id: string;
 };
 
 /**

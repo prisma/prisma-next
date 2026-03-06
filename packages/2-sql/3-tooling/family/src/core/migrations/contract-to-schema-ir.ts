@@ -10,6 +10,7 @@ import type {
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import type {
+  DependencyIR,
   SqlAnnotations,
   SqlColumnIR,
   SqlForeignKeyIR,
@@ -178,8 +179,8 @@ export interface ContractToSchemaIROptions {
  * Converts an `SqlContract` to `SqlSchemaIR`.
  *
  * Reads `contract.storage` for tables, `contract.storage.types` for type
- * annotations, and derives database extensions from `frameworkComponents`
- * (each component's `databaseDependencies.init[].extensions`).
+ * annotations, and derives database dependencies from `frameworkComponents`
+ * (each component's `databaseDependencies.init[].id`).
  *
  * Drops codec metadata (`codecId`, `typeRef`) since the schema IR only represents
  * structural information. When `expandNativeType` is provided, parameterized types
@@ -193,7 +194,7 @@ export function contractToSchemaIR(
   options?: ContractToSchemaIROptions,
 ): SqlSchemaIR {
   if (!contract) {
-    return { tables: {}, extensions: [] };
+    return { tables: {}, dependencies: [] };
   }
 
   const storage = contract.storage;
@@ -202,30 +203,34 @@ export function contractToSchemaIR(
     tables[tableName] = convertTable(tableName, tableDef, options?.expandNativeType);
   }
 
-  const extensions = collectExtensionsFromComponents(options?.frameworkComponents);
+  const dependencies = collectDependenciesFromComponents(options?.frameworkComponents);
   const annotations = deriveAnnotations(storage);
 
   return {
     tables,
-    extensions,
+    dependencies,
     ...(annotations ? { annotations } : {}),
   };
 }
 
-function collectExtensionsFromComponents(components?: readonly unknown[]): readonly string[] {
+function collectDependenciesFromComponents(
+  components?: readonly unknown[],
+): readonly DependencyIR[] {
   if (!components || components.length === 0) return [];
   const seen = new Set<string>();
+  const result: DependencyIR[] = [];
   for (const component of components) {
     if (!isDependencyProvider(component)) continue;
     const deps = component.databaseDependencies?.init;
     if (!deps) continue;
     for (const dep of deps) {
-      if (dep.extension) {
-        seen.add(dep.extension);
+      if (dep.id && !seen.has(dep.id)) {
+        seen.add(dep.id);
+        result.push({ id: dep.id });
       }
     }
   }
-  return [...seen];
+  return result;
 }
 
 function isDependencyProvider(value: unknown): value is DatabaseDependencyProvider {

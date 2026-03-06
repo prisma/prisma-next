@@ -10,7 +10,7 @@ import { createPostgresMigrationPlanner } from '../../src/core/migrations/planne
 
 const emptySchema: SqlSchemaIR = {
   tables: {},
-  extensions: [],
+  dependencies: [],
 };
 
 describe('PostgresMigrationPlanner - storage types', () => {

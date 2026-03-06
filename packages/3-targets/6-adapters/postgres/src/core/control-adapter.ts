@@ -1,6 +1,7 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type {
+  DependencyIR,
   PrimaryKey,
   SqlColumnIR,
   SqlForeignKeyIR,
@@ -417,7 +418,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const extensions = extensionsResult.rows.map((row) => row.extname);
+    const dependencies: readonly DependencyIR[] = extensionsResult.rows.map((row) => ({
+      id: `postgres.extension.${row.extname}`,
+    }));
 
     const storageTypes =
       (await pgEnumControlHooks.introspectTypes?.({ driver, schemaName: schema })) ?? {};
@@ -435,7 +438,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
     return {
       tables,
-      extensions,
+      dependencies,
       annotations,
     };
   }

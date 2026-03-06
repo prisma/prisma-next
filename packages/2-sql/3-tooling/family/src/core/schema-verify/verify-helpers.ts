@@ -467,8 +467,8 @@ export function verifyIndexes(
 
 /**
  * Verifies database dependencies are installed using component-owned verification hooks.
- * Each dependency provides a pure verifyDatabaseDependencyInstalled function that checks
- * whether the dependency is satisfied based on the in-memory schema IR (no DB I/O).
+ * Checks whether each dependency is satisfied by verifying its id is present in
+ * schema.dependencies (populated from introspection).
  *
  * Returns verification nodes for the tree.
  */
@@ -478,16 +478,20 @@ export function verifyDatabaseDependencies(
   issues: SchemaIssue[],
 ): SchemaVerificationNode[] {
   const nodes: SchemaVerificationNode[] = [];
+  const installedIds = new Set(schema.dependencies.map((d) => d.id));
 
   for (const dependency of dependencies) {
-    const depIssues = dependency.verifyDatabaseDependencyInstalled(schema);
+    const isSatisfied = installedIds.has(dependency.id);
     const depPath = `dependencies.${dependency.id}`;
 
-    if (depIssues.length > 0) {
-      // Dependency is not satisfied
-      issues.push(...depIssues);
-      const issuesMessage = depIssues.map((i) => i.message).join('; ');
-      const nodeMessage = issuesMessage ? `${dependency.id}: ${issuesMessage}` : dependency.id;
+    if (!isSatisfied) {
+      const depIssue: SchemaIssue = {
+        kind: 'extension_missing',
+        table: '',
+        message: `Dependency "${dependency.id}" is missing from database`,
+      };
+      issues.push(depIssue);
+      const nodeMessage = depIssue.message;
       nodes.push({
         status: 'fail',
         kind: 'databaseDependency',
