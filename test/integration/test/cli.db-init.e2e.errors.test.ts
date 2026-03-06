@@ -77,7 +77,7 @@ withTempDir(({ createTempDir }) => {
               runDbInit(testSetup, ['--config', configPath, '--json', '--no-color']),
             ).rejects.toThrow();
 
-            const errorText = consoleErrors.join('\n').trim();
+            const errorText = consoleOutput.join('\n').trim();
             const errorJson = JSON.parse(errorText) as Record<string, unknown>;
             expect(errorJson).toMatchObject({
               code: 'PN-CLI-4004',
@@ -103,38 +103,6 @@ withTempDir(({ createTempDir }) => {
 
             const output = stripAnsi(consoleOutput.join('\n'));
             expect(output).not.toContain('Bootstrap');
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-    });
-
-    describe('--json ndjson', () => {
-      it(
-        'rejects ndjson output mode',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            const { testSetup, configPath } = await setupDbInitFixture(
-              connectionString,
-              createTempDir,
-              fixtureSubdir,
-            );
-
-            // setupDbTestFixture emits the contract and logs to console; clear so we only assert on db init output
-            consoleOutput.length = 0;
-            consoleErrors.length = 0;
-
-            await expect(
-              runDbInit(testSetup, ['--config', configPath, '--json', 'ndjson', '--no-color']),
-            ).rejects.toThrow();
-
-            expect(consoleOutput.join('\n').trim()).toBe('');
-
-            const errorText = consoleErrors.join('\n').trim();
-            const errorJson = JSON.parse(errorText) as Record<string, unknown>;
-            expect(errorJson).toMatchObject({
-              domain: 'CLI',
-            });
           });
         },
         timeouts.spinUpPpgDev,
@@ -172,9 +140,7 @@ withTempDir(({ createTempDir }) => {
               ]),
             ).rejects.toThrow();
 
-            expect(consoleOutput.join('\n').trim()).toBe('');
-
-            const errorText = consoleErrors.join('\n').trim();
+            const errorText = consoleOutput.join('\n').trim();
             const errorJson = JSON.parse(errorText) as Record<string, unknown>;
 
             expect(errorJson).toMatchObject({
@@ -232,7 +198,7 @@ withTempDir(({ createTempDir }) => {
               runDbInit(testSetup, ['--config', configPath, '--json', '--no-color']),
             ).rejects.toThrow();
 
-            const errorText = consoleErrors.join('\n').trim();
+            const errorText = consoleOutput.join('\n').trim();
             const errorJson = JSON.parse(errorText) as Record<string, unknown>;
 
             expect(errorJson).toMatchObject({

@@ -97,7 +97,7 @@ describe('formatMigrationPlanOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('dry run');
-    expect(stripped).toContain('Run without --plan');
+    expect(stripped).toContain('Run without --dry-run');
   });
 
   it('shows tree characters', () => {

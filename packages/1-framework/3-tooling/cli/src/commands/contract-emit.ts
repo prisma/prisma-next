@@ -12,11 +12,15 @@ import {
   errorRuntime,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import {
+  addGlobalOptions,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   type EmitContractResult,
-  formatCommandHelp,
   formatEmitJson,
   formatEmitOutput,
   formatStyledHeader,
@@ -24,19 +28,10 @@ import {
 } from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
-interface ContractEmitOptions {
+interface ContractEmitOptions extends CommonCommandOptions {
   readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly vv?: boolean;
-  readonly trace?: boolean;
-  readonly timestamps?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
 }
 
 function mapDiagnosticsToIssues(
@@ -98,6 +93,7 @@ function mapEmitFailure(
 async function executeContractEmitCommand(
   options: ContractEmitOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<EmitContractResult, CliStructuredError>> {
   // Load config
@@ -154,10 +150,8 @@ async function executeContractEmitCommand(
   // Colocate .d.ts with .json (contract.json → contract.d.ts)
   const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
-  // Output header (only for human-readable output)
-  if (flags.json !== 'object' && !flags.quiet) {
-    // Normalize config path for display (match contract path format - no ./ prefix)
-    // Convert absolute paths to relative paths for display
+  // Output header to stderr (decoration)
+  if (!flags.json && !flags.quiet) {
     const contractPath = relative(process.cwd(), outputJsonPath);
     const typesPath = relative(process.cwd(), outputDtsPath);
     const header = formatStyledHeader({
@@ -171,7 +165,7 @@ async function executeContractEmitCommand(
       ],
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Create control client (no driver needed for emit)
@@ -207,11 +201,6 @@ async function executeContractEmitCommand(
     // Write the results to files
     writeFileSync(outputJsonPath, result.value.contractJson, 'utf-8');
     writeFileSync(outputDtsPath, result.value.contractDts, 'utf-8');
-
-    // Add blank line after all async operations if spinners were shown
-    if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
-      console.log('');
-    }
 
     // Convert success result to CLI output format
     const emitResult: EmitContractResult = {
@@ -253,42 +242,30 @@ export function createContractEmitCommand(): Command {
       'contract.d.ts. The contract.json contains the canonical contract structure, and\n' +
       'contract.d.ts provides TypeScript types for type-safe query building.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const flags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags });
-      },
-    })
+  setCommandExamples(command, [
+    'prisma-next contract emit',
+    'prisma-next contract emit --config ./custom-config.ts',
+  ]);
+  addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object or ndjson)', false)
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
     .action(async (options: ContractEmitOptions) => {
       const flags = parseGlobalFlags(options);
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
       const startTime = Date.now();
 
-      const result = await executeContractEmitCommand(options, flags, startTime);
+      const result = await executeContractEmitCommand(options, flags, ui, startTime);
 
       // Handle result - formats output and returns exit code
       const exitCode = handleResult(result, flags, (emitResult) => {
-        // Output based on flags
-        if (flags.json === 'object') {
-          // JSON output to stdout
-          console.log(formatEmitJson(emitResult));
+        if (flags.json) {
+          ui.output(formatEmitJson(emitResult));
         } else {
-          // Human-readable output to stdout
           const output = formatEmitOutput(emitResult, flags);
           if (output) {
-            console.log(output);
+            ui.log(output);
           }
-          // Output success message
           if (!flags.quiet) {
-            console.log(formatSuccessMessage(flags));
+            ui.success(formatSuccessMessage(flags));
           }
         }
       });

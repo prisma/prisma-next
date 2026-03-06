@@ -161,22 +161,6 @@ describe('formatIntrospectOutput', () => {
     expect(stripped).toContain('Total time: 123ms');
   });
 
-  it('applies timestamps prefix when enabled', () => {
-    const schemaView = createSchemaView();
-    const result = createResult();
-    const flags = parseGlobalFlags({ timestamps: true, 'no-color': true });
-
-    const output = formatIntrospectOutput(result, schemaView, flags);
-    const lines = output.split('\n');
-
-    // All lines should start with timestamp prefix
-    for (const line of lines) {
-      if (line.trim()) {
-        expect(line).toMatch(/^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/);
-      }
-    }
-  });
-
   it('applies colors when enabled', () => {
     const schemaView = createSchemaView();
     const result = createResult();
@@ -550,21 +534,6 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toContain('pass=3');
     expect(stripped).toContain('warn=0');
     expect(stripped).toContain('fail=1');
-  });
-
-  it('applies timestamps prefix when enabled', () => {
-    const result = createResult();
-    const flags = parseGlobalFlags({ timestamps: true, 'no-color': true });
-
-    const output = formatSchemaVerifyOutput(result, flags);
-    const lines = output.split('\n');
-
-    // All non-empty lines should start with timestamp prefix
-    for (const line of lines) {
-      if (line.trim()) {
-        expect(line).toMatch(/^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/);
-      }
-    }
   });
 
   it('applies colors when enabled', () => {

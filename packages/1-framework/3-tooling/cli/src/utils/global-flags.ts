@@ -1,42 +1,52 @@
 export interface GlobalFlags {
-  readonly json?: 'object' | 'ndjson';
+  readonly json?: boolean;
   readonly quiet?: boolean;
   readonly verbose?: number; // 0, 1, or 2
-  readonly timestamps?: boolean;
   readonly color?: boolean;
+  readonly interactive?: boolean;
+  readonly yes?: boolean;
 }
 
-export interface CliOptions {
+/**
+ * Common options parsed by Commander.js for every command.
+ * Extend this for command-specific options instead of duplicating these fields.
+ */
+export interface CommonCommandOptions {
   readonly json?: string | boolean;
   readonly quiet?: boolean;
   readonly q?: boolean;
   readonly verbose?: boolean;
   readonly v?: boolean;
-  readonly vv?: boolean;
   readonly trace?: boolean;
-  readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+  readonly interactive?: boolean;
+  readonly 'no-interactive'?: boolean;
+  readonly yes?: boolean;
+  readonly y?: boolean;
 }
+
+/** @deprecated Use CommonCommandOptions instead */
+export type CliOptions = CommonCommandOptions;
 
 /**
  * Parses global flags from CLI options.
- * Handles verbosity flags (-v, -vv, --trace), JSON output, quiet mode, timestamps, and color.
+ * Handles verbosity flags (-v, --trace), JSON output, quiet mode, color,
+ * interactivity (--interactive/--no-interactive), and auto-accept (-y/--yes).
  */
 export function parseGlobalFlags(options: CliOptions): GlobalFlags {
   const flags: {
-    json?: 'object' | 'ndjson';
+    json?: boolean;
     quiet?: boolean;
     verbose?: number;
-    timestamps?: boolean;
     color?: boolean;
+    interactive?: boolean;
+    yes?: boolean;
   } = {};
 
-  // JSON output
-  if (options.json === true || options.json === 'object') {
-    flags.json = 'object';
-  } else if (options.json === 'ndjson') {
-    flags.json = 'ndjson';
+  // JSON output (boolean flag; also accepts legacy string values for backward compat)
+  if (options.json) {
+    flags.json = true;
   }
 
   // Quiet mode
@@ -44,22 +54,18 @@ export function parseGlobalFlags(options: CliOptions): GlobalFlags {
     flags.quiet = true;
   }
 
-  // Verbosity: -v = 1, -vv or --trace = 2
-  if (options.vv || options.trace) {
+  // Verbosity: -v = 1, --trace = 2
+  // Env toggles: PRISMA_NEXT_TRACE=1 ≅ --trace, PRISMA_NEXT_DEBUG=1 ≅ -v
+  if (options.trace || process.env['PRISMA_NEXT_TRACE'] === '1') {
     flags.verbose = 2;
-  } else if (options.verbose || options.v) {
+  } else if (options.verbose || options.v || process.env['PRISMA_NEXT_DEBUG'] === '1') {
     flags.verbose = 1;
   } else {
     flags.verbose = 0;
   }
 
-  // Timestamps
-  if (options.timestamps) {
-    flags.timestamps = true;
-  }
-
   // Color: respect NO_COLOR env var, --color/--no-color flags
-  // When JSON output is enabled (any format), disable color to ensure clean JSON output
+  // When JSON output is enabled, disable color to ensure clean JSON output
   if (process.env['NO_COLOR'] || flags.json) {
     flags.color = false;
   } else if (options['no-color']) {
@@ -69,6 +75,21 @@ export function parseGlobalFlags(options: CliOptions): GlobalFlags {
   } else {
     // Default: enable color if TTY
     flags.color = process.stdout.isTTY && !process.env['CI'];
+  }
+
+  // Interactivity: --interactive/--no-interactive
+  // Default: interactive when stdout is a TTY
+  if (options['no-interactive']) {
+    flags.interactive = false;
+  } else if (options.interactive !== undefined) {
+    flags.interactive = options.interactive;
+  } else {
+    flags.interactive = !!process.stdout.isTTY;
+  }
+
+  // Auto-accept prompts: -y/--yes
+  if (options.yes || options.y) {
+    flags.yes = true;
   }
 
   return flags as GlobalFlags;

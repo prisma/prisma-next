@@ -59,7 +59,7 @@ withTempDir(({ createTempDir }) => {
 
           // Run db update immediately without changing the contract
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned 0 operation(s)');
 
@@ -95,7 +95,7 @@ withTempDir(({ createTempDir }) => {
           }
 
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned');
           expect(planOutput).toContain('nickname');
@@ -144,7 +144,13 @@ withTempDir(({ createTempDir }) => {
           }
 
           const outputStart = consoleOutput.length;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--json', '--no-color']);
+          await runDbUpdate(testSetup, [
+            '--config',
+            configPath,
+            '--dry-run',
+            '--json',
+            '--no-color',
+          ]);
           const output = consoleOutput.slice(outputStart).join('\n').trim();
           const payload = JSON.parse(output) as Record<string, unknown>;
 
@@ -223,7 +229,7 @@ withTempDir(({ createTempDir }) => {
 
           // db update should work on a fresh database without db init
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned');
         });
@@ -246,7 +252,7 @@ withTempDir(({ createTempDir }) => {
           await switchToContractV2(testSetup.testDir, configPath);
 
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
 
           expect(planOutput).toContain('Planned');
@@ -351,7 +357,7 @@ withTempDir(({ createTempDir }) => {
           });
 
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
 
           expect(planOutput).toContain('legacy_code');
@@ -403,7 +409,7 @@ withTempDir(({ createTempDir }) => {
 
     // Scenario 7a: Destructive changes gate
     it(
-      'fails with DESTRUCTIVE_CHANGES when destructive ops require --accept-data-loss',
+      'fails with DESTRUCTIVE_CHANGES when destructive ops are not confirmed',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const { testSetup, configPath } = await setupDbUpdateFixture(
@@ -422,18 +428,19 @@ withTempDir(({ createTempDir }) => {
           const exitCode = await runDbUpdateAllowFailure(testSetup, [
             '--config',
             configPath,
+            '--no-interactive',
             '--no-color',
           ]);
 
           expect(exitCode).not.toBe(0);
           const allOutput = [...consoleOutput, ...consoleErrors].join('\n');
-          expect(allOutput).toMatch(/destructive|accept-data-loss/i);
+          expect(allOutput).toMatch(/destructive/i);
         });
       },
       timeouts.spinUpPpgDev,
     );
 
-    // Scenario 7b: Runner failure after planning (with --accept-data-loss)
+    // Scenario 7b: Runner failure after planning (with -y)
     it(
       'fails during apply when a blocking view prevents column drop',
       async () => {
@@ -457,7 +464,7 @@ withTempDir(({ createTempDir }) => {
           const exitCode = await runDbUpdateAllowFailure(testSetup, [
             '--config',
             configPath,
-            '--accept-data-loss',
+            '-y',
             '--no-color',
           ]);
 
@@ -486,7 +493,13 @@ withTempDir(({ createTempDir }) => {
           await switchToContractV2(testSetup.testDir, configPath);
 
           const outputStart = consoleOutput.length;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--json', '--no-color']);
+          await runDbUpdate(testSetup, [
+            '--config',
+            configPath,
+            '--dry-run',
+            '--json',
+            '--no-color',
+          ]);
           const output = consoleOutput.slice(outputStart).join('\n').trim();
           const payload = JSON.parse(output) as Record<string, unknown>;
 

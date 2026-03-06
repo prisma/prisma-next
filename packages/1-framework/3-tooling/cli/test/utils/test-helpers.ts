@@ -54,7 +54,18 @@ export async function executeCommand(command: Command, args: string[]): Promise<
 
 /**
  * Sets up console and process.exit mocks for CLI command tests.
- * Returns cleanup functions and arrays to capture console output.
+ *
+ * Simulates an interactive terminal (`process.stdout.isTTY = true`) so that
+ * TerminalUI enables decoration (headers, spinners, human-readable output).
+ *
+ * Captures output from:
+ * - `process.stdout.write` → `consoleOutput` (JSON data via `ui.output()`)
+ * - `process.stderr.write` → `consoleErrors` AND `consoleOutput` (decoration via `ui.log()`, `ui.error()`, etc.)
+ *
+ * Merging stderr into consoleOutput maintains backward compatibility with tests
+ * that check `consoleOutput` for human-readable text. Tests that need only errors
+ * can check `consoleErrors`. Tests that need only JSON should use `--json` flag
+ * (JSON goes to stdout, decoration goes to stderr — they don't mix).
  */
 export function setupCommandMocks(): {
   consoleOutput: string[];
@@ -67,22 +78,49 @@ export function setupCommandMocks(): {
   const originalConsoleLog = console.log;
   const originalConsoleError = console.error;
   const originalExit = process.exit;
+  const originalStdoutWrite = process.stdout.write;
+  const originalStderrWrite = process.stderr.write;
+  const originalIsTTY = process.stdout.isTTY;
 
   // Reset exit code tracking
   resetExitCode();
 
-  // Mock console first (before process.exit) so errors are captured
+  // Force interactive mode so TerminalUI enables decoration
+  process.stdout.isTTY = true;
+
+  // Mock console.log (legacy path)
   console.log = vi.fn((...args: unknown[]) => {
     consoleOutput.push(args.map(String).join(' '));
   }) as typeof console.log;
 
+  // Mock console.error (legacy path)
   console.error = vi.fn((...args: unknown[]) => {
     consoleErrors.push(args.map(String).join(' '));
   }) as typeof console.error;
 
+  // Mock process.stdout.write (ui.output writes JSON data here)
+  process.stdout.write = vi.fn((chunk: unknown) => {
+    const text = typeof chunk === 'string' ? chunk : String(chunk);
+    const trimmed = text.endsWith('\n') ? text.slice(0, -1) : text;
+    if (trimmed) {
+      consoleOutput.push(trimmed);
+    }
+    return true;
+  }) as typeof process.stdout.write;
+
+  // Mock process.stderr.write (TerminalUI decoration + @clack/prompts write here)
+  // Route to BOTH consoleErrors and consoleOutput for backward compatibility
+  process.stderr.write = vi.fn((chunk: unknown) => {
+    const text = typeof chunk === 'string' ? chunk : String(chunk);
+    const trimmed = text.endsWith('\n') ? text.slice(0, -1) : text;
+    if (trimmed) {
+      consoleErrors.push(trimmed);
+      consoleOutput.push(trimmed);
+    }
+    return true;
+  }) as typeof process.stderr.write;
+
   // Mock process.exit to record the exit code and throw
-  // We record the exit code BEFORE throwing since vi.fn().mock.calls may not be
-  // reliably accessible when an error is thrown inside the mock implementation
   process.exit = vi.fn((code?: number) => {
     lastExitCode = code ?? 0;
     throw new Error('process.exit called');
@@ -92,6 +130,9 @@ export function setupCommandMocks(): {
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
     process.exit = originalExit;
+    process.stdout.write = originalStdoutWrite;
+    process.stderr.write = originalStderrWrite;
+    process.stdout.isTTY = originalIsTTY;
     resetExitCode();
   };
 

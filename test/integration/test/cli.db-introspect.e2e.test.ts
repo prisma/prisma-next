@@ -12,15 +12,34 @@ import {
 // Fixture subdirectory for db-introspect e2e tests
 const fixtureSubdir = 'db-introspect';
 
+/**
+ * Returns only the stdout lines from consoleOutput by filtering out stderr decoration.
+ * The test mock pushes stderr writes to both consoleErrors and consoleOutput,
+ * so removing consoleErrors entries yields stdout-only content.
+ */
+function stdoutOnly(consoleOutput: string[], consoleErrors: string[]): string[] {
+  const stderrBag = [...consoleErrors];
+  return consoleOutput.filter((line) => {
+    const idx = stderrBag.indexOf(line);
+    if (idx !== -1) {
+      stderrBag.splice(idx, 1);
+      return false;
+    }
+    return true;
+  });
+}
+
 withTempDir(({ createTempDir }) => {
   describe('db introspect command (e2e)', () => {
     let consoleOutput: string[] = [];
+    let consoleErrors: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       // Set up console and process.exit mocks
       const mocks = setupCommandMocks();
       consoleOutput = mocks.consoleOutput;
+      consoleErrors = mocks.consoleErrors;
       cleanupMocks = mocks.cleanup;
     });
 
@@ -75,8 +94,25 @@ withTempDir(({ createTempDir }) => {
           const output = consoleOutput.join('\n');
           const stripped = stripAnsi(output);
 
-          // Normalize database URL (port number) in output for snapshot
-          const normalized = stripped.replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX');
+          // Normalize database URL (port number) and strip non-deterministic spinner output.
+          // The 100ms spinner delay means the spinner line may or may not appear.
+          // Strip: spinner frames (◒◐◓◑), completion lines (◇), and orphan bar lines (│ alone)
+          // that clack emits around spinner lifecycle.
+          const normalized = stripped
+            .replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX')
+            .replace(/\(\d+ms\)/g, '(Xms)')
+            .split('\n')
+            .filter((line) => {
+              const trimmed = line.trim();
+              // Strip non-deterministic spinner output (100ms delay means it may or may not appear)
+              if (/^[◒◐◓◑]/.test(trimmed)) return false;
+              if (/^◇/.test(trimmed)) return false;
+              // Strip bare bar lines (clack decoration from spinner lifecycle)
+              if (trimmed === '│') return false;
+              return true;
+            })
+            .join('\n')
+            .replace(/\n{3,}/g, '\n\n');
 
           // Snapshot test for tree output
           expect(normalized).toMatchSnapshot();
@@ -117,8 +153,8 @@ withTempDir(({ createTempDir }) => {
             process.chdir(originalCwd);
           }
 
-          // Get output and parse JSON
-          const output = consoleOutput.join('\n');
+          // Get stdout-only output (exclude stderr decoration) and parse JSON
+          const output = stdoutOnly(consoleOutput, consoleErrors).join('\n');
           const jsonOutput = JSON.parse(output);
 
           // Normalize non-deterministic values (dbUrl and timing) for snapshot

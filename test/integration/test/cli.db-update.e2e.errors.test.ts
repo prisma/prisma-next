@@ -9,13 +9,11 @@ const fixtureSubdir = 'db-init';
 
 withTempDir(({ createTempDir }) => {
   describe('db update command (e2e) - errors', () => {
-    let consoleErrors: string[] = [];
     let consoleOutput: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       const mocks = setupCommandMocks();
-      consoleErrors = mocks.consoleErrors;
       consoleOutput = mocks.consoleOutput;
       cleanupMocks = mocks.cleanup;
     });
@@ -36,33 +34,9 @@ withTempDir(({ createTempDir }) => {
 
           // db update should work on a fresh database without db init
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned');
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'rejects ndjson format',
-      async () => {
-        await withDevDatabase(async ({ connectionString }) => {
-          const { testSetup, configPath } = await setupDbUpdateFixture(
-            connectionString,
-            createTempDir,
-            fixtureSubdir,
-          );
-
-          await expect(
-            runDbUpdate(testSetup, ['--config', configPath, '--json', 'ndjson', '--no-color']),
-          ).rejects.toThrow();
-
-          const errorText = consoleErrors.join('\n').trim();
-          const errorJson = JSON.parse(errorText) as Record<string, unknown>;
-          expect(errorJson).toMatchObject({
-            domain: 'CLI',
-          });
         });
       },
       timeouts.spinUpPpgDev,
@@ -88,7 +62,7 @@ withTempDir(({ createTempDir }) => {
 
           // db update should detect the extra column and plan a destructive drop
           consoleOutput.length = 0;
-          await runDbUpdate(testSetup, ['--config', configPath, '--plan', '--no-color']);
+          await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('legacy_notes');
           expect(planOutput).toContain('destructive');

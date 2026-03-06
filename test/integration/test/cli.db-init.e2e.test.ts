@@ -118,7 +118,7 @@ withTempDir(({ createTempDir }) => {
       );
     });
 
-    describe('plan mode (--plan)', () => {
+    describe('dry-run mode (--dry-run)', () => {
       it(
         'shows planned operations without applying',
         async () => {
@@ -129,7 +129,7 @@ withTempDir(({ createTempDir }) => {
               fixtureSubdir,
             );
 
-            await runDbInit(testSetup, ['--config', configPath, '--plan', '--no-color']);
+            await runDbInit(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
 
             // Get output and strip ANSI for verification
             const output = consoleOutput.join('\n');
@@ -173,7 +173,13 @@ withTempDir(({ createTempDir }) => {
 
             const outputStartIndex = consoleOutput.length;
 
-            await runDbInit(testSetup, ['--config', configPath, '--plan', '--json', '--no-color']);
+            await runDbInit(testSetup, [
+              '--config',
+              configPath,
+              '--dry-run',
+              '--json',
+              '--no-color',
+            ]);
 
             const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
             const jsonOutput = JSON.parse(output) as Record<string, unknown>;
@@ -251,7 +257,7 @@ withTempDir(({ createTempDir }) => {
             consoleOutput.length = 0;
 
             // Second run in plan mode: should succeed as noop with 0 operations
-            await runDbInit(testSetup, ['--config', configPath, '--plan', '--no-color']);
+            await runDbInit(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
 
             const output = consoleOutput.join('\n');
             const stripped = stripAnsi(output);
@@ -390,7 +396,7 @@ withTempDir(({ createTempDir }) => {
 
             // Should fail with MARKER_ORIGIN_MISMATCH even in plan mode
             await expect(
-              runDbInit(testSetup, ['--config', configPath, '--plan', '--no-color']),
+              runDbInit(testSetup, ['--config', configPath, '--dry-run', '--no-color']),
             ).rejects.toThrow();
 
             const errorOutput = consoleErrors.join('\n');

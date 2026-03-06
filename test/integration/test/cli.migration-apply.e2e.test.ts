@@ -206,8 +206,10 @@ withTempDir(({ createTempDir }) => {
 
             expect(failed).toBe(true);
             expect(getExitCode()).toBe(1);
-            const stderr = stripAnsi(consoleErrors.join('\n'));
-            expect(stderr).toContain('Current contract has no planned migration path');
+            // In --json mode, error output goes to stdout via ui.output(), not stderr.
+            // consoleOutput contains both stdout and stderr; check the combined output.
+            const output = stripAnsi(consoleOutput.join('\n'));
+            expect(output).toContain('Current contract has no planned migration path');
           });
         },
         timeouts.spinUpPpgDev,

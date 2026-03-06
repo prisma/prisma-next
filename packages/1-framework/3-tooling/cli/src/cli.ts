@@ -1,5 +1,10 @@
 import { Command } from 'commander';
 import { createContractEmitCommand } from './commands/contract-emit';
+import { installShutdownHandlers } from './utils/shutdown';
+
+// Install SIGINT/SIGTERM handlers before anything else
+installShutdownHandlers();
+
 import { createDbInitCommand } from './commands/db-init';
 import { createDbIntrospectCommand } from './commands/db-introspect';
 import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
@@ -14,6 +19,20 @@ import { createMigrationVerifyCommand } from './commands/migration-verify';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { parseGlobalFlags } from './utils/global-flags';
 import { formatCommandHelp, formatRootHelp } from './utils/output';
+import { suggestCommands } from './utils/suggest-command';
+
+/**
+ * Formats the "Did you mean ...?" hint for an unknown command.
+ */
+function formatSuggestion(input: string, candidates: readonly string[]): string {
+  const suggestions = suggestCommands(
+    input,
+    candidates.map((c) => c),
+  );
+  if (suggestions.length === 0) return '';
+  if (suggestions.length === 1) return `\nDid you mean ${suggestions[0]}?\n`;
+  return `\nDid you mean one of these?\n${suggestions.map((s) => `  ${s}`).join('\n')}\n`;
+}
 
 const program = new Command();
 
@@ -49,14 +68,11 @@ program.configureHelp({
 // Commands handle structured errors themselves via process.exit()
 program.exitOverride((err) => {
   if (err) {
-    // Help requests are not errors - allow Commander to output help and exit normally
-    // Commander throws errors with codes like 'commander.help', 'commander.helpDisplayed', or 'outputHelp'
     const errorCode = (err as { code?: string }).code;
     const errorMessage = String(err.message ?? '');
     const errorName = err.name ?? '';
 
-    // Check for unknown command errors first (before other checks)
-    // Commander.js uses code 'commander.unknownCommand' or error message contains 'unknown command'
+    // Unknown command/argument → exit 2 (CLI usage error)
     const isUnknownCommandError =
       errorCode === 'commander.unknownCommand' ||
       errorCode === 'commander.unknownArgument' ||
@@ -64,40 +80,34 @@ program.exitOverride((err) => {
         (errorMessage.includes('unknown command') || errorMessage.includes('unknown argument')));
     if (isUnknownCommandError) {
       const flags = parseGlobalFlags({});
-      // Extract the command/subcommand name from the error message
-      // Error message format: "unknown command 'command-name'"
       const match = errorMessage.match(/unknown command ['"]([^'"]+)['"]/);
       const commandName = match ? match[1] : process.argv[3] || process.argv[2] || 'unknown';
 
-      // Determine which command context we're in
-      // Check if the first argument is a recognized parent command
       const firstArg = process.argv[2];
       const parentCommand = firstArg
         ? program.commands.find((cmd) => cmd.name() === firstArg)
         : undefined;
 
       if (parentCommand && commandName !== firstArg) {
-        // Unrecognized subcommand - show parent command help
-        // eslint-disable-next-line no-console
-        console.error(`Unknown command: ${commandName}`);
-        // eslint-disable-next-line no-console
-        console.error('');
+        const subNames = parentCommand.commands.map((c) => c.name());
+        process.stderr.write(
+          `Unknown command: ${commandName}${formatSuggestion(commandName!, subNames)}\n`,
+        );
         const helpText = formatCommandHelp({ command: parentCommand, flags });
-        // eslint-disable-next-line no-console
-        console.log(helpText);
+        process.stderr.write(`${helpText}\n`);
       } else {
-        // Unrecognized top-level command - show root help
-        // eslint-disable-next-line no-console
-        console.error(`Unknown command: ${commandName}`);
-        // eslint-disable-next-line no-console
-        console.error('');
+        const topNames = program.commands.map((c) => c.name());
+        process.stderr.write(
+          `Unknown command: ${commandName}${formatSuggestion(commandName!, topNames)}\n`,
+        );
         const helpText = formatRootHelp({ program, flags });
-        // eslint-disable-next-line no-console
-        console.log(helpText);
+        process.stderr.write(`${helpText}\n`);
       }
-      process.exit(1);
+      process.exit(2);
       return;
     }
+
+    // Help requests → exit 0
     const isHelpError =
       errorCode === 'commander.help' ||
       errorCode === 'commander.helpDisplayed' ||
@@ -109,25 +119,22 @@ program.exitOverride((err) => {
       process.exit(0);
       return;
     }
-    // Missing required arguments/subcommands - show help and exit with 0
-    // Commander throws errors with code 'commander.missingArgument' or 'commander.missingMandatoryOptionValue'
-    // or when a command with subcommands is called without a subcommand
+
+    // Missing required arguments → exit 2 (CLI usage error)
     const isMissingArgumentError =
       errorCode === 'commander.missingArgument' ||
       errorCode === 'commander.missingMandatoryOptionValue' ||
       (errorName === 'CommanderError' &&
         (errorMessage.includes('missing') || errorMessage.includes('required')));
     if (isMissingArgumentError) {
-      // Help was already displayed by Commander.js, just exit with 0
-      process.exit(0);
+      process.exit(2);
       return;
     }
-    // Unhandled error - fail fast with exit code 1
-    // eslint-disable-next-line no-console
-    console.error(`Unhandled error: ${err.message}`);
+
+    // Unhandled error → exit 1
+    process.stderr.write(`Unhandled error: ${err.message}\n`);
     if (err.stack) {
-      // eslint-disable-next-line no-console
-      console.error(err.stack);
+      process.stderr.write(`${err.stack}\n`);
     }
     process.exit(1);
   }
@@ -245,8 +252,8 @@ const helpCommand = new Command('help')
   .action(() => {
     const flags = parseGlobalFlags({});
     const helpText = formatRootHelp({ program, flags });
-    // eslint-disable-next-line no-console
-    console.log(helpText);
+    // Help is decoration → stderr
+    process.stderr.write(`${helpText}\n`);
     process.exit(0);
   });
 
@@ -256,8 +263,7 @@ program.addCommand(helpCommand);
 program.action(() => {
   const flags = parseGlobalFlags({});
   const helpText = formatRootHelp({ program, flags });
-  // eslint-disable-next-line no-console
-  console.log(helpText);
+  process.stderr.write(`${helpText}\n`);
   process.exit(0);
 });
 
@@ -268,8 +274,8 @@ if (args.length > 0) {
   const commandName = args[0];
   // Handle version option explicitly since we suppress default output
   if (commandName === '--version' || commandName === '-V') {
-    // eslint-disable-next-line no-console
-    console.log(program.version());
+    // Version is data → stdout
+    process.stdout.write(`${program.version()}\n`);
     process.exit(0);
   }
   // Skip command check for global options like --help, -h
@@ -279,22 +285,20 @@ if (args.length > 0) {
     const command = program.commands.find((cmd) => cmd.name() === commandName);
 
     if (!command) {
-      // Unrecognized command - show error message and usage
+      // Unrecognized command → exit 2 (CLI usage error)
       const flags = parseGlobalFlags({});
-      // eslint-disable-next-line no-console
-      console.error(`Unknown command: ${commandName}`);
-      // eslint-disable-next-line no-console
-      console.error('');
+      const topNames = program.commands.map((c) => c.name());
+      process.stderr.write(
+        `Unknown command: ${commandName}${formatSuggestion(commandName!, topNames)}\n`,
+      );
       const helpText = formatRootHelp({ program, flags });
-      // eslint-disable-next-line no-console
-      console.log(helpText);
-      process.exit(1);
+      process.stderr.write(`${helpText}\n`);
+      process.exit(2);
     } else if (command.commands.length > 0 && args.length === 1) {
       // Parent command called with no subcommand - show help and exit with 0
       const flags = parseGlobalFlags({});
       const helpText = formatCommandHelp({ command, flags });
-      // eslint-disable-next-line no-console
-      console.log(helpText);
+      process.stderr.write(`${helpText}\n`);
       process.exit(0);
     }
   }

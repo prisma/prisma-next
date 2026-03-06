@@ -17,14 +17,12 @@ const fixtureSubdir = 'emit';
 withTempDir(({ createTempDir }) => {
   describe('contract emit command (e2e)', () => {
     let consoleOutput: string[] = [];
-    let consoleErrors: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       // Set up console and process.exit mocks
       const mocks = setupCommandMocks();
       consoleOutput = mocks.consoleOutput;
-      consoleErrors = mocks.consoleErrors;
       cleanupMocks = mocks.cleanup;
     });
 
@@ -178,7 +176,7 @@ withTempDir(({ createTempDir }) => {
         expect(exitCode).toBe(2); // Config errors should have exit code 2
 
         // Parse and verify JSON error output
-        const errorOutput = consoleErrors.join('\n');
+        const errorOutput = consoleOutput.join('\n');
         expect(() => JSON.parse(errorOutput)).not.toThrow();
 
         const parsed = JSON.parse(errorOutput);
@@ -221,7 +219,7 @@ withTempDir(({ createTempDir }) => {
         expect(exitCode).not.toBe(0);
 
         // Parse and verify JSON error output
-        const errorOutput = consoleErrors.join('\n');
+        const errorOutput = consoleOutput.join('\n');
         expect(() => JSON.parse(errorOutput)).not.toThrow();
 
         const parsed = JSON.parse(errorOutput);
