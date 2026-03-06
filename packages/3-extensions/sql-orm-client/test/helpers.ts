@@ -1,4 +1,4 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { ExecutionPlan, StorageHashBase } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { RuntimeQueryable } from '../src/types';
@@ -137,7 +137,7 @@ export function createTestContract(): TestContract {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:test',
+    storageHash: 'sha256:test' as StorageHashBase<string>,
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -300,7 +300,7 @@ export function createTestContract(): TestContract {
       },
       operationTypes: {},
     },
-  } as unknown as TestContract;
+  } satisfies TestContract;
 }
 
 export interface MockExecution {
