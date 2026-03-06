@@ -23,6 +23,7 @@ import {
   ContractBuilder,
   createTable,
   type ExtractColumns,
+  type ExtractModelFields,
   type ExtractPrimaryKey,
   ModelBuilder,
   type Mutable,
@@ -35,7 +36,6 @@ import {
   type ModelField,
   type ReferentialAction,
   type SqlContract,
-  type SqlMappings,
   type SqlStorage,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -130,22 +130,34 @@ export interface SqlTableBuilder<
   >;
 }
 
+type InvertRecord<T extends Record<string, string>> = {
+  readonly [K in keyof T & string as T[K]]: K;
+};
+
 /**
  * Type-level mappings structure for contracts built via `defineContract()`.
  *
- * Compile-time type helper (not a runtime object) that ensures mappings match what the builder
- * produces. `codecTypes` uses the generic `CodecTypes` parameter; `operationTypes` is always
- * empty since operations are added via extensions at runtime.
- *
- * **Difference from ExecutionContext**: This is a compile-time type for contract construction.
- * `ExecutionContext` is a runtime object with populated registries for query execution.
- *
- * @template C - The `CodecTypes` generic parameter passed to `defineContract<CodecTypes>()`
+ * Derives literal types for `modelToTable`, `tableToModel`, `fieldToColumn`, and `columnToField`
+ * from the builder's `Models` generic parameter, preserving the specific string literal types
+ * needed for type-safe query building.
  */
-type ContractBuilderMappings<C extends Record<string, { output: unknown }>> = Omit<
-  SqlMappings,
-  'codecTypes' | 'operationTypes'
-> & {
+type ContractBuilderMappings<
+  Models extends Record<
+    string,
+    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
+  >,
+  C extends Record<string, { output: unknown }>,
+> = {
+  readonly modelToTable: { readonly [K in keyof Models & string]: Models[K]['table'] };
+  readonly tableToModel: { readonly [K in keyof Models & string as Models[K]['table']]: K };
+  readonly fieldToColumn: {
+    readonly [K in keyof Models & string]: ExtractModelFields<Models[K]>;
+  };
+  readonly columnToField: {
+    readonly [K in keyof Models & string as Models[K]['table']]: InvertRecord<
+      ExtractModelFields<Models[K]>
+    >;
+  };
   readonly codecTypes: C;
   readonly operationTypes: Record<string, never>;
 };
@@ -322,7 +334,7 @@ class SqlContractBuilder<
         BuildStorage<Tables, Types>,
         BuildModels<Models>,
         BuildRelations<Models>,
-        ContractBuilderMappings<CodecTypes>
+        ContractBuilderMappings<Models, CodecTypes>
       > & {
         readonly schemaVersion: '1';
         readonly target: Target;
@@ -341,7 +353,7 @@ class SqlContractBuilder<
           BuildStorage<Tables, Types>,
           BuildModels<Models>,
           BuildRelations<Models>,
-          ContractBuilderMappings<CodecTypes>
+          ContractBuilderMappings<Models, CodecTypes>
         > & {
           readonly schemaVersion: '1';
           readonly target: Target;
@@ -564,7 +576,7 @@ class SqlContractBuilder<
       ...baseMappings,
       codecTypes: {} as CodecTypes,
       operationTypes: {} as Record<string, never>,
-    } as ContractBuilderMappings<CodecTypes>;
+    } as ContractBuilderMappings<Models, CodecTypes>;
 
     const extensionNamespaces = this.state.extensionNamespaces ?? [];
     const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };
