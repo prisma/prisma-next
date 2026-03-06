@@ -1,0 +1,27 @@
+// db.users.where({ id: 1 }).delete()
+digraph {
+  label="db.users.where({ id: 1 }).delete()"
+  labelloc=t
+  fontsize=16
+  fontname="Helvetica-Bold"
+  rankdir=BT
+  node [fontname="Helvetica" fontsize=11 style=filled]
+  edge [fontname="Helvetica" fontsize=9]
+
+  // Nodes
+  start [label="Start" shape=circle fillcolor=white]
+  cs_users_0 [label="CollectionState\n(users, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  read_users [label="Read\n(users, [*]\nwhere=[id = 1])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  delete_users [label="Delete\n(users)\nwhere=[id = 1]" shape=box fillcolor="#ffccbc" color="#e64a19"]
+  cs_users_1 [label="CollectionState\n(users, 1)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  ret [label="Return" shape=doublecircle fillcolor=black fontcolor=white]
+
+  // Edges
+  cs_users_0 -> start [color=gray60]
+  read_users -> cs_users_0 [color=gray60]
+  delete_users -> read_users [label="FilterData\n(users.id -> users.id)" color="#2196F3" fontcolor="#2196F3"]
+  delete_users -> cs_users_0 [color=gray60]
+  cs_users_1 -> delete_users [color=gray60]
+  ret -> read_users [color=gray60]
+  ret -> cs_users_1 [color=gray60 style=dashed]
+}

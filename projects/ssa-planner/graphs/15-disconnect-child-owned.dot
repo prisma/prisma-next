@@ -1,0 +1,38 @@
+// db.users.where({ id: 1 }).update({ posts: p => p.disconnect([{ id: 11 }]) })
+digraph {
+  label="db.users.where({ id: 1 }).update({\n  posts: p => p.disconnect([{ id: 11 }])\n})"
+  labelloc=t
+  fontsize=14
+  fontname="Helvetica-Bold"
+  rankdir=BT
+  node [fontname="Helvetica" fontsize=11 style=filled]
+  edge [fontname="Helvetica" fontsize=9]
+
+  // Nodes
+  start [label="Start" shape=circle fillcolor=white]
+  cs_users_0 [label="CollectionState\n(users, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  cs_posts_0 [label="CollectionState\n(posts, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  read_a [label="Read (A)\n(users, [id]\nwhere=[id = 1])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  update_users [label="Update\n(users)\ndata={}\nwhere=[id = 1]" shape=box fillcolor="#ffccbc" color="#e64a19"]
+  cs_users_1 [label="CollectionState\n(users, 1)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  read_b [label="Read (B)\n(users, [*])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  update_posts [label="Update\n(posts)\ndata={userId: null}\nwhere=[id = 11]" shape=box fillcolor="#ffccbc" color="#e64a19"]
+  cs_posts_1 [label="CollectionState\n(posts, 1)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  ret [label="Return" shape=doublecircle fillcolor=black fontcolor=white]
+
+  // Edges
+  cs_users_0 -> start [color=gray60]
+  cs_posts_0 -> start [color=gray60]
+  read_a -> cs_users_0 [color=gray60]
+  update_users -> read_a [label="FilterData\n(users.id -> users.id)" color="#2196F3" fontcolor="#2196F3"]
+  update_users -> cs_users_0 [color=gray60]
+  cs_users_1 -> update_users [color=gray60]
+  read_b -> read_a [label="FilterData\n(users.id -> users.id)" color="#2196F3" fontcolor="#2196F3"]
+  read_b -> cs_users_1 [color=gray60]
+  update_posts -> read_b [label="FilterData\n(users.id -> posts.userId)" color="#2196F3" fontcolor="#2196F3"]
+  update_posts -> cs_posts_0 [color=gray60]
+  cs_posts_1 -> update_posts [color=gray60]
+  ret -> read_b [color=gray60]
+  ret -> cs_users_1 [color=gray60 style=dashed]
+  ret -> cs_posts_1 [color=gray60 style=dashed]
+}
