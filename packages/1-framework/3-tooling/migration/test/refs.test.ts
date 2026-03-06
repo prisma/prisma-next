@@ -61,7 +61,6 @@ describe('readRefs', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await mkdir(join(tmpdir(), 'test-refs-read-'), { recursive: true });
     tmpDir = join(tmpdir(), `test-refs-read-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     await mkdir(tmpDir, { recursive: true });
   });

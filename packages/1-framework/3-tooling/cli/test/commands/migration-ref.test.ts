@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
@@ -297,7 +297,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     await writeRefs(refsPath, { ...refs, staging: 'sha256:hash-c' });
     refs = await readRefs(refsPath);
-    expect(refs.staging).toBe('sha256:hash-c');
+    expect(refs['staging']).toBe('sha256:hash-c');
 
     const { staging: _, ...remaining } = refs;
     await writeRefs(refsPath, remaining);
