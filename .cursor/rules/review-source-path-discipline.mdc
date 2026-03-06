@@ -1,0 +1,9 @@
+---
+description: Ensure review file paths match user-provided paths before implementing fixes
+alwaysApply: false
+---
+# Review Source Path Discipline
+
+- When the user provides an explicit review file path (for example a `code-review.md` under a specific folder), always treat that exact path as the source of truth.
+- Before implementing fixes from a review, confirm the loaded file path matches the user-provided path.
+- If multiple similarly named review files exist, explicitly disambiguate and ask before proceeding.
