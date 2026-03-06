@@ -1,4 +1,4 @@
-import { bgGreen, blue, bold, cyan, green } from 'colorette';
+import { blue, bold, cyan, green } from 'colorette';
 import type { Command } from 'commander';
 import stringWidth from 'string-width';
 import stripAnsi from 'strip-ansi';
@@ -24,15 +24,7 @@ function createPrismaNextBadge(useColor: boolean): string {
   if (!useColor) {
     return 'prisma-next';
   }
-  // Body: green background with white text
-  const text = ' prisma-next ';
-  const body = bgGreen(bold(text));
-
-  // Use Powerline separator (U+E0B0) which creates the arrow transition effect
-  const separator = '\u{E0B0}';
-  const tip = green(separator); // Dark grey arrow tip
-
-  return `${body}${tip}`;
+  return bold('prisma-next');
 }
 
 /**
