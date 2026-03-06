@@ -1,27 +1,33 @@
-import type { ExecutionPlan, StorageHashBase } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
-import type { SqlContract, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlContract, StorageTable } from '@prisma-next/sql-contract/types';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { RuntimeQueryable } from '../src/types';
 
 // ---- helpers to build a minimal contract for tests ----
 
-function col(nativeType: string, codecId: string, nullable = false): StorageColumn {
-  return { nativeType, codecId, nullable };
-}
+type TestCodecTypes = {
+  'pg/int4@1': { output: number };
+  'pg/text@1': { output: string };
+};
 
-function table(columns: Record<string, StorageColumn>, pk?: string[]): StorageTable {
-  const base = {
-    columns,
-    uniques: [] as const,
-    indexes: [] as const,
-    foreignKeys: [] as const,
-  };
-  if (pk) {
-    return { ...base, primaryKey: { columns: pk } };
-  }
-  return base;
-}
+const int4Column = { codecId: 'pg/int4@1', nativeType: 'int4' } as const;
+const textColumn = { codecId: 'pg/text@1', nativeType: 'text' } as const;
 
+const postgresTarget: TargetPackRef<'sql', 'postgres'> = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+};
+
+// Explicit type alias required: the builder produces a structurally equivalent type,
+// but TypeScript's conditional type evaluation in the ORM's deep type machinery
+// (e.g. `ModelTableFromMappings`, `RelationsOf`, `ScalarModelAccessor`) does not
+// fully reduce the builder's intersection-heavy return type. Keeping the explicit
+// `SqlContract<...>` instantiation ensures the ORM's type-level tests pass.
 export type TestContract = SqlContract<
   {
     tables: {
@@ -132,175 +138,131 @@ export type TestContract = SqlContract<
   }
 >;
 
-export function createTestContract(): TestContract {
-  return {
-    schemaVersion: '1',
-    target: 'postgres',
-    targetFamily: 'sql',
-    storageHash: 'sha256:test' as StorageHashBase<string>,
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    sources: {},
-    storage: {
-      tables: {
-        users: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            name: col('text', 'pg/text@1'),
-            email: col('text', 'pg/text@1'),
-            invited_by_id: col('int4', 'pg/int4@1', true),
-          },
-          ['id'],
-        ),
-        posts: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            title: col('text', 'pg/text@1'),
-            user_id: col('int4', 'pg/int4@1'),
-            views: col('int4', 'pg/int4@1'),
-          },
-          ['id'],
-        ),
-        comments: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            body: col('text', 'pg/text@1'),
-            post_id: col('int4', 'pg/int4@1'),
-          },
-          ['id'],
-        ),
-        profiles: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            user_id: col('int4', 'pg/int4@1'),
-            bio: col('text', 'pg/text@1'),
-          },
-          ['id'],
-        ),
-      },
-    },
-    models: {
-      User: {
-        storage: { table: 'users' },
-        fields: {
-          id: { column: 'id' },
-          name: { column: 'name' },
-          email: { column: 'email' },
-          invitedById: { column: 'invited_by_id' },
-        },
-        relations: {
-          invitedBy: {},
-          invitedUsers: {},
-        },
-      },
-      Post: {
-        storage: { table: 'posts' },
-        fields: {
-          id: { column: 'id' },
-          title: { column: 'title' },
-          userId: { column: 'user_id' },
-          views: { column: 'views' },
-        },
-        relations: {},
-      },
-      Comment: {
-        storage: { table: 'comments' },
-        fields: {
-          id: { column: 'id' },
-          body: { column: 'body' },
-          postId: { column: 'post_id' },
-        },
-        relations: {},
-      },
-      Profile: {
-        storage: { table: 'profiles' },
-        fields: {
-          id: { column: 'id' },
-          userId: { column: 'user_id' },
-          bio: { column: 'bio' },
-        },
-        relations: {},
-      },
-    },
-    relations: {
-      users: {
-        invitedUsers: {
-          to: 'User',
+function buildTestContract() {
+  return defineContract<TestCodecTypes>()
+    .target(postgresTarget)
+    .storageHash('sha256:test')
+    .table('users', (t) =>
+      t
+        .column('id', { type: int4Column })
+        .column('name', { type: textColumn })
+        .column('email', { type: textColumn })
+        .column('invited_by_id', { type: int4Column, nullable: true })
+        .primaryKey(['id']),
+    )
+    .table('posts', (t) =>
+      t
+        .column('id', { type: int4Column })
+        .column('title', { type: textColumn })
+        .column('user_id', { type: int4Column })
+        .column('views', { type: int4Column })
+        .primaryKey(['id']),
+    )
+    .table('comments', (t) =>
+      t
+        .column('id', { type: int4Column })
+        .column('body', { type: textColumn })
+        .column('post_id', { type: int4Column })
+        .primaryKey(['id']),
+    )
+    .table('profiles', (t) =>
+      t
+        .column('id', { type: int4Column })
+        .column('user_id', { type: int4Column })
+        .column('bio', { type: textColumn })
+        .primaryKey(['id']),
+    )
+    .model('User', 'users', (m) =>
+      m
+        .field('id', 'id')
+        .field('name', 'name')
+        .field('email', 'email')
+        .field('invitedById', 'invited_by_id')
+        .relation('invitedUsers', {
+          toModel: 'User',
+          toTable: 'users',
           cardinality: '1:N',
           on: {
-            parentCols: ['id'],
-            childCols: ['invited_by_id'],
+            parentTable: 'users',
+            parentColumns: ['id'],
+            childTable: 'users',
+            childColumns: ['invited_by_id'],
           },
-        },
-        invitedBy: {
-          to: 'User',
+        })
+        .relation('invitedBy', {
+          toModel: 'User',
+          toTable: 'users',
           cardinality: 'N:1',
           on: {
-            parentCols: ['invited_by_id'],
-            childCols: ['id'],
+            parentTable: 'users',
+            parentColumns: ['invited_by_id'],
+            childTable: 'users',
+            childColumns: ['id'],
           },
-        },
-        posts: {
-          to: 'Post',
+        })
+        .relation('posts', {
+          toModel: 'Post',
+          toTable: 'posts',
           cardinality: '1:N',
           on: {
-            parentCols: ['id'],
-            childCols: ['user_id'],
+            parentTable: 'users',
+            parentColumns: ['id'],
+            childTable: 'posts',
+            childColumns: ['user_id'],
           },
-        },
-        profile: {
-          to: 'Profile',
+        })
+        .relation('profile', {
+          toModel: 'Profile',
+          toTable: 'profiles',
           cardinality: '1:1',
           on: {
-            parentCols: ['id'],
-            childCols: ['user_id'],
+            parentTable: 'users',
+            parentColumns: ['id'],
+            childTable: 'profiles',
+            childColumns: ['user_id'],
           },
-        },
-      },
-      posts: {
-        comments: {
-          to: 'Comment',
+        }),
+    )
+    .model('Post', 'posts', (m) =>
+      m
+        .field('id', 'id')
+        .field('title', 'title')
+        .field('userId', 'user_id')
+        .field('views', 'views')
+        .relation('comments', {
+          toModel: 'Comment',
+          toTable: 'comments',
           cardinality: '1:N',
           on: {
-            parentCols: ['id'],
-            childCols: ['post_id'],
+            parentTable: 'posts',
+            parentColumns: ['id'],
+            childTable: 'comments',
+            childColumns: ['post_id'],
           },
-        },
-        author: {
-          to: 'User',
+        })
+        .relation('author', {
+          toModel: 'User',
+          toTable: 'users',
           cardinality: 'N:1',
           on: {
-            parentCols: ['user_id'],
-            childCols: ['id'],
+            parentTable: 'posts',
+            parentColumns: ['user_id'],
+            childTable: 'users',
+            childColumns: ['id'],
           },
-        },
-      },
-      comments: {},
-      profiles: {},
-    },
-    mappings: {
-      modelToTable: { User: 'users', Post: 'posts', Comment: 'comments', Profile: 'profiles' },
-      tableToModel: { users: 'User', posts: 'Post', comments: 'Comment', profiles: 'Profile' },
-      fieldToColumn: {
-        User: { id: 'id', name: 'name', email: 'email', invitedById: 'invited_by_id' },
-        Post: { id: 'id', title: 'title', userId: 'user_id', views: 'views' },
-        Comment: { id: 'id', body: 'body', postId: 'post_id' },
-        Profile: { id: 'id', userId: 'user_id', bio: 'bio' },
-      },
-      columnToField: {
-        users: { id: 'id', name: 'name', email: 'email', invited_by_id: 'invitedById' },
-        posts: { id: 'id', title: 'title', user_id: 'userId', views: 'views' },
-        comments: { id: 'id', body: 'body', post_id: 'postId' },
-        profiles: { id: 'id', user_id: 'userId', bio: 'bio' },
-      },
-      codecTypes: {
-        'pg/int4@1': { output: 0 as number },
-        'pg/text@1': { output: '' as string },
-      },
-      operationTypes: {},
-    },
-  } satisfies TestContract;
+        }),
+    )
+    .model('Comment', 'comments', (m) =>
+      m.field('id', 'id').field('body', 'body').field('postId', 'post_id'),
+    )
+    .model('Profile', 'profiles', (m) =>
+      m.field('id', 'id').field('userId', 'user_id').field('bio', 'bio'),
+    )
+    .build();
+}
+
+export function createTestContract(): TestContract {
+  return buildTestContract() as unknown as TestContract;
 }
 
 export interface MockExecution {

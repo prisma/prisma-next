@@ -24,6 +24,7 @@
     "kysely": "catalog:"
   },
   "devDependencies": {
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
