@@ -1,3 +1,4 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   SqlContract,
@@ -7,10 +8,23 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
+import type { DefaultRenderer } from '../src/core/migrations/contract-to-schema-ir';
 import {
   contractToSchemaIR as contractToSchemaIRImpl,
   detectDestructiveChanges,
 } from '../src/core/migrations/contract-to-schema-ir';
+
+const testRenderer: DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => {
+  if (def.kind === 'function') return def.expression;
+  const { value } = def;
+  if (typeof value === 'string') return `'${value.replaceAll("'", "''")}'`;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value === null) return 'NULL';
+  const json = JSON.stringify(value);
+  const isJsonColumn = column.nativeType === 'json' || column.nativeType === 'jsonb';
+  if (isJsonColumn) return `'${json}'::${column.nativeType}`;
+  return `'${json}'`;
+};
 
 function wrap(storage: SqlStorage): SqlContract<SqlStorage> {
   return {
@@ -58,7 +72,7 @@ function contractToSchemaIR(
 
 describe('contractToSchemaIR', () => {
   it('converts empty storage to empty schema IR', () => {
-    const result = contractToSchemaIR(null);
+    const result = contractToSchemaIR(null, { renderDefault: testRenderer });
 
     expect(result).toEqual<SqlSchemaIR>({
       tables: {},
@@ -79,7 +93,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
 
     expect(result.tables['User']).toBeDefined();
     expect(result.tables['User']!.name).toBe('User');
@@ -106,7 +120,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     const column = result.tables['T']!.columns['a']!;
 
     expect(column).toEqual({ name: 'a', nativeType: 'vector', nullable: false });
@@ -142,7 +156,10 @@ describe('contractToSchemaIR', () => {
       return input.nativeType;
     };
 
-    const result = contractToSchemaIR(wrap(storage), { expandNativeType: expand });
+    const result = contractToSchemaIR(wrap(storage), {
+      expandNativeType: expand,
+      renderDefault: testRenderer,
+    });
     expect(result.tables['T']!.columns['id']!.nativeType).toBe('character(36)');
     expect(result.tables['T']!.columns['name']!.nativeType).toBe('text');
   });
@@ -162,7 +179,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['id']!.nativeType).toBe('character');
   });
 
@@ -180,7 +197,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['status']!.default).toBe("'active'");
   });
 
@@ -198,7 +215,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['author']!.default).toBe("'O''Reilly'");
   });
 
@@ -216,7 +233,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['textValue']!.default).toBe("'a''b''''c'");
   });
 
@@ -234,7 +251,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['createdAt']!.default).toBe('now()');
   });
 
@@ -249,7 +266,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['name']!.default).toBeUndefined();
     expect('default' in result.tables['T']!.columns['name']!).toBe(false);
   });
@@ -266,7 +283,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.primaryKey).toEqual({ columns: ['id'], name: 'T_pkey' });
   });
 
@@ -282,7 +299,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.uniques).toEqual([{ columns: ['email'], name: 'T_email_key' }]);
   });
 
@@ -298,7 +315,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.indexes).toEqual([
       { columns: ['email'], name: 'T_email_idx', unique: false },
     ]);
@@ -324,7 +341,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['Post']!.foreignKeys).toEqual([
       {
         columns: ['authorId'],
@@ -347,7 +364,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(Object.keys(result.tables)).toEqual(expect.arrayContaining(['User', 'Post']));
     expect(Object.keys(result.tables)).toHaveLength(2);
   });
@@ -370,7 +387,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.dependencies).toEqual([]);
     expect(result.tables['T']!.columns['embedding']!.nativeType).toBe('vector');
     expect((result.annotations as Record<string, unknown>)?.['pg']).toMatchObject({
@@ -426,7 +443,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.dependencies).toEqual([]);
   });
 
@@ -509,7 +526,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.uniques[0]).toEqual({ columns: ['a', 'b'] });
   });
 
@@ -530,7 +547,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(wrap(storage));
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['Post']!.foreignKeys[0]).toEqual({
       columns: ['authorId'],
       referencedTable: 'User',
