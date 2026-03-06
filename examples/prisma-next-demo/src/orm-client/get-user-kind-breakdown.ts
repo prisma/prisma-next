@@ -10,8 +10,7 @@ export async function ormClientGetUserKindBreakdown(
   runtime: Runtime,
 ): Promise<Array<{ kind: UserKind; totalUsers: number }>> {
   const db = createOrmClient(runtime);
-  const grouped = await db.users
-    .groupBy('kind')
+  const grouped = await db.User.groupBy('kind')
     .having((having) => having.count().gte(minUsers))
     .aggregate((aggregate) => ({
       totalUsers: aggregate.count(),

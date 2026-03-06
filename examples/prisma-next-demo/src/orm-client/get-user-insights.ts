@@ -3,8 +3,7 @@ import { createOrmClient } from './client';
 
 export async function ormClientGetUserInsights(limit: number, runtime: Runtime) {
   const db = createOrmClient(runtime);
-  return db.users
-    .newestFirst()
+  return db.User.newestFirst()
     .select('id', 'email', 'kind', 'createdAt')
     .include('posts', (posts) =>
       posts.combine({

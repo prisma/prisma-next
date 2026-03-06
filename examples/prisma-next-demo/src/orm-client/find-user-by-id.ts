@@ -7,7 +7,7 @@ type UserId = DefaultModelRow<Contract, 'User'>['id'];
 
 export async function ormClientFindUserById(id: string, runtime: Runtime) {
   const db = createOrmClient(runtime);
-  return db.users.first({ id: toUserId(id) });
+  return db.User.first({ id: toUserId(id) });
 }
 
 function toUserId(value: string): UserId {

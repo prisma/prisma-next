@@ -20,19 +20,15 @@ const runtime = createMockRuntime();
 const db = orm({
   contract,
   runtime,
-  collections: { users: UserCollection, Post: PostCollection },
+  collections: { User: UserCollection, Post: PostCollection },
 });
 
-db.users.named('Alice');
-db.user.named('Alice');
 db.User.named('Alice');
-db.posts.published();
-db.post.published();
 db.Post.published();
 
 orm({
   contract,
   runtime,
   // @ts-expect-error collections values must be classes, not instances
-  collections: { users: new UserCollection({ contract, runtime }, 'User') },
+  collections: { User: new UserCollection({ contract, runtime }, 'User') },
 });

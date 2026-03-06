@@ -7,7 +7,7 @@ export async function ormClientGetUsersByIdCursor(
   runtime: Runtime,
 ) {
   const db = createOrmClient(runtime);
-  const orderedUsers = db.users.orderBy((user) => user.id.asc()).select('id', 'email', 'kind');
+  const orderedUsers = db.User.orderBy((user) => user.id.asc()).select('id', 'email', 'kind');
   const scopedUsers = cursor ? orderedUsers.cursor({ id: cursor }) : orderedUsers;
   return scopedUsers.take(limit).all();
 }

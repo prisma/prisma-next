@@ -7,8 +7,7 @@ type UserId = DefaultModelRow<Contract, 'User'>['id'];
 
 export async function ormClientUpdateUserEmail(id: string, email: string, runtime: Runtime) {
   const db = createOrmClient(runtime);
-  return db.users
-    .where({ id: toUserId(id) })
+  return db.User.where({ id: toUserId(id) })
     .select('id', 'email', 'kind')
     .update({ email });
 }
