@@ -12,11 +12,38 @@ import { interpretPslDocumentToSqlContractIR } from './interpreter';
 type CapabilityMatrix = ContractIR['capabilities'];
 
 export interface CapabilitySource {
-  readonly capabilities?: CapabilityMatrix;
+  /**
+   * Capability providers in the stack (adapter meta, extension pack meta, etc.).
+   *
+   * Some descriptors type this as `Record<string, unknown>` even when the runtime
+   * shape is `{ [namespace]: { [capabilityKey]: boolean } }`. The provider accepts
+   * the broader shape and extracts boolean flags safely.
+   */
+  readonly capabilities?: CapabilityMatrix | Record<string, unknown>;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function extractCapabilityMatrix(value: unknown): CapabilityMatrix {
+  if (!isPlainObject(value)) return {};
+
+  const out: CapabilityMatrix = {};
+  for (const [namespace, maybeCaps] of Object.entries(value)) {
+    if (!isPlainObject(maybeCaps)) continue;
+    const caps: Record<string, boolean> = {};
+    for (const [key, flag] of Object.entries(maybeCaps)) {
+      if (typeof flag === 'boolean') {
+        caps[key] = flag;
+      }
+    }
+    if (Object.keys(caps).length > 0) {
+      out[namespace] = caps;
+    }
+  }
+
+  return out;
 }
 
 function mergePlainObjects(
@@ -64,7 +91,7 @@ function mergeCapabilitiesFromSources(
   let merged: CapabilityMatrix = {};
   for (const source of sources) {
     if (!source.capabilities) continue;
-    merged = mergeCapabilities(merged, source.capabilities);
+    merged = mergeCapabilities(merged, extractCapabilityMatrix(source.capabilities));
   }
   return merged;
 }
