@@ -30,6 +30,7 @@ import {
 } from '@prisma-next/contract-authoring';
 import {
   applyFkDefaults,
+  type Index,
   type ModelDefinition,
   type ModelField,
   type ReferentialAction,
@@ -164,7 +165,7 @@ type BuildStorageTable<
       : never;
   };
   readonly uniques: ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>;
-  readonly indexes: ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>;
+  readonly indexes: ReadonlyArray<Index>;
   readonly foreignKeys: ReadonlyArray<{
     readonly columns: readonly string[];
     readonly references: { readonly table: string; readonly columns: readonly string[] };
@@ -420,6 +421,8 @@ class SqlContractBuilder<
       const indexes = (tableState.indexes ?? []).map((i) => ({
         columns: i.columns,
         ...(i.name ? { name: i.name } : {}),
+        ...(i.using ? { using: i.using } : {}),
+        ...(i.config ? { config: i.config } : {}),
       }));
 
       // Build foreign keys from table state, materializing defaults

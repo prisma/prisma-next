@@ -1,5 +1,4 @@
 import type {
-  Index,
   ModelDefinition,
   ModelField,
   ModelStorage,
@@ -11,7 +10,11 @@ import type {
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { decodeContractDefaults } from '@prisma-next/sql-contract/validate';
-import { ColumnDefaultSchema, ForeignKeySchema } from '@prisma-next/sql-contract/validators';
+import {
+  ColumnDefaultSchema,
+  ForeignKeySchema,
+  IndexSchema,
+} from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
@@ -41,11 +44,6 @@ const PrimaryKeySchema = type.declare<PrimaryKey>().type({
 });
 
 const UniqueConstraintSchema = type.declare<UniqueConstraint>().type({
-  columns: type.string.array().readonly(),
-  'name?': 'string',
-});
-
-const IndexSchema = type.declare<Index>().type({
   columns: type.string.array().readonly(),
   'name?': 'string',
 });

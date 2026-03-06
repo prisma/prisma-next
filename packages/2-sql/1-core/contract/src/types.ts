@@ -49,6 +49,16 @@ export type UniqueConstraint = {
 export type Index = {
   readonly columns: readonly string[];
   readonly name?: string;
+  /**
+   * Optional access method identifier.
+   * Extension-specific methods are represented as strings and interpreted
+   * by the owning extension package.
+   */
+  readonly using?: string;
+  /**
+   * Optional extension-owned index configuration payload.
+   */
+  readonly config?: Record<string, unknown>;
 };
 
 export type ForeignKeyReferences = {

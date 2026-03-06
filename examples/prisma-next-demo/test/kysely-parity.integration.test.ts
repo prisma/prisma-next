@@ -3,7 +3,13 @@ import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { budgets, createRuntime, lints, type Runtime } from '@prisma-next/sql-runtime';
+import {
+  budgets,
+  type CreateRuntimeOptions,
+  createRuntime,
+  lints,
+  type Runtime,
+} from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -41,7 +47,9 @@ async function createTestDriver(connectionString: string, executionStack: (typeo
 async function getRuntime(connectionString: string): Promise<Runtime> {
   const executionStack = db.stack;
   return createRuntime({
-    stackInstance: instantiateExecutionStack(executionStack),
+    stackInstance: instantiateExecutionStack(
+      executionStack,
+    ) as CreateRuntimeOptions['stackInstance'],
     context: executionContext,
     driver: await createTestDriver(connectionString, executionStack),
     verify: { mode: 'onFirstUse', requireMarker: false },
@@ -80,12 +88,12 @@ async function seedTestData(
           email: param('email'),
           kind: param('kind'),
         })
-        .returning(userTable.columns.id!)
+        .returning(userTable.columns['id']!)
         .build({ params: { id, email, kind } });
 
       type InsertedRow = ResultType<typeof plan>;
       for await (const row of runtime.execute(plan)) {
-        userIds.push((row as InsertedRow).id!);
+        userIds.push((row as InsertedRow)['id']!);
       }
     }
   }
@@ -195,8 +203,8 @@ describe('Kysely parity integration', () => {
           });
           const users = await getUsersWithPosts(runtime, 10);
           expect(users).toHaveLength(2);
-          const alice = users.find((u) => u.email === 'alice@example.com')!;
-          const bob = users.find((u) => u.email === 'bob@example.com')!;
+          const alice = users.find((u) => u['email'] === 'alice@example.com')!;
+          const bob = users.find((u) => u['email'] === 'bob@example.com')!;
           expect(alice).toMatchObject({ email: 'alice@example.com', posts: expect.any(Array) });
           expect(alice.posts).toHaveLength(2);
           expect(bob).toMatchObject({ email: 'bob@example.com', posts: expect.any(Array) });

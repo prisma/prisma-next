@@ -374,7 +374,11 @@ export const sqlTargetFamilyHook = {
         .map((i) => {
           const cols = i.columns.map((c: string) => `'${c}'`).join(', ');
           const name = i.name ? `; readonly name: '${i.name}'` : '';
-          return `{ readonly columns: readonly [${cols}]${name} }`;
+          const using =
+            i.using !== undefined ? `; readonly using: ${this.serializeValue(i.using)}` : '';
+          const config =
+            i.config !== undefined ? `; readonly config: ${this.serializeValue(i.config)}` : '';
+          return `{ readonly columns: readonly [${cols}]${name}${using}${config} }`;
         })
         .join(', ');
       tableParts.push(`indexes: readonly [${indexes}]`);
@@ -431,7 +435,7 @@ export const sqlTargetFamilyHook = {
     const entries: string[] = [];
     for (const [key, value] of Object.entries(params)) {
       const serialized = this.serializeValue(value);
-      entries.push(`readonly ${key}: ${serialized}`);
+      entries.push(`readonly ${this.serializeObjectKey(key)}: ${serialized}`);
     }
 
     return `{ ${entries.join('; ')} }`;
@@ -465,11 +469,18 @@ export const sqlTargetFamilyHook = {
     if (typeof value === 'object') {
       const entries: string[] = [];
       for (const [k, v] of Object.entries(value)) {
-        entries.push(`readonly ${k}: ${this.serializeValue(v)}`);
+        entries.push(`readonly ${this.serializeObjectKey(k)}: ${this.serializeValue(v)}`);
       }
       return `{ ${entries.join('; ')} }`;
     }
     return 'unknown';
+  },
+
+  serializeObjectKey(key: string): string {
+    if (/^[$A-Z_a-z][$\w]*$/.test(key)) {
+      return key;
+    }
+    return this.serializeValue(key);
   },
 
   generateModelsType(

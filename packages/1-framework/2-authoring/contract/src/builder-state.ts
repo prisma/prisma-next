@@ -70,6 +70,15 @@ export interface UniqueConstraintDef {
 export interface IndexDef {
   readonly columns: readonly string[];
   readonly name?: string;
+  /**
+   * Optional index access method. Extension-specific methods are represented
+   * as strings and interpreted by the owning extension package.
+   */
+  readonly using?: string;
+  /**
+   * Optional extension-owned index configuration payload.
+   */
+  readonly config?: Record<string, unknown>;
 }
 
 /**
