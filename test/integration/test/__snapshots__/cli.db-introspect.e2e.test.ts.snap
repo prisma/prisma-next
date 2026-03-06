@@ -14,8 +14,10 @@ exports[`db introspect command (e2e) > outputs JSON envelope with real database 
         "version": "17.5",
       },
     },
-    "extensions": [
-      "plpgsql",
+    "dependencies": [
+      {
+        "id": "postgres.extension.plpgsql",
+      },
     ],
     "tables": {
       "user": {
