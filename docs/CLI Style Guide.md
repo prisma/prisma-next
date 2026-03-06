@@ -108,9 +108,10 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 ### Destructive operation confirmation
 - `db update` prompts for confirmation when the plan includes destructive operations (drops, type changes).
 - The prompt lists the destructive operations and asks the user to confirm before applying.
-- Bypass options: `-y`/`--yes` (auto-accept all prompts) or `--accept-data-loss` (explicit destructive-changes flag).
-- In non-interactive mode (piped, CI, `--no-interactive`): no prompt is shown; the command fails with a structured error and suggests `--accept-data-loss` or `-y`.
+- `-y`/`--yes` auto-accepts the prompt (the single bypass mechanism, per clig.dev §Arguments §Confirmation).
+- In non-interactive mode (piped, CI, `--no-interactive`): no prompt is shown; the command fails with a structured error and suggests `-y`.
 - In `--json` mode: no prompt; same non-interactive behavior.
+- No separate `--accept-data-loss` flag — `-y` is the standard CLI convention for auto-accepting prompts, keeping the flag surface minimal. The internal control API retains `acceptDataLoss` for programmatic consumers.
 
 ## Config & Environment
 - Config file names: `prisma-next.config.ts|.mjs|.js` (ESM); optional CJS fallback.

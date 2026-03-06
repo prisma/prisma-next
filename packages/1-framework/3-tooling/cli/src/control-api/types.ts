@@ -214,8 +214,8 @@ export interface DbUpdateOptions {
    * When true, allows applying plans that contain destructive operations
    * (e.g., DROP TABLE, DROP COLUMN, ALTER TYPE).
    * When false (default), the operation returns a failure if the plan
-   * includes destructive operations, prompting the user to confirm or use --accept-data-loss
-   * to preview and then re-run with --accept-data-loss.
+   * includes destructive operations, prompting the user to confirm interactively
+   * or re-run with -y/--yes.
    */
   readonly acceptDataLoss?: boolean;
   /** Optional progress callback for observing operation progress */

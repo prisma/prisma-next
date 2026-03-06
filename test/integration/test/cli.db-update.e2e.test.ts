@@ -409,7 +409,7 @@ withTempDir(({ createTempDir }) => {
 
     // Scenario 7a: Destructive changes gate
     it(
-      'fails with DESTRUCTIVE_CHANGES when destructive ops require --accept-data-loss',
+      'fails with DESTRUCTIVE_CHANGES when destructive ops are not confirmed',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const { testSetup, configPath } = await setupDbUpdateFixture(
@@ -434,13 +434,13 @@ withTempDir(({ createTempDir }) => {
 
           expect(exitCode).not.toBe(0);
           const allOutput = [...consoleOutput, ...consoleErrors].join('\n');
-          expect(allOutput).toMatch(/destructive|accept-data-loss/i);
+          expect(allOutput).toMatch(/destructive/i);
         });
       },
       timeouts.spinUpPpgDev,
     );
 
-    // Scenario 7b: Runner failure after planning (with --accept-data-loss)
+    // Scenario 7b: Runner failure after planning (with -y)
     it(
       'fails during apply when a blocking view prevents column drop',
       async () => {
@@ -464,7 +464,7 @@ withTempDir(({ createTempDir }) => {
           const exitCode = await runDbUpdateAllowFailure(testSetup, [
             '--config',
             configPath,
-            '--accept-data-loss',
+            '-y',
             '--no-color',
           ]);
 

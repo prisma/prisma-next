@@ -123,7 +123,7 @@ Destructive operations are surfaced as a prominent warning in `migration show` a
 - Requiring `--accept-data-loss` in CI creates friction without adding safety (CI would either hardcode it, defeating the purpose, or need to inspect migration files to decide)
 - The human review checkpoint is the PR review, and `migration show` ensures reviewers can see what they're approving
 
-This differs from `db update --accept-data-loss` which is appropriate because `db update` plans and applies in a single command with no intermediate review step.
+This differs from `db update -y` which is appropriate because `db update` plans and applies in a single command with no intermediate review step.
 
 ## RD-2: Default to latest migration when no target provided
 

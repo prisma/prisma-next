@@ -31,9 +31,7 @@ import {
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-type DbUpdateOptions = MigrationCommandOptions & {
-  readonly acceptDataLoss?: boolean;
-};
+type DbUpdateOptions = MigrationCommandOptions;
 
 /**
  * Maps a DbUpdateFailure to a CliStructuredError for consistent error handling.
@@ -54,7 +52,7 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
   if (failure.code === 'DESTRUCTIVE_CHANGES') {
     return errorDestructiveChanges(failure.summary, {
       ...ifDefined('why', failure.why),
-      fix: 'Re-run with `--accept-data-loss` or `-y` to apply destructive changes, or use `--dry-run` to preview first',
+      fix: 'Re-run with `-y` to apply destructive changes, or use `--dry-run` to preview first',
       ...ifDefined('meta', failure.meta),
     });
   }
@@ -89,7 +87,7 @@ async function executeDbUpdateCommand(
       contractIR: contractJson,
       mode: options.dryRun ? 'plan' : 'apply',
       connection: dbConnection,
-      ...(options.acceptDataLoss ? { acceptDataLoss: true } : {}),
+      ...(flags.yes ? { acceptDataLoss: true } : {}),
       onProgress,
     });
 
@@ -174,40 +172,30 @@ export function createDbUpdateCommand(): Command {
     'Compares your database schema to the emitted contract and applies the necessary\n' +
       'changes. Works on any database, whether or not it has been initialized with `db init`.\n' +
       'Destructive operations prompt for confirmation in interactive mode. Use -y to\n' +
-      'auto-accept, --accept-data-loss for scripts, or --dry-run to preview first.',
+      'auto-accept or --dry-run to preview first.',
   );
   setCommandExamples(command, [
     'prisma-next db update --db $DATABASE_URL',
     'prisma-next db update --db $DATABASE_URL --dry-run',
   ]);
   addMigrationCommandOptions(command);
-  command.option(
-    '--accept-data-loss',
-    'Skip confirmation for destructive operations (for non-interactive/CI use)',
-    false,
-  );
   command.action(async (options: DbUpdateOptions) => {
     const flags = parseGlobalFlags(options);
     const startTime = Date.now();
 
     const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-    // -y/--yes implies --accept-data-loss (auto-accept destructive operations)
-    const effectiveOptions: DbUpdateOptions = flags.yes
-      ? { ...options, acceptDataLoss: true }
-      : options;
-
-    let result = await executeDbUpdateCommand(effectiveOptions, flags, ui, startTime);
+    let result = await executeDbUpdateCommand(options, flags, ui, startTime);
 
     // Interactive confirmation for destructive operations:
     // When the control API rejects destructive changes, prompt the user instead of failing.
+    // In non-interactive mode (CI, piped, --no-interactive, --json), the error is returned as-is.
     if (
       !result.ok &&
       result.failure.code === '3030' &&
       flags.interactive &&
       !flags.json &&
-      !flags.yes &&
-      !options.acceptDataLoss
+      !flags.yes
     ) {
       const meta = result.failure.meta as
         | { destructiveOperations?: readonly { id: string; label: string }[] }
@@ -223,12 +211,7 @@ export function createDbUpdateCommand(): Command {
       const confirmed = await ui.confirm('Apply destructive changes? This cannot be undone.');
 
       if (confirmed) {
-        result = await executeDbUpdateCommand(
-          { ...options, acceptDataLoss: true },
-          flags,
-          ui,
-          Date.now(),
-        );
+        result = await executeDbUpdateCommand(options, { ...flags, yes: true }, ui, Date.now());
       }
     }
 
