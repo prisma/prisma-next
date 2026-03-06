@@ -136,7 +136,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
       return notOk({
         code: 'DESTRUCTIVE_CHANGES',
         summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
-        why: 'Use --dry-run to preview destructive operations, then re-run with --accept-data-loss to apply',
+        why: 'Destructive operations require confirmation — re-run with --accept-data-loss or -y',
         conflicts: undefined,
         meta: { destructiveOperations: destructiveOps },
       });

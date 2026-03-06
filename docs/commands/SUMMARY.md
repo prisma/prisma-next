@@ -121,6 +121,8 @@ Both commands share the same flag surface:
 | `--db <url>` | Database connection string |
 | `--config <path>` | Path to `prisma-next.config.ts` |
 | `--dry-run` | Preview planned operations without applying |
+| `--accept-data-loss` | Skip confirmation for destructive operations (for non-interactive/CI use) |
+| `-y, --yes` | Auto-accept prompts (implies `--accept-data-loss` for `db update`) |
 | `--json [format]` | Output as JSON (`object` format only) |
 | `-q, --quiet` | Quiet mode: errors only |
 | `-v, --verbose` | Verbose output: debug info, timings |

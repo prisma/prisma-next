@@ -215,6 +215,20 @@ export class TerminalUI {
   }
 
   /**
+   * Prompt for yes/no confirmation on stderr. Returns true if confirmed.
+   * In non-interactive mode or when cancelled (Ctrl-C), returns false.
+   */
+  async confirm(message: string): Promise<boolean> {
+    if (!this.isInteractive) return false;
+    const result = await clack.confirm({
+      message,
+      ...TerminalUI.stderrOpts,
+    });
+    if (clack.isCancel(result)) return false;
+    return result;
+  }
+
+  /**
    * Write a raw line to stderr. No-op when piped.
    * Use for decoration that doesn't fit Clack's log format (e.g. styled headers).
    */

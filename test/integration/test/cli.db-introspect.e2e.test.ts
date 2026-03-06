@@ -94,12 +94,24 @@ withTempDir(({ createTempDir }) => {
           const output = consoleOutput.join('\n');
           const stripped = stripAnsi(output);
 
-          // Normalize database URL (port number), spinner timings, and intermediate
-          // Clack spinner frames (◒, ◐, ◓, ◑) that appear before final ◇ result
+          // Normalize database URL (port number) and strip non-deterministic spinner output.
+          // The 100ms spinner delay means the spinner line may or may not appear.
+          // Strip: spinner frames (◒◐◓◑), completion lines (◇), and orphan bar lines (│ alone)
+          // that clack emits around spinner lifecycle.
           const normalized = stripped
             .replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX')
             .replace(/\(\d+ms\)/g, '(Xms)')
-            .replace(/^[◒◐◓◑].*$/gm, '')
+            .split('\n')
+            .filter((line) => {
+              const trimmed = line.trim();
+              // Strip non-deterministic spinner output (100ms delay means it may or may not appear)
+              if (/^[◒◐◓◑]/.test(trimmed)) return false;
+              if (/^◇/.test(trimmed)) return false;
+              // Strip bare bar lines (clack decoration from spinner lifecycle)
+              if (trimmed === '│') return false;
+              return true;
+            })
+            .join('\n')
             .replace(/\n{3,}/g, '\n\n');
 
           // Snapshot test for tree output

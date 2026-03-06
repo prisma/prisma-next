@@ -428,6 +428,7 @@ withTempDir(({ createTempDir }) => {
           const exitCode = await runDbUpdateAllowFailure(testSetup, [
             '--config',
             configPath,
+            '--no-interactive',
             '--no-color',
           ]);
 

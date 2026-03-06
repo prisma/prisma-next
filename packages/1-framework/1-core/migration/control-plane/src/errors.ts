@@ -454,7 +454,9 @@ export function errorDestructiveChanges(
   return new CliStructuredError('3030', summary, {
     domain: 'RTM',
     why: options?.why ?? 'Planned operations include destructive changes that require confirmation',
-    fix: options?.fix ?? 'Use `--dry-run` to preview, then re-run with `--accept-data-loss`',
+    fix:
+      options?.fix ??
+      'Re-run with `--accept-data-loss` or `-y` to apply, or use `--dry-run` to preview first',
     ...(options?.meta ? { meta: options.meta } : {}),
   });
 }

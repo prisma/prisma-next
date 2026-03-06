@@ -54,7 +54,7 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
   if (failure.code === 'DESTRUCTIVE_CHANGES') {
     return errorDestructiveChanges(failure.summary, {
       ...ifDefined('why', failure.why),
-      fix: 'Use `prisma-next db update --dry-run` to preview, then re-run with `--accept-data-loss` to apply destructive changes',
+      fix: 'Re-run with `--accept-data-loss` or `-y` to apply destructive changes, or use `--dry-run` to preview first',
       ...ifDefined('meta', failure.meta),
     });
   }
@@ -173,7 +173,8 @@ export function createDbUpdateCommand(): Command {
     'Update your database schema to match your contract',
     'Compares your database schema to the emitted contract and applies the necessary\n' +
       'changes. Works on any database, whether or not it has been initialized with `db init`.\n' +
-      'Use --dry-run to preview operations before applying.',
+      'Destructive operations prompt for confirmation in interactive mode. Use -y to\n' +
+      'auto-accept, --accept-data-loss for scripts, or --dry-run to preview first.',
   );
   setCommandExamples(command, [
     'prisma-next db update --db $DATABASE_URL',
@@ -182,7 +183,7 @@ export function createDbUpdateCommand(): Command {
   addMigrationCommandOptions(command);
   command.option(
     '--accept-data-loss',
-    'Confirm destructive operations (required when plan includes drops or type changes)',
+    'Skip confirmation for destructive operations (for non-interactive/CI use)',
     false,
   );
   command.action(async (options: DbUpdateOptions) => {
@@ -191,7 +192,46 @@ export function createDbUpdateCommand(): Command {
 
     const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-    const result = await executeDbUpdateCommand(options, flags, ui, startTime);
+    // -y/--yes implies --accept-data-loss (auto-accept destructive operations)
+    const effectiveOptions: DbUpdateOptions = flags.yes
+      ? { ...options, acceptDataLoss: true }
+      : options;
+
+    let result = await executeDbUpdateCommand(effectiveOptions, flags, ui, startTime);
+
+    // Interactive confirmation for destructive operations:
+    // When the control API rejects destructive changes, prompt the user instead of failing.
+    if (
+      !result.ok &&
+      result.failure.code === '3030' &&
+      flags.interactive &&
+      !flags.json &&
+      !flags.yes &&
+      !options.acceptDataLoss
+    ) {
+      const meta = result.failure.meta as
+        | { destructiveOperations?: readonly { id: string; label: string }[] }
+        | undefined;
+      const destructiveOps = meta?.destructiveOperations ?? [];
+
+      if (destructiveOps.length > 0) {
+        ui.warn(
+          `${destructiveOps.length} destructive operation(s) that may cause data loss:\n${destructiveOps.map((op) => `  ${ui.yellow('▸')} ${op.label}`).join('\n')}`,
+        );
+      }
+
+      const confirmed = await ui.confirm('Apply destructive changes? This cannot be undone.');
+
+      if (confirmed) {
+        result = await executeDbUpdateCommand(
+          { ...options, acceptDataLoss: true },
+          flags,
+          ui,
+          Date.now(),
+        );
+      }
+    }
+
     const exitCode = handleResult(result, flags, (dbUpdateResult) => {
       if (flags.json) {
         ui.output(formatMigrationJson(dbUpdateResult));

@@ -98,8 +98,8 @@ exports[`help text snapshots > formats db update help 1`] = `
 │ --config <path>       Path to prisma-next.config.ts
 │ --dry-run             Preview planned operations without applying
 │                       default: false
-│ --accept-data-loss    Confirm destructive operations (required when plan
-│                       includes drops or type changes)
+│ --accept-data-loss    Skip confirmation for destructive operations (for
+│                       non-interactive/CI use)
 │                       default: false
 │
 │ Examples:
@@ -110,7 +110,8 @@ exports[`help text snapshots > formats db update help 1`] = `
 │ necessary
 │ changes. Works on any database, whether or not it has been initialized with
 │ \`db init\`.
-│ Use --dry-run to preview operations before applying.
+│ Destructive operations prompt for confirmation in interactive mode. Use -y to
+│ auto-accept, --accept-data-loss for scripts, or --dry-run to preview first.
 └
 "
 `;
