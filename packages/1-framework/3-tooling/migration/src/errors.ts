@@ -102,8 +102,8 @@ export function errorAmbiguousLeaf(leaves: readonly string[]): MigrationToolsErr
 
 export function errorNoRoot(nodes: readonly string[]): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.NO_ROOT', 'Migration graph has no root', {
-    why: `No root migration found in the migration graph (nodes: ${nodes.join(', ')}). Every migration references a parentMigrationId that does not exist, or the graph contains a cycle in parent pointers.`,
-    fix: 'Inspect the migrations directory for corrupted migration.json files. Exactly one migration must have parentMigrationId set to null (the first migration).',
+    why: `No root migration found in the migration graph (nodes: ${nodes.join(', ')}). No migration starts from the empty contract hash, or all edges form a disconnected subgraph.`,
+    fix: 'Inspect the migrations directory for corrupted migration.json files. At least one migration must start from the empty contract hash.',
     details: { nodes },
   });
 }
@@ -113,7 +113,7 @@ export function errorDuplicateMigrationId(migrationId: string): MigrationToolsEr
     'MIGRATION.DUPLICATE_MIGRATION_ID',
     'Duplicate migrationId in migration graph',
     {
-      why: `Multiple migrations share migrationId "${migrationId}". This makes parent-chain reconstruction ambiguous and unsafe.`,
+      why: `Multiple migrations share migrationId "${migrationId}". Each migration must have a unique content-addressed identity.`,
       fix: 'Regenerate one of the conflicting migrations so each migrationId is unique, then re-run migration commands.',
       details: { migrationId },
     },

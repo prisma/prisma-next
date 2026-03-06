@@ -22,16 +22,6 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { DatabaseDependencyProvider } from './types';
 
-function convertDefault(def: ColumnDefault): string {
-  if (def.kind === 'function') {
-    return def.expression;
-  }
-  if (typeof def.value === 'string') {
-    return `'${def.value.replaceAll("'", "''")}'`;
-  }
-  return String(def.value);
-}
-
 /**
  * Target-specific callback that expands a column's base `nativeType` and optional
  * `typeParams` into the fully-qualified type string used by the database
@@ -48,10 +38,22 @@ export type NativeTypeExpander = (input: {
   readonly typeParams?: Record<string, unknown>;
 }) => string;
 
+/**
+ * Target-specific callback that renders a `ColumnDefault` into the raw SQL literal
+ * string stored in `SqlColumnIR.default`.
+ *
+ * Default value serialization is target-specific (quoting, casting, type syntax vary
+ * between Postgres, MySQL, SQLite, …). This callback follows the same IoC pattern as
+ * `NativeTypeExpander`: the target provides its renderer when calling
+ * `contractToSchemaIR`, keeping the family layer target-agnostic.
+ */
+export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => string;
+
 function convertColumn(
   name: string,
   column: StorageColumn,
-  expandNativeType?: NativeTypeExpander,
+  expandNativeType: NativeTypeExpander | undefined,
+  renderDefault: DefaultRenderer,
 ): SqlColumnIR {
   const nativeType = expandNativeType
     ? expandNativeType({
@@ -64,7 +66,10 @@ function convertColumn(
     name,
     nativeType,
     nullable: column.nullable,
-    ...(column.default != null ? { default: convertDefault(column.default) } : {}),
+    ...ifDefined(
+      'default',
+      column.default != null ? renderDefault(column.default, column) : undefined,
+    ),
   };
 }
 
@@ -95,11 +100,12 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
 function convertTable(
   name: string,
   table: StorageTable,
-  expandNativeType?: NativeTypeExpander,
+  expandNativeType: NativeTypeExpander | undefined,
+  renderDefault: DefaultRenderer,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIR> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
-    columns[colName] = convertColumn(colName, colDef, expandNativeType);
+    columns[colName] = convertColumn(colName, colDef, expandNativeType, renderDefault);
   }
 
   const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
@@ -172,6 +178,7 @@ export function detectDestructiveChanges(
 
 export interface ContractToSchemaIROptions {
   readonly expandNativeType?: NativeTypeExpander;
+  readonly renderDefault: DefaultRenderer;
   readonly frameworkComponents?: readonly unknown[];
 }
 
@@ -191,7 +198,7 @@ export interface ContractToSchemaIROptions {
  */
 export function contractToSchemaIR(
   contract: SqlContract<SqlStorage> | null,
-  options?: ContractToSchemaIROptions,
+  options: ContractToSchemaIROptions,
 ): SqlSchemaIR {
   if (!contract) {
     return { tables: {}, dependencies: [] };
@@ -200,7 +207,12 @@ export function contractToSchemaIR(
   const storage = contract.storage;
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
-    tables[tableName] = convertTable(tableName, tableDef, options?.expandNativeType);
+    tables[tableName] = convertTable(
+      tableName,
+      tableDef,
+      options.expandNativeType,
+      options.renderDefault,
+    );
   }
 
   const dependencies = collectDependenciesFromComponents(options?.frameworkComponents);

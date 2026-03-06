@@ -12,7 +12,6 @@ export interface MigrationManifest {
   readonly from: string;
   readonly to: string;
   readonly migrationId: string | null;
-  readonly parentMigrationId: string | null;
   readonly kind: 'regular' | 'baseline';
   readonly fromContract: ContractIR | null;
   readonly toContract: ContractIR;
@@ -36,7 +35,6 @@ export interface MigrationChainEntry {
   readonly from: string;
   readonly to: string;
   readonly migrationId: string | null;
-  readonly parentMigrationId: string | null;
   readonly dirName: string;
   readonly createdAt: string;
   readonly labels: readonly string[];
@@ -47,5 +45,4 @@ export interface MigrationGraph {
   readonly forwardChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
   readonly reverseChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
   readonly migrationById: ReadonlyMap<string, MigrationChainEntry>;
-  readonly childrenByParentId: ReadonlyMap<string | null, readonly MigrationChainEntry[]>;
 }

@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findPathWithDecision, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type { MigrationGraph, MigrationPackage } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -35,6 +36,7 @@ import { handleResult } from '../utils/result-handler';
 interface MigrationApplyCommandOptions {
   readonly db?: string;
   readonly config?: string;
+  readonly ref?: string;
   readonly json?: string | boolean;
   readonly quiet?: boolean;
   readonly q?: boolean;
@@ -59,6 +61,14 @@ export interface MigrationApplyResult {
     readonly operationsExecuted: number;
   }[];
   readonly summary: string;
+  readonly pathDecision?: {
+    readonly fromHash: string;
+    readonly toHash: string;
+    readonly alternativeCount: number;
+    readonly tieBreakReasons: readonly string[];
+    readonly refName?: string;
+    readonly refHash?: string;
+  };
   readonly timings: {
     readonly total: number;
   };
@@ -136,29 +146,45 @@ async function executeMigrationApplyCommand(
   }
 
   let destinationHash: string;
-  try {
-    const contractPathAbsolute = resolveContractPath(config);
-    const contractRaw = JSON.parse(await readFile(contractPathAbsolute, 'utf-8')) as Record<
-      string,
-      unknown
-    >;
-    const contractHash = contractRaw['storageHash'];
-    if (typeof contractHash !== 'string') {
+  let refName: string | undefined;
+
+  if (options.ref) {
+    refName = options.ref;
+    const refsPath = resolve(migrationsDir, 'refs.json');
+    try {
+      const refs = await readRefs(refsPath);
+      destinationHash = resolveRef(refs, refName);
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(mapMigrationToolsError(error));
+      }
+      throw error;
+    }
+  } else {
+    try {
+      const contractPathAbsolute = resolveContractPath(config);
+      const contractRaw = JSON.parse(await readFile(contractPathAbsolute, 'utf-8')) as Record<
+        string,
+        unknown
+      >;
+      const contractHash = contractRaw['storageHash'];
+      if (typeof contractHash !== 'string') {
+        return notOk(
+          errorRuntime('Current contract is missing storage hash', {
+            why: `The contract at ${relative(process.cwd(), contractPathAbsolute)} does not contain a valid storageHash`,
+            fix: 'Run `prisma-next contract emit` and re-run `prisma-next migration apply`.',
+          }),
+        );
+      }
+      destinationHash = contractHash;
+    } catch (error) {
       return notOk(
-        errorRuntime('Current contract is missing storage hash', {
-          why: `The contract at ${relative(process.cwd(), contractPathAbsolute)} does not contain a valid storageHash`,
-          fix: 'Run `prisma-next contract emit` and re-run `prisma-next migration apply`.',
+        errorRuntime('Current contract is unavailable', {
+          why: `Failed to read contract hash before apply: ${error instanceof Error ? error.message : String(error)}`,
+          fix: 'Run `prisma-next contract emit` to generate a valid contract.json, then retry apply.',
         }),
       );
     }
-    destinationHash = contractHash;
-  } catch (error) {
-    return notOk(
-      errorRuntime('Current contract is unavailable', {
-        why: `Failed to read contract hash before apply: ${error instanceof Error ? error.message : String(error)}`,
-        fix: 'Run `prisma-next contract emit` to generate a valid contract.json, then retry apply.',
-      }),
-    );
   }
 
   if (flags.json !== 'object' && !flags.quiet) {
@@ -168,6 +194,9 @@ async function executeMigrationApplyCommand(
     ];
     if (typeof dbConnection === 'string') {
       details.push({ label: 'database', value: maskConnectionUrl(dbConnection) });
+    }
+    if (refName) {
+      details.push({ label: 'ref', value: refName });
     }
     const header = formatStyledHeader({
       command: 'migration apply',
@@ -304,8 +333,13 @@ async function executeMigrationApplyCommand(
       );
     }
 
-    const pendingPath = findPath(graph, markerHash, destinationHash);
-    if (!pendingPath) {
+    const decision = findPathWithDecision(
+      graph,
+      markerHash,
+      destinationHash,
+      refName ? { name: refName, hash: destinationHash } : undefined,
+    );
+    if (!decision) {
       return notOk(
         errorRuntime('No migration path from current state to target', {
           why: `Cannot find a path from marker hash "${markerHash}" to target "${destinationHash}"`,
@@ -315,6 +349,16 @@ async function executeMigrationApplyCommand(
       );
     }
 
+    const pendingPath = decision.selectedPath;
+    const pathDecision = {
+      fromHash: decision.fromHash,
+      toHash: decision.toHash,
+      alternativeCount: decision.alternativeCount,
+      tieBreakReasons: decision.tieBreakReasons,
+      ...(decision.refName ? { refName: decision.refName } : {}),
+      ...(decision.refHash ? { refHash: decision.refHash } : {}),
+    };
+
     if (pendingPath.length === 0) {
       return ok({
         ok: true,
@@ -323,6 +367,7 @@ async function executeMigrationApplyCommand(
         markerHash,
         applied: [],
         summary: 'Already up to date',
+        pathDecision,
         timings: { total: Date.now() - startTime },
       });
     }
@@ -368,6 +413,7 @@ async function executeMigrationApplyCommand(
       markerHash: value.markerHash,
       applied: value.applied,
       summary: value.summary,
+      pathDecision,
       timings: { total: Date.now() - startTime },
     });
   } catch (error) {
@@ -403,6 +449,7 @@ export function createMigrationApplyCommand(): Command {
     })
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
+    .option('--ref <name>', 'Target ref name from migrations/refs.json')
     .option('--json [format]', 'Output as JSON (object)', false)
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')

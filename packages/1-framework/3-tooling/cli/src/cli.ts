@@ -8,6 +8,7 @@ import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
 import { createMigrationApplyCommand } from './commands/migration-apply';
 import { createMigrationPlanCommand } from './commands/migration-plan';
+import { createMigrationRefCommand } from './commands/migration-ref';
 import { createMigrationShowCommand } from './commands/migration-show';
 import { createMigrationStatusCommand } from './commands/migration-status';
 import { createMigrationVerifyCommand } from './commands/migration-verify';
@@ -230,6 +231,9 @@ migrationCommand.addCommand(migrationVerifyCommand);
 
 const migrationApplyCommand = createMigrationApplyCommand();
 migrationCommand.addCommand(migrationApplyCommand);
+
+const migrationRefCommand = createMigrationRefCommand();
+migrationCommand.addCommand(migrationRefCommand);
 
 program.addCommand(migrationCommand);
 

@@ -16,6 +16,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import { postgresRenderDefault } from '../../src/exports/control';
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
@@ -62,6 +63,7 @@ function planFromStorages(from: SqlStorage | null, to: SqlStorage): MigrationPla
   const toContract = createTestContract(to);
   const fromSchemaIR = contractToSchemaIR(from ? createTestContract(from) : null, {
     expandNativeType: expandParameterizedNativeType,
+    renderDefault: postgresRenderDefault,
   });
   const planner = createPostgresMigrationPlanner();
   return planner.plan({
@@ -93,6 +95,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     const contract = createTestContract(storage);
     const schemaIR = contractToSchemaIR(createTestContract(storage), {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
     });
     const planner = createPostgresMigrationPlanner();
 
@@ -128,6 +131,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     const contract = createTestContract(storage);
     const emptySchemaIR = contractToSchemaIR(null, {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
     });
     const planner = createPostgresMigrationPlanner();
 
@@ -188,6 +192,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     const contract = createTestContract(toStorage);
     const fromSchemaIR = contractToSchemaIR(createTestContract(fromStorage), {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
     });
     const planner = createPostgresMigrationPlanner();
 
@@ -239,6 +244,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     const contract = createTestContract(storage);
     const schemaIR = contractToSchemaIR(createTestContract(storage), {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
     });
     const planner = createPostgresMigrationPlanner();
 
@@ -784,6 +790,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
 
     const fromSchemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
       frameworkComponents,
     });
     const toContract = createDemoContract(toStorage);
@@ -811,6 +818,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
   it('produces no ops when from and to storages are identical (with extensions and types)', () => {
     const fromSchemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
       frameworkComponents,
     });
     const toContract = createDemoContract(DEMO_BASE_STORAGE);
@@ -834,6 +842,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
   it('emits all ops on initial migration from empty state', () => {
     const fromSchemaIR = contractToSchemaIR(null, {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
     });
     const toContract = createDemoContract(DEMO_BASE_STORAGE);
     const planner = createPostgresMigrationPlanner();
@@ -859,6 +868,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
   it('contractToSchemaIR derives dependencies from framework components', () => {
     const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
       frameworkComponents,
     });
     expect(schemaIR.dependencies).toContainEqual({ id: 'postgres.extension.vector' });
@@ -867,6 +877,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
   it('contractToSchemaIR derives annotations from contract storage types', () => {
     const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
       frameworkComponents,
     });
     const pgAnnotations = schemaIR.annotations?.['pg'] as Record<string, unknown> | undefined;
@@ -881,6 +892,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
   it('contractToSchemaIR defaults to empty dependencies when no framework components given', () => {
     const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
+      renderDefault: postgresRenderDefault,
     });
     expect(schemaIR.dependencies).toEqual([]);
   });

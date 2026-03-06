@@ -56,11 +56,7 @@ Each migration carries a `parentMigrationId` field: the `migrationId` of the mig
 - The canonicalized `fromContract`
 - The canonicalized `toContract`
 
-**`parentMigrationId` should be excluded from the hash.** The identity answers "what does this migration do?" (ops + contracts), not "where does it sit in the chain?" (parent pointer). This separation is critical for future squash and rebase operations:
-
-- **Rebase**: Re-parenting a migration changes `parentMigrationId` but not the content. If `parentMigrationId` is in the hash, rebasing cascades ID changes through every downstream migration.
-- **Squash**: Collapsing N migrations into one produces a new migration that replaces the chain. Downstream migrations update their `parentMigrationId` to point to the squashed migration. If `parentMigrationId` is in the hash, all downstream IDs change.
-- **Deduplication**: Two developers independently planning the same change get the same `migrationId` when the parent is excluded, enabling detection of identical changes.
+`parentMigrationId` is included in the manifest and therefore in the hash. This means re-parenting a migration (rebase, squash) changes its `migrationId`.
 
 ### 4. Direct SQL on disk
 
