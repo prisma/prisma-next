@@ -220,7 +220,7 @@ Track adoption and friction:
 - count of divergence/branch errors,
 - and ref usage by command (status/plan/apply).
 
-# Offline planning: contractToSchemaIR and component-owned extensions
+# Offline planning: contractToSchemaIR and declarative dependencies
 
 During implementation, incremental migrations were incorrectly re-emitting operations for database extensions (`CREATE EXTENSION vector`), storage types (`CREATE TYPE user_type`), and FK-backing indexes that already existed in the previous contract. The planner itself was correct — it faithfully diffed the "from" and "to" states it was given. The bug was in `contractToSchemaIR`: it only received `SqlStorage` (tables), not the full contract, so the "from" schema IR it produced was incomplete — missing extensions, types, and FK-backed indexes. The planner correctly concluded these were new additions because they were absent from the "from" state.
 
@@ -238,26 +238,26 @@ contractToSchemaIR(
 The function derives schema IR fields from three sources:
 
 1. **Tables** — from `contract.storage.tables`, same as before. Codec metadata (`codecId`, `typeRef`) is dropped; the planner only needs structural information. FK-backing indexes (from `foreignKeys` with `index: true`) are now derived into `SqlSchemaIR.indexes`.
-2. **Extensions** — from `frameworkComponents`. Each component that declares `databaseDependencies.init[].extension` contributes its database extension name (e.g., `'vector'`). This follows ADR 154: extensions are component-owned declarations, not inferred from `contract.extensionPacks`.
+2. **Dependencies** — from `frameworkComponents`. Each component that declares `databaseDependencies.init[]` contributes its dependency ID (e.g., `'postgres.extension.vector'`) to `SqlSchemaIR.dependencies`. This follows ADR 154: dependencies are component-owned declarations, not inferred from `contract.extensionPacks`.
 3. **Type annotations** — from `contract.storage.types`. Storage types (e.g., enums) are placed into `SqlSchemaIR.annotations.pg.storageTypes` so the planner can diff them against the "to" contract and skip operations for types that already exist.
 
-## Why component-owned, not contract-inferred
+## Generic DependencyIR model
 
-ADR 154 forbids inferring database prerequisites from `contract.extensionPacks`. The extension pack ID (`pgvector`) is a namespace for type/codec/operation registration — it is not a database extension name. The mapping is owned by each component, declared explicitly via `ComponentDatabaseDependency.extension`:
+`SqlSchemaIR` uses a target-agnostic `dependencies: readonly DependencyIR[]` field instead of the earlier Postgres-specific `extensions: readonly string[]`. Each `DependencyIR` carries only an `id: string` — the same ID declared on `ComponentDatabaseDependency`:
 
 ```typescript
 interface ComponentDatabaseDependency<TTargetDetails> {
   readonly id: string;
   readonly label: string;
-  readonly extension?: string;  // e.g., 'vector'
   readonly install: readonly SqlMigrationPlanOperation<TTargetDetails>[];
-  readonly verifyDatabaseDependencyInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
 }
 ```
 
-This field is singular (`extension`, not `extensions`) because each `ComponentDatabaseDependency` represents one dependency with its own install ops and verification. If a pack needed two database extensions, it would declare two entries in `databaseDependencies.init[]`.
+The planner checks `schemaIR.dependencies` for each component dependency's `id` — if present, the dependency is already installed and install ops are skipped. Verification uses the same structural ID check, replacing the earlier per-component `verifyDatabaseDependencyInstalled` callback.
 
-Third-party extension packs declare their own `extension` name. No hardcoded maps exist in targets.
+Introspection maps database objects to dependency IDs. For Postgres, `pg_extension` rows use the convention `postgres.extension.<extname>` (e.g., `{ id: 'postgres.extension.vector' }`). The adapter owns this convention; extension components must follow it.
+
+See `projects/on-disk-migrations-v2/specs/declarative-database-dependencies.spec.md` for the full design rationale and solutions considered.
 
 ## Typing at the interface boundary
 
