@@ -12,7 +12,7 @@ import {
 } from './schema-verify.helpers';
 
 /**
- * Creates a test database dependency that checks for a specific extension.
+ * Creates a test database dependency for a specific extension.
  */
 function createExtensionDependency(
   extensionName: string,
@@ -37,18 +37,6 @@ function createExtensionDependency(
         postcheck: [],
       },
     ],
-    verifyDatabaseDependencyInstalled: (schema) => {
-      if (!schema.extensions.includes(extensionName)) {
-        return [
-          {
-            kind: 'extension_missing',
-            table: '',
-            message: `Extension "${extensionName}" is missing from database`,
-          },
-        ];
-      }
-      return [];
-    },
   };
 }
 
@@ -64,7 +52,10 @@ describe('verifyDatabaseDependencies', () => {
   });
 
   it('returns pass nodes when all dependencies are satisfied', () => {
-    const schema = createTestSchemaIR({}, ['vector', 'postgis']);
+    const schema = createTestSchemaIR({}, [
+      { id: 'postgres.extension.vector' },
+      { id: 'postgres.extension.postgis' },
+    ]);
     const issues: Parameters<typeof verifyDatabaseDependencies>[2] = [];
     const dependencies = [
       createExtensionDependency('vector', 'Enable vector extension'),
@@ -86,7 +77,7 @@ describe('verifyDatabaseDependencies', () => {
   });
 
   it('returns fail nodes when dependencies are missing', () => {
-    const schema = createTestSchemaIR({}, []); // No extensions installed
+    const schema = createTestSchemaIR({}, []); // No dependencies installed
     const issues: Parameters<typeof verifyDatabaseDependencies>[2] = [];
     const dependencies = [createExtensionDependency('vector', 'Enable vector extension')];
 
@@ -101,12 +92,12 @@ describe('verifyDatabaseDependencies', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       kind: 'extension_missing',
-      message: 'Extension "vector" is missing from database',
+      message: 'Dependency "postgres.extension.vector" is missing from database',
     });
   });
 
   it('returns mixed nodes when some dependencies are satisfied', () => {
-    const schema = createTestSchemaIR({}, ['vector']); // Only vector installed
+    const schema = createTestSchemaIR({}, [{ id: 'postgres.extension.vector' }]); // Only vector installed
     const issues: Parameters<typeof verifyDatabaseDependencies>[2] = [];
     const dependencies = [
       createExtensionDependency('vector', 'Enable vector extension'),
@@ -127,7 +118,7 @@ describe('verifyDatabaseDependencies', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       kind: 'extension_missing',
-      message: 'Extension "postgis" is missing from database',
+      message: 'Dependency "postgres.extension.postgis" is missing from database',
     });
   });
 });
@@ -146,7 +137,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
           id: { nativeType: 'int4', nullable: false },
         }),
       },
-      ['vector'],
+      [{ id: 'postgres.extension.vector' }],
     );
 
     const dependencies = [createExtensionDependency('vector', 'Enable vector extension')];
@@ -185,7 +176,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
           id: { nativeType: 'int4', nullable: false },
         }),
       },
-      [], // No extensions installed
+      [], // No dependencies installed
     );
 
     const dependencies = [createExtensionDependency('vector', 'Enable vector extension')];
@@ -211,7 +202,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
     expect(result.schema.issues).toContainEqual(
       expect.objectContaining({
         kind: 'extension_missing',
-        message: 'Extension "vector" is missing from database',
+        message: 'Dependency "postgres.extension.vector" is missing from database',
       }),
     );
   });
@@ -234,7 +225,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
           id: { nativeType: 'int4', nullable: false },
         }),
       },
-      [], // No extensions installed
+      [], // No dependencies installed
     );
 
     // This should throw because pgvector is in the contract but not in frameworkComponents
@@ -270,7 +261,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
           id: { nativeType: 'int4', nullable: false },
         }),
       },
-      [], // No extensions installed
+      [], // No dependencies installed
     );
 
     // Provide a pgvector extension descriptor WITHOUT database dependencies

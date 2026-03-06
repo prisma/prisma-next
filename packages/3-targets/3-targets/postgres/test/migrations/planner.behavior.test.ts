@@ -25,7 +25,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
     };
 
     const result = planner.plan({
@@ -55,7 +55,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
     };
 
     const result = planner.plan({
@@ -94,7 +94,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
     };
 
     const result = planner.plan({

@@ -11,11 +11,11 @@ import { createPostgresMigrationPlanner } from '../../src/core/migrations/planne
 import type { PostgresColumnDefault } from '../../src/core/types';
 
 const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
-  id: 'postgres.extension.pgvector',
+  id: 'postgres.extension.vector',
   label: 'Enable extension "vector"',
   install: [
     {
-      id: 'extension.pgvector',
+      id: 'extension.vector',
       label: 'Enable extension "vector"',
       summary: 'Ensures the pgvector extension is enabled for vector columns',
       operationClass: 'additive',
@@ -40,18 +40,6 @@ const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
       ],
     },
   ],
-  verifyDatabaseDependencyInstalled: (schema) => {
-    if (schema.extensions.includes('vector')) {
-      return [];
-    }
-    return [
-      {
-        kind: 'extension_missing',
-        table: '',
-        message: 'Extension "vector" is missing from database',
-      },
-    ];
-  },
 };
 
 type PostgresStorageColumn = Omit<StorageColumn, 'default'> & {
@@ -128,7 +116,7 @@ const contract = createTestContract();
 
 const emptySchema: SqlSchemaIR = {
   tables: {},
-  extensions: [],
+  dependencies: [],
 };
 
 describe('PostgresMigrationPlanner - when database is empty', () => {
@@ -150,7 +138,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     const operations = result.plan.operations;
     expect(operations.length).toBeGreaterThan(0);
     expect(operations.map((op) => op.id)).toEqual([
-      'extension.pgvector',
+      'extension.vector',
       'table.post',
       'table.user',
       'unique.user.user_email_key',
@@ -289,7 +277,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     const frameworkComponents = [createFrameworkComponent()];
     const schemaWithExtension: SqlSchemaIR = {
       tables: {},
-      extensions: ['vector'],
+      dependencies: [{ id: 'postgres.extension.vector' }],
     };
 
     const result = planner.plan({
@@ -303,7 +291,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     if (result.kind !== 'success') {
       throw new Error(`Expected success but got ${JSON.stringify(result)}`);
     }
-    expect(result.plan.operations.map((op) => op.id)).not.toContain('extension.pgvector');
+    expect(result.plan.operations.map((op) => op.id)).not.toContain('extension.vector');
   });
 
   it('builds additive plan for empty schema without database dependencies', () => {
@@ -360,7 +348,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
     };
 
     const result = planner.plan({
@@ -375,7 +363,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       throw new Error(`Expected success but got ${JSON.stringify(result)}`);
     }
     expect(result.plan.operations.map((op) => op.id)).toEqual([
-      'extension.pgvector',
+      'extension.vector',
       'table.post',
       'table.user',
       'unique.user.user_email_key',
@@ -421,7 +409,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
     };
 
     const result = planner.plan({
@@ -436,7 +424,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       throw new Error(`Expected success but got ${JSON.stringify(result)}`);
     }
     expect(result.plan.operations.map((op) => op.id)).toEqual([
-      'extension.pgvector',
+      'extension.vector',
       'table.post',
       'table.user',
       'unique.user.user_email_key',

@@ -705,13 +705,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         },
       );
 
-      const extensionNodes: readonly SchemaTreeNode[] = schema.extensions.map((extName) => ({
+      const dependencyNodes: readonly SchemaTreeNode[] = schema.dependencies.map((dep) => ({
         kind: 'extension',
-        id: `extension-${extName}`,
-        label: `${extName} extension is enabled`,
+        id: `dependency-${dep.id}`,
+        label: `${dep.id} is enabled`,
       }));
 
-      const rootChildren = [...tableNodes, ...extensionNodes];
+      const rootChildren = [...tableNodes, ...dependencyNodes];
 
       const rootNode: SchemaTreeNode = {
         kind: 'root',

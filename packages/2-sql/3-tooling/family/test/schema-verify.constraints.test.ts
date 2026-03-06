@@ -1,4 +1,3 @@
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
@@ -383,7 +382,7 @@ describe('verifySqlSchema - constraints', () => {
 
       const schema = createTestSchemaIR(
         { user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }) },
-        [], // No extensions
+        [], // No dependencies
       );
 
       const frameworkComponents = [
@@ -399,18 +398,6 @@ describe('verifySqlSchema - constraints', () => {
                 id: 'postgres.extension.vector',
                 label: 'Enable vector extension',
                 install: [],
-                verifyDatabaseDependencyInstalled: (s: SqlSchemaIR) => {
-                  if (!s.extensions.includes('vector')) {
-                    return [
-                      {
-                        kind: 'extension_missing',
-                        table: '',
-                        message: 'Extension "vector" is missing from database',
-                      },
-                    ];
-                  }
-                  return [];
-                },
               },
             ],
           },

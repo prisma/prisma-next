@@ -64,7 +64,7 @@ function createRefActionContract(
 
 const emptySchema: SqlSchemaIR = {
   tables: {},
-  extensions: [],
+  dependencies: [],
 };
 
 function planAndGetFkSql(onDelete?: ReferentialAction, onUpdate?: ReferentialAction): string {

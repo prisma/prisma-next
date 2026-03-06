@@ -27,9 +27,9 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
       },
       contractToSchema(contract, frameworkComponents) {
-        return contractToSchemaIR(contract as SqlContract<SqlStorage> | null, {
+        return contractToSchemaIR(contract, {
           expandNativeType: expandParameterizedNativeType,
-          frameworkComponents,
+          frameworkComponents: frameworkComponents ?? [],
         });
       },
     },
