@@ -9,10 +9,10 @@ import {
   mapStorageRowToModelFields,
   stripHiddenMappedFields,
 } from '../src/collection-runtime';
-import { createTestContract } from './helpers';
+import { getTestContract } from './helpers';
 
 describe('collection-runtime', () => {
-  const contract = createTestContract();
+  const contract = getTestContract();
 
   it('augmentSelectionForJoinColumns() handles undefined and complete selections', () => {
     expect(augmentSelectionForJoinColumns(undefined, ['id'])).toEqual({

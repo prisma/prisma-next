@@ -1500,6 +1500,21 @@ importers:
         specifier: 'catalog:'
         version: 0.28.10
     devDependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/6-adapters/postgres
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/cli
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../2-sql/3-tooling/family
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../2-sql/2-authoring/contract-ts
+      '@prisma-next/target-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/3-targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils

@@ -4,10 +4,10 @@ import {
   mapFieldsToColumns,
   mapFieldToColumn,
 } from '../src/collection-column-mapping';
-import { createTestContract } from './helpers';
+import { getTestContract } from './helpers';
 
 describe('collection-column-mapping', () => {
-  const contract = createTestContract();
+  const contract = getTestContract();
 
   it('mapFieldToColumn() resolves known fields and falls back for unknown fields', () => {
     expect(mapFieldToColumn(contract, 'Post', 'userId')).toBe('user_id');

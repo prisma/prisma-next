@@ -5,7 +5,7 @@ import {
   createReturningCollectionFor,
   withReturningCapability,
 } from '../collection-fixtures';
-import { createMockRuntime, createTestContract } from '../helpers';
+import { createMockRuntime, getTestContract } from '../helpers';
 import { normalizeSql, serializePlans } from './helpers';
 
 describe('sql-compilation/upsert', () => {
@@ -130,7 +130,7 @@ describe('sql-compilation/upsert', () => {
 
   it('upsert() throws when no conflict columns can be resolved', async () => {
     const runtime = createMockRuntime();
-    const contractWithoutPrimaryKey = withReturningCapability(createTestContract());
+    const contractWithoutPrimaryKey = withReturningCapability(getTestContract());
     delete (contractWithoutPrimaryKey.storage.tables.users as { primaryKey?: unknown }).primaryKey;
 
     const collection = new Collection({ contract: contractWithoutPrimaryKey, runtime }, 'User');
