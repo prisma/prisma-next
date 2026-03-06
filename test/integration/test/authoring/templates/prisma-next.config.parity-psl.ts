@@ -11,6 +11,13 @@ function extensionPackMetaFromDescriptor(descriptor: unknown): Record<string, un
     return {};
   }
   const record = descriptor as Record<string, unknown>;
+  const types = record['types'] as
+    | undefined
+    | {
+        readonly codecTypes?: {
+          readonly controlPlaneHooks?: unknown;
+        };
+      };
   return {
     kind: record['kind'],
     id: record['id'],
@@ -18,7 +25,16 @@ function extensionPackMetaFromDescriptor(descriptor: unknown): Record<string, un
     targetId: record['targetId'],
     version: record['version'],
     ...(record['capabilities'] ? { capabilities: record['capabilities'] } : {}),
-    ...(record['types'] ? { types: record['types'] } : {}),
+    ...(types
+      ? {
+          types: {
+            ...types,
+            codecTypes: types.codecTypes
+              ? { ...types.codecTypes, controlPlaneHooks: undefined }
+              : undefined,
+          },
+        }
+      : {}),
   };
 }
 
