@@ -116,7 +116,7 @@ export class ContractBuilder<
     name: ModelName,
     table: TableName,
     callback: (
-      m: ModelBuilder<ModelName, TableName, Record<string, string>, Record<never, never>>,
+      m: ModelBuilder<ModelName, TableName, Record<never, never>, Record<never, never>>,
     ) => M | undefined,
   ): ContractBuilder<
     Target,
