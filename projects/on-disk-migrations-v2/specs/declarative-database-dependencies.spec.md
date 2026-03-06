@@ -38,7 +38,7 @@ type ExtensionResolver = (packId: string) => readonly string[];
 
 **Rejected because:** Still requires the target to maintain a mapping. Inferring database prerequisites from `contract.extensionPacks` violates ADR 154. The extension pack ID (`pgvector`) is a namespace for type/codec/operation registration, not a database extension name.
 
-### Solution 3: `extension` field on `ComponentDatabaseDependency` (implemented, unsatisfactory)
+### Solution 3: `extension` field on `ComponentDatabaseDependency` (rejected)
 
 Add `extension?: string` to the dependency interface:
 
@@ -52,10 +52,12 @@ interface ComponentDatabaseDependency<TTargetDetails> {
 
 `contractToSchemaIR` reads `extension` from each component's dependencies to populate `SqlSchemaIR.extensions`.
 
-**Problems:**
+**Rejected because:**
 - `extension` is a Postgres-specific concept on a family-level generic interface. MySQL components wouldn't use this field. Future dependencies that require schemas, functions, or GUC settings wouldn't use it either.
 - It puts knowledge of database extensions into the SQL family tooling layer, which shouldn't know about them.
 - The field exists solely to serve `contractToSchemaIR`'s offline synthesis — it duplicates information already encoded in the `install` ops and the `verifyDatabaseDependencyInstalled` callback.
+
+Was briefly implemented and then replaced by Solution 6.
 
 ### Solution 4: `contributeToSchemaIR` callback (considered, not pursued)
 
@@ -82,7 +84,7 @@ interface ComponentDatabaseDependency<TTargetDetails> {
 
 **Not pursued because:** Over-engineered. `Partial<SqlSchemaIR>` includes fields like `tables` that don't make sense for component dependencies. Merging partial schema IR fragments introduces complexity (deep-merge rules, conflict resolution) that isn't justified when all we really need is an identifier match. The `extensions` field it would contribute to is itself Postgres-specific — using `Partial<SqlSchemaIR>` just moves the coupling rather than removing it.
 
-### Solution 6: Generic `DependencyIR` node on `SqlSchemaIR` (proposed)
+### Solution 6: Generic `DependencyIR` node on `SqlSchemaIR` (chosen)
 
 Replace the Postgres-specific `extensions: readonly string[]` with a target-agnostic `dependencies: DependencyIR[]`:
 
@@ -169,15 +171,15 @@ The callback is removed from `ComponentDatabaseDependency`. Verification is a ge
 
 # Acceptance Criteria
 
-- [ ] AC-1: `SqlSchemaIR` has `dependencies: DependencyIR[]` instead of `extensions: readonly string[]`.
-- [ ] AC-2: `DependencyIR` is `{ readonly id: string }`.
-- [ ] AC-3: `ComponentDatabaseDependency` no longer has the `extension?: string` field.
-- [ ] AC-4: `verifyDatabaseDependencyInstalled` callback is removed from `ComponentDatabaseDependency`. Verification uses generic dependency ID matching.
-- [ ] AC-5: `contractToSchemaIR` populates `dependencies` from `dep.id` of active framework components. No component-specific logic.
-- [ ] AC-6: Postgres adapter introspection maps `pg_extension` rows to `DependencyIR` entries (e.g., `{ id: 'postgres.extension.vector' }`).
-- [ ] AC-7: The planner skips `install` ops for dependencies already present in `schemaIR.dependencies`, and emits them for missing dependencies.
-- [ ] AC-8: Incremental `migration plan` produces only the actual change (e.g., `ADD COLUMN`) and does not re-emit extension operations. Verified by the prisma-next-demo-like test suite.
-- [ ] AC-9: A third-party extension pack can declare `ComponentDatabaseDependency` with its own `id` and `install` ops without changes to core, family, or target packages.
+- [x] AC-1: `SqlSchemaIR` has `dependencies: DependencyIR[]` instead of `extensions: readonly string[]`.
+- [x] AC-2: `DependencyIR` is `{ readonly id: string }`.
+- [x] AC-3: `ComponentDatabaseDependency` no longer has the `extension?: string` field.
+- [x] AC-4: `verifyDatabaseDependencyInstalled` callback is removed from `ComponentDatabaseDependency`. Verification uses generic dependency ID matching.
+- [x] AC-5: `contractToSchemaIR` populates `dependencies` from `dep.id` of active framework components. No component-specific logic.
+- [x] AC-6: Postgres adapter introspection maps `pg_extension` rows to `DependencyIR` entries (e.g., `{ id: 'postgres.extension.vector' }`).
+- [x] AC-7: The planner skips `install` ops for dependencies already present in `schemaIR.dependencies`, and emits them for missing dependencies.
+- [x] AC-8: Incremental `migration plan` produces only the actual change (e.g., `ADD COLUMN`) and does not re-emit extension operations. Verified by the prisma-next-demo-like test suite.
+- [x] AC-9: A third-party extension pack can declare `ComponentDatabaseDependency` with its own `id` and `install` ops without changes to core, family, or target packages.
 
 # Other Considerations
 
