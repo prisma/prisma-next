@@ -4,5 +4,5 @@
     "rootDir": "."
   },
   "include": ["src", "test", "*.config.*", "package.json"],
-  "exclude": ["dist", "dist-tsc", "dist-tsc-prod", "node_modules"]
+  "exclude": ["dist", "dist-tsc", "dist-tsc-prod", "node_modules", "test/fixtures/**/*"]
 }

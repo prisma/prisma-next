@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { orm } from '../../src/orm';
-import { createTestContract, type TestContract } from '../helpers';
+import { getTestContract, type TestContract } from '../helpers';
 import { timeouts, withCollectionRuntime } from './helpers';
 import { seedComments, seedPosts, seedUsers } from './runtime-helpers';
 
@@ -31,7 +31,7 @@ describe('integration/orm', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const db = orm({
-          contract: createTestContract(),
+          contract: getTestContract(),
           runtime,
           collections: { Post: PostCollection },
         });
@@ -79,7 +79,7 @@ describe('integration/orm', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const db = orm({
-          contract: createTestContract(),
+          contract: getTestContract(),
           runtime,
           collections: { Post: PostCollection, Comment: CommentCollection },
         });

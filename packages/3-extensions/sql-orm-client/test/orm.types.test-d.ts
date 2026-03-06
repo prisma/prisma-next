@@ -1,6 +1,6 @@
 import { Collection } from '../src/collection';
 import { orm } from '../src/orm';
-import { createMockRuntime, createTestContract, type TestContract } from './helpers';
+import { createMockRuntime, getTestContract, type TestContract } from './helpers';
 
 class UserCollection extends Collection<TestContract, 'User'> {
   named(name: string) {
@@ -14,7 +14,7 @@ class PostCollection extends Collection<TestContract, 'Post'> {
   }
 }
 
-const contract = createTestContract();
+const contract = getTestContract();
 const runtime = createMockRuntime();
 
 const db = orm({

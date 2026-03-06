@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import { orm } from '../src/orm';
 import type { TestContract } from './helpers';
-import { createMockRuntime, createTestContract } from './helpers';
+import { createMockRuntime, getTestContract } from './helpers';
 
 class UserCollection extends Collection<TestContract, 'User'> {
   named(name: string) {
@@ -32,7 +32,7 @@ function expectCommentCollection(value: unknown): asserts value is CommentCollec
 }
 
 describe('orm()', () => {
-  const contract = createTestContract();
+  const contract = getTestContract();
 
   it('returns custom collections by key', () => {
     const runtime = createMockRuntime();

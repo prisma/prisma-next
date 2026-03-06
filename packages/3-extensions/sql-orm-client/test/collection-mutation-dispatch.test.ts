@@ -6,7 +6,7 @@ import {
 } from '../src/collection-mutation-dispatch';
 import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, createTestContract } from './helpers';
+import { createMockRuntime, getTestContract } from './helpers';
 
 function makeCompiled(sqlText = 'select 1'): CompiledQuery<Record<string, unknown>> {
   return {
@@ -44,7 +44,7 @@ function usersPostsIncludes(contract: TestContract) {
 
 describe('collection-mutation-dispatch', () => {
   it('dispatchMutationRows() maps rows without includes and strips hidden fields', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
@@ -62,7 +62,7 @@ describe('collection-mutation-dispatch', () => {
   });
 
   it('dispatchMutationRows() returns empty when include query returns no rows and releases scope', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[]]);
 
@@ -86,7 +86,7 @@ describe('collection-mutation-dispatch', () => {
   });
 
   it('dispatchMutationRows() stitches includes and strips hidden fields in include mode', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
@@ -113,7 +113,7 @@ describe('collection-mutation-dispatch', () => {
   });
 
   it('dispatchMutationRows() keeps mapped fields when include mode has no hidden columns', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
@@ -141,7 +141,7 @@ describe('collection-mutation-dispatch', () => {
   });
 
   it('executeMutationReturningSingleRow() returns null when no rows are returned without includes', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[]]);
 
@@ -160,7 +160,7 @@ describe('collection-mutation-dispatch', () => {
   });
 
   it('executeMutationReturningSingleRow() strips hidden fields in no-include mode', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
@@ -179,7 +179,7 @@ describe('collection-mutation-dispatch', () => {
   });
 
   it('executeMutationReturningSingleRow() returns null when include query has no first row', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[]]);
 
@@ -198,7 +198,7 @@ describe('collection-mutation-dispatch', () => {
   });
 
   it('executeMutationReturningSingleRow() stitches includes, strips hidden fields, and releases scope', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
@@ -230,7 +230,7 @@ describe('collection-mutation-dispatch', () => {
   });
 
   it('executeMutationReturningSingleRow() keeps fields when include mode has no hidden columns', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 1, name: 'Alice', email: 'alice@example.com' }],

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createAggregateBuilder, isAggregateSelector } from '../src/aggregate-builder';
-import { createTestContract } from './helpers';
+import { getTestContract } from './helpers';
 
 describe('aggregate-builder', () => {
-  const contract = createTestContract();
+  const contract = getTestContract();
 
   it('createAggregateBuilder() maps numeric field selectors to storage columns', () => {
     const aggregate = createAggregateBuilder(contract, 'Post');
