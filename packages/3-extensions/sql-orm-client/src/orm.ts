@@ -123,7 +123,7 @@ function createCollectionRegistry<
         `Custom collection '${key}' must be a Collection class (constructor), not an instance`,
       );
     }
-    if (!(key in models)) {
+    if (!Object.hasOwn(models, key)) {
       throw new Error(
         `No model found for custom collection '${key}'. Available models: ${Object.keys(models).join(', ')}`,
       );
