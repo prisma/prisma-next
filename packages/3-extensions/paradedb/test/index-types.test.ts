@@ -40,9 +40,11 @@ describe('ParadeDB extension', () => {
       });
 
       it('creates a text field with remove_emojis', () => {
-        expect(bm25.text('description', { tokenizer: 'unicode', remove_emojis: true })).toEqual({
+        expect(
+          bm25.text('description', { tokenizer: 'unicode_words', remove_emojis: true }),
+        ).toEqual({
           column: 'description',
-          tokenizer: 'unicode',
+          tokenizer: 'unicode_words',
           tokenizerParams: { remove_emojis: true },
         });
       });

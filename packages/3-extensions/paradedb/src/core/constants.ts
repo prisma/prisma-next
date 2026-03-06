@@ -8,7 +8,7 @@ export const PARADEDB_EXTENSION_ID = 'paradedb' as const;
  * These correspond to the `pdb.*` casting syntax in `CREATE INDEX ... USING bm25`.
  */
 export type TokenizerId =
-  | 'unicode'
+  | 'unicode_words'
   | 'simple'
   | 'ngram'
   | 'icu'

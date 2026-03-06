@@ -124,7 +124,7 @@ All 12 built-in ParadeDB tokenizers are available via the `TokenizerId` type:
 
 | Tokenizer | Description |
 |-----------|-------------|
-| `unicode` | Default. Unicode word boundaries (UAX #29). Lowercases. |
+| `unicode_words` | Default. Unicode word boundaries (UAX #29). Lowercases. |
 | `simple` | Splits on non-alphanumeric. Lowercases. |
 | `ngram` | Character n-grams of configurable length. |
 | `icu` | ICU Unicode standard segmentation. Multilingual. |
@@ -160,4 +160,3 @@ The following are planned for follow-up work:
 - [ParadeDB Tokenizers](https://docs.paradedb.com/documentation/tokenizers/overview)
 - [pg_search source](https://github.com/paradedb/paradedb/tree/main/pg_search)
 - [Prisma Next Architecture Overview](../../../docs/Architecture%20Overview.md)
-- [Project spec](../../../projects/parade-db-core/spec.md)
