@@ -46,8 +46,8 @@ export function createOrmClient(runtime: Runtime) {
     contract,
     runtime,
     collections: {
-      users: UserCollection,
-      posts: PostCollection,
+      User: UserCollection,
+      Post: PostCollection,
     },
   });
 }

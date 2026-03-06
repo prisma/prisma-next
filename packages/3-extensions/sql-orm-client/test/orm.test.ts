@@ -39,16 +39,16 @@ describe('orm()', () => {
     const db = orm({
       contract,
       runtime,
-      collections: { posts: PostCollection },
+      collections: { Post: PostCollection },
     });
-    expect(db.posts).toBeInstanceOf(PostCollection);
+    expect(db.Post).toBeInstanceOf(PostCollection);
   });
 
   it('creates default collections for model names', async () => {
     const runtime = createMockRuntime();
     const db = orm({ contract, runtime });
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
-    const results = await db.users.all();
+    const results = await db.User.all();
     expect(results).toHaveLength(1);
   });
 
@@ -58,36 +58,12 @@ describe('orm()', () => {
     expect((db as Record<PropertyKey, unknown>)[Symbol.toStringTag]).toBeUndefined();
   });
 
-  it('resolves plural names to PascalCase model names', () => {
-    const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
-    expect(db.users.modelName).toBe('User');
-  });
-
-  it('resolves "posts" to "Post"', () => {
-    const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
-    expect(db.posts.modelName).toBe('Post');
-  });
-
-  it('resolves "comments" to "Comment"', () => {
-    const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
-    expect(db.comments.modelName).toBe('Comment');
-  });
-
   it('caches lazily created collections', () => {
     const runtime = createMockRuntime();
     const db = orm({ contract, runtime });
-    const first = db.users;
-    const second = db.users;
+    const first = db.User;
+    const second = db.User;
     expect(first).toBe(second);
-  });
-
-  it('shares cached collection across model aliases', () => {
-    const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
-    expect(db.users).toBe(db.User);
   });
 
   it('throws for unknown model name', () => {
@@ -96,13 +72,6 @@ describe('orm()', () => {
     expect(() => (db as Record<string, unknown>)['unknown']).toThrow(
       /No model found for 'unknown'/,
     );
-  });
-
-  it('resolves singular fallback when key ends with s but exact alias is missing', () => {
-    const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
-
-    expect((db as Record<string, Collection<TestContract, string>>)['Users']).toBe(db.User);
   });
 
   it('resolves aliases when modelToTable mappings are absent', () => {
@@ -116,33 +85,7 @@ describe('orm()', () => {
     } as unknown as TestContract;
 
     const db = orm({ contract: withoutModelToTable, runtime });
-    expect(db.users.modelName).toBe('User');
-  });
-
-  it('adds plural table aliases when mapped table names are singular', () => {
-    const runtime = createMockRuntime();
-    const withSingularTable = {
-      ...contract,
-      mappings: {
-        ...contract.mappings,
-        modelToTable: {
-          ...contract.mappings.modelToTable,
-          User: 'account',
-        },
-      },
-      models: {
-        ...contract.models,
-        User: {
-          ...contract.models.User,
-          storage: {
-            table: 'account',
-          },
-        },
-      },
-    } as unknown as TestContract;
-
-    const db = orm({ contract: withSingularTable, runtime });
-    expect((db as Record<string, Collection<TestContract, string>>)['accounts']).toBe(db.User);
+    expect(db.User.modelName).toBe('User');
   });
 
   it('custom collection overrides default for same key', () => {
@@ -150,13 +93,13 @@ describe('orm()', () => {
     const db = orm({
       contract,
       runtime,
-      collections: { posts: PostCollection },
+      collections: { Post: PostCollection },
     });
 
-    expect(db.posts).toBeInstanceOf(PostCollection);
+    expect(db.Post).toBeInstanceOf(PostCollection);
   });
 
-  it('resolves User/user/users aliases to one custom collection instance', () => {
+  it('resolves User to custom collection instance', () => {
     const runtime = createMockRuntime();
     const db = orm({
       contract,
@@ -165,8 +108,6 @@ describe('orm()', () => {
     });
 
     expect(db.User).toBeInstanceOf(UserCollection);
-    expect(db.user).toBe(db.User);
-    expect(db.users).toBe(db.User);
   });
 
   it('instantiates custom collections lazily and caches by model', () => {
@@ -179,13 +120,13 @@ describe('orm()', () => {
     const db = orm({
       contract,
       runtime,
-      collections: { posts: LazyPostCollection },
+      collections: { Post: LazyPostCollection },
     });
 
     expect(constructions).toBe(0);
-    void db.users;
+    void db.User;
     expect(constructions).toBe(0);
-    const postsFirst = db.posts;
+    const postsFirst = db.Post;
     expect(constructions).toBe(1);
     const postsSecond = db.Post;
     expect(postsSecond).toBe(postsFirst);
@@ -197,11 +138,11 @@ describe('orm()', () => {
     const db = orm({
       contract,
       runtime,
-      collections: { posts: undefined as unknown as typeof PostCollection },
+      collections: { Post: undefined as unknown as typeof PostCollection },
     });
 
-    expect(db.posts).toBeInstanceOf(Collection);
-    expect(db.posts).not.toBeInstanceOf(PostCollection);
+    expect(db.Post).toBeInstanceOf(Collection);
+    expect(db.Post).not.toBeInstanceOf(PostCollection);
   });
 
   it('throws when a custom collection key cannot resolve to a model', () => {
@@ -225,7 +166,7 @@ describe('orm()', () => {
         contract,
         runtime,
         collections: {
-          posts: postCollectionInstance as unknown as typeof PostCollection,
+          Post: postCollectionInstance as unknown as typeof PostCollection,
         },
       }),
     ).toThrow(/must be a Collection class/);
@@ -244,7 +185,7 @@ describe('orm()', () => {
         contract,
         runtime,
         collections: {
-          posts: NotACollection as unknown as typeof PostCollection,
+          Post: NotACollection as unknown as typeof PostCollection,
         },
       }),
     ).toThrow(/must be a Collection class/);
@@ -258,7 +199,7 @@ describe('orm()', () => {
         contract,
         runtime,
         collections: {
-          posts: (() => ({ ok: true })) as unknown as typeof PostCollection,
+          Post: (() => ({ ok: true })) as unknown as typeof PostCollection,
         },
       }),
     ).toThrow(/must be a Collection class/);
@@ -267,7 +208,7 @@ describe('orm()', () => {
   it('does not type unknown keys on the client', () => {
     const runtime = createMockRuntime();
     const db = orm({ contract, runtime });
-    expect(db.users).toBeDefined();
+    expect(db.User).toBeDefined();
     type DbClient = typeof db;
     // @ts-expect-error unknown collection key should not exist on typed client
     type _UnknownCollection = DbClient['unknown'];
@@ -281,10 +222,10 @@ describe('orm()', () => {
       const db = orm({
         contract,
         runtime,
-        collections: { posts: PostCollection },
+        collections: { Post: PostCollection },
       });
 
-      const withPosts = db.users.include('posts', (posts) => {
+      const withPosts = db.User.include('posts', (posts) => {
         expectPostCollection(posts);
         return posts.popular();
       });
@@ -300,12 +241,12 @@ describe('orm()', () => {
       contract,
       runtime,
       collections: {
-        posts: PostCollection,
-        comments: CommentCollection,
+        Post: PostCollection,
+        Comment: CommentCollection,
       },
     });
 
-    const withNested = db.users.include('posts', (posts) => {
+    const withNested = db.User.include('posts', (posts) => {
       expectPostCollection(posts);
       return posts.include('comments', (comments) => {
         expectCommentCollection(comments);

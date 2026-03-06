@@ -816,13 +816,6 @@ type TableRelations<
     : Record<string, never>
   : Record<string, never>;
 
-type LegacyModelRelations<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-> = ModelDef<TContract, ModelName> extends { readonly relations: infer R }
-  ? R
-  : Record<string, never>;
-
 type ExactRecord<T> =
   T extends Record<string, unknown>
     ? string extends keyof T
@@ -833,9 +826,7 @@ type ExactRecord<T> =
 export type RelationsOf<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
-> = keyof ExactRecord<TableRelations<TContract, ModelName>> extends never
-  ? ExactRecord<LegacyModelRelations<TContract, ModelName>>
-  : ExactRecord<TableRelations<TContract, ModelName>>;
+> = ExactRecord<TableRelations<TContract, ModelName>>;
 
 export type RelationNames<
   TContract extends SqlContract<SqlStorage>,
