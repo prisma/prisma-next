@@ -5,7 +5,7 @@ import type { IncludeExpr, RuntimeScope } from '../src/types';
 import { emptyState } from '../src/types';
 import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, createTestContract } from './helpers';
+import { createMockRuntime, getTestContract } from './helpers';
 
 function withSingleQueryCapabilities(contract: TestContract): TestContract {
   return {
@@ -70,7 +70,7 @@ describe('collection-dispatch', () => {
   });
 
   it('dispatchCollectionRows() single-query path returns empty rows and releases scope', async () => {
-    const contract = withSingleQueryCapabilities(createTestContract());
+    const contract = withSingleQueryCapabilities(getTestContract());
     const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.include('posts');
     runtime.setNextResults([[]]);
@@ -92,7 +92,7 @@ describe('collection-dispatch', () => {
   });
 
   it('dispatchCollectionRows() single-query path parses include payloads and strips hidden join columns', async () => {
-    const contract = withSingleQueryCapabilities(createTestContract());
+    const contract = withSingleQueryCapabilities(getTestContract());
     const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.select('name').include('posts');
     runtime.setNextResults([
@@ -148,7 +148,7 @@ describe('collection-dispatch', () => {
   });
 
   it('dispatchCollectionRows() single-query to-one include returns mapped row or null', async () => {
-    const contract = withSingleQueryCapabilities(createTestContract());
+    const contract = withSingleQueryCapabilities(getTestContract());
     const { collection, runtime } = createCollectionFor('Post', contract);
     const scoped = collection.select('title').include('author');
     runtime.setNextResults([
@@ -190,7 +190,7 @@ describe('collection-dispatch', () => {
   });
 
   it('dispatchCollectionRows() multi-query path stitches includes, strips hidden fields, and releases scope', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.select('name').include('posts', (posts) => posts.select('title'));
 
@@ -247,7 +247,7 @@ describe('collection-dispatch', () => {
   });
 
   it('stitchIncludes() assigns empty values for row, scalar, and combine descriptors', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const { collection } = createCollectionFor('User', contract);
     const rowInclude = collection.include('posts').state.includes[0]!;
     const scalarInclude = collection.include('posts', (posts) => posts.sum('views' as never)).state
@@ -297,7 +297,7 @@ describe('collection-dispatch', () => {
   });
 
   it('stitchIncludes() computes scalar aggregates with numeric coercion and unknown selectors', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     const baseInclude = createCollectionFor('User', contract).collection.include('posts').state
       .includes[0]!;
@@ -375,7 +375,7 @@ describe('collection-dispatch', () => {
   });
 
   it('stitchIncludes() returns null for empty to-one row includes', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const include = createCollectionFor('Post', contract).collection.include('author').state
       .includes[0]!;
 

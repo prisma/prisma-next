@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or, shorthandToWhereExpr } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
-import { createTestContract } from './helpers';
+import { getTestContract } from './helpers';
 
 describe('filters', () => {
-  const contract = createTestContract();
+  const contract = getTestContract();
 
   it('and() composes multiple expressions', () => {
     const user = createModelAccessor(contract, 'User');

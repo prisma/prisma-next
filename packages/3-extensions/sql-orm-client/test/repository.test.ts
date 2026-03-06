@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import type { TestContract } from './helpers';
-import { createMockRuntime, createTestContract } from './helpers';
+import { createMockRuntime, getTestContract } from './helpers';
 
 class PostCollection extends Collection<TestContract, 'Post'> {
   popular() {
@@ -10,7 +10,7 @@ class PostCollection extends Collection<TestContract, 'Post'> {
 }
 
 describe('Collection construction', () => {
-  const contract = createTestContract();
+  const contract = getTestContract();
 
   it('resolves table name from contract mappings', () => {
     const runtime = createMockRuntime();
