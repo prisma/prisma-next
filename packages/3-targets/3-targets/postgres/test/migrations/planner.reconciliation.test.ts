@@ -45,7 +45,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
     };
 
     const result = planner.plan({
@@ -97,7 +97,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
     };
 
     const result = planner.plan({
@@ -148,7 +148,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
     };
 
     const result = planner.plan({

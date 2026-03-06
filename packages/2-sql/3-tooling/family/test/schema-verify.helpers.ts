@@ -11,6 +11,7 @@ import {
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type {
+  DependencyIR,
   SqlReferentialAction,
   SqlSchemaIR,
   SqlTableIR,
@@ -55,9 +56,9 @@ export function createTestContract(
  */
 export function createTestSchemaIR(
   tables: Record<string, SqlTableIR>,
-  extensions: readonly string[] = [],
+  dependencies: readonly DependencyIR[] = [],
 ): SqlSchemaIR {
-  return { tables, extensions };
+  return { tables, dependencies };
 }
 
 /**

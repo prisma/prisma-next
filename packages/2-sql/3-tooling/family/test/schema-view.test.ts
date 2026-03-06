@@ -61,7 +61,7 @@ describe('SqlFamilyInstance.toSchemaView', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
     };
 
     const view = familyInstance.toSchemaView(schema);

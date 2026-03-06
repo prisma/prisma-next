@@ -262,7 +262,12 @@ export interface TargetMigrationsCapability<
    * The returned schema can be passed to `planner.plan({ schema })` as the "from" state.
    *
    * @param contract - The contract to convert, or null for a new project (empty schema).
+   * @param frameworkComponents - Active framework components, used to derive database
+   *   dependencies (e.g. extensions) that should be reflected in the schema IR.
    * @returns Family-specific schema IR (e.g., `SqlSchemaIR` for SQL targets).
    */
-  contractToSchema(contract: ContractIR | null): unknown;
+  contractToSchema(
+    contract: ContractIR | null,
+    frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>,
+  ): unknown;
 }

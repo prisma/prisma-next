@@ -37,15 +37,24 @@ A component can declare `databaseDependencies.init`, where each dependency provi
 - a stable `id` (e.g., `postgres.extension.vector`)
 - a human `label`
 - `install` operations (`SqlMigrationPlanOperation`) for `db init`
-- `verifyDatabaseDependencyInstalled(schemaIR)` — pure verification hook producing `SchemaIssue[]`
+
+Verification is generic: the planner and schema verifier check whether a dependency's `id` is present in `SqlSchemaIR.dependencies`. No per-component verification callbacks are needed.
+
+### Schema IR representation
+
+`SqlSchemaIR` carries a target-agnostic `dependencies: readonly DependencyIR[]` array, where `DependencyIR = { readonly id: string }`. This replaces the earlier Postgres-specific `extensions: readonly string[]` field.
+
+- **Introspection** (online path): the adapter maps database objects to dependency IDs. For Postgres, `pg_extension` rows are mapped using the convention `postgres.extension.<extname>`.
+- **`contractToSchemaIR`** (offline path): dependency IDs are collected from active framework components' `databaseDependencies.init[].id`.
+- **Planner**: skips install ops for dependencies already present in `schemaIR.dependencies`; emits them for missing ones.
 
 ### Data sources
 
 This ADR distinguishes three concepts:
 
 - **Framework extensions / packs**: registered via config; their identity and namespace appear in `contract.extensionPacks` for type/codec/operation namespacing.
-- **Database extensions** (Postgres): introspected into `SqlSchemaIR.extensions` as a database fact.
-- **Database dependencies**: the bridge between components and schema facts, declared by components and verified via pure hooks.
+- **Database dependencies** (`DependencyIR`): a target-agnostic node in `SqlSchemaIR` representing an installed prerequisite. Populated by introspection (online) or `contractToSchemaIR` (offline).
+- **Component database dependencies**: the bridge between components and schema facts, declared by components. The dependency `id` matches the `DependencyIR.id` in the schema IR.
 
 ## Consequences
 
@@ -58,7 +67,7 @@ This ADR distinguishes three concepts:
 ### Negative / tradeoffs
 
 - Callers must consistently pass the active `frameworkComponents` list to planner/runner/verification.
-- Some schema IR fields may have target-specific vocabulary (e.g., `extensions` for Postgres); this is acceptable as long as the CLI remains family-agnostic and no inference is performed.
+- Adapters own the convention for mapping database objects to dependency IDs (e.g., Postgres uses `postgres.extension.<extname>`). Extension components must follow the adapter's convention.
 
 ## Related
 

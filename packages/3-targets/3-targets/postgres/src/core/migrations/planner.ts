@@ -61,7 +61,6 @@ type PlannerDatabaseDependency = {
   readonly id: string;
   readonly label: string;
   readonly install: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
-  readonly verifyDatabaseDependencyInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
 };
 
 export interface PostgresPlanTargetDetails {
@@ -187,14 +186,15 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const seenDependencyIds = new Set<string>();
     const seenOperationIds = new Set<string>();
 
+    const installedIds = new Set(options.schema.dependencies.map((d) => d.id));
+
     for (const dependency of dependencies) {
       if (seenDependencyIds.has(dependency.id)) {
         continue;
       }
       seenDependencyIds.add(dependency.id);
 
-      const issues = dependency.verifyDatabaseDependencyInstalled(options.schema);
-      if (issues.length === 0) {
+      if (installedIds.has(dependency.id)) {
         continue;
       }
 
@@ -203,8 +203,6 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
           continue;
         }
         seenOperationIds.add(installOp.id);
-        // SQL family components are expected to provide compatible target details. This would be better if
-        // the type system could enforce it but it's not likely to occur in practice.
         operations.push(installOp as SqlMigrationPlanOperation<PostgresPlanTargetDetails>);
       }
     }

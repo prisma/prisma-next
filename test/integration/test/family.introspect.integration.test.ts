@@ -75,8 +75,8 @@ describe('family instance introspect', () => {
 
           expect(schemaIR).toBeDefined();
           expect(schemaIR.tables).toBeDefined();
-          expect(schemaIR.extensions).toBeDefined();
-          expect(Array.isArray(schemaIR.extensions)).toBe(true);
+          expect(schemaIR.dependencies).toBeDefined();
+          expect(Array.isArray(schemaIR.dependencies)).toBe(true);
         } finally {
           await driver.close();
         }
@@ -394,7 +394,7 @@ describe('family instance introspect', () => {
     );
   });
 
-  describe('for a schema with extensions', () => {
+  describe('for a schema with dependencies', () => {
     beforeEach(async () => {
       if (!connectionString) {
         throw new Error('Connection string not set');
@@ -411,7 +411,7 @@ describe('family instance introspect', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns extensions array',
+      'returns dependencies array',
       async () => {
         if (!connectionString) {
           throw new Error('Connection string not set');
@@ -430,9 +430,9 @@ describe('family instance introspect', () => {
             driver,
           });
 
-          expect(schemaIR.extensions).toBeDefined();
-          expect(Array.isArray(schemaIR.extensions)).toBe(true);
-          expect(schemaIR.extensions.length).toBeGreaterThanOrEqual(0);
+          expect(schemaIR.dependencies).toBeDefined();
+          expect(Array.isArray(schemaIR.dependencies)).toBe(true);
+          expect(schemaIR.dependencies.length).toBeGreaterThanOrEqual(0);
         } finally {
           await driver.close();
         }

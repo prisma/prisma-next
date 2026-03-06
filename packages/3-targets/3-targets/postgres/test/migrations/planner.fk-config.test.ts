@@ -63,7 +63,7 @@ function createFkTestContract(fkConfig: {
 
 const emptySchema: SqlSchemaIR = {
   tables: {},
-  extensions: [],
+  dependencies: [],
 };
 
 describe('PostgresMigrationPlanner - per-FK config combinations', () => {

@@ -33,7 +33,6 @@ export interface ComponentDatabaseDependency<TTargetDetails> {
   readonly id: string;
   readonly label: string;
   readonly install: readonly SqlMigrationPlanOperation<TTargetDetails>[];
-  readonly verifyDatabaseDependencyInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
 }
 
 export interface ComponentDatabaseDependencies<TTargetDetails> {

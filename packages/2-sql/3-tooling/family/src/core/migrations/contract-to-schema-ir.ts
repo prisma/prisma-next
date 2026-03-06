@@ -3,12 +3,15 @@ import type { MigrationPlannerConflict } from '@prisma-next/core-control-plane/t
 import type {
   ForeignKey,
   Index,
+  SqlContract,
   SqlStorage,
   StorageColumn,
   StorageTable,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import type {
+  DependencyIR,
+  SqlAnnotations,
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
@@ -17,6 +20,7 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { DatabaseDependencyProvider } from './types';
 
 function convertDefault(def: ColumnDefault): string {
   if (def.kind === 'function') {
@@ -98,13 +102,26 @@ function convertTable(
     columns[colName] = convertColumn(colName, colDef, expandNativeType);
   }
 
+  const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
+  const fkBackingIndexes: SqlIndexIR[] = [];
+  for (const fk of table.foreignKeys) {
+    if (fk.index === false) continue;
+    const key = fk.columns.join(',');
+    if (declaredIndexColumns.has(key)) continue;
+    fkBackingIndexes.push({
+      columns: fk.columns,
+      unique: false,
+      name: `${name}_${fk.columns.join('_')}_idx`,
+    });
+  }
+
   return {
     name,
     columns,
     ...(table.primaryKey != null ? { primaryKey: table.primaryKey } : {}),
     foreignKeys: table.foreignKeys.map(convertForeignKey),
     uniques: table.uniques.map(convertUnique),
-    indexes: table.indexes.map(convertIndex),
+    indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
   };
 }
 
@@ -153,29 +170,74 @@ export function detectDestructiveChanges(
   return conflicts;
 }
 
+export interface ContractToSchemaIROptions {
+  readonly expandNativeType?: NativeTypeExpander;
+  readonly frameworkComponents?: readonly unknown[];
+}
+
 /**
- * Converts a contract's `SqlStorage` to `SqlSchemaIR`.
+ * Converts an `SqlContract` to `SqlSchemaIR`.
  *
- * Drops codec metadata (`codecId`, `typeRef`) since the schema IR only represents structural
- * information. When `expandNativeType` is provided, parameterized types are expanded
- * (e.g. `character` + `{ length: 36 }` → `character(36)`) so the resulting IR compares
- * correctly against the "to" contract during planning.
+ * Reads `contract.storage` for tables, `contract.storage.types` for type
+ * annotations, and derives database dependencies from `frameworkComponents`
+ * (each component's `databaseDependencies.init[].id`).
  *
- * `extensions` is always `[]` — the planner resolves extension dependencies from framework
- * components, and an empty array means "nothing installed yet" which is correct for the
- * "from" side of a diff.
+ * Drops codec metadata (`codecId`, `typeRef`) since the schema IR only represents
+ * structural information. When `expandNativeType` is provided, parameterized types
+ * are expanded (e.g. `character` + `{ length: 36 }` → `character(36)`) so the
+ * resulting IR compares correctly against the "to" contract during planning.
+ *
+ * Returns an empty schema IR when `contract` is `null` (new project).
  */
 export function contractToSchemaIR(
-  storage: SqlStorage,
-  expandNativeType?: NativeTypeExpander,
+  contract: SqlContract<SqlStorage> | null,
+  options?: ContractToSchemaIROptions,
 ): SqlSchemaIR {
+  if (!contract) {
+    return { tables: {}, dependencies: [] };
+  }
+
+  const storage = contract.storage;
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
-    tables[tableName] = convertTable(tableName, tableDef, expandNativeType);
+    tables[tableName] = convertTable(tableName, tableDef, options?.expandNativeType);
   }
+
+  const dependencies = collectDependenciesFromComponents(options?.frameworkComponents);
+  const annotations = deriveAnnotations(storage);
 
   return {
     tables,
-    extensions: [],
+    dependencies,
+    ...(annotations ? { annotations } : {}),
   };
+}
+
+function collectDependenciesFromComponents(
+  components?: readonly unknown[],
+): readonly DependencyIR[] {
+  if (!components || components.length === 0) return [];
+  const seen = new Set<string>();
+  const result: DependencyIR[] = [];
+  for (const component of components) {
+    if (!isDependencyProvider(component)) continue;
+    const deps = component.databaseDependencies?.init;
+    if (!deps) continue;
+    for (const dep of deps) {
+      if (dep.id && !seen.has(dep.id)) {
+        seen.add(dep.id);
+        result.push({ id: dep.id });
+      }
+    }
+  }
+  return result;
+}
+
+function isDependencyProvider(value: unknown): value is DatabaseDependencyProvider {
+  return typeof value === 'object' && value !== null && 'databaseDependencies' in value;
+}
+
+function deriveAnnotations(storage: SqlStorage): SqlAnnotations | undefined {
+  if (!storage.types || Object.keys(storage.types).length === 0) return undefined;
+  return { pg: { storageTypes: storage.types } };
 }
