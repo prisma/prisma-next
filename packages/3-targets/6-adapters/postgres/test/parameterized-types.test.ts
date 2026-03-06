@@ -115,4 +115,14 @@ describe('expandParameterizedNativeType', () => {
 
     expect(result).toBe('custom');
   });
+
+  it('expands pgvector vector(N) using length parameter', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'vector',
+      codecId: 'pg/vector@1',
+      typeParams: { length: 1536 },
+    });
+
+    expect(result).toBe('vector(1536)');
+  });
 });

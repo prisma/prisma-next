@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:987c42ba7205051110984a2cafe4ce9d985bd3eb44baa598e92dbb8d5ed9afdc",
+  "storageHash": "sha256:6a38af603d36ab9862c3e73197e094c00b696e55a0928d0003a7b5e9201017bc",
   "profileHash": "sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89",
   "models": {
     "Member": {
@@ -75,6 +75,7 @@
             "columns": ["team_ref"],
             "constraint": true,
             "index": true,
+            "name": "team_member_team_ref_fkey",
             "onDelete": "cascade",
             "onUpdate": "cascade",
             "references": {

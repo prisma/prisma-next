@@ -112,6 +112,7 @@ type ParsedRelationAttribute = {
   readonly relationName?: string;
   readonly fields?: readonly string[];
   readonly references?: readonly string[];
+  readonly constraintName?: string;
   readonly onDelete?: string;
   readonly onUpdate?: string;
 };
@@ -178,7 +179,7 @@ type DynamicTableBuilder = {
   foreignKey(
     columns: readonly string[],
     references: { table: string; columns: readonly string[] },
-    options?: { onDelete?: string; onUpdate?: string },
+    options?: { name?: string; onDelete?: string; onUpdate?: string },
   ): DynamicTableBuilder;
 };
 
@@ -558,7 +559,7 @@ function collectResolvedFields(
           if (length !== undefined) {
             descriptor = {
               codecId: 'pg/vector@1',
-              nativeType: `vector(${length})`,
+              nativeType: 'vector',
               typeParams: { length },
             };
           }
@@ -981,6 +982,7 @@ function parseRelationAttribute(input: {
       arg.name !== 'name' &&
       arg.name !== 'fields' &&
       arg.name !== 'references' &&
+      arg.name !== 'map' &&
       arg.name !== 'onDelete' &&
       arg.name !== 'onUpdate'
     ) {
@@ -1022,6 +1024,20 @@ function parseRelationAttribute(input: {
     return undefined;
   }
   const relationName = namedRelationName ?? relationNameFromPositional;
+
+  const constraintNameRaw = getNamedArgument(input.attribute, 'map');
+  const constraintName = constraintNameRaw
+    ? parseQuotedStringLiteral(constraintNameRaw)
+    : undefined;
+  if (constraintNameRaw && !constraintName) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+      message: `Relation field "${input.modelName}.${input.fieldName}" map argument must be a quoted string literal`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
 
   const fieldsRaw = getNamedArgument(input.attribute, 'fields');
   const referencesRaw = getNamedArgument(input.attribute, 'references');
@@ -1065,6 +1081,7 @@ function parseRelationAttribute(input: {
     ...ifDefined('relationName', relationName),
     ...ifDefined('fields', fields),
     ...ifDefined('references', references),
+    ...ifDefined('constraintName', constraintName),
     ...ifDefined('onDelete', onDeleteArgument ? unquoteStringLiteral(onDeleteArgument) : undefined),
     ...ifDefined('onUpdate', onUpdateArgument ? unquoteStringLiteral(onUpdateArgument) : undefined),
   };
@@ -1160,12 +1177,12 @@ export function interpretPslDocumentToSqlContractIR(
       }
       namedTypeDescriptors.set(declaration.name, {
         codecId: 'pg/vector@1',
-        nativeType: `vector(${length})`,
-        typeRef: declaration.name,
+        nativeType: 'vector',
+        typeParams: { length },
       });
       builder = builder.storageType(declaration.name, {
         codecId: 'pg/vector@1',
-        nativeType: `vector(${length})`,
+        nativeType: 'vector',
         typeParams: { length },
       });
       continue;
@@ -1483,6 +1500,7 @@ export function interpretPslDocumentToSqlContractIR(
             columns: referencedColumns,
           },
           {
+            ...ifDefined('name', parsedRelation.constraintName),
             ...ifDefined('onDelete', onDelete),
             ...ifDefined('onUpdate', onUpdate),
           },

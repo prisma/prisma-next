@@ -5,8 +5,12 @@ import type {
   AnyOrderBuilder,
   ResultType,
 } from '@prisma-next/sql-relational-core/types';
-import { expectTypeOf, test } from 'vitest';
+import { test } from 'vitest';
 import { db } from '../prisma/db';
+
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type Expect<T extends true> = T;
 
 type VectorDistanceExpression = AnyExpressionSource & {
   asc(): AnyOrderBuilder;
@@ -50,7 +54,13 @@ test('ResultType exposes projected keys for similarity query result', () => {
     .build({ params: { queryVector: [1, 2, 3] } });
 
   type Row = ResultType<typeof _plan>;
-  expectTypeOf<Row['distance']>().toEqualTypeOf<number>();
-  expectTypeOf<Row['id']>().toEqualTypeOf<Char<36>>();
-  expectTypeOf<Row['title']>().toEqualTypeOf<string>();
+
+  // Compile-time assertions
+  type Assertions = [
+    Expect<Equal<Row['distance'], number>>,
+    Expect<Equal<Row['id'], Char<36>>>,
+    Expect<Equal<Row['title'], string>>,
+  ];
+  const assertions = null as unknown as Assertions;
+  void assertions;
 });

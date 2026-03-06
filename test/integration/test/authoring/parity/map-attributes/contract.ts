@@ -18,7 +18,7 @@ export const contract = defineContract<CodecTypes>()
       .foreignKey(
         ['team_ref'],
         { table: 'org_team', columns: ['team_id'] },
-        { onDelete: 'cascade', onUpdate: 'cascade' },
+        { name: 'team_member_team_ref_fkey', onDelete: 'cascade', onUpdate: 'cascade' },
       ),
   )
   .model('Team', 'org_team', (m) => m.field('id', 'team_id'))

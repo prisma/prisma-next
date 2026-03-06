@@ -32,6 +32,8 @@ export interface ExpandNativeTypeInput {
   readonly typeParams?: Record<string, unknown>;
 }
 
+const PG_VECTOR_CODEC_ID = 'pg/vector@1' as const;
+
 /** Set of codec IDs that use the 'length' parameter */
 const LENGTH_CODEC_IDS: Set<string> = new Set([
   SQL_CHAR_CODEC_ID,
@@ -79,6 +81,19 @@ export function expandParameterizedNativeType(input: ExpandNativeTypeInput): str
   const { nativeType, codecId, typeParams } = input;
 
   if (!typeParams || !codecId) {
+    return nativeType;
+  }
+
+  if (codecId === PG_VECTOR_CODEC_ID) {
+    const length = typeParams['length'];
+    if (
+      typeof length === 'number' &&
+      Number.isFinite(length) &&
+      Number.isInteger(length) &&
+      length > 0
+    ) {
+      return `${nativeType}(${length})`;
+    }
     return nativeType;
   }
 
