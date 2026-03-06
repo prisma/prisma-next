@@ -7,7 +7,6 @@ import type {
   ValidationContext,
 } from '@prisma-next/contract/types';
 import type {
-  Index,
   ModelDefinition,
   ModelField,
   SqlStorage,
@@ -174,8 +173,7 @@ export const sqlTargetFamilyHook = {
       }
 
       for (const index of table.indexes) {
-        const idx = index as Index;
-        for (const colName of idx.columns) {
+        for (const colName of index.columns) {
           if (!columnNames.has(colName)) {
             throw new Error(
               `Table "${tableName}" index references non-existent column "${colName}"`,
@@ -374,13 +372,12 @@ export const sqlTargetFamilyHook = {
 
       const indexes = table.indexes
         .map((i) => {
-          const idx = i as Index;
-          const cols = idx.columns.map((c: string) => `'${c}'`).join(', ');
-          const name = idx.name ? `; readonly name: '${idx.name}'` : '';
+          const cols = i.columns.map((c: string) => `'${c}'`).join(', ');
+          const name = i.name ? `; readonly name: '${i.name}'` : '';
           const using =
-            idx.using !== undefined ? `; readonly using: ${this.serializeValue(idx.using)}` : '';
+            i.using !== undefined ? `; readonly using: ${this.serializeValue(i.using)}` : '';
           const config =
-            idx.config !== undefined ? `; readonly config: ${this.serializeValue(idx.config)}` : '';
+            i.config !== undefined ? `; readonly config: ${this.serializeValue(i.config)}` : '';
           return `{ readonly columns: readonly [${cols}]${name}${using}${config} }`;
         })
         .join(', ');

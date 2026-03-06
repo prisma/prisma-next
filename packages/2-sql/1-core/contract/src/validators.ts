@@ -92,7 +92,7 @@ const UniqueConstraintSchema = type.declare<UniqueConstraint>().type({
   'name?': 'string',
 });
 
-const IndexSchema = type({
+export const IndexSchema = type({
   columns: type.string.array().readonly(),
   'name?': 'string',
   'using?': 'string',
