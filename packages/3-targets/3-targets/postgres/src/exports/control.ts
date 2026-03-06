@@ -1,4 +1,6 @@
+import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   ControlTargetInstance,
   MigrationPlanner,
@@ -9,10 +11,11 @@ import type {
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
-import { createPostgresMigrationPlanner } from '../core/migrations/planner';
+import { createPostgresMigrationPlanner, renderDefaultLiteral } from '../core/migrations/planner';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 
 function buildNativeTypeExpander(
@@ -48,6 +51,13 @@ function buildNativeTypeExpander(
   };
 }
 
+export function postgresRenderDefault(def: ColumnDefault, column: StorageColumn): string {
+  if (def.kind === 'function') {
+    return def.expression;
+  }
+  return renderDefaultLiteral(def.value, column);
+}
+
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
   {
     ...postgresTargetDescriptorMeta,
@@ -63,7 +73,8 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         const expander = buildNativeTypeExpander(frameworkComponents);
         return contractToSchemaIR(contract as SqlContract<SqlStorage> | null, {
           annotationNamespace: 'pg',
-          ...(expander ? { expandNativeType: expander } : {}),
+          ...ifDefined('expandNativeType', expander),
+          renderDefault: postgresRenderDefault,
           frameworkComponents: frameworkComponents ?? [],
         });
       },
