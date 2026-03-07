@@ -48,4 +48,8 @@ describe('@prisma-next/ids', () => {
     const value = generateId({ id: 'nanoid', params: { size: 12 } });
     expect(value).toHaveLength(12);
   });
+
+  it('throws for unknown generator id', () => {
+    expect(() => generateId({ id: 'nonexistent' })).toThrow('Unknown built-in ID generator');
+  });
 });
