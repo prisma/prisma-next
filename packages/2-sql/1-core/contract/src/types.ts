@@ -161,23 +161,26 @@ export type TypeMaps<
   readonly operationTypes: TOperationTypes;
 };
 
-export type CodecTypesOf<T> = T extends { readonly codecTypes: infer C }
-  ? C extends Record<string, { output: unknown }>
-    ? C
-    : Record<string, never>
-  : Record<string, never>;
+export type CodecTypesOf<T> = [T] extends [never]
+  ? Record<string, { output: unknown }>
+  : T extends { readonly codecTypes: infer C }
+    ? C extends Record<string, { output: unknown }>
+      ? C
+      : Record<string, never>
+    : Record<string, never>;
 
-export type OperationTypesOf<T> = T extends { readonly operationTypes: infer O }
-  ? O extends Record<string, unknown>
-    ? O
-    : Record<string, never>
-  : Record<string, never>;
+export type OperationTypesOf<T> = [T] extends [never]
+  ? Record<string, Record<string, unknown>>
+  : T extends { readonly operationTypes: infer O }
+    ? O extends Record<string, unknown>
+      ? O
+      : Record<string, never>
+    : Record<string, never>;
 
-declare const TYPE_MAPS: unique symbol;
-export type TypeMapsPhantomKey = typeof TYPE_MAPS;
+export type TypeMapsPhantomKey = '__@prisma-next/sql-contract/typeMaps@__';
 
 export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
-  readonly [TYPE_MAPS]?: TTypeMaps;
+  readonly '__@prisma-next/sql-contract/typeMaps@__'?: TTypeMaps;
 };
 
 export type SqlCodecTypesKey = '__@prisma-next/sql-contract/codecTypes@__';
@@ -204,10 +207,8 @@ export type SqlContract<
  * Extracts TypeMaps from a contract for lane typing.
  * Handles: phantom typeMaps (no-emit), legacy phantom keys (codecTypes/operationTypes), or never (emitted requires explicit TypeMaps).
  */
-export type ExtractTypeMapsFromContract<T> = T extends {
-  readonly [K in TypeMapsPhantomKey]?: infer TM;
-}
-  ? TM
+export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T
+  ? NonNullable<T[TypeMapsPhantomKey & keyof T]>
   : T extends { readonly [K in SqlCodecTypesKey]: infer C }
     ? T extends { readonly [K in SqlOperationTypesKey]: infer O }
       ? TypeMaps<
