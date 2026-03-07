@@ -159,10 +159,7 @@ function createJsonSchemaContract(
     capabilities: {},
     meta: {},
     sources: {},
-    mappings: {
-      codecTypes: {},
-      operationTypes: {},
-    },
+    mappings: {},
   };
 }
 

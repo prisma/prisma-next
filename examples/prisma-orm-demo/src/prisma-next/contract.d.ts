@@ -19,6 +19,7 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type {
+  ContractWithTypeMaps,
   SqlContract,
   SqlStorage,
   SqlMappings,
@@ -40,7 +41,7 @@ export type TypeMaps = {
   readonly operationTypes: OperationTypes;
 };
 
-export type Contract = SqlContract<
+export type Contract = ContractWithTypeMaps<SqlContract<
   {
     readonly tables: {
       readonly User: {
@@ -109,7 +110,7 @@ export type Contract = SqlContract<
   StorageHash,
   ExecutionHash,
   ProfileHash
->;
+>, TypeMaps>;
 
 export type Tables = Contract['storage']['tables'];
 export type Models = Contract['models'];
