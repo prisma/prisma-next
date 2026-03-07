@@ -6,6 +6,7 @@ import {
   int4Column,
   int8Column,
   intervalColumn,
+  jsonb,
   numericColumn,
   textColumn,
   timeColumn,

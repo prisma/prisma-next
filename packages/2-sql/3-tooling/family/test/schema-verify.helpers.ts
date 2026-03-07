@@ -44,7 +44,7 @@ export function createTestContract(
     meta: {},
     sources: {},
     extensionPacks,
-  };
+  } as SqlContract<SqlStorage>;
 }
 
 /**

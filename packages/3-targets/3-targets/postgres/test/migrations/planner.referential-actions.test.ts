@@ -54,7 +54,7 @@ function createRefActionContract(
     },
     models: {},
     relations: {},
-    mappings: { codecTypes: {}, operationTypes: {} },
+    mappings: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},

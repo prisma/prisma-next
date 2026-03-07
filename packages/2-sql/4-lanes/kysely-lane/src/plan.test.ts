@@ -36,10 +36,7 @@ const contract: SqlContract<SqlStorage> = {
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {
-    codecTypes: {},
-    operationTypes: {},
-  },
+  mappings: {},
 };
 
 function createSelectCompiledQuery(): CompiledQuery<{ id: string; email: string }> {

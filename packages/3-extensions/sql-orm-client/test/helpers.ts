@@ -294,11 +294,6 @@ export function createTestContract(): TestContract {
         comments: { id: 'id', body: 'body', post_id: 'postId' },
         profiles: { id: 'id', user_id: 'userId', bio: 'bio' },
       },
-      codecTypes: {
-        'pg/int4@1': { output: 0 as number },
-        'pg/text@1': { output: '' as string },
-      },
-      operationTypes: {},
     },
   } satisfies TestContract;
 }
