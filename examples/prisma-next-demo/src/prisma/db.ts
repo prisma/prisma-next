@@ -1,10 +1,10 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import postgres from '@prisma-next/postgres';
 import { budgets } from '@prisma-next/sql-runtime';
-import type { Contract, TypeMaps } from './contract.d';
+import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-export const db = postgres<Contract, TypeMaps>({
+export const db = postgres<Contract>({
   contractJson,
   extensions: [pgvector],
   plugins: [
