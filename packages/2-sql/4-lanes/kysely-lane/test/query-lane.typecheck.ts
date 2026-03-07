@@ -1,41 +1,47 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  SqlContract,
+  SqlStorage,
+  TypeMaps,
+} from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { KyselyQueryLane } from '../src/client';
 
-type MockContract = SqlContract<SqlStorage> & {
-  storage: {
-    tables: {
-      user: {
-        columns: {
-          id: { codecId: 'string'; nullable: false; nativeType: 'uuid' };
-          email: { codecId: 'string'; nullable: false; nativeType: 'text' };
-          createdAt: { codecId: 'string'; nullable: false; nativeType: 'timestamptz' };
-          kind: { codecId: 'string'; nullable: false; nativeType: 'text' };
-        };
-        uniques: [];
-        indexes: [];
-        foreignKeys: [];
-      };
-      post: {
-        columns: {
-          id: { codecId: 'string'; nullable: false; nativeType: 'uuid' };
-          userId: { codecId: 'string'; nullable: false; nativeType: 'uuid' };
-          title: { codecId: 'string'; nullable: false; nativeType: 'text' };
-          createdAt: { codecId: 'string'; nullable: false; nativeType: 'timestamptz' };
-        };
-        uniques: [];
-        indexes: [];
-        foreignKeys: [];
-      };
-    };
-  };
-  mappings: {
-    codecTypes: {
-      string: { output: string };
-    };
-    operationTypes: Record<string, never>;
-  };
+type MockCodecTypes = {
+  string: { output: string };
 };
+
+type MockContract = ContractWithTypeMaps<
+  SqlContract<SqlStorage> & {
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { codecId: 'string'; nullable: false; nativeType: 'uuid' };
+            email: { codecId: 'string'; nullable: false; nativeType: 'text' };
+            createdAt: { codecId: 'string'; nullable: false; nativeType: 'timestamptz' };
+            kind: { codecId: 'string'; nullable: false; nativeType: 'text' };
+          };
+          uniques: [];
+          indexes: [];
+          foreignKeys: [];
+        };
+        post: {
+          columns: {
+            id: { codecId: 'string'; nullable: false; nativeType: 'uuid' };
+            userId: { codecId: 'string'; nullable: false; nativeType: 'uuid' };
+            title: { codecId: 'string'; nullable: false; nativeType: 'text' };
+            createdAt: { codecId: 'string'; nullable: false; nativeType: 'timestamptz' };
+          };
+          uniques: [];
+          indexes: [];
+          foreignKeys: [];
+        };
+      };
+    };
+  },
+  TypeMaps<MockCodecTypes, Record<string, never>>
+>;
 
 type HasKey<TObject, TKey extends string> = TKey extends keyof TObject ? true : false;
 type AssertFalse<TValue extends false> = TValue;
