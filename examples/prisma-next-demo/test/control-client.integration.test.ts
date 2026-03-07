@@ -20,7 +20,8 @@ describe('control client integration', () => {
     'initializes database schema from contract',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract });
+        // Use control client to initialize the database
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
 
         // Verify tables were created by querying the database
         const pool = new Pool({ connectionString });
@@ -48,8 +49,9 @@ describe('control client integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         // Initialize and sign database
-        await initTestDatabase({ connection: connectionString, contract });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
 
+        // Create a new client to verify
         const client = createPrismaNextControlClient({ connection: connectionString });
         try {
           const verifyResult = await client.verify({ contractIR: contract });
@@ -70,7 +72,7 @@ describe('control client integration', () => {
     'schema verify passes after dbInit',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
 
         const client = createPrismaNextControlClient({ connection: connectionString });
         try {
@@ -89,7 +91,7 @@ describe('control client integration', () => {
     'introspects database schema',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
 
         const client = createPrismaNextControlClient({ connection: connectionString });
         try {
