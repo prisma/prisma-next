@@ -23,7 +23,6 @@ import {
   ContractBuilder,
   createTable,
   type ExtractColumns,
-  type ExtractModelFields,
   type ExtractPrimaryKey,
   ModelBuilder,
   type Mutable,
@@ -132,10 +131,6 @@ export interface SqlTableBuilder<
     PrimaryKey
   >;
 }
-
-type InvertRecord<T extends Record<string, string>> = {
-  readonly [K in keyof T & string as T[K]]: K;
-};
 
 type ContractBuilderMappings = SqlMappings;
 
@@ -615,8 +610,11 @@ class SqlContractBuilder<
     >;
   }
 
-  override target<T extends string, TPack extends TargetPackRef<string, T>>(
-    packRef: TPack,
+  override target<
+    T extends string,
+    TPack extends TargetPackRef<string, T> = TargetPackRef<string, T>,
+  >(
+    packRef: TPack & TargetPackRef<string, T>,
   ): SqlContractBuilder<
     ExtractCodecTypesFromPack<TPack> extends Record<string, never>
       ? CodecTypes
