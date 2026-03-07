@@ -25,8 +25,81 @@ import type { SqlControlFamilyInstance } from '../control-instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
+type ControlMutationDefaultSpan = {
+  readonly start: {
+    readonly offset: number;
+    readonly line: number;
+    readonly column: number;
+  };
+  readonly end: {
+    readonly offset: number;
+    readonly line: number;
+    readonly column: number;
+  };
+};
+
+type ControlMutationDefaultFunctionCall = {
+  readonly name: string;
+  readonly raw: string;
+  readonly args: readonly {
+    readonly raw: string;
+    readonly span: ControlMutationDefaultSpan;
+  }[];
+  readonly span: ControlMutationDefaultSpan;
+};
+
+type ControlMutationDefaultLoweringContext = {
+  readonly sourceId: string;
+  readonly modelName: string;
+  readonly fieldName: string;
+  readonly columnCodecId?: string;
+};
+
+export type ControlMutationDefaultFunctionHandler = (input: {
+  readonly call: ControlMutationDefaultFunctionCall;
+  readonly context: ControlMutationDefaultLoweringContext;
+}) => unknown;
+
+export interface ControlMutationDefaultFunctionEntry {
+  readonly lower: ControlMutationDefaultFunctionHandler;
+  readonly usageSignatures?: readonly string[];
+}
+
+export interface ControlMutationDefaultGeneratorDescriptor {
+  readonly id: string;
+  readonly applicableCodecIds: readonly string[];
+  readonly resolveGeneratedColumnDescriptor?: (input: {
+    readonly generated: {
+      readonly kind: string;
+      readonly id: string;
+      readonly params?: Record<string, unknown>;
+    };
+  }) =>
+    | {
+        readonly codecId: string;
+        readonly nativeType: string;
+        readonly typeRef?: string;
+        readonly typeParams?: Record<string, unknown>;
+      }
+    | undefined;
+}
+
+export interface PslScalarTypeDescriptor {
+  readonly codecId: string;
+  readonly nativeType: string;
+  readonly typeRef?: string;
+  readonly typeParams?: Record<string, unknown>;
+}
+
 export interface SqlControlStaticContributions {
   readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
+  readonly controlMutationDefaults?: () => {
+    readonly defaultFunctionRegistry: ReadonlyMap<string, ControlMutationDefaultFunctionEntry>;
+    readonly generatorDescriptors: ReadonlyArray<ControlMutationDefaultGeneratorDescriptor>;
+  };
+  readonly pslTypeDescriptors?: () => {
+    readonly scalarTypeDescriptors: ReadonlyMap<string, PslScalarTypeDescriptor>;
+  };
 }
 
 export interface ComponentDatabaseDependency<TTargetDetails> {

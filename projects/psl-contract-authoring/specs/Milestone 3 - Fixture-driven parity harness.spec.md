@@ -57,6 +57,6 @@ This milestone also records (and keeps current) an explicit inventory of TS-auth
 # References
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
-- Project plan: `projects/psl-contract-authoring/plans/plan.md`
+- Project plan: `projects/psl-contract-authoring/plan.md`
 - Gap inventory: `projects/psl-contract-authoring/references/authoring-surface-gap-inventory.md`
 

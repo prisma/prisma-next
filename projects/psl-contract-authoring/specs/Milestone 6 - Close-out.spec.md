@@ -36,6 +36,6 @@ This spec defines the close-out deliverable: verification, doc migration, and de
 # References
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
-- Project plan: `projects/psl-contract-authoring/plans/plan.md`
+- Project plan: `projects/psl-contract-authoring/plan.md`
 - Workspace rules: `.cursor/rules/doc-maintenance.mdc`
 

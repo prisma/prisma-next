@@ -75,9 +75,13 @@ const ModelSchema = type.declare<ModelDefinition>().type({
   relations: type({ '[string]': 'unknown' }),
 });
 
+const GeneratorIdSchema = type('string').narrow((value, ctx) => {
+  return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value) ? true : ctx.mustBe('a flat generator id');
+});
+
 const ExecutionMutationDefaultValueSchema = type({
   kind: "'generator'",
-  id: "'ulid' | 'nanoid' | 'uuidv7' | 'uuidv4' | 'cuid2' | 'ksuid'",
+  id: GeneratorIdSchema,
   'params?': 'Record<string, unknown>',
 });
 
