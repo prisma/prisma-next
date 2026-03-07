@@ -1,13 +1,10 @@
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import { ifDefined } from '@prisma-next/utils/defined';
-import {
-  type BuiltinGeneratorId,
-  builtinGeneratorIds as builtinGeneratorIdsInternal,
-  type IdGeneratorOptionsById,
-} from './generators';
+import { type BuiltinGeneratorId, builtinGeneratorIds } from './generator-ids';
+import type { IdGeneratorOptionsById } from './generators';
 
-export const builtinGeneratorIds = builtinGeneratorIdsInternal;
+export { builtinGeneratorIds };
 
 export type GeneratedColumnDescriptor = {
   readonly type: ColumnTypeDescriptor;
