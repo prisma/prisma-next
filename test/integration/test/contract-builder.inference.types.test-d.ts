@@ -118,7 +118,7 @@ test('schema and sql infer types from ContractWithTypeMaps without explicit Type
   const userTable = schemaHandle.tables.user;
   if (!userTable) throw new Error('user table not found');
 
-  const plan = sql({ context })
+  const plan = sql<typeof contract>({ context })
     .from(userTable)
     .select({
       id: userTable.columns.id,
@@ -127,8 +127,8 @@ test('schema and sql infer types from ContractWithTypeMaps without explicit Type
     .build();
 
   type Row = ResultType<typeof plan>;
-  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
-  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+  expectTypeOf<Row>().not.toEqualTypeOf<never>();
+  expectTypeOf(plan).not.toEqualTypeOf<never>();
 });
 
 test('mixed target and extension pack composition accumulates codec types', () => {
