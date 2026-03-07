@@ -1,6 +1,6 @@
 import type { ExtensionPackRef } from '@prisma-next/contract/framework-components';
-import type { CodecTypes } from '@prisma-next/extension-pgvector/codec-types';
 import { pgvectorPackMeta } from '../core/descriptor-meta';
+import type { CodecTypes } from '../types/codec-types';
 
 const pgvectorPack = pgvectorPackMeta;
 
