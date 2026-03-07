@@ -37,7 +37,7 @@ function createTestContract(): SqlContract<SqlStorage> {
     },
     models: {},
     relations: {},
-    mappings: { codecTypes: {}, operationTypes: {} },
+    mappings: {},
   };
 }
 

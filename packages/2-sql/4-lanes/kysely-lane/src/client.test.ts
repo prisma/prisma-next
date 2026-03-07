@@ -33,10 +33,7 @@ const contract: SqlContract<SqlStorage> = {
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {
-    codecTypes: {},
-    operationTypes: {},
-  },
+  mappings: {},
 };
 
 describe('createKyselyLane', () => {

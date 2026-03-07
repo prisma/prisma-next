@@ -28,10 +28,7 @@ export function createTestContract(storage: Partial<SqlStorage> = {}): SqlContra
     } as SqlStorage,
     models: {},
     relations: {},
-    mappings: {
-      codecTypes: {},
-      operationTypes: {},
-    },
+    mappings: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},

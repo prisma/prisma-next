@@ -1,4 +1,10 @@
-import type { ExtractCodecTypes, SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  ExtractCodecTypes,
+  SqlContract,
+  SqlMappings,
+  TypeMaps,
+} from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   int4Column as int4ColumnType,
@@ -45,7 +51,16 @@ type TestContract = SqlContract<
   SqlMappings
 >;
 
-type TestSchemaHandle = SchemaHandle<TestContract, ExtractCodecTypes<TestContract>, OperationTypes>;
+type TestTypeMaps = TypeMaps<
+  { 'pg/int4@1': { output: number }; 'pg/text@1': { output: string } },
+  Record<string, never>
+>;
+type TestContractWithTypeMaps = ContractWithTypeMaps<TestContract, TestTypeMaps>;
+type TestSchemaHandle = SchemaHandle<
+  TestContractWithTypeMaps,
+  ExtractCodecTypes<TestContractWithTypeMaps>,
+  OperationTypes
+>;
 type TestUserTable = TestSchemaHandle['tables']['user'];
 
 type MutableStorage = {
@@ -83,7 +98,7 @@ describe('schema', () => {
 
   it('creates schema with tables', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     expect(tables).toBeDefined();
     const userTable = tables.user;
@@ -95,7 +110,7 @@ describe('schema', () => {
 
   it('table proxy allows direct column access', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable: TestUserTable = tables.user;
     // Test proxy access pattern: userTable.id should work via proxy
@@ -122,7 +137,7 @@ describe('schema', () => {
 
   it('table proxy returns undefined for non-existent properties', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable: TestUserTable = tables.user;
     const nonexistentColumn = (userTable.columns as Record<string, unknown>)['nonexistent'];
@@ -139,7 +154,7 @@ describe('schema', () => {
 
   it('table proxy returns undefined for non-string properties', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable: TestUserTable = tables.user;
     // Access with Symbol or number to test non-string branch
@@ -157,7 +172,7 @@ describe('schema', () => {
 
   it('table proxy preserves standard properties', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables.user;
     expect(userTable.name).toBe('user');
@@ -190,7 +205,10 @@ describe('schema', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithUndefinedColumn, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(
+      contractWithUndefinedColumn,
+      adapter,
+    );
     // Manually manipulate storage to have undefined column to test continue branch
     // This tests the branch where columnDef is undefined (line 202 in schema.ts)
     const storage = context.contract.storage as unknown as MutableStorage;
@@ -217,7 +235,7 @@ describe('schema', () => {
 
   it('column builder has columnMeta property', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable: TestUserTable = tables.user;
     const idColumn = userTable.columns.id;
@@ -235,7 +253,7 @@ describe('schema', () => {
 
   it('column builder has __jsType property', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id;
@@ -248,7 +266,7 @@ describe('schema', () => {
 
     it.each(operators)('%s creates binary builder with correct op', (op) => {
       const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
+      const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
       const tables = schema(context).tables;
       const idColumn = tables.user.columns.id;
 
@@ -264,7 +282,7 @@ describe('schema', () => {
 
     it.each(operators)('%s throws for invalid param', (op) => {
       const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
+      const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
       const tables = schema(context).tables;
       const idColumn = tables.user.columns.id;
 
@@ -276,7 +294,7 @@ describe('schema', () => {
 
     it.each(operators)('%s throws for null value', (op) => {
       const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
+      const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
       const tables = schema(context).tables;
       const idColumn = tables.user.columns.id;
 
@@ -290,7 +308,7 @@ describe('schema', () => {
       operators,
     )('%s creates binary builder when comparing with ExpressionSource (another column)', (op) => {
       const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
+      const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
       const tables = schema(context).tables;
       const idColumn = tables.user.columns.id;
       const emailColumn = tables.user.columns.email;
@@ -311,7 +329,7 @@ describe('schema', () => {
 
   it('column builder asc creates order builder', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable: TestUserTable = tables.user;
     const idColumn = userTable.columns.id;
@@ -330,7 +348,7 @@ describe('schema', () => {
 
   it('column builder desc creates order builder', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable: TestUserTable = tables.user;
     const idColumn = userTable.columns.id;
@@ -349,7 +367,7 @@ describe('schema', () => {
 
   it('table proxy returns undefined for non-string property access (number)', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable: TestUserTable = tables.user;
 
@@ -360,7 +378,7 @@ describe('schema', () => {
 
   it('column builder isNull creates null check builder', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const bioColumn = tables.user.columns.bio;
 
@@ -373,7 +391,7 @@ describe('schema', () => {
 
   it('column builder isNotNull creates null check builder', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const bioColumn = tables.user.columns.bio;
 
