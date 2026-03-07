@@ -1,6 +1,12 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
+import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
+
+const baseInput = {
+  target: postgresTarget,
+  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+} as const;
 
 describe('interpretPslDocumentToSqlContractIR relations', () => {
   it('accepts relation navigation list fields and emits relation metadata for both sides', () => {
@@ -19,7 +25,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -67,7 +73,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -118,7 +124,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -157,7 +163,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -198,7 +204,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;

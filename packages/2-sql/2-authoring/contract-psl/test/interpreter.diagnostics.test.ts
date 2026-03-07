@@ -1,6 +1,12 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
+import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
+
+const baseInput = {
+  target: postgresTarget,
+  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+} as const;
 
 describe('interpretPslDocumentToSqlContractIR diagnostics', () => {
   it('maps pgvector attributes on named types and fields to vector descriptor shape', () => {
@@ -18,6 +24,7 @@ model Document {
     });
 
     const namedTypeResult = interpretPslDocumentToSqlContractIR({
+      ...baseInput,
       document: namedTypeDocument,
       composedExtensionPacks: ['pgvector'],
     });
@@ -42,6 +49,7 @@ model Document {
       sourceId: 'schema.prisma',
     });
     const fieldResult = interpretPslDocumentToSqlContractIR({
+      ...baseInput,
       document: fieldDocument,
       composedExtensionPacks: ['pgvector'],
     });
@@ -73,6 +81,7 @@ model Document {
     });
 
     const result = interpretPslDocumentToSqlContractIR({
+      ...baseInput,
       document,
       composedExtensionPacks: [],
     });
@@ -103,7 +112,7 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -135,7 +144,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -167,7 +176,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -199,7 +208,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -229,7 +238,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -263,7 +272,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -292,7 +301,7 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
