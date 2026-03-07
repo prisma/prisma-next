@@ -3,7 +3,7 @@
 // without namespace collisions. Each contract can have its own namespace name.
 
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { ContractWithTypeMaps, SqlContract } from '@prisma-next/sql-contract/types';
 
 // Stub codec types for testing (matches stub codecs in createStubAdapter)
 // These provide type inference without requiring the postgres adapter package
@@ -19,7 +19,7 @@ export type ProfileHash = ProfileHashBase<'sha256:test-profile'>;
 
 // Contract type representing the contract data structure
 // This type matches the structure of contract.json and can be used as a return type
-export type Contract = SqlContract<
+export type Contract = ContractWithTypeMaps<SqlContract<
   {
     readonly tables: {
       readonly user: {
@@ -88,7 +88,7 @@ export type Contract = SqlContract<
   StorageHash,
   ExecutionHash,
   ProfileHash
-> & { readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes; readonly '__@prisma-next/sql-contract/operationTypes@__': OperationTypes };
+>, TypeMaps>;
 
 // Operation types (empty for now, can be extended by extension packs)
 export type OperationTypes = Record<string, never>;
