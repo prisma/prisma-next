@@ -84,7 +84,7 @@ model Post {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma');
+      const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source();
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -170,7 +170,7 @@ model Post {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma');
+      const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source();
 
       expect(result.ok).toBe(false);
