@@ -1,5 +1,6 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import type {
   ComponentDatabaseDependency,
   SqlControlExtensionDescriptor,
@@ -11,69 +12,9 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 import type { PostgresColumnDefault } from '../../src/core/types';
 
-const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
-  id: 'postgres.extension.vector',
-  label: 'Enable extension "vector"',
-  install: [
-    {
-      id: 'extension.vector',
-      label: 'Enable extension "vector"',
-      summary: 'Ensures the pgvector extension is enabled for vector columns',
-      operationClass: 'additive',
-      target: { id: 'postgres' },
-      precheck: [
-        {
-          description: 'verify extension "vector" is not already enabled',
-          sql: "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-        },
-      ],
-      execute: [
-        {
-          description: 'create extension "vector"',
-          sql: 'CREATE EXTENSION IF NOT EXISTS vector',
-        },
-      ],
-      postcheck: [
-        {
-          description: 'confirm extension "vector" is enabled',
-          sql: "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-        },
-      ],
-    },
-  ],
-};
-
 type PostgresStorageColumn = Omit<StorageColumn, 'default'> & {
   readonly default?: PostgresColumnDefault;
 };
-
-function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
-  return {
-    kind: 'extension',
-    id: 'pgvector',
-    familyId: 'sql',
-    targetId: 'postgres',
-    version: '0.0.0-test',
-    operationSignatures: () => [],
-    databaseDependencies: { init: [pgvectorDependency] },
-    types: {
-      codecTypes: {
-        controlPlaneHooks: {
-          'pg/vector@1': {
-            expandNativeType: ({ nativeType, typeParams }) => {
-              const length = typeParams?.['length'];
-              if (typeof length === 'number' && Number.isInteger(length) && length > 0) {
-                return `${nativeType}(${length})`;
-              }
-              return nativeType;
-            },
-          },
-        },
-      },
-    },
-    create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
-  };
-}
 
 function createFrameworkComponentWithDependencies(
   dependencies: readonly ComponentDatabaseDependency<unknown>[],
@@ -153,7 +94,7 @@ const emptySchema: SqlSchemaIR = {
 describe('PostgresMigrationPlanner - when database is empty', () => {
   it('builds additive plan for empty schema with database dependencies', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [createFrameworkComponent()];
+    const frameworkComponents = [pgvectorDescriptor];
 
     const result = planner.plan({
       contract,
@@ -227,7 +168,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       ],
     };
     const frameworkComponents = [
-      createFrameworkComponent(),
+      pgvectorDescriptor,
       createFrameworkComponentWithDependencies([mysqlDependency]),
     ];
 
@@ -385,7 +326,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [createFrameworkComponent()],
+      frameworkComponents: [pgvectorDescriptor],
     });
 
     expect(result.kind).toBe('success');
@@ -401,7 +342,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('skips dependency install when dependency already satisfied', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [createFrameworkComponent()];
+    const frameworkComponents = [pgvectorDescriptor];
     const schemaWithExtension: SqlSchemaIR = {
       tables: {},
       dependencies: [{ id: 'postgres.extension.vector' }],
@@ -461,7 +402,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('still plans additive fixes when schema contains extra tables', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [createFrameworkComponent()];
+    const frameworkComponents = [pgvectorDescriptor];
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
         existing: {
@@ -502,7 +443,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('ignores extra tables when they are unrelated to the contract', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [createFrameworkComponent()];
+    const frameworkComponents = [pgvectorDescriptor];
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
         users: {
