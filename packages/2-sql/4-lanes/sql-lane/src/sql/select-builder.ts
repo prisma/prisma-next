@@ -63,14 +63,12 @@ export class SelectBuilderImpl<
   Includes extends Record<string, unknown> = Record<string, never>,
 > {
   private readonly contract: TContract;
-  private readonly codecTypes: CodecTypes;
   private readonly context: ExecutionContext<TContract>;
   private state: BuilderState = {};
 
   constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {
     this.context = options.context;
     this.contract = options.context.contract;
-    this.codecTypes = {} as CodecTypes;
     if (state) {
       this.state = state;
     }
@@ -145,7 +143,6 @@ export class SelectBuilderImpl<
     // Build child builder
     const childBuilderImpl = new IncludeChildBuilderImpl<TContract, CodecTypes, unknown>(
       this.contract,
-      this.codecTypes,
       childTable,
     );
     const builtChild = childBuilder(
