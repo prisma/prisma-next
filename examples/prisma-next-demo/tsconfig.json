@@ -2,11 +2,13 @@
   "extends": ["@prisma-next/tsconfig/base"],
   "compilerOptions": {
     "outDir": "dist",
-    "lib": ["ES2022", "DOM"],
-    "types": ["vite/client"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "jsx": "react-jsx"
   },
   "include": [
     "src/**/*.ts",
+    "src/**/*.tsx",
     "test/**/*.ts",
     "scripts/**/*.ts",
     "prisma/**/*.ts",
