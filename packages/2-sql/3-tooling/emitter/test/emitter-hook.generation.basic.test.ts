@@ -67,7 +67,7 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('CodecTypes');
   });
 
-  describe('Contract and TypeMaps shape (Task 1.1)', () => {
+  describe('Contract and TypeMaps shape', () => {
     it('emits TypeMaps as separate export', () => {
       const ir = createContractIR({
         models: {

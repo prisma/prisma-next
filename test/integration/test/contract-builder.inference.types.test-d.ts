@@ -1,9 +1,3 @@
-/**
- * Type tests for defineContract() inference from .target() and .extensionPacks().
- * Verifies that codec/op type maps are inferred from packs without manual type composition.
- * Task 4.1: pack-driven TypeMaps inference and ContractWithTypeMaps no-emit inference.
- */
-
 import type { CodecTypes as PgCodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
   int4Column,

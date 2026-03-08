@@ -15,7 +15,7 @@ const RUNTIME_MAPPING_KEYS: (keyof SqlMappings)[] = [
   'columnToField',
 ];
 
-describe('Contract and TypeMaps shape (Task 1.1)', () => {
+describe('Contract and TypeMaps shape', () => {
   describe('TypeMaps shape', () => {
     it('TypeMaps has locked shape with codecTypes and operationTypes', () => {
       type TM = TypeMaps<{ 'pg/text@1': { output: string } }, Record<string, never>>;
