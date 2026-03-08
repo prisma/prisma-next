@@ -15,7 +15,7 @@ alwaysApply: false
 
 ```typescript
 // Emitted: import TypeMaps, use CodecTypesOf<TypeMaps>
-import type { Contract, TypeMaps } from './contract.d';
+import type { Contract, TypeMaps } from './contract';
 type CodecTypes = CodecTypesOf<TypeMaps>;
 
 // No-emit: ExtractCodecTypes works with ContractWithTypeMaps
