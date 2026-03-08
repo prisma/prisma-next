@@ -227,5 +227,4 @@ Rationale: we want an explicit signal that these maps are for TypeScript inferen
 
 - Demo visualization (`examples/prisma-next-demo/src/entry.ts`) renders directly from `validateContract<Contract>(contractJson)` output. No `ContractIR` alias; the constructed Contract is used for rendering and HMR.
 - Demo emitted workflow (`examples/prisma-next-demo/src/prisma/db.ts`) uses `postgres<Contract, TypeMaps>({ contractJson, ... })` with explicit `TypeMaps` from `contract.d.ts`.
-- Control-client test utilities use the constructed Contract from `validateContract` for dbInit/verify operations.
 
