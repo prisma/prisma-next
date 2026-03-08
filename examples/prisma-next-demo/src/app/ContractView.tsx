@@ -1,13 +1,15 @@
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import type { Contract } from '../prisma/contract.d';
 
+type ContractModel = Contract['models'][keyof Contract['models']];
+
 function ModelCard({
   modelName,
   model,
   contract,
 }: {
   modelName: string;
-  model: { storage: { readonly table: string }; fields: Record<string, unknown> };
+  model: ContractModel;
   contract: Contract;
 }) {
   const tableName = model.storage.table;
