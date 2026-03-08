@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SqlContract, SqlMappings, SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
-
-const RUNTIME_MAPPING_KEYS: (keyof SqlMappings)[] = [
-  'modelToTable',
-  'tableToModel',
-  'fieldToColumn',
-  'columnToField',
-];
+import { RUNTIME_MAPPING_KEYS } from './test-constants';
 
 const baseContract = {
   schemaVersion: '1',
