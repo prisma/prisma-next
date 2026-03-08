@@ -2,6 +2,8 @@
 
 This follow-up removes ID generator “built-ins” from low layers by moving **concrete ID generator implementations** (and generator-owned metadata like storage shape + applicability) out of `@prisma-next/ids` in the framework authoring layer and into **composed framework components** (targets/adapters/extension packs). The core system continues to define **strategy/registry shapes and assembly rules**, while implementations live only in high layers (“thin core, fat interfaces/targets”).
 
+It also clarifies the TS authoring story: instead of low-layer “built-in” ID helpers, TS authoring uses **composition-owned column helpers** (assembled from the target + extension packs) so that helpers like `uuid()` can remain ergonomic while the framework core stays ignorant of their implementation.
+
 # Description
 
 The current ID generator design introduces a privileged “built-in” vocabulary (`builtinGeneratorIds` / `BuiltinGeneratorId`) and concrete generator implementations (via `uniku/*`) in a framework authoring package (`packages/1-framework/2-authoring/ids`). This is a category error relative to the architectural direction established in the mutation-default registry work:
@@ -37,8 +39,22 @@ This work is intentionally sequenced after the mutation-default registry seam ex
   - Execution plane: composed generator implementations registry
 - Define a clear story for the TS authoring surface:
   - TS-first authoring must remain able to express execution defaults with arbitrary ids (escape hatch).
-  - TS “convenience helpers” for ID generators must not require low layers to ship concrete implementations or privileged vocabularies.
-  - Preferred direction: TS convenience helpers for ID generators live with the composed implementation contributor (pack/adapter), not in framework core.
+  - TS “convenience helpers” must not require low layers to ship concrete implementations or privileged vocabularies.
+  - Provide a composition-owned **column helper registry** for TS authoring:
+    - The TS contract authoring callback receives an additional `column` helper (or equivalent) that aggregates registered helpers from the composed target + extension packs.
+    - Helpers can produce full column definitions, including:
+      - `type` + `nativeType` (and `typeParams`)
+      - nullability + default (storage default) and/or execution default (`ExecutionMutationDefaultValue`)
+      - any extension-owned attributes where applicable
+    - ID generators become one instance of this pattern (e.g. `column.uuid()` / `column.nanoid({ size })`), preserving “packed ID” column sizing logic without introducing a low-layer built-in.
+    - Helpers may imply constraints (for example, an id-column helper may imply primary key semantics).
+    - Namespacing uses dot notation (e.g. `pgvector.vector(...)`, `ids.uuid(...)`) when needed.
+    - Duplicates are hard errors during assembly; there is no override/last-wins.
+    - The framework core defines only the helper *shape* and deterministic assembly rules; helper implementations live only in composed contributors.
+
+- Align TS helper design with future PSL improvements:
+  - Record the decision to introduce composed registries for **type constructors** (parameterized storage types) and **field presets** (may bundle defaults + constraints) across PSL and TS authoring, per ADR 170.
+  - This follow-up does not need to redesign PSL syntax immediately, but it must avoid locking TS helper shapes into a model that PSL cannot adopt.
 
 ## Non-Functional Requirements
 
@@ -73,7 +89,12 @@ This work is intentionally sequenced after the mutation-default registry seam ex
 ## TS authoring story
 
 - [ ] TS-first authoring can still emit execution defaults with arbitrary ids (escape hatch).
-- [ ] Any TS “ID generator convenience API” does not require low layers to ship concrete implementations or “built-in id lists”.
+- [ ] Any TS “convenience helper” (including ID generator helpers) does not require low layers to ship concrete implementations or “built-in id lists”.
+- [ ] The TS authoring surface can opt into composed column helpers (target + extension packs) and use them to define columns without hardcoding helper implementations in the core authoring packages.
+- [ ] Column helper assembly:
+  - [ ] duplicates are hard errors
+  - [ ] dot namespacing is supported for extension-owned helpers
+  - [ ] non-namespaced helpers are reserved for family + target contributors (extensions should namespace)
 
 ## Evidence
 
@@ -108,6 +129,7 @@ No change.
 # References
 
 - Mutation-default registry spec (hard constraint: no built-ins outside the registry): `projects/psl-contract-authoring/specs/Follow-up - Pack-provided mutation default functions registry.spec.md`
+- ADR 170 — Pack-provided type constructors and field presets: `docs/architecture docs/adrs/ADR 170 - Pack-provided type constructors and field presets.md`
 - Current problematic implementation location: `packages/1-framework/2-authoring/ids/src/generators.ts`
 - Current adapter consumers:
   - runtime provisioning: `packages/3-targets/6-adapters/postgres/src/exports/runtime.ts`
@@ -120,9 +142,14 @@ No change.
    - Alternative: per-target/per-adapter contributions (more explicit, less reuse).
 
 2. What is the desired TS authoring UX for ID generators once implementations live in packs?
-   - **Default assumption**: TS helper functions live in the pack (importing the pack opts into the vocabulary).
-   - Alternative: TS helper stays low but only constructs specs with string ids (no privileged union) and relies on composition for meaning/validation.
+  - **Decision**: TS helper functions are provided as composed column helpers (e.g. `column.uuid()`), assembled from the target + extension packs (importing/composing a pack opts into its vocabulary). Duplicates are hard errors; dot namespaces are used when needed. Helpers may imply constraints.
+  - Alternative: pack-level helpers without a shared `column` aggregator (more explicit imports, less uniform UX).
+  - Alternative: a low-layer helper that only constructs specs with string ids (no privileged union) and relies on composition for meaning/validation (escape hatch, not the primary UX).
 
 3. Do we want to keep any of `@prisma-next/ids` as a package?
    - **Default assumption**: keep only minimal types (if any) that do not encode privileged vocabularies; remove concrete implementations and “builtin” tables entirely.
+
+4. How do column helper names compose?
+  - **Decision**: strict duplicate detection (hard error). Use dot namespaces when needed.
+  - **Constraint**: reserve non-namespaced helper names for family + target contributors; extensions should contribute namespaced helpers by default (ADR 170).
 
