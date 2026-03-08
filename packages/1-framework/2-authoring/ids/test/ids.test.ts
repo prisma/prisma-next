@@ -52,4 +52,17 @@ describe('@prisma-next/ids', () => {
   it('throws for unknown generator id', () => {
     expect(() => generateId({ id: 'nonexistent' })).toThrow('Unknown built-in ID generator');
   });
+
+  it('rejects nanoid with invalid size', () => {
+    expect(() => nanoid({ size: 1 })).toThrow('nanoid size must be an integer between 2 and 255');
+    expect(() => nanoid({ size: 256 })).toThrow('nanoid size must be an integer between 2 and 255');
+    expect(() => nanoid({ size: 3.5 } as never)).toThrow(
+      'nanoid size must be an integer between 2 and 255',
+    );
+  });
+
+  it('accepts nanoid with valid size', () => {
+    expect(nanoid({ size: 2 }).typeParams).toEqual({ length: 2 });
+    expect(nanoid({ size: 255 }).typeParams).toEqual({ length: 255 });
+  });
 });
