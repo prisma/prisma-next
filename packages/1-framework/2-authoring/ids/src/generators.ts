@@ -4,7 +4,7 @@ import { nanoid as nanoidGenerator } from 'uniku/nanoid';
 import { ulid as ulidGenerator } from 'uniku/ulid';
 import { uuidv4 as uuidv4Generator } from 'uniku/uuid/v4';
 import { uuidv7 as uuidv7Generator } from 'uniku/uuid/v7';
-import { type BuiltinGeneratorId, builtinGeneratorIds } from './generator-ids';
+import type { BuiltinGeneratorId } from './generator-ids';
 
 type FirstArg<TFunction> = TFunction extends (...args: infer TArgs) => unknown
   ? TArgs extends []

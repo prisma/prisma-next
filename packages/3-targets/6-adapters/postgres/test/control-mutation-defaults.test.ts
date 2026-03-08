@@ -5,10 +5,23 @@ import {
   createPostgresPslScalarTypeDescriptors,
 } from '../src/core/control-mutation-defaults';
 
-const stubContext = { sourceId: 'test.prisma' } as const;
+const stubSpan = {
+  start: { offset: 0, line: 1, column: 1 },
+  end: { offset: 0, line: 1, column: 1 },
+} as const;
 
-function makeCall(name: string, args: Array<{ raw: string; span?: undefined }> = []) {
-  return { name, args, span: undefined };
+const stubContext = {
+  sourceId: 'test.prisma',
+  modelName: 'TestModel',
+  fieldName: 'testField',
+} as const;
+
+function makeCall(name: string, args: Array<{ raw: string; span: typeof stubSpan }> = []) {
+  return { name, raw: `${name}(${args.map((a) => a.raw).join(', ')})`, args, span: stubSpan };
+}
+
+function arg(raw: string) {
+  return { raw, span: stubSpan };
 }
 
 describe('createPostgresDefaultFunctionRegistry', () => {
@@ -58,7 +71,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('lowers uuid(7) to uuidv7 execution generator', () => {
     const handler = registry.get('uuid')!;
     const result = handler.lower({
-      call: makeCall('uuid', [{ raw: '7' }]),
+      call: makeCall('uuid', [arg('7')]),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -76,7 +89,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('lowers cuid(2) to cuid2 execution generator', () => {
     const handler = registry.get('cuid')!;
     const result = handler.lower({
-      call: makeCall('cuid', [{ raw: '2' }]),
+      call: makeCall('cuid', [arg('2')]),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -106,7 +119,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('lowers nanoid(16) with size param', () => {
     const handler = registry.get('nanoid')!;
     const result = handler.lower({
-      call: makeCall('nanoid', [{ raw: '16' }]),
+      call: makeCall('nanoid', [arg('16')]),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -121,7 +134,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('lowers dbgenerated("expr") to storage default', () => {
     const handler = registry.get('dbgenerated')!;
     const result = handler.lower({
-      call: makeCall('dbgenerated', [{ raw: '"gen_random_uuid()"' }]),
+      call: makeCall('dbgenerated', [arg('"gen_random_uuid()"')]),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -142,7 +155,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('rejects dbgenerated with empty string', () => {
     const handler = registry.get('dbgenerated')!;
     const result = handler.lower({
-      call: makeCall('dbgenerated', [{ raw: '""' }]),
+      call: makeCall('dbgenerated', [arg('""')]),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -151,7 +164,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('rejects uuid with invalid version', () => {
     const handler = registry.get('uuid')!;
     const result = handler.lower({
-      call: makeCall('uuid', [{ raw: '3' }]),
+      call: makeCall('uuid', [arg('3')]),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -160,7 +173,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('rejects uuid with too many arguments', () => {
     const handler = registry.get('uuid')!;
     const result = handler.lower({
-      call: makeCall('uuid', [{ raw: '4' }, { raw: '7' }]),
+      call: makeCall('uuid', [arg('4'), arg('7')]),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -169,7 +182,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('rejects nanoid with out-of-range size', () => {
     const handler = registry.get('nanoid')!;
     const result = handler.lower({
-      call: makeCall('nanoid', [{ raw: '1' }]),
+      call: makeCall('nanoid', [arg('1')]),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -178,7 +191,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('rejects autoincrement with arguments', () => {
     const handler = registry.get('autoincrement')!;
     const result = handler.lower({
-      call: makeCall('autoincrement', [{ raw: '1' }]),
+      call: makeCall('autoincrement', [arg('1')]),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -187,7 +200,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('rejects cuid with invalid version', () => {
     const handler = registry.get('cuid')!;
     const result = handler.lower({
-      call: makeCall('cuid', [{ raw: '1' }]),
+      call: makeCall('cuid', [arg('1')]),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -196,7 +209,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('rejects cuid with too many arguments', () => {
     const handler = registry.get('cuid')!;
     const result = handler.lower({
-      call: makeCall('cuid', [{ raw: '2' }, { raw: '3' }]),
+      call: makeCall('cuid', [arg('2'), arg('3')]),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -205,7 +218,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('rejects nanoid with too many arguments', () => {
     const handler = registry.get('nanoid')!;
     const result = handler.lower({
-      call: makeCall('nanoid', [{ raw: '16' }, { raw: '32' }]),
+      call: makeCall('nanoid', [arg('16'), arg('32')]),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -214,7 +227,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('rejects dbgenerated with non-string argument', () => {
     const handler = registry.get('dbgenerated')!;
     const result = handler.lower({
-      call: makeCall('dbgenerated', [{ raw: 'notAString' }]),
+      call: makeCall('dbgenerated', [arg('notAString')]),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -233,7 +246,9 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
 
   it('resolves column descriptor for matching generator', () => {
     const uuidv4Descriptor = descriptors.find((d) => d.id === 'uuidv4')!;
-    const result = uuidv4Descriptor.resolveGeneratedColumnDescriptor({
+    const resolve = uuidv4Descriptor.resolveGeneratedColumnDescriptor;
+    expect(resolve).toBeDefined();
+    const result = resolve!({
       generated: { kind: 'generator', id: 'uuidv4' },
     });
     expect(result).toMatchObject({
@@ -245,7 +260,9 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
 
   it('returns undefined for non-matching generator', () => {
     const uuidv4Descriptor = descriptors.find((d) => d.id === 'uuidv4')!;
-    const result = uuidv4Descriptor.resolveGeneratedColumnDescriptor({
+    const resolve = uuidv4Descriptor.resolveGeneratedColumnDescriptor;
+    expect(resolve).toBeDefined();
+    const result = resolve!({
       generated: { kind: 'generator', id: 'nanoid' },
     });
     expect(result).toBeUndefined();
