@@ -23,13 +23,20 @@ function resolveNanoidColumnDescriptor(
   params?: Record<string, unknown>,
 ): GeneratedColumnDescriptor {
   const rawSize = params?.['size'];
-  const length =
-    typeof rawSize === 'number' && Number.isInteger(rawSize) && rawSize >= 2 && rawSize <= 255
-      ? rawSize
-      : 21;
+  if (rawSize === undefined) {
+    return {
+      type: { codecId: 'sql/char@1', nativeType: 'character' },
+      typeParams: { length: 21 },
+    };
+  }
+
+  if (typeof rawSize !== 'number' || !Number.isInteger(rawSize) || rawSize < 2 || rawSize > 255) {
+    throw new Error('nanoid size must be an integer between 2 and 255');
+  }
+
   return {
     type: { codecId: 'sql/char@1', nativeType: 'character' },
-    typeParams: { length },
+    typeParams: { length: rawSize },
   };
 }
 
