@@ -27,6 +27,8 @@ import type {
   SqlStorage,
   SqlMappings,
   ModelDefinition,
+  ContractWithTypeMaps,
+  TypeMaps as TypeMapsType,
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
@@ -47,7 +49,9 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
     : Encoded
   : Encoded;
 
-export type Contract = SqlContract<
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
+
+type ContractBase = SqlContract<
   {
     readonly tables: {
       readonly user: {
@@ -210,13 +214,69 @@ export type Contract = SqlContract<
         readonly kind: 'kind';
       };
     };
-    codecTypes: PgTypes & PgVectorTypes;
-    operationTypes: PgVectorOperationTypes;
   },
   StorageHash,
   ExecutionHash,
   ProfileHash
->;
+> & {
+  readonly target: 'postgres';
+  readonly capabilities: {
+    readonly postgres: {
+      readonly jsonAgg: true;
+      readonly lateral: true;
+      readonly limit: true;
+      readonly orderBy: true;
+      readonly 'pgvector/cosine': true;
+      readonly returning: true;
+    };
+    readonly sql: { readonly enums: true };
+  };
+  readonly extensionPacks: {
+    readonly pgvector: {
+      readonly capabilities: { readonly postgres: { readonly 'pgvector/cosine': true } };
+      readonly familyId: 'sql';
+      readonly id: 'pgvector';
+      readonly kind: 'extension';
+      readonly targetId: 'postgres';
+      readonly types: {
+        readonly codecTypes: {
+          readonly controlPlaneHooks: undefined;
+          readonly import: {
+            readonly alias: 'PgVectorTypes';
+            readonly named: 'CodecTypes';
+            readonly package: '@prisma-next/extension-pgvector/codec-types';
+          };
+          readonly parameterized: { readonly 'pg/vector@1': 'Vector<{{length}}>' };
+          readonly typeImports: readonly [
+            {
+              readonly alias: 'Vector';
+              readonly named: 'Vector';
+              readonly package: '@prisma-next/extension-pgvector/codec-types';
+            },
+          ];
+        };
+        readonly operationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorOperationTypes';
+            readonly named: 'OperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
+        };
+        readonly storage: readonly [
+          {
+            readonly familyId: 'sql';
+            readonly nativeType: 'vector';
+            readonly targetId: 'postgres';
+            readonly typeId: 'pg/vector@1';
+          },
+        ];
+      };
+      readonly version: '0.0.1';
+    };
+  };
+};
+
+export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Tables = Contract['storage']['tables'];
 export type Models = Contract['models'];
