@@ -8,6 +8,7 @@ import postgresTarget from '@prisma-next/target-postgres/runtime';
 // No-emit workflow: use the TypeScript contract directly.
 import { contract } from '../../prisma/contract';
 
+// pgvector was previously missing here; added for parity with the emit workflow config.
 export const stack = createSqlExecutionStack({
   target: postgresTarget,
   adapter: postgresAdapter,
