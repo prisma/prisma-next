@@ -1,6 +1,5 @@
 import {
   escapeLiteral,
-  expandParameterizedNativeType,
   normalizeSchemaNativeType,
   parsePostgresDefault,
   quoteIdentifier,
@@ -121,6 +120,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       schemaName,
       mode: planningMode,
       policy: options.policy,
+      codecHooks,
     });
     if (reconciliationPlan.conflicts.length > 0) {
       return plannerFailure(reconciliationPlan.conflicts);
@@ -142,8 +142,8 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       ...this.buildDatabaseDependencyOperations(options),
       ...storageTypePlan.operations,
       ...reconciliationPlan.operations,
-      ...this.buildTableOperations(sortedTables, options.schema, schemaName),
-      ...this.buildColumnOperations(sortedTables, options.schema, schemaName),
+      ...this.buildTableOperations(sortedTables, options.schema, schemaName, codecHooks),
+      ...this.buildColumnOperations(sortedTables, options.schema, schemaName, codecHooks),
       ...this.buildPrimaryKeyOperations(sortedTables, options.schema, schemaName),
       ...this.buildUniqueOperations(sortedTables, schemaLookups, schemaName),
       ...this.buildIndexOperations(sortedTables, schemaLookups, schemaName),
@@ -272,6 +272,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
+    codecHooks: Map<string, CodecControlHooks>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
@@ -297,7 +298,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         execute: [
           {
             description: `create table "${tableName}"`,
-            sql: buildCreateTableSql(qualified, table),
+            sql: buildCreateTableSql(qualified, table, codecHooks),
           },
         ],
         postcheck: [
@@ -315,6 +316,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
+    codecHooks: Map<string, CodecControlHooks>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
@@ -326,7 +328,9 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         if (schemaTable.columns[columnName]) {
           continue;
         }
-        operations.push(this.buildAddColumnOperation(schemaName, tableName, columnName, column));
+        operations.push(
+          this.buildAddColumnOperation(schemaName, tableName, columnName, column, codecHooks),
+        );
       }
     }
     return operations;
@@ -337,6 +341,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     tableName: string,
     columnName: string,
     column: StorageColumn,
+    codecHooks: Map<string, CodecControlHooks>,
   ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
     const qualified = qualifyTableName(schema, tableName);
     const notNull = column.nullable === false;
@@ -362,7 +367,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const execute = [
       {
         description: `add column "${columnName}"`,
-        sql: buildAddColumnSql(qualified, columnName, column),
+        sql: buildAddColumnSql(qualified, columnName, column, codecHooks),
       },
     ];
     const postcheck = [
@@ -704,12 +709,16 @@ function isPostgresPlannerDependency(
   return dependency.install.every((operation) => operation.target.id === 'postgres');
 }
 
-function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): string {
+function buildCreateTableSql(
+  qualifiedTableName: string,
+  table: StorageTable,
+  codecHooks: Map<string, CodecControlHooks>,
+): string {
   const columnDefinitions = Object.entries(table.columns).map(
     ([columnName, column]: [string, StorageColumn]) => {
       const parts = [
         quoteIdentifier(columnName),
-        buildColumnTypeSql(column),
+        buildColumnTypeSql(column, codecHooks),
         buildColumnDefaultSql(column.default, column),
         column.nullable ? '' : 'NOT NULL',
       ].filter(Boolean);
@@ -758,14 +767,12 @@ function assertSafeDefaultExpression(expression: string): void {
   }
 }
 
-/**
- * Builds the column type SQL, handling autoincrement as a special case.
- * For autoincrement on int4/int8, we use SERIAL/BIGSERIAL types.
- */
-export function buildColumnTypeSql(column: StorageColumn): string {
+export function buildColumnTypeSql(
+  column: StorageColumn,
+  codecHooks: Map<string, CodecControlHooks>,
+): string {
   const columnDefault = column.default;
 
-  // For autoincrement, use SERIAL/BIGSERIAL types instead of int4/int8
   if (columnDefault?.kind === 'function' && columnDefault.expression === 'autoincrement()') {
     if (column.nativeType === 'int4' || column.nativeType === 'integer') {
       return 'SERIAL';
@@ -782,31 +789,29 @@ export function buildColumnTypeSql(column: StorageColumn): string {
     return quoteIdentifier(column.nativeType);
   }
 
-  // Validate nativeType before using it unquoted in DDL
   assertSafeNativeType(column.nativeType);
-  return renderParameterizedTypeSql(column) ?? column.nativeType;
+  return renderParameterizedTypeSql(column, codecHooks) ?? column.nativeType;
 }
 
-/**
- * Renders parameterized type SQL for a column, returning null if no expansion is needed.
- *
- * Uses the shared expandParameterizedNativeType utility from the postgres adapter.
- * Returns null when the column has no typeParams, allowing the caller to fall back
- * to the base nativeType.
- */
-function renderParameterizedTypeSql(column: StorageColumn): string | null {
-  if (!column.typeParams) {
+function renderParameterizedTypeSql(
+  column: StorageColumn,
+  codecHooks: Map<string, CodecControlHooks>,
+): string | null {
+  if (!column.typeParams || !column.codecId) {
     return null;
   }
 
-  const expanded = expandParameterizedNativeType({
+  const hooks = codecHooks.get(column.codecId);
+  if (!hooks?.expandNativeType) {
+    return null;
+  }
+
+  const expanded = hooks.expandNativeType({
     nativeType: column.nativeType,
     codecId: column.codecId,
     typeParams: column.typeParams,
   });
 
-  // If no expansion happened (returned the same base type), return null
-  // so caller can decide whether to use nativeType directly
   return expanded !== column.nativeType ? expanded : null;
 }
 
@@ -968,8 +973,9 @@ function buildAddColumnSql(
   qualifiedTableName: string,
   columnName: string,
   column: StorageColumn,
+  codecHooks: Map<string, CodecControlHooks>,
 ): string {
-  const typeSql = buildColumnTypeSql(column);
+  const typeSql = buildColumnTypeSql(column, codecHooks);
   const defaultSql = buildColumnDefaultSql(column.default, column);
   const parts = [
     `ALTER TABLE ${qualifiedTableName}`,
