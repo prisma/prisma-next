@@ -55,16 +55,14 @@ export class IncludeChildBuilderImpl<
 > implements IncludeChildBuilder<TContract, CodecTypes, ChildRow>
 {
   private readonly contract: TContract;
-  private readonly codecTypes: CodecTypes;
   private readonly table: TableRef;
   private childProjection?: ProjectionState;
   private childWhere?: BinaryBuilder;
   private childOrderBy?: OrderBuilder;
   private childLimit?: number;
 
-  constructor(contract: TContract, codecTypes: CodecTypes, table: TableRef) {
+  constructor(contract: TContract, table: TableRef) {
     this.contract = contract;
-    this.codecTypes = codecTypes;
     this.table = table;
   }
 
@@ -76,7 +74,7 @@ export class IncludeChildBuilderImpl<
       TContract,
       CodecTypes,
       InferNestedProjectionRow<P, CodecTypes>
-    >(this.contract, this.codecTypes, this.table);
+    >(this.contract, this.table);
     builder.childProjection = projectionState;
     if (this.childWhere !== undefined) {
       builder.childWhere = this.childWhere;
