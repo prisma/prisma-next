@@ -108,6 +108,19 @@ Make mutation default generator compatibility deterministic without type-theory 
 - [ ] Update runtime to resolve mutation default generator ids via composed registry (baseline: `@prisma-next/ids`).
 - [ ] Add integration tests proving pack-provided generators/defaults work end-to-end and diagnostics remain stable.
 
+### Milestone 6.1: Follow-up — Move ID generator implementations to composition (thin core, fat interfaces)
+
+Remove “built-in” ID generator implementations and privileged vocabularies from low layers. Registries/strategy shapes remain in low layers; concrete implementations (and generator-owned metadata like applicability + generated-column typing) are provided only by composed components (targets/adapters/extension packs).
+
+**Spec:** `projects/psl-contract-authoring/specs/follow-up-move-id-generators-to-composition.spec.md`
+
+**Tasks:**
+
+- [ ] Move ID generator algorithm implementations out of framework authoring layers and into a composed component (preferably an extension pack).
+- [ ] Remove low-layer exports that encode privileged “built-in” generator vocabularies (id unions / id lists).
+- [ ] Ensure TS authoring convenience helpers (if retained) do not require shipping concrete implementations in low layers.
+- [ ] Update fixtures/tests to prove generator ids exist only when the corresponding component is composed.
+
 ### Milestone 7: PSL sql template literal syntax (follow-up)
 
 Introduce PSL grammar support for inline SQL literals via backticks (`sql\`...\``), designed for tooling highlighting and future SQL embedding surfaces.

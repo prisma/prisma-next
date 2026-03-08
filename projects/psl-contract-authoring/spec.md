@@ -190,6 +190,15 @@ Requirements for the follow-up:
 - Keep scalar lists strictly unsupported.
 - Populate `contract.relations` consistently so both sides of a relation (N:1 and 1:N) are represented in a stable, deterministic way.
 
+## Planned follow-up requirement: thin core, fat interfaces for composed behaviors
+
+The contract authoring system is built on the “thin core, fat interfaces/targets” rule:
+
+- **Low layers** define strategy shapes: contribution interfaces, registry/assembly rules, and diagnostics contracts.
+- **High layers** define composed behavior implementations (targets/adapters/extension packs).
+
+As a follow-up slice, we will remove any privileged “built-in” implementations of composed behaviors (such as ID generators) from low layers and provide them only via composition.
+
 ## Error behavior
 
 - Errors must include a precise PSL source location and a short explanation of what’s unsupported.
