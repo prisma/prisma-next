@@ -91,7 +91,6 @@ export class IncludeChildBuilderImpl<
   where(expr: AnyBinaryBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
     const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
-      this.codecTypes,
       this.table,
     );
     if (this.childProjection !== undefined) {
@@ -110,7 +109,6 @@ export class IncludeChildBuilderImpl<
   orderBy(order: AnyOrderBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
     const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
-      this.codecTypes,
       this.table,
     );
     if (this.childProjection !== undefined) {
@@ -133,7 +131,6 @@ export class IncludeChildBuilderImpl<
 
     const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
-      this.codecTypes,
       this.table,
     );
     if (this.childProjection !== undefined) {
