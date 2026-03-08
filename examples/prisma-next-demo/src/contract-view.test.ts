@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ContractIR } from './contract-view';
 import { renderContractInto } from './contract-view';
+import type { Contract } from './prisma/contract.d';
 
 class FakeElement {
   readonly tagName: string;
@@ -41,10 +41,11 @@ function collectByClassName(root: FakeElement, className: string): FakeElement[]
   return matches;
 }
 
-function buildContract(overrides?: Partial<ContractIR>): ContractIR {
-  const base: ContractIR = {
+function buildContract(overrides?: Partial<Contract>): Contract {
+  const base = {
     storageHash: 'storage_hash',
     target: 'postgres',
+    targetFamily: 'sql',
     models: {
       user: {
         storage: { table: 'users' },
@@ -59,15 +60,23 @@ function buildContract(overrides?: Partial<ContractIR>): ContractIR {
         users: {
           primaryKey: { columns: ['id'] },
           columns: {
-            id: { nativeType: 'uuid', nullable: false },
-            email: { nativeType: 'text', nullable: false },
+            id: { nativeType: 'uuid', nullable: false, codecId: 'pg/uuid@1' },
+            email: { nativeType: 'text', nullable: false, codecId: 'pg/text@1' },
           },
           foreignKeys: [],
+          uniques: [],
+          indexes: [],
         },
       },
     },
     relations: {
       users: {},
+    },
+    mappings: {
+      modelToTable: { user: 'users' },
+      tableToModel: { users: 'user' },
+      fieldToColumn: { user: { id: 'id', email: 'email' } },
+      columnToField: { users: { id: 'id', email: 'email' } },
     },
     capabilities: {
       sql: { returning: true },
@@ -75,7 +84,7 @@ function buildContract(overrides?: Partial<ContractIR>): ContractIR {
     extensionPacks: {
       pgvector: {},
     },
-  } as unknown as ContractIR;
+  } as unknown as Contract;
 
   return { ...base, ...overrides };
 }
@@ -109,7 +118,13 @@ describe('renderContractInto', () => {
           },
         },
       },
-    } as unknown as ContractIR['models']);
+      mappings: {
+        modelToTable: { [untrusted]: 'users' },
+        tableToModel: { users: untrusted },
+        fieldToColumn: { [untrusted]: { [untrusted]: untrusted } },
+        columnToField: { users: { [untrusted]: untrusted } },
+      },
+    } as unknown as Partial<Contract>);
 
     renderContractInto(app as unknown as Element, contract, doc as unknown as Document);
 

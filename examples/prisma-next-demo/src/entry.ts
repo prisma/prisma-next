@@ -11,12 +11,12 @@
  */
 
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { type ContractIR, renderContractInto } from './contract-view';
+import { renderContractInto } from './contract-view';
 import type { Contract } from './prisma/contract.d';
 import contractJson from './prisma/contract.json' with { type: 'json' };
 
 function renderFromContractJson(json: unknown): void {
-  const c = validateContract<Contract>(json) as unknown as ContractIR;
+  const c = validateContract<Contract>(json);
   if (app) renderContractInto(app, c);
 }
 

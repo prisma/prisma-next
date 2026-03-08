@@ -1,17 +1,5 @@
-import type { ModelDefinition, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-
-type Relation = {
-  readonly cardinality: string;
-  readonly to: string;
-  readonly on: { readonly parentCols: readonly string[]; readonly childCols: readonly string[] };
-};
-
-export type ContractIR = SqlContract<SqlStorage, Record<string, ModelDefinition>> & {
-  target: string;
-  relations: Record<string, Record<string, Relation>>;
-  capabilities: Record<string, Record<string, boolean>>;
-  extensionPacks: Record<string, unknown>;
-};
+import type { StorageTable } from '@prisma-next/sql-contract/types';
+import type { Contract } from './prisma/contract.d';
 
 function createElement(
   doc: Document,
@@ -40,7 +28,7 @@ function appendRelationRow(
   doc: Document,
   parent: HTMLElement,
   name: string,
-  relation: Relation,
+  relation: { readonly cardinality: string; readonly to: string },
 ): void {
   const row = createElement(doc, 'div', 'column');
   const arrow = relation.cardinality === '1:N' ? '⇉' : '→';
@@ -53,20 +41,26 @@ function appendModelCard(
   doc: Document,
   parent: HTMLElement,
   modelName: string,
-  model: ModelDefinition,
-  c: ContractIR,
+  model: { storage: { readonly table: string }; fields: Record<string, unknown> },
+  c: Contract,
 ): void {
   const tableName = model.storage.table;
-  const tableRelations = c.relations[tableName] ?? {};
+  const relations = c.relations as Record<
+    string,
+    Record<string, { cardinality: string; to: string }>
+  >;
+  const tableRelations = relations[tableName] ?? {};
   const card = createElement(doc, 'div', 'table-card');
   const header = createElement(doc, 'div', 'table-name');
   header.append(createElement(doc, 'span', undefined, `🧩 ${modelName}`));
   header.append(createElement(doc, 'span', 'pk-badge', `table: ${tableName}`));
   card.append(header);
 
+  const fieldToColumn =
+    (c.mappings.fieldToColumn as Record<string, Record<string, string>>)?.[modelName] ?? {};
   const columns = createElement(doc, 'div', 'columns');
-  for (const [fieldName, field] of Object.entries(model.fields)) {
-    appendFieldRow(doc, columns, fieldName, `${field?.column ?? ''}`);
+  for (const fieldName of Object.keys(model.fields)) {
+    appendFieldRow(doc, columns, fieldName, fieldToColumn[fieldName] ?? '');
   }
 
   const relationEntries = Object.entries(tableRelations);
@@ -86,7 +80,7 @@ function appendTableCard(
   doc: Document,
   parent: HTMLElement,
   tableName: string,
-  table: ContractIR['storage']['tables'][string],
+  table: StorageTable,
 ): void {
   const primaryKey = table.primaryKey?.columns ?? [];
   const card = createElement(doc, 'div', 'table-card');
@@ -134,7 +128,7 @@ function appendSection(doc: Document, root: HTMLElement, title: string): HTMLEle
 
 export function renderContractInto(
   container: Element,
-  c: ContractIR,
+  c: Contract,
   doc: Document = document,
 ): void {
   const fragmentRoot = createElement(doc, 'div');
