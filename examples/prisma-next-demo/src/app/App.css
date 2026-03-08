@@ -15,7 +15,7 @@
 }
 
 body {
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: "SF Mono", "Fira Code", monospace;
   background: var(--bg);
   color: var(--text);
   padding: 2rem;
