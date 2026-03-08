@@ -14,7 +14,9 @@ function renderApp(json: unknown) {
   );
 }
 
-const root = createRoot(document.getElementById('root')!);
+const el = document.getElementById('root');
+if (!el) throw new Error('Missing #root element');
+const root = createRoot(el);
 renderApp(contractJson);
 
 if (import.meta.hot) {
