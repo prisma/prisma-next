@@ -26,8 +26,8 @@ type CodecTypes = ExtractCodecTypes<typeof contract>;
 
 - `CodecTypesOf<TTypeMaps>`: Extracts `codecTypes` from TypeMaps
 - `OperationTypesOf<TTypeMaps>`: Extracts `operationTypes` from TypeMaps
-- `ExtractTypeMapsFromContract<T>`: Extracts TypeMaps from contract (phantom typeMaps, legacy codecTypes/operationTypes keys, or `never` for emitted)
-- `ExtractCodecTypes<T>`: Extracts from ContractWithTypeMaps (no-emit) or legacy phantom key, fallback `Record<string, never>`
+- `ExtractTypeMapsFromContract<T>`: Extracts TypeMaps from contract (`TypeMapsPhantomKey` → extract, or `never` for emitted)
+- `ExtractCodecTypes<T>`: Extracts from ContractWithTypeMaps (no-emit), fallback `Record<string, never>`
 - `ExtractOperationTypes<T>`: Same for operation types
 
 ## Lane APIs with Explicit TypeMaps
