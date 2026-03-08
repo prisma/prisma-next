@@ -272,6 +272,7 @@ describe('buildIncludeAst', () => {
   });
 
   it('throws when alias is missing in child projection', () => {
+    // Cast simulates a corrupted projection where an alias slot is undefined at runtime
     const includeState = {
       alias: 'posts',
       table: postTableRef,
