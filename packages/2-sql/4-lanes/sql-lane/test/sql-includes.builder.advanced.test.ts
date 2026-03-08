@@ -1,4 +1,9 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  SqlContract,
+  SqlStorage,
+  TypeMaps as TypeMapsType,
+} from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -26,39 +31,40 @@ type TimestamptzColumn = {
 };
 
 // Define a fully-typed contract type with capabilities
-type ContractWithCapabilities = SqlContract<
-  {
-    readonly tables: {
-      readonly user: {
-        readonly columns: {
-          readonly id: Int4Column;
-          readonly email: TextColumn;
+type ContractWithCapabilities = ContractWithTypeMaps<
+  SqlContract<
+    {
+      readonly tables: {
+        readonly user: {
+          readonly columns: {
+            readonly id: Int4Column;
+            readonly email: TextColumn;
+          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
-      };
-      readonly post: {
-        readonly columns: {
-          readonly id: Int4Column;
-          readonly userId: Int4Column;
-          readonly title: TextColumn;
-          readonly createdAt: TimestamptzColumn;
+        readonly post: {
+          readonly columns: {
+            readonly id: Int4Column;
+            readonly userId: Int4Column;
+            readonly title: TextColumn;
+            readonly createdAt: TimestamptzColumn;
+          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
       };
-    };
-  },
-  Record<string, never>,
-  Record<string, never>,
-  Record<string, never>
+    },
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  >,
+  TypeMapsType<CodecTypes, Record<string, never>>
 > & {
-  readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
-  readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, never>;
   readonly capabilities: {
     readonly postgres: {
       readonly lateral: true;
@@ -68,38 +74,39 @@ type ContractWithCapabilities = SqlContract<
 };
 
 // Define a contract without capabilities
-type ContractWithoutCapabilities = SqlContract<
-  {
-    readonly tables: {
-      readonly user: {
-        readonly columns: {
-          readonly id: Int4Column;
-          readonly email: TextColumn;
+type ContractWithoutCapabilities = ContractWithTypeMaps<
+  SqlContract<
+    {
+      readonly tables: {
+        readonly user: {
+          readonly columns: {
+            readonly id: Int4Column;
+            readonly email: TextColumn;
+          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
-      };
-      readonly post: {
-        readonly columns: {
-          readonly id: Int4Column;
-          readonly userId: Int4Column;
-          readonly title: TextColumn;
+        readonly post: {
+          readonly columns: {
+            readonly id: Int4Column;
+            readonly userId: Int4Column;
+            readonly title: TextColumn;
+          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
       };
-    };
-  },
-  Record<string, never>,
-  Record<string, never>,
-  Record<string, never>
+    },
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  >,
+  TypeMapsType<CodecTypes, Record<string, never>>
 > & {
-  readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
-  readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, never>;
   readonly capabilities?: {
     readonly postgres?: {
       readonly lateral?: false;

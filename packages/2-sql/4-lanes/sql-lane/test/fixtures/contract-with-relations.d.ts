@@ -1,10 +1,10 @@
 // Contract type definitions for contract-with-relations.json
 
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { ContractWithTypeMaps, SqlContract, TypeMaps as TypeMapsType } from '@prisma-next/sql-contract/types';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 
 // Contract type representing the contract data structure with relations
-export type Contract = SqlContract<
+export type Contract = ContractWithTypeMaps<SqlContract<
   {
     readonly tables: {
       readonly user: {
@@ -133,13 +133,13 @@ export type Contract = SqlContract<
       };
     };
   }
-> & { readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes; readonly '__@prisma-next/sql-contract/operationTypes@__': OperationTypes };
+>, TypeMaps>;
 
-// Codec type map and scalar mapping imported from adapter
 export type { CodecTypes };
 
-// Operation types (empty for now, can be extended by extension packs)
 export type OperationTypes = Record<string, never>;
+
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
 
 // Direct model exports for easy importing
 export type User = Contract['models']['User'];

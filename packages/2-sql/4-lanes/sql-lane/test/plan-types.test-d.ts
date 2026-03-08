@@ -1,5 +1,11 @@
 import type { ResultType as CoreResultType, ExecutionPlan } from '@prisma-next/contract/types';
-import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  ExtractCodecTypes,
+  SqlContract,
+  SqlStorage,
+  TypeMaps as TypeMapsType,
+} from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -567,21 +573,21 @@ test('result typing is derived solely from projection, unaffected by joins', () 
     };
   };
 
-  type ContractWithPosts = SqlContract<
-    ContractWithPostsStorage,
-    Record<string, never>,
-    Record<string, never>,
-    Record<string, never>
-  > & {
-    readonly '__@prisma-next/sql-contract/codecTypes@__': {
-      readonly 'pg/int4@1': { readonly output: number };
-      readonly 'pg/text@1': { readonly output: string };
-    };
-    readonly '__@prisma-next/sql-contract/operationTypes@__': Record<
-      string,
-      Record<string, unknown>
-    >;
-  };
+  type ContractWithPosts = ContractWithTypeMaps<
+    SqlContract<
+      ContractWithPostsStorage,
+      Record<string, never>,
+      Record<string, never>,
+      Record<string, never>
+    >,
+    TypeMapsType<
+      {
+        readonly 'pg/int4@1': { readonly output: number };
+        readonly 'pg/text@1': { readonly output: string };
+      },
+      Record<string, Record<string, unknown>>
+    >
+  >;
 
   const contractWithPosts = validateContract<ContractWithPosts>({
     target: 'postgres',
@@ -817,21 +823,21 @@ test('nested projection with joins infers nested Row type', () => {
     };
   };
 
-  type NestedContractWithPosts = SqlContract<
-    NestedContractStorage,
-    Record<string, never>,
-    Record<string, never>,
-    Record<string, never>
-  > & {
-    readonly '__@prisma-next/sql-contract/codecTypes@__': {
-      readonly 'pg/int4@1': { readonly output: number };
-      readonly 'pg/text@1': { readonly output: string };
-    };
-    readonly '__@prisma-next/sql-contract/operationTypes@__': Record<
-      string,
-      Record<string, unknown>
-    >;
-  };
+  type NestedContractWithPosts = ContractWithTypeMaps<
+    SqlContract<
+      NestedContractStorage,
+      Record<string, never>,
+      Record<string, never>,
+      Record<string, never>
+    >,
+    TypeMapsType<
+      {
+        readonly 'pg/int4@1': { readonly output: number };
+        readonly 'pg/text@1': { readonly output: string };
+      },
+      Record<string, Record<string, unknown>>
+    >
+  >;
 
   const contractWithPosts = validateContract<NestedContractWithPosts>({
     target: 'postgres',
