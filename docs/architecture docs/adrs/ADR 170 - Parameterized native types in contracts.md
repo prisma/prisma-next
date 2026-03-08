@@ -24,23 +24,26 @@ For parameterized storage types, **contracts MUST represent the base type name i
   - `nativeType: "vector"`
   - `typeParams: { length: 1536 }`
 
-Expansion to a parameterized SQL type string (for example `vector(1536)`) is the responsibility of the **target adapter** via a native-type expansion hook:
+Expansion to a parameterized SQL type string (for example `vector(1536)`) is the responsibility of each component (adapter or extension) that owns the codec, via `CodecControlHooks.expandNativeType`:
 
-- DDL/migrations: adapter expands when rendering column types.
-- Schema verification: adapter expands the *expected* type before comparing to introspected schema types.
+- DDL/migrations: the migration planner extracts codec hooks from framework components and uses them when rendering column types.
+- Schema verification: the schema verifier uses the same hooks to expand the *expected* type before comparing to introspected schema types.
+- `contractToSchema`: receives framework components to build a `NativeTypeExpander` from hooks for offline planning.
+
+No centralized dispatch function is used. Each component declares its own expansion logic alongside its codec hook definitions.
 
 ## Consequences
 
 - **Safety**: planners and validators can continue applying native type safety rules to base type identifiers, without handling arbitrary strings that might look like executable SQL.
 - **Determinism**: contracts remain stable; parameters are explicit structured data.
-- **Extensibility**: new parameterized types can follow the same pattern without teaching each planner about bespoke `nativeType` string formats.
+- **Extensibility**: new parameterized types can follow the same pattern by adding an `expandNativeType` hook to their component's `controlPlaneHooks` — no adapter changes needed.
+- **No adapter coupling**: the adapter does not reference extension-owned codecs. Each component owns its expansion logic.
 - **Hash changes**: adopting this convention changes storage/profile hashes for affected contracts; contracts should be re-emitted.
 
 ## Implementation Notes
 
 - Contract authoring (PSL/TS) should emit base `nativeType` + `typeParams` for parameterized types.
-- Postgres adapter expands parameterized types in:
-  - migration planning/type rendering (for DDL)
-  - schema verification (expected type rendering)
-- Where schema verification is codec-hook driven, parameterized type expansion should be provided via control-plane codec hooks on the composed framework components.
+- Expansion is hook-driven: each component provides `expandNativeType` in its `controlPlaneHooks` map. The planner and schema verifier extract hooks via `extractCodecControlHooks(frameworkComponents)` and look up per-codec hooks by `codecId`.
+- The Postgres adapter defines category-based expansion functions (`expandLength`, `expandPrecision`, `expandNumeric`) assigned to its built-in codec hooks.
+- Extensions (e.g. pgvector) define their own `expandNativeType` hooks for extension-owned codecs.
 
