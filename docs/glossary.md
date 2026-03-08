@@ -29,7 +29,7 @@ A function that tells the CLI how to read the user's schema and produce a contra
 | `prismaSchema()` | Reads a `.prisma` PSL file |
 | `typescriptSchema()` | Accepts a TypeScript-defined schema |
 
-> **Divergence:** Currently named `prismaContract()` and `typescriptContract()` in code. The config property is `contract:`. These use "contract" where they should use "schema", since they specify the schema source (not the contract artifact). **Status: pending refactor.**
+> **Divergence:** Currently named `prismaContract()` and `typescriptContract()` in code, and the config property is `contract:` instead of `schema:`. These use "contract" where they should use "schema", since they specify the schema source (not the contract artifact). **Status: pending refactor.**
 
 ### Extension
 
@@ -117,4 +117,5 @@ Planned refactors to bring internal naming in line with user-facing terminology:
 | middleware / `middleware` | plugin / `plugins` | Runtime options, types, docs | Pending |
 | `prismaSchema()` | `prismaContract()` | `@prisma-next/sql-contract-psl/provider` export | Pending |
 | `typescriptSchema()` | `typescriptContract()` | `@prisma-next/sql-contract-ts/config-types` export | Pending |
+| `schema:` config property | `contract:` config property | `PrismaNextConfig`, `defineConfig`, examples, CLI internals, docs | Pending |
 | schema provider | contract provider / contract source | Config types, docs, internal naming | Pending |
