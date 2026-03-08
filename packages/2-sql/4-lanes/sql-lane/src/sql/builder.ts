@@ -20,19 +20,15 @@ export type { IncludeChildBuilder } from './include-builder';
 export function sql<
   TContract extends SqlContract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
-  CodecTypesOverride extends Record<string, { readonly output: unknown }> = ResolveCodecTypes<
-    TContract,
-    TTypeMaps
-  >,
 >(
   options: SqlBuilderOptions<TContract>,
 ): SelectBuilder<
   TContract,
   unknown,
-  CodecTypesOverride,
+  ResolveCodecTypes<TContract, TTypeMaps>,
   ResolveOperationTypes<TContract, TTypeMaps>
 > {
-  type CodecTypes = CodecTypesOverride;
+  type CodecTypes = ResolveCodecTypes<TContract, TTypeMaps>;
   type Operations = ResolveOperationTypes<TContract, TTypeMaps>;
   const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(
     options,
