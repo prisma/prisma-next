@@ -1,124 +1,163 @@
 # ADR 170 — Pack-provided type constructors and field presets
 
-## Context
+## What this looks like
 
-Prisma Next supports dual authoring modes (ADR 006): PSL-first (schema language) and TS-first (builder APIs). In practice, both surfaces routinely need to express **more than just a base scalar type**:
+Today, the TS authoring surface can already express “id column with UUID generation” as a single helper call:
 
-- a parameterized storage shape (e.g. `varchar(35)`),
-- a target/extension-owned persistence mechanism (codec + native type),
-- sometimes a default (including execution-time mutation defaults, ADR 158), and
-- sometimes a “preset” that naturally bundles multiple choices (e.g. “this is my id column”).
+```ts
+.table('user', (t) =>
+  t
+    .generated('id', uuidv4())
+    .primaryKey(['id'])
+)
+```
 
-Today, PSL encodes much of this via `@` attributes because the type position can’t carry enough information. That leads to patterns like:
+The current PSL surface expresses the same idea by spreading the meaning across the base type and attributes:
 
-- `String @db.VarChar(35)`-style workarounds,
-- extension-specific “type parameterization” attributes (e.g. `@pgvector.column(1536)` in this repo), and
-- `@default(uuid())` where the author’s intent is closer to “UUID id preset” than “call an arbitrary function”.
+```prisma
+model User {
+  id String @id @default(uuid())
+}
+```
 
-TS authoring fills the same gap with helper functions that produce column definitions and often pick efficient storage parameters (for example “packed” id columns). Historically, this repo attempted to centralize those helpers in a low-layer `@prisma-next/ids` package; that created an architectural category error by introducing a privileged built-in vocabulary and concrete implementations in a low layer (ADR 005, ADR 169).
+What we want after this work is for both surfaces to lead with the same idea: the author is choosing a named column shape, not manually stitching together a base type, a default, and constraints.
 
-This ADR records the next step: make “type-like” authoring vocabulary **composition-owned**, so both PSL and TS can be ergonomic without hardcoding semantics in core.
+Illustrative TS shape after this work:
 
-## Problem
+```ts
+.table('user', (t, column) =>
+  t.column('id', column.uuid())
+)
+```
 
-We need a shared, composable vocabulary mechanism for authoring-time “type-like” building blocks that:
+Illustrative PSL shape after this work:
 
-- can produce parameterized storage types (`codecId`/`nativeType`/`typeParams`),
-- can optionally bundle defaults and constraints when that is the natural abstraction,
-- works consistently across PSL and TS authoring,
-- does not reintroduce global built-ins or hardcoded maps in low layers, and
-- is deterministic under composition (collisions are hard errors).
+```prisma
+model User {
+  id Uuid()
+}
+```
 
-## Decision
+Or, for a parameterized storage type:
 
-### 1) Introduce composed registries for authoring-time constructors
+```prisma
+model User {
+  name String(length: 35)
+}
+```
 
-We introduce composition-owned registries (contributed by family/target/extension packs). These registries are the single place where “type-like vocabulary” is defined.
+Extension-owned types would still use a namespace when needed, for example `pgvector.Vector(1536)`.
 
-They provide two related concepts:
+The point is not the exact final spelling of every helper. The point is that both TS and PSL should be able to express the same intent in the same place: the type position should carry the real meaning, and packs/targets should own the behavior behind it.
 
-- **Type constructors**: build the storage shape (`codecId`, `nativeType`, `typeParams` or `typeRef`).
-- **Field presets**: build the storage shape and may additionally bundle:
-  - nullability,
-  - storage defaults,
-  - execution-time mutation defaults (`ExecutionMutationDefaultValue`, ADR 158),
-  - and may imply constraints (see Decision 4).
+## Why we need this
 
-Framework/core authoring packages remain thin. They define only:
+The examples above show the core problem.
 
-- the constructor/preset *shapes* (interfaces/types),
-- deterministic registry assembly rules,
-- and registry consumption hooks in PSL/TS authoring surfaces.
+Right now, a column definition usually needs to say more than just “this is a string” or “this is bytes”.
 
-Concrete constructor/preset implementations live only in composition layers (family/target/extension packs). This is the critical layering boundary.
+Quite often we also need to say:
 
-### 2) Namespacing uses dot notation
+- what storage shape to use, including parameters like length
+- what default behavior to apply
+- whether this is really a common preset, like an id column
+- and, sometimes, what constraints naturally come with that choice
 
-Constructor and preset names are referenced using **dot notation** namespaces.
+Today, PSL handles a lot of this by piling information into `@` attributes because the type position is too weak. That is how we end up with things like:
 
-Examples (illustrative):
+- `String` plus extra attributes to describe the real storage type
+- extension-specific attributes like `@pgvector.column(1536)`
+- `@default(uuid())` when what the author really means is something closer to “make this a UUID-backed id column”
+
+TS authoring has the same problem. We solved part of it there with helper functions, but we put some of those helpers in a low layer in `@prisma-next/ids`. That turned out to be the wrong place. It made concrete behavior feel “built in” even though it really belongs to targets, families, or packs.
+
+So this ADR is about fixing that in a way that works for both authoring surfaces.
+
+## What we are doing
+
+We are introducing a shared way for families, targets, and extension packs to provide authoring helpers.
+
+There are two kinds of helpers:
+
+- **Type constructors**: these describe the storage type. They answer questions like “what codec/native type should this use?” and “does it have parameters like length?”
+- **Field presets**: these do the same thing, but can also bundle extra behavior such as defaults, nullability, execution-time generation, and even constraints when that makes sense.
+
+In plain terms:
+
+- a type constructor is something like “a string with length 35”
+- a field preset is something like “a UUID id column”
+
+The important rule is that the framework core does **not** define the actual helpers. Core only defines the shape they must follow and the rules for combining them. The real helpers live in the family, target, or extension pack that owns the behavior.
+
+That keeps the core thin and keeps the real behavior with the part of the system that actually knows what it means.
+
+## How names work
+
+Helpers use dot-separated names when they need a namespace.
+
+Examples:
 
 - `sql.String(length: 35)`
 - `ids.Uuid(4)`
 - `pgvector.Vector(1536)`
 
-### 3) Registry collisions are hard errors
+If two contributors try to register the same helper name, that is a hard error. We do not allow silent overrides or “last one wins” behavior.
 
-When assembling constructor/preset registries, duplicates are a **fail-fast hard error**.
+That rule matters because we want the available vocabulary to be obvious and predictable. If there is a naming conflict, we fix it by adding or widening a namespace, not by relying on load order.
 
-There is no override/last-wins behavior.
+## What can a preset do?
 
-If collisions become common, contributors must introduce or expand namespaces rather than relying on implicit precedence.
+A field preset is allowed to imply constraints.
 
-### 4) Presets may imply constraints
+For example, an id preset can mean more than “use this storage type and this default”. It can also imply primary key behavior if that is part of the preset being offered.
 
-Field presets may imply constraints.
+That reflects how people actually think about these cases. They are not just choosing a storage type; they are choosing a well-known column shape with expected behavior.
 
-For example, a preset used to define an id column may imply primary key semantics rather than requiring a separate explicit attribute.
+## Who gets the short names?
 
-The exact constraint encoding remains part of the authoring surface’s normal contract encoding rules (no executable code in contracts; contracts store data).
+We do not want to recreate a global “built-in standard library” by accident.
 
-### 5) Non-namespaced entries are reserved
+Because of that, only **family** and **target** contributors may register non-namespaced helper names. Extension packs should use namespaced names by default.
 
-To prevent an ambient, global “standard library” from reappearing implicitly, we reserve the “short names”:
+This gives us a small, deliberate baseline vocabulary while making extension-owned behavior explicit.
 
-- **Only family and target** contributors may provide **non-namespaced** constructor/preset entries.
-- Extension packs should contribute namespaced entries by default.
+## How this fits TS and PSL together
 
-This preserves a small, deliberate “baseline vocabulary” owned by the family/target while keeping extensions explicit.
+TS and PSL should not solve this problem in two completely different ways.
 
-### 6) Unify TS and PSL on shared underlying data structures
+Both authoring surfaces should lower into the same underlying contract data:
 
-Both authoring surfaces target the same underlying structures for storage typing and defaults:
+- `ColumnTypeDescriptor` for storage shape
+- `ExecutionMutationDefaultValue` for execution-time defaults
 
-- `ColumnTypeDescriptor` (`codecId`, `nativeType`, `typeParams`/`typeRef`)
-- `ExecutionMutationDefaultValue` for execution-time defaults (ADR 158)
+That means:
 
-TS “column helpers” can be implemented as thin wrappers over the same constructor/preset descriptors contributed by composition.
+- TS column helpers can be thin wrappers around the same helper definitions
+- PSL can read the same helper definitions and lower them without hardcoding special cases into the interpreter
 
-PSL interpretation consumes the composed registries to lower type expressions and presets; it must not hardcode constructor names or semantics in the interpreter.
+This is the main reason to do this as a shared architecture decision instead of a one-off TS convenience feature.
 
 ## Consequences
 
-### Benefits
+### Good outcomes
 
-- **Better PSL ergonomics**: the type position can carry parameterization and presets, reducing reliance on `@` attribute workarounds.
-- **One vocabulary seam**: both TS and PSL opt into the same composed constructor/preset sets.
-- **Layering alignment**: removes pressure to keep concrete helpers in low layers.
-- **Deterministic composition**: collisions are explicit and actionable.
+- PSL becomes easier to read because more meaning can move into the type position instead of being spread across `@` attributes.
+- TS and PSL can share one source of truth for these common authoring helpers.
+- We stop pushing concrete behavior down into low layers where it does not belong.
+- The available helper vocabulary stays deterministic because naming collisions fail fast.
 
 ### Costs
 
-- **New SPI surface**: registries and assembly rules must be defined and maintained.
-- **Migration work**: existing attribute-based patterns (e.g. `@pgvector.column`) may be migrated to type constructors/presets.
-- **Vocabulary management**: contributors must coordinate namespacing to avoid collisions.
+- We need to define and maintain the registry shape and assembly rules.
+- Some existing syntax and examples may need to migrate over time.
+- Contributors will need to think a bit more carefully about names and namespaces.
 
-### Risks and mitigations
+### Risks
 
-- **PSL complexity growth**:
-  - Mitigation: keep the core grammar minimal; treat constructors/presets as registry-backed identifiers rather than baking semantics into PSL.
-- **Recreating built-ins under a new name**:
-  - Mitigation: reserve non-namespaced entries; require namespacing for extensions; enforce collision hard errors.
+- PSL could become more complicated if we try to make the syntax do too much at once.
+  - Mitigation: keep the grammar simple and let the registries provide the meaning.
+- We could accidentally reinvent “built-ins” under a different name.
+  - Mitigation: reserve short names for family/target contributors, require namespaces for extensions by default, and fail hard on duplicates.
 
 ## Related ADRs
 
