@@ -1,3 +1,4 @@
+import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   ComponentDatabaseDependency,
@@ -55,6 +56,21 @@ function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
     version: '0.0.0-test',
     operationSignatures: () => [],
     databaseDependencies: { init: [pgvectorDependency] },
+    types: {
+      codecTypes: {
+        controlPlaneHooks: {
+          'pg/vector@1': {
+            expandNativeType: ({ nativeType, typeParams }) => {
+              const length = typeParams?.['length'];
+              if (typeof length === 'number' && Number.isInteger(length) && length > 0) {
+                return `${nativeType}(${length})`;
+              }
+              return nativeType;
+            },
+          },
+        },
+      },
+    },
     create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
   };
 }
@@ -307,7 +323,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
+      frameworkComponents: [postgresAdapterDescriptor],
     });
 
     expect(result.kind).toBe('success');
@@ -369,7 +385,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
+      frameworkComponents: [createFrameworkComponent()],
     });
 
     expect(result.kind).toBe('success');
