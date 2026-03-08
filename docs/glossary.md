@@ -10,13 +10,13 @@ Where internal terminology currently diverges from the desired user-facing term,
 
 ### Schema
 
-The user's data model definition. A schema lets users describe their application domain and how it maps to persistence mechanisms. For SQL databases, that means tables, columns, relationships, types, and invariants. For document-oriented databases, the persistence mechanisms will differ. Schemas can be authored in PSL (Prisma Schema Language) or via TypeScript builders.
+A schema lets users describe their application domain and how it maps to persistence mechanisms. For SQL databases, that means tables, columns, relationships, types, and invariants. For document-oriented databases, the persistence mechanisms will differ. Schemas can be authored in PSL (Prisma Schema Language) or via TypeScript builders.
 
 The schema is the **input**; the contract is the **output**. Users think in terms of "my Prisma schema" — the contract is a derived artifact.
 
 ### Contract
 
-A canonical, verifiable JSON artifact (`contract.json` + `contract.d.ts`) derived from a schema. The contract describes what exists, what's allowed, and what's expected. It includes hashes (`storageHash`, `profileHash`, optional `executionHash`) for verification against the database.
+A canonical, verifiable JSON artifact (`contract.json` + `contract.d.ts`) derived from a schema. The contract binds an application to a database. For the application, it declares the models the application is defined in terms of and how they map to database structures. For the database, it is a guarantee: if signed with this contract, the database will provide all of the structures the contract depends on. It includes hashes (`storageHash`, `profileHash`, optional `executionHash`) for verification.
 
 Users author schemas; the system emits contracts. The contract is a build artifact, not something users typically edit directly.
 
