@@ -59,30 +59,58 @@ function isValidTypeParamNumber(value: unknown): value is number {
 }
 
 function expandLength({ nativeType, typeParams }: ExpandNativeTypeInput): string {
-  const length = typeParams?.['length'];
-  if (isValidTypeParamNumber(length)) {
-    return `${nativeType}(${length})`;
+  if (!typeParams || !('length' in typeParams)) {
+    return nativeType;
   }
-  return nativeType;
+  const length = typeParams['length'];
+  if (!isValidTypeParamNumber(length)) {
+    throw new Error(
+      `Invalid "length" type parameter for "${nativeType}": expected a non-negative integer, got ${JSON.stringify(length)}`,
+    );
+  }
+  return `${nativeType}(${length})`;
 }
 
 function expandPrecision({ nativeType, typeParams }: ExpandNativeTypeInput): string {
-  const precision = typeParams?.['precision'];
-  if (isValidTypeParamNumber(precision)) {
-    return `${nativeType}(${precision})`;
+  if (!typeParams || !('precision' in typeParams)) {
+    return nativeType;
   }
-  return nativeType;
+  const precision = typeParams['precision'];
+  if (!isValidTypeParamNumber(precision)) {
+    throw new Error(
+      `Invalid "precision" type parameter for "${nativeType}": expected a non-negative integer, got ${JSON.stringify(precision)}`,
+    );
+  }
+  return `${nativeType}(${precision})`;
 }
 
 function expandNumeric({ nativeType, typeParams }: ExpandNativeTypeInput): string {
-  const precision = typeParams?.['precision'];
-  const scale = typeParams?.['scale'];
-  if (isValidTypeParamNumber(precision)) {
-    if (isValidTypeParamNumber(scale)) {
+  const hasPrecision = typeParams && 'precision' in typeParams;
+  const hasScale = typeParams && 'scale' in typeParams;
+
+  if (!hasPrecision && !hasScale) {
+    return nativeType;
+  }
+
+  if (hasPrecision) {
+    const precision = typeParams['precision'];
+    if (!isValidTypeParamNumber(precision)) {
+      throw new Error(
+        `Invalid "precision" type parameter for "${nativeType}": expected a non-negative integer, got ${JSON.stringify(precision)}`,
+      );
+    }
+    if (hasScale) {
+      const scale = typeParams['scale'];
+      if (!isValidTypeParamNumber(scale)) {
+        throw new Error(
+          `Invalid "scale" type parameter for "${nativeType}": expected a non-negative integer, got ${JSON.stringify(scale)}`,
+        );
+      }
       return `${nativeType}(${precision},${scale})`;
     }
     return `${nativeType}(${precision})`;
   }
+
   return nativeType;
 }
 

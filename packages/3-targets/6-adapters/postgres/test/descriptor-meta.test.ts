@@ -105,61 +105,98 @@ describe('renderJsonTypeExpression via descriptor-meta', () => {
 const hooks = postgresAdapterDescriptorMeta.types.codecTypes.controlPlaneHooks as HooksMap;
 
 describe('expandNativeType hooks via descriptor-meta', () => {
-  describe('expandLength (sql/char, sql/varchar, pg/char, pg/varchar, pg/bit, pg/varbit)', () => {
-    const expand = hooks['sql/char@1']!.expandNativeType;
+  const lengthCodecIds = [
+    'sql/char@1',
+    'sql/varchar@1',
+    'pg/char@1',
+    'pg/varchar@1',
+    'pg/bit@1',
+    'pg/varbit@1',
+  ] as const;
 
-    it('appends length param to native type', () => {
-      expect(expand({ nativeType: 'character', typeParams: { length: 10 } })).toBe('character(10)');
-    });
+  describe('expandLength', () => {
+    for (const codecId of lengthCodecIds) {
+      describe(codecId, () => {
+        const expand = hooks[codecId]!.expandNativeType;
 
-    it('returns bare native type when typeParams is missing', () => {
-      expect(expand({ nativeType: 'character' })).toBe('character');
-    });
+        it('appends length param to native type', () => {
+          expect(expand({ nativeType: 'character', typeParams: { length: 10 } })).toBe(
+            'character(10)',
+          );
+        });
 
-    it('returns bare native type when length is absent', () => {
-      expect(expand({ nativeType: 'character', typeParams: {} })).toBe('character');
-    });
+        it('returns bare native type when typeParams is missing', () => {
+          expect(expand({ nativeType: 'character' })).toBe('character');
+        });
 
-    it('returns bare native type for non-integer length', () => {
-      expect(expand({ nativeType: 'character', typeParams: { length: 1.5 } })).toBe('character');
-    });
+        it('returns bare native type when length is absent', () => {
+          expect(expand({ nativeType: 'character', typeParams: {} })).toBe('character');
+        });
 
-    it('returns bare native type for negative length', () => {
-      expect(expand({ nativeType: 'character', typeParams: { length: -1 } })).toBe('character');
-    });
+        it('throws for non-integer length', () => {
+          expect(() => expand({ nativeType: 'character', typeParams: { length: 1.5 } })).toThrow(
+            'Invalid "length" type parameter',
+          );
+        });
 
-    it('returns bare native type for non-number length', () => {
-      expect(expand({ nativeType: 'character', typeParams: { length: 'big' } })).toBe('character');
-    });
+        it('throws for negative length', () => {
+          expect(() => expand({ nativeType: 'character', typeParams: { length: -1 } })).toThrow(
+            'Invalid "length" type parameter',
+          );
+        });
+
+        it('throws for non-number length', () => {
+          expect(() => expand({ nativeType: 'character', typeParams: { length: 'big' } })).toThrow(
+            'Invalid "length" type parameter',
+          );
+        });
+      });
+    }
   });
 
-  describe('expandPrecision (pg/timestamp, pg/timestamptz, pg/time, pg/timetz, pg/interval)', () => {
-    const expand = hooks['pg/timestamp@1']!.expandNativeType;
+  const precisionCodecIds = [
+    'pg/timestamp@1',
+    'pg/timestamptz@1',
+    'pg/time@1',
+    'pg/timetz@1',
+    'pg/interval@1',
+  ] as const;
 
-    it('appends precision param to native type', () => {
-      expect(expand({ nativeType: 'timestamp', typeParams: { precision: 3 } })).toBe(
-        'timestamp(3)',
-      );
-    });
+  describe('expandPrecision', () => {
+    for (const codecId of precisionCodecIds) {
+      describe(codecId, () => {
+        const expand = hooks[codecId]!.expandNativeType;
 
-    it('returns bare native type when typeParams is missing', () => {
-      expect(expand({ nativeType: 'timestamp' })).toBe('timestamp');
-    });
+        it('appends precision param to native type', () => {
+          expect(expand({ nativeType: 'timestamp', typeParams: { precision: 3 } })).toBe(
+            'timestamp(3)',
+          );
+        });
 
-    it('returns bare native type when precision is absent', () => {
-      expect(expand({ nativeType: 'timestamp', typeParams: {} })).toBe('timestamp');
-    });
+        it('returns bare native type when typeParams is missing', () => {
+          expect(expand({ nativeType: 'timestamp' })).toBe('timestamp');
+        });
 
-    it('returns bare native type for non-integer precision', () => {
-      expect(expand({ nativeType: 'timestamp', typeParams: { precision: 2.5 } })).toBe('timestamp');
-    });
+        it('returns bare native type when precision is absent', () => {
+          expect(expand({ nativeType: 'timestamp', typeParams: {} })).toBe('timestamp');
+        });
 
-    it('returns bare native type for negative precision', () => {
-      expect(expand({ nativeType: 'timestamp', typeParams: { precision: -1 } })).toBe('timestamp');
-    });
+        it('throws for non-integer precision', () => {
+          expect(() => expand({ nativeType: 'timestamp', typeParams: { precision: 2.5 } })).toThrow(
+            'Invalid "precision" type parameter',
+          );
+        });
+
+        it('throws for negative precision', () => {
+          expect(() => expand({ nativeType: 'timestamp', typeParams: { precision: -1 } })).toThrow(
+            'Invalid "precision" type parameter',
+          );
+        });
+      });
+    }
   });
 
-  describe('expandNumeric (pg/numeric)', () => {
+  describe('expandNumeric (pg/numeric@1)', () => {
     const expand = hooks['pg/numeric@1']!.expandNativeType;
 
     it('appends precision only when scale is absent', () => {
@@ -184,14 +221,16 @@ describe('expandNativeType hooks via descriptor-meta', () => {
       expect(expand({ nativeType: 'numeric', typeParams: { scale: 2 } })).toBe('numeric');
     });
 
-    it('returns bare native type for negative precision', () => {
-      expect(expand({ nativeType: 'numeric', typeParams: { precision: -5 } })).toBe('numeric');
+    it('throws for negative precision', () => {
+      expect(() => expand({ nativeType: 'numeric', typeParams: { precision: -5 } })).toThrow(
+        'Invalid "precision" type parameter',
+      );
     });
 
-    it('ignores non-integer scale', () => {
-      expect(expand({ nativeType: 'numeric', typeParams: { precision: 10, scale: 1.5 } })).toBe(
-        'numeric(10)',
-      );
+    it('throws for non-integer scale', () => {
+      expect(() =>
+        expand({ nativeType: 'numeric', typeParams: { precision: 10, scale: 1.5 } }),
+      ).toThrow('Invalid "scale" type parameter');
     });
   });
 });
