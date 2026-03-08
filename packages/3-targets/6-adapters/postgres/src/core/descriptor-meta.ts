@@ -117,6 +117,7 @@ function expandNumeric({ nativeType, typeParams }: ExpandNativeTypeInput): strin
 const lengthHooks: CodecControlHooks = { expandNativeType: expandLength };
 const precisionHooks: CodecControlHooks = { expandNativeType: expandPrecision };
 const numericHooks: CodecControlHooks = { expandNativeType: expandNumeric };
+const identityHooks: CodecControlHooks = { expandNativeType: ({ nativeType }) => nativeType };
 
 /**
  * Validates that a type expression string is safe to embed in generated .d.ts files.
@@ -250,6 +251,8 @@ export const postgresAdapterDescriptorMeta = {
         [PG_TIMETZ_CODEC_ID]: precisionHooks,
         [PG_INTERVAL_CODEC_ID]: precisionHooks,
         [PG_ENUM_CODEC_ID]: pgEnumControlHooks,
+        [PG_JSON_CODEC_ID]: identityHooks,
+        [PG_JSONB_CODEC_ID]: identityHooks,
       },
     },
     storage: [

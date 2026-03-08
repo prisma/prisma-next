@@ -11,7 +11,7 @@ const fixtureSubdir = 'emit-contract';
 const resolveContractIR = async (
   source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
 ) => {
-  const sourceResult = await source();
+  const sourceResult = await source({ composedExtensionPacks: [] });
   if (!sourceResult.ok) {
     throw new Error(sourceResult.failure.summary);
   }
