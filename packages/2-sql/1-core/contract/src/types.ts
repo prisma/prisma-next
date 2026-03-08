@@ -177,11 +177,10 @@ export type OperationTypesOf<T> = [T] extends [never]
       : Record<string, never>
     : Record<string, never>;
 
-declare const TYPE_MAPS: unique symbol;
-export type TypeMapsPhantomKey = typeof TYPE_MAPS;
+export type TypeMapsPhantomKey = '__@prisma-next/sql-contract/typeMaps@__';
 
 export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
-  readonly [TYPE_MAPS]?: TTypeMaps;
+  readonly [K in TypeMapsPhantomKey]?: TTypeMaps;
 };
 
 export type SqlContract<
