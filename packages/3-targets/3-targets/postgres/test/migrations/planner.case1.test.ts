@@ -196,7 +196,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: coreHash('sha256:contract'),
-      profileHash: 'sha256:profile' as never,
+      profileHash: profileHash('sha256:profile'),
       storage: {
         tables: {
           params: {
@@ -290,7 +290,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: coreHash('sha256:contract'),
-      profileHash: 'sha256:profile' as never,
+      profileHash: profileHash('sha256:profile'),
       storage: {
         tables: {
           documents: {

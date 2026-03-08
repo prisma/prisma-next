@@ -1,5 +1,4 @@
 import { existsSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient, enrichContractIR } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
@@ -8,6 +7,7 @@ import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
+import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createIntegrationTestDir } from '../utils/cli-test-helpers';
 
