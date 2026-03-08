@@ -206,3 +206,11 @@ export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T
 
 export type ExtractCodecTypes<T> = CodecTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractOperationTypes<T> = OperationTypesOf<ExtractTypeMapsFromContract<T>>;
+
+export type ResolveCodecTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
+  ? ExtractCodecTypes<TContract>
+  : CodecTypesOf<TTypeMaps>;
+
+export type ResolveOperationTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
+  ? ExtractOperationTypes<TContract>
+  : OperationTypesOf<TTypeMaps>;

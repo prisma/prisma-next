@@ -14,6 +14,8 @@ export type {
   OperationTypesOf,
   PrimaryKey,
   ReferentialAction,
+  ResolveCodecTypes,
+  ResolveOperationTypes,
   SqlContract,
   SqlMappings,
   SqlStorage,

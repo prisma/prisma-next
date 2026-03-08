@@ -2,11 +2,9 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import type {
-  CodecTypesOf,
-  ExtractCodecTypes,
-  ExtractOperationTypes,
   ExtractTypeMapsFromContract,
-  OperationTypesOf,
+  ResolveCodecTypes,
+  ResolveOperationTypes,
   SqlContract,
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
@@ -65,16 +63,14 @@ export interface PostgresClient<
   readonly sql: SelectBuilder<
     TContract,
     unknown,
-    [TTypeMaps] extends [never] ? ExtractCodecTypes<TContract> : CodecTypesOf<TTypeMaps>,
-    [TTypeMaps] extends [never] ? ExtractOperationTypes<TContract> : OperationTypesOf<TTypeMaps>
+    ResolveCodecTypes<TContract, TTypeMaps>,
+    ResolveOperationTypes<TContract, TTypeMaps>
   >;
   readonly kysely: KyselyQueryLane<TContract>;
   readonly schema: SchemaHandle<
     TContract,
-    [TTypeMaps] extends [never] ? ExtractCodecTypes<TContract> : CodecTypesOf<TTypeMaps>,
-    ToSchemaOperationTypes<
-      [TTypeMaps] extends [never] ? ExtractOperationTypes<TContract> : OperationTypesOf<TTypeMaps>
-    >
+    ResolveCodecTypes<TContract, TTypeMaps>,
+    ToSchemaOperationTypes<ResolveOperationTypes<TContract, TTypeMaps>>
   >;
   readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
