@@ -42,7 +42,7 @@ test('.target(postgresPack) infers CodecTypes without defineContract type param'
     .build();
 
   type InferredCodecTypes = ExtractCodecTypes<typeof contract>;
-  expectTypeOf<InferredCodecTypes>().toMatchTypeOf<PgCodecTypes>();
+  expectTypeOf<InferredCodecTypes>().toExtend<PgCodecTypes>();
   expectTypeOf<InferredCodecTypes>().toHaveProperty('pg/int4@1');
   expectTypeOf<InferredCodecTypes>().toHaveProperty('pg/text@1');
   expectTypeOf<InferredCodecTypes>().toHaveProperty('pg/timestamptz@1');
@@ -62,7 +62,7 @@ test('.extensionPacks({ pgvector }) infers and accumulates pgvector codec types'
     .build();
 
   type InferredCodecTypes = ExtractCodecTypes<typeof contract>;
-  expectTypeOf<InferredCodecTypes>().toMatchTypeOf<PgCodecTypes & PgVectorCodecTypes>();
+  expectTypeOf<InferredCodecTypes>().toExtend<PgCodecTypes & PgVectorCodecTypes>();
   expectTypeOf<InferredCodecTypes>().toHaveProperty('pg/int4@1');
   expectTypeOf<InferredCodecTypes>().toHaveProperty('pg/vector@1');
 });
@@ -80,7 +80,7 @@ test('defineContract<CodecTypes>() still works when explicit type param provided
     .build();
 
   type InferredCodecTypes = ExtractCodecTypes<typeof contract>;
-  expectTypeOf<InferredCodecTypes>().toMatchTypeOf<PgCodecTypes>();
+  expectTypeOf<InferredCodecTypes>().toExtend<PgCodecTypes>();
 });
 
 test('ExtractTypeMapsFromContract extracts TypeMaps from defineContract build result', () => {
@@ -96,7 +96,7 @@ test('ExtractTypeMapsFromContract extracts TypeMaps from defineContract build re
     .build();
 
   type Extracted = ExtractTypeMapsFromContract<typeof contract>;
-  expectTypeOf<Extracted>().toMatchTypeOf<TypeMaps<PgCodecTypes, Record<string, never>>>();
+  expectTypeOf<Extracted>().toExtend<TypeMaps<PgCodecTypes, Record<string, never>>>();
   expectTypeOf<Extracted['codecTypes']>().toHaveProperty('pg/int4@1');
 });
 

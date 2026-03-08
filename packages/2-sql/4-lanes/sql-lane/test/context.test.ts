@@ -65,8 +65,7 @@ describe('createSqlContext', () => {
     createSqlContext(runtimeContext);
 
     const tables = schema(runtimeContext).tables;
-    const userTable = tables.user;
-    if (!userTable) throw new Error('user table not found');
+    const userTable = tables.user!;
 
     const plan = sql({ context: runtimeContext })
       .from(userTable)
@@ -76,8 +75,10 @@ describe('createSqlContext', () => {
       })
       .build();
 
-    expect(plan).toHaveProperty('ast');
-    expect(plan).toHaveProperty('params');
-    expect(plan).toHaveProperty('meta');
+    expect(plan).toMatchObject({
+      ast: expect.anything(),
+      params: expect.anything(),
+      meta: expect.anything(),
+    });
   });
 });
