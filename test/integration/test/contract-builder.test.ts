@@ -32,7 +32,7 @@ describe('builder integration', () => {
       .storageHash('sha256:test-core')
       .build();
 
-    expectTypeOf<ExtractCodecTypes<typeof contract>>().toMatchTypeOf<CodecTypes>();
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toExtend<CodecTypes>();
 
     // Runtime checks
     expect(contract).toMatchObject({
@@ -61,7 +61,7 @@ describe('builder integration', () => {
     expectTypeOf<ColumnMeta['codecId']>().toExtend<string>();
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
 
-    expectTypeOf<ExtractCodecTypes<typeof contract>>().toMatchTypeOf<CodecTypes>();
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toExtend<CodecTypes>();
     expect(userTable?.primaryKey?.columns).toEqual(['id']);
     const userModel = contract.models.User;
     expect(userModel).toMatchObject({
@@ -184,7 +184,7 @@ describe('builder integration', () => {
       .storageHash('sha256:test-core')
       .build();
 
-    expectTypeOf<ExtractCodecTypes<typeof contract>>().toMatchTypeOf<CodecTypes>();
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toExtend<CodecTypes>();
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
