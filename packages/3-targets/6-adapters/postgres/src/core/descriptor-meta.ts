@@ -1,4 +1,4 @@
-import type { CodecControlHooks } from '@prisma-next/family-sql/control';
+import type { CodecControlHooks, ExpandNativeTypeInput } from '@prisma-next/family-sql/control';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
@@ -29,7 +29,6 @@ import {
 } from './codec-ids';
 import { pgEnumControlHooks } from './enum-control-hooks';
 import { renderTypeScriptTypeFromJsonSchema } from './json-schema-type-expression';
-import { expandParameterizedNativeType } from './parameterized-types';
 
 // ============================================================================
 // Helper functions for reducing boilerplate
@@ -53,10 +52,43 @@ const precisionRenderer = (typeName: string) =>
     },
   }) as const;
 
-/** Creates control hooks with just expandNativeType for parameterized types */
-const parameterizedTypeHooks: CodecControlHooks = {
-  expandNativeType: expandParameterizedNativeType,
-};
+function isValidTypeParamNumber(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0
+  );
+}
+
+function expandLength({ nativeType, typeParams }: ExpandNativeTypeInput): string {
+  const length = typeParams?.['length'];
+  if (isValidTypeParamNumber(length)) {
+    return `${nativeType}(${length})`;
+  }
+  return nativeType;
+}
+
+function expandPrecision({ nativeType, typeParams }: ExpandNativeTypeInput): string {
+  const precision = typeParams?.['precision'];
+  if (isValidTypeParamNumber(precision)) {
+    return `${nativeType}(${precision})`;
+  }
+  return nativeType;
+}
+
+function expandNumeric({ nativeType, typeParams }: ExpandNativeTypeInput): string {
+  const precision = typeParams?.['precision'];
+  const scale = typeParams?.['scale'];
+  if (isValidTypeParamNumber(precision)) {
+    if (isValidTypeParamNumber(scale)) {
+      return `${nativeType}(${precision},${scale})`;
+    }
+    return `${nativeType}(${precision})`;
+  }
+  return nativeType;
+}
+
+const lengthHooks: CodecControlHooks = { expandNativeType: expandLength };
+const precisionHooks: CodecControlHooks = { expandNativeType: expandPrecision };
+const numericHooks: CodecControlHooks = { expandNativeType: expandNumeric };
 
 /**
  * Validates that a type expression string is safe to embed in generated .d.ts files.
@@ -177,18 +209,18 @@ export const postgresAdapterDescriptorMeta = {
         codecTypeImport('Interval'),
       ],
       controlPlaneHooks: {
-        [SQL_CHAR_CODEC_ID]: parameterizedTypeHooks,
-        [SQL_VARCHAR_CODEC_ID]: parameterizedTypeHooks,
-        [PG_CHAR_CODEC_ID]: parameterizedTypeHooks,
-        [PG_VARCHAR_CODEC_ID]: parameterizedTypeHooks,
-        [PG_NUMERIC_CODEC_ID]: parameterizedTypeHooks,
-        [PG_BIT_CODEC_ID]: parameterizedTypeHooks,
-        [PG_VARBIT_CODEC_ID]: parameterizedTypeHooks,
-        [PG_TIMESTAMP_CODEC_ID]: parameterizedTypeHooks,
-        [PG_TIMESTAMPTZ_CODEC_ID]: parameterizedTypeHooks,
-        [PG_TIME_CODEC_ID]: parameterizedTypeHooks,
-        [PG_TIMETZ_CODEC_ID]: parameterizedTypeHooks,
-        [PG_INTERVAL_CODEC_ID]: parameterizedTypeHooks,
+        [SQL_CHAR_CODEC_ID]: lengthHooks,
+        [SQL_VARCHAR_CODEC_ID]: lengthHooks,
+        [PG_CHAR_CODEC_ID]: lengthHooks,
+        [PG_VARCHAR_CODEC_ID]: lengthHooks,
+        [PG_NUMERIC_CODEC_ID]: numericHooks,
+        [PG_BIT_CODEC_ID]: lengthHooks,
+        [PG_VARBIT_CODEC_ID]: lengthHooks,
+        [PG_TIMESTAMP_CODEC_ID]: precisionHooks,
+        [PG_TIMESTAMPTZ_CODEC_ID]: precisionHooks,
+        [PG_TIME_CODEC_ID]: precisionHooks,
+        [PG_TIMETZ_CODEC_ID]: precisionHooks,
+        [PG_INTERVAL_CODEC_ID]: precisionHooks,
         [PG_ENUM_CODEC_ID]: pgEnumControlHooks,
       },
     },
