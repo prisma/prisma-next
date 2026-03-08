@@ -1,9 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
 import {
   assembleControlMutationDefaultContributions,
   assemblePslInterpretationContributions,
-  createControlMutationDefaultGeneratorDescriptorMap,
 } from '../src/core/assembly';
 
 function createDescriptor(
@@ -154,9 +153,21 @@ describe('assembleControlMutationDefaultContributions', () => {
       }),
     });
 
-    expect(() => createControlMutationDefaultGeneratorDescriptorMap([first, second])).toThrow(
+    expect(() => assembleControlMutationDefaultContributions([first, second])).toThrow(
       /Duplicate mutation default generator id "duplicate-generator"/,
     );
+  });
+
+  it('evaluates controlMutationDefaults() once per descriptor', () => {
+    const spy = vi.fn(() => ({
+      defaultFunctionRegistry: new Map(),
+      generatorDescriptors: [{ id: 'gen-a', applicableCodecIds: ['pg/text@1'] }],
+    }));
+
+    const descriptor = createDescriptor('spied', { controlMutationDefaults: spy });
+
+    assembleControlMutationDefaultContributions([descriptor]);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it('collects scalar type descriptor contributions', () => {
