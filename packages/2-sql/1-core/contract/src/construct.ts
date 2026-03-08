@@ -158,32 +158,21 @@ type ValidatedContractInput = SqlContract<SqlStorage> & { _generated?: unknown }
 
 function stripGenerated(obj: ValidatedContractInput): Omit<ValidatedContractInput, '_generated'> {
   const input = obj as unknown as Record<string, unknown>;
-  const { _generated, ...rest } = input;
-  void _generated;
+  const { _generated: _, ...rest } = input;
   return rest as Omit<ValidatedContractInput, '_generated'>;
 }
 
-class ContractConstructor {
-  construct<TContract extends SqlContract<SqlStorage>>(
-    input: ValidatedContractInput,
-  ): Omit<TContract, '_generated'> {
-    const existingMappings = (input as { mappings?: Partial<SqlMappings> }).mappings;
-    const defaultMappings = computeDefaultMappings(input.models as Record<string, ModelDefinition>);
-    const mappings = mergeMappings(defaultMappings, existingMappings);
-
-    const contractWithMappings = {
-      ...stripGenerated(input),
-      mappings,
-    };
-
-    return contractWithMappings as Omit<TContract, '_generated'>;
-  }
-}
-
-const contractConstructor = new ContractConstructor();
-
 export function constructContract<TContract extends SqlContract<SqlStorage>>(
-  validatedInput: ValidatedContractInput,
+  input: ValidatedContractInput,
 ): TContract {
-  return contractConstructor.construct(validatedInput) as TContract;
+  const existingMappings = (input as { mappings?: Partial<SqlMappings> }).mappings;
+  const defaultMappings = computeDefaultMappings(input.models as Record<string, ModelDefinition>);
+  const mappings = mergeMappings(defaultMappings, existingMappings);
+
+  const contractWithMappings = {
+    ...stripGenerated(input),
+    mappings,
+  };
+
+  return contractWithMappings as TContract;
 }

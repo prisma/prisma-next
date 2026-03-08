@@ -7,13 +7,7 @@ import type {
   SqlStorage,
   TypeMaps,
 } from '../src/types';
-
-const RUNTIME_MAPPING_KEYS: (keyof SqlMappings)[] = [
-  'modelToTable',
-  'tableToModel',
-  'fieldToColumn',
-  'columnToField',
-];
+import { RUNTIME_MAPPING_KEYS } from './test-constants';
 
 describe('Contract and TypeMaps shape', () => {
   describe('TypeMaps shape', () => {
