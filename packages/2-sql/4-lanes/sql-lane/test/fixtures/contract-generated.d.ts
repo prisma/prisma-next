@@ -1,5 +1,5 @@
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { ContractWithTypeMaps, SqlContract, TypeMaps as TypeMapsType } from '@prisma-next/sql-contract/types';
 
 type CodecTypes = {
   readonly 'pg/text@1': { readonly output: string };
@@ -9,7 +9,7 @@ export type StorageHash = StorageHashBase<'sha256:test-core'>;
 export type ExecutionHash = ExecutionHashBase<'sha256:test-execution'>;
 export type ProfileHash = ProfileHashBase<'sha256:test-profile'>;
 
-export type GeneratedContract = SqlContract<
+export type GeneratedContract = ContractWithTypeMaps<SqlContract<
   {
     readonly tables: {
       readonly user: {
@@ -62,10 +62,12 @@ export type GeneratedContract = SqlContract<
   StorageHash,
   ExecutionHash,
   ProfileHash
-> & { readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes; readonly '__@prisma-next/sql-contract/operationTypes@__': OperationTypes };
+>, TypeMaps>;
 
 export type { CodecTypes };
 
 export type OperationTypes = Record<string, never>;
+
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
 
 export type User = GeneratedContract['models']['User'];

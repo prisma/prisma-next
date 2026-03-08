@@ -1,4 +1,9 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  SqlContract,
+  SqlStorage,
+  TypeMaps as TypeMapsType,
+} from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -110,61 +115,62 @@ test('HasIncludeManyCapabilities requires both capabilities to be true', () => {
 });
 
 // Test contract with capabilities for includeMany
-type TestContractWithCapabilities = SqlContract<
-  {
-    readonly tables: {
-      readonly user: {
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
+type TestContractWithCapabilities = ContractWithTypeMaps<
+  SqlContract<
+    {
+      readonly tables: {
+        readonly user: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
+            };
+            readonly email: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              nullable: false;
+            };
           };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            nullable: false;
-          };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
-      };
-      readonly post: {
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
+        readonly post: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
+            };
+            readonly userId: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
+            };
+            readonly title: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              nullable: false;
+            };
+            readonly createdAt: {
+              readonly nativeType: 'timestamptz';
+              readonly codecId: 'pg/timestamptz@1';
+              nullable: false;
+            };
           };
-          readonly userId: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
-          };
-          readonly title: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            nullable: false;
-          };
-          readonly createdAt: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            nullable: false;
-          };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
       };
-    };
-  },
-  Record<string, never>,
-  Record<string, never>,
-  Record<string, never>
+    },
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  >,
+  TypeMapsType<CodecTypes, Record<string, Record<string, unknown>>>
 > & {
-  readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
-  readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, Record<string, unknown>>;
   readonly capabilities: {
     readonly postgres: {
       readonly lateral: true;
@@ -405,81 +411,79 @@ test('includeMany with multiple includes preserves all types', () => {
   const adapter = createStubAdapter();
 
   // Create a contract with a comment table for multiple includes
-  type ContractWithComments = SqlContract<
-    {
-      readonly tables: {
-        readonly user: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
+  type ContractWithComments = ContractWithTypeMaps<
+    SqlContract<
+      {
+        readonly tables: {
+          readonly user: {
+            readonly columns: {
+              readonly id: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                nullable: false;
+              };
+              readonly email: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                nullable: false;
+              };
             };
-            readonly email: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
+            readonly uniques: readonly [];
+            readonly indexes: readonly [];
+            readonly foreignKeys: readonly [];
           };
-          readonly uniques: readonly [];
-          readonly indexes: readonly [];
-          readonly foreignKeys: readonly [];
-        };
-        readonly post: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
+          readonly post: {
+            readonly columns: {
+              readonly id: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                nullable: false;
+              };
+              readonly userId: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                nullable: false;
+              };
+              readonly title: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                nullable: false;
+              };
             };
-            readonly userId: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly title: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
+            readonly uniques: readonly [];
+            readonly indexes: readonly [];
+            readonly foreignKeys: readonly [];
           };
-          readonly uniques: readonly [];
-          readonly indexes: readonly [];
-          readonly foreignKeys: readonly [];
-        };
-        readonly comment: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
+          readonly comment: {
+            readonly columns: {
+              readonly id: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                nullable: false;
+              };
+              readonly postId: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                nullable: false;
+              };
+              readonly content: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                nullable: false;
+              };
             };
-            readonly postId: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly content: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
+            readonly uniques: readonly [];
+            readonly indexes: readonly [];
+            readonly foreignKeys: readonly [];
           };
-          readonly uniques: readonly [];
-          readonly indexes: readonly [];
-          readonly foreignKeys: readonly [];
         };
-      };
-    },
-    Record<string, never>,
-    Record<string, never>,
-    Record<string, never>
+      },
+      Record<string, never>,
+      Record<string, never>,
+      Record<string, never>
+    >,
+    TypeMapsType<CodecTypes, Record<string, Record<string, unknown>>>
   > & {
-    readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
-    readonly '__@prisma-next/sql-contract/operationTypes@__': Record<
-      string,
-      Record<string, unknown>
-    >;
     readonly capabilities: {
       readonly postgres: {
         readonly lateral: true;

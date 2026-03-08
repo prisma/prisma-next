@@ -70,8 +70,6 @@ export type Contract = ContractWithTypeMaps<SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
-    readonly codecTypes: CodecTypes;
-    readonly operationTypes: OperationTypes;
   }
 >, TypeMaps>;
 

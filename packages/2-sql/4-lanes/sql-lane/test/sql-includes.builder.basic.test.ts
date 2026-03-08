@@ -1,4 +1,9 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  SqlContract,
+  SqlStorage,
+  TypeMaps as TypeMapsType,
+} from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -12,61 +17,62 @@ import { sql } from '../src/sql/builder';
 type CodecTypes = Record<string, { readonly output: unknown }>;
 
 // Define a fully-typed contract type with capabilities
-type ContractWithCapabilities = SqlContract<
-  {
-    readonly tables: {
-      readonly user: {
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
+type ContractWithCapabilities = ContractWithTypeMaps<
+  SqlContract<
+    {
+      readonly tables: {
+        readonly user: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+            };
+            readonly email: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
           };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
-      };
-      readonly post: {
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
+        readonly post: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+            };
+            readonly userId: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+            };
+            readonly title: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly createdAt: {
+              readonly nativeType: 'timestamptz';
+              readonly codecId: 'pg/timestamptz@1';
+              readonly nullable: false;
+            };
           };
-          readonly userId: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
-          };
-          readonly title: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly createdAt: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            readonly nullable: false;
-          };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
       };
-    };
-  },
-  Record<string, never>,
-  Record<string, never>,
-  Record<string, never>
+    },
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  >,
+  TypeMapsType<CodecTypes, Record<string, Record<string, unknown>>>
 > & {
-  readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
-  readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, Record<string, unknown>>;
   readonly capabilities: {
     readonly postgres: {
       readonly lateral: true;
