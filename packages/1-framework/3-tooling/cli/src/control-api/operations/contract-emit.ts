@@ -5,6 +5,8 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
+import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
+import { enrichContractIR } from '../contract-enrichment';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
 interface ProviderFailureLike {
@@ -90,9 +92,13 @@ export async function executeContractEmit(
   // Colocate .d.ts with .json (contract.json → contract.d.ts)
   const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
+  const sourceContext = {
+    composedExtensionPacks: (config.extensionPacks ?? []).map((p) => p.id),
+  };
+
   let providerResult: Awaited<ReturnType<typeof contractConfig.source>>;
   try {
-    providerResult = await unlessAborted(contractConfig.source());
+    providerResult = await unlessAborted(contractConfig.source(sourceContext));
   } catch (error) {
     if (signal.aborted || isAbortError(error)) {
       throw error;
@@ -139,10 +145,16 @@ export async function executeContractEmit(
   const stack = createControlPlaneStack(config);
   const familyInstance = config.family.create(stack);
 
-  // Emit contract via family instance
-  const emitResult = await unlessAborted(
-    familyInstance.emitContract({ contractIR: providerResult.value }),
+  const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
+  const frameworkComponents = assertFrameworkComponentsCompatible(
+    config.family.familyId,
+    config.target.targetId,
+    rawComponents,
   );
+  const enrichedIR = enrichContractIR(providerResult.value, frameworkComponents);
+
+  // Emit contract via family instance
+  const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: enrichedIR }));
 
   // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));

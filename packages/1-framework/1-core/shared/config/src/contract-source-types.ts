@@ -25,4 +25,10 @@ export interface ContractSourceDiagnostics {
   readonly meta?: Record<string, unknown>;
 }
 
-export type ContractSourceProvider = () => Promise<Result<ContractIR, ContractSourceDiagnostics>>;
+export interface ContractSourceContext {
+  readonly composedExtensionPacks: readonly string[];
+}
+
+export type ContractSourceProvider = (
+  context: ContractSourceContext,
+) => Promise<Result<ContractIR, ContractSourceDiagnostics>>;

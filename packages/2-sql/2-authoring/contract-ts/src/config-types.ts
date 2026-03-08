@@ -5,7 +5,7 @@ import { ok } from '@prisma-next/utils/result';
 
 export function typescriptContract(contractIR: ContractIR, output?: string): ContractConfig {
   return {
-    source: async () => ok(contractIR),
+    source: async (_context) => ok(contractIR),
     ...ifDefined('output', output),
   };
 }

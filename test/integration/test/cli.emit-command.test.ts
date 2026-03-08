@@ -567,7 +567,12 @@ describe('emit command', () => {
         >;
         try {
           process.chdir(testDirPsl);
-          sourceResult = await contractConfig!.source();
+          const sourceContext = {
+            composedExtensionPacks: (providerConfig.extensionPacks ?? []).map(
+              (p: { id: string }) => p.id,
+            ),
+          };
+          sourceResult = await contractConfig!.source(sourceContext);
         } finally {
           process.chdir(originalCwd);
         }

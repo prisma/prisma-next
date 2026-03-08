@@ -1,10 +1,9 @@
 import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { createControlClient } from '@prisma-next/cli/control-api';
+import { createControlClient, enrichContractIR } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
-import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
@@ -48,15 +47,16 @@ model Document {
         );
 
         process.chdir(testDir);
-        const contractConfig = prismaContract('./schema.prisma', {
-          composedExtensionPacks: ['pgvector'],
-          extensionPacks: { pgvector: pgvectorPack },
-          capabilitySources: [postgresAdapter, pgvectorPack],
-        });
+        const contractConfig = prismaContract('./schema.prisma');
 
-        const pslResult = await contractConfig.source();
+        const pslResult = await contractConfig.source({
+          composedExtensionPacks: ['pgvector'],
+        });
         expect(pslResult.ok).toBe(true);
         if (!pslResult.ok) return;
+
+        const frameworkComponents = [postgres, postgresAdapter, pgvector];
+        const enrichedIR = enrichContractIR(pslResult.value, frameworkComponents);
 
         const familyInstance = sql.create({
           target: postgres,
@@ -65,7 +65,7 @@ model Document {
           extensionPacks: [pgvector],
         });
 
-        const emitted = await familyInstance.emitContract({ contractIR: pslResult.value });
+        const emitted = await familyInstance.emitContract({ contractIR: enrichedIR });
         const emittedContractIR = JSON.parse(emitted.contractJson) as Record<string, unknown>;
 
         await withDevDatabase(async ({ connectionString }) => {

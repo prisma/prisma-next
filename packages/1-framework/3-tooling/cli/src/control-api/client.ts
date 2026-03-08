@@ -14,6 +14,7 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
+import { enrichContractIR } from './contract-enrichment';
 import { ContractValidationError } from './errors';
 import { executeDbInit } from './operations/db-init';
 import { executeDbUpdate } from './operations/db-update';
@@ -492,7 +493,10 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
-      const providerResult = await contractConfig.sourceProvider();
+      const sourceContext = {
+        composedExtensionPacks: (this.options.extensionPacks ?? []).map((p) => p.id),
+      };
+      const providerResult = await contractConfig.sourceProvider(sourceContext);
       if (!providerResult.ok) {
         onProgress?.({
           action: 'emit',
@@ -552,8 +556,13 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
+      const enrichedIR = enrichContractIR(
+        contractRaw as ContractIR,
+        this.frameworkComponents ?? [],
+      );
+
       try {
-        this.familyInstance.validateContractIR(contractRaw);
+        this.familyInstance.validateContractIR(enrichedIR);
       } catch (error) {
         onProgress?.({
           action: 'emit',
@@ -570,7 +579,7 @@ class ControlClientImpl implements ControlClient {
         });
       }
 
-      const emitResult = await this.familyInstance.emitContract({ contractIR: contractRaw });
+      const emitResult = await this.familyInstance.emitContract({ contractIR: enrichedIR });
 
       onProgress?.({
         action: 'emit',
