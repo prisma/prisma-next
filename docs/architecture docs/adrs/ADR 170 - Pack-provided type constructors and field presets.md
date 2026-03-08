@@ -2,66 +2,59 @@
 
 ## Context
 
-Prisma Next supports dual authoring modes (ADR 006):
+Prisma Next supports dual authoring modes (ADR 006): PSL-first (schema language) and TS-first (builder APIs). In practice, both surfaces routinely need to express **more than just a base scalar type**:
 
-- PSL-first authoring (schema language)
-- TS-first authoring (builder APIs)
+- a parameterized storage shape (e.g. `varchar(35)`),
+- a target/extension-owned persistence mechanism (codec + native type),
+- sometimes a default (including execution-time mutation defaults, ADR 158), and
+- sometimes a “preset” that naturally bundles multiple choices (e.g. “this is my id column”).
 
-Today, both authoring surfaces frequently need to specify more than a “base scalar type”:
+Today, PSL encodes much of this via `@` attributes because the type position can’t carry enough information. That leads to patterns like:
 
-- a parameterized storage shape (e.g. `varchar(35)` length)
-- a target/extension-owned persistence mechanism (codec/native type)
-- optionally, a storage default or execution-time mutation default (ADR 158)
-- occasionally, column attributes/constraints that are semantically bundled with the choice (e.g. “id column preset”)
+- `String @db.VarChar(35)`-style workarounds,
+- extension-specific “type parameterization” attributes (e.g. `@pgvector.column(1536)` in this repo), and
+- `@default(uuid())` where the author’s intent is closer to “UUID id preset” than “call an arbitrary function”.
 
-In PSL, this often shows up as `@` attributes that act as workarounds for an underpowered type position:
+TS authoring fills the same gap with helper functions that produce column definitions and often pick efficient storage parameters (for example “packed” id columns). Historically, this repo attempted to centralize those helpers in a low-layer `@prisma-next/ids` package; that created an architectural category error by introducing a privileged built-in vocabulary and concrete implementations in a low layer (ADR 005, ADR 169).
 
-- `String @db.VarChar(35)`-style patterns in Prisma ecosystem
-- extension-specific attributes that parameterize the storage type (example: `@pgvector.column(1536)` in this repo)
-- `@default(uuid())` for what is conceptually a preset (“UUID id column”) rather than a generic default function call
-
-In TS authoring, this gap is often filled by helper functions that emit “generated column specs” and choose storage parameters (for example “packed” id columns). Historically this repo used a low-layer `@prisma-next/ids` package to provide those helpers, but that created an architectural category error: a privileged “built-in” vocabulary and concrete implementations in a low layer (see ADR 005 and ADR 169).
-
-We want a design that:
-
-- improves PSL ergonomics by promoting these concepts into the type position,
-- keeps the framework core ignorant of concrete vocabulary and implementations, and
-- preserves deterministic composition and layering (“thin core, fat targets/packs”).
+This ADR records the next step: make “type-like” authoring vocabulary **composition-owned**, so both PSL and TS can be ergonomic without hardcoding semantics in core.
 
 ## Problem
 
-We need a shared, composable vocabulary mechanism for authoring-time “type-like” builders that can:
+We need a shared, composable vocabulary mechanism for authoring-time “type-like” building blocks that:
 
-- specify parameterized storage types (codec/native type/type params),
-- optionally bundle defaults and constraints when that is the natural abstraction (field presets),
-- work consistently across PSL and TS authoring,
-- avoid reintroducing global built-ins or hardcoded maps in low layers, and
-- remain deterministic under composition (hard errors for collisions).
+- can produce parameterized storage types (`codecId`/`nativeType`/`typeParams`),
+- can optionally bundle defaults and constraints when that is the natural abstraction,
+- works consistently across PSL and TS authoring,
+- does not reintroduce global built-ins or hardcoded maps in low layers, and
+- is deterministic under composition (collisions are hard errors).
 
 ## Decision
 
 ### 1) Introduce composed registries for authoring-time constructors
 
-We introduce composition-owned registries (contributed by family/target/extension packs) that provide:
+We introduce composition-owned registries (contributed by family/target/extension packs). These registries are the single place where “type-like vocabulary” is defined.
+
+They provide two related concepts:
 
 - **Type constructors**: build the storage shape (`codecId`, `nativeType`, `typeParams` or `typeRef`).
-- **Field presets**: may additionally bundle:
+- **Field presets**: build the storage shape and may additionally bundle:
   - nullability,
   - storage defaults,
   - execution-time mutation defaults (`ExecutionMutationDefaultValue`, ADR 158),
   - and may imply constraints (see Decision 4).
 
-Framework/core authoring packages define only:
+Framework/core authoring packages remain thin. They define only:
 
 - the constructor/preset *shapes* (interfaces/types),
 - deterministic registry assembly rules,
 - and registry consumption hooks in PSL/TS authoring surfaces.
 
-Concrete constructor/preset implementations live only in composition layers (family/target/extension packs).
+Concrete constructor/preset implementations live only in composition layers (family/target/extension packs). This is the critical layering boundary.
 
 ### 2) Namespacing uses dot notation
 
-Constructor names are referenced using **dot notation** namespaces.
+Constructor and preset names are referenced using **dot notation** namespaces.
 
 Examples (illustrative):
 
@@ -87,7 +80,7 @@ The exact constraint encoding remains part of the authoring surface’s normal c
 
 ### 5) Non-namespaced entries are reserved
 
-To prevent an ambient, global “standard library” from reappearing implicitly:
+To prevent an ambient, global “standard library” from reappearing implicitly, we reserve the “short names”:
 
 - **Only family and target** contributors may provide **non-namespaced** constructor/preset entries.
 - Extension packs should contribute namespaced entries by default.
@@ -109,8 +102,8 @@ PSL interpretation consumes the composed registries to lower type expressions an
 
 ### Benefits
 
-- **Better PSL ergonomics**: type position becomes expressive enough to carry parameterization and presets, reducing reliance on `@` attribute workarounds.
-- **One vocabulary seam**: both TS and PSL can opt into the same composed constructor/preset sets.
+- **Better PSL ergonomics**: the type position can carry parameterization and presets, reducing reliance on `@` attribute workarounds.
+- **One vocabulary seam**: both TS and PSL opt into the same composed constructor/preset sets.
 - **Layering alignment**: removes pressure to keep concrete helpers in low layers.
 - **Deterministic composition**: collisions are explicit and actionable.
 
