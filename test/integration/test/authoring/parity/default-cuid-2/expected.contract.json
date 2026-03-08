@@ -4,7 +4,7 @@
   "target": "postgres",
   "storageHash": "sha256:ab25b558e03744f8878f72857aef610808c4f3f05e2827e68bcd872b826a428b",
   "executionHash": "sha256:9c330b02774fd7b35ab7463eea7551d8e147b97fa8dac27aed080a630be6bd0c",
-  "profileHash": "sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89",
+  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
   "models": {
     "User": {
       "fields": {
@@ -56,7 +56,18 @@
       ]
     }
   },
-  "capabilities": {},
+  "capabilities": {
+    "postgres": {
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "enums": true
+    }
+  },
   "extensionPacks": {},
   "meta": {},
   "_generated": {
