@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 
-const REPO_ROOT = join(import.meta.dirname, '../../../');
+const REPO_ROOT = join(import.meta.dirname, '../../../../');
 
 const GENERATED_ARTIFACT_ROOTS = [
   'examples/prisma-next-demo/src/prisma/contract.d.ts',
