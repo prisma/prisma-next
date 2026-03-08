@@ -803,6 +803,11 @@ function renderParameterizedTypeSql(
 
   const hooks = codecHooks.get(column.codecId);
   if (!hooks?.expandNativeType) {
+    console.warn(
+      `Column has typeParams but no expandNativeType hook for codecId "${column.codecId}". ` +
+        `The column will use the base nativeType "${column.nativeType}" without parameter expansion. ` +
+        'Ensure the extension providing this codec is included in extensionPacks.',
+    );
     return null;
   }
 
