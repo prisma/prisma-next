@@ -312,10 +312,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       },
       models: {},
       relations: {},
-      mappings: {
-        codecTypes: {},
-        operationTypes: {},
-      },
+      mappings: {},
       capabilities: {},
       extensionPacks: {},
       meta: {},
