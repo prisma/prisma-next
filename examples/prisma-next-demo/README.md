@@ -144,7 +144,7 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
 
 ## Browser Visualization
 
-Run `pnpm dev` for the Vite app that visualizes the contract. It renders directly from the constructed Contract (`validateContract` output), with HMR when contract.json is re-emitted. See `src/entry.ts`.
+Run `pnpm dev` for the Vite app that visualizes the contract. It renders directly from the constructed Contract (`validateContract` output) using React, with HMR when contract.json is re-emitted. See `src/app/`.
 
 ## Key Files
 
@@ -158,7 +158,7 @@ Run `pnpm dev` for the Vite app that visualizes the contract. It renders directl
 - `src/orm-client/*.ts` - End-to-end ORM client query examples
 - `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
 - `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
-- `src/entry.ts` - Browser visualization (validates contract, renders from constructed Contract)
+- `src/app/` - React browser visualization (validates contract, renders from constructed Contract)
 - `scripts/stamp-marker.ts` - Contract marker management
 - `scripts/seed.ts` - Database seeding (includes vector embeddings)
 - `src/queries/similarity-search.ts` - Example vector similarity search query
