@@ -3,7 +3,7 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:7bc2d92b8bd871bb95a1030e0befcb591b9641949fed2263293e9111ca1b90b3",
-  "profileHash": "sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89",
+  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
   "models": {
     "Post": {
       "fields": {
@@ -101,7 +101,18 @@
       }
     }
   },
-  "capabilities": {},
+  "capabilities": {
+    "postgres": {
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "enums": true
+    }
+  },
   "extensionPacks": {},
   "meta": {},
   "_generated": {
