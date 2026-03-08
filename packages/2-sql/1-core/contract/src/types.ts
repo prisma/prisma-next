@@ -162,7 +162,7 @@ export type TypeMaps<
 };
 
 export type CodecTypesOf<T> = [T] extends [never]
-  ? Record<string, { output: unknown }>
+  ? Record<string, never>
   : T extends { readonly codecTypes: infer C }
     ? C extends Record<string, { output: unknown }>
       ? C
@@ -170,7 +170,7 @@ export type CodecTypesOf<T> = [T] extends [never]
     : Record<string, never>;
 
 export type OperationTypesOf<T> = [T] extends [never]
-  ? Record<string, Record<string, unknown>>
+  ? Record<string, never>
   : T extends { readonly operationTypes: infer O }
     ? O extends Record<string, unknown>
       ? O
