@@ -797,18 +797,24 @@ function renderParameterizedTypeSql(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
 ): string | null {
-  if (!column.typeParams || !column.codecId) {
+  if (!column.typeParams) {
     return null;
+  }
+
+  if (!column.codecId) {
+    throw new Error(
+      `Column declares typeParams for nativeType "${column.nativeType}" but has no codecId. ` +
+        'Ensure the column is associated with a codec.',
+    );
   }
 
   const hooks = codecHooks.get(column.codecId);
   if (!hooks?.expandNativeType) {
-    console.warn(
-      `Column has typeParams but no expandNativeType hook for codecId "${column.codecId}". ` +
-        `The column will use the base nativeType "${column.nativeType}" without parameter expansion. ` +
+    throw new Error(
+      `Column declares typeParams for nativeType "${column.nativeType}" ` +
+        `but no expandNativeType hook is registered for codecId "${column.codecId}". ` +
         'Ensure the extension providing this codec is included in extensionPacks.',
     );
-    return null;
   }
 
   const expanded = hooks.expandNativeType({
