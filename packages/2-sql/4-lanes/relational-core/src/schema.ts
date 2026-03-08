@@ -1,11 +1,9 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
 import type {
-  CodecTypesOf,
-  ExtractCodecTypes,
-  ExtractOperationTypes,
   ExtractTypeMapsFromContract,
-  OperationTypesOf,
+  ResolveCodecTypes,
+  ResolveOperationTypes,
   SqlContract,
   SqlStorage,
   StorageColumn,
@@ -360,10 +358,8 @@ type SchemaReturnType<
   TTypeMaps = ExtractTypeMapsFromContract<Contract>,
 > = SchemaHandle<
   Contract,
-  [TTypeMaps] extends [never] ? ExtractCodecTypes<Contract> : CodecTypesOf<TTypeMaps>,
-  [TTypeMaps] extends [never]
-    ? ToOperationTypes<ExtractOperationTypes<Contract>>
-    : ToOperationTypes<OperationTypesOf<TTypeMaps>>
+  ResolveCodecTypes<Contract, TTypeMaps>,
+  ToOperationTypes<ResolveOperationTypes<Contract, TTypeMaps>>
 >;
 
 type NormalizeOperationTypes<T> = {
@@ -397,12 +393,8 @@ export function schema<
 >(context: ExecutionContext<Contract>): SchemaReturnType<Contract, TTypeMaps> {
   const contract = context.contract;
   const storage = contract.storage;
-  type CodecTypes = [TTypeMaps] extends [never]
-    ? ExtractCodecTypes<Contract>
-    : CodecTypesOf<TTypeMaps>;
-  type Operations = [TTypeMaps] extends [never]
-    ? ToOperationTypes<ExtractOperationTypes<Contract>>
-    : ToOperationTypes<OperationTypesOf<TTypeMaps>>;
+  type CodecTypes = ResolveCodecTypes<Contract, TTypeMaps>;
+  type Operations = ToOperationTypes<ResolveOperationTypes<Contract, TTypeMaps>>;
   const tables = {} as ExtractSchemaTables<Contract, CodecTypes, Operations>;
   const contractCapabilities = contract.capabilities;
 

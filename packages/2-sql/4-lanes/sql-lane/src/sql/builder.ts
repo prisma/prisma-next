@@ -1,9 +1,7 @@
 import type {
-  CodecTypesOf,
-  ExtractCodecTypes,
-  ExtractOperationTypes,
   ExtractTypeMapsFromContract,
-  OperationTypesOf,
+  ResolveCodecTypes,
+  ResolveOperationTypes,
   SqlContract,
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
@@ -22,23 +20,20 @@ export type { IncludeChildBuilder } from './include-builder';
 export function sql<
   TContract extends SqlContract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
-  CodecTypesOverride extends Record<string, { readonly output: unknown }> = [TTypeMaps] extends [
-    never,
-  ]
-    ? ExtractCodecTypes<TContract>
-    : CodecTypesOf<TTypeMaps>,
+  CodecTypesOverride extends Record<string, { readonly output: unknown }> = ResolveCodecTypes<
+    TContract,
+    TTypeMaps
+  >,
 >(
   options: SqlBuilderOptions<TContract>,
 ): SelectBuilder<
   TContract,
   unknown,
   CodecTypesOverride,
-  [TTypeMaps] extends [never] ? ExtractOperationTypes<TContract> : OperationTypesOf<TTypeMaps>
+  ResolveOperationTypes<TContract, TTypeMaps>
 > {
   type CodecTypes = CodecTypesOverride;
-  type Operations = [TTypeMaps] extends [never]
-    ? ExtractOperationTypes<TContract>
-    : OperationTypesOf<TTypeMaps>;
+  type Operations = ResolveOperationTypes<TContract, TTypeMaps>;
   const builder = new SelectBuilderImpl<TContract, unknown, CodecTypes, Record<string, never>>(
     options,
   ) as SelectBuilder<TContract, unknown, CodecTypes, Operations>;
