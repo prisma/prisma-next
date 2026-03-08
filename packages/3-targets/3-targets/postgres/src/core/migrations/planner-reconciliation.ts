@@ -1,6 +1,7 @@
 import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
+  CodecControlHooks,
   MigrationOperationPolicy,
   SqlMigrationPlanOperation,
   SqlPlannerConflict,
@@ -28,6 +29,7 @@ export function buildReconciliationPlan(options: {
   readonly schemaName: string;
   readonly mode: PlanningMode;
   readonly policy: MigrationOperationPolicy;
+  readonly codecHooks: Map<string, CodecControlHooks>;
 }): {
   readonly operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
   readonly conflicts: readonly SqlPlannerConflict[];
@@ -47,6 +49,7 @@ export function buildReconciliationPlan(options: {
       contract: options.contract,
       schemaName: options.schemaName,
       mode,
+      codecHooks: options.codecHooks,
     });
 
     if (operation) {
@@ -109,8 +112,9 @@ function buildReconciliationOperationFromIssue(options: {
   readonly contract: SqlContract<SqlStorage>;
   readonly schemaName: string;
   readonly mode: PlanningMode;
+  readonly codecHooks: Map<string, CodecControlHooks>;
 }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> | null {
-  const { issue, contract, schemaName, mode } = options;
+  const { issue, contract, schemaName, mode, codecHooks } = options;
   switch (issue.kind) {
     case 'extra_table':
       if (!mode.allowDestructive || !issue.table) {
@@ -176,7 +180,13 @@ function buildReconciliationOperationFromIssue(options: {
       if (!contractColumn) {
         return null;
       }
-      return buildAlterColumnTypeOperation(schemaName, issue.table, issue.column, contractColumn);
+      return buildAlterColumnTypeOperation(
+        schemaName,
+        issue.table,
+        issue.column,
+        contractColumn,
+        codecHooks,
+      );
     }
 
     // Remaining issue kinds (default_missing, default_mismatch, primary_key_mismatch,
@@ -443,9 +453,10 @@ function buildAlterColumnTypeOperation(
   tableName: string,
   columnName: string,
   column: StorageColumn,
+  codecHooks: Map<string, CodecControlHooks>,
 ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
   const qualified = qualifyTableName(schemaName, tableName);
-  const expectedType = buildColumnTypeSql(column);
+  const expectedType = buildColumnTypeSql(column, codecHooks);
   return {
     id: `alterType.${tableName}.${columnName}`,
     label: `Alter type for ${columnName} on ${tableName}`,
