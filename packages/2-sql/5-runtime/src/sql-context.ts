@@ -394,6 +394,7 @@ function computeExecutionDefaultValue(
           },
         );
       }
+      // nosemgrep: javascript.express.security.express-wkhtml-injection.express-wkhtmltoimage-injection
       return generator.generate(spec.params);
     }
   }
