@@ -16,7 +16,7 @@ The schema is the **input**; the contract is the **output**. Users think in term
 
 ### Contract
 
-A canonical, verifiable JSON artifact (`contract.json` + `contract.d.ts`) derived from a schema. The contract binds an application to a database. For the application, it declares the models the application is defined in terms of and how they map to database structures. For the database, it is a guarantee: if signed with this contract, the database will provide all of the structures the contract depends on. It includes hashes (`storageHash`, `profileHash`, optional `executionHash`) for verification.
+A verifiable agreement between an application and its database. The application declares what models it depends on and how they map to storage; the database guarantees it provides the required structures. Emitted as `contract.json` + `contract.d.ts`, the application carries its contract and the database is signed with the contract's hash to make the agreement verifiable at both migration and runtime.
 
 Users author schemas; the system emits contracts. The contract is a build artifact, not something users typically edit directly.
 
@@ -75,7 +75,7 @@ A database family (e.g., SQL, Document). Family-level code is dialect-agnostic b
 
 The composable, type-safe query builder. Queries are authored as chained method calls (`sql().from(...).select(...).limit(...)`) and compile to plans.
 
-### ORM
+### ORM Client
 
 The object-relational mapping surface built on top of the SQL DSL. Provides `findMany`, `create`, `update`, `delete` and relation loading (`include`, `select`).
 
