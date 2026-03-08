@@ -130,6 +130,7 @@ describe('sql-target-family-hook', () => {
       const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
       expect(types).not.toContain("'__@prisma-next/sql-contract/codecTypes@__'");
       expect(types).not.toContain("'__@prisma-next/sql-contract/operationTypes@__'");
+      expect(types).not.toContain("'__@prisma-next/sql-contract/typeMaps@__'");
     });
 
     it('Contract mappings type includes only runtime-real keys', () => {
