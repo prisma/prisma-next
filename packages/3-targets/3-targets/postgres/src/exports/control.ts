@@ -1,4 +1,4 @@
-import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   ControlTargetInstance,
   MigrationPlanner,
@@ -8,12 +8,30 @@ import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
-import { contractToSchemaIR } from '@prisma-next/family-sql/control';
+import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
+
+function buildNativeTypeExpander(
+  frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>,
+) {
+  if (!frameworkComponents) {
+    return undefined;
+  }
+  const codecHooks = extractCodecControlHooks(frameworkComponents);
+  return (input: {
+    readonly nativeType: string;
+    readonly codecId?: string;
+    readonly typeParams?: Record<string, unknown>;
+  }) => {
+    if (!input.codecId) return input.nativeType;
+    const hooks = codecHooks.get(input.codecId);
+    return hooks?.expandNativeType?.(input) ?? input.nativeType;
+  };
+}
 
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
   {
@@ -29,7 +47,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       contractToSchema(contract, frameworkComponents) {
         return contractToSchemaIR(contract as SqlContract<SqlStorage> | null, {
           annotationNamespace: 'pg',
-          expandNativeType: expandParameterizedNativeType,
+          expandNativeType: buildNativeTypeExpander(frameworkComponents),
           frameworkComponents: frameworkComponents ?? [],
         });
       },
