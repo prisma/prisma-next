@@ -15,7 +15,7 @@ function assertNoLegacyMappingsInContract(content: string): void {
   if (!mappingsSection) {
     throw new Error('Could not find SqlContract type in generated file');
   }
-  const contractBody = mappingsSection[1];
+  const contractBody = mappingsSection[1]!;
   const legacyCodecInMappings = /columnToField[^}]+}\s*}\s*,\s*codecTypes\s*:/;
   const legacyOpInMappings = /columnToField[^}]+}\s*}\s*,\s*operationTypes\s*:/;
   if (legacyCodecInMappings.test(contractBody)) {
