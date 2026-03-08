@@ -187,7 +187,7 @@ describe('defineConfig', () => {
   it('builds TypeScript contract config via helper utility', async () => {
     const contract = { targetFamily: 'sql' } as ContractIR;
     const config = typescriptContract(contract, 'output/contract.json');
-    const result = await config.source();
+    const result = await config.source({ composedExtensionPacks: [] });
 
     expect(config.output).toBe('output/contract.json');
     expect(result.ok).toBe(true);

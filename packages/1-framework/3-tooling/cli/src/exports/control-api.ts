@@ -18,6 +18,9 @@ export type {
 // Client factory
 export { createControlClient } from '../control-api/client';
 
+// Contract enrichment (merges framework-derived capabilities and extension pack metadata into IR)
+export { enrichContractIR } from '../control-api/contract-enrichment';
+
 // Standalone operations (for tooling that doesn't need full client)
 export { executeContractEmit } from '../control-api/operations/contract-emit';
 

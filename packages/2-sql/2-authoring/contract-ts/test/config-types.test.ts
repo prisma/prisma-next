@@ -6,7 +6,7 @@ describe('typescriptContract', () => {
   it('returns provider result with contract IR', async () => {
     const contractIR = { targetFamily: 'sql', target: 'postgres' } as ContractIR;
     const config = typescriptContract(contractIR, 'output/contract.json');
-    const result = await config.source();
+    const result = await config.source({ composedExtensionPacks: [] });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

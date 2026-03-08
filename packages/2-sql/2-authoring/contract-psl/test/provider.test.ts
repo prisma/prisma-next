@@ -1,31 +1,11 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 
-const pgvectorPack = {
-  kind: 'extension',
-  id: 'pgvector',
-  familyId: 'sql',
-  targetId: 'postgres',
-  version: '0.0.1',
-  capabilities: {
-    postgres: {
-      'pgvector/cosine': true,
-    },
-  },
-} as const;
-
-const postgresAdapterMeta = {
-  capabilities: {
-    postgres: {
-      lateral: true,
-      jsonAgg: true,
-      returning: true,
-    },
-  },
-} as const;
+const emptyContext: ContractSourceContext = { composedExtensionPacks: [] };
 
 describe('prismaContract provider helper', () => {
   const originalCwd = process.cwd();
@@ -58,7 +38,7 @@ describe('prismaContract provider helper', () => {
       const contract = prismaContract('./schema.prisma', { output: 'output/contract.json' });
 
       expect(contract.output).toBe('output/contract.json');
-      const result = await contract.source();
+      const result = await contract.source(emptyContext);
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
@@ -95,7 +75,7 @@ model Post {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma');
-      const result = await contract.source();
+      const result = await contract.source(emptyContext);
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
@@ -139,7 +119,7 @@ model Post {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma');
-      const result = await contract.source();
+      const result = await contract.source(emptyContext);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -181,7 +161,7 @@ model Post {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma');
-      const result = await contract.source();
+      const result = await contract.source(emptyContext);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -219,7 +199,7 @@ model Post {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma');
-      const result = await contract.source();
+      const result = await contract.source(emptyContext);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -257,10 +237,8 @@ model Document {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma', {
-        composedExtensionPacks: ['pgvector'],
-      });
-      const result = await contract.source();
+      const contract = prismaContract('./schema.prisma');
+      const result = await contract.source({ composedExtensionPacks: ['pgvector'] });
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -291,45 +269,6 @@ model Document {
     });
   });
 
-  describe('given configured framework metadata', () => {
-    it('emits extensionPacks and merged capabilities into contract IR', async () => {
-      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
-      tempDirs.push(tempDir);
-      const schemaPath = join(tempDir, 'schema.prisma');
-      await writeFile(
-        schemaPath,
-        `model Document {
-  id Int @id
-}
-`,
-        'utf-8',
-      );
-
-      process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma', {
-        composedExtensionPacks: ['pgvector'],
-        extensionPacks: { pgvector: pgvectorPack },
-        capabilitySources: [postgresAdapterMeta, pgvectorPack],
-      });
-
-      const result = await contract.source();
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-
-      expect(result.value.extensionPacks).toMatchObject({
-        pgvector: pgvectorPack,
-      });
-      expect(result.value.capabilities).toMatchObject({
-        postgres: {
-          lateral: true,
-          jsonAgg: true,
-          returning: true,
-          'pgvector/cosine': true,
-        },
-      });
-    });
-  });
-
   describe('given supported default functions in schema', () => {
     it('maps function defaults to execution or storage defaults', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
@@ -350,7 +289,7 @@ model Document {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma');
-      const result = await contract.source();
+      const result = await contract.source(emptyContext);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -407,7 +346,7 @@ model Document {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma');
-      const result = await contract.source();
+      const result = await contract.source(emptyContext);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -435,7 +374,7 @@ model Document {
 
       process.chdir(tempDir);
       const contract = prismaContract('./missing.prisma');
-      const result = await contract.source();
+      const result = await contract.source(emptyContext);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;

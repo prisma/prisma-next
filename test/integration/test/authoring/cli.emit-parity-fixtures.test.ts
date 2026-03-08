@@ -2,6 +2,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { loadConfig } from '@prisma-next/cli/config-loader';
+import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/cli/config-types';
+import { enrichContractIR } from '@prisma-next/cli/control-api';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { executeCommand, setupCommandMocks } from '../utils/cli-test-helpers';
@@ -12,6 +14,12 @@ import {
 } from './authoring-parity-test-helpers';
 
 const writeExpected = process.env['UPDATE_AUTHORING_PARITY_EXPECTED'] === '1';
+
+function sourceContextFromConfig(config: PrismaNextConfig): ContractSourceContext {
+  return {
+    composedExtensionPacks: (config.extensionPacks ?? []).map((p: { id: string }) => p.id),
+  };
+}
 
 function parseContractJson(contractJson: string): Record<string, unknown> {
   return JSON.parse(contractJson) as Record<string, unknown>;
@@ -77,10 +85,12 @@ describe('emit parity fixtures', () => {
           let pslProviderResultSecond: Awaited<ReturnType<typeof pslConfig.contract.source>>;
           try {
             process.chdir(testSetup.testDir);
-            tsProviderResultFirst = await tsConfig.contract.source();
-            tsProviderResultSecond = await tsConfig.contract.source();
-            pslProviderResultFirst = await pslConfig.contract.source();
-            pslProviderResultSecond = await pslConfig.contract.source();
+            const tsContext = sourceContextFromConfig(tsConfig);
+            const pslContext = sourceContextFromConfig(pslConfig);
+            tsProviderResultFirst = await tsConfig.contract.source(tsContext);
+            tsProviderResultSecond = await tsConfig.contract.source(tsContext);
+            pslProviderResultFirst = await pslConfig.contract.source(pslContext);
+            pslProviderResultSecond = await pslConfig.contract.source(pslContext);
           } finally {
             process.chdir(originalCwd);
           }
@@ -102,8 +112,16 @@ describe('emit parity fixtures', () => {
             extensionPacks: tsConfig.extensionPacks ?? [],
           });
 
-          const normalizedTs = familyInstance.validateContractIR(tsProviderResultFirst.value);
-          const normalizedPsl = familyInstance.validateContractIR(pslProviderResultFirst.value);
+          const frameworkComponents = [
+            tsConfig.target,
+            tsConfig.adapter,
+            ...(tsConfig.extensionPacks ?? []),
+          ];
+          const enrichedTs = enrichContractIR(tsProviderResultFirst.value, frameworkComponents);
+          const enrichedPsl = enrichContractIR(pslProviderResultFirst.value, frameworkComponents);
+
+          const normalizedTs = familyInstance.validateContractIR(enrichedTs);
+          const normalizedPsl = familyInstance.validateContractIR(enrichedPsl);
           expect(normalizedTs).toEqual(normalizedPsl);
 
           const tsEmitFirst = await familyInstance.emitContract({ contractIR: normalizedTs });
@@ -206,7 +224,7 @@ describe('emit parity fixture diagnostics', () => {
           let sourceResult: Awaited<ReturnType<typeof pslConfig.contract.source>>;
           try {
             process.chdir(testSetup.testDir);
-            sourceResult = await pslConfig.contract.source();
+            sourceResult = await pslConfig.contract.source(sourceContextFromConfig(pslConfig));
           } finally {
             process.chdir(originalCwd);
           }
