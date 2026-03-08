@@ -298,8 +298,19 @@ export const sqlTargetFamilyHook = {
   // To regenerate, run: prisma-next contract emit
   ${importLines.join('\n')}
 
-  import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
-  import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-contract/types';
+  import type {
+    ExecutionHashBase,
+    ProfileHashBase,
+    StorageHashBase,
+  } from '@prisma-next/contract/types';
+  import type {
+    SqlContract,
+    SqlStorage,
+    SqlMappings,
+    ModelDefinition,
+    ContractWithTypeMaps,
+    TypeMaps as TypeMapsType,
+  } from '@prisma-next/sql-contract/types';
 
   export type StorageHash = StorageHashBase<'${hashes.storageHash}'>;
   export type ExecutionHash = ${executionHashType};
@@ -315,12 +326,9 @@ export const sqlTargetFamilyHook = {
         : Encoded
       : Encoded;
 
-  export type TypeMaps = {
-    readonly codecTypes: CodecTypes;
-    readonly operationTypes: OperationTypes;
-  };
+  export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
 
-  export type Contract = SqlContract<
+  type ContractBase = SqlContract<
   ${storageType},
   ${modelsType},
   ${relationsType},
@@ -328,7 +336,13 @@ export const sqlTargetFamilyHook = {
   StorageHash,
   ExecutionHash,
   ProfileHash
-  >;
+  > & {
+    readonly target: ${this.serializeValue(ir.target)};
+    readonly capabilities: ${this.serializeValue(ir.capabilities)};
+    readonly extensionPacks: ${this.serializeValue(ir.extensionPacks)};
+  };
+
+  export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
   export type Tables = Contract['storage']['tables'];
   export type Models = Contract['models'];

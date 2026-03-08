@@ -92,19 +92,16 @@ describe('sql-target-family-hook', () => {
         },
       });
       const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-      expect(types).toContain('export type TypeMaps');
-      expect(types).toContain('codecTypes');
-      expect(types).toContain('operationTypes');
+      expect(types).toContain('export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>');
     });
 
-    it('TypeMaps has locked shape { codecTypes, operationTypes }', () => {
+    it('TypeMaps delegates to TypeMapsType with CodecTypes and OperationTypes', () => {
       const ir = createContractIR({
         models: {},
         storage: { tables: {} },
       });
       const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-      expect(types).toContain('readonly codecTypes: CodecTypes');
-      expect(types).toContain('readonly operationTypes: OperationTypes');
+      expect(types).toContain('TypeMapsType<CodecTypes, OperationTypes>');
     });
 
     it('Contract does not include phantom codecTypes or operationTypes keys', () => {
@@ -194,9 +191,10 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain(
-      "import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-contract/types';",
-    );
+    expect(types).toContain('SqlContract,');
+    expect(types).toContain('ContractWithTypeMaps,');
+    expect(types).toContain('TypeMaps as TypeMapsType,');
+    expect(types).toContain("from '@prisma-next/sql-contract/types';");
     expect(types).not.toContain("from './contract-types'");
   });
 
