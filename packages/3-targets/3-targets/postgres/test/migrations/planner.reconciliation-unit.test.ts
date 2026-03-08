@@ -102,6 +102,7 @@ function plan(
     schemaName: options?.schemaName ?? 'public',
     mode: options?.mode ?? FULL_MODE,
     policy: options?.policy ?? FULL_POLICY,
+    codecHooks: new Map(),
   });
 }
 
