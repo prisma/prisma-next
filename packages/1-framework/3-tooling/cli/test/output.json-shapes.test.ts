@@ -64,7 +64,7 @@ describe('MigrationApplyResult JSON shape', () => {
     `);
   });
 
-  it('pathDecision with ref includes refName and refHash', () => {
+  it('pathDecision with ref includes refName', () => {
     const result: MigrationApplyResult = {
       ok: true,
       migrationsApplied: 1,
@@ -78,7 +78,6 @@ describe('MigrationApplyResult JSON shape', () => {
         alternativeCount: 1,
         tieBreakReasons: ['at sha256:a: 2 candidates, selected by tie-break'],
         refName: 'production',
-        refHash: 'sha256:b',
       },
       timings: { total: 10 },
     };
@@ -86,7 +85,6 @@ describe('MigrationApplyResult JSON shape', () => {
       [
         "alternativeCount",
         "fromHash",
-        "refHash",
         "refName",
         "tieBreakReasons",
         "toHash",
@@ -135,7 +133,6 @@ describe('MigrationStatusResult JSON shape', () => {
         alternativeCount: 0,
         tieBreakReasons: [],
         refName: 'production',
-        refHash: 'sha256:ref',
       },
       summary: 'At ref "production" target',
       diagnostics: [],
