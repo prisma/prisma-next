@@ -87,16 +87,29 @@ type AggregateTarget =
   | { readonly kind: 'countAllRows' }   // count(*)
   | { readonly kind: 'column'; readonly name: string };  // sum(views), avg(price), etc.
 
-/** One collapsed child query folded into the parent Read. Carries both the subquery config and the Nest metadata. */
-interface SubqueryEntry extends ReadBase {
-  // Nest metadata (preserved from the eliminated Nest node)
+/** Nest metadata shared by all collapsed subquery variants. */
+interface SubqueryBase {
   readonly field: string;               // target property name on parent
   readonly arity: 'array' | 'scalar';
   readonly leftKeys: readonly string[];
   readonly rightKeys: readonly string[];
-  // Subquery execution mode
-  readonly subquery: 'jsonAgg' | 'scalar';
 }
+
+/** Lateral join collapse: full child Read folded into parent via lateral subquery. */
+interface RowsSubquery extends SubqueryBase, ReadBase {
+  readonly subquery: 'rows';
+}
+
+/** Lateral aggregate collapse: scalar aggregate folded into parent via scalar lateral subquery. */
+interface AggregateSubquery extends SubqueryBase {
+  readonly subquery: 'aggregate';
+  readonly collection: string;
+  readonly fn: AggregateFn;
+  readonly column: AggregateTarget;
+  readonly filters: readonly WhereExpr[];
+}
+
+type SubqueryEntry = RowsSubquery | AggregateSubquery;
 
 interface CreateNode extends NodeBase {
   readonly kind: 'Create';
@@ -464,12 +477,12 @@ function lateralJoinCollapse(graph: QueryPlanGraph, contract: SqlContract<SqlSto
 
     // 5. Collapse: append a subquery entry to leftInput.
     //    If rightInput already has subqueries (from a prior inner collapse), carry them over.
-    const entry: SubqueryEntry = {
+    const entry: RowsSubquery = {
       field: nest.field,
       arity: nest.arity,
       leftKeys: nest.leftKeys,
       rightKeys: nest.rightKeys,
-      subquery: 'jsonAgg',
+      subquery: 'rows',
       collection: rightInput.collection,
       columns: rightInput.columns,
       filters: rightInput.filters,
@@ -502,7 +515,7 @@ function lateralJoinCollapse(graph: QueryPlanGraph, contract: SqlContract<SqlSto
 **After**:
 
 ```
-Read#1("users", subqueries=[{ subquery: 'jsonAgg', field: "posts", collection: "posts", ... }])
+Read#1("users", subqueries=[{ subquery: 'rows', field: "posts", collection: "posts", ... }])
   --Dependency--> CollectionState("users", 0)
 
 Return --Dependency--> Read#1
