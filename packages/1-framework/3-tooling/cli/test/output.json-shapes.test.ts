@@ -99,7 +99,7 @@ describe('MigrationStatusResult JSON shape', () => {
       ok: true,
       mode: 'offline',
       migrations: [],
-      leafHash: 'sha256:leaf',
+      targetHash: 'sha256:leaf',
       contractHash: 'sha256:contract',
       summary: '0 migration(s) on disk',
       diagnostics: [],
@@ -108,11 +108,11 @@ describe('MigrationStatusResult JSON shape', () => {
       [
         "contractHash",
         "diagnostics",
-        "leafHash",
         "migrations",
         "mode",
         "ok",
         "summary",
+        "targetHash",
       ]
     `);
   });
@@ -123,7 +123,7 @@ describe('MigrationStatusResult JSON shape', () => {
       mode: 'online',
       migrations: [],
       markerHash: 'sha256:marker',
-      leafHash: 'sha256:leaf',
+      targetHash: 'sha256:leaf',
       contractHash: 'sha256:contract',
       refName: 'production',
       refHash: 'sha256:ref',
@@ -141,7 +141,6 @@ describe('MigrationStatusResult JSON shape', () => {
       [
         "contractHash",
         "diagnostics",
-        "leafHash",
         "markerHash",
         "migrations",
         "mode",
@@ -150,6 +149,7 @@ describe('MigrationStatusResult JSON shape', () => {
         "refHash",
         "refName",
         "summary",
+        "targetHash",
       ]
     `);
   });

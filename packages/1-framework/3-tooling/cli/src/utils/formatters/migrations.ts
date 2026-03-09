@@ -315,7 +315,7 @@ interface MigrationStatusResult {
   readonly mode: 'online' | 'offline';
   readonly migrations: readonly MigrationStatusEntry[];
   readonly markerHash?: string;
-  readonly leafHash: string;
+  readonly targetHash: string;
   readonly contractHash: string;
   readonly summary: string;
   readonly diagnostics?: readonly StatusDiagnostic[];
