@@ -38,23 +38,41 @@ export class Tokenizer {
   }
 
   next(): Token {
-    const token = this.#buffer.shift() ?? scan(this.#source, this.#pos);
-    this.#pos += token.text.length;
-    return token;
+    const next = this.#buffer.shift();
+    if (next) {
+      return next;
+    }
+    return this.#scanNext();
   }
 
   peek(offset = 0): Token {
-    while (this.#buffer.length <= offset) {
+    if (offset > this.#buffer.length) {
       const last = this.#buffer.at(-1);
       if (last?.kind === 'Eof') {
-        break;
+        return last;
       }
-      const scanPos = this.#buffer.reduce((pos, t) => pos + t.text.length, this.#pos);
-      this.#buffer.push(scan(this.#source, scanPos));
     }
-    return (
-      this.#buffer[offset] ?? this.#buffer[this.#buffer.length - 1] ?? scan(this.#source, this.#pos)
-    );
+
+    const token = this.#buffer[offset];
+    if (token) {
+      return token;
+    }
+
+    while (this.#buffer.length <= offset) {
+      const token = this.#scanNext();
+      if (token.kind === 'Eof') {
+        return token;
+      }
+      this.#buffer.push(token);
+    }
+
+    return this.#buffer[offset] as Token;
+  }
+
+  #scanNext(): Token {
+    const token = scan(this.#source, this.#pos);
+    this.#pos += token.text.length;
+    return token;
   }
 }
 
