@@ -1,3 +1,4 @@
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/core-control-plane/types';
 import type {
@@ -20,7 +21,7 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { DatabaseDependencyProvider } from './types';
+import { isDatabaseDependencyProvider } from './types';
 
 function convertDefault(def: ColumnDefault): string {
   if (def.kind === 'function') {
@@ -172,7 +173,7 @@ export function detectDestructiveChanges(
 
 export interface ContractToSchemaIROptions {
   readonly expandNativeType?: NativeTypeExpander;
-  readonly frameworkComponents?: readonly unknown[];
+  readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**
@@ -209,18 +210,18 @@ export function contractToSchemaIR(
   return {
     tables,
     dependencies,
-    ...(annotations ? { annotations } : {}),
+    ...ifDefined('annotations', annotations),
   };
 }
 
 function collectDependenciesFromComponents(
-  components?: readonly unknown[],
+  components?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
 ): readonly DependencyIR[] {
   if (!components || components.length === 0) return [];
   const seen = new Set<string>();
   const result: DependencyIR[] = [];
   for (const component of components) {
-    if (!isDependencyProvider(component)) continue;
+    if (!isDatabaseDependencyProvider(component)) continue;
     const deps = component.databaseDependencies?.init;
     if (!deps) continue;
     for (const dep of deps) {
@@ -231,10 +232,6 @@ function collectDependenciesFromComponents(
     }
   }
   return result;
-}
-
-function isDependencyProvider(value: unknown): value is DatabaseDependencyProvider {
-  return typeof value === 'object' && value !== null && 'databaseDependencies' in value;
 }
 
 function deriveAnnotations(storage: SqlStorage): SqlAnnotations | undefined {

@@ -43,6 +43,10 @@ export interface DatabaseDependencyProvider {
   readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
 }
 
+export function isDatabaseDependencyProvider(value: unknown): value is DatabaseDependencyProvider {
+  return typeof value === 'object' && value !== null && 'databaseDependencies' in value;
+}
+
 export interface StorageTypePlanResult<TTargetDetails> {
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
 }
