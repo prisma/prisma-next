@@ -108,6 +108,22 @@ export function errorNoRoot(nodes: readonly string[]): MigrationToolsError {
   });
 }
 
+export function errorInvalidRefs(refsPath: string, reason: string): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.INVALID_REFS', 'Invalid refs.json', {
+    why: `refs.json at "${refsPath}" is invalid: ${reason}`,
+    fix: 'Ensure refs.json is a flat object mapping valid ref names to contract hash strings.',
+    details: { path: refsPath, reason },
+  });
+}
+
+export function errorInvalidRefName(refName: string): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.INVALID_REF_NAME', 'Invalid ref name', {
+    why: `Ref name "${refName}" is invalid. Names must be lowercase alphanumeric with hyphens or forward slashes, no path traversal.`,
+    fix: `Use a valid ref name (e.g., "staging", "envs/production").`,
+    details: { refName },
+  });
+}
+
 export function errorDuplicateMigrationId(migrationId: string): MigrationToolsError {
   return new MigrationToolsError(
     'MIGRATION.DUPLICATE_MIGRATION_ID',

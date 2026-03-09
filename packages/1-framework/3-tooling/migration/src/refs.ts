@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { type } from 'arktype';
 import { dirname, join } from 'pathe';
-import { MigrationToolsError } from './errors';
+import { errorInvalidRefName, errorInvalidRefs, MigrationToolsError } from './errors';
 
 export type Refs = Readonly<Record<string, string>>;
 
@@ -13,6 +14,13 @@ export function validateRefName(name: string): boolean {
   if (name.startsWith('.')) return false;
   return REF_NAME_PATTERN.test(name);
 }
+
+const RefsSchema = type('Record<string, string>').narrow((refs, ctx) => {
+  for (const key of Object.keys(refs)) {
+    if (!validateRefName(key)) return ctx.mustBe(`valid ref names (invalid: "${key}")`);
+  }
+  return true;
+});
 
 export async function readRefs(refsPath: string): Promise<Refs> {
   let raw: string;
@@ -29,50 +37,21 @@ export async function readRefs(refsPath: string): Promise<Refs> {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new MigrationToolsError('MIGRATION.INVALID_REFS', 'Invalid refs.json', {
-      why: `Failed to parse "${refsPath}" as JSON.`,
-      fix: 'Fix the JSON syntax in refs.json or delete it and recreate.',
-      details: { path: refsPath },
-    });
+    throw errorInvalidRefs(refsPath, 'Failed to parse as JSON');
   }
 
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new MigrationToolsError('MIGRATION.INVALID_REFS', 'Invalid refs.json', {
-      why: `Expected refs.json to be a JSON object, got ${Array.isArray(parsed) ? 'array' : typeof parsed}.`,
-      fix: 'Ensure refs.json is a flat object mapping ref names to contract hash strings.',
-      details: { path: refsPath },
-    });
+  const result = RefsSchema(parsed);
+  if (result instanceof type.errors) {
+    throw errorInvalidRefs(refsPath, result.summary);
   }
 
-  const record = parsed as Record<string, unknown>;
-  for (const [key, value] of Object.entries(record)) {
-    if (typeof value !== 'string') {
-      throw new MigrationToolsError('MIGRATION.INVALID_REFS', 'Invalid refs.json', {
-        why: `Ref "${key}" has a non-string value. All ref values must be contract hash strings.`,
-        fix: `Update the value of "${key}" in refs.json to a valid contract hash string.`,
-        details: { path: refsPath, refName: key, valueType: typeof value },
-      });
-    }
-    if (!validateRefName(key)) {
-      throw new MigrationToolsError('MIGRATION.INVALID_REFS', 'Invalid refs.json', {
-        why: `Ref name "${key}" is invalid. Names must be lowercase alphanumeric with hyphens or forward slashes, no path traversal.`,
-        fix: `Rename "${key}" in refs.json to a valid ref name (e.g., "staging", "envs/production").`,
-        details: { path: refsPath, refName: key },
-      });
-    }
-  }
-
-  return record as Refs;
+  return result;
 }
 
 export async function writeRefs(refsPath: string, refs: Refs): Promise<void> {
   for (const key of Object.keys(refs)) {
     if (!validateRefName(key)) {
-      throw new MigrationToolsError('MIGRATION.INVALID_REF_NAME', 'Invalid ref name', {
-        why: `Ref name "${key}" is invalid. Names must be lowercase alphanumeric with hyphens or forward slashes, no path traversal.`,
-        fix: `Use a valid ref name (e.g., "staging", "envs/production").`,
-        details: { refName: key },
-      });
+      throw errorInvalidRefName(key);
     }
   }
 
@@ -88,11 +67,7 @@ export async function writeRefs(refsPath: string, refs: Refs): Promise<void> {
 
 export function resolveRef(refs: Refs, name: string): string {
   if (!validateRefName(name)) {
-    throw new MigrationToolsError('MIGRATION.INVALID_REF_NAME', 'Invalid ref name', {
-      why: `Ref name "${name}" is invalid. Names must be lowercase alphanumeric with hyphens or forward slashes, no path traversal.`,
-      fix: `Use a valid ref name (e.g., "staging", "envs/production").`,
-      details: { refName: name },
-    });
+    throw errorInvalidRefName(name);
   }
 
   const hash = refs[name];
