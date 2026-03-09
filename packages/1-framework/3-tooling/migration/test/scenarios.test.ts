@@ -96,9 +96,9 @@ async function loadGraph(migrationsDir: string) {
   return { graph: reconstructGraph(attested), packages: attested };
 }
 
-const C1 = 'sha256:c1';
-const C2 = 'sha256:c2';
-const C3 = 'sha256:c3';
+const C1 = `sha256:${'1'.repeat(64)}`;
+const C2 = `sha256:${'2'.repeat(64)}`;
+const C3 = `sha256:${'3'.repeat(64)}`;
 
 const contractC1 = contract({
   user: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },

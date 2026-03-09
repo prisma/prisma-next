@@ -17,6 +17,10 @@ import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
+const HASH_A = `sha256:${'a'.repeat(64)}`;
+const HASH_B = `sha256:${'b'.repeat(64)}`;
+const HASH_C = `sha256:${'c'.repeat(64)}`;
+
 function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
   return {
     schemaVersion: '1',
@@ -130,7 +134,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     await writeAttestedMigration(migrationsDir, {
       from: EMPTY_CONTRACT_HASH,
-      to: 'sha256:hash-a',
+      to: HASH_A,
       fromContract: null,
       toContract: contractA,
       ops: [createTableOp('user')],
@@ -139,8 +143,8 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: 'sha256:hash-a',
-      to: 'sha256:hash-b',
+      from: HASH_A,
+      to: HASH_B,
       fromContract: contractA,
       toContract: contractB,
       ops: [createTableOp('post')],
@@ -149,8 +153,8 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: 'sha256:hash-b',
-      to: 'sha256:hash-c',
+      from: HASH_B,
+      to: HASH_C,
       fromContract: contractB,
       toContract: contractC,
       ops: [createTableOp('comment')],
@@ -160,16 +164,16 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     const refsPath = join(migrationsDir, 'refs.json');
     await writeRefs(refsPath, {
-      staging: 'sha256:hash-c',
-      production: 'sha256:hash-b',
+      staging: HASH_C,
+      production: HASH_B,
     });
 
     const refs = await readRefs(refsPath);
     const stagingHash = resolveRef(refs, 'staging');
     const productionHash = resolveRef(refs, 'production');
 
-    expect(stagingHash).toBe('sha256:hash-c');
-    expect(productionHash).toBe('sha256:hash-b');
+    expect(stagingHash).toBe(HASH_C);
+    expect(productionHash).toBe(HASH_B);
 
     const packages = await readMigrationsDir(migrationsDir);
     const attested = packages.filter((p) => p.manifest.migrationId !== null);
@@ -191,7 +195,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await mkdir(migrationsDir, { recursive: true });
 
     const refsPath = join(migrationsDir, 'refs.json');
-    const originalRefs = { staging: 'sha256:hash-a', production: 'sha256:hash-b' };
+    const originalRefs = { staging: HASH_A, production: HASH_B };
     await writeRefs(refsPath, originalRefs);
 
     const refs = await readRefs(refsPath);
@@ -202,7 +206,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
   });
 
   it('reports error for unknown ref', () => {
-    const refs = { staging: 'sha256:hash-a' };
+    const refs = { staging: HASH_A };
     expect(() => resolveRef(refs, 'production')).toThrow();
 
     try {
@@ -242,7 +246,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     await writeAttestedMigration(migrationsDir, {
       from: EMPTY_CONTRACT_HASH,
-      to: 'sha256:hash-a',
+      to: HASH_A,
       fromContract: null,
       toContract: contractA,
       ops: [createTableOp('user')],
@@ -251,8 +255,8 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: 'sha256:hash-a',
-      to: 'sha256:hash-b',
+      from: HASH_A,
+      to: HASH_B,
       fromContract: contractA,
       toContract: contractB,
       ops: [createTableOp('post')],
@@ -261,7 +265,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     const refsPath = join(migrationsDir, 'refs.json');
-    await writeRefs(refsPath, { production: 'sha256:hash-a' });
+    await writeRefs(refsPath, { production: HASH_A });
 
     const refs = await readRefs(refsPath);
     const refHash = resolveRef(refs, 'production');
@@ -270,7 +274,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const attested = packages.filter((p) => p.manifest.migrationId !== null);
     const graph = reconstructGraph(attested);
 
-    const markerHash = 'sha256:hash-b';
+    const markerHash = HASH_B;
     const forwardPath = findPath(graph, markerHash, refHash);
     expect(forwardPath).toBeNull();
 
@@ -287,22 +291,22 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     let refs = await readRefs(refsPath);
     expect(refs).toEqual({});
 
-    await writeRefs(refsPath, { staging: 'sha256:hash-a' });
+    await writeRefs(refsPath, { staging: HASH_A });
     refs = await readRefs(refsPath);
-    expect(refs).toEqual({ staging: 'sha256:hash-a' });
+    expect(refs).toEqual({ staging: HASH_A });
 
-    await writeRefs(refsPath, { ...refs, production: 'sha256:hash-b' });
+    await writeRefs(refsPath, { ...refs, production: HASH_B });
     refs = await readRefs(refsPath);
-    expect(refs).toEqual({ staging: 'sha256:hash-a', production: 'sha256:hash-b' });
+    expect(refs).toEqual({ staging: HASH_A, production: HASH_B });
 
-    await writeRefs(refsPath, { ...refs, staging: 'sha256:hash-c' });
+    await writeRefs(refsPath, { ...refs, staging: HASH_C });
     refs = await readRefs(refsPath);
-    expect(refs['staging']).toBe('sha256:hash-c');
+    expect(refs['staging']).toBe(HASH_C);
 
     const { staging: _, ...remaining } = refs;
     await writeRefs(refsPath, remaining);
     refs = await readRefs(refsPath);
-    expect(refs).toEqual({ production: 'sha256:hash-b' });
+    expect(refs).toEqual({ production: HASH_B });
 
     const raw = await readFile(refsPath, 'utf-8');
     expect(() => JSON.parse(raw)).not.toThrow();
@@ -337,7 +341,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     await writeAttestedMigration(migrationsDir, {
       from: EMPTY_CONTRACT_HASH,
-      to: 'sha256:hash-a',
+      to: HASH_A,
       fromContract: null,
       toContract: contractA,
       ops: [createTableOp('user')],
@@ -346,8 +350,8 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: 'sha256:hash-a',
-      to: 'sha256:hash-b',
+      from: HASH_A,
+      to: HASH_B,
       fromContract: contractA,
       toContract: contractB,
       ops: [createTableOp('post')],
@@ -360,7 +364,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const graph = reconstructGraph(attested);
 
     const refsPath = join(migrationsDir, 'refs.json');
-    await writeRefs(refsPath, { production: 'sha256:hash-b' });
+    await writeRefs(refsPath, { production: HASH_B });
 
     const refs = await readRefs(refsPath);
     const refHash = resolveRef(refs, 'production');
@@ -372,11 +376,11 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const atTarget = markerHash === refHash;
     expect(atTarget).toBe(false);
 
-    const markerAtA = 'sha256:hash-a';
+    const markerAtA = HASH_A;
     const pathFromA = findPath(graph, markerAtA, refHash);
     expect(pathFromA).toHaveLength(1);
 
-    const markerAtB = 'sha256:hash-b';
+    const markerAtB = HASH_B;
     expect(markerAtB === refHash).toBe(true);
   });
 
@@ -409,7 +413,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     await writeAttestedMigration(migrationsDir, {
       from: EMPTY_CONTRACT_HASH,
-      to: 'sha256:hash-a',
+      to: HASH_A,
       fromContract: null,
       toContract: contractA,
       ops: [createTableOp('user')],
@@ -418,8 +422,8 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: 'sha256:hash-a',
-      to: 'sha256:hash-b',
+      from: HASH_A,
+      to: HASH_B,
       fromContract: contractA,
       toContract: contractB,
       ops: [createTableOp('post')],
@@ -429,8 +433,8 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     const refsPath = join(migrationsDir, 'refs.json');
     await writeRefs(refsPath, {
-      staging: 'sha256:hash-b',
-      production: 'sha256:hash-a',
+      staging: HASH_B,
+      production: HASH_A,
     });
 
     const refs = await readRefs(refsPath);
@@ -445,6 +449,6 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     expect(productionPath).toHaveLength(1);
 
     const refsAfter = await readRefs(refsPath);
-    expect(refsAfter).toEqual({ staging: 'sha256:hash-b', production: 'sha256:hash-a' });
+    expect(refsAfter).toEqual({ staging: HASH_B, production: HASH_A });
   });
 });
