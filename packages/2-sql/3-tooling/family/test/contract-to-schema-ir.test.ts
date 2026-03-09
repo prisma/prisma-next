@@ -22,7 +22,7 @@ function wrap(storage: SqlStorage): SqlContract<SqlStorage> {
     storage,
     models: {},
     relations: {},
-    mappings: { codecTypes: {}, operationTypes: {} },
+    mappings: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},

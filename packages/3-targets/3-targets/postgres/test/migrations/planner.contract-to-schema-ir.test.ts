@@ -755,7 +755,7 @@ function createDemoContract(
     storage,
     models: {},
     relations: {},
-    mappings: { codecTypes: {}, operationTypes: {} },
+    mappings: {},
     capabilities: {},
     extensionPacks: { pgvector: {} },
     meta: {},
