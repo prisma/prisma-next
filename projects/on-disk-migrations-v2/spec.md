@@ -186,6 +186,398 @@ Production ref targets `C2`. DB marker is at `C3` (someone applied `C2 -> C3` ou
 
 **Behavior:** Standard marker-mismatch error. The system cannot route from `C3` to `C2` unless a `C3 -> C2` edge exists. If it does, it would be applied (it's a valid edge). If it doesn't, the error tells the user the DB is ahead of the ref and the ref should be updated.
 
+## S-7: Transitioning from `db update` to migrations (baseline)
+
+A developer has been iterating on their schema using `db update`, which pushes schema changes directly to the database without creating migration edges. The database is now at contract hash `C1`. The developer wants to switch to migrations for deployment safety.
+
+**Workflow:**
+1. Database is at `C1` (applied via `db update`). No migration history exists on disk.
+2. Developer creates a baseline migration: `kind: 'baseline'`, `from: EMPTY`, `to: C1`. This edge carries no operations — it declares "the database is already at `C1`."
+3. Developer makes schema changes, emits `C2`, and runs `migration plan` to create edge `C1 -> C2`.
+4. In CI/production, `migration apply` sees the baseline edge and the incremental edge. The baseline is a no-op (the DB is already at `C1`), and the incremental edge `C1 -> C2` applies normally.
+
+**Behavior:** The baseline migration bridges the gap between an existing database state (managed by `db update`) and the migration graph. The pathfinder treats the baseline like any other edge — it contributes a node (`C1`) to the graph. From that point forward, the developer uses `migration plan` and `migration apply` exclusively.
+
+**Key constraint:** The baseline must accurately reflect the current database state. If the database is actually at a schema that doesn't match `C1`, the incremental migration `C1 -> C2` will produce incorrect or failing operations. There is no automatic verification that the baseline matches reality — this is the developer's responsibility.
+
+## S-8: Mixed `db update` and migrations during development
+
+A developer uses `db update` for rapid local iteration but migrations for staging and production.
+
+**Workflow:**
+1. Local dev database is managed with `db update` — schema changes are applied immediately, no migration edges created.
+2. When ready to deploy, the developer runs `migration plan` to create an edge from the last known migration state to the current contract.
+3. Staging and production use `migration apply` to apply the planned edge.
+
+**Behavior:** This is the expected development workflow. `db update` and migrations operate on the same contract hash space — `db update` writes the contract hash to the marker table, and `migration apply` reads the marker to determine the starting point. The two mechanisms are interoperable as long as the developer plans migrations before deploying.
+
+**Limitation:** If the developer runs `db update` on a shared database (e.g., a shared staging instance) and also applies migrations to it, the marker may advance past the migration graph's expectation. This produces a standard marker-mismatch error and requires the developer to plan a migration that accounts for the current state.
+
+## S-9: Adopting migrations on an existing production database
+
+A production database has been running with `db update` for months. The team decides to adopt migrations.
+
+**Workflow:**
+1. Current production schema corresponds to contract hash `C5`.
+2. Developer creates a baseline migration: `from: EMPTY`, `to: C5`, `kind: 'baseline'`. This records "production is at `C5`" without replaying the schema history.
+3. All subsequent changes go through `migration plan` → `migration apply`.
+4. On production, `migration apply` sees the baseline. The marker is already at `C5` (from prior `db update` usage), so the baseline is a no-op. Future edges apply normally.
+
+**Behavior:** The baseline does not need to contain the full DDL history — it only establishes a starting node in the migration graph. The production marker (written by prior `db update` runs) already reflects `C5`, so the pathfinder routes from `C5` to whatever the target is.
+
+**Prerequisite:** The production marker must match the baseline's `to` hash. If the marker was not set (e.g., the database was managed outside of Prisma Next entirely), the team must first run `db update` or manually set the marker to establish the starting point.
+
+## Scenario Playbook (prisma-next-demo)
+
+All scenarios run against the `examples/prisma-next-demo` package with a local Postgres database. `reset-db.sh --full` resets DB state (tables, types, extensions, marker schema) and on-disk artifacts (migrations directory, emitted contract, refs.json). All commands run from the `examples/prisma-next-demo` directory.
+
+### P-1: Linear happy path (S-1)
+
+Demonstrates the basic workflow: emit → plan → apply → edit → emit → plan → apply → status.
+
+```bash
+# 1. Full reset
+../../reset-db.sh --full
+
+# 2. Emit contract C1
+pnpm prisma-next contract emit
+
+# 3. Plan migration EMPTY -> C1
+pnpm prisma-next migration plan --name init
+
+# 4. Apply migration — DB moves to C1
+pnpm prisma-next migration apply
+
+# 5. Edit contract: add a `name` column to `user` table in prisma/contract.ts
+# (manual edit — add .column('name', { type: textColumn, nullable: true }))
+
+# 6. Re-emit contract C2
+pnpm prisma-next contract emit
+
+# 7. Plan migration C1 -> C2
+pnpm prisma-next migration plan --name add-user-name
+
+# 8. Apply migration — DB moves to C2
+pnpm prisma-next migration apply
+
+# 9. Verify status shows everything applied
+pnpm prisma-next migration status
+```
+
+**Expected:** All commands succeed. Two migration edge directories on disk (`init`, `add-user-name`). Status shows both applied and DB at C2.
+
+### P-2: Staging rollback cycle (S-2)
+
+Demonstrates rollback: staging advances then rolls back, production takes the direct route.
+
+```bash
+# 1. Full reset
+../../reset-db.sh --full
+
+# 2. Emit contract C1 and plan+apply EMPTY -> C1
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name init
+pnpm prisma-next migration apply
+
+# 3. Edit contract: add `phone` column to `user` → C2
+# (manual edit)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name add-phone
+pnpm prisma-next migration apply
+# DB now at C2
+
+# 4. Rollback: revert contract to remove `phone` column → C1 again
+# (manual edit — remove `phone` column)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name rollback-phone
+pnpm prisma-next migration apply
+# DB now at C1
+
+# 5. Different change: add `bio` column instead → C3
+# (manual edit — add `bio` column)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name add-bio
+pnpm prisma-next migration apply
+
+# 6. Verify status
+pnpm prisma-next migration status
+```
+
+**Expected:** Four edges on disk. Graph: `EMPTY->C1`, `C1->C2`, `C2->C1`, `C1->C3`. Status shows all applied and DB at C3. The rollback cycle (C1→C2→C1→C3) is valid because pathfinding tolerates cycles.
+
+**Result (post-fix):** PASS. After the rollback (C2→C1), `migration plan` without `--from` now produces a clear `MIGRATION.NO_RESOLVABLE_LEAF` error: "The migration graph contains cycles and no node has zero outgoing edges. Use `--from <hash>` to specify the planning origin explicitly." Using `--from <C1_HASH>`, the planner correctly produces the incremental 1-op plan (add column bio). Apply succeeds, and status shows the graph routed via shortest path `EMPTY→C1→C3` with 2 migrations applied. The add-phone and rollback-phone edges exist on disk but are not on the selected path.
+
+**Previous result (GAP, now fixed):** `findLeaf` returned `EMPTY_CONTRACT_HASH` for cycle-without-exit graphs, causing `migration plan` to silently produce a full greenfield migration. Fixed by throwing `MIGRATION.NO_RESOLVABLE_LEAF` and by skipping `findLatestMigration` when `--from` is provided.
+
+### P-3: Converging paths (S-3)
+
+Demonstrates shortest-path selection when multiple paths exist to the same target.
+
+```bash
+# 1. Full reset
+../../reset-db.sh --full
+
+# 2. Emit C1, plan+apply EMPTY -> C1
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name init
+pnpm prisma-next migration apply
+# DB at C1
+
+# 3. Add `phone` column → C2
+# (manual edit)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name add-phone
+# Do NOT apply yet
+
+# 4. Also add `email_verified` column → C3 from C2
+# (manual edit — add email_verified on top of phone)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name add-email-verified
+# Now have C1->C2->C3
+
+# 5. Create a direct edge C1->C3 by planning from C1 with --from
+pnpm prisma-next migration plan --name direct-to-c3 --from <C1_HASH>
+# Now have both C1->C2->C3 and C1->C3
+
+# 6. Apply — should pick C1->C3 (shortest, 1 hop vs 2 hops)
+pnpm prisma-next migration apply
+
+# 7. Verify status
+pnpm prisma-next migration status
+```
+
+**Expected:** Pathfinder selects the 1-hop `C1->C3` edge. Status shows that edge applied. The 2-hop path exists but is not used.
+
+**Result:** PASS. Apply selected `direct-to-c3` (1 hop, 2 ops) over the 2-hop path `add-phone` + `add-email-verified`. Status shows `init` and `direct-to-c3` as the applied path.
+
+### P-4: Same-base divergence (S-4)
+
+Demonstrates the hard error when two migrations fork from the same base with no explicit target.
+
+```bash
+# 1. Full reset
+../../reset-db.sh --full
+
+# 2. Emit C1, plan+apply EMPTY -> C1
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name init
+pnpm prisma-next migration apply
+# DB at C1
+
+# 3. Add `phone` column → C2
+# (manual edit)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name add-phone
+# Do NOT apply — edge C1->C2 on disk
+
+# 4. Revert contract back to C1 state, then add `bio` instead → C3
+# (manual edit — remove phone, add bio)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name add-bio --from <C1_HASH>
+# Now have C1->C2 and C1->C3 — divergent
+
+# 5. Attempt apply without specifying target — should error
+pnpm prisma-next migration apply
+# EXPECTED: hard error — divergent branches from C1
+
+# 6. Apply with explicit target (use contract hash or ref)
+pnpm prisma-next migration ref set production <C3_HASH>
+pnpm prisma-next migration apply --ref production
+# EXPECTED: succeeds, applies C1->C3
+
+# 7. Verify status
+pnpm prisma-next migration status
+```
+
+**Expected:** Step 5 applies C1→C3 via contract.json's implicit target (contract.json hash = C3). `migration status` without `--ref` errors with `AMBIGUOUS_LEAF` on the divergent graph. `migration status --ref production` succeeds, showing the correct chain EMPTY→C1→C3.
+
+**Result (post-fix):** PASS. Step 5 correctly applies C1→C3 — `migration apply` uses contract.json's storageHash (C3) as the implicit target, which is by design (the contract.json hash acts as "I want this state"). `migration status` without `--ref` correctly errors with `AMBIGUOUS_LEAF` listing both leaves (C2 and C3). After setting `production` ref to C3, `migration status --ref production` works on the divergent graph without error, showing EMPTY→C1→C3 with both migrations applied.
+
+**Design note:** `migration apply` always resolves its target from `contract.json` (or `--ref`), so divergence detection via `AMBIGUOUS_LEAF` is surfaced through `migration status` (without `--ref`) and `migration plan` (without `--from`), not through `migration apply`. This is intentional — the contract.json hash is the user's declaration of the desired state.
+
+**Previous result (GAP, now fixed):** `migration status --ref` on a divergent graph threw `AMBIGUOUS_LEAF` because `findLeaf` was called unconditionally before ref-based routing. Fixed by skipping `findLeaf` when `--ref` provides an explicit target.
+
+### P-5: Staging ahead of production via refs (S-5)
+
+Demonstrates independent environment routing using refs.
+
+```bash
+# 1. Full reset
+../../reset-db.sh --full
+
+# 2. Emit C1, plan+apply EMPTY -> C1
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name init
+pnpm prisma-next migration apply
+# DB at C1
+
+# 3. Add `phone` column → C2, plan
+# (manual edit)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name add-phone
+
+# 4. Set refs: production=C1, staging=C2
+pnpm prisma-next migration ref set production <C1_HASH>
+pnpm prisma-next migration ref set staging <C2_HASH>
+
+# 5. Status for each ref
+pnpm prisma-next migration status --ref production
+# EXPECTED: shows DB at C1, target C1, no-op — already at target
+pnpm prisma-next migration status --ref staging
+# EXPECTED: shows DB at C1, target C2, 1 pending edge
+
+# 6. Apply for staging
+pnpm prisma-next migration apply --ref staging
+# EXPECTED: applies C1->C2
+
+# 7. Status again
+pnpm prisma-next migration status --ref production
+pnpm prisma-next migration status --ref staging
+```
+
+**Expected:** Production reports no-op (already at C1). Staging applies the pending edge. After apply, staging status shows fully applied.
+
+**Result:** PASS. Status for production showed "At ref production target" (DB=C1, ref=C1). Status for staging showed "1 edge(s) behind ref staging" (DB=C1, ref=C2). After `migration apply --ref staging`, staging status showed "At ref staging target" and production showed "1 edge(s) ahead of ref production" (DB now at C2 from staging apply, ref still at C1). Ref routing works correctly — environments route independently.
+
+### P-6: DB marker ahead of ref target (S-6)
+
+Demonstrates the error when the database has advanced past the ref target.
+
+```bash
+# 1. Full reset
+../../reset-db.sh --full
+
+# 2. Emit C1, plan+apply EMPTY -> C1
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name init
+pnpm prisma-next migration apply
+
+# 3. Add column → C2, plan+apply
+# (manual edit)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name add-phone
+pnpm prisma-next migration apply
+# DB at C2
+
+# 4. Set ref to C1 (behind DB)
+pnpm prisma-next migration ref set production <C1_HASH>
+
+# 5. Attempt apply with --ref production
+pnpm prisma-next migration apply --ref production
+# EXPECTED: error — DB at C2, ref targets C1, no C2->C1 edge exists
+
+# 6. Status with --ref production
+pnpm prisma-next migration status --ref production
+```
+
+**Expected:** Apply fails because no backward edge exists. Status should report the mismatch clearly.
+
+**Result:** PASS. `migration apply --ref production` failed with `PN-RTM-3000: No migration path from current state to target` (DB at C2, ref at C1, no C2→C1 edge). `migration status --ref production` reported "1 edge(s) ahead of ref production".
+
+### P-7: Transition from `db update` to migrations (S-7)
+
+Demonstrates bridging from `db update` to the migration workflow.
+
+```bash
+# 1. Full reset
+../../reset-db.sh --full
+
+# 2. Emit contract and use db update to push schema (no migrations)
+pnpm prisma-next contract emit
+pnpm prisma-next db update
+# DB at C1, no migration edges on disk
+
+# 3. Plan first migration from EMPTY -> C1
+# This creates a baseline-like edge that represents the current state
+pnpm prisma-next migration plan --name init
+
+# 4. Edit contract (add column) → C2, emit
+# (manual edit)
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name add-phone
+
+# 5. Apply migrations — init edge should be no-op (DB already at C1), add-phone applies
+pnpm prisma-next migration apply
+
+# 6. Verify
+pnpm prisma-next migration status
+```
+
+**Expected:** `migration apply` sees the DB marker is already at C1, so the init edge is skipped. The add-phone edge applies normally. Status shows everything up to date.
+
+**Result:** PASS. `db update` wrote the marker at C1. `migration apply` found path C1→C2 (skipping the EMPTY→C1 init edge since the DB was already at C1). Only `add-phone` (1 op) was applied. Status confirmed both migrations applied and DB up to date.
+
+### P-8: Mixed `db update` and migrations (S-8)
+
+Demonstrates using `db update` for local iteration and migrations for deployment.
+
+```bash
+# 1. Full reset
+../../reset-db.sh --full
+
+# 2. Emit C1, plan+apply EMPTY -> C1 via migrations
+pnpm prisma-next contract emit
+pnpm prisma-next migration plan --name init
+pnpm prisma-next migration apply
+# DB at C1 via migrations
+
+# 3. Use db update to iterate locally: add `phone` column → C2
+# (manual edit)
+pnpm prisma-next contract emit
+pnpm prisma-next db update
+# DB at C2 via db update — marker updated
+
+# 4. Plan migration C1 -> C2 for deployment
+pnpm prisma-next migration plan --name add-phone
+
+# 5. Apply — DB already at C2 so this edge is a no-op
+pnpm prisma-next migration apply
+
+# 6. Verify
+pnpm prisma-next migration status
+```
+
+**Expected:** After `db update`, the DB marker is at C2. `migration plan` creates the C1->C2 edge for deployment purposes. `migration apply` sees the DB is already at C2 and reports a no-op. This validates the interoperability between `db update` and migrations.
+
+**Result:** PASS. `db update` advanced the marker to C2. `migration plan` produced the C1→C2 edge (1 op: add column phone). `migration apply` reported "Already up to date" since the DB marker already matched the target. Status showed both migrations applied.
+
+### P-9: Adopting migrations on existing production database (S-9)
+
+Same as P-7 but emphasizes the "existing production" framing. Uses `db update` to simulate a database that was managed without migrations.
+
+```bash
+# 1. Full reset
+../../reset-db.sh --full
+
+# 2. Simulate production DB managed via db update for a while
+pnpm prisma-next contract emit   # C1
+pnpm prisma-next db update       # DB at C1
+
+# 3. Add column, emit, db update again — simulates history
+# (manual edit)
+pnpm prisma-next contract emit   # C2
+pnpm prisma-next db update       # DB at C2
+
+# 4. Decision: adopt migrations. Plan from EMPTY -> C2 (current contract)
+pnpm prisma-next migration plan --name baseline
+
+# 5. Apply — DB already at C2, so baseline is no-op
+pnpm prisma-next migration apply
+
+# 6. Going forward: add another column → C3, plan+apply via migrations
+# (manual edit)
+pnpm prisma-next contract emit   # C3
+pnpm prisma-next migration plan --name add-bio
+pnpm prisma-next migration apply
+
+# 7. Verify
+pnpm prisma-next migration status
+```
+
+**Expected:** The baseline edge EMPTY->C2 is a no-op since the DB is already at C2. The subsequent migration C2->C3 applies normally. This proves you can adopt migrations at any point in a database's lifetime.
+
+**Result:** PASS. Simulated months of `db update` usage (C1 then C2). Created baseline EMPTY→C2 — `migration apply` reported "Already up to date" (DB marker matched C2). Planned and applied incremental C2→C3 (1 op: add column bio). Status confirmed both migrations applied and DB up to date.
+
 # Acceptance Criteria
 
 - [ ] AC-1: For graphs with cycles, path resolution returns a deterministic shortest path and never loops.
