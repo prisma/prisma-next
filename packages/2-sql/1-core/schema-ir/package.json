@@ -34,6 +34,7 @@
   },
   "exports": {
     ".": "./dist/index.mjs",
+    "./naming": "./dist/exports/naming.mjs",
     "./types": "./dist/exports/types.mjs",
     "./package.json": "./package.json"
   },

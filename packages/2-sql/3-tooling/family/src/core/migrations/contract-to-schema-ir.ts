@@ -10,6 +10,7 @@ import type {
   StorageTable,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
+import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type {
   DependencyIR,
   SqlAnnotations,
@@ -112,7 +113,7 @@ function convertTable(
     fkBackingIndexes.push({
       columns: fk.columns,
       unique: false,
-      name: `${name}_${fk.columns.join('_')}_idx`,
+      name: defaultIndexName(name, fk.columns),
     });
   }
 

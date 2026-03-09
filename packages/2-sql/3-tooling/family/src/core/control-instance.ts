@@ -24,6 +24,7 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
+import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
@@ -665,7 +666,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           }
 
           for (const index of table.indexes) {
-            const name = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
+            const name = index.name ?? defaultIndexName(tableName, index.columns);
             const label = index.unique ? `unique index ${name}` : `index ${name}`;
             children.push({
               kind: 'index',

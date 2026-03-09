@@ -28,6 +28,7 @@ import type {
   StorageColumn,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
+import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
@@ -519,7 +520,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
         if (lookup && hasIndex(lookup, index.columns)) {
           continue;
         }
-        const indexName = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
+        const indexName = index.name ?? defaultIndexName(tableName, index.columns);
         operations.push({
           id: `index.${tableName}.${indexName}`,
           label: `Create index ${indexName} on ${tableName}`,
@@ -578,7 +579,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
         // Skip if the index already exists in the database
         if (lookup && hasIndex(lookup, fk.columns)) continue;
 
-        const indexName = `${tableName}_${fk.columns.join('_')}_idx`;
+        const indexName = defaultIndexName(tableName, fk.columns);
         operations.push({
           id: `index.${tableName}.${indexName}`,
           label: `Create FK-backing index ${indexName} on ${tableName}`,
