@@ -22,7 +22,7 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { isDatabaseDependencyProvider } from './types';
+import { collectInitDependencies } from './types';
 
 function convertDefault(def: ColumnDefault): string {
   if (def.kind === 'function') {
@@ -205,7 +205,9 @@ export function contractToSchemaIR(
     tables[tableName] = convertTable(tableName, tableDef, options?.expandNativeType);
   }
 
-  const dependencies = collectDependenciesFromComponents(options?.frameworkComponents);
+  const dependencies = deduplicateDependencyIRs(
+    collectInitDependencies(options?.frameworkComponents ?? []),
+  );
   const annotations = deriveAnnotations(storage);
 
   return {
@@ -215,21 +217,15 @@ export function contractToSchemaIR(
   };
 }
 
-function collectDependenciesFromComponents(
-  components?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
+function deduplicateDependencyIRs(
+  deps: readonly { readonly id: string }[],
 ): readonly DependencyIR[] {
-  if (!components || components.length === 0) return [];
   const seen = new Set<string>();
   const result: DependencyIR[] = [];
-  for (const component of components) {
-    if (!isDatabaseDependencyProvider(component)) continue;
-    const deps = component.databaseDependencies?.init;
-    if (!deps) continue;
-    for (const dep of deps) {
-      if (dep.id && !seen.has(dep.id)) {
-        seen.add(dep.id);
-        result.push({ id: dep.id });
-      }
+  for (const dep of deps) {
+    if (dep.id && !seen.has(dep.id)) {
+      seen.add(dep.id);
+      result.push({ id: dep.id });
     }
   }
   return result;

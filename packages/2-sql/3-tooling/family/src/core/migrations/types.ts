@@ -47,6 +47,19 @@ export function isDatabaseDependencyProvider(value: unknown): value is DatabaseD
   return typeof value === 'object' && value !== null && 'databaseDependencies' in value;
 }
 
+export function collectInitDependencies(
+  components: ReadonlyArray<unknown>,
+): readonly ComponentDatabaseDependency<unknown>[] {
+  const result: ComponentDatabaseDependency<unknown>[] = [];
+  for (const component of components) {
+    if (!isDatabaseDependencyProvider(component)) continue;
+    const deps = component.databaseDependencies?.init;
+    if (!deps) continue;
+    result.push(...deps);
+  }
+  return result;
+}
+
 export interface StorageTypePlanResult<TTargetDetails> {
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
 }

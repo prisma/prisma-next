@@ -16,6 +16,7 @@ import type {
   SqlPlannerConflict,
 } from '@prisma-next/family-sql/control';
 import {
+  collectInitDependencies,
   createMigrationPlan,
   extractCodecControlHooks,
   plannerFailure,
@@ -35,7 +36,7 @@ import type { PostgresColumnDefault } from '../types';
 import { buildReconciliationPlan } from './planner-reconciliation';
 
 export type OperationClass =
-  | 'extension'
+  | 'dependency'
   | 'type'
   | 'table'
   | 'column'
@@ -262,20 +263,9 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   private collectDependencies(
     options: PlannerOptionsWithComponents,
   ): ReadonlyArray<PlannerDatabaseDependency> {
-    const components = options.frameworkComponents;
-    if (components.length === 0) {
-      return [];
-    }
-    const deps: PlannerDatabaseDependency[] = [];
-    for (const component of components) {
-      if (!isSqlDependencyProvider(component)) {
-        continue;
-      }
-      const initDeps = component.databaseDependencies?.init;
-      if (initDeps && initDeps.length > 0) {
-        deps.push(...initDeps);
-      }
-    }
+    const deps = collectInitDependencies(
+      options.frameworkComponents,
+    ) as readonly PlannerDatabaseDependency[];
     return sortDependencies(deps);
   }
 
@@ -703,34 +693,9 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   }
 }
 
-function isSqlDependencyProvider(component: unknown): component is {
-  readonly databaseDependencies?: {
-    readonly init?: readonly PlannerDatabaseDependency[];
-  };
-} {
-  if (typeof component !== 'object' || component === null) {
-    return false;
-  }
-  const record = component as Record<string, unknown>;
-
-  // If present, enforce familyId match to avoid mixing families at runtime.
-  if (Object.hasOwn(record, 'familyId') && record['familyId'] !== 'sql') {
-    return false;
-  }
-
-  if (!Object.hasOwn(record, 'databaseDependencies')) {
-    return false;
-  }
-  const deps = record['databaseDependencies'];
-  return deps === undefined || (typeof deps === 'object' && deps !== null);
-}
-
 function sortDependencies(
   dependencies: ReadonlyArray<PlannerDatabaseDependency>,
 ): ReadonlyArray<PlannerDatabaseDependency> {
-  if (dependencies.length <= 1) {
-    return dependencies;
-  }
   return [...dependencies].sort((a, b) => a.id.localeCompare(b.id));
 }
 

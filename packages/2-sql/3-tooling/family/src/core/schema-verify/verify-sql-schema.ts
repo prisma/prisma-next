@@ -19,7 +19,11 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
-import type { CodecControlHooks, ComponentDatabaseDependency } from '../migrations/types';
+import {
+  type CodecControlHooks,
+  type ComponentDatabaseDependency,
+  collectInitDependencies,
+} from '../migrations/types';
 import {
   arraysEqual,
   computeCounts,
@@ -162,9 +166,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     });
   }
 
-  const databaseDependencies = collectDependenciesFromFrameworkComponents(
+  const databaseDependencies = collectInitDependencies(
     options.frameworkComponents,
-  );
+  ) as readonly ComponentDatabaseDependency<string>[];
   const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
   rootChildren.push(...dependencyStatuses);
 
@@ -878,45 +882,6 @@ function validateFrameworkComponentsForExtensions(
       );
     }
   }
-}
-
-/**
- * Type predicate to check if a component has database dependencies with an init array.
- * The familyId check is redundant since TargetBoundComponentDescriptor<'sql', T> already
- * guarantees familyId is 'sql' at the type level, so we don't need runtime checks for it.
- */
-function hasDatabaseDependenciesInit<T extends string>(
-  component: TargetBoundComponentDescriptor<'sql', T>,
-): component is TargetBoundComponentDescriptor<'sql', T> & {
-  readonly databaseDependencies: {
-    readonly init: readonly ComponentDatabaseDependency<T>[];
-  };
-} {
-  if (!('databaseDependencies' in component)) {
-    return false;
-  }
-  const dbDeps = (component as Record<string, unknown>)['databaseDependencies'];
-  if (dbDeps === undefined || dbDeps === null || typeof dbDeps !== 'object') {
-    return false;
-  }
-  const depsRecord = dbDeps as Record<string, unknown>;
-  const init = depsRecord['init'];
-  if (init === undefined || !Array.isArray(init)) {
-    return false;
-  }
-  return true;
-}
-
-function collectDependenciesFromFrameworkComponents<T extends string>(
-  components: ReadonlyArray<TargetBoundComponentDescriptor<'sql', T>>,
-): ReadonlyArray<ComponentDatabaseDependency<T>> {
-  const dependencies: ComponentDatabaseDependency<T>[] = [];
-  for (const component of components) {
-    if (hasDatabaseDependenciesInit(component)) {
-      dependencies.push(...component.databaseDependencies.init);
-    }
-  }
-  return dependencies;
 }
 
 /**

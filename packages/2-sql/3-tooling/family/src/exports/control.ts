@@ -64,5 +64,6 @@ export type {
   SqlPlannerSuccessResult,
   StorageTypePlanResult,
 } from '../core/migrations/types';
+export { collectInitDependencies, isDatabaseDependencyProvider } from '../core/migrations/types';
 
 export default new SqlFamilyDescriptor();
