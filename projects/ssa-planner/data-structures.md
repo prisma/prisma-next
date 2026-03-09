@@ -47,8 +47,8 @@ interface StartNode extends NodeBase {
   readonly kind: 'Start';
 }
 
-interface ReadNode extends NodeBase {
-  readonly kind: 'Read';
+/** Common query shape shared by ReadNode and SubqueryEntry. */
+interface ReadBase {
   readonly collection: string;          // table name
   readonly columns: readonly string[] | '*';  // selected columns ('*' = all)
   readonly filters: readonly WhereExpr[];
@@ -56,15 +56,19 @@ interface ReadNode extends NodeBase {
   readonly limit: number | undefined;
   readonly offset: number | undefined;
   readonly distinctMode: DistinctMode | undefined;
+  // Recursive: collapsed child queries folded into this read.
+  // Set by subquery collapse optimization pass.
+  // The SQL dialect determines the mechanism (LATERAL JOIN on Postgres, correlated subquery elsewhere).
+  readonly subqueries: readonly SubqueryEntry[] | undefined;
+}
+
+interface ReadNode extends NodeBase, ReadBase {
+  readonly kind: 'Read';
   // GroupedCollection support (spec §21)
   readonly groupBy: readonly string[] | undefined;
   readonly having: readonly WhereExpr[] | undefined;
+
   readonly aggregateSelections: readonly AggregateSelection[] | undefined;
-  // Set by subquery collapse optimization pass.
-  // Array: each entry represents one collapsed include (e.g., include('posts').include('profile')
-  // collapses into two correlated subqueries on the same parent Read).
-  // The SQL dialect determines the mechanism (LATERAL JOIN on Postgres, correlated subquery elsewhere).
-  readonly subqueries: readonly SubqueryEntry[] | undefined;
 }
 
 /** Distinct and distinctOn are mutually exclusive. */
@@ -80,26 +84,18 @@ interface AggregateSelection {
 
 /** Explicit discriminant — no overloading undefined for count(*). */
 type AggregateTarget =
-  | { readonly kind: 'allRows' }   // count(*)
+  | { readonly kind: 'countAllRows' }   // count(*)
   | { readonly kind: 'column'; readonly name: string };  // sum(views), avg(price), etc.
 
 /** One collapsed child query folded into the parent Read. Carries both the subquery config and the Nest metadata. */
-interface SubqueryEntry {
+interface SubqueryEntry extends ReadBase {
   // Nest metadata (preserved from the eliminated Nest node)
   readonly field: string;               // target property name on parent
   readonly arity: 'array' | 'scalar';
   readonly leftKeys: readonly string[];
   readonly rightKeys: readonly string[];
-  // Subquery config (from the eliminated child Read/Aggregate)
+  // Subquery execution mode
   readonly subquery: 'jsonAgg' | 'scalar';
-  readonly collection: string;
-  readonly columns: readonly string[] | '*';
-  readonly filters: readonly WhereExpr[];
-  readonly orderBy: readonly OrderExpr[] | undefined;
-  readonly limit: number | undefined;
-  // Recursive: if the collapsed child Read itself had subqueries, they nest here.
-  // e.g., include('posts', p => p.include('comments')) → posts subquery carries comments subquery.
-  readonly subqueries: readonly SubqueryEntry[] | undefined;
 }
 
 interface CreateNode extends NodeBase {
@@ -159,7 +155,7 @@ interface CombineNode extends NodeBase {
 interface CollectionStateNode extends NodeBase {
   readonly kind: 'CollectionState';
   readonly collection: string;
-  readonly counter: number;
+  readonly version: number;
 }
 
 type PlanNode =
@@ -344,7 +340,7 @@ interface CollectionStateTracker {
 ```
 
 This is used by the graph builder during construction. On `advance`, it:
-1. Creates a new `CollectionStateNode` with `counter + 1`
+1. Creates a new `CollectionStateNode` with `version + 1`
 2. Adds a `Dependency` edge from the new state to the write node
 3. Updates its internal `Map<string, NodeId>` to point to the new state
 
@@ -483,7 +479,7 @@ function lateralJoinCollapse(graph: QueryPlanGraph, contract: SqlContract<SqlSto
     };
     const updatedLeft: ReadNode = {
       ...leftInput,
-      laterals: [...(leftInput.kind === 'Read' ? leftInput.subqueries ?? [] : []), entry],
+      subqueries: [...(leftInput.kind === 'Read' ? leftInput.subqueries ?? [] : []), entry],
     };
     graph.nodes.set(leftInput.id, updatedLeft);
 
