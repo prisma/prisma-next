@@ -172,9 +172,6 @@ async function executeMigrationPlanCommand(
   try {
     const allPackages = await readMigrationsDir(migrationsDir);
     const packages = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
-    const graph = reconstructGraph(packages);
-    const latestMigration = findLatestMigration(graph);
-    const leafHash = latestMigration ? latestMigration.to : EMPTY_CONTRACT_HASH;
 
     if (options.from) {
       fromHash = options.from;
@@ -188,11 +185,17 @@ async function executeMigrationPlanCommand(
         );
       }
       fromContract = sourcePkg.manifest.toContract;
-    } else if (leafHash !== EMPTY_CONTRACT_HASH && latestMigration) {
-      fromHash = leafHash;
-      const leafPkg = packages.find((p) => p.manifest.migrationId === latestMigration.migrationId);
-      if (leafPkg) {
-        fromContract = leafPkg.manifest.toContract;
+    } else {
+      const graph = reconstructGraph(packages);
+      const latestMigration = findLatestMigration(graph);
+      if (latestMigration) {
+        fromHash = latestMigration.to;
+        const leafPkg = packages.find(
+          (p) => p.manifest.migrationId === latestMigration.migrationId,
+        );
+        if (leafPkg) {
+          fromContract = leafPkg.manifest.toContract;
+        }
       }
     }
   } catch (error) {
