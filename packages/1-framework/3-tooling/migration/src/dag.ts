@@ -1,4 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { errorAmbiguousLeaf, errorDuplicateMigrationId, errorSelfLoop } from './errors';
 import type { MigrationChainEntry, MigrationGraph, MigrationPackage } from './types';
 
@@ -135,7 +136,6 @@ export interface PathDecision {
   readonly alternativeCount: number;
   readonly tieBreakReasons: readonly string[];
   readonly refName?: string;
-  readonly refHash?: string;
 }
 
 /**
@@ -146,7 +146,7 @@ export function findPathWithDecision(
   graph: MigrationGraph,
   fromHash: string,
   toHash: string,
-  ref?: { name: string; hash: string },
+  refName?: string,
 ): PathDecision | null {
   if (fromHash === toHash) {
     return {
@@ -155,7 +155,7 @@ export function findPathWithDecision(
       toHash,
       alternativeCount: 0,
       tieBreakReasons: [],
-      ...(ref ? { refName: ref.name, refHash: ref.hash } : {}),
+      ...ifDefined('refName', refName),
     };
   }
 
@@ -192,7 +192,7 @@ export function findPathWithDecision(
     toHash,
     alternativeCount,
     tieBreakReasons,
-    ...(ref ? { refName: ref.name, refHash: ref.hash } : {}),
+    ...ifDefined('refName', refName),
   };
 }
 

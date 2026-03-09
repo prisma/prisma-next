@@ -5,6 +5,7 @@ import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type { MigrationGraph, MigrationPackage } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -58,7 +59,6 @@ export interface MigrationApplyResult {
     readonly alternativeCount: number;
     readonly tieBreakReasons: readonly string[];
     readonly refName?: string;
-    readonly refHash?: string;
   };
   readonly timings: {
     readonly total: number;
@@ -326,12 +326,7 @@ async function executeMigrationApplyCommand(
       );
     }
 
-    const decision = findPathWithDecision(
-      graph,
-      markerHash,
-      destinationHash,
-      refName ? { name: refName, hash: destinationHash } : undefined,
-    );
+    const decision = findPathWithDecision(graph, markerHash, destinationHash, refName);
     if (!decision) {
       return notOk(
         errorRuntime('No migration path from current state to target', {
@@ -348,8 +343,7 @@ async function executeMigrationApplyCommand(
       toHash: decision.toHash,
       alternativeCount: decision.alternativeCount,
       tieBreakReasons: decision.tieBreakReasons,
-      ...(decision.refName ? { refName: decision.refName } : {}),
-      ...(decision.refHash ? { refHash: decision.refHash } : {}),
+      ...ifDefined('refName', decision.refName),
     };
 
     if (pendingPath.length === 0) {

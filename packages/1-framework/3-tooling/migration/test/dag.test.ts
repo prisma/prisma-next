@@ -344,10 +344,9 @@ describe('findPathWithDecision', () => {
   it('includes ref metadata when provided', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    const decision = findPathWithDecision(graph, 'H1', 'H2', { name: 'production', hash: 'H2' });
+    const decision = findPathWithDecision(graph, 'H1', 'H2', 'production');
     expect(decision).not.toBeNull();
     expect(decision!.refName).toBe('production');
-    expect(decision!.refHash).toBe('H2');
   });
 
   it('omits ref metadata when not provided', () => {
@@ -356,7 +355,6 @@ describe('findPathWithDecision', () => {
     const decision = findPathWithDecision(graph, 'H1', 'H2');
     expect(decision).not.toBeNull();
     expect(decision!.refName).toBeUndefined();
-    expect(decision!.refHash).toBeUndefined();
   });
 
   it('reports alternative count for converging paths', () => {
@@ -376,13 +374,12 @@ describe('findPathWithDecision', () => {
   it('output shape matches expected keys', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    const decision = findPathWithDecision(graph, E, 'H2', { name: 'staging', hash: 'H2' });
+    const decision = findPathWithDecision(graph, E, 'H2', 'staging');
     expect(decision).not.toBeNull();
     expect(Object.keys(decision!).sort()).toMatchInlineSnapshot(`
       [
         "alternativeCount",
         "fromHash",
-        "refHash",
         "refName",
         "selectedPath",
         "tieBreakReasons",

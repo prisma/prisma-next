@@ -15,6 +15,7 @@ import type {
   MigrationPackage,
 } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -74,7 +75,6 @@ export interface MigrationStatusResult {
     readonly alternativeCount: number;
     readonly tieBreakReasons: readonly string[];
     readonly refName?: string;
-    readonly refHash?: string;
   };
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
@@ -431,20 +431,14 @@ async function executeMigrationStatusCommand(
   let pathDecision: MigrationStatusResult['pathDecision'];
   if (mode === 'online' && markerHash !== undefined) {
     const target = refHash ?? leafHash;
-    const decision = findPathWithDecision(
-      graph,
-      markerHash,
-      target,
-      refName && refHash ? { name: refName, hash: refHash } : undefined,
-    );
+    const decision = findPathWithDecision(graph, markerHash, target, refName);
     if (decision) {
       pathDecision = {
         fromHash: decision.fromHash,
         toHash: decision.toHash,
         alternativeCount: decision.alternativeCount,
         tieBreakReasons: decision.tieBreakReasons,
-        ...(decision.refName ? { refName: decision.refName } : {}),
-        ...(decision.refHash ? { refHash: decision.refHash } : {}),
+        ...ifDefined('refName', decision.refName),
       };
     }
   }
