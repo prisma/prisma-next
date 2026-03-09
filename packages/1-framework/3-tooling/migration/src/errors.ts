@@ -124,6 +124,26 @@ export function errorInvalidRefName(refName: string): MigrationToolsError {
   });
 }
 
+export function errorNoResolvableLeaf(reachableNodes: readonly string[]): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.NO_RESOLVABLE_LEAF',
+    'Migration graph has no resolvable leaf',
+    {
+      why: `The migration graph contains cycles and no node has zero outgoing edges (reachable nodes: ${reachableNodes.join(', ')}). This typically happens after rollback migrations (e.g., C1→C2→C1).`,
+      fix: 'Use --from <hash> to specify the planning origin explicitly.',
+      details: { reachableNodes },
+    },
+  );
+}
+
+export function errorInvalidRefValue(value: string): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.INVALID_REF_VALUE', 'Invalid ref value', {
+    why: `Ref value "${value}" is not a valid contract hash. Values must be in the format "sha256:<64 hex chars>" or "sha256:empty".`,
+    fix: 'Use a valid storage hash from `prisma-next contract emit` output or an existing migration.',
+    details: { value },
+  });
+}
+
 export function errorDuplicateMigrationId(migrationId: string): MigrationToolsError {
   return new MigrationToolsError(
     'MIGRATION.DUPLICATE_MIGRATION_ID',

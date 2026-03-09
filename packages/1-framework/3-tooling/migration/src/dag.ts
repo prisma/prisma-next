@@ -1,6 +1,11 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { errorAmbiguousLeaf, errorDuplicateMigrationId, errorSelfLoop } from './errors';
+import {
+  errorAmbiguousLeaf,
+  errorDuplicateMigrationId,
+  errorNoResolvableLeaf,
+  errorSelfLoop,
+} from './errors';
 import type { MigrationChainEntry, MigrationGraph, MigrationPackage } from './types';
 
 export function reconstructGraph(packages: readonly MigrationPackage[]): MigrationGraph {
@@ -238,6 +243,10 @@ export function findLeaf(graph: MigrationGraph): string {
   const leaves = findReachableLeaves(graph, EMPTY_CONTRACT_HASH);
 
   if (leaves.length === 0) {
+    const reachable = [...graph.nodes].filter((n) => n !== EMPTY_CONTRACT_HASH);
+    if (reachable.length > 0) {
+      throw errorNoResolvableLeaf(reachable);
+    }
     return EMPTY_CONTRACT_HASH;
   }
 

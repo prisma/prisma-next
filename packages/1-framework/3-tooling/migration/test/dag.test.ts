@@ -124,25 +124,19 @@ describe('findLeaf', () => {
     expect(findLeaf(graph)).toBe('H3');
   });
 
-  it('handles revisited contract hashes (A→B→A) — leaf is the node with no outgoing edges', () => {
+  it('throws NO_RESOLVABLE_LEAF on cycle-without-exit (A→B→A)', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2'], ['H2', 'H1', 'm3']);
     const graph = reconstructGraph(packages);
-    // H1 has an outgoing edge to H2, H2 has an outgoing edge to H1.
-    // E has an outgoing edge to H1. All nodes have outgoing edges,
-    // so no leaf exists from E's perspective (it's a cycle). E itself
-    // is the only node with no outgoing edges beyond H1, but H1/H2 form a cycle.
-    // With cycle tolerance, BFS from E reaches H1 then H2 then back to H1 (already visited).
-    // H2 has outgoing edge to H1 (visited), so H2 appears to have no unvisited neighbors,
-    // but it does have an outgoing edge. The leaf detection checks whether a node has ANY
-    // outgoing edges in the graph, not just unvisited ones.
-    // E → H1 → H2 → H1: H1 has outgoing [H2], H2 has outgoing [H1], so neither is a leaf.
-    // This means the graph has no leaves reachable from E — which yields EMPTY_CONTRACT_HASH.
-    // But wait: the graph also has E → H1. E's outgoing is [H1]. So E is not a leaf either.
-    // Actually: We're looking at ALL nodes reachable from EMPTY_CONTRACT_HASH. The "leaves"
-    // are nodes with no outgoing edges in the forward chain. Here every reachable node has outgoing
-    // edges, so findReachableLeaves returns []. findLeaf returns EMPTY_CONTRACT_HASH.
-    // This is correct: a cycle with no exit means there's no definitive "latest" state.
-    expect(findLeaf(graph)).toBe(E);
+    try {
+      findLeaf(graph);
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      const mte = e as MigrationToolsError;
+      expect(mte.code).toBe('MIGRATION.NO_RESOLVABLE_LEAF');
+      expect(mte.fix).toContain('--from');
+      expect(mte.details).toHaveProperty('reachableNodes');
+    }
   });
 
   it('handles cycle with an exit node', () => {
