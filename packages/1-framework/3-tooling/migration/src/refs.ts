@@ -1,11 +1,17 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { type } from 'arktype';
 import { dirname, join } from 'pathe';
-import { errorInvalidRefName, errorInvalidRefs, MigrationToolsError } from './errors';
+import {
+  errorInvalidRefName,
+  errorInvalidRefs,
+  errorInvalidRefValue,
+  MigrationToolsError,
+} from './errors';
 
 export type Refs = Readonly<Record<string, string>>;
 
 const REF_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\/[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
+const REF_VALUE_PATTERN = /^sha256:(empty|[0-9a-f]{64})$/;
 
 export function validateRefName(name: string): boolean {
   if (name.length === 0) return false;
@@ -15,9 +21,15 @@ export function validateRefName(name: string): boolean {
   return REF_NAME_PATTERN.test(name);
 }
 
+export function validateRefValue(value: string): boolean {
+  return REF_VALUE_PATTERN.test(value);
+}
+
 const RefsSchema = type('Record<string, string>').narrow((refs, ctx) => {
-  for (const key of Object.keys(refs)) {
+  for (const [key, value] of Object.entries(refs)) {
     if (!validateRefName(key)) return ctx.mustBe(`valid ref names (invalid: "${key}")`);
+    if (!validateRefValue(value))
+      return ctx.mustBe(`valid contract hashes (invalid value for "${key}": "${value}")`);
   }
   return true;
 });
@@ -49,9 +61,12 @@ export async function readRefs(refsPath: string): Promise<Refs> {
 }
 
 export async function writeRefs(refsPath: string, refs: Refs): Promise<void> {
-  for (const key of Object.keys(refs)) {
+  for (const [key, value] of Object.entries(refs)) {
     if (!validateRefName(key)) {
       throw errorInvalidRefName(key);
+    }
+    if (!validateRefValue(value)) {
+      throw errorInvalidRefValue(value);
     }
   }
 
@@ -61,7 +76,7 @@ export async function writeRefs(refsPath: string, refs: Refs): Promise<void> {
   await mkdir(dir, { recursive: true });
 
   const tmpPath = join(dir, `.refs.json.${Date.now()}.tmp`);
-  await writeFile(tmpPath, JSON.stringify(sorted, null, 2) + '\n');
+  await writeFile(tmpPath, `${JSON.stringify(sorted, null, 2)}\n`);
   await rename(tmpPath, refsPath);
 }
 
@@ -77,6 +92,10 @@ export function resolveRef(refs: Refs, name: string): string {
       fix: `Available refs: ${Object.keys(refs).join(', ') || '(none)'}. Create a ref with: set the "${name}" key in migrations/refs.json.`,
       details: { refName: name, availableRefs: Object.keys(refs) },
     });
+  }
+
+  if (!validateRefValue(hash)) {
+    throw errorInvalidRefValue(hash);
   }
 
   return hash;
