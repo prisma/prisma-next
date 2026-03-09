@@ -519,11 +519,50 @@ CollectionState("posts", 0) is now orphaned — DCE removes it in a later pass.
 
 ## Execution
 
-### Result Map
+### Result Types
 
 ```typescript
-type ResultSet = readonly Record<string, unknown>[];
-type ResultMap = Map<NodeId, ResultSet>;
+type Row = Record<string, unknown>;
+
+/**
+ * Wraps a node's output, providing uniform access regardless of whether
+ * the result is still streaming or has been materialized.
+ *
+ * Starts in streaming state. On first call to `materialize()`, collects
+ * the iterator into an array and transitions to materialized state.
+ * Subsequent calls to `materialize()` return the cached array.
+ */
+interface NodeResult {
+  /**
+   * Async-iterate over the rows. If already materialized, yields from the array.
+   * Can only be called once when in streaming state (consuming the iterator).
+   */
+  [Symbol.asyncIterator](): AsyncIterableIterator<Row>;
+
+  /**
+   * Collect all rows into an array (if not already done) and return them.
+   * Transitions the result from streaming to materialized state.
+   * Idempotent — subsequent calls return the same cached array.
+   */
+  materialize(): Promise<readonly Row[]>;
+
+  /** True if `materialize()` has already been called and the rows are buffered. */
+  readonly isMaterialized: boolean;
+}
+
+/** Create a NodeResult from an async iterator (streaming). */
+function createStreamingResult(iter: AsyncIterableIterator<Row>): NodeResult;
+
+/** Create a NodeResult from an already-materialized array. */
+function createMaterializedResult(rows: readonly Row[]): NodeResult;
+
+/**
+ * Holds executed node outputs. Each entry is a `NodeResult` — the executor
+ * reads via `[Symbol.asyncIterator]()` for streaming consumers (Nest left parent)
+ * and via `materialize()` for buffered consumers (FilterData, PayloadData,
+ * Nest right child, Combine branches, multiple consumers).
+ */
+type ResultMap = Map<NodeId, NodeResult>;
 ```
 
 ### Executor
@@ -534,18 +573,20 @@ interface PlanExecutor {
     graph: QueryPlanGraph,
     scope: RuntimeScope,
     contract: SqlContract<SqlStorage>,
-  ): Promise<ResultSet>;
+  ): AsyncIterableIterator<Row>;
 }
 ```
 
 The executor:
 1. Topologically sorts the graph
 2. Iterates nodes in dependency order
-3. For each node, reads dependency results from `ResultMap`
-4. **Short-circuits** on empty FilterData parents (produces `[]`)
+3. For each node, reads dependency `NodeResult`s from `ResultMap`
+   - Calls `result.materialize()` when the consuming edge requires buffered access: FilterData, PayloadData, Nest right child (NestChild edge), Combine branches (BranchData edge), or when the dependency has multiple consumers
+   - Iterates via `result[Symbol.asyncIterator]()` when the dependency feeds only into Nest as left parent (NestParent edge) with no other consumers
+4. **Short-circuits** on empty materialized FilterData parents (produces an empty `NodeResult`)
 5. Executes the node (SQL for Read/Create/Update/Delete/Aggregate, in-memory for Nest/Combine)
-6. Stores result in `ResultMap`
-7. Returns `ResultMap.get(returnId)`
+6. Stores result in `ResultMap` as a `NodeResult` (via `createStreamingResult` or `createMaterializedResult`)
+7. Returns the `NodeResult` from `ResultMap.get(returnId)` — the caller iterates it directly
 
 ### Transaction Heuristic
 

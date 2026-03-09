@@ -27,7 +27,7 @@ Nodes represent operations. Directed edges `A --> B` mean "A depends on B". Edge
 
 #### Node Types
 
-All nodes produce arrays as output.
+All nodes produce `AsyncIterableIterator<Row>` as output. The executor **materializes** (collects into an array) a node's output only when required — see Execution Model for materialization rules.
 
 | Node | Description |
 |------|-------------|
@@ -587,11 +587,21 @@ After optimization, the graph is executed as follows:
 
 1. **Scheduling**: Nodes are topologically sorted by their dependency edges and executed sequentially, one at a time, in dependency order. The graph is acyclic by construction.
 
-2. **Data flow**: A `Map<NodeId, ResultSet>` holds the output of each executed node. When a node executes, it reads its dependencies' results from this map. Each node writes its own result to the map upon completion.
+2. **Data flow**: All nodes produce `AsyncIterableIterator<Row>` as output. A `ResultMap` holds the output of each executed node. When a node executes, it reads its dependencies' results from this map. Each node writes its own result to the map upon completion.
 
-3. **Empty parent short-circuit**: When a Read node returns zero rows, any downstream node connected via a FilterData edge skips execution and produces an empty result set. This avoids issuing queries with empty `WHERE ... IN ()` clauses.
+3. **Materialization**: The executor **materializes** (collects an async iterator into an array) a node's output when any downstream consumer requires buffered access:
+   - **FilterData / PayloadData targets**: The consumer must collect the parent's rows to extract column values for `WHERE ... IN (...)` or payload injection. The parent's output is materialized.
+   - **Nest right (child) input**: Nest buffers the right side into a key-indexed `Map<KeyTuple, Row[]>` for per-parent lookup. The right child's output is materialized.
+   - **Combine branch inputs**: Combine must group all branch results by `rightKeys`. All branch outputs are materialized.
+   - **Multiple consumers**: If more than one downstream node reads from the same source, the source is materialized (an iterator can only be consumed once).
 
-4. **Combine execution**: Combine merges N named branch results (connected via BranchData edges) into one row per unique `rightKeys` value:
+   Nodes whose output feeds **only** into Nest as the left (parent) input — and has no other consumers — **stream**: Nest iterates over the left side lazily, yielding assembled rows one at a time.
+
+   In practice, most intermediate nodes are materialized (reads that feed both FilterData and NestParent, writes that feed PayloadData). The streaming path matters most for the **outermost parent Read → Nest → Return** chain, where large result sets avoid full buffering.
+
+4. **Empty parent short-circuit**: When a node's materialized output is an empty array, any downstream node connected via a FilterData edge skips execution and produces an empty iterator. This avoids issuing queries with empty `WHERE ... IN ()` clauses.
+
+5. **Combine execution**: Combine materializes all N branch results (connected via BranchData edges), then yields one row per unique `rightKeys` value as an `AsyncIterableIterator`:
    1. **Group**: For each branch, group its result rows by the `rightKeys` columns, producing `Map<KeyTuple, Row[]>` per branch. This is necessary because `rows` branches can have multiple rows per key (e.g., multiple popular posts for one user).
    2. **Union keys**: Collect the set of all unique `rightKeys` tuples across all branches. This is necessary because different branches may have different filters, producing different key sets (e.g., branch A with `views > 150` has keys `{1, 2}` while branch B with `views > 1000` has only `{2}`).
    3. **Assemble**: For each unique key tuple, produce one output row containing:
@@ -607,7 +617,9 @@ After optimization, the graph is executed as follows:
    - After Union keys: `{1, 2}`
    - After Assemble: `[{userId: 1, popular: [{id: 10, views: 200}, {id: 11, views: 300}], totalCount: 2}, {userId: 2, popular: [{id: 12, views: 500}], totalCount: 2}]`
 
-4. **Sequential execution**: Independent branches (e.g., sibling includes) execute sequentially.
+6. **Nest execution**: Nest materializes the right (child) input into a `Map<KeyTuple, Row[]>` index, then **streams** over the left (parent) input. For each parent row, it looks up matching children by key and yields the assembled row with the nested field attached. This means Nest produces an `AsyncIterableIterator` without buffering the parent side.
+
+7. **Sequential execution**: Independent branches (e.g., sibling includes) execute sequentially.
 
 ### Transaction Heuristic
 
@@ -707,9 +719,9 @@ No new attack surface. SQL generation still goes through parameterized queries v
 9. **Cross-collection write state**: Only the directly written collection advances its counter. Reading collection B to filter a write to collection A does not advance B's state.
 10. **Aggregate + lateral**: Separate pass (Lateral Aggregate Collapse) — different graph topology (Aggregate with FilterData → Nest vs Read with FilterData → Nest), different SQL generation (scalar aggregation vs `json_agg`), and the Aggregate's `groupBy` is dropped since lateral correlation provides implicit per-parent scoping. Requires only `lateral` capability (not `jsonAgg`).
 11. **Optimization pass ordering**: Determined empirically during implementation
-12. **Execution scheduling**: Topological sort, sequential execution, `Map<NodeId, ResultSet>` for data flow
+12. **Execution scheduling**: Topological sort, sequential execution, `ResultMap` (`Map<NodeId, MaterializedRows | NodeOutput>`) for data flow with lazy materialization
 13. **Empty parent handling**: Skip execution (short-circuit with empty results) when parent Read returns zero rows
-14. **Node output arity**: All nodes produce arrays. Nest is arity-aware and unwraps scalars (e.g., Aggregate results)
+14. **Node output arity**: All nodes produce `AsyncIterableIterator<Row>`. The executor materializes a node's output only when a downstream consumer requires buffered access (FilterData/PayloadData targets, Nest right child, Combine branches, multiple consumers). Nest is arity-aware and unwraps scalars (e.g., Aggregate results)
 15. **Multi-level nesting**: Recursive subgraph — inner Read has FilterData from outer Read, Nest nodes chain from inner to outer
 16. **RETURNING collapse — three separate passes**: (a) **Create RETURNING**: matches Create → CollectionState → Read where Read has FilterData on PK from Create. (b) **Update RETURNING**: matches Read(A) → Update (FilterData from A) → CollectionState → Read(B) (FilterData from A); eliminates both Reads. (c) **Delete RETURNING**: matches Read → Delete (FilterData from Read on PK) where both share CollectionState input. In all three, edges to eliminated Reads are rewritten to point to the Write-with-RETURNING node
 17. **Read deduplication mechanics**: Structural equality of filter ASTs, edge rewriting to surviving Read, column set union
