@@ -65,7 +65,7 @@ export interface MigrationStatusResult {
   readonly mode: 'online' | 'offline';
   readonly migrations: readonly MigrationStatusEntry[];
   readonly markerHash?: string;
-  readonly leafHash: string;
+  readonly targetHash: string;
   readonly contractHash: string;
   readonly refName?: string;
   readonly refHash?: string;
@@ -286,7 +286,7 @@ async function executeMigrationStatusCommand(
       ok: true,
       mode: dbConnection && hasDriver ? 'online' : 'offline',
       migrations: [],
-      leafHash: EMPTY_CONTRACT_HASH,
+      targetHash: EMPTY_CONTRACT_HASH,
       contractHash,
       summary: 'No migrations found',
       diagnostics,
@@ -294,10 +294,10 @@ async function executeMigrationStatusCommand(
   }
 
   let graph: MigrationGraph;
-  let leafHash: string;
+  let targetHash: string;
   try {
     graph = reconstructGraph(attested);
-    leafHash = findLeaf(graph);
+    targetHash = refHash ?? findLeaf(graph);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -307,11 +307,11 @@ async function executeMigrationStatusCommand(
     throw error;
   }
 
-  const chain = findPath(graph, EMPTY_CONTRACT_HASH, leafHash);
+  const chain = findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
   if (!chain) {
     return notOk(
       errorRuntime('Cannot reconstruct migration chain', {
-        why: `No path from ${EMPTY_CONTRACT_HASH} to leaf ${leafHash}`,
+        why: `No path from ${EMPTY_CONTRACT_HASH} to target ${targetHash}`,
         fix: 'The migration history may have gaps. Check the migrations directory for missing or corrupted packages.',
       }),
     );
@@ -390,7 +390,7 @@ async function executeMigrationStatusCommand(
     summary = `${entries.length} migration(s) on disk`;
   }
 
-  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== leafHash) {
+  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== targetHash) {
     diagnostics.push({
       code: 'CONTRACT.AHEAD',
       severity: 'warn',
@@ -430,8 +430,7 @@ async function executeMigrationStatusCommand(
 
   let pathDecision: MigrationStatusResult['pathDecision'];
   if (mode === 'online' && markerHash !== undefined) {
-    const target = refHash ?? leafHash;
-    const decision = findPathWithDecision(graph, markerHash, target, refName);
+    const decision = findPathWithDecision(graph, markerHash, targetHash, refName);
     if (decision) {
       pathDecision = {
         fromHash: decision.fromHash,
@@ -447,7 +446,7 @@ async function executeMigrationStatusCommand(
     ok: true,
     mode,
     migrations: entries,
-    leafHash,
+    targetHash,
     contractHash,
     summary,
     diagnostics,
