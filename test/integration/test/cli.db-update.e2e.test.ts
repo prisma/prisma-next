@@ -435,6 +435,14 @@ withTempDir(({ createTempDir }) => {
           expect(exitCode).not.toBe(0);
           const allOutput = [...consoleOutput, ...consoleErrors].join('\n');
           expect(allOutput).toMatch(/destructive/i);
+
+          // Verify the confirmation gate actually blocked the update — drift column must still exist
+          await withClient(connectionString, async (client) => {
+            const result = await client.query(
+              `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'project' AND column_name = 'legacy_notes'`,
+            );
+            expect(result.rows).toHaveLength(1);
+          });
         });
       },
       timeouts.spinUpPpgDev,
