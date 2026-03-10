@@ -6,15 +6,10 @@ import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
+import type { Equal, Expect } from '@prisma-next/test-utils/typed-expectations';
 import { test } from 'vitest';
 import type { Contract } from '../prisma/contract.d';
 import contractJson from '../prisma/contract.json' with { type: 'json' };
-
-// Manual type assertions: expectTypeOf produces false positives with branded types
-// like Vector<1536> and Char<36> because it erases the brand during comparison.
-type Equal<A, B> =
-  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
-type Expect<T extends true> = T;
 
 /**
  * Type test to verify that ResultType correctly infers the distance column as number
