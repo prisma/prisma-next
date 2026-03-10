@@ -709,7 +709,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const dependencyNodes: readonly SchemaTreeNode[] = schema.dependencies.map((dep) => {
         const shortName = dep.id.split('.').pop() ?? dep.id;
         return {
-          kind: 'extension',
+          kind: 'dependency',
           id: `dependency-${dep.id}`,
           label: `${shortName} extension is enabled`,
         };

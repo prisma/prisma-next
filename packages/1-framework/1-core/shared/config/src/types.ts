@@ -21,7 +21,7 @@ export type SchemaNodeKind =
   | 'entity'
   | 'field'
   | 'index'
-  | 'extension';
+  | 'dependency';
 
 export interface SchemaTreeNode {
   readonly kind: SchemaNodeKind;

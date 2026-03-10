@@ -84,8 +84,8 @@ wmadden argues the PR shifts dependency detection from component-owned to adapte
   `contract as SqlContract<SqlStorage> | null` cast is safe but not statically enforced.
   **Analysis:** The cast is correct by design. The adapter is the boundary where framework-level `ContractIR` meets family-level `SqlContract`. Making this statically enforced would require making `TargetMigrationsCapability` generic over the contract type, which cascades into many interfaces. Not worth the complexity.
 
-- [ ] **11. `SchemaNodeKind` still uses `'extension'` instead of `'dependency'`**
-  Could be renamed together with `extension_missing` in a follow-up.
+- [x] **11. `SchemaNodeKind` still uses `'extension'` instead of `'dependency'`**
+  **Resolved:** Renamed schema-view node kind from `'extension'` to `'dependency'` in shared/core schema-view types, SQL family `toSchemaView` dependency nodes, and CLI schema-tree rendering.
 
 - [ ] **12. No runtime validation of dependency ID format**
   `DependencyIR = { readonly id: string }` has no validation that IDs follow the `target.type.name` convention. A structural validator could prevent subtle bugs (e.g., ID typo causing the planner to always re-emit an install op).

@@ -367,7 +367,7 @@ function renderSchemaTree(
         }
         break;
       }
-      case 'extension': {
+      case 'dependency': {
         // Parse extension message formats similar to schema-verify
         // "extensionName extension is enabled" -> cyan extensionName, dim rest
         const extMatch = node.label.match(/^([^\s]+)\s+(extension is enabled)$/);
