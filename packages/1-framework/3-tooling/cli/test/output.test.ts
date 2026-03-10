@@ -110,16 +110,15 @@ describe('formatIntrospectOutput', () => {
     const output = formatIntrospectOutput(result, schemaView, flags);
     const lines = output.split('\n').map(stripAnsi);
 
-    // Root should be first line
-    expect(lines[0]).toContain('sql schema (tables: 2)');
-    // First entity should have tree character
-    const userLine = lines.find((line) => line.includes('table user'));
-    expect(userLine).toBeDefined();
-    expect(userLine).toMatch(/[├└].*table user/);
-    // Fields should be indented
-    const idFieldLine = lines.find((line) => line.includes('id: pg/int4@1'));
-    expect(idFieldLine).toBeDefined();
-    expect(idFieldLine).toMatch(/[├└].*id: pg\/int4@1/);
+    // Exact tree structure: prefix is accumulated so depth-2 nodes
+    // get the ancestor continuation guide (│) from depth 1.
+    expect(lines[0]).toBe('sql schema (tables: 2)');
+    expect(lines[1]).toBe('├─ table user');
+    expect(lines[2]).toBe('│  ├─ id: pg/int4@1 (not null)');
+    expect(lines[3]).toBe('│  ├─ email: pg/text@1 (not null)');
+    expect(lines[4]).toBe('│  └─ index user_email_unique');
+    expect(lines[5]).toBe('└─ table post');
+    expect(lines[6]).toBe('   └─ id: pg/int4@1 (not null)');
   });
 
   it('renders root with no children', () => {

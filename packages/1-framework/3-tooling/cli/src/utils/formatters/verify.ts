@@ -7,7 +7,6 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import { bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
-import stripAnsi from 'strip-ansi';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
@@ -190,34 +189,18 @@ function renderSchemaTree(
     }
   }
 
-  // Root node renders without tree characters or | prefix
+  // Root node renders without tree characters or prefix
   if (isRoot) {
     lines.push(formattedLabel);
   } else {
-    // Determine tree character for this node
     const treeChar = isLast ? '└' : '├';
     const treePrefix = `${formatDimText(treeChar)}─ `;
-    // Root's direct children don't have | prefix, other nodes do
-    // But if prefix already contains | (for nested children), don't add another
-    const isRootChild = prefix === '';
-    // Check if prefix already contains | (strip ANSI codes for comparison)
-    const prefixWithoutAnsi = stripAnsi(prefix);
-    const prefixHasVerticalBar = prefixWithoutAnsi.includes('│');
-    if (isRootChild) {
-      lines.push(`${treePrefix}${formattedLabel}`);
-    } else if (prefixHasVerticalBar) {
-      // Prefix already has |, so just use treePrefix directly
-      lines.push(`${treePrefix}${formattedLabel}`);
-    } else {
-      lines.push(`${formatDimText('│')} ${treePrefix}${formattedLabel}`);
-    }
+    lines.push(`${prefix}${treePrefix}${formattedLabel}`);
   }
 
   // Render children if present
   if (node.children && node.children.length > 0) {
-    // For root node, children start with no prefix (they'll add their own tree characters)
-    // For other nodes, calculate child prefix based on whether this is last
-    const childPrefix = isRoot ? '' : isLast ? '   ' : `${formatDimText('│')}  `;
+    const childPrefix = isRoot ? '' : `${prefix}${isLast ? '   ' : `${formatDimText('│')}  `}`;
     for (let i = 0; i < node.children.length; i++) {
       const child = node.children[i];
       if (!child) continue;
@@ -453,32 +436,18 @@ function renderSchemaVerificationTree(
   }
 
   // Root node renders without tree characters or | prefix
+  // Root node renders without tree characters or prefix
   if (isRoot) {
     lines.push(`${statusGlyphColored} ${nodeLabel}`);
   } else {
-    // Determine tree character for this node
     const treeChar = isLast ? '└' : '├';
     const treePrefix = `${formatDimText(treeChar)}─ `;
-    // Root's direct children don't have | prefix, other nodes do
-    const isRootChild = prefix === '';
-    // Check if prefix already contains | (strip ANSI codes for comparison)
-    const prefixWithoutAnsi = stripAnsi(prefix);
-    const prefixHasVerticalBar = prefixWithoutAnsi.includes('│');
-    if (isRootChild) {
-      lines.push(`${treePrefix}${statusGlyphColored} ${nodeLabel}`);
-    } else if (prefixHasVerticalBar) {
-      // Prefix already has |, so just use treePrefix directly
-      lines.push(`${treePrefix}${statusGlyphColored} ${nodeLabel}`);
-    } else {
-      lines.push(`${formatDimText('│')} ${treePrefix}${statusGlyphColored} ${nodeLabel}`);
-    }
+    lines.push(`${prefix}${treePrefix}${statusGlyphColored} ${nodeLabel}`);
   }
 
   // Render children if present
   if (node.children && node.children.length > 0) {
-    // For root node, children start with no prefix (they'll add their own tree characters)
-    // For other nodes, calculate child prefix based on whether this is last
-    const childPrefix = isRoot ? '' : isLast ? '   ' : `${formatDimText('│')}  `;
+    const childPrefix = isRoot ? '' : `${prefix}${isLast ? '   ' : `${formatDimText('│')}  `}`;
     for (let i = 0; i < node.children.length; i++) {
       const child = node.children[i];
       if (!child) continue;
