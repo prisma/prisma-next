@@ -1,11 +1,18 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { ControlProgressEvent } from '../../src/control-api/types';
+import type { GlobalFlags } from '../../src/utils/global-flags';
 import { createProgressAdapter } from '../../src/utils/progress-adapter';
+import { TerminalUI } from '../../src/utils/terminal-ui';
+
+function createAdapter(flags: GlobalFlags = {}) {
+  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+  return createProgressAdapter({ ui, flags });
+}
 
 describe('progress adapter', () => {
   it('is no-op when quiet flag is set', () => {
-    const adapter = createProgressAdapter({ flags: { quiet: true } });
+    const adapter = createAdapter({ quiet: true });
     const event: ControlProgressEvent = {
       action: 'dbInit',
       kind: 'spanStart',
@@ -18,7 +25,7 @@ describe('progress adapter', () => {
   });
 
   it('is no-op when json output is enabled', () => {
-    const adapter = createProgressAdapter({ flags: { json: true } });
+    const adapter = createAdapter({ json: true });
     const event: ControlProgressEvent = {
       action: 'dbInit',
       kind: 'spanStart',
@@ -35,7 +42,7 @@ describe('progress adapter', () => {
     process.stdout.isTTY = false;
 
     try {
-      const adapter = createProgressAdapter({ flags: {} });
+      const adapter = createAdapter();
       const event: ControlProgressEvent = {
         action: 'dbInit',
         kind: 'spanStart',
@@ -56,7 +63,7 @@ describe('progress adapter', () => {
     process.stdout.isTTY = true;
 
     try {
-      const adapter = createProgressAdapter({ flags: {} });
+      const adapter = createAdapter();
       const events: ControlProgressEvent[] = [
         {
           action: 'dbInit',
@@ -86,7 +93,7 @@ describe('progress adapter', () => {
     process.stdout.isTTY = true;
 
     try {
-      const adapter = createProgressAdapter({ flags: {} });
+      const adapter = createAdapter();
 
       // Start span
       adapter({
@@ -113,7 +120,7 @@ describe('progress adapter', () => {
     process.stdout.isTTY = true;
 
     try {
-      const adapter = createProgressAdapter({ flags: {} });
+      const adapter = createAdapter();
 
       // Start span
       adapter({
@@ -140,7 +147,7 @@ describe('progress adapter', () => {
     process.stdout.isTTY = true;
 
     try {
-      const adapter = createProgressAdapter({ flags: {} });
+      const adapter = createAdapter();
 
       // End span without starting it - should be no-op
       adapter({
@@ -159,7 +166,7 @@ describe('progress adapter', () => {
     process.stdout.isTTY = true;
 
     try {
-      const adapter = createProgressAdapter({ flags: { color: false } });
+      const adapter = createAdapter({ color: false });
 
       // Start span with color disabled
       adapter({
@@ -190,7 +197,7 @@ describe('progress adapter', () => {
     const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     try {
-      const adapter = createProgressAdapter({ flags: {} });
+      const adapter = createAdapter();
       const event: ControlProgressEvent = {
         action: 'dbInit',
         kind: 'spanStart',
