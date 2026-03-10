@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Token } from '../src/tokenizer';
 import { Tokenizer } from '../src/tokenizer';
@@ -43,158 +45,38 @@ function assertLossless(source: string): void {
 
 describe('Tokenizer', () => {
   describe('PSL fragments', () => {
-    it('tokenizes a model with fields and attributes', () => {
-      assertLossless('model User {\n  id Int @id\n}');
-      expect(tokenize('model User {\n  id Int @id\n}')).toMatchInlineSnapshot(`
-        "Ident          "model"
-        Whitespace     " "
-        Ident          "User"
-        Whitespace     " "
-        LBrace         "{"
-        Newline        "\\n"
-        Whitespace     "  "
-        Ident          "id"
-        Whitespace     " "
-        Ident          "Int"
-        Whitespace     " "
-        At             "@"
-        Ident          "id"
-        Newline        "\\n"
-        RBrace         "}"
-        Eof            """
-      `);
+    const cases: [string, string][] = [
+      ['model with fields and attributes', 'model User {\n  id Int @id\n}'],
+      ['optional and array types', 'role Role?\nposts Post[]'],
+      ['@relation with named arguments', '@relation(fields: [userId], references: [id])'],
+      ['block attribute @@index', '@@index([userId])'],
+      ['comment followed by model', '// config\nmodel C {}'],
+      ['string default value', '@default("unknown")'],
+      ['namespaced attribute with dot', '@db.VarChar(191)'],
+      ['types block with equals', 'Email = String'],
+      ['hyphenated attribute namespace', '@my-pack.column'],
+      ['unicode identifiers', 'café Ñame 名前'],
+      ['astral unicode identifiers', '𐐀𐐁 test'],
+    ];
+
+    it.each(cases)('lossless round-trip: %s', (_desc, input) => {
+      assertLossless(input);
     });
 
-    it('tokenizes optional and array types', () => {
-      expect(tokenize('role Role?\nposts Post[]')).toMatchInlineSnapshot(`
-        "Ident          "role"
-        Whitespace     " "
-        Ident          "Role"
-        Question       "?"
-        Newline        "\\n"
-        Ident          "posts"
-        Whitespace     " "
-        Ident          "Post"
-        LBracket       "["
-        RBracket       "]"
-        Eof            """
-      `);
+    it.each(cases)('snapshot: %s', (_desc, input) => {
+      expect(tokenize(input)).toMatchSnapshot();
+    });
+  });
+
+  describe('fixture: realistic schema', () => {
+    const fixture = readFileSync(join(__dirname, 'fixtures/schema.psl'), 'utf-8');
+
+    it('lossless round-trip', () => {
+      assertLossless(fixture);
     });
 
-    it('tokenizes @relation with named arguments', () => {
-      expect(tokenize('@relation(fields: [userId], references: [id])')).toMatchInlineSnapshot(`
-        "At             "@"
-        Ident          "relation"
-        LParen         "("
-        Ident          "fields"
-        Colon          ":"
-        Whitespace     " "
-        LBracket       "["
-        Ident          "userId"
-        RBracket       "]"
-        Comma          ","
-        Whitespace     " "
-        Ident          "references"
-        Colon          ":"
-        Whitespace     " "
-        LBracket       "["
-        Ident          "id"
-        RBracket       "]"
-        RParen         ")"
-        Eof            """
-      `);
-    });
-
-    it('tokenizes block attribute @@index', () => {
-      expect(tokenize('@@index([userId])')).toMatchInlineSnapshot(`
-        "DoubleAt       "@@"
-        Ident          "index"
-        LParen         "("
-        LBracket       "["
-        Ident          "userId"
-        RBracket       "]"
-        RParen         ")"
-        Eof            """
-      `);
-    });
-
-    it('tokenizes comment followed by model', () => {
-      expect(tokenize('// config\nmodel C {}')).toMatchInlineSnapshot(`
-        "Comment        "// config"
-        Newline        "\\n"
-        Ident          "model"
-        Whitespace     " "
-        Ident          "C"
-        Whitespace     " "
-        LBrace         "{"
-        RBrace         "}"
-        Eof            """
-      `);
-    });
-
-    it('tokenizes string default value', () => {
-      expect(tokenize('@default("unknown")')).toMatchInlineSnapshot(`
-        "At             "@"
-        Ident          "default"
-        LParen         "("
-        StringLiteral  "\\"unknown\\""
-        RParen         ")"
-        Eof            """
-      `);
-    });
-
-    it('tokenizes namespaced attribute with dot', () => {
-      expect(tokenize('@db.VarChar(191)')).toMatchInlineSnapshot(`
-        "At             "@"
-        Ident          "db"
-        Dot            "."
-        Ident          "VarChar"
-        LParen         "("
-        NumberLiteral  "191"
-        RParen         ")"
-        Eof            """
-      `);
-    });
-
-    it('tokenizes types block with equals', () => {
-      expect(tokenize('Email = String')).toMatchInlineSnapshot(`
-        "Ident          "Email"
-        Whitespace     " "
-        Equals         "="
-        Whitespace     " "
-        Ident          "String"
-        Eof            """
-      `);
-    });
-
-    it('tokenizes hyphenated attribute namespace', () => {
-      expect(tokenize('@my-pack.column')).toMatchInlineSnapshot(`
-        "At             "@"
-        Ident          "my-pack"
-        Dot            "."
-        Ident          "column"
-        Eof            """
-      `);
-    });
-
-    it('tokenizes unicode identifiers', () => {
-      expect(tokenize('café Ñame 名前')).toMatchInlineSnapshot(`
-        "Ident          "café"
-        Whitespace     " "
-        Ident          "Ñame"
-        Whitespace     " "
-        Ident          "名前"
-        Eof            """
-      `);
-    });
-
-    it('tokenizes astral unicode identifiers', () => {
-      expect(tokenize('𐐀𐐁 test')).toMatchInlineSnapshot(`
-        "Ident          "𐐀𐐁"
-        Whitespace     " "
-        Ident          "test"
-        Eof            """
-      `);
+    it('token output matches snapshot', () => {
+      expect(tokenize(fixture)).toMatchSnapshot();
     });
   });
 
