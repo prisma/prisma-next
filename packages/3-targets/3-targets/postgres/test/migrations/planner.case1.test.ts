@@ -59,6 +59,21 @@ function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
   };
 }
 
+function createFrameworkComponentWithDependencies(
+  dependencies: readonly ComponentDatabaseDependency<unknown>[],
+): SqlControlExtensionDescriptor<'postgres'> {
+  return {
+    kind: 'extension',
+    id: 'mixed-dependencies',
+    familyId: 'sql',
+    targetId: 'postgres',
+    version: '0.0.0-test',
+    operationSignatures: () => [],
+    databaseDependencies: { init: dependencies },
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
+  };
+}
+
 function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlContract<SqlStorage> {
   return {
     schemaVersion: '1',
@@ -176,6 +191,45 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     });
     expect(uniqueOp!.execute[0]!.sql).toContain('ALTER TABLE');
     expect(uniqueOp!.execute[0]!.sql).toContain('"user_email_key"');
+  });
+
+  it('ignores non-postgres dependency install operations', () => {
+    const planner = createPostgresMigrationPlanner();
+    const mysqlDependency: ComponentDatabaseDependency<unknown> = {
+      id: 'mysql.extension.audit',
+      label: 'Enable mysql audit extension',
+      install: [
+        {
+          id: 'extension.audit.mysql',
+          label: 'Enable mysql audit extension',
+          operationClass: 'additive',
+          target: { id: 'mysql' },
+          precheck: [],
+          execute: [{ description: 'enable mysql audit extension', sql: 'SELECT 1' }],
+          postcheck: [],
+        },
+      ],
+    };
+    const frameworkComponents = [
+      createFrameworkComponent(),
+      createFrameworkComponentWithDependencies([mysqlDependency]),
+    ];
+
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+    const operationIds = result.plan.operations.map((op) => op.id);
+    expect(operationIds).toContain('extension.vector');
+    expect(operationIds).not.toContain('extension.audit.mysql');
+    expect(result.plan.operations.every((op) => op.target.id === 'postgres')).toBe(true);
   });
 
   it('renders parameterized column types in DDL', () => {

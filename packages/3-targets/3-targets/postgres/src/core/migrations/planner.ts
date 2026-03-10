@@ -9,6 +9,7 @@ import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
+  ComponentDatabaseDependency,
   MigrationOperationPolicy,
   SqlMigrationPlanner,
   SqlMigrationPlannerPlanOptions,
@@ -263,10 +264,8 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   private collectDependencies(
     options: PlannerOptionsWithComponents,
   ): ReadonlyArray<PlannerDatabaseDependency> {
-    const deps = collectInitDependencies(
-      options.frameworkComponents,
-    ) as readonly PlannerDatabaseDependency[];
-    return sortDependencies(deps);
+    const dependencies = collectInitDependencies(options.frameworkComponents);
+    return sortDependencies(dependencies.filter(isPostgresPlannerDependency));
   }
 
   private buildTableOperations(
@@ -697,6 +696,12 @@ function sortDependencies(
   dependencies: ReadonlyArray<PlannerDatabaseDependency>,
 ): ReadonlyArray<PlannerDatabaseDependency> {
   return [...dependencies].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function isPostgresPlannerDependency(
+  dependency: ComponentDatabaseDependency<unknown>,
+): dependency is PlannerDatabaseDependency {
+  return dependency.install.every((operation) => operation.target.id === 'postgres');
 }
 
 function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): string {
