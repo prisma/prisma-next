@@ -720,7 +720,11 @@ const DEMO_BASE_STORAGE: SqlStorage = {
           typeParams: { length: 36 },
         }),
         title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-        userId: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+        userId: col({
+          nativeType: 'character',
+          codecId: 'sql/char@1',
+          typeParams: { length: 36 },
+        }),
         createdAt: col({
           nativeType: 'timestamptz',
           codecId: 'pg/timestamptz@1',
