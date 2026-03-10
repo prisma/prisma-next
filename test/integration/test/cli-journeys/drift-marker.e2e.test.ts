@@ -56,7 +56,7 @@ withTempDir(({ createTempDir }) => {
 
         // K.02: db schema-verify (fails — missing tables)
         const schemaVerifyFail = await runDbSchemaVerify(ctx);
-        expect(schemaVerifyFail.exitCode, 'K.02: db schema-verify fails').not.toBe(0);
+        expect(schemaVerifyFail.exitCode, 'K.02: db schema-verify fails').toBe(1);
 
         // K.03: db introspect (empty schema)
         const introspect = await runDbIntrospect(ctx);
@@ -113,7 +113,7 @@ withTempDir(({ createTempDir }) => {
 
         // L.02: db schema-verify (fails — missing name column)
         const schemaVerifyFail = await runDbSchemaVerify(ctx);
-        expect(schemaVerifyFail.exitCode, 'L.02: db schema-verify fails').not.toBe(0);
+        expect(schemaVerifyFail.exitCode, 'L.02: db schema-verify fails').toBe(1);
 
         // L.03: db update (recovery)
         const update = await runDbUpdate(ctx);

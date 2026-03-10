@@ -133,15 +133,15 @@ withTempDir(({ createTempDir }) => {
 
         // G.03: db schema-verify (fails — missing column)
         const schemaVerifyFail = await runDbSchemaVerify(ctx);
-        expect(schemaVerifyFail.exitCode, 'G.03: db schema-verify fails').not.toBe(0);
+        expect(schemaVerifyFail.exitCode, 'G.03: db schema-verify fails').toBe(1);
 
         // G.04: db sign (fails — schema verification fails first)
         const signFail = await runDbSign(ctx);
-        expect(signFail.exitCode, 'G.04: db sign fails').not.toBe(0);
+        expect(signFail.exitCode, 'G.04: db sign fails').toBe(1);
 
         // G.05: db sign --json (fails with error envelope)
         const signJsonFail = await runDbSign(ctx, ['--json']);
-        expect(signJsonFail.exitCode, 'G.05: db sign json fails').not.toBe(0);
+        expect(signJsonFail.exitCode, 'G.05: db sign json fails').toBe(1);
         const signError = parseJsonOutput(signJsonFail);
         expect(signError, 'G.05: error envelope').toMatchObject({ ok: false });
 
@@ -204,7 +204,7 @@ withTempDir(({ createTempDir }) => {
 
         // H.02: db schema-verify --strict (fails — extra audit_log)
         const strict = await runDbSchemaVerify(ctx, ['--strict']);
-        expect(strict.exitCode, 'H.02: schema-verify strict fails').not.toBe(0);
+        expect(strict.exitCode, 'H.02: schema-verify strict fails').toBe(1);
 
         // H.03: db sign (uses tolerant verification — succeeds)
         const sign = await runDbSign(ctx);
