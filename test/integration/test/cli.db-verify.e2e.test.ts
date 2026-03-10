@@ -187,6 +187,10 @@ withTempDir(({ createTempDir }) => {
           const contractJsonPath = join(testDir, 'output', 'contract.json');
           loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
+          // Clear console output before running the command we want to test
+          // (previous commands like 'contract emit' may have added output)
+          const outputStartIndex = consoleOutput.length;
+
           const command = createDbVerifyCommand();
           const verifyCwd1 = process.cwd();
           try {
@@ -202,8 +206,11 @@ withTempDir(({ createTempDir }) => {
           const exitCode = getExitCode();
           expect(exitCode).not.toBe(0);
 
-          // consoleOutput may contain Clack decoration alongside JSON; extract the JSON block.
-          const parsed = extractJson(consoleOutput) as Record<string, unknown>;
+          // Parse only the db verify output (skip earlier contract emit output).
+          const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+            string,
+            unknown
+          >;
           expect(parsed).toMatchObject({
             code: 'PN-RTM-3001',
             summary: expect.any(String),
