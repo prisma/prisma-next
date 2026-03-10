@@ -426,6 +426,26 @@ export function errorMarkerRequired(options?: {
 }
 
 /**
+ * Schema verification found mismatches between the database and the contract.
+ * The full verification tree is preserved in `meta.verificationResult`.
+ */
+export function errorSchemaVerificationFailed(options: {
+  readonly summary: string;
+  readonly verificationResult: Record<string, unknown>;
+  readonly issues?: readonly { kind?: string; message?: string }[];
+}): CliStructuredError {
+  return new CliStructuredError('3004', options.summary, {
+    domain: 'RTM',
+    why: 'Database schema does not satisfy the contract',
+    fix: 'Run `prisma-next db update` to reconcile, or adjust your contract to match the database',
+    meta: {
+      verificationResult: options.verificationResult,
+      ...(options.issues ? { issues: options.issues } : {}),
+    },
+  });
+}
+
+/**
  * Migration runner failed during execution.
  */
 export function errorRunnerFailed(

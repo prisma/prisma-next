@@ -12,6 +12,7 @@ import {
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
+  errorSchemaVerificationFailed,
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
@@ -136,6 +137,16 @@ async function executeDbSchemaVerifyCommand(
       onProgress,
     });
 
+    if (!schemaVerifyResult.ok) {
+      return notOk(
+        errorSchemaVerificationFailed({
+          summary: schemaVerifyResult.summary,
+          verificationResult: schemaVerifyResult as unknown as Record<string, unknown>,
+          issues: schemaVerifyResult.schema.issues,
+        }),
+      );
+    }
+
     return ok(schemaVerifyResult);
   } catch (error) {
     // Driver already throws CliStructuredError for connection failures
@@ -186,7 +197,20 @@ export function createDbSchemaVerifyCommand(): Command {
 
       const result = await executeDbSchemaVerifyCommand(options, flags, ui);
 
-      // Handle result - formats output and returns exit code
+      // On failure, render the verification tree before the error summary (for TTY).
+      // The tree is preserved in meta.verificationResult for JSON consumers.
+      if (!result.ok && !flags.json) {
+        const verificationResult = result.failure.meta?.['verificationResult'] as
+          | VerifyDatabaseSchemaResult
+          | undefined;
+        if (verificationResult) {
+          const output = formatSchemaVerifyOutput(verificationResult, flags);
+          if (output) {
+            ui.log(output);
+          }
+        }
+      }
+
       const exitCode = handleResult(result, flags, ui, (schemaVerifyResult) => {
         if (flags.json) {
           ui.output(formatSchemaVerifyJson(schemaVerifyResult));
@@ -198,15 +222,7 @@ export function createDbSchemaVerifyCommand(): Command {
         }
       });
 
-      // For logical schema mismatches, check if verification passed
-      // Infra errors already handled by handleResult (returns non-zero exit code)
-      if (result.ok && !result.value.ok) {
-        // Schema verification failed - exit with code 1
-        process.exit(1);
-      } else {
-        // Success or infra error - use exit code from handleResult
-        process.exit(exitCode);
-      }
+      process.exit(exitCode);
     });
 
   return command;
