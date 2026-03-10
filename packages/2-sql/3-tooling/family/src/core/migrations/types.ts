@@ -160,8 +160,6 @@ export type SqlPlannerConflictKind =
   | 'indexIncompatible'
   | 'foreignKeyConflict'
   | 'missingButNonAdditive'
-  | 'unsupportedExtension'
-  | 'extensionMissing'
   | 'unsupportedOperation';
 
 export interface SqlPlannerConflictLocation {

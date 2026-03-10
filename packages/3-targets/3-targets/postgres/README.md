@@ -91,7 +91,7 @@ if (planResult.kind === 'success') {
     console.error(executeResult.failure.code, executeResult.failure.summary);
   }
 } else {
-  // Handle planner failure (e.g., unsupportedExtension, unsupportedOperation)
+  // Handle planner failure (e.g., unsupportedOperation)
   console.error(planResult.conflicts);
 }
 ```

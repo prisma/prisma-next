@@ -59,8 +59,9 @@ wmadden argues the PR shifts dependency detection from component-owned to adapte
   `collectDependenciesFromComponents()` (schema IR), `collectDependencies()` (planner), `collectDependenciesFromFrameworkComponents()` (verifier) all do the same core algorithm with different type guards, dedup, and return types.
   **Resolved:** Extracted `collectInitDependencies()` into `types.ts` (next to `isDatabaseDependencyProvider`), exported from `@prisma-next/family-sql/control`. All three consumers now use it. Schema-IR adds dedup on top; planner adds sort + cast; verifier casts to typed deps.
 
-- [ ] **6. Dead `SqlPlannerConflictKind` variants**
+- [x] **6. Dead `SqlPlannerConflictKind` variants**
   `'extensionMissing'` and `'unsupportedExtension'` in the union are never emitted. Clean up alongside `extension_missing` rename.
+  **Resolved:** Removed both dead variants from `SqlPlannerConflictKind` and updated postgres README example text.
 
 - [x] **7. `OperationClass` type still includes `'extension'`**
   Used in `PostgresPlanTargetDetails.objectType`. Should be renamed to `'dependency'` for consistency.
