@@ -338,7 +338,7 @@ async function executeMigrationApplyCommand(
 
     if (!flags.quiet && !flags.json) {
       for (const migration of pendingMigrations) {
-        ui.step(`Applying ${migration.dirName}...`);
+        ui.step(`Pending ${migration.dirName}`);
       }
     }
 
