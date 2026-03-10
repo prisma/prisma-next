@@ -44,6 +44,7 @@
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/pg": "catalog:",
+    "commander": "^12.1.0",
     "kysely": "catalog:",
     "pathe": "^2.0.3",
     "pg": "catalog:",

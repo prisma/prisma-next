@@ -15,7 +15,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
-  parseJsonOutput,
   runContractEmit,
   runDbInit,
   runDbVerify,
