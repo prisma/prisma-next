@@ -486,7 +486,7 @@ export function verifyDatabaseDependencies(
 
     if (!isSatisfied) {
       const depIssue: SchemaIssue = {
-        kind: 'extension_missing',
+        kind: 'dependency_missing',
         table: '',
         message: `Dependency "${dependency.id}" is missing from database`,
       };

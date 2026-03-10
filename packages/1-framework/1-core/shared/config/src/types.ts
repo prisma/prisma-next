@@ -206,7 +206,7 @@ export interface SchemaIssue {
     | 'foreign_key_mismatch'
     | 'unique_constraint_mismatch'
     | 'index_mismatch'
-    | 'extension_missing'
+    | 'dependency_missing'
     | 'default_missing'
     | 'default_mismatch';
   readonly table: string;

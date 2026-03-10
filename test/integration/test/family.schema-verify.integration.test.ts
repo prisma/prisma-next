@@ -548,7 +548,7 @@ describe('family instance schemaVerify', () => {
     );
   });
 
-  describe('extension missing', () => {
+  describe('dependency missing', () => {
     beforeEach(async () => {
       if (!connectionString) {
         throw new Error('Connection string not set');
@@ -565,7 +565,7 @@ describe('family instance schemaVerify', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with extension_missing issue',
+      'returns ok=false with dependency_missing issue',
       async () => {
         if (!connectionString) {
           throw new Error('Connection string not set');
@@ -608,7 +608,7 @@ describe('family instance schemaVerify', () => {
 
           expect(result.ok).toBe(false);
           expect(result.schema.counts.fail).toBeGreaterThan(0);
-          expect(result.schema.issues.some((i) => i.kind === 'extension_missing')).toBe(true);
+          expect(result.schema.issues.some((i) => i.kind === 'dependency_missing')).toBe(true);
         } finally {
           await driver.close();
         }

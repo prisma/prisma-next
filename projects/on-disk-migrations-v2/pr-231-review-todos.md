@@ -48,8 +48,9 @@ wmadden argues the PR shifts dependency detection from component-owned to adapte
   Two separate duck-typing guards exist in different layers doing similar checks.
   **Resolved:** Removed planner-local `isSqlDependencyProvider` entirely. The `familyId === 'sql'` check was redundant since the type already guarantees it. Planner now uses `collectInitDependencies` (shared utility) which internally uses `isDatabaseDependencyProvider`.
 
-- [ ] **3. `extension_missing` issue kind not renamed to `dependency_missing`**
+- [x] **3. `extension_missing` issue kind not renamed to `dependency_missing`**
   `verify-helpers.ts:489` still emits `kind: 'extension_missing'`. Referenced in 15+ locations. Recommendation: follow-up ticket (large blast radius).
+  **Resolved:** Renamed `SchemaIssue.kind` to `dependency_missing` in shared types, family verifier emission, postgres reconciliation additive-issue filtering, and all related unit/integration assertions.
 
 - [x] **4. Weak typing of `frameworkComponents` in `ContractToSchemaIROptions`**
   Was `readonly unknown[]`, should be properly typed.

@@ -91,7 +91,7 @@ describe('verifyDatabaseDependencies', () => {
     });
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      kind: 'extension_missing',
+      kind: 'dependency_missing',
       message: 'Dependency "postgres.extension.vector" is missing from database',
     });
   });
@@ -117,7 +117,7 @@ describe('verifyDatabaseDependencies', () => {
     });
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      kind: 'extension_missing',
+      kind: 'dependency_missing',
       message: 'Dependency "postgres.extension.postgis" is missing from database',
     });
   });
@@ -201,7 +201,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
     expect(result.ok).toBe(false);
     expect(result.schema.issues).toContainEqual(
       expect.objectContaining({
-        kind: 'extension_missing',
+        kind: 'dependency_missing',
         message: 'Dependency "postgres.extension.vector" is missing from database',
       }),
     );

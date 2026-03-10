@@ -349,8 +349,8 @@ describe('buildReconciliationPlan', () => {
       expect(result.conflicts).toHaveLength(0);
     });
 
-    it('skips extension_missing issues', () => {
-      const result = plan([issue({ kind: 'extension_missing', table: '', message: 'missing' })]);
+    it('skips dependency_missing issues', () => {
+      const result = plan([issue({ kind: 'dependency_missing', table: '', message: 'missing' })]);
 
       expect(result.operations).toHaveLength(0);
       expect(result.conflicts).toHaveLength(0);

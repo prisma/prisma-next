@@ -18,7 +18,7 @@ import {
 describe('family instance schemaVerify - modes', () => {
   const { getConnectionString } = useDevDatabase();
 
-  describe('extension missing', () => {
+  describe('dependency missing', () => {
     beforeEach(async () => {
       await withClient(getConnectionString(), async (client) => {
         await client.query('DROP TABLE IF EXISTS "user"');
@@ -32,7 +32,7 @@ describe('family instance schemaVerify - modes', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with extension_missing issue',
+      'returns ok=false with dependency_missing issue',
       async () => {
         const contract = defineContract<CodecTypes>()
           .target(postgresPack)
@@ -54,7 +54,7 @@ describe('family instance schemaVerify - modes', () => {
           schema: {
             counts: { fail: expect.any(Number) },
             issues: expect.arrayContaining([
-              expect.objectContaining({ kind: 'extension_missing' }),
+              expect.objectContaining({ kind: 'dependency_missing' }),
             ]),
           },
         });

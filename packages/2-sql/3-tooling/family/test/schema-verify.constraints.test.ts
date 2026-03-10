@@ -374,8 +374,8 @@ describe('verifySqlSchema - constraints', () => {
     });
   });
 
-  describe('extension missing', () => {
-    it('returns extension_missing issue when required extension is not in schema', () => {
+  describe('dependency missing', () => {
+    it('returns dependency_missing issue when required dependency is not in schema', () => {
       const contract = createTestContract({
         user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
       });
@@ -415,7 +415,7 @@ describe('verifySqlSchema - constraints', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          kind: 'extension_missing',
+          kind: 'dependency_missing',
         }),
       );
     });
