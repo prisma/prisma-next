@@ -200,11 +200,15 @@ export function formatMigrationVerifyCommandOutput(
   switch (result.status) {
     case 'verified':
       lines.push(`${formatGreen('✔')} Migration verified`);
-      lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
+      if (result.migrationId) {
+        lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
+      }
       break;
     case 'attested':
       lines.push(`${formatYellow('◉')} Draft migration attested`);
-      lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
+      if (result.migrationId) {
+        lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
+      }
       break;
   }
 
