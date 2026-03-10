@@ -65,17 +65,17 @@ exports[`db introspect command (e2e) > outputs tree structure with real database
 
 │  contract
 │  ├─ table post
-│  ├─ columns
-│  ├─ id: int4 (not nullable)
-│  ├─ title: text (not nullable)
-│  └─ userId: int4 (nullable)
-│  └─ primary key: id
+│  │  ├─ columns
+│  │  │  ├─ id: int4 (not nullable)
+│  │  │  ├─ title: text (not nullable)
+│  │  │  └─ userId: int4 (nullable)
+│  │  └─ primary key: id
 │  ├─ table user
-│  ├─ columns
-│  ├─ id: int4 (not nullable)
-│  ├─ email: text (not nullable)
-│  └─ name: text (nullable)
-│  ├─ primary key: id
-│  └─ unique index user_email_unique
+│  │  ├─ columns
+│  │  │  ├─ id: int4 (not nullable)
+│  │  │  ├─ email: text (not nullable)
+│  │  │  └─ name: text (nullable)
+│  │  ├─ primary key: id
+│  │  └─ unique index user_email_unique
 │  └─ plpgsql extension is enabled"
 `;
