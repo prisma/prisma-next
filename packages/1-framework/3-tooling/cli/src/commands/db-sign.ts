@@ -123,6 +123,7 @@ async function executeDbSignCommand(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for db sign (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'db sign',
       }),
     );
   }

@@ -109,6 +109,7 @@ async function executeDbSchemaVerifyCommand(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for db schema-verify (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'db schema-verify',
       }),
     );
   }

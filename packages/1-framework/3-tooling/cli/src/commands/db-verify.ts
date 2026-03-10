@@ -136,6 +136,7 @@ async function executeDbVerifyCommand(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for db verify (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'db verify',
       }),
     );
   }

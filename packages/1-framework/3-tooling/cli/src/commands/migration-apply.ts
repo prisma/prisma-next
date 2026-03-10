@@ -107,6 +107,7 @@ async function executeMigrationApplyCommand(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for migration apply (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'migration apply',
       }),
     );
   }

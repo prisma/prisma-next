@@ -127,6 +127,7 @@ export async function prepareMigrationContext(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for ${descriptor.commandName} (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: descriptor.commandName,
       }),
     );
   }

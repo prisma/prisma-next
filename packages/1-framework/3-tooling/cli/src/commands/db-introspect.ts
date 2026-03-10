@@ -75,6 +75,7 @@ async function executeDbIntrospectCommand(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for db introspect (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'db introspect',
       }),
     );
   }

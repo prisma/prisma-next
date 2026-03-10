@@ -227,11 +227,17 @@ describe('Config Errors', () => {
     expect(error.code).toBe('4005');
     expect(error.message).toBe('Database connection is required');
     expect(error.domain).toBe('CLI');
+    expect(error.fix).toContain('Provide `--db <url>`');
   });
 
   it('errorDatabaseConnectionRequired with custom why', () => {
     const error = errorDatabaseConnectionRequired({ why: 'Custom reason' });
     expect(error.why).toBe('Custom reason');
+  });
+
+  it('errorDatabaseConnectionRequired with commandName shows fully copyable command', () => {
+    const error = errorDatabaseConnectionRequired({ commandName: 'db init' });
+    expect(error.fix).toContain('Run `prisma-next db init --db <url>`');
   });
 
   it('errorQueryRunnerFactoryRequired creates correct error', () => {
