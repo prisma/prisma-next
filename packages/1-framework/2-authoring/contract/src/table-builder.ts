@@ -49,6 +49,15 @@ type ColumnOptions<Descriptor extends ColumnTypeDescriptor> =
   | NonNullableColumnOptions<Descriptor>;
 
 type NullableFromOptions<TOptions> = TOptions extends { nullable: true } ? true : false;
+type IndexOptions = {
+  readonly name?: string;
+  readonly using?: string;
+  readonly config?: Record<string, unknown>;
+};
+
+function isIndexDef(value: readonly string[] | IndexDef): value is IndexDef {
+  return !Array.isArray(value);
+}
 
 interface TableBuilderInternalState<
   Name extends string,
@@ -244,8 +253,30 @@ export class TableBuilder<
     );
   }
 
-  index(columns: readonly string[], name?: string): TableBuilder<Name, Columns, PrimaryKey> {
-    const indexDef: IndexDef = name ? { columns, name } : { columns };
+  index(columns: readonly string[], name?: string): TableBuilder<Name, Columns, PrimaryKey>;
+  index(
+    columns: readonly string[],
+    options?: IndexOptions,
+  ): TableBuilder<Name, Columns, PrimaryKey>;
+  index(indexDef: IndexDef): TableBuilder<Name, Columns, PrimaryKey>;
+  index(
+    columnsOrIndexDef: readonly string[] | IndexDef,
+    nameOrOptions?: string | IndexOptions,
+  ): TableBuilder<Name, Columns, PrimaryKey> {
+    const indexDef: IndexDef = isIndexDef(columnsOrIndexDef)
+      ? columnsOrIndexDef
+      : {
+          columns: columnsOrIndexDef,
+          ...(typeof nameOrOptions === 'string' ? { name: nameOrOptions } : {}),
+          ...(typeof nameOrOptions === 'object' && nameOrOptions !== null
+            ? {
+                ...(nameOrOptions.name !== undefined ? { name: nameOrOptions.name } : {}),
+                ...(nameOrOptions.using !== undefined ? { using: nameOrOptions.using } : {}),
+                ...(nameOrOptions.config !== undefined ? { config: nameOrOptions.config } : {}),
+              }
+            : {}),
+        };
+
     return new TableBuilder(
       this._state.name,
       this._state.columns,

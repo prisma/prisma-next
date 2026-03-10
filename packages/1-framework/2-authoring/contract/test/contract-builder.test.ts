@@ -81,4 +81,11 @@ describe('ContractBuilder', () => {
     expect(withTwoModels).toBeInstanceOf(ContractBuilder);
     expect(withTwoModels).not.toBe(withModel);
   });
+
+  it('manages foreignKeyDefaults state', () => {
+    const builder = defineContract();
+    const withDefaults = builder.foreignKeyDefaults({ constraint: true, index: false });
+    expect(withDefaults).toBeInstanceOf(ContractBuilder);
+    expect(withDefaults).not.toBe(builder);
+  });
 });

@@ -25,13 +25,12 @@ describe('IncludeChildBuilderImpl', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
   const context = createTestContext(contract, adapter);
-  const codecTypes = contract.mappings.codecTypes;
   const tableRef = createTableRef('user');
   const tables = schema<Contract>(context).tables;
   const userColumns = tables.user.columns;
 
   it('throws when getState called without projection', () => {
-    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef);
+    const builder = new IncludeChildBuilderImpl(contract, tableRef);
 
     expect(() => builder.getState()).toThrow('Child projection must be specified');
   });
@@ -40,7 +39,7 @@ describe('IncludeChildBuilderImpl', () => {
     const tables = schema<Contract>(context).tables;
     const userColumns = tables.user.columns;
 
-    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef)
+    const builder = new IncludeChildBuilderImpl(contract, tableRef)
       .select({
         id: userColumns.id,
       })
@@ -66,7 +65,7 @@ describe('IncludeChildBuilderImpl', () => {
     const tables = schema<Contract>(context).tables;
     const userColumns = tables.user.columns;
 
-    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef)
+    const builder = new IncludeChildBuilderImpl(contract, tableRef)
       .select({
         id: userColumns.id,
       })
@@ -86,7 +85,7 @@ describe('IncludeChildBuilderImpl', () => {
     const tables = schema<Contract>(context).tables;
     const userColumns = tables.user.columns;
 
-    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef)
+    const builder = new IncludeChildBuilderImpl(contract, tableRef)
       .select({
         id: userColumns.id,
       })
@@ -106,7 +105,7 @@ describe('IncludeChildBuilderImpl', () => {
     const tables = schema<Contract>(context).tables;
     const userColumns = tables.user.columns;
 
-    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef)
+    const builder = new IncludeChildBuilderImpl(contract, tableRef)
       .select({
         id: userColumns.id,
       })
@@ -145,7 +144,7 @@ describe('IncludeChildBuilderImpl', () => {
       },
     ],
   ] as const)('preserves %s state when select is called later', (_name, apply, assertState) => {
-    const seeded = apply(new IncludeChildBuilderImpl(contract, codecTypes, tableRef));
+    const seeded = apply(new IncludeChildBuilderImpl(contract, tableRef));
     const next = seeded.select({
       id: userColumns.id,
     });
@@ -158,7 +157,7 @@ describe('IncludeChildBuilderImpl', () => {
     const tables = schema<Contract>(context).tables;
     const userColumns = tables.user.columns;
 
-    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef).select({
+    const builder = new IncludeChildBuilderImpl(contract, tableRef).select({
       id: userColumns.id,
     });
 
@@ -169,7 +168,7 @@ describe('IncludeChildBuilderImpl', () => {
     const tables = schema<Contract>(context).tables;
     const userColumns = tables.user.columns;
 
-    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef).select({
+    const builder = new IncludeChildBuilderImpl(contract, tableRef).select({
       id: userColumns.id,
     });
 
@@ -273,6 +272,7 @@ describe('buildIncludeAst', () => {
   });
 
   it('throws when alias is missing in child projection', () => {
+    // Cast simulates a corrupted projection where an alias slot is undefined at runtime
     const includeState = {
       alias: 'posts',
       table: postTableRef,

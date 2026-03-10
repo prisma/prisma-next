@@ -1,41 +1,49 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  SqlContract,
+  SqlStorage,
+  TypeMaps,
+} from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { KyselyQueryLane } from '../src/client';
 
-type MockContract = SqlContract<SqlStorage> & {
-  storage: {
-    tables: {
-      user: {
-        columns: {
-          id: { codecId: 'string'; nullable: false; nativeType: 'uuid' };
-          email: { codecId: 'string'; nullable: false; nativeType: 'text' };
-          createdAt: { codecId: 'string'; nullable: false; nativeType: 'timestamptz' };
-          kind: { codecId: 'string'; nullable: false; nativeType: 'text' };
-        };
-        uniques: [];
-        indexes: [];
-        foreignKeys: [];
-      };
-      post: {
-        columns: {
-          id: { codecId: 'string'; nullable: false; nativeType: 'uuid' };
-          userId: { codecId: 'string'; nullable: false; nativeType: 'uuid' };
-          title: { codecId: 'string'; nullable: false; nativeType: 'text' };
-          createdAt: { codecId: 'string'; nullable: false; nativeType: 'timestamptz' };
-        };
-        uniques: [];
-        indexes: [];
-        foreignKeys: [];
-      };
-    };
-  };
-  mappings: {
-    codecTypes: {
-      string: { output: string };
-    };
-    operationTypes: Record<string, never>;
-  };
+type MockCodecTypes = {
+  readonly 'pg/int4@1': { readonly output: number };
+  readonly 'pg/text@1': { readonly output: string };
+  readonly 'pg/timestamptz@1': { readonly output: string };
 };
+
+type MockContract = ContractWithTypeMaps<
+  SqlContract<SqlStorage> & {
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1'; nullable: false; nativeType: 'int4' };
+            email: { codecId: 'pg/text@1'; nullable: false; nativeType: 'text' };
+            createdAt: { codecId: 'pg/timestamptz@1'; nullable: false; nativeType: 'timestamptz' };
+            kind: { codecId: 'pg/text@1'; nullable: false; nativeType: 'text' };
+          };
+          uniques: [];
+          indexes: [];
+          foreignKeys: [];
+        };
+        post: {
+          columns: {
+            id: { codecId: 'pg/int4@1'; nullable: false; nativeType: 'int4' };
+            userId: { codecId: 'pg/int4@1'; nullable: false; nativeType: 'int4' };
+            title: { codecId: 'pg/text@1'; nullable: false; nativeType: 'text' };
+            createdAt: { codecId: 'pg/timestamptz@1'; nullable: false; nativeType: 'timestamptz' };
+          };
+          uniques: [];
+          indexes: [];
+          foreignKeys: [];
+        };
+      };
+    };
+  },
+  TypeMaps<MockCodecTypes, Record<string, never>>
+>;
 
 type HasKey<TObject, TKey extends string> = TKey extends keyof TObject ? true : false;
 type AssertFalse<TValue extends false> = TValue;
@@ -53,10 +61,10 @@ void lane.whereExpr(query);
 type BuiltRow = typeof plan extends SqlQueryPlan<infer TRow> ? TRow : never;
 type BuiltId = BuiltRow extends { id: infer TValue } ? TValue : never;
 type BuiltEmail = BuiltRow extends { email: infer TValue } ? TValue : never;
-type BuiltIdIsString = BuiltId extends string ? true : false;
+type BuiltIdIsNumber = BuiltId extends number ? true : false;
 type BuiltEmailIsString = BuiltEmail extends string ? true : false;
 
-const assertPlanRowInference: AssertTrue<BuiltIdIsString> = true;
+const assertPlanRowInference: AssertTrue<BuiltIdIsNumber> = true;
 const assertEmailInference: AssertTrue<BuiltEmailIsString> = true;
 const assertNoExecuteOnLane: AssertFalse<HasKey<typeof lane, 'execute'>> = false;
 const assertNoTransactionOnLane: AssertFalse<HasKey<typeof lane, 'transaction'>> = false;

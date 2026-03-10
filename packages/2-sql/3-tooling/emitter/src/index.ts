@@ -287,7 +287,7 @@ export const sqlTargetFamilyHook = {
     const storageType = this.generateStorageType(storage);
     const modelsType = this.generateModelsType(models, storage, parameterizedRenderers);
     const relationsType = this.generateRelationsType(ir.relations);
-    const mappingsType = this.generateMappingsType(models, storage, codecTypes, operationTypes);
+    const mappingsType = this.generateMappingsType(models, storage);
 
     const executionHashType = hashes.executionHash
       ? `ExecutionHashBase<'${hashes.executionHash}'>`
@@ -298,8 +298,19 @@ export const sqlTargetFamilyHook = {
   // To regenerate, run: prisma-next contract emit
   ${importLines.join('\n')}
 
-  import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
-  import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-contract/types';
+  import type {
+    ExecutionHashBase,
+    ProfileHashBase,
+    StorageHashBase,
+  } from '@prisma-next/contract/types';
+  import type {
+    SqlContract,
+    SqlStorage,
+    SqlMappings,
+    ModelDefinition,
+    ContractWithTypeMaps,
+    TypeMaps as TypeMapsType,
+  } from '@prisma-next/sql-contract/types';
 
   export type StorageHash = StorageHashBase<'${hashes.storageHash}'>;
   export type ExecutionHash = ${executionHashType};
@@ -315,7 +326,9 @@ export const sqlTargetFamilyHook = {
         : Encoded
       : Encoded;
 
-  export type Contract = SqlContract<
+  export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
+
+  type ContractBase = SqlContract<
   ${storageType},
   ${modelsType},
   ${relationsType},
@@ -323,7 +336,13 @@ export const sqlTargetFamilyHook = {
   StorageHash,
   ExecutionHash,
   ProfileHash
-  >;
+  > & {
+    readonly target: ${this.serializeValue(ir.target)};
+    readonly capabilities: ${this.serializeValue(ir.capabilities)};
+    readonly extensionPacks: ${this.serializeValue(ir.extensionPacks)};
+  };
+
+  export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
   export type Tables = Contract['storage']['tables'];
   export type Models = Contract['models'];
@@ -374,7 +393,11 @@ export const sqlTargetFamilyHook = {
         .map((i) => {
           const cols = i.columns.map((c: string) => `'${c}'`).join(', ');
           const name = i.name ? `; readonly name: '${i.name}'` : '';
-          return `{ readonly columns: readonly [${cols}]${name} }`;
+          const using =
+            i.using !== undefined ? `; readonly using: ${this.serializeValue(i.using)}` : '';
+          const config =
+            i.config !== undefined ? `; readonly config: ${this.serializeValue(i.config)}` : '';
+          return `{ readonly columns: readonly [${cols}]${name}${using}${config} }`;
         })
         .join(', ');
       tableParts.push(`indexes: readonly [${indexes}]`);
@@ -431,7 +454,7 @@ export const sqlTargetFamilyHook = {
     const entries: string[] = [];
     for (const [key, value] of Object.entries(params)) {
       const serialized = this.serializeValue(value);
-      entries.push(`readonly ${key}: ${serialized}`);
+      entries.push(`readonly ${this.serializeObjectKey(key)}: ${serialized}`);
     }
 
     return `{ ${entries.join('; ')} }`;
@@ -465,11 +488,18 @@ export const sqlTargetFamilyHook = {
     if (typeof value === 'object') {
       const entries: string[] = [];
       for (const [k, v] of Object.entries(value)) {
-        entries.push(`readonly ${k}: ${this.serializeValue(v)}`);
+        entries.push(`readonly ${this.serializeObjectKey(k)}: ${this.serializeValue(v)}`);
       }
       return `{ ${entries.join('; ')} }`;
     }
     return 'unknown';
+  },
+
+  serializeObjectKey(key: string): string {
+    if (/^[$A-Z_a-z][$\w]*$/.test(key)) {
+      return key;
+    }
+    return this.serializeValue(key);
   },
 
   generateModelsType(
@@ -628,11 +658,9 @@ export const sqlTargetFamilyHook = {
   generateMappingsType(
     models: Record<string, ModelDefinition> | undefined,
     storage: SqlStorage,
-    codecTypes: string,
-    operationTypes: string,
   ): string {
     if (!models) {
-      return `SqlMappings & { readonly codecTypes: ${codecTypes || 'Record<string, never>'}; readonly operationTypes: ${operationTypes || 'Record<string, never>'}; }`;
+      return 'SqlMappings';
     }
 
     const modelToTable: string[] = [];
@@ -679,9 +707,7 @@ export const sqlTargetFamilyHook = {
     if (columnToField.length > 0) {
       parts.push(`columnToField: { ${columnToField.join('; ')} }`);
     }
-    parts.push(`codecTypes: ${codecTypes || 'Record<string, never>'}`);
-    parts.push(`operationTypes: ${operationTypes || 'Record<string, never>'}`);
 
-    return `{ ${parts.join('; ')} }`;
+    return parts.length > 0 ? `{ ${parts.join('; ')} }` : 'SqlMappings';
   },
 } as const;

@@ -7,6 +7,7 @@ interface SeedUser {
   id: number;
   name: string;
   email: string;
+  invitedById?: number | null;
 }
 
 interface SeedPost {
@@ -89,7 +90,8 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
     create table users (
       id integer primary key,
       name text not null,
-      email text not null
+      email text not null,
+      invited_by_id integer
     )
   `);
 
@@ -124,11 +126,10 @@ export async function seedUsers(
   users: readonly SeedUser[],
 ): Promise<void> {
   for (const user of users) {
-    await runtime.query('insert into users (id, name, email) values ($1, $2, $3)', [
-      user.id,
-      user.name,
-      user.email,
-    ]);
+    await runtime.query(
+      'insert into users (id, name, email, invited_by_id) values ($1, $2, $3, $4)',
+      [user.id, user.name, user.email, user.invitedById ?? null],
+    );
   }
 }
 

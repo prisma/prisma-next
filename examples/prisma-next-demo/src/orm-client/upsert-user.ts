@@ -14,7 +14,7 @@ export interface OrmClientUpsertUserInput {
 
 export async function ormClientUpsertUser(data: OrmClientUpsertUserInput, runtime: Runtime) {
   const db = createOrmClient(runtime);
-  return db.users.select('id', 'email', 'kind', 'createdAt').upsert({
+  return db.User.select('id', 'email', 'kind', 'createdAt').upsert({
     create: {
       id: toUserId(data.id),
       email: data.email,

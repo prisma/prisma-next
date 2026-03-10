@@ -313,6 +313,95 @@ describe('TableBuilder', () => {
     expect(table.columns.id).not.toHaveProperty('typeParams');
   });
 
+  describe('index extensions', () => {
+    it('stores index using options with access method and config payload', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('description', { type: textColumn })
+        .index(['description'], {
+          name: 'search_idx',
+          using: 'bm25',
+          config: { keyField: 'id', fields: [{ column: 'description', tokenizer: 'simple' }] },
+        })
+        .build();
+
+      expect(table.indexes).toEqual([
+        {
+          columns: ['description'],
+          name: 'search_idx',
+          using: 'bm25',
+          config: { keyField: 'id', fields: [{ column: 'description', tokenizer: 'simple' }] },
+        },
+      ]);
+    });
+
+    it('stores index using options with only access method (no name or config)', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('description', { type: textColumn })
+        .index(['description'], { using: 'gin' })
+        .build();
+
+      expect(table.indexes).toEqual([
+        {
+          columns: ['description'],
+          using: 'gin',
+        },
+      ]);
+    });
+
+    it('stores index using options with only name (no using or config)', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('description', { type: textColumn })
+        .index(['description'], { name: 'desc_idx' })
+        .build();
+
+      expect(table.indexes).toEqual([
+        {
+          columns: ['description'],
+          name: 'desc_idx',
+        },
+      ]);
+    });
+
+    it('stores index using options with only config (no name or using)', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('description', { type: textColumn })
+        .index(['description'], { config: { weight: 1 } })
+        .build();
+
+      expect(table.indexes).toEqual([
+        {
+          columns: ['description'],
+          config: { weight: 1 },
+        },
+      ]);
+    });
+
+    it('stores index from full index definition object', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .index({
+          columns: ['id'],
+          name: 'custom_idx',
+          using: 'custom/access-method',
+          config: { foo: 'bar' },
+        })
+        .build();
+
+      expect(table.indexes).toEqual([
+        {
+          columns: ['id'],
+          name: 'custom_idx',
+          using: 'custom/access-method',
+          config: { foo: 'bar' },
+        },
+      ]);
+    });
+  });
+
   describe('nullable/default mutual exclusivity', () => {
     it('allows nullable column without default', () => {
       const table = createTable('user')

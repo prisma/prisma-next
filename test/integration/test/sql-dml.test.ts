@@ -39,10 +39,7 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
   },
   models: {},
   relations: {},
-  mappings: {
-    codecTypes: {},
-    operationTypes: {},
-  },
+  mappings: {},
   capabilities: {
     postgres: {
       returning: true,

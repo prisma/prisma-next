@@ -1,8 +1,14 @@
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { sql } from '@prisma-next/sql-lane';
+import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
+import {
+  budgets,
+  type CreateRuntimeOptions,
+  createRuntime,
+  type Runtime,
+} from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -14,8 +20,10 @@ const { contract } = context;
 const executionStack = db.stack;
 
 async function createTestDriver(connectionString: string) {
-  const stackInstance = instantiateExecutionStack(executionStack);
-  const driver = stackInstance.driver;
+  const stackInstance = instantiateExecutionStack(
+    executionStack,
+  ) as CreateRuntimeOptions['stackInstance'];
+  const driver = stackInstance.driver as unknown as SqlDriver<unknown>;
   if (!driver) {
     throw new Error('Driver descriptor missing from execution stack');
   }
@@ -79,7 +87,7 @@ async function seedTestData(
         .build({ params: { id, email, createdAt, kind } });
 
       for await (const row of runtime.execute(plan)) {
-        userIds.push((row as { id: string }).id);
+        userIds.push((row as unknown as { id: string }).id);
       }
     }
   }
@@ -321,19 +329,19 @@ describe('ORM integration tests', () => {
 
           const firstPage = await ormGetUsersByIdCursor(null, 3, runtime);
           expect(firstPage).toHaveLength(3);
-          expect(firstPage.map((u) => u.id)).toEqual(['user_001', 'user_002', 'user_003']);
+          expect(firstPage.map((u) => u['id'])).toEqual(['user_001', 'user_002', 'user_003']);
 
           const secondPage = await ormGetUsersByIdCursor('user_003', 3, runtime);
           expect(secondPage).toHaveLength(3);
-          expect(secondPage.map((u) => u.id)).toEqual(['user_004', 'user_005', 'user_006']);
+          expect(secondPage.map((u) => u['id'])).toEqual(['user_004', 'user_005', 'user_006']);
 
           const thirdPage = await ormGetUsersByIdCursor('user_006', 3, runtime);
           expect(thirdPage).toHaveLength(3);
-          expect(thirdPage.map((u) => u.id)).toEqual(['user_007', 'user_008', 'user_009']);
+          expect(thirdPage.map((u) => u['id'])).toEqual(['user_007', 'user_008', 'user_009']);
 
           const lastPage = await ormGetUsersByIdCursor('user_009', 3, runtime);
           expect(lastPage).toHaveLength(1);
-          expect(lastPage.map((u) => u.id)).toEqual(['user_010']);
+          expect(lastPage.map((u) => u['id'])).toEqual(['user_010']);
 
           const emptyPage = await ormGetUsersByIdCursor('user_010', 3, runtime);
           expect(emptyPage).toHaveLength(0);
@@ -360,15 +368,15 @@ describe('ORM integration tests', () => {
 
           const page = await ormGetUsersBackward('user_008', 3, runtime);
           expect(page).toHaveLength(3);
-          expect(page.map((u) => u.id)).toEqual(['user_007', 'user_006', 'user_005']);
+          expect(page.map((u) => u['id'])).toEqual(['user_007', 'user_006', 'user_005']);
 
           const earlierPage = await ormGetUsersBackward('user_004', 3, runtime);
           expect(earlierPage).toHaveLength(3);
-          expect(earlierPage.map((u) => u.id)).toEqual(['user_003', 'user_002', 'user_001']);
+          expect(earlierPage.map((u) => u['id'])).toEqual(['user_003', 'user_002', 'user_001']);
 
           const partialPage = await ormGetUsersBackward('user_002', 3, runtime);
           expect(partialPage).toHaveLength(1);
-          expect(partialPage.map((u) => u.id)).toEqual(['user_001']);
+          expect(partialPage.map((u) => u['id'])).toEqual(['user_001']);
 
           const emptyPage = await ormGetUsersBackward('user_001', 3, runtime);
           expect(emptyPage).toHaveLength(0);

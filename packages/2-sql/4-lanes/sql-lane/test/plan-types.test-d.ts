@@ -1,5 +1,11 @@
 import type { ResultType as CoreResultType, ExecutionPlan } from '@prisma-next/contract/types';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  ExtractCodecTypes,
+  SqlContract,
+  SqlStorage,
+  TypeMaps as TypeMapsType,
+} from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -15,6 +21,98 @@ import { expectTypeOf, test } from 'vitest';
 import { sql } from '../src/sql/builder';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
+
+type UserPostStorage = SqlStorage & {
+  readonly tables: {
+    readonly user: {
+      readonly columns: {
+        readonly id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          nullable: false;
+        };
+        readonly email: {
+          readonly nativeType: 'text';
+          readonly codecId: 'pg/text@1';
+          nullable: false;
+        };
+      };
+      readonly primaryKey: { readonly columns: readonly ['id'] };
+      readonly uniques: readonly never[];
+      readonly indexes: readonly never[];
+      readonly foreignKeys: readonly never[];
+    };
+    readonly post: {
+      readonly columns: {
+        readonly id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          nullable: false;
+        };
+        readonly userId: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          nullable: false;
+        };
+        readonly title: {
+          readonly nativeType: 'text';
+          readonly codecId: 'pg/text@1';
+          nullable: false;
+        };
+      };
+      readonly primaryKey: { readonly columns: readonly ['id'] };
+      readonly uniques: readonly never[];
+      readonly indexes: readonly never[];
+      readonly foreignKeys: readonly never[];
+    };
+  };
+};
+
+type UserPostContract = ContractWithTypeMaps<
+  SqlContract<UserPostStorage, Record<string, never>, Record<string, never>, Record<string, never>>,
+  TypeMapsType<
+    {
+      readonly 'pg/int4@1': { readonly output: number };
+      readonly 'pg/text@1': { readonly output: string };
+    },
+    Record<string, Record<string, unknown>>
+  >
+>;
+
+function createUserPostContract() {
+  return validateContract<UserPostContract>({
+    target: 'postgres',
+    targetFamily: 'sql' as const,
+    storageHash: 'sha256:test-core',
+    profileHash: 'sha256:test-profile',
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+        post: {
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+    models: {},
+    relations: {},
+    mappings: {},
+  });
+}
 
 // Helper to simulate execute signature (runtime accepts both ExecutionPlan and SqlQueryPlan)
 function execute<Row>(_plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterable<Row> {
@@ -37,9 +135,8 @@ test('builder without select() has unknown Row type', () => {
   if (!userTable) throw new Error('user table not found');
   const builderAfterFrom = builder.from(userTable);
 
-  // Before select(), Row type should be unknown
-  const _plan = builderAfterFrom.build();
-  expectTypeOf<ResultType<typeof _plan>>().toEqualTypeOf<unknown>();
+  type PlanType = ReturnType<typeof builderAfterFrom.build>;
+  expectTypeOf<ResultType<PlanType>>().toEqualTypeOf<unknown>();
 });
 
 test('select() with object projection infers Row type', () => {
@@ -264,14 +361,13 @@ test('builder chain preserves Row type through methods', () => {
   const _plan = builderWithSelect.build();
   type Row = ResultType<typeof _plan>;
 
-  // Methods that don't change projection should preserve Row type
-  const _planFromWhere = builderWithWhere.build();
-  const _planFromOrder = builderWithOrder.build();
-  const _planFromLimit = builderWithLimit.build();
+  type PlanFromWhere = ReturnType<typeof builderWithWhere.build>;
+  type PlanFromOrder = ReturnType<typeof builderWithOrder.build>;
+  type PlanFromLimit = ReturnType<typeof builderWithLimit.build>;
 
-  expectTypeOf<ResultType<typeof _planFromWhere>>().toEqualTypeOf<Row>();
-  expectTypeOf<ResultType<typeof _planFromOrder>>().toEqualTypeOf<Row>();
-  expectTypeOf<ResultType<typeof _planFromLimit>>().toEqualTypeOf<Row>();
+  expectTypeOf<ResultType<PlanFromWhere>>().toEqualTypeOf<Row>();
+  expectTypeOf<ResultType<PlanFromOrder>>().toEqualTypeOf<Row>();
+  expectTypeOf<ResultType<PlanFromLimit>>().toEqualTypeOf<Row>();
 });
 
 test('wrong Row type assignments fail type check', () => {
@@ -476,7 +572,7 @@ test('codec mapping resolves scalar types correctly', () => {
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
   expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
 
-  type ContractCodecTypes = Contract['mappings'] extends { codecTypes: infer C } ? C : never;
+  type ContractCodecTypes = ExtractCodecTypes<Contract>;
   expectTypeOf<ContractCodecTypes>().toExtend<CodecTypes>();
 });
 
@@ -523,102 +619,8 @@ test('representative contract resolves types correctly end-to-end', () => {
 });
 
 test('result typing is derived solely from projection, unaffected by joins', () => {
-  // Define a fully-typed contract type for this test
-  type ContractWithPosts = SqlContract<
-    {
-      readonly tables: {
-        readonly user: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly email: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
-          };
-          readonly primaryKey: { readonly columns: readonly ['id'] };
-          readonly uniques: readonly never[];
-          readonly indexes: readonly never[];
-          readonly foreignKeys: readonly never[];
-        };
-        readonly post: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly userId: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly title: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
-          };
-          readonly primaryKey: { readonly columns: readonly ['id'] };
-          readonly uniques: readonly never[];
-          readonly indexes: readonly never[];
-          readonly foreignKeys: readonly never[];
-        };
-      };
-    },
-    Record<string, never>,
-    Record<string, never>,
-    {
-      readonly codecTypes: {
-        readonly 'pg/int4@1': { readonly output: number };
-        readonly 'pg/text@1': { readonly output: string };
-      };
-      readonly operationTypes: Record<string, Record<string, unknown>>;
-    }
-  >;
-
-  const contractWithPosts = validateContract<ContractWithPosts>({
-    target: 'postgres',
-    targetFamily: 'sql' as const,
-    storageHash: 'sha256:test-core',
-    profileHash: 'sha256:test-profile',
-    storage: {
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        post: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-      },
-    },
-    models: {},
-    relations: {},
-    mappings: {
-      codecTypes: {},
-      operationTypes: {},
-    } as unknown as ContractWithPosts['mappings'],
-  });
-
   const adapter = createStubAdapter();
-  const context = createTestContext(contractWithPosts, adapter);
+  const context = createTestContext(createUserPostContract(), adapter);
   const tables = schema(context).tables;
   const userTable = tables['user'];
   const postTable = tables['post'];
@@ -640,22 +642,18 @@ test('result typing is derived solely from projection, unaffected by joins', () 
 
   type Row = ResultType<typeof _plan>;
 
-  // Row type should only include projected columns, not all available columns
   expectTypeOf<Row['userId']>().toEqualTypeOf<number>();
   expectTypeOf<Row['postId']>().toEqualTypeOf<number>();
   expectTypeOf<Row['title']>().toEqualTypeOf<string>();
 
-  // Row should NOT have email (not in projection, even though it's available from user table)
   expectTypeOf<Row>().not.toMatchTypeOf<{ email: unknown }>();
 
-  // Verify the overall structure
   expectTypeOf<Row>().toExtend<{
     userId: number;
     postId: number;
     title: string;
   }>();
 
-  // Verify plan structure
   expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
@@ -772,102 +770,8 @@ test('mixed leaves and nested objects in projection', () => {
 });
 
 test('nested projection with joins infers nested Row type', () => {
-  // Define a fully-typed contract type for this test
-  type ContractWithPosts = SqlContract<
-    {
-      readonly tables: {
-        readonly user: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly email: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
-          };
-          readonly primaryKey: { readonly columns: readonly ['id'] };
-          readonly uniques: readonly never[];
-          readonly indexes: readonly never[];
-          readonly foreignKeys: readonly never[];
-        };
-        readonly post: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly userId: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly title: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
-          };
-          readonly primaryKey: { readonly columns: readonly ['id'] };
-          readonly uniques: readonly never[];
-          readonly indexes: readonly never[];
-          readonly foreignKeys: readonly never[];
-        };
-      };
-    },
-    Record<string, never>,
-    Record<string, never>,
-    {
-      readonly codecTypes: {
-        readonly 'pg/int4@1': { readonly output: number };
-        readonly 'pg/text@1': { readonly output: string };
-      };
-      readonly operationTypes: Record<string, Record<string, unknown>>;
-    }
-  >;
-
-  const contractWithPosts = validateContract<ContractWithPosts>({
-    target: 'postgres',
-    targetFamily: 'sql' as const,
-    storageHash: 'sha256:test-core',
-    profileHash: 'sha256:test-profile',
-    storage: {
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        post: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-      },
-    },
-    models: {},
-    relations: {},
-    mappings: {
-      codecTypes: {},
-      operationTypes: {},
-    } as unknown as ContractWithPosts['mappings'],
-  });
-
   const adapter = createStubAdapter();
-  const context = createTestContext(contractWithPosts, adapter);
+  const context = createTestContext(createUserPostContract(), adapter);
   const tables = schema(context).tables;
   const userTable = tables['user'];
   const postTable = tables['post'];
@@ -891,13 +795,11 @@ test('nested projection with joins infers nested Row type', () => {
 
   type Row = ResultType<typeof _plan>;
 
-  // Row type should have nested structure with joined columns
   expectTypeOf<Row['name']>().toEqualTypeOf<string>();
   expectTypeOf<Row['post']>().toEqualTypeOf<{ title: string; id: number }>();
   expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
   expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
 
-  // Verify the overall structure
   expectTypeOf<Row>().toExtend<{
     name: string;
     post: { title: string; id: number };

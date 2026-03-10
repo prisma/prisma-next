@@ -20,7 +20,7 @@
  *
  * See also:
  * - main.ts: Full CLI using emitted contract.json + contract.d.ts
- * - entry.ts: Browser app for visualizing contract.json
+ * - src/app/main.tsx: React browser app for visualizing contract.json
  */
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';

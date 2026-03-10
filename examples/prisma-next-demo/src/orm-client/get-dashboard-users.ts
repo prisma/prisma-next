@@ -10,13 +10,12 @@ export async function ormClientGetDashboardUsers(
   runtime: Runtime,
 ) {
   const db = createOrmClient(runtime);
-  return await db.users
-    .where((user) =>
-      and(
-        or(user.kind.eq('admin'), user.email.ilike(`%@${emailDomain}`)),
-        not(user.posts.none((post) => post.title.ilike(`%${postTitleTerm}%`))),
-      ),
-    )
+  return await db.User.where((user) =>
+    and(
+      or(user.kind.eq('admin'), user.email.ilike(`%@${emailDomain}`)),
+      not(user.posts.none((post) => post.title.ilike(`%${postTitleTerm}%`))),
+    ),
+  )
     .select('id', 'email', 'kind', 'createdAt')
     .include('posts', (post) =>
       post

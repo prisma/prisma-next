@@ -16,10 +16,7 @@ const contract: SqlContract<SqlStorage> = {
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {
-    codecTypes: {},
-    operationTypes: {},
-  },
+  mappings: {},
 };
 
 const db = postgres({

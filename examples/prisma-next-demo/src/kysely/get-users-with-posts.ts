@@ -16,7 +16,7 @@ export async function getUsersWithPosts(runtime: Runtime, limit = 10) {
     const postsQuery = db.kysely
       .selectFrom('post')
       .select(['id', 'title', 'createdAt'])
-      .where('userId', '=', user.id)
+      .where('userId', '=', user['id'])
       .orderBy('createdAt', 'desc')
       .limit(100);
 

@@ -32,7 +32,7 @@ describe('builder integration', () => {
       .storageHash('sha256:test-core')
       .build();
 
-    expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toExtend<CodecTypes>();
 
     // Runtime checks
     expect(contract).toMatchObject({
@@ -58,12 +58,10 @@ describe('builder integration', () => {
     type IntCodecOutput = ContractCodecTypes['pg/int4@1']['output'];
     expectTypeOf<IntCodecOutput>().toEqualTypeOf<number>();
     type ColumnMeta = (typeof contract)['storage']['tables']['user']['columns']['id'];
-    // Type inference may widen literal types, so we check that the codecId exists and maps to number
     expectTypeOf<ColumnMeta['codecId']>().toExtend<string>();
-    // ComputeColumnJsType may infer unknown if literal types are widened, so we check the codec output directly
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
 
-    expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toExtend<CodecTypes>();
     expect(userTable?.primaryKey?.columns).toEqual(['id']);
     const userModel = contract.models.User;
     expect(userModel).toMatchObject({
@@ -186,7 +184,7 @@ describe('builder integration', () => {
       .storageHash('sha256:test-core')
       .build();
 
-    expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
+    expectTypeOf<ExtractCodecTypes<typeof contract>>().toExtend<CodecTypes>();
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);

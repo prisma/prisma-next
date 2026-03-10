@@ -55,10 +55,7 @@ function createParamTypesTestContract(
     capabilities: {},
     meta: {},
     sources: {},
-    mappings: {
-      codecTypes: {},
-      operationTypes: {},
-    },
+    mappings: {},
   };
 }
 

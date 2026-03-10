@@ -318,7 +318,7 @@ describe('collection-dispatch', () => {
       fn: 'median' as never,
       column: 'views',
       state: emptyState(),
-    } as IncludeExpr['scalar'];
+    } as unknown as IncludeExpr['scalar'];
 
     runtime.setNextResults([
       [

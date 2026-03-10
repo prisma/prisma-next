@@ -3,10 +3,10 @@ import { createOrmClient } from './client';
 
 export async function ormClientAggregateUsers(runtime: Runtime) {
   const db = createOrmClient(runtime);
-  const totalUsers = await db.users.aggregate((aggregate) => ({
+  const totalUsers = await db.User.aggregate((aggregate) => ({
     totalUsers: aggregate.count(),
   }));
-  const adminUsers = await db.users.where({ kind: 'admin' }).aggregate((aggregate) => ({
+  const adminUsers = await db.User.where({ kind: 'admin' }).aggregate((aggregate) => ({
     adminUsers: aggregate.count(),
   }));
 

@@ -44,7 +44,12 @@ describe('integration/delete', () => {
         ]);
 
         const deleted = await users.where({ id: 1 }).delete();
-        expect(deleted).toEqual({ id: 1, name: 'Remove', email: 'a@example.com' });
+        expect(deleted).toEqual({
+          id: 1,
+          name: 'Remove',
+          email: 'a@example.com',
+          invitedById: null,
+        });
 
         const missing = await users.where({ id: 999 }).delete();
         expect(missing).toBeNull();
@@ -74,8 +79,8 @@ describe('integration/delete', () => {
         expect(deleted).toHaveLength(2);
         expect(deleted).toEqual(
           expect.arrayContaining([
-            { id: 1, name: 'Remove', email: 'a@example.com' },
-            { id: 2, name: 'Remove', email: 'b@example.com' },
+            { id: 1, name: 'Remove', email: 'a@example.com', invitedById: null },
+            { id: 2, name: 'Remove', email: 'b@example.com', invitedById: null },
           ]),
         );
 

@@ -34,10 +34,7 @@ export const contract: SqlContract<SqlStorage> = {
   },
   models: {},
   relations: {},
-  mappings: {
-    codecTypes: {},
-    operationTypes: {},
-  },
+  mappings: {},
   capabilities: {},
   extensionPacks: {},
   meta: {},

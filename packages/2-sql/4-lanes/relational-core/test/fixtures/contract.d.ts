@@ -2,7 +2,7 @@
 // Example: This pattern allows multiple contracts (e.g., authDataContract.d.ts, salesDataContract.d.ts)
 // without namespace collisions. Each contract can have its own namespace name.
 
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { ContractWithTypeMaps, SqlContract } from '@prisma-next/sql-contract/types';
 
 // Minimal CodecTypes for testing - matches adapter-postgres structure
 type CodecTypes = {
@@ -13,7 +13,7 @@ type CodecTypes = {
 
 // Contract type representing the contract data structure
 // This type matches the structure of contract.json and can be used as a return type
-export type Contract = SqlContract<
+export type Contract = ContractWithTypeMaps<SqlContract<
   {
     readonly tables: {
       readonly user: {
@@ -70,16 +70,16 @@ export type Contract = SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
-    readonly codecTypes: CodecTypes;
-    readonly operationTypes: OperationTypes;
   }
->;
+>, TypeMaps>;
 
 // Codec type map and scalar mapping imported from adapter - used for type inference in lanes
 export type { CodecTypes };
 
 // Operation types (empty for now, can be extended by extension packs)
 export type OperationTypes = Record<string, never>;
+
+export type TypeMaps = { readonly codecTypes: CodecTypes; readonly operationTypes: OperationTypes };
 
 // Direct model exports for easy importing: import type { User } from './contract.d'
 export type User = Contract['models']['User'];

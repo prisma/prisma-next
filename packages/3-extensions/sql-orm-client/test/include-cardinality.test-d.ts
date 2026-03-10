@@ -27,6 +27,7 @@ const usersWithPosts = userCollection.include('posts');
 const usersWithProfile = userCollection.include('profile');
 const postsWithAuthor = postCollection.include('author');
 const usersWithPostCount = userCollection.include('posts', (posts) => posts.count());
+const usersWithSelectedPosts = userCollection.include('posts', (posts) => posts.select('title'));
 
 userCollection.include('posts', (posts) => {
   // @ts-expect-error include refinement collection does not expose all()
@@ -50,10 +51,12 @@ type UsersWithPostsRow = RowOf<typeof usersWithPosts>;
 type UsersWithProfileRow = RowOf<typeof usersWithProfile>;
 type PostsWithAuthorRow = RowOf<typeof postsWithAuthor>;
 type UsersWithPostCountRow = RowOf<typeof usersWithPostCount>;
+type UsersWithSelectedPostsRow = RowOf<typeof usersWithSelectedPosts>;
 
 export type IncludeCardinalityTypeAssertions = [
   Assert<Equal<UsersWithPostsRow['posts'], Array<RowOf<Collection<TestContract, 'Post'>>>>>,
   Assert<Equal<UsersWithPostCountRow['posts'], number>>,
+  Assert<Equal<keyof UsersWithSelectedPostsRow['posts'][number], 'title'>>,
   Assert<Equal<Extract<UsersWithProfileRow['profile'], null>, null>>,
   Assert<
     Equal<
@@ -69,5 +72,7 @@ export type IncludeCardinalityTypeAssertions = [
       false
     >
   >,
-  Assert<Equal<keyof NonNullable<PostsWithAuthorRow['author']>, 'id' | 'name' | 'email'>>,
+  Assert<
+    Equal<keyof NonNullable<PostsWithAuthorRow['author']>, 'id' | 'name' | 'email' | 'invitedById'>
+  >,
 ];

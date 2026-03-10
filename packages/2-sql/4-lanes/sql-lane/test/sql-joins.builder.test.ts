@@ -1,4 +1,9 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  SqlContract,
+  SqlStorage,
+  TypeMaps as TypeMapsType,
+} from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, createColumnRef } from '@prisma-next/sql-relational-core/ast';
@@ -10,81 +15,81 @@ import { sql } from '../src/sql/builder';
 import type { CodecTypes } from './fixtures/contract.d';
 
 // Define a fully-typed contract type for this test
-type ContractWithPosts = SqlContract<
-  {
-    readonly tables: {
-      readonly user: {
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
+type ContractWithPosts = ContractWithTypeMaps<
+  SqlContract<
+    {
+      readonly tables: {
+        readonly user: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
+            };
+            readonly email: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              nullable: false;
+            };
           };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            nullable: false;
-          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
-      };
-      readonly post: {
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
+        readonly post: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
+            };
+            readonly userId: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
+            };
+            readonly title: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              nullable: false;
+            };
           };
-          readonly userId: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
-          };
-          readonly title: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            nullable: false;
-          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
-      };
-      readonly comment: {
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
+        readonly comment: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
+            };
+            readonly postId: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
+            };
+            readonly content: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              nullable: false;
+            };
           };
-          readonly postId: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
-          };
-          readonly content: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            nullable: false;
-          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
       };
-    };
-  },
-  Record<string, never>,
-  Record<string, never>,
-  {
-    readonly codecTypes: CodecTypes;
-    readonly operationTypes: Record<string, Record<string, unknown>>;
-  }
+    },
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  >,
+  TypeMapsType<CodecTypes, Record<string, Record<string, unknown>>>
 >;
 
 const contractWithPosts = validateContract<ContractWithPosts>({
@@ -130,10 +135,7 @@ const contractWithPosts = validateContract<ContractWithPosts>({
   },
   models: {},
   relations: {},
-  mappings: {
-    codecTypes: {} as CodecTypes,
-    operationTypes: {},
-  },
+  mappings: {},
 });
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {

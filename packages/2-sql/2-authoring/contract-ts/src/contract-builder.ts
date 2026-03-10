@@ -30,6 +30,8 @@ import {
 } from '@prisma-next/contract-authoring';
 import {
   applyFkDefaults,
+  type ContractWithTypeMaps,
+  type Index,
   type ModelDefinition,
   type ModelField,
   type ReferentialAction,
@@ -37,6 +39,7 @@ import {
   type SqlMappings,
   type SqlStorage,
   type StorageTypeInstance,
+  type TypeMaps,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { computeMappings } from './contract';
@@ -129,25 +132,25 @@ export interface SqlTableBuilder<
   >;
 }
 
-/**
- * Type-level mappings structure for contracts built via `defineContract()`.
- *
- * Compile-time type helper (not a runtime object) that ensures mappings match what the builder
- * produces. `codecTypes` uses the generic `CodecTypes` parameter; `operationTypes` is always
- * empty since operations are added via extensions at runtime.
- *
- * **Difference from ExecutionContext**: This is a compile-time type for contract construction.
- * `ExecutionContext` is a runtime object with populated registries for query execution.
- *
- * @template C - The `CodecTypes` generic parameter passed to `defineContract<CodecTypes>()`
- */
-type ContractBuilderMappings<C extends Record<string, { output: unknown }>> = Omit<
-  SqlMappings,
-  'codecTypes' | 'operationTypes'
-> & {
-  readonly codecTypes: C;
-  readonly operationTypes: Record<string, never>;
-};
+type ContractBuilderMappings = SqlMappings;
+
+type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
+  ? C extends Record<string, { output: unknown }>
+    ? C
+    : Record<string, never>
+  : Record<string, never>;
+
+type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (
+  k: infer I,
+) => void
+  ? I
+  : never;
+
+type MergeExtensionCodecTypes<Packs extends Record<string, unknown>> = UnionToIntersection<
+  {
+    [K in keyof Packs]: ExtractCodecTypesFromPack<Packs[K]>;
+  }[keyof Packs]
+>;
 
 type BuildStorageTable<
   _TableName extends string,
@@ -164,7 +167,7 @@ type BuildStorageTable<
       : never;
   };
   readonly uniques: ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>;
-  readonly indexes: ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>;
+  readonly indexes: ReadonlyArray<Index>;
   readonly foreignKeys: ReadonlyArray<{
     readonly columns: readonly string[];
     readonly references: { readonly table: string; readonly columns: readonly string[] };
@@ -317,30 +320,12 @@ class SqlContractBuilder<
    * @returns A normalized SqlContract with all required fields present
    */
   build(): Target extends string
-    ? SqlContract<
-        BuildStorage<Tables, Types>,
-        BuildModels<Models>,
-        BuildRelations<Models>,
-        ContractBuilderMappings<CodecTypes>
-      > & {
-        readonly schemaVersion: '1';
-        readonly target: Target;
-        readonly targetFamily: 'sql';
-        readonly storageHash: StorageHash extends string ? StorageHash : string;
-      } & (ExtensionPacks extends Record<string, unknown>
-          ? { readonly extensionPacks: ExtensionPacks }
-          : Record<string, never>) &
-        (Capabilities extends Record<string, Record<string, boolean>>
-          ? { readonly capabilities: Capabilities }
-          : Record<string, never>)
-    : never {
-    // Type helper to ensure literal types are preserved in return type
-    type BuiltContract = Target extends string
-      ? SqlContract<
+    ? ContractWithTypeMaps<
+        SqlContract<
           BuildStorage<Tables, Types>,
           BuildModels<Models>,
           BuildRelations<Models>,
-          ContractBuilderMappings<CodecTypes>
+          ContractBuilderMappings
         > & {
           readonly schemaVersion: '1';
           readonly target: Target;
@@ -351,7 +336,30 @@ class SqlContractBuilder<
             : Record<string, never>) &
           (Capabilities extends Record<string, Record<string, boolean>>
             ? { readonly capabilities: Capabilities }
-            : Record<string, never>)
+            : Record<string, never>),
+        TypeMaps<CodecTypes, Record<string, never>>
+      >
+    : never {
+    type BuiltContract = Target extends string
+      ? ContractWithTypeMaps<
+          SqlContract<
+            BuildStorage<Tables, Types>,
+            BuildModels<Models>,
+            BuildRelations<Models>,
+            ContractBuilderMappings
+          > & {
+            readonly schemaVersion: '1';
+            readonly target: Target;
+            readonly targetFamily: 'sql';
+            readonly storageHash: StorageHash extends string ? StorageHash : string;
+          } & (ExtensionPacks extends Record<string, unknown>
+              ? { readonly extensionPacks: ExtensionPacks }
+              : Record<string, never>) &
+            (Capabilities extends Record<string, Record<string, boolean>>
+              ? { readonly capabilities: Capabilities }
+              : Record<string, never>),
+          TypeMaps<CodecTypes, Record<string, never>>
+        >
       : never;
     if (!this.state.target) {
       throw new Error('target is required. Call .target() before .build()');
@@ -420,6 +428,8 @@ class SqlContractBuilder<
       const indexes = (tableState.indexes ?? []).map((i) => ({
         columns: i.columns,
         ...(i.name ? { name: i.name } : {}),
+        ...(i.using ? { using: i.using } : {}),
+        ...(i.config ? { config: i.config } : {}),
       }));
 
       // Build foreign keys from table state, materializing defaults
@@ -557,11 +567,7 @@ class SqlContractBuilder<
       storage as SqlStorage,
     );
 
-    const mappings = {
-      ...baseMappings,
-      codecTypes: {} as CodecTypes,
-      operationTypes: {} as Record<string, never>,
-    } as ContractBuilderMappings<CodecTypes>;
+    const mappings = baseMappings as ContractBuilderMappings;
 
     const extensionNamespaces = this.state.extensionNamespaces ?? [];
     const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };
@@ -604,10 +610,15 @@ class SqlContractBuilder<
     >;
   }
 
-  override target<T extends string>(
-    packRef: TargetPackRef<'sql', T>,
+  override target<
+    T extends string,
+    TPack extends TargetPackRef<string, T> = TargetPackRef<string, T>,
+  >(
+    packRef: TPack & TargetPackRef<string, T>,
   ): SqlContractBuilder<
-    CodecTypes,
+    ExtractCodecTypesFromPack<TPack> extends Record<string, never>
+      ? CodecTypes
+      : ExtractCodecTypesFromPack<TPack>,
     T,
     Tables,
     Models,
@@ -617,7 +628,9 @@ class SqlContractBuilder<
     Capabilities
   > {
     return new SqlContractBuilder<
-      CodecTypes,
+      ExtractCodecTypesFromPack<TPack> extends Record<string, never>
+        ? CodecTypes
+        : ExtractCodecTypesFromPack<TPack>,
       T,
       Tables,
       Models,
@@ -628,13 +641,24 @@ class SqlContractBuilder<
     >({
       ...this.state,
       target: packRef.targetId,
-    });
+    }) as SqlContractBuilder<
+      ExtractCodecTypesFromPack<TPack> extends Record<string, never>
+        ? CodecTypes
+        : ExtractCodecTypesFromPack<TPack>,
+      T,
+      Tables,
+      Models,
+      Types,
+      StorageHash,
+      ExtensionPacks,
+      Capabilities
+    >;
   }
 
-  extensionPacks(
-    packs: Record<string, ExtensionPackRef<'sql', string>>,
+  extensionPacks<const Packs extends Record<string, ExtensionPackRef<'sql', string>>>(
+    packs: Packs,
   ): SqlContractBuilder<
-    CodecTypes,
+    CodecTypes & MergeExtensionCodecTypes<Packs>,
     Target,
     Tables,
     Models,
@@ -649,7 +673,7 @@ class SqlContractBuilder<
 
     const namespaces = new Set(this.state.extensionNamespaces ?? []);
 
-    for (const packRef of Object.values(packs)) {
+    for (const packRef of Object.values(packs) as ExtensionPackRef<'sql', string>[]) {
       if (!packRef) continue;
 
       if (packRef.kind !== 'extension') {
@@ -674,7 +698,7 @@ class SqlContractBuilder<
     }
 
     return new SqlContractBuilder<
-      CodecTypes,
+      CodecTypes & MergeExtensionCodecTypes<Packs>,
       Target,
       Tables,
       Models,
@@ -792,7 +816,7 @@ class SqlContractBuilder<
     name: ModelName,
     table: TableName,
     callback: (
-      m: ModelBuilder<ModelName, TableName, Record<string, string>, Record<never, never>>,
+      m: ModelBuilder<ModelName, TableName, Record<never, never>, Record<never, never>>,
     ) => M | undefined,
   ): SqlContractBuilder<
     CodecTypes,

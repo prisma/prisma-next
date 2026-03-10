@@ -49,6 +49,16 @@ export type UniqueConstraint = {
 export type Index = {
   readonly columns: readonly string[];
   readonly name?: string;
+  /**
+   * Optional access method identifier.
+   * Extension-specific methods are represented as strings and interpreted
+   * by the owning extension package.
+   */
+  readonly using?: string;
+  /**
+   * Optional extension-owned index configuration payload.
+   */
+  readonly config?: Record<string, unknown>;
 };
 
 export type ForeignKeyReferences = {
@@ -128,17 +138,11 @@ export type SqlMappings = {
   readonly tableToModel?: Record<string, string>;
   readonly fieldToColumn?: Record<string, Record<string, string>>;
   readonly columnToField?: Record<string, Record<string, string>>;
-  readonly codecTypes: Record<string, { readonly output: unknown }>;
-  readonly operationTypes: Record<string, Record<string, unknown>>;
 };
 
 export const DEFAULT_FK_CONSTRAINT = true;
 export const DEFAULT_FK_INDEX = true;
 
-/**
- * Resolves foreign key `constraint` and `index` fields to their effective boolean values,
- * falling back through optional override defaults, then to the global defaults.
- */
 export function applyFkDefaults(
   fk: { constraint?: boolean | undefined; index?: boolean | undefined },
   overrideDefaults?: { constraint?: boolean | undefined; index?: boolean | undefined },
@@ -148,6 +152,36 @@ export function applyFkDefaults(
     index: fk.index ?? overrideDefaults?.index ?? DEFAULT_FK_INDEX,
   };
 }
+
+export type TypeMaps<
+  TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  TOperationTypes extends Record<string, unknown> = Record<string, never>,
+> = {
+  readonly codecTypes: TCodecTypes;
+  readonly operationTypes: TOperationTypes;
+};
+
+export type CodecTypesOf<T> = [T] extends [never]
+  ? Record<string, never>
+  : T extends { readonly codecTypes: infer C }
+    ? C extends Record<string, { output: unknown }>
+      ? C
+      : Record<string, never>
+    : Record<string, never>;
+
+export type OperationTypesOf<T> = [T] extends [never]
+  ? Record<string, never>
+  : T extends { readonly operationTypes: infer O }
+    ? O extends Record<string, unknown>
+      ? O
+      : Record<string, never>
+    : Record<string, never>;
+
+export type TypeMapsPhantomKey = '__@prisma-next/sql-contract/typeMaps@__';
+
+export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
+  readonly [K in TypeMapsPhantomKey]?: TTypeMaps;
+};
 
 export type SqlContract<
   S extends SqlStorage = SqlStorage,
@@ -166,8 +200,17 @@ export type SqlContract<
   readonly execution?: ExecutionSection;
 };
 
-export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> =
-  TContract['mappings']['codecTypes'];
+export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T
+  ? NonNullable<T[TypeMapsPhantomKey & keyof T]>
+  : never;
 
-export type ExtractOperationTypes<TContract extends SqlContract<SqlStorage>> =
-  TContract['mappings']['operationTypes'];
+export type ExtractCodecTypes<T> = CodecTypesOf<ExtractTypeMapsFromContract<T>>;
+export type ExtractOperationTypes<T> = OperationTypesOf<ExtractTypeMapsFromContract<T>>;
+
+export type ResolveCodecTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
+  ? ExtractCodecTypes<TContract>
+  : CodecTypesOf<TTypeMaps>;
+
+export type ResolveOperationTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
+  ? ExtractOperationTypes<TContract>
+  : OperationTypesOf<TTypeMaps>;

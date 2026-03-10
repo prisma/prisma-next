@@ -8,40 +8,42 @@ alwaysApply: false
 
 ## Pattern
 
-`CodecTypes` and `OperationTypes` are stored in `SqlMappings` (non-optional, compile-time only). They are extracted from the contract using helper types:
+`CodecTypes` and `OperationTypes` are carried via **TypeMaps** (type-only, not runtime keys).
+
+- **Emitted workflow**: `contract.d.ts` exports `Contract` and `TypeMaps` separately. Use `CodecTypesOf<TypeMaps>` and `OperationTypesOf<TypeMaps>` for explicit threading.
+- **No-emit workflow**: `defineContract().build()` returns `ContractWithTypeMaps<Contract, TypeMaps>`. Use `ExtractCodecTypes` / `ExtractOperationTypes` which extract from the phantom key.
 
 ```typescript
-type CodecTypes = ExtractCodecTypes<Contract>;
-type OperationTypes = ExtractOperationTypes<Contract>;
+// Emitted: import TypeMaps, use CodecTypesOf<TypeMaps>
+import type { Contract, TypeMaps } from './contract';
+type CodecTypes = CodecTypesOf<TypeMaps>;
+
+// No-emit: ExtractCodecTypes works with ContractWithTypeMaps
+type CodecTypes = ExtractCodecTypes<typeof contract>;
 ```
 
 ## Helper Types
 
-- `ExtractCodecTypes<Contract>`: Extracts `Contract['mappings']['codecTypes']` with fallback to `Record<string, never>`
-- `ExtractOperationTypes<Contract>`: Extracts `Contract['mappings']['operationTypes']` with fallback to `Record<string, never>`
+- `CodecTypesOf<TTypeMaps>`: Extracts `codecTypes` from TypeMaps
+- `OperationTypesOf<TTypeMaps>`: Extracts `operationTypes` from TypeMaps
+- `ExtractTypeMapsFromContract<T>`: Extracts TypeMaps from contract (`TypeMapsPhantomKey` → extract, or `never` for emitted)
+- `ExtractCodecTypes<T>`: Extracts from ContractWithTypeMaps (no-emit), fallback `Record<string, never>`
+- `ExtractOperationTypes<T>`: Same for operation types
 
-## Usage
+## Lane APIs with Explicit TypeMaps
 
-- Never pass `CodecTypes` or `Operations` as separate type parameters to `schema()`, `sql()`, or `orm()`
-- Always extract types from contract using the helper types
-- Contract must be validated before passing to `createRuntimeContext()`
-- Types flow automatically through the system from contract → context → builders
-
-## Example
+`schema`, `sql`, and `orm` accept optional `TTypeMaps` (defaults to `ExtractTypeMapsFromContract<TContract>`):
 
 ```typescript
-import { validateContract } from '@prisma-next/sql-query/schema';
-import { createRuntimeContext } from '@prisma-next/runtime';
-import { schema } from '@prisma-next/sql-query/schema';
-import type { Contract } from './contract.d';
-import contractJson from './contract.json' with { type: 'json' };
+// No-emit: infers from ContractWithTypeMaps
+const schemaHandle = schema<Contract>(context);
 
-// Validate contract first
-const contract = validateContract<Contract>(contractJson);
-
-// Create context (contract is stored here)
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
-
-// Types are extracted automatically from contract.mappings
-const tables = schema(context).tables;  // No CodecTypes parameter needed
+// Emitted: pass TypeMaps explicitly
+const schemaHandle = schema<Contract, TypeMaps>(context);
 ```
+
+## Important
+
+- Codec/operation type maps do **not** exist at runtime on `contract.mappings`
+- Runtime contract values include only structural mappings (modelToTable, tableToModel, fieldToColumn, columnToField)
+- Generated `Contract` type (emitted) has no phantom keys; TypeMaps is a separate export

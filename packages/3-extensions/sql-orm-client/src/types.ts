@@ -8,6 +8,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
+import type { RowSelection } from './collection-internal-types';
 
 // ---------------------------------------------------------------------------
 // Comparison / Filter / Order / Include
@@ -20,17 +21,13 @@ export interface OrderExpr {
 
 export type OrderByDirective = OrderExpr;
 
-declare const includeScalarResultBrand: unique symbol;
-declare const includeCombineResultBrand: unique symbol;
-
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
-export interface IncludeScalar<Result> {
+export interface IncludeScalar<Result> extends RowSelection<Result> {
   readonly kind: 'includeScalar';
   readonly fn: AggregateFn;
   readonly column?: string;
   readonly state: CollectionState;
-  readonly [includeScalarResultBrand]?: Result;
 }
 
 export interface IncludeRowsBranch {
@@ -45,10 +42,10 @@ export interface IncludeScalarBranch {
 
 export type IncludeCombineBranch = IncludeRowsBranch | IncludeScalarBranch;
 
-export interface IncludeCombine<ResultShape extends Record<string, unknown>> {
+export interface IncludeCombine<ResultShape extends Record<string, unknown>>
+  extends RowSelection<ResultShape> {
   readonly kind: 'includeCombine';
   readonly branches: Readonly<Record<string, IncludeCombineBranch>>;
-  readonly [includeCombineResultBrand]?: ResultShape;
 }
 
 export interface IncludeExpr {
@@ -819,13 +816,6 @@ type TableRelations<
     : Record<string, never>
   : Record<string, never>;
 
-type LegacyModelRelations<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-> = ModelDef<TContract, ModelName> extends { readonly relations: infer R }
-  ? R
-  : Record<string, never>;
-
 type ExactRecord<T> =
   T extends Record<string, unknown>
     ? string extends keyof T
@@ -836,9 +826,7 @@ type ExactRecord<T> =
 export type RelationsOf<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
-> = keyof ExactRecord<TableRelations<TContract, ModelName>> extends never
-  ? ExactRecord<LegacyModelRelations<TContract, ModelName>>
-  : ExactRecord<TableRelations<TContract, ModelName>>;
+> = ExactRecord<TableRelations<TContract, ModelName>>;
 
 export type RelationNames<
   TContract extends SqlContract<SqlStorage>,

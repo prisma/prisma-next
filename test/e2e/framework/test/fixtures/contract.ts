@@ -1,4 +1,3 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
   bitColumn,
   boolColumn,
@@ -7,7 +6,6 @@ import {
   int4Column,
   int8Column,
   intervalColumn,
-  json,
   jsonb,
   numericColumn,
   textColumn,
@@ -19,23 +17,10 @@ import {
 } from '@prisma-next/adapter-postgres/column-types';
 import { uuidv7 } from '@prisma-next/ids';
 import postgresPack from '@prisma-next/target-postgres/pack';
-import { type as arktype } from 'arktype';
 // Use relative import to avoid module resolution issues in test context
 import { defineContract } from '../../../../../packages/2-sql/2-authoring/contract-ts/src/exports/contract-builder';
 
-const profileSchema = arktype({
-  displayName: 'string',
-  tags: 'string[]',
-  active: 'boolean',
-});
-
-const metaSchema = arktype({
-  source: 'string',
-  rank: 'number',
-  verified: 'boolean',
-});
-
-export const contract = defineContract<CodecTypes>()
+export const contract = defineContract()
   .target(postgresPack)
   .table('user', (t) =>
     t
@@ -49,11 +34,6 @@ export const contract = defineContract<CodecTypes>()
         default: { kind: 'function', expression: 'now()' },
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
-      .column('profile', {
-        type: jsonb(profileSchema),
-        nullable: true,
-      })
-      .unique(['email'])
       .primaryKey(['id']),
   )
   .table('post', (t) =>
@@ -70,10 +50,6 @@ export const contract = defineContract<CodecTypes>()
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
       .column('published', { type: boolColumn, nullable: false })
-      .column('meta', {
-        type: json(metaSchema),
-        nullable: true,
-      })
       .primaryKey(['id']),
   )
   .table('comment', (t) =>
@@ -167,8 +143,7 @@ export const contract = defineContract<CodecTypes>()
       .field('id', 'id')
       .field('email', 'email')
       .field('createdAt', 'created_at')
-      .field('updatedAt', 'update_at')
-      .field('profile', 'profile'),
+      .field('updatedAt', 'update_at'),
   )
   .model('Post', 'post', (m) =>
     m
@@ -176,8 +151,7 @@ export const contract = defineContract<CodecTypes>()
       .field('userId', 'userId')
       .field('title', 'title')
       .field('createdAt', 'created_at')
-      .field('updatedAt', 'update_at')
-      .field('meta', 'meta'),
+      .field('updatedAt', 'update_at'),
   )
   .model('Comment', 'comment', (m) =>
     m

@@ -1,4 +1,10 @@
-import type { SqlContract, SqlMappings, StorageColumn } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  SqlContract,
+  SqlMappings,
+  StorageColumn,
+  TypeMaps,
+} from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
@@ -63,6 +69,17 @@ type TestContractWithIdOnly = SqlContract<
   SqlMappings
 >;
 
+type TestTypeMaps = TypeMaps<
+  { 'pg/int4@1': { output: number }; 'pg/vector@1': { output: unknown } },
+  Record<string, never>
+>;
+type TestTypeMapsIdOnly = TypeMaps<{ 'pg/int4@1': { output: number } }, Record<string, never>>;
+type TestContractWithTypeMaps = ContractWithTypeMaps<TestContract, TestTypeMaps>;
+type TestContractWithIdOnlyWithTypeMaps = ContractWithTypeMaps<
+  TestContractWithIdOnly,
+  TestTypeMapsIdOnly
+>;
+
 describe('operations-registry', () => {
   const contract = validateContract<TestContract>({
     target: 'postgres',
@@ -102,7 +119,7 @@ describe('operations-registry', () => {
     };
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -119,7 +136,7 @@ describe('operations-registry', () => {
 
   it('does not attach operations when registry is not provided', () => {
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables.user;
     const vectorColumn = userTable.columns.vector;
@@ -195,13 +212,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const contextWithoutCapabilities = createTestContext(contractWithoutCaps, adapter, {
-      extensions: [
-        {
-          operations: () => [signature],
-        },
-      ],
-    });
+    const contextWithoutCapabilities = createTestContext<TestContractWithTypeMaps>(
+      contractWithoutCaps,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [signature],
+          },
+        ],
+      },
+    );
     const tablesWithoutCaps = schema(contextWithoutCapabilities).tables;
     const userTableWithoutCaps = tablesWithoutCaps.user;
     const vectorColumnWithoutCaps = userTableWithoutCaps.columns.vector;
@@ -209,13 +230,17 @@ describe('operations-registry', () => {
       (vectorColumnWithoutCaps as unknown as { cosineDistance?: unknown }).cosineDistance,
     ).toBeUndefined();
 
-    const contextWithCapabilities = createTestContext(contractWithCaps, adapter, {
-      extensions: [
-        {
-          operations: () => [signature],
-        },
-      ],
-    });
+    const contextWithCapabilities = createTestContext<TestContractWithTypeMaps>(
+      contractWithCaps,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [signature],
+          },
+        ],
+      },
+    );
     const tablesWithCaps = schema(contextWithCapabilities).tables;
     const userTableWithCaps = tablesWithCaps.user;
     const vectorColumnWithCaps = userTableWithCaps.columns.vector;
@@ -268,7 +293,7 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithFalseCaps, adapter, {
+    const context = createTestContext<TestContractWithTypeMaps>(contractWithFalseCaps, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -357,13 +382,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const contextWithPartialCaps = createTestContext(contractWithPartialCaps, adapter, {
-      extensions: [
-        {
-          operations: () => [signature],
-        },
-      ],
-    });
+    const contextWithPartialCaps = createTestContext<TestContractWithTypeMaps>(
+      contractWithPartialCaps,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [signature],
+          },
+        ],
+      },
+    );
     const tablesPartial = schema(contextWithPartialCaps).tables;
     const userTablePartial = tablesPartial.user;
     const vectorColumnPartial = userTablePartial.columns.vector;
@@ -371,13 +400,17 @@ describe('operations-registry', () => {
       (vectorColumnPartial as unknown as { cosineDistance?: unknown }).cosineDistance,
     ).toBeUndefined();
 
-    const contextWithAllCaps = createTestContext(contractWithAllCaps, adapter, {
-      extensions: [
-        {
-          operations: () => [signature],
-        },
-      ],
-    });
+    const contextWithAllCaps = createTestContext<TestContractWithTypeMaps>(
+      contractWithAllCaps,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [signature],
+          },
+        ],
+      },
+    );
     const tablesAll = schema(contextWithAllCaps).tables;
     const userTableAll = tablesAll.user;
     const vectorColumnAll = userTableAll.columns.vector;
@@ -401,7 +434,7 @@ describe('operations-registry', () => {
     };
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -455,7 +488,7 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithoutCaps, adapter, {
+    const context = createTestContext<TestContractWithTypeMaps>(contractWithoutCaps, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -485,7 +518,7 @@ describe('operations-registry', () => {
     };
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -522,7 +555,7 @@ describe('operations-registry', () => {
     };
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -555,7 +588,7 @@ describe('operations-registry', () => {
     };
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext<TestContractWithTypeMaps>(contract, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -610,13 +643,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [
-        {
-          operations: () => [signature],
-        },
-      ],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [signature],
+          },
+        ],
+      },
+    );
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id as unknown as {
@@ -679,13 +716,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [
-        {
-          operations: () => [firstSignature, secondSignature],
-        },
-      ],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [firstSignature, secondSignature],
+          },
+        ],
+      },
+    );
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id as unknown as {
@@ -754,13 +795,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithoutCaps, adapter, {
-      extensions: [
-        {
-          operations: () => [firstSignature, secondSignature],
-        },
-      ],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithoutCaps,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [firstSignature, secondSignature],
+          },
+        ],
+      },
+    );
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id as unknown as {
@@ -838,13 +883,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithFalseCaps, adapter, {
-      extensions: [
-        {
-          operations: () => [firstSignature, secondSignature],
-        },
-      ],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithFalseCaps,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [firstSignature, secondSignature],
+          },
+        ],
+      },
+    );
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id as unknown as {
@@ -901,13 +950,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [
-        {
-          operations: () => [firstSignature],
-        },
-      ],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [firstSignature],
+          },
+        ],
+      },
+    );
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id as unknown as {
@@ -958,13 +1011,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [
-        {
-          operations: () => [signature],
-        },
-      ],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [signature],
+          },
+        ],
+      },
+    );
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id as unknown as {
@@ -1027,13 +1084,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [
-        {
-          operations: () => [signature],
-        },
-      ],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [signature],
+          },
+        ],
+      },
+    );
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id as unknown as {
@@ -1101,13 +1162,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [
-        {
-          operations: () => [signature],
-        },
-      ],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [signature],
+          },
+        ],
+      },
+    );
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id as unknown as {
@@ -1148,7 +1213,7 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter);
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, adapter);
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id;
@@ -1187,26 +1252,30 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [
-        {
-          operations: () => [
-            {
-              forTypeId: 'pg/int4@1',
-              method: 'add',
-              args: [{ kind: 'literal' }],
-              returns: { kind: 'builtin', type: 'number' },
-              lowering: {
-                targetFamily: 'sql',
-                strategy: 'infix',
-                // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-                template: '${self} + ${arg0}',
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [
+              {
+                forTypeId: 'pg/int4@1',
+                method: 'add',
+                args: [{ kind: 'literal' }],
+                returns: { kind: 'builtin', type: 'number' },
+                lowering: {
+                  targetFamily: 'sql',
+                  strategy: 'infix',
+                  // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+                  template: '${self} + ${arg0}',
+                },
               },
-            },
-          ],
-        },
-      ],
-    });
+            ],
+          },
+        ],
+      },
+    );
 
     // Create a fresh column builder without pre-attached operations
     const columnMeta = contractWithInt.storage.tables.user.columns.id;
@@ -1260,7 +1329,7 @@ describe('operations-registry', () => {
 
     const adapter = createStubAdapter();
     // Create context with empty operation registry (no operations registered)
-    const context = createTestContext(contractWithInt, adapter);
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, adapter);
     const tables = schema(context).tables;
     const userTable = tables.user;
     const idColumn = userTable.columns.id;
@@ -1301,7 +1370,7 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter);
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, adapter);
     const tables = schema(context).tables;
     const idColumn = tables.user.columns.id;
 
@@ -1367,13 +1436,17 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [
-        {
-          operations: () => [malformedSignature],
-        },
-      ],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [
+          {
+            operations: () => [malformedSignature],
+          },
+        ],
+      },
+    );
     const idColumn = schema(context).tables.user.columns.id as unknown as {
       broken: (arg: unknown) => unknown;
     };
@@ -1491,7 +1564,7 @@ describe('operations-registry', () => {
       contractInput as unknown as TestContract,
     );
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithMatrixCaps, adapter, {
+    const context = createTestContext<TestContractWithTypeMaps>(contractWithMatrixCaps, adapter, {
       extensions: [
         {
           operations: () => [signature],
@@ -1546,9 +1619,13 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [{ operations: () => [signature] }],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [{ operations: () => [signature] }],
+      },
+    );
     const idColumn = schema(context).tables.user.columns.id as unknown as {
       add: (arg: unknown) => { readonly __jsType: unknown };
     };
@@ -1593,9 +1670,13 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter, {
-      extensions: [{ operations: () => [signature] }],
-    });
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(
+      contractWithInt,
+      adapter,
+      {
+        extensions: [{ operations: () => [signature] }],
+      },
+    );
     const idColumn = schema(context).tables.user.columns.id as unknown as {
       toUnregisteredType: (arg: unknown) => { kind: 'expression' };
     };
@@ -1654,7 +1735,7 @@ describe('operations-registry', () => {
     });
 
     const adapter = createStubAdapter();
-    const context = createTestContext(contractWithInt, adapter);
+    const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, adapter);
     context.operations.register(firstSignature);
     context.operations.register(gatedSignature);
 

@@ -25,9 +25,11 @@ import type {
   IncludeRefinementResult,
   IncludeRefinementValue,
   IsToManyRelation,
+  RowSelection,
   WithOrderByState,
   WithWhereState,
 } from './collection-internal-types';
+import { RowType } from './collection-internal-types';
 import {
   dispatchMutationRows,
   executeMutationReturningSingleRow,
@@ -120,7 +122,9 @@ export class Collection<
   ModelName extends string,
   Row = DefaultModelRow<TContract, ModelName>,
   State extends CollectionTypeState = DefaultCollectionTypeState,
-> {
+> implements RowSelection<Row>
+{
+  declare readonly [RowType]: Row;
   /** @internal */
   readonly ctx: CollectionContext<TContract>;
   /** @internal */

@@ -33,7 +33,7 @@ describe('integration/orm', () => {
         const db = orm({
           contract: createTestContract(),
           runtime,
-          collections: { posts: PostCollection },
+          collections: { Post: PostCollection },
         });
 
         await seedUsers(runtime, [
@@ -46,8 +46,7 @@ describe('integration/orm', () => {
           { id: 12, title: 'Published B', userId: 2, views: 300 },
         ]);
 
-        const rows = await db.users
-          .orderBy((user) => user.id.asc())
+        const rows = await db.User.orderBy((user) => user.id.asc())
           .include('posts', (posts) => {
             expectPostCollection(posts);
             return posts.published().orderBy((post) => post.id.asc());
@@ -59,12 +58,14 @@ describe('integration/orm', () => {
             id: 1,
             name: 'Alice',
             email: 'alice@example.com',
+            invitedById: null,
             posts: [{ id: 11, title: 'Published A', userId: 1, views: 250 }],
           },
           {
             id: 2,
             name: 'Bob',
             email: 'bob@example.com',
+            invitedById: null,
             posts: [{ id: 12, title: 'Published B', userId: 2, views: 300 }],
           },
         ]);
@@ -80,7 +81,7 @@ describe('integration/orm', () => {
         const db = orm({
           contract: createTestContract(),
           runtime,
-          collections: { posts: PostCollection, comments: CommentCollection },
+          collections: { Post: PostCollection, Comment: CommentCollection },
         });
 
         await seedUsers(runtime, [
@@ -98,8 +99,7 @@ describe('integration/orm', () => {
           { id: 102, body: 'approved', postId: 12 },
         ]);
 
-        const rows = await db.users
-          .orderBy((user) => user.id.asc())
+        const rows = await db.User.orderBy((user) => user.id.asc())
           .include('posts', (posts) => {
             expectPostCollection(posts);
             return posts
@@ -117,6 +117,7 @@ describe('integration/orm', () => {
             id: 1,
             name: 'Alice',
             email: 'alice@example.com',
+            invitedById: null,
             posts: [
               {
                 id: 11,
@@ -131,6 +132,7 @@ describe('integration/orm', () => {
             id: 2,
             name: 'Bob',
             email: 'bob@example.com',
+            invitedById: null,
             posts: [
               {
                 id: 12,

@@ -2,7 +2,6 @@ import { type } from 'arktype';
 import type {
   ForeignKey,
   ForeignKeyReferences,
-  Index,
   ModelDefinition,
   ModelField,
   ModelStorage,
@@ -93,9 +92,11 @@ const UniqueConstraintSchema = type.declare<UniqueConstraint>().type({
   'name?': 'string',
 });
 
-const IndexSchema = type.declare<Index>().type({
+export const IndexSchema = type({
   columns: type.string.array().readonly(),
   'name?': 'string',
+  'using?': 'string',
+  'config?': 'Record<string, unknown>',
 });
 
 export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({

@@ -45,7 +45,7 @@
  *
  * See also:
  * - main-no-emit.ts: Same CLI using inline contract (no emission step)
- * - entry.ts: Browser app for visualizing contract.json
+ * - src/app/main.tsx: React browser app for visualizing contract.json
  */
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';

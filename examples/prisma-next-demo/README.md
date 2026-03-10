@@ -24,7 +24,7 @@ This demo includes two runtime implementations demonstrating different approache
 
 ### 1. Emit Workflow (Default)
 
-Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-liner client:
+Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-liner client. The emitted workflow uses `Contract` and `TypeMaps` explicitly: `postgres<Contract, TypeMaps>({ contractJson, url })`.
 
 - **Files**: `src/prisma/db.ts`, `src/main.ts`
 - **Contract source**: `src/prisma/contract.json` (emitted from `prisma/contract.ts`)
@@ -142,6 +142,10 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
    pnpm test
    ```
 
+## Browser Visualization
+
+Run `pnpm dev` for the Vite app that visualizes the contract. It renders directly from the constructed Contract (`validateContract` output) using React, with HMR when contract.json is re-emitted. See `src/app/`.
+
 ## Key Files
 
 - `prisma/contract.ts` - Contract definition (source of truth)
@@ -154,6 +158,8 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
 - `src/orm-client/*.ts` - End-to-end ORM client query examples
 - `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
 - `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
+- `src/app/` - React browser visualization (validates contract, renders from constructed Contract)
+- `scripts/stamp-marker.ts` - Contract marker management
 - `scripts/seed.ts` - Database seeding (includes vector embeddings)
 - `src/queries/similarity-search.ts` - Example vector similarity search query
 - `test/` - Integration tests demonstrating Prisma Next usage

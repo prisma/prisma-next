@@ -177,7 +177,7 @@ function createContract(
     storage: { tables },
     models: {},
     relations: {},
-    mappings: { codecTypes: {}, operationTypes: {} },
+    mappings: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},

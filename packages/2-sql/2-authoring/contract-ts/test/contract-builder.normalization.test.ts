@@ -126,6 +126,90 @@ describe('contract builder normalization', () => {
     expect(contract.storage.tables.user.columns.email.nullable).toBe(false);
   });
 
+  it('passes through extension-owned index fields (using, config)', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('items', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('description', { type: textColumn, nullable: false })
+          .primaryKey(['id'])
+          .index(['description'], {
+            name: 'search_idx',
+            using: 'bm25',
+            config: {
+              keyField: 'id',
+              fields: [{ column: 'description', tokenizer: 'simple' }],
+            },
+          }),
+      )
+      .build();
+
+    const indexes = contract.storage.tables.items.indexes;
+    expect(indexes).toHaveLength(1);
+    expect(indexes[0]).toMatchObject({
+      columns: ['description'],
+      using: 'bm25',
+      name: 'search_idx',
+      config: {
+        keyField: 'id',
+        fields: [{ column: 'description', tokenizer: 'simple' }],
+      },
+    });
+  });
+
+  it('passes through extension index config with expression fields', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('items', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('description', { type: textColumn, nullable: false })
+          .primaryKey(['id'])
+          .index(['description'], {
+            using: 'bm25',
+            config: {
+              keyField: 'id',
+              fields: [
+                { column: 'description' },
+                {
+                  expression: "description || ' ' || category",
+                  alias: 'concat',
+                  tokenizer: 'simple',
+                },
+              ],
+            },
+          }),
+      )
+      .build();
+
+    const idx = contract.storage.tables.items.indexes[0]!;
+    expect(idx.using).toBe('bm25');
+    expect((idx.config as { fields: readonly unknown[] }).fields).toHaveLength(2);
+    expect((idx.config as { fields: readonly unknown[] }).fields[1]).toMatchObject({
+      expression: "description || ' ' || category",
+      alias: 'concat',
+    });
+  });
+
+  it('preserves plain indexes without extension config', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('email', { type: textColumn, nullable: false })
+          .primaryKey(['id'])
+          .index(['email']),
+      )
+      .build();
+
+    const idx = contract.storage.tables.user.indexes[0]!;
+    expect(idx.columns).toEqual(['email']);
+    expect(idx).not.toHaveProperty('using');
+    expect(idx).not.toHaveProperty('config');
+  });
+
   it('normalizes contract-level relations to empty object', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)

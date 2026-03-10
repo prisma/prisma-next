@@ -139,10 +139,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         },
         models: {},
         relations: {},
-        mappings: {
-          codecTypes: {},
-          operationTypes: {},
-        },
+        mappings: {},
         capabilities: {},
         extensionPacks: {},
         meta: {},
@@ -204,10 +201,7 @@ describe.sequential('Schema verification after runner - integration', () => {
           },
           models: {},
           relations: {},
-          mappings: {
-            codecTypes: {},
-            operationTypes: {},
-          },
+          mappings: {},
           capabilities: {},
           extensionPacks: {},
           meta: {},

@@ -1,8 +1,9 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
 import type {
-  ExtractCodecTypes,
-  ExtractOperationTypes,
+  ExtractTypeMapsFromContract,
+  ResolveCodecTypes,
+  ResolveOperationTypes,
   SqlContract,
   SqlStorage,
   StorageColumn,
@@ -352,10 +353,13 @@ export type SchemaHandle<
   readonly types: ExtractSchemaTypes<Contract>;
 };
 
-type SchemaReturnType<Contract extends SqlContract<SqlStorage>> = SchemaHandle<
+type SchemaReturnType<
+  Contract extends SqlContract<SqlStorage>,
+  TTypeMaps = ExtractTypeMapsFromContract<Contract>,
+> = SchemaHandle<
   Contract,
-  ExtractCodecTypes<Contract>,
-  ToOperationTypes<ExtractOperationTypes<Contract>>
+  ResolveCodecTypes<Contract, TTypeMaps>,
+  ToOperationTypes<ResolveOperationTypes<Contract, TTypeMaps>>
 >;
 
 type NormalizeOperationTypes<T> = {
@@ -376,18 +380,21 @@ type ToOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationType
  *
  * @example
  * ```typescript
+ * // No-emit: infers TypeMaps from ContractWithTypeMaps
  * const schemaHandle = schema<Contract>(context);
- * const userTable = schemaHandle.tables.user;
- * const vectorType = schemaHandle.types.Vector1536;
+ *
+ * // Emitted: pass TypeMaps explicitly
+ * const schemaHandle = schema<Contract, TypeMaps>(context);
  * ```
  */
-export function schema<Contract extends SqlContract<SqlStorage>>(
-  context: ExecutionContext<Contract>,
-): SchemaReturnType<Contract> {
+export function schema<
+  Contract extends SqlContract<SqlStorage>,
+  TTypeMaps = ExtractTypeMapsFromContract<Contract>,
+>(context: ExecutionContext<Contract>): SchemaReturnType<Contract, TTypeMaps> {
   const contract = context.contract;
   const storage = contract.storage;
-  type CodecTypes = ExtractCodecTypes<Contract>;
-  type Operations = ToOperationTypes<ExtractOperationTypes<Contract>>;
+  type CodecTypes = ResolveCodecTypes<Contract, TTypeMaps>;
+  type Operations = ToOperationTypes<ResolveOperationTypes<Contract, TTypeMaps>>;
   const tables = {} as ExtractSchemaTables<Contract, CodecTypes, Operations>;
   const contractCapabilities = contract.capabilities;
 
@@ -425,7 +432,7 @@ export function schema<Contract extends SqlContract<SqlStorage>>(
   // Get type helpers from context (populated by runtime context creation)
   const types = context.types as ExtractSchemaTypes<Contract>;
 
-  return Object.freeze({ tables, types }) as SchemaReturnType<Contract>;
+  return Object.freeze({ tables, types }) as SchemaReturnType<Contract, TTypeMaps>;
 }
 
 export type { ColumnBuilderImpl as Column, TableBuilderImpl as Table };

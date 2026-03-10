@@ -60,12 +60,11 @@ This package is part of the package layering architecture:
 
 ```typescript
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import { enumColumn, enumType, int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 
-const contract = defineContract<CodecTypes>()
+const contract = defineContract()
   .target(postgresPack)
   .extensionPacks({ pgvector })
   .storageType('Role', enumType('role', ['USER', 'ADMIN']))

@@ -27,20 +27,31 @@ import type {
   SqlStorage,
   SqlMappings,
   ModelDefinition,
+  ContractWithTypeMaps,
+  TypeMaps as TypeMapsType,
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:ecd6961acf844e8a19d1e51d9503b244d3a9d5d6bc0cfc5835997dd21ad2a1ee'>;
+  StorageHashBase<'sha256:cdb433bb52596aa07ffa5997dd8bdddf01de87bb7e7df82ba8fc1e1bb9088148'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:8564aae6b2d73c1c37b71bce79fc4222405383e180e042b7596cae01d925804b'>;
+  ExecutionHashBase<'sha256:630618d96f7674c186a027d1295bfc5d688c4168c5a023a1aea01553820387dc'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:27cf0a2f9718e05d72553d6c0519ba1c2235c04fc96df2255d7a904571f47a57'>;
+  ProfileHashBase<'sha256:ba9d575fa1cddbd70ebe61671f203b6771010052872a41edda627b93e230293f'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
+type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyof CodecTypes
+  ? CodecTypes[CodecId] extends { readonly output: infer O }
+    ? O extends Date | bigint
+      ? O
+      : Encoded
+    : Encoded
+  : Encoded;
 
-export type Contract = SqlContract<
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
+
+type ContractBase = SqlContract<
   {
     readonly tables: {
       readonly user: {
@@ -59,6 +70,7 @@ export type Contract = SqlContract<
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
           };
           readonly kind: {
             readonly nativeType: 'user_type';
@@ -92,6 +104,7 @@ export type Contract = SqlContract<
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
           };
           readonly embedding: {
             readonly nativeType: 'vector';
@@ -197,13 +210,25 @@ export type Contract = SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
-    codecTypes: PgTypes & PgVectorTypes;
-    operationTypes: PgVectorOperationTypes;
   },
   StorageHash,
   ExecutionHash,
   ProfileHash
->;
+> & {
+  readonly target: 'postgres';
+  readonly capabilities: {
+    readonly postgres: {
+      readonly lateral: true;
+      readonly jsonAgg: true;
+      readonly returning: true;
+      readonly 'pgvector/cosine': true;
+      readonly 'defaults.now': true;
+    };
+  };
+  readonly extensionPacks: { readonly pgvector: {} };
+};
+
+export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Tables = Contract['storage']['tables'];
 export type Models = Contract['models'];

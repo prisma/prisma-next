@@ -800,6 +800,70 @@ describe('sql-target-family-hook', () => {
     }).not.toThrow();
   });
 
+  it('accepts extension-owned index config payloads without core-specific validation', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          items: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [
+              {
+                columns: ['description'],
+                using: 'bm25',
+                config: {
+                  keyField: 'id',
+                  fields: [{ column: 'description', tokenizer: 'simple' }],
+                },
+              },
+            ],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    expect(() => {
+      sqlTargetFamilyHook.validateStructure(ir);
+    }).not.toThrow();
+  });
+
+  it('still validates index column references independent of extension config', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          items: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [
+              {
+                columns: ['nonexistent'],
+                using: 'bm25',
+                config: {
+                  keyField: 'id',
+                  fields: [{ expression: "description || ' ' || category", tokenizer: 'simple' }],
+                },
+              },
+            ],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    expect(() => {
+      sqlTargetFamilyHook.validateStructure(ir);
+    }).toThrow('index references non-existent column');
+  });
+
   it('validates structure with complex valid contract', () => {
     const ir = createContractIR({
       models: {
