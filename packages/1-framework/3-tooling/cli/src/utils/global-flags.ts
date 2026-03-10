@@ -44,7 +44,7 @@ export function parseGlobalFlags(options: CliOptions): GlobalFlags {
     yes?: boolean;
   } = {};
 
-  // JSON output (boolean flag; also accepts legacy string values for backward compat)
+  // JSON output
   if (options.json) {
     flags.json = true;
   }
