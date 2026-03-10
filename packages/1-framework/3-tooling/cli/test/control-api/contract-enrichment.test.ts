@@ -143,7 +143,7 @@ describe('enrichContractIR', () => {
     const types = packMeta['types'] as Record<string, unknown>;
     const codecTypes = types['codecTypes'] as Record<string, unknown>;
 
-    expect(codecTypes['controlPlaneHooks']).toBeUndefined();
+    expect(codecTypes).not.toHaveProperty('controlPlaneHooks');
     expect(codecTypes['parameterized']).toBeDefined();
   });
 

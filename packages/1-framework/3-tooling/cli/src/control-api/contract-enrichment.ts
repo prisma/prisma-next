@@ -88,9 +88,12 @@ function extractExtensionPackMeta(
     base['capabilities'] = capabilities;
   }
   if (types) {
-    base['types'] = types.codecTypes
-      ? { ...types, codecTypes: { ...types.codecTypes, controlPlaneHooks: undefined } }
-      : types;
+    if (types.codecTypes) {
+      const { controlPlaneHooks: _, ...cleanedCodecTypes } = types.codecTypes;
+      base['types'] = { ...types, codecTypes: cleanedCodecTypes };
+    } else {
+      base['types'] = types;
+    }
   }
   return base;
 }
