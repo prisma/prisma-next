@@ -26,15 +26,12 @@ export interface CommonCommandOptions {
   readonly y?: boolean;
 }
 
-/** @deprecated Use CommonCommandOptions instead */
-export type CliOptions = CommonCommandOptions;
-
 /**
  * Parses global flags from CLI options.
  * Handles verbosity flags (-v, --trace), JSON output, quiet mode, color,
  * interactivity (--interactive/--no-interactive), and auto-accept (-y/--yes).
  */
-export function parseGlobalFlags(options: CliOptions): GlobalFlags {
+export function parseGlobalFlags(options: CommonCommandOptions): GlobalFlags {
   const flags: {
     json?: boolean;
     quiet?: boolean;
