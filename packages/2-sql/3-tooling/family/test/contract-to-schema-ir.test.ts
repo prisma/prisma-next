@@ -8,7 +8,7 @@ import type {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import {
-  contractToSchemaIR,
+  contractToSchemaIR as contractToSchemaIRImpl,
   detectDestructiveChanges,
 } from '../src/core/migrations/contract-to-schema-ir';
 
@@ -47,6 +47,13 @@ function table(
     foreignKeys: [],
     ...overrides,
   };
+}
+
+function contractToSchemaIR(
+  contract: SqlContract<SqlStorage> | null,
+  options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
+): SqlSchemaIR {
+  return contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });
 }
 
 describe('contractToSchemaIR', () => {
@@ -375,6 +382,39 @@ describe('contractToSchemaIR', () => {
         },
       },
     });
+  });
+
+  it('writes storage type annotations using the configured namespace', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
+          },
+        }),
+      },
+      types: {
+        Embedding: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          typeParams: { dimensions: 1536 },
+        },
+      },
+    };
+
+    const result = contractToSchemaIRImpl(wrap(storage), {
+      annotationNamespace: 'custom',
+    });
+    expect((result.annotations as Record<string, unknown>)?.['custom']).toMatchObject({
+      storageTypes: {
+        Embedding: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          typeParams: { dimensions: 1536 },
+        },
+      },
+    });
+    expect((result.annotations as Record<string, unknown>)?.['pg']).toBeUndefined();
   });
 
   it('sets dependencies to empty array', () => {

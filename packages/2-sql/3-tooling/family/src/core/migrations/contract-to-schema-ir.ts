@@ -173,6 +173,7 @@ export function detectDestructiveChanges(
 }
 
 export interface ContractToSchemaIROptions {
+  readonly annotationNamespace: string;
   readonly expandNativeType?: NativeTypeExpander;
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
@@ -183,6 +184,7 @@ export interface ContractToSchemaIROptions {
  * Reads `contract.storage` for tables, `contract.storage.types` for type
  * annotations, and derives database dependencies from `frameworkComponents`
  * (each component's `databaseDependencies.init[].id`).
+ * Storage-type annotations are written under `options.annotationNamespace`.
  *
  * Drops codec metadata (`codecId`, `typeRef`) since the schema IR only represents
  * structural information. When `expandNativeType` is provided, parameterized types
@@ -193,8 +195,12 @@ export interface ContractToSchemaIROptions {
  */
 export function contractToSchemaIR(
   contract: SqlContract<SqlStorage> | null,
-  options?: ContractToSchemaIROptions,
+  options: ContractToSchemaIROptions,
 ): SqlSchemaIR {
+  if (options.annotationNamespace.length === 0) {
+    throw new Error('annotationNamespace must be a non-empty string');
+  }
+
   if (!contract) {
     return { tables: {}, dependencies: [] };
   }
@@ -202,13 +208,13 @@ export function contractToSchemaIR(
   const storage = contract.storage;
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
-    tables[tableName] = convertTable(tableName, tableDef, options?.expandNativeType);
+    tables[tableName] = convertTable(tableName, tableDef, options.expandNativeType);
   }
 
   const dependencies = deduplicateDependencyIRs(
-    collectInitDependencies(options?.frameworkComponents ?? []),
+    collectInitDependencies(options.frameworkComponents ?? []),
   );
-  const annotations = deriveAnnotations(storage);
+  const annotations = deriveAnnotations(storage, options.annotationNamespace);
 
   return {
     tables,
@@ -231,7 +237,10 @@ function deduplicateDependencyIRs(
   return result;
 }
 
-function deriveAnnotations(storage: SqlStorage): SqlAnnotations | undefined {
+function deriveAnnotations(
+  storage: SqlStorage,
+  annotationNamespace: string,
+): SqlAnnotations | undefined {
   if (!storage.types || Object.keys(storage.types).length === 0) return undefined;
-  return { pg: { storageTypes: storage.types } };
+  return { [annotationNamespace]: { storageTypes: storage.types } };
 }

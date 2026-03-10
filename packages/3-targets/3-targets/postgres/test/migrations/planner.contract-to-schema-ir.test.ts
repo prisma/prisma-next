@@ -7,7 +7,10 @@ import type {
   MigrationPlannerResult,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
-import { contractToSchemaIR, detectDestructiveChanges } from '@prisma-next/family-sql/control';
+import {
+  contractToSchemaIR as contractToSchemaIRImpl,
+  detectDestructiveChanges,
+} from '@prisma-next/family-sql/control';
 import type {
   SqlContract,
   SqlStorage,
@@ -56,6 +59,13 @@ function createTestContract(
     sources: {},
     ...overrides,
   };
+}
+
+function contractToSchemaIR(
+  contract: SqlContract<SqlStorage> | null,
+  options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
+) {
+  return contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });
 }
 
 function planFromStorages(from: SqlStorage | null, to: SqlStorage): MigrationPlannerResult {

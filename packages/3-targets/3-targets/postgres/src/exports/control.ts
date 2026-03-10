@@ -28,6 +28,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       },
       contractToSchema(contract, frameworkComponents) {
         return contractToSchemaIR(contract as SqlContract<SqlStorage> | null, {
+          annotationNamespace: 'pg',
           expandNativeType: expandParameterizedNativeType,
           frameworkComponents: frameworkComponents ?? [],
         });
