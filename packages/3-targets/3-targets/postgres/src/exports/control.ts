@@ -27,9 +27,24 @@ function buildNativeTypeExpander(
     readonly codecId?: string;
     readonly typeParams?: Record<string, unknown>;
   }) => {
-    if (!input.codecId) return input.nativeType;
+    if (!input.typeParams) return input.nativeType;
+
+    if (!input.codecId) {
+      throw new Error(
+        `Column declares typeParams for nativeType "${input.nativeType}" but has no codecId. ` +
+          'Ensure the column is associated with a codec.',
+      );
+    }
+
     const hooks = codecHooks.get(input.codecId);
-    return hooks?.expandNativeType?.(input) ?? input.nativeType;
+    if (!hooks?.expandNativeType) {
+      throw new Error(
+        `Column declares typeParams for nativeType "${input.nativeType}" ` +
+          `but no expandNativeType hook is registered for codecId "${input.codecId}". ` +
+          'Ensure the extension providing this codec is included in extensionPacks.',
+      );
+    }
+    return hooks.expandNativeType(input);
   };
 }
 

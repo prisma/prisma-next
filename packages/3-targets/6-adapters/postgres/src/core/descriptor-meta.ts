@@ -52,7 +52,13 @@ const precisionRenderer = (typeName: string) =>
     },
   }) as const;
 
-function isValidTypeParamNumber(value: unknown): value is number {
+function isPositiveInteger(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value > 0
+  );
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
   return (
     typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0
   );
@@ -63,9 +69,9 @@ function expandLength({ nativeType, typeParams }: ExpandNativeTypeInput): string
     return nativeType;
   }
   const length = typeParams['length'];
-  if (!isValidTypeParamNumber(length)) {
+  if (!isPositiveInteger(length)) {
     throw new Error(
-      `Invalid "length" type parameter for "${nativeType}": expected a non-negative integer, got ${JSON.stringify(length)}`,
+      `Invalid "length" type parameter for "${nativeType}": expected a positive integer, got ${JSON.stringify(length)}`,
     );
   }
   return `${nativeType}(${length})`;
@@ -76,9 +82,9 @@ function expandPrecision({ nativeType, typeParams }: ExpandNativeTypeInput): str
     return nativeType;
   }
   const precision = typeParams['precision'];
-  if (!isValidTypeParamNumber(precision)) {
+  if (!isPositiveInteger(precision)) {
     throw new Error(
-      `Invalid "precision" type parameter for "${nativeType}": expected a non-negative integer, got ${JSON.stringify(precision)}`,
+      `Invalid "precision" type parameter for "${nativeType}": expected a positive integer, got ${JSON.stringify(precision)}`,
     );
   }
   return `${nativeType}(${precision})`;
@@ -92,16 +98,22 @@ function expandNumeric({ nativeType, typeParams }: ExpandNativeTypeInput): strin
     return nativeType;
   }
 
+  if (!hasPrecision && hasScale) {
+    throw new Error(
+      `Invalid type parameters for "${nativeType}": "scale" requires "precision" to be specified`,
+    );
+  }
+
   if (hasPrecision) {
     const precision = typeParams['precision'];
-    if (!isValidTypeParamNumber(precision)) {
+    if (!isPositiveInteger(precision)) {
       throw new Error(
-        `Invalid "precision" type parameter for "${nativeType}": expected a non-negative integer, got ${JSON.stringify(precision)}`,
+        `Invalid "precision" type parameter for "${nativeType}": expected a positive integer, got ${JSON.stringify(precision)}`,
       );
     }
     if (hasScale) {
       const scale = typeParams['scale'];
-      if (!isValidTypeParamNumber(scale)) {
+      if (!isNonNegativeInteger(scale)) {
         throw new Error(
           `Invalid "scale" type parameter for "${nativeType}": expected a non-negative integer, got ${JSON.stringify(scale)}`,
         );
