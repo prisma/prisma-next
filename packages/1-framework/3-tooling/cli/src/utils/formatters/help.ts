@@ -31,9 +31,10 @@ const RIGHT_COLUMN_MAX_WIDTH = 90;
  * Gets the terminal width, or returns a default if not available.
  */
 function getTerminalWidth(): number {
-  const terminalWidth = process.stdout.columns;
-  const defaultWidth = Number.parseInt(process.env['CLI_WIDTH'] || '80', 10);
-  return terminalWidth || defaultWidth;
+  // Help text goes to stderr, so prefer stderr columns. Fall back to stdout, then CLI_WIDTH env.
+  const terminalWidth = process.stderr.columns || process.stdout.columns;
+  const envWidth = Number.parseInt(process.env['CLI_WIDTH'] || '', 10);
+  return terminalWidth || (Number.isFinite(envWidth) ? envWidth : 80);
 }
 
 /**
@@ -131,6 +132,13 @@ function getCommandDocsUrl(commandPath: string): string | undefined {
     'contract emit': 'https://pris.ly/contract-emit',
     'db verify': 'https://pris.ly/db-verify',
     'db update': 'https://pris.ly/db-update',
+    'db introspect': 'https://pris.ly/db-introspect',
+    'db schema-verify': 'https://pris.ly/db-schema-verify',
+    'migration plan': 'https://pris.ly/migration-plan',
+    'migration apply': 'https://pris.ly/migration-apply',
+    'migration show': 'https://pris.ly/migration-show',
+    'migration status': 'https://pris.ly/migration-status',
+    'migration verify': 'https://pris.ly/migration-verify',
   };
   return docsMap[commandPath];
 }
