@@ -1,5 +1,5 @@
 /**
- * Verification mode tests: strict mode, extensions.
+ * Verification mode tests: strict mode, dependency missing.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
