@@ -376,6 +376,7 @@ describe('verifySqlSchema - constraints', () => {
 
   describe('dependency missing', () => {
     it('returns dependency_missing issue when required dependency is not in schema', () => {
+      const dependencyId = 'postgres.extension.vector';
       const contract = createTestContract({
         user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
       });
@@ -395,7 +396,7 @@ describe('verifySqlSchema - constraints', () => {
           databaseDependencies: {
             init: [
               {
-                id: 'postgres.extension.vector',
+                id: dependencyId,
                 label: 'Enable vector extension',
                 install: [],
               },
@@ -416,6 +417,7 @@ describe('verifySqlSchema - constraints', () => {
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
           kind: 'dependency_missing',
+          message: `Dependency "${dependencyId}" is missing from database`,
         }),
       );
     });
