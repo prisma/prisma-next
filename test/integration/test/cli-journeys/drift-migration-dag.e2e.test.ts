@@ -67,29 +67,30 @@ withTempDir(({ createTempDir }) => {
         const plan2 = await runMigrationPlan(ctx, ['--name', 'add-posts']);
         expect(plan2.exitCode, 'P3.pre: plan v3').toBe(0);
 
-        // Delete the second migration directory
+        // Delete the add-posts migration directory (additive→v3 edge)
+        // Note: can't use alphabetical sort — 'initial' sorts after 'add-*'.
+        // Find by name suffix instead.
         const migrationsDir = join(ctx.testDir, 'migrations');
-        const migrationDirs = readdirSync(migrationsDir).sort();
-        const lastMigration = migrationDirs[migrationDirs.length - 1];
-        if (lastMigration) {
-          rmSync(join(migrationsDir, lastMigration), { recursive: true, force: true });
-        }
+        const migrationDirs = readdirSync(migrationsDir);
+        const addPostsDir = migrationDirs.find((d) => d.endsWith('_add_posts'));
+        expect(addPostsDir, 'P3.pre: add-posts dir exists').toBeDefined();
+        rmSync(join(migrationsDir, addPostsDir!), { recursive: true, force: true });
 
-        // P3.01: migration status (reports broken chain)
+        // P3.01: migration status (reports broken chain — contract has no matching leaf)
         const statusBroken = await runMigrationStatus(ctx);
-        // May exit 0 or 1 depending on implementation
         expect([0, 1], 'P3.01: status exits 0 or 1').toContain(statusBroken.exitCode);
 
-        // P3.02: migration apply (fails — missing edge in chain)
+        // P3.02: migration apply (fails — no path from marker to destination contract)
         const applyFail = await runMigrationApply(ctx);
         expect(applyFail.exitCode, 'P3.02: migration apply fails').not.toBe(0);
 
-        // P3.03–P3.04: Recovery by re-planning and applying
-        // TODO: Chain breakage recovery requires the migration planner to handle
-        // gaps in the DAG. Currently `migration plan` fails because it can't
-        // reconstruct the graph with a missing intermediate migration.
-        // This is a known limitation — the user must manually recreate the
-        // deleted migration or use `db update` as an alternative.
+        // P3.03: re-plan the missing edge (chain leaf is additive, contract is v3)
+        const rePlan = await runMigrationPlan(ctx, ['--name', 're-add-posts']);
+        expect(rePlan.exitCode, 'P3.03: migration plan recovery').toBe(0);
+
+        // P3.04: migration apply (applies the re-planned additive→v3 migration)
+        const applyRecovery = await runMigrationApply(ctx);
+        expect(applyRecovery.exitCode, 'P3.04: migration apply recovery').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );
