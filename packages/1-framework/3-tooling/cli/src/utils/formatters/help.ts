@@ -1,4 +1,4 @@
-import { bgGreen, blue, bold, cyan, dim, green, magenta } from 'colorette';
+import { blue, bold, cyan, dim, green, magenta } from 'colorette';
 import type { Command } from 'commander';
 import wrapAnsi from 'wrap-ansi';
 
@@ -46,17 +46,10 @@ function calculateRightColumnWidth(): number {
 }
 
 /**
- * Creates an arrow segment badge with green background and white text.
+ * Creates the CLI brand badge.
  */
 function createPrismaNextBadge(useColor: boolean): string {
-  if (!useColor) {
-    return 'prisma-next';
-  }
-  const text = ' prisma-next ';
-  const body = bgGreen(bold(text));
-  const separator = '\u{E0B0}';
-  const tip = green(separator);
-  return `${body}${tip}`;
+  return useColor ? bold('prisma-next') : 'prisma-next';
 }
 
 /**
