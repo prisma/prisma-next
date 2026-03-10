@@ -387,10 +387,7 @@ export function createMigrationApplyCommand(): Command {
       'migrations are pending, then executes them sequentially. Each migration runs\n' +
       'in its own transaction. Does not plan new migrations — run `migration plan` first.',
   );
-  setCommandExamples(command, [
-    'prisma-next migration apply --db $DATABASE_URL',
-    'prisma-next migration apply --db $DATABASE_URL --yes',
-  ]);
+  setCommandExamples(command, ['prisma-next migration apply --db $DATABASE_URL']);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')

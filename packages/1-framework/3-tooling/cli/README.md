@@ -787,10 +787,12 @@ Update your database schema to match the currently emitted contract.
 - Allows `additive`, `widening`, and `destructive` operation classes where supported by planner/runner
 - Disables per-operation runner execution checks by default (precheck/postcheck/idempotency)
 - In `--dry-run` mode for SQL targets, prints a DDL preview derived from planned operations
+- In interactive mode, destructive plans require confirmation before apply
+- In non-interactive mode, destructive plans fail unless `-y, --yes` is provided
 
 **Command:**
 ```bash
-prisma-next db update [--db <url>] [--config <path>] [--dry-run] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next db update [--db <url>] [--config <path>] [--dry-run] [-y|--yes] [--interactive|--no-interactive] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
 ```
 
 **Error codes (additional to shared CLI/runtime codes):**
