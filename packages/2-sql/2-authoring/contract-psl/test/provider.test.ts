@@ -265,7 +265,7 @@ model Document {
           },
         },
       });
-      expect(storage.tables['document']?.columns['embedding']).not.toHaveProperty('typeRef');
+      expect(storage.tables['document']!.columns['embedding']).not.toHaveProperty('typeRef');
     });
   });
 

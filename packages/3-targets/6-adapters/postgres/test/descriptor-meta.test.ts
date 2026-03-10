@@ -139,6 +139,12 @@ describe('expandNativeType hooks via descriptor-meta', () => {
           );
         });
 
+        it('throws for zero length', () => {
+          expect(() => expand({ nativeType: 'character', typeParams: { length: 0 } })).toThrow(
+            'Invalid "length" type parameter',
+          );
+        });
+
         it('throws for negative length', () => {
           expect(() => expand({ nativeType: 'character', typeParams: { length: -1 } })).toThrow(
             'Invalid "length" type parameter',
@@ -187,6 +193,12 @@ describe('expandNativeType hooks via descriptor-meta', () => {
           );
         });
 
+        it('throws for zero precision', () => {
+          expect(() => expand({ nativeType: 'timestamp', typeParams: { precision: 0 } })).toThrow(
+            'Invalid "precision" type parameter',
+          );
+        });
+
         it('throws for negative precision', () => {
           expect(() => expand({ nativeType: 'timestamp', typeParams: { precision: -1 } })).toThrow(
             'Invalid "precision" type parameter',
@@ -217,8 +229,22 @@ describe('expandNativeType hooks via descriptor-meta', () => {
       expect(expand({ nativeType: 'numeric', typeParams: {} })).toBe('numeric');
     });
 
-    it('ignores scale when precision is absent', () => {
-      expect(expand({ nativeType: 'numeric', typeParams: { scale: 2 } })).toBe('numeric');
+    it('accepts zero scale with valid precision', () => {
+      expect(expand({ nativeType: 'numeric', typeParams: { precision: 10, scale: 0 } })).toBe(
+        'numeric(10,0)',
+      );
+    });
+
+    it('throws when scale is declared without precision', () => {
+      expect(() => expand({ nativeType: 'numeric', typeParams: { scale: 2 } })).toThrow(
+        '"scale" requires "precision"',
+      );
+    });
+
+    it('throws for zero precision', () => {
+      expect(() => expand({ nativeType: 'numeric', typeParams: { precision: 0 } })).toThrow(
+        'Invalid "precision" type parameter',
+      );
     });
 
     it('throws for negative precision', () => {
