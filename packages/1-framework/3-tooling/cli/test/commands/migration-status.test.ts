@@ -12,6 +12,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { buildMigrationEntries } from '../../src/commands/migration-status';
@@ -139,7 +140,7 @@ async function setupChain(migrationsDir: string) {
   return { dir1, dir2, dir3 };
 }
 
-describe('buildMigrationEntries', () => {
+describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () => {
   it('builds entries for a linear chain (offline)', async () => {
     const tempDir = await createTempDir('offline');
     const migrationsDir = join(tempDir, 'migrations');
