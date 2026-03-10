@@ -240,7 +240,6 @@ type ContractBase = SqlContract<
       readonly targetId: 'postgres';
       readonly types: {
         readonly codecTypes: {
-          readonly controlPlaneHooks: undefined;
           readonly import: {
             readonly alias: 'PgVectorTypes';
             readonly named: 'CodecTypes';
