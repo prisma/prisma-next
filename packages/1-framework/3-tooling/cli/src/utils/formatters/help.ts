@@ -181,11 +181,10 @@ export function formatCommandHelp(options: {
 
   // Extract options and format them
   const optionsList = command.options.map((opt) => {
-    const flags = opt.flags;
     const description = opt.description || '';
     // Commander.js stores default value in defaultValue property
     const defaultValue = (opt as { defaultValue?: unknown }).defaultValue;
-    return { flags, description, defaultValue };
+    return { flags: opt.flags, description, defaultValue };
   });
 
   // Extract subcommands if any
@@ -304,11 +303,10 @@ export function formatRootHelp(options: {
 
   // Extract global options (needed to determine if last command)
   const globalOptions = program.options.map((opt) => {
-    const flags = opt.flags;
     const description = opt.description || '';
     // Commander.js stores default value in defaultValue property
     const defaultValue = (opt as { defaultValue?: unknown }).defaultValue;
-    return { flags, description, defaultValue };
+    return { flags: opt.flags, description, defaultValue };
   });
 
   // Build command tree
