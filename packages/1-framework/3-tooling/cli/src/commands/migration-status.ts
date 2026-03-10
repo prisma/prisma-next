@@ -405,7 +405,7 @@ export function createMigrationStatusCommand(): Command {
 
       const result = await executeMigrationStatusCommand(options, flags, ui);
 
-      const exitCode = handleResult(result, flags, (statusResult) => {
+      const exitCode = handleResult(result, flags, ui, (statusResult) => {
         if (flags.json) {
           ui.output(JSON.stringify(statusResult, null, 2));
         } else if (!flags.quiet) {

@@ -161,7 +161,7 @@ export async function prepareMigrationContext(
   });
 
   // Create progress adapter
-  const onProgress = createProgressAdapter({ flags });
+  const onProgress = createProgressAdapter({ ui, flags });
 
   return ok({
     client,

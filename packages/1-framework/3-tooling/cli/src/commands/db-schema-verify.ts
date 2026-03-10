@@ -129,7 +129,7 @@ async function executeDbSchemaVerifyCommand(
   });
 
   // Create progress adapter
-  const onProgress = createProgressAdapter({ flags });
+  const onProgress = createProgressAdapter({ ui, flags });
 
   try {
     const schemaVerifyResult = await client.schemaVerify({
@@ -190,7 +190,7 @@ export function createDbSchemaVerifyCommand(): Command {
       const result = await executeDbSchemaVerifyCommand(options, flags, ui);
 
       // Handle result - formats output and returns exit code
-      const exitCode = handleResult(result, flags, (schemaVerifyResult) => {
+      const exitCode = handleResult(result, flags, ui, (schemaVerifyResult) => {
         if (flags.json) {
           ui.output(formatSchemaVerifyJson(schemaVerifyResult));
         } else {

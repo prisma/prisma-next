@@ -156,7 +156,7 @@ async function executeDbVerifyCommand(
   });
 
   // Create progress adapter
-  const onProgress = createProgressAdapter({ flags });
+  const onProgress = createProgressAdapter({ ui, flags });
 
   try {
     const verifyResult = await client.verify({
@@ -217,7 +217,7 @@ export function createDbVerifyCommand(): Command {
 
       const result = await executeDbVerifyCommand(options, flags, ui);
 
-      const exitCode = handleResult(result, flags, (verifyResult) => {
+      const exitCode = handleResult(result, flags, ui, (verifyResult) => {
         if (flags.json) {
           ui.output(formatVerifyJson(verifyResult));
         } else {

@@ -118,7 +118,7 @@ export function createMigrationVerifyCommand(): Command {
 
       const result = await executeMigrationVerifyCommand(options, flags, ui);
 
-      const exitCode = handleResult(result, flags, (verifyResult) => {
+      const exitCode = handleResult(result, flags, ui, (verifyResult) => {
         if (flags.json) {
           ui.output(JSON.stringify(verifyResult, null, 2));
         } else if (!flags.quiet) {

@@ -217,7 +217,7 @@ export function createDbInitCommand(): Command {
 
     const result = await executeDbInitCommand(options, flags, ui, startTime);
 
-    const exitCode = handleResult(result, flags, (dbInitResult) => {
+    const exitCode = handleResult(result, flags, ui, (dbInitResult) => {
       if (flags.json) {
         ui.output(formatMigrationJson(dbInitResult));
       } else {

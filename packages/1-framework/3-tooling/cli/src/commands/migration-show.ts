@@ -230,7 +230,7 @@ export function createMigrationShowCommand(): Command {
 
       const result = await executeMigrationShowCommand(target, options, flags, ui);
 
-      const exitCode = handleResult(result, flags, (showResult) => {
+      const exitCode = handleResult(result, flags, ui, (showResult) => {
         if (flags.json) {
           ui.output(JSON.stringify(showResult, null, 2));
         } else if (!flags.quiet) {

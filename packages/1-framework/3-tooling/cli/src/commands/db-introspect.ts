@@ -95,7 +95,7 @@ async function executeDbIntrospectCommand(
   });
 
   // Create progress adapter
-  const onProgress = createProgressAdapter({ flags });
+  const onProgress = createProgressAdapter({ ui, flags });
 
   try {
     // Introspect with connection and progress
@@ -173,7 +173,7 @@ export function createDbIntrospectCommand(): Command {
       const result = await executeDbIntrospectCommand(options, flags, ui, startTime);
 
       // Handle result - formats output and returns exit code
-      const exitCode = handleResult(result, flags, (value) => {
+      const exitCode = handleResult(result, flags, ui, (value) => {
         const { introspectResult, schemaView } = value;
         if (flags.json) {
           ui.output(formatIntrospectJson(introspectResult));

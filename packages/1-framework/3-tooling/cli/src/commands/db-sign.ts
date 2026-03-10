@@ -143,7 +143,7 @@ async function executeDbSignCommand(
   });
 
   // Create progress adapter
-  const onProgress = createProgressAdapter({ flags });
+  const onProgress = createProgressAdapter({ ui, flags });
 
   try {
     // Step 1: Schema verification - connect here
@@ -232,7 +232,7 @@ export function createDbSignCommand(): Command {
 
       if (failure instanceof CliStructuredError) {
         // Infrastructure error - use standard handler
-        const exitCode = handleResult(result as Result<never, CliStructuredError>, flags);
+        const exitCode = handleResult(result as Result<never, CliStructuredError>, flags, ui);
         process.exit(exitCode);
       }
 

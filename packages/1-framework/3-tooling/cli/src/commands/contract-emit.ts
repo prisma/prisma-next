@@ -177,7 +177,7 @@ async function executeContractEmitCommand(
   });
 
   // Create progress adapter
-  const onProgress = createProgressAdapter({ flags });
+  const onProgress = createProgressAdapter({ ui, flags });
 
   try {
     // Call emit with progress callback
@@ -256,7 +256,7 @@ export function createContractEmitCommand(): Command {
       const result = await executeContractEmitCommand(options, flags, ui, startTime);
 
       // Handle result - formats output and returns exit code
-      const exitCode = handleResult(result, flags, (emitResult) => {
+      const exitCode = handleResult(result, flags, ui, (emitResult) => {
         if (flags.json) {
           ui.output(formatEmitJson(emitResult));
         } else {

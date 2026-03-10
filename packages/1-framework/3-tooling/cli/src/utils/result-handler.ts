@@ -1,8 +1,8 @@
 import type { Result } from '@prisma-next/utils/result';
 import type { CliStructuredError } from './cli-errors';
+import { formatErrorJson, formatErrorOutput } from './formatters/errors';
 import type { GlobalFlags } from './global-flags';
-import { formatErrorJson, formatErrorOutput } from './output';
-import { TerminalUI } from './terminal-ui';
+import type { TerminalUI } from './terminal-ui';
 
 /**
  * Processes a CLI command result, handling both success and error cases.
@@ -16,6 +16,7 @@ import { TerminalUI } from './terminal-ui';
 export function handleResult<T>(
   result: Result<T, CliStructuredError>,
   flags: GlobalFlags,
+  ui: TerminalUI,
   onSuccess?: (value: T) => void,
 ): number {
   if (result.ok) {
@@ -24,8 +25,6 @@ export function handleResult<T>(
     }
     return 0;
   }
-
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
   // Convert to CLI envelope
   const envelope = result.failure.toEnvelope();

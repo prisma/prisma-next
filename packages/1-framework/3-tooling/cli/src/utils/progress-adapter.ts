@@ -1,12 +1,13 @@
 import type { SpinnerResult } from '@clack/prompts';
 import type { ControlProgressEvent, OnControlProgress } from '../control-api/types';
 import type { GlobalFlags } from './global-flags';
-import { TerminalUI } from './terminal-ui';
+import type { TerminalUI } from './terminal-ui';
 
 /**
  * Options for creating a progress adapter.
  */
 interface ProgressAdapterOptions {
+  readonly ui: TerminalUI;
   readonly flags: GlobalFlags;
 }
 
@@ -29,8 +30,7 @@ interface SpanState {
  * - Respects quiet/json/non-TTY flags (no-op in those cases)
  */
 export function createProgressAdapter(options: ProgressAdapterOptions): OnControlProgress {
-  const { flags } = options;
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+  const { ui, flags } = options;
 
   // Skip progress if quiet, JSON output, or non-interactive
   if (flags.quiet || flags.json || !ui.isInteractive) {

@@ -351,7 +351,7 @@ export function createMigrationPlanCommand(): Command {
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
       const result = await executeMigrationPlanCommand(options, flags, ui, startTime);
 
-      const exitCode = handleResult(result, flags, (planResult) => {
+      const exitCode = handleResult(result, flags, ui, (planResult) => {
         if (flags.json) {
           ui.output(JSON.stringify(planResult, null, 2));
         } else if (!flags.quiet) {

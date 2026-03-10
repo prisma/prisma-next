@@ -401,7 +401,7 @@ export function createMigrationApplyCommand(): Command {
 
       const result = await executeMigrationApplyCommand(options, flags, ui, startTime);
 
-      const exitCode = handleResult(result, flags, (applyResult) => {
+      const exitCode = handleResult(result, flags, ui, (applyResult) => {
         if (flags.json) {
           ui.output(JSON.stringify(applyResult, null, 2));
         } else if (!flags.quiet) {

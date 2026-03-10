@@ -215,7 +215,7 @@ export function createDbUpdateCommand(): Command {
       }
     }
 
-    const exitCode = handleResult(result, flags, (dbUpdateResult) => {
+    const exitCode = handleResult(result, flags, ui, (dbUpdateResult) => {
       if (flags.json) {
         ui.output(formatMigrationJson(dbUpdateResult));
       } else {

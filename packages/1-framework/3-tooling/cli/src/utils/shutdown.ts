@@ -82,7 +82,11 @@ export function isShuttingDown(): boolean {
  * - First signal: aborts the controller, starts a 3s grace timer.
  * - Second signal: force-exits immediately.
  */
+let installed = false;
+
 export function installShutdownHandlers(): void {
+  if (installed) return;
+  installed = true;
   process.on('SIGINT', globalHandler.onSignal);
   process.on('SIGTERM', globalHandler.onSignal);
 }
