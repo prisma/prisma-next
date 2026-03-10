@@ -6,7 +6,7 @@ Review comments from **wmadden** and **jkomyno** on `refactor/declarative-depend
 
 ### Architectural concern: composability of dependency detection
 
-**Status:** Open — needs discussion/decision
+**Status:** Discussed with wmadden — accepted as known limitation for now (deferred follow-up)
 
 wmadden argues the PR shifts dependency detection from component-owned to adapter-owned, violating composability:
 
@@ -17,11 +17,13 @@ wmadden argues the PR shifts dependency detection from component-owned to adapte
 
 > "If we want to keep `DependencyIR` as structural IDs, we still need component-owned detection (or at least a component-contributed detector registry) so that dependency installation/presence is composable with extension packs, not gated on adapter feature work."
 
+**Decision note:** Keep the current model for now. It works for Postgres extension-shaped dependencies (`pg_extension` mapped to dependency IDs), but broader dependency shapes are a known limitation. Follow-up work may introduce component-contributed detectors/detector registry.
+
 ### Inline comments
 
-- [ ] **ADR 154 — verify method question** (`docs/architecture docs/adrs/ADR 154 - Component-owned database dependencies.md:41`)
+- [x] **ADR 154 — verify method question** (`docs/architecture docs/adrs/ADR 154 - Component-owned database dependencies.md:41`)
   Asks: "Isn't the verify method needed to detect whether the dependency is installed in the database schema?"
-  saevarb replied explaining the new model handles this via ID presence checks. May need further ADR clarification.
+  **Resolved:** ADR 154 now explicitly documents the accepted limitation: verification remains ID-presence based (`requiredId ∈ schema.dependencies`) and broader dependency-shape detection is deferred follow-up work.
 
 - [x] **FK-backing index name duplication** (`contract-to-schema-ir.ts:114`)
   "This name generation looks like it doesn't belong here. It must exist in at least one other place and these two locations should share a common implementation."
@@ -87,6 +89,7 @@ wmadden argues the PR shifts dependency detection from component-owned to adapte
 
 - [ ] **12. No runtime validation of dependency ID format**
   `DependencyIR = { readonly id: string }` has no validation that IDs follow the `target.type.name` convention. A structural validator could prevent subtle bugs (e.g., ID typo causing the planner to always re-emit an install op).
+  **Deferred:** Non-blocking for this PR; out of scope for now.
 
 ### Squash recommendation
 

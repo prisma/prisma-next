@@ -69,6 +69,16 @@ This ADR distinguishes three concepts:
 - Callers must consistently pass the active `frameworkComponents` list to planner/runner/verification.
 - Adapters own the convention for mapping database objects to dependency IDs (e.g., Postgres uses `postgres.extension.<extname>`). Extension components must follow the adapter's convention.
 
+### Known limitation (accepted for now)
+
+The current detection model is intentionally limited to dependency shapes the adapter can introspect into `SqlSchemaIR.dependencies`.
+
+- For Postgres today, this means dependency presence is based on `pg_extension` mapping (`postgres.extension.<extname>`).
+- Non-`pg_extension` dependency shapes (for example, prerequisites represented by specific tables, functions, or settings) are not yet composable without additional adapter support.
+- Some extension behavior is better modeled as regular contract storage (tables/columns/constraints) instead of dependency installation side effects.
+
+This limitation is accepted for v1. A future iteration may add a component-contributed dependency detector model (or detector registry) that can project richer installed-state facts into `SqlSchemaIR.dependencies` while keeping planner/verifier logic structural (`requiredId ∈ schema.dependencies`).
+
 ## Related
 
 - ADR 005 — Thin Core Fat Targets
