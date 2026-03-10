@@ -7,11 +7,15 @@
  * Journey V: db init on non-empty unmanaged database.
  */
 
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
+import stripAnsi from 'strip-ansi';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
+  parseJsonOutput,
   runContractEmit,
   runDbInit,
   runDbVerify,
@@ -95,47 +99,30 @@ withTempDir(({ createTempDir }) => {
       await closeDb();
     });
 
-    // TODO: This scenario requires constructing a marker with a fake target hash.
-    // The current infrastructure only supports Postgres targets.
     it(
-      'db verify fails when marker target differs from contract target',
+      'db verify fails when contract target differs from config target',
       async () => {
         const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
 
-        // Init normally
+        // Init normally with Postgres contract
         const emit = await runContractEmit(ctx);
         expect(emit.exitCode, 'U.pre: emit').toBe(0);
         const init = await runDbInit(ctx);
         expect(init.exitCode, 'U.pre: init').toBe(0);
 
-        // Tamper with marker to simulate different target
-        try {
-          await withClient(connectionString, async (client) => {
-            // Read the current contract_json from marker
-            const result = await client.query(
-              'SELECT contract_json FROM prisma_contract.marker WHERE id = 1',
-            );
-            if (result.rows.length > 0) {
-              const contractJson = result.rows[0]?.['contract_json'] as Record<string, unknown>;
-              // Try to change the target in the stored contract
-              if (contractJson && typeof contractJson === 'object') {
-                const tampered = { ...contractJson, target: { id: 'fake-target' } };
-                await client.query(
-                  'UPDATE prisma_contract.marker SET contract_json = $1::jsonb WHERE id = 1',
-                  [JSON.stringify(tampered)],
-                );
-              }
-            }
-          });
+        // Tamper with contract.json on disk: change "target" from "postgres" to "mysql"
+        // The config still says target=postgres, so db verify will see a mismatch.
+        const contractJsonPath = join(ctx.outputDir, 'contract.json');
+        const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        contractJson.target = 'mysql';
+        writeFileSync(contractJsonPath, JSON.stringify(contractJson, null, 2), 'utf-8');
 
-          // U.01: db verify — may or may not fail depending on how target matching works
-          const verify = await runDbVerify(ctx);
-          // We just verify it doesn't crash — exact behavior needs validation
-          expect([0, 1], 'U.01: verify completes').toContain(verify.exitCode);
-        } catch {
-          // If tampering fails, skip this test
-          // TODO: Find a better way to simulate target mismatch
-        }
+        // U.01: db verify (fails — contract says "mysql", config says "postgres")
+        const verify = await runDbVerify(ctx);
+        expect(verify.exitCode, 'U.01: db verify target mismatch').toBe(1);
+        expect(stripAnsi(verify.stdout), 'U.01: mentions target mismatch').toContain(
+          'Target mismatch',
+        );
       },
       timeouts.spinUpPpgDev,
     );
