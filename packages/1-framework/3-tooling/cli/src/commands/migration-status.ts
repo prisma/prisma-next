@@ -22,9 +22,10 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { formatMigrationStatusOutput } from '../utils/formatters/migrations';
+import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import { formatMigrationStatusOutput, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 

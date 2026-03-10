@@ -15,8 +15,8 @@ import {
   errorUnexpected,
 } from './cli-errors';
 import { addGlobalOptions, maskConnectionUrl, resolveContractPath } from './command-helpers';
+import { formatStyledHeader } from './formatters/styled';
 import type { GlobalFlags } from './global-flags';
-import { formatStyledHeader } from './output';
 import { createProgressAdapter } from './progress-adapter';
 import type { TerminalUI } from './terminal-ui';
 

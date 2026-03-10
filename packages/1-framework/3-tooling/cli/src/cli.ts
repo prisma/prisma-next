@@ -17,8 +17,8 @@ import { createMigrationShowCommand } from './commands/migration-show';
 import { createMigrationStatusCommand } from './commands/migration-status';
 import { createMigrationVerifyCommand } from './commands/migration-verify';
 import { setCommandDescriptions } from './utils/command-helpers';
+import { formatCommandHelp, formatRootHelp } from './utils/formatters/help';
 import { parseGlobalFlags } from './utils/global-flags';
-import { formatCommandHelp, formatRootHelp } from './utils/output';
 import { suggestCommands } from './utils/suggest-command';
 
 /**

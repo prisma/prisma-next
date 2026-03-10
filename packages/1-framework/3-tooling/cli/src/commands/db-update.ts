@@ -17,17 +17,17 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import {
-  addMigrationCommandOptions,
-  prepareMigrationContext,
-} from '../utils/migration-command-scaffold';
 import {
   formatMigrationApplyOutput,
   formatMigrationJson,
   formatMigrationPlanOutput,
   type MigrationCommandResult,
-} from '../utils/output';
+} from '../utils/formatters/migrations';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import {
+  addMigrationCommandOptions,
+  prepareMigrationContext,
+} from '../utils/migration-command-scaffold';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 

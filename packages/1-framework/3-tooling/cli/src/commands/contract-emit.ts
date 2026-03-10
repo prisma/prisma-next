@@ -17,15 +17,14 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   type EmitContractResult,
   formatEmitJson,
   formatEmitOutput,
-  formatStyledHeader,
-  formatSuccessMessage,
-} from '../utils/output';
+} from '../utils/formatters/emit';
+import { formatStyledHeader, formatSuccessMessage } from '../utils/formatters/styled';
+import type { CommonCommandOptions } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';

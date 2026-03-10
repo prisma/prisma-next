@@ -1,8 +1,8 @@
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import type { CliErrorConflict, CliErrorEnvelope } from '../src/utils/cli-errors';
+import { formatErrorOutput } from '../src/utils/formatters/errors';
 import { parseGlobalFlags } from '../src/utils/global-flags';
-import { formatErrorOutput } from '../src/utils/output';
 
 const baseError: CliErrorEnvelope = {
   ok: false,

@@ -35,10 +35,10 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import { formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 

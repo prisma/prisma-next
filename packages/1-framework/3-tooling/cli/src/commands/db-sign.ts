@@ -24,15 +24,15 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { formatStyledHeader } from '../utils/formatters/styled';
 import {
   formatSchemaVerifyJson,
   formatSchemaVerifyOutput,
   formatSignJson,
   formatSignOutput,
-  formatStyledHeader,
-} from '../utils/output';
+} from '../utils/formatters/verify';
+import type { CommonCommandOptions } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';

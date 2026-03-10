@@ -14,8 +14,8 @@ import type { MigrationManifest, MigrationPackage } from '@prisma-next/migration
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { resolveByHashPrefix } from '../../src/commands/migration-show';
+import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
-import { formatMigrationShowOutput } from '../../src/utils/output';
 
 function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
   return {

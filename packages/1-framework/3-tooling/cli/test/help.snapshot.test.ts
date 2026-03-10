@@ -4,8 +4,8 @@ import { createContractEmitCommand } from '../src/commands/contract-emit';
 import { createDbIntrospectCommand } from '../src/commands/db-introspect';
 import { createDbUpdateCommand } from '../src/commands/db-update';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
+import { formatCommandHelp, formatRootHelp } from '../src/utils/formatters/help';
 import { parseGlobalFlags } from '../src/utils/global-flags';
-import { formatCommandHelp, formatRootHelp } from '../src/utils/output';
 
 describe('help text snapshots', () => {
   it('formats root help', () => {

@@ -1,8 +1,8 @@
 import type { Command } from 'commander';
 import { resolve } from 'pathe';
+import { formatCommandHelp } from './formatters/help';
 import type { CommonCommandOptions } from './global-flags';
 import { parseGlobalFlags } from './global-flags';
-import { formatCommandHelp } from './output';
 
 const longDescriptions = new WeakMap<Command, string>();
 const commandExamples = new WeakMap<Command, readonly string[]>();
