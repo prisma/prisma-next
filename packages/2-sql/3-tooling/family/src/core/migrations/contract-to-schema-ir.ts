@@ -104,17 +104,22 @@ function convertTable(
     columns[colName] = convertColumn(colName, colDef, expandNativeType);
   }
 
-  const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
+  const satisfiedIndexColumns = new Set([
+    ...table.indexes.map((idx) => idx.columns.join(',')),
+    ...table.uniques.map((unique) => unique.columns.join(',')),
+    ...(table.primaryKey ? [table.primaryKey.columns.join(',')] : []),
+  ]);
   const fkBackingIndexes: SqlIndexIR[] = [];
   for (const fk of table.foreignKeys) {
     if (fk.index === false) continue;
     const key = fk.columns.join(',');
-    if (declaredIndexColumns.has(key)) continue;
+    if (satisfiedIndexColumns.has(key)) continue;
     fkBackingIndexes.push({
       columns: fk.columns,
       unique: false,
       name: defaultIndexName(name, fk.columns),
     });
+    satisfiedIndexColumns.add(key);
   }
 
   return {

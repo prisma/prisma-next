@@ -471,6 +471,91 @@ describe('contractToSchemaIR', () => {
       referencedColumns: ['id'],
     });
   });
+
+  it('does not synthesize FK backing index when FK columns match primary key columns', () => {
+    const storage: SqlStorage = {
+      tables: {
+        User: table({
+          columns: { id: col({ nativeType: 'text' }) },
+          primaryKey: { columns: ['id'] },
+        }),
+        Post: table({
+          columns: { userId: col({ nativeType: 'text' }) },
+          primaryKey: { columns: ['userId'] },
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              references: { table: 'User', columns: ['id'] },
+              constraint: true,
+              index: true,
+            },
+          ],
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(wrap(storage));
+    expect(result.tables['Post']!.indexes).toEqual([]);
+  });
+
+  it('does not synthesize FK backing index when FK columns match unique columns', () => {
+    const storage: SqlStorage = {
+      tables: {
+        User: table({
+          columns: { id: col({ nativeType: 'text' }) },
+          primaryKey: { columns: ['id'] },
+        }),
+        Post: table({
+          columns: { userId: col({ nativeType: 'text' }) },
+          uniques: [{ columns: ['userId'] }],
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              references: { table: 'User', columns: ['id'] },
+              constraint: true,
+              index: true,
+            },
+          ],
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(wrap(storage));
+    expect(result.tables['Post']!.indexes).toEqual([]);
+  });
+
+  it('deduplicates synthesized FK backing indexes for repeated FK column sets', () => {
+    const storage: SqlStorage = {
+      tables: {
+        User: table({
+          columns: { id: col({ nativeType: 'text' }) },
+          primaryKey: { columns: ['id'] },
+        }),
+        Post: table({
+          columns: { userId: col({ nativeType: 'text' }) },
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              references: { table: 'User', columns: ['id'] },
+              constraint: true,
+              index: true,
+            },
+            {
+              columns: ['userId'],
+              references: { table: 'User', columns: ['id'] },
+              constraint: true,
+              index: true,
+            },
+          ],
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(wrap(storage));
+    expect(result.tables['Post']!.indexes).toEqual([
+      { columns: ['userId'], unique: false, name: 'Post_userId_idx' },
+    ]);
+  });
 });
 
 describe('detectDestructiveChanges', () => {
