@@ -1,9 +1,10 @@
 /**
- * Journeys F + G + H: Brownfield Adoption
+ * Journeys F + G: Brownfield Adoption
  *
  * Journey F: Adopt Prisma Next on an existing database with tables.
  * Journey G: Brownfield with schema mismatch.
- * Journey H: Brownfield with extra tables (strict vs tolerant).
+ *
+ * (Journey H was removed — tolerant vs strict is covered by Journey N in drift-schema.e2e.test.ts)
  */
 
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
@@ -157,58 +158,6 @@ withTempDir(({ createTempDir }) => {
         // G.08: db sign (succeeds)
         const sign = await runDbSign(ctx);
         expect(sign.exitCode, 'G.08: db sign').toBe(0);
-      },
-      timeouts.spinUpPpgDev,
-    );
-  });
-
-  // -------------------------------------------------------------------------
-  // Journey H: Brownfield with Extra Tables (Strict vs. Tolerant)
-  // -------------------------------------------------------------------------
-  describe('Journey H: Brownfield Extras', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void>;
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-      // Create user + extra audit_log table
-      await withClient(connectionString, async (client) => {
-        await client.query(CREATE_USER_TABLE);
-        await client.query(`
-          CREATE TABLE "audit_log" (
-            id int4 PRIMARY KEY,
-            action text NOT NULL
-          );
-        `);
-      });
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
-
-    it(
-      'schema-verify tolerant passes → strict fails → sign succeeds',
-      async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
-
-        // Emit base contract (only defines user table)
-        const emit = await runContractEmit(ctx);
-        expect(emit.exitCode, 'H.pre: emit').toBe(0);
-
-        // H.01: db schema-verify (tolerant — extras OK)
-        const tolerant = await runDbSchemaVerify(ctx);
-        expect(tolerant.exitCode, 'H.01: schema-verify tolerant passes').toBe(0);
-
-        // H.02: db schema-verify --strict (fails — extra audit_log)
-        const strict = await runDbSchemaVerify(ctx, ['--strict']);
-        expect(strict.exitCode, 'H.02: schema-verify strict fails').toBe(1);
-
-        // H.03: db sign (uses tolerant verification — succeeds)
-        const sign = await runDbSign(ctx);
-        expect(sign.exitCode, 'H.03: db sign succeeds').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );
