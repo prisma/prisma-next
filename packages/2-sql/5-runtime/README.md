@@ -20,6 +20,8 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 
 - **Execution Stack Composition**: Compose runtime descriptors into a reusable `ExecutionStack`
 - **Descriptor-Based Static Context Derivation**: Build `ExecutionContext` from `SqlStaticContributions` on descriptors without instantiation
+- **Mutation Default Generator Composition**: Assemble execution default generators from composed target/adapter/extension contributors
+- **No Implicit Generator Baseline**: Runtime resolves generator ids only from composed contributors (no built-in runtime fallback table)
 - **SQL Context Creation**: Create runtime contexts with SQL contracts, adapters, and codecs
 - **SQL Marker Management**: Provide SQL statements for reading/writing contract markers
 - **Codec Encoding/Decoding**: Encode parameters and decode rows using SQL codec registries
@@ -90,7 +92,8 @@ for await (const row of runtime.execute(plan)) {
 
 ### Descriptors & Stack
 
-- `SqlStaticContributions` - Interface for descriptor-level static contributions (codecs, operations, parameterized codecs)
+- `SqlStaticContributions` - Interface for descriptor-level static contributions (codecs, operations, parameterized codecs, mutation default generators)
+- `RuntimeMutationDefaultGenerator` - Descriptor for generator id + implementation
 - `SqlRuntimeTargetDescriptor`, `SqlRuntimeAdapterDescriptor`, `SqlRuntimeExtensionDescriptor` - Structural descriptor types requiring `SqlStaticContributions`
 - `SqlRuntimeAdapterInstance`, `SqlRuntimeDriverInstance`, `SqlRuntimeExtensionInstance` - Instance types
 - `SqlExecutionStack` - Descriptors-only stack type for static context creation
@@ -147,7 +150,7 @@ const runtime = createRuntime({
 The SQL runtime composes runtime-executor with SQL-specific implementations. Descriptors implement `SqlStaticContributions` so `ExecutionContext` can be derived from the descriptors-only stack without instantiation.
 
 1. **ExecutionStack**: Descriptors-only stack (from `@prisma-next/core-execution-plane`)
-2. **SqlStaticContributions**: Codecs, operation signatures, and parameterized codecs contributed by each descriptor
+2. **SqlStaticContributions**: Codecs, operation signatures, parameterized codecs, and mutation default generators contributed by each descriptor
 3. **ExecutionContext**: Built from contract + stack descriptors (no instantiation)
 4. **ExecutionStackInstance**: Instantiated components used at runtime for execution
 5. **SqlRuntime**: Wraps `RuntimeCore` and adds SQL-specific encoding/decoding
@@ -185,6 +188,8 @@ The SQL runtime uses stable error codes for programmatic error handling:
 - `RUNTIME.CONTRACT_TARGET_MISMATCH` — Contract target differs from stack target descriptor
 - `RUNTIME.MISSING_EXTENSION_PACK` — Contract requires an extension pack not provided in stack
 - `RUNTIME.DUPLICATE_PARAMETERIZED_CODEC` — Multiple extensions registered same parameterized codec
+- `RUNTIME.DUPLICATE_MUTATION_DEFAULT_GENERATOR` — Multiple components registered the same mutation default generator id (details include `existingOwner` and `incomingOwner`)
+- `RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING` — Contract references a generator id that no composed runtime component provides
 - `RUNTIME.TYPE_PARAMS_INVALID` — Type parameters fail codec schema validation
 - `RUNTIME.CODEC_MISSING` — Required codec not found in registry
 - `RUNTIME.DECODE_FAILED` — Row decoding failed

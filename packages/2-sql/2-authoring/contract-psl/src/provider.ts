@@ -5,18 +5,26 @@ import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
-import { createBuiltinDefaultFunctionRegistry } from './default-function-registry';
+import type { ControlMutationDefaults } from './default-function-registry';
 import { interpretPslDocumentToSqlContractIR } from './interpreter';
 
 export interface PrismaContractOptions {
   readonly output?: string;
-  readonly target?: TargetPackRef<'sql', 'postgres'>;
+  readonly target: TargetPackRef<'sql', 'postgres'>;
+  readonly scalarTypeDescriptors: ReadonlyMap<
+    string,
+    {
+      readonly codecId: string;
+      readonly nativeType: string;
+      readonly typeRef?: string;
+      readonly typeParams?: Record<string, unknown>;
+    }
+  >;
+  readonly controlMutationDefaults?: ControlMutationDefaults;
+  readonly composedExtensionPacks?: readonly string[];
 }
 
-export function prismaContract(
-  schemaPath: string,
-  options?: PrismaContractOptions,
-): ContractConfig {
+export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
   return {
     source: async (context: ContractSourceContext) => {
       const absoluteSchemaPath = resolve(schemaPath);
@@ -42,12 +50,20 @@ export function prismaContract(
         schema,
         sourceId: schemaPath,
       });
+      const composedExtensionPacks = [
+        ...(context.composedExtensionPacks ?? []),
+        ...(options.composedExtensionPacks ?? []),
+      ];
 
       const interpreted = interpretPslDocumentToSqlContractIR({
         document,
-        ...ifDefined('target', options?.target),
-        composedExtensionPacks: context.composedExtensionPacks,
-        defaultFunctionRegistry: createBuiltinDefaultFunctionRegistry(),
+        target: options.target,
+        scalarTypeDescriptors: options.scalarTypeDescriptors,
+        ...ifDefined(
+          'composedExtensionPacks',
+          composedExtensionPacks.length > 0 ? composedExtensionPacks : undefined,
+        ),
+        ...ifDefined('controlMutationDefaults', options.controlMutationDefaults),
       });
       if (!interpreted.ok) {
         return interpreted;
@@ -55,6 +71,6 @@ export function prismaContract(
 
       return ok(interpreted.value);
     },
-    ...ifDefined('output', options?.output),
+    ...ifDefined('output', options.output),
   };
 }

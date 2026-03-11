@@ -1682,9 +1682,15 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../2-sql/3-tooling/family
+      '@prisma-next/ids':
+        specifier: workspace:*
+        version: link:../../../1-framework/2-authoring/ids
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../../2-sql/1-core/contract
+      '@prisma-next/sql-contract-psl':
+        specifier: workspace:*
+        version: link:../../../2-sql/2-authoring/contract-psl
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../2-sql/2-authoring/contract-ts

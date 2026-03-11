@@ -11,6 +11,44 @@ jobs:
     uses: prisma/.github/.github/workflows/secret_detection.yml@main
     secrets: inherit
   code-scanning:
-    name: Code Scanning
-    if: github.event_name == 'pull_request'
-    uses: prisma/.github/.github/workflows/code_scanning.yml@main
+    name: Code Scanning / semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.147.0
+    # Skip any PR created by dependabot to avoid permission issues:
+    if: (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]')
+    permissions:
+      contents: read # Permission to read repository contents
+      pull-requests: write # Permission for posting comments
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0 # Required to scan git diff/history
+
+      - name: Perform Semgrep Analysis
+        run: |
+          BASELINE_ARG=""
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            BASELINE_ARG="--baseline-commit ${{ github.event.pull_request.base.sha }}"
+          fi
+          semgrep scan --severity ERROR --error --sarif --config auto --exclude-rule javascript.express.security.express-wkhtml-injection.express-wkhtmltoimage-injection . --output=semgrep-results.sarif $BASELINE_ARG
+
+      - name: Save SARIF results as artifact
+        if: always() && github.event.pull_request != null && hashFiles('semgrep-results.sarif') != ''
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: semgrep-results.sarif
+          path: semgrep-results.sarif
+
+      - name: Setup Reviewdog
+        if: always() && github.event.pull_request != null
+        uses: reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f # v1.5.0
+
+      - name: Post SARIF to PR
+        if: always() && github.event.pull_request != null && hashFiles('semgrep-results.sarif') != ''
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat semgrep-results.sarif | reviewdog -f=sarif -reporter=github-pr-review
