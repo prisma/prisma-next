@@ -1,10 +1,12 @@
 /**
- * Journeys J + Y: Help & Discovery + Global Flags
+ * Journey Y: Global Flag Behavior
  *
- * Journey J: New user explores available commands.
- * Journey Y: Verifying global flags work consistently.
- *
+ * Verifying global flags (--no-color, -q, -v) work consistently.
  * No database needed.
+ *
+ * (Journey J was removed — help output testing has near-zero regression value)
+ * (Journey I was removed — JSON output is tested per-command in A.09, A.10, B.10,
+ *  and in isolated command tests)
  */
 
 import { timeouts } from '@prisma-next/test-utils';
@@ -13,33 +15,6 @@ import { withTempDir } from '../utils/cli-test-helpers';
 import { runContractEmit, setupJourneyNoDb } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
-  // -------------------------------------------------------------------------
-  // Journey J: Help & Discovery
-  // -------------------------------------------------------------------------
-  describe('Journey J: Help & Discovery', () => {
-    // J.01–J.06: Help output for various commands
-    // These are tested via the individual command --help flags
-    // rather than through the full CLI program to avoid side effects
-
-    it(
-      'J.01–J.06: help flags produce output for all command groups',
-      async () => {
-        const ctx = setupJourneyNoDb(createTempDir);
-
-        // Test help via contract emit --help (representative of help system)
-        const help = await runContractEmit(ctx, ['--help']);
-        // Help should produce output (may exit 0 or use process.exit(0))
-        expect(help.stdout.length + help.stderr.length, 'J: help produces output').toBeGreaterThan(
-          0,
-        );
-      },
-      timeouts.typeScriptCompilation,
-    );
-  });
-
-  // -------------------------------------------------------------------------
-  // Journey Y: Global Flag Behavior
-  // -------------------------------------------------------------------------
   describe('Journey Y: Global Flags', () => {
     // Y.01: --no-color (already used by default in our helpers)
     it(
