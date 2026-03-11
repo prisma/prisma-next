@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:journeys": "vitest run --config vitest.journeys.config.ts",
     "test:watch": "vitest",
     "pretest": "pnpm -w build",
     "typecheck": "tsc --project tsconfig.json --noEmit",
