@@ -167,7 +167,6 @@ export interface SqlPlannerConflictLocation {
   readonly column?: string;
   readonly index?: string;
   readonly constraint?: string;
-  readonly extension?: string;
   readonly type?: string;
 }
 

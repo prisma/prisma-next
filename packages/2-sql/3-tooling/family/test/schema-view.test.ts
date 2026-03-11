@@ -91,4 +91,25 @@ describe('SqlFamilyInstance.toSchemaView', () => {
       default: "'draft'::text",
     });
   });
+
+  it('renders dependency nodes with dependency-oriented wording', () => {
+    const familyInstance = createSqlFamilyInstance({
+      target: createMockTarget(),
+      adapter: createMockAdapter(),
+      extensionPacks: [],
+    });
+
+    const schema: SqlSchemaIR = {
+      tables: {},
+      dependencies: [{ id: 'postgres.extension.vector' }],
+    };
+
+    const view = familyInstance.toSchemaView(schema);
+    const dependencyNode = view.root.children?.find(
+      (n) => n.id === 'dependency-postgres.extension.vector',
+    );
+
+    expect(dependencyNode?.kind).toBe('dependency');
+    expect(dependencyNode?.label).toBe('vector dependency is installed');
+  });
 });

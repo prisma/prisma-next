@@ -234,10 +234,12 @@ function deduplicateDependencyIRs(
   const seen = new Set<string>();
   const result: DependencyIR[] = [];
   for (const dep of deps) {
-    if (dep.id && !seen.has(dep.id)) {
-      seen.add(dep.id);
-      result.push({ id: dep.id });
+    if (dep.id.trim().length === 0) {
+      throw new Error('Dependency id must be a non-empty string');
     }
+    if (seen.has(dep.id)) continue;
+    seen.add(dep.id);
+    result.push({ id: dep.id });
   }
   return result;
 }

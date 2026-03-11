@@ -430,6 +430,72 @@ describe('contractToSchemaIR', () => {
     expect(result.dependencies).toEqual([]);
   });
 
+  it('deduplicates dependency IDs from framework components', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: { id: col({ nativeType: 'text' }) },
+        }),
+      },
+    };
+
+    const frameworkComponents = [
+      {
+        kind: 'extension',
+        id: 'dep-a',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.0-test',
+        databaseDependencies: {
+          init: [
+            { id: 'postgres.extension.vector', label: 'vector', install: [] },
+            { id: 'postgres.extension.vector', label: 'vector duplicate', install: [] },
+          ],
+        },
+      },
+    ] as unknown as NonNullable<
+      Omit<
+        Parameters<typeof contractToSchemaIRImpl>[1],
+        'annotationNamespace'
+      >['frameworkComponents']
+    >;
+
+    const result = contractToSchemaIR(wrap(storage), { frameworkComponents });
+    expect(result.dependencies).toEqual([{ id: 'postgres.extension.vector' }]);
+  });
+
+  it('throws for empty dependency IDs from framework components', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: { id: col({ nativeType: 'text' }) },
+        }),
+      },
+    };
+
+    const frameworkComponents = [
+      {
+        kind: 'extension',
+        id: 'dep-a',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.0-test',
+        databaseDependencies: {
+          init: [{ id: '', label: 'invalid', install: [] }],
+        },
+      },
+    ] as unknown as NonNullable<
+      Omit<
+        Parameters<typeof contractToSchemaIRImpl>[1],
+        'annotationNamespace'
+      >['frameworkComponents']
+    >;
+
+    expect(() => contractToSchemaIR(wrap(storage), { frameworkComponents })).toThrow(
+      'Dependency id must be a non-empty string',
+    );
+  });
+
   it('handles unique constraints without names', () => {
     const storage: SqlStorage = {
       tables: {

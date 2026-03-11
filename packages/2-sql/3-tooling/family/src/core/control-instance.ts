@@ -711,7 +711,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         return {
           kind: 'dependency',
           id: `dependency-${dep.id}`,
-          label: `${shortName} extension is enabled`,
+          label: `${shortName} dependency is installed`,
         };
       });
 
