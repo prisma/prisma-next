@@ -407,7 +407,7 @@ model Document {
         target: postgresTarget,
         scalarTypeDescriptors: postgresScalarTypeDescriptors,
       });
-      const result = await contract.source();
+      const result = await contract.source(emptyContext);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;

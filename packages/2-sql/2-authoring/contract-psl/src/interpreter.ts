@@ -18,8 +18,8 @@ import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
+  type ControlMutationDefaultRegistry,
   type ControlMutationDefaults,
-  type DefaultFunctionRegistry,
   lowerDefaultFunctionWithRegistry,
   type MutationDefaultGeneratorDescriptor,
   parseDefaultFunctionCall,
@@ -274,7 +274,7 @@ function lowerDefaultForField(input: {
   readonly columnDescriptor: ColumnDescriptor;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly sourceId: string;
-  readonly defaultFunctionRegistry: DefaultFunctionRegistry;
+  readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): {
   readonly defaultValue?: ColumnDefault;
@@ -456,7 +456,7 @@ function collectResolvedFields(
   namedTypeBaseTypes: Map<string, string>,
   modelNames: Set<string>,
   composedExtensions: Set<string>,
-  defaultFunctionRegistry: DefaultFunctionRegistry,
+  defaultFunctionRegistry: ControlMutationDefaultRegistry,
   generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
