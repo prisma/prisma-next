@@ -60,9 +60,10 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
       },
       contractToSchema(contract, frameworkComponents) {
+        const expander = buildNativeTypeExpander(frameworkComponents);
         return contractToSchemaIR(contract as SqlContract<SqlStorage> | null, {
           annotationNamespace: 'pg',
-          expandNativeType: buildNativeTypeExpander(frameworkComponents),
+          ...(expander ? { expandNativeType: expander } : {}),
           frameworkComponents: frameworkComponents ?? [],
         });
       },
