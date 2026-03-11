@@ -409,7 +409,7 @@ export interface SchemaIssue {
     | 'dependency_missing'
     | 'default_missing'
     | 'default_mismatch';
-  readonly table: string;
+  readonly table?: string;
   readonly column?: string;
   readonly indexOrConstraint?: string;
   readonly typeName?: string;

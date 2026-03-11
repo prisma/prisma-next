@@ -19,11 +19,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
-import {
-  type CodecControlHooks,
-  type ComponentDatabaseDependency,
-  collectInitDependencies,
-} from '../migrations/types';
+import { type CodecControlHooks, collectInitDependencies } from '../migrations/types';
 import {
   arraysEqual,
   computeCounts,
@@ -166,9 +162,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     });
   }
 
-  const databaseDependencies = collectInitDependencies(
-    options.frameworkComponents,
-  ) as readonly ComponentDatabaseDependency<string>[];
+  const databaseDependencies = collectInitDependencies(options.frameworkComponents);
   const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
   rootChildren.push(...dependencyStatuses);
 

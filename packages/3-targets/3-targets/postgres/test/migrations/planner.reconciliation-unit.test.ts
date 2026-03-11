@@ -39,7 +39,7 @@ const ADDITIVE_MODE: PlanningMode = {
 // ---------------------------------------------------------------------------
 
 function issue(
-  overrides: Partial<SchemaIssue> & Pick<SchemaIssue, 'kind' | 'table' | 'message'>,
+  overrides: Partial<SchemaIssue> & Pick<SchemaIssue, 'kind' | 'message'>,
 ): SchemaIssue {
   return overrides as SchemaIssue;
 }
@@ -350,7 +350,7 @@ describe('buildReconciliationPlan', () => {
     });
 
     it('skips dependency_missing issues', () => {
-      const result = plan([issue({ kind: 'dependency_missing', table: '', message: 'missing' })]);
+      const result = plan([issue({ kind: 'dependency_missing', message: 'missing' })]);
 
       expect(result.operations).toHaveLength(0);
       expect(result.conflicts).toHaveLength(0);
