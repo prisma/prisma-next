@@ -21,6 +21,11 @@ Model database-side prerequisites as **component-owned database dependencies**, 
 
 The CLI passes a **list of configured framework components** (`frameworkComponents`) into planning/execution/verification. SQL-family code structurally narrows the components that declare `databaseDependencies` and evaluates their dependency hooks.
 
+The target architecture is that components own both:
+
+- dependency declaration (`id`, `label`, `install` ops), and
+- dependency verification logic (pure schema-IR evaluation that determines whether the dependency is installed).
+
 ### Key constraints
 
 - **No inference from `contract.extensionPacks`**: schema verification must not interpret `contract.extensionPacks` as database prerequisites.
@@ -37,8 +42,9 @@ A component can declare `databaseDependencies.init`, where each dependency provi
 - a stable `id` (e.g., `postgres.extension.vector`)
 - a human `label`
 - `install` operations (`SqlMigrationPlanOperation`) for `db init`
+- component-owned verification logic (pure over `SqlSchemaIR`) that determines installed-state for that dependency
 
-Verification is generic: the planner and schema verifier check whether a dependency's `id` is present in `SqlSchemaIR.dependencies`. No per-component verification callbacks are needed.
+Planner and verifier stay structural consumers: they rely on component-owned verification outputs and avoid target-level fuzzy matching or inference from `contract.extensionPacks`.
 
 ### Schema IR representation
 
@@ -46,7 +52,7 @@ Verification is generic: the planner and schema verifier check whether a depende
 
 - **Introspection** (online path): the adapter maps database objects to dependency IDs. For Postgres, `pg_extension` rows are mapped using the convention `postgres.extension.<extname>`.
 - **`contractToSchemaIR`** (offline path): dependency IDs are collected from active framework components' `databaseDependencies.init[].id`.
-- **Planner**: skips install ops for dependencies already present in `schemaIR.dependencies`; emits them for missing ones.
+- **Planner**: uses component-owned verification outcomes to decide skip/emit for dependency install ops.
 
 ### Data sources
 
@@ -67,17 +73,18 @@ This ADR distinguishes three concepts:
 ### Negative / tradeoffs
 
 - Callers must consistently pass the active `frameworkComponents` list to planner/runner/verification.
-- Adapters own the convention for mapping database objects to dependency IDs (e.g., Postgres uses `postgres.extension.<extname>`). Extension components must follow the adapter's convention.
+- Adapters still own the base introspection surfaces and conventions used to materialize schema facts (for example, Postgres `pg_extension` -> `postgres.extension.<extname>`).
 
-### Known limitation (accepted for now)
+### Current implementation compromise (v1)
 
-The current detection model is intentionally limited to dependency shapes the adapter can introspect into `SqlSchemaIR.dependencies`.
+The current implementation intentionally simplifies verification to adapter-owned ID-presence checks:
 
-- For Postgres today, this means dependency presence is based on `pg_extension` mapping (`postgres.extension.<extname>`).
-- Non-`pg_extension` dependency shapes (for example, prerequisites represented by specific tables, functions, or settings) are not yet composable without additional adapter support.
-- Some extension behavior is better modeled as regular contract storage (tables/columns/constraints) instead of dependency installation side effects.
+- `ComponentDatabaseDependency` no longer includes a per-dependency verify callback.
+- Planner and schema verification currently use `requiredId ∈ schemaIR.dependencies`.
+- For Postgres today, `schemaIR.dependencies` is populated from adapter-owned `pg_extension` introspection (`postgres.extension.<extname>`).
+- This works for the current dependency set because all active dependencies are extension-shaped and map cleanly from `pg_extension`.
 
-This limitation is accepted for v1. A future iteration may add a component-contributed dependency detector model (or detector registry) that can project richer installed-state facts into `SqlSchemaIR.dependencies` while keeping planner/verifier logic structural (`requiredId ∈ schema.dependencies`).
+This is a temporary compromise, not the target architecture. When non-extension dependency shapes emerge (for example, prerequisites represented by functions, settings, or catalog/table facts), we should restore component-owned verification through component-contributed detectors/hooks that project installed-state facts into `SqlSchemaIR.dependencies`, while keeping planner/verifier matching structural.
 
 ## Related
 
