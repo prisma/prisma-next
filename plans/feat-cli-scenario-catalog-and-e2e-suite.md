@@ -40,12 +40,10 @@ The catalog covers **happy paths** (complete workflows end-to-end), **drift/erro
 | `brownfield-*` | Happy: existing DB adoption | `brownfield-adoption`, `brownfield-mismatch`, `brownfield-extras` |
 | `direct-*`, `destructive-*` | Happy: db update workflows | `direct-update`, `destructive-update` |
 | `schema-evolution-*`, `multi-step-*` | Happy: migration workflows | `schema-evolution-migrations`, `multi-step-migration` |
-| `ci-*` | Happy: CI/CD pipelines | `ci-pipeline` |
 | `init-to-*` | Happy: workflow transitions | `init-to-migrations` |
 | `drift-*` | Drift detection + recovery | `drift-phantom`, `drift-stale-marker`, `drift-mixed-mode` |
 | `connection-*`, `config-*` | Infrastructure errors | `connection-errors`, `config-errors` |
-| `migration-*` | Migration edge cases | `migration-plan-noop`, `migration-show-variants`, `migration-no-pending` |
-| `help-*`, `global-*` | Discovery / flags | `help-discovery`, `global-flags` |
+| `global-*` | Global flag behavior | `global-flags` |
 | `target-*` | Target mismatch | `target-mismatch` |
 | `unmanaged-*`, `no-contract-*` | Unusual initial states | `unmanaged-db-init`, `no-contract-yet` |
 
@@ -59,13 +57,13 @@ The catalog covers **happy paths** (complete workflows end-to-end), **drift/erro
 
 Journey tests run in parallel at the file level via Vitest's default `forks` pool. Each test file provisions its own PGlite instance in a `beforeAll` hook, so there are no cross-file database conflicts.
 
-**Expected concurrency**: 4 workers (configurable via `vitest.config.ts` `poolOptions.forks.maxForks`). With 13 test files (journeys grouped by shared preconditions) and 4 workers, projected wall-clock time is **2–4 minutes** (vs. 8–15 minutes sequential). Peak concurrent PGlite instances ≤ 4 since grouped journeys run sequentially within each file.
+**Expected concurrency**: 4 workers (configurable via `vitest.config.ts` `poolOptions.forks.maxForks`). With 10 test files (journeys grouped by shared preconditions) and 4 workers, projected wall-clock time is **2–3 minutes** (vs. 6–12 minutes sequential). Peak concurrent PGlite instances ≤ 4 since grouped journeys run sequentially within each file.
 
 **Constraints**:
 - PGlite assigns ports automatically via `@prisma/dev`, so concurrent instances don't collide.
 - Each PGlite instance uses ~50–100MB memory. 4 concurrent instances ≈ 200–400MB — well within CI runner limits.
 - The `sql()` helper must use connect-execute-disconnect semantics (like existing `withClient`), never holding a persistent connection, to respect PGlite's single-connection constraint.
-- Non-database journeys (J: help, Y: global flags, T: config errors, W: no contract) use short timeouts (`typeScriptCompilation` or `default`), not `spinUpPpgDev`.
+- Non-database journeys (Y: global flags, T: config errors, W: no contract) use short timeouts (`typeScriptCompilation` or `default`), not `spinUpPpgDev`.
 
 **Vitest configuration** (for journey tests):
 ```typescript
@@ -131,7 +129,7 @@ All scenarios reference abstract fixture names. Concrete implementations live in
 
 ### Journey B: Schema Evolution via Migrations
 
-> Developer evolves the schema through the migration workflow.
+> Developer evolves the schema through the migration workflow. Also covers edge cases from former Journeys Q (apply noop), R (plan noop), and X (show variants) — merged as tail steps to avoid redundant PGlite instances.
 
 **Preconditions**: Journey A completed (database initialized with `contract-base`).
 
@@ -147,6 +145,11 @@ All scenarios reference abstract fixture names. Concrete implementations live in
 | B.08 | `migration status --db` | All applied. No pending. | 0 | `schema-evolution-migrations/08-migration-status-applied` |
 | B.09 | `db verify` | Passes (marker matches v2 contract). | 0 | `schema-evolution-migrations/09-db-verify` |
 | B.10 | `migration status --json --db` | JSON: `mode: "online"`, all migrations in `migrations[]` with status. | 0 | `schema-evolution-migrations/10-migration-status-json` |
+| Q.01 | `migration apply --db --json` | Already up-to-date: `migrationsApplied: 0`. | 0 | — |
+| R.01 | `migration plan --json` | No changes: `noOp: true`. | 0 | — |
+| X.01 | `migration show` | Shows latest migration (post-apply). | 0 | — |
+| X.03 | `migration show ./migrations/<dir>` | Shows migration by directory path. | 0 | — |
+| X.05 | `migration show sha256:nonexistent` | **Fails**: no migration found for prefix. | 1 | — |
 
 ---
 
@@ -242,50 +245,21 @@ All scenarios reference abstract fixture names. Concrete implementations live in
 
 ---
 
-### Journey H: Brownfield with Extra Tables (Strict vs. Tolerant)
+### ~~Journey H: Brownfield with Extra Tables (Strict vs. Tolerant)~~ — REMOVED
 
-> Database has more tables than the contract defines.
-
-**Preconditions**: Database has `user` + `audit_log` tables. Contract only defines `user`.
-
-| Step | Command | Expected Behavior | Exit | Recording |
-|---|---|---|---|---|
-| H.01 | `db schema-verify` | **Passes** (tolerant mode: extras allowed). | 0 | `brownfield-extras/01-db-schema-verify-tolerant` |
-| H.02 | `db schema-verify --strict` | **Fails**: extra `audit_log` table reported. | 1 | `brownfield-extras/02-db-schema-verify-strict-fail` |
-| H.03 | `db sign` | **Succeeds** (sign uses tolerant verification). | 0 | `brownfield-extras/03-db-sign` |
+> Removed: tolerant vs strict schema-verify is already covered by Journey N (extra column drift, N.02–N.03). Same verification code path, different schema objects.
 
 ---
 
-### Journey I: CI/CD Pipeline
+### ~~Journey I: CI/CD Pipeline~~ — REMOVED
 
-> Automated pipeline: emit, apply migrations, verify.
-
-**Preconditions**: Code checked out. Database exists (may or may not have pending migrations).
-
-| Step | Command | Expected Behavior | Exit | Recording |
-|---|---|---|---|---|
-| I.01 | `contract emit --json` | JSON output with `storageHash`, `outDir`, `files`, `timings`. | 0 | `ci-pipeline/01-contract-emit-json` |
-| I.02 | `migration apply --db $URL --json` | JSON output: `migrationsApplied`, `migrationsTotal`, `applied[]`. If up-to-date: `migrationsApplied: 0`. | 0 | `ci-pipeline/02-migration-apply-json` |
-| I.03 | `db verify --db $URL --json` | JSON output: `ok: true`, `code`, `summary`, `contract.storageHash`, `marker.storageHash`. | 0 | `ci-pipeline/03-db-verify-json` |
-| I.04 | `db schema-verify --db $URL --json` | JSON output with verification tree. | 0 | `ci-pipeline/04-db-schema-verify-json` |
+> Removed: JSON output for each command is already tested inline in other journeys (A.09, A.10, B.10, B/Q.01, E.06–E.07, F.09, G.05) and in isolated command tests. No integration is tested by running them in sequence since commands don't pipe JSON to each other.
 
 ---
 
-### Journey J: Help & Discovery
+### ~~Journey J: Help & Discovery~~ — REMOVED
 
-> New user explores available commands.
-
-**Preconditions**: None (no database, no config needed for help).
-
-| Step | Command | Expected Behavior | Exit | Recording |
-|---|---|---|---|---|
-| J.01 | `prisma-next --help` | Root command tree with all groups. | 0 | `help-discovery/01-root-help` |
-| J.02 | `prisma-next db --help` | Lists all `db` subcommands with descriptions. | 0 | `help-discovery/02-db-help` |
-| J.03 | `prisma-next migration --help` | Lists all `migration` subcommands. | 0 | `help-discovery/03-migration-help` |
-| J.04 | `prisma-next contract --help` | Lists `contract` subcommands. | 0 | `help-discovery/04-contract-help` |
-| J.05 | `prisma-next db init --help` | Shows `db init` flags and examples. | 0 | `help-discovery/05-db-init-help` |
-| J.06 | `prisma-next --version` | Prints version. | 0 | `help-discovery/06-version` |
-| J.07 | `prisma-next db inot` | Unknown command. **Suggests** `db init`. Exit 2. | 2 | `help-discovery/07-unknown-command-suggestion` |
+> Removed: help output testing has near-zero regression prevention value. If help breaks, it's a CLI framework issue (commander.js), not application logic.
 
 ---
 
@@ -437,37 +411,15 @@ All scenarios reference abstract fixture names. Concrete implementations live in
 
 ---
 
-### Journey P4: Migration Apply Partial Failure and Resume
+### ~~Journey P4: Migration Apply Partial Failure and Resume~~ — REMOVED
 
-> Second migration in a chain fails mid-apply, then resumes (ADR 123: `schema/partial-apply`).
-
-**Preconditions**: Migration chain with 2 migrations. Second migration's DDL will fail (e.g., constraint violation from conflicting pre-existing data).
-
-| Step | Command | Expected Behavior | Exit | Recording |
-|---|---|---|---|---|
-| P4.01 | `migration apply --db` | Migration 1 applied. Migration 2 fails (rolled back by transaction). Marker at migration 1's target hash. | 1 | `drift-partial-apply/01-migration-apply-partial-fail` |
-| P4.02 | `migration status --db` | Migration 1: Applied. Migration 2: Pending. | 0 | `drift-partial-apply/02-migration-status-partial` |
-| P4.03 | Fix the conflicting data via raw SQL | Remove the data causing the constraint violation. | — | — |
-| P4.04 | `migration apply --db` | **Resume**: migration 2 applied. Marker updated to final hash. | 0 | `drift-partial-apply/03-migration-apply-resume` |
-| P4.05 | `migration status --db` | All applied. | 0 | `drift-partial-apply/04-migration-status-all-applied` |
-
-> **Note**: This scenario is already tested in `cli.migration-apply.e2e.test.ts` ("resumes from last successful migration after failure"). The journey catalogs it here for completeness and to generate a recording.
+> Removed: already tested in `cli.migration-apply.e2e.test.ts` ("resumes from last successful migration after failure"). Recovery pattern is a core migration-apply concern, not a distinct user journey.
 
 ---
 
-### Journey P5: No Migration Path (dag/no-path)
+### ~~Journey P5: No Migration Path (dag/no-path)~~ — REMOVED
 
-> Database marker points to a hash that has no forward path in the migration DAG.
-
-**Preconditions**: Database initialized with `contract-base`. Migration planned from `contract-additive` → `contract-v3` (skipping base → additive). Marker is at base hash.
-
-| Step | Command | Expected Behavior | Exit | Recording |
-|---|---|---|---|---|
-| P5.01 | `migration apply --db` | **Fails**: no path from marker hash to destination. Error suggests re-planning from current state. | 1 | `drift-no-path/01-migration-apply-no-path` |
-| P5.02 | `migration plan --name from-base` | **Recovery**: plans the missing base → additive edge. | 0 | `drift-no-path/02-migration-plan-recovery` |
-| P5.03 | `migration apply --db` | Applies the now-complete chain. | 0 | `drift-no-path/03-migration-apply-recovery` |
-
-> **Note**: This scenario is already tested in `cli.migration-apply.e2e.test.ts` ("fails when current contract has no planned migration path"). Cataloged here for recordings.
+> Removed: already tested in `cli.migration-apply.e2e.test.ts` ("fails when current contract has no planned migration path"). Recovery pattern (re-plan missing edge) is identical to P3.
 
 ---
 
@@ -485,28 +437,15 @@ The following drift categories from ADR 123 are **not covered** by CLI e2e tests
 
 ---
 
-### Journey Q: Migration Apply Already Up-to-Date
+### ~~Journey Q: Migration Apply Already Up-to-Date~~ — MERGED INTO B
 
-> All migrations already applied.
-
-**Preconditions**: Journey B completed (all migrations applied).
-
-| Step | Command | Expected Behavior | Exit | Recording |
-|---|---|---|---|---|
-| Q.01 | `migration apply --db` | Reports "Already up to date". `migrationsApplied: 0`. | 0 | `migration-no-pending/01-migration-apply-noop` |
-| Q.02 | `migration status --db` | All migrations marked "Applied". | 0 | `migration-no-pending/02-migration-status-all-applied` |
+> Merged: now B/Q.01 — a tail step in Journey B after all migrations are applied.
 
 ---
 
-### Journey R: Migration Plan No Changes
+### ~~Journey R: Migration Plan No Changes~~ — MERGED INTO B
 
-> Contract hasn't changed since last migration.
-
-**Preconditions**: Migration chain exists. Contract matches leaf migration's `to` hash.
-
-| Step | Command | Expected Behavior | Exit | Recording |
-|---|---|---|---|---|
-| R.01 | `migration plan` | Reports no-op: "No changes detected." `noOp: true`. | 0 | `migration-plan-noop/01-migration-plan-noop` |
+> Merged: now B/R.01 — a tail step in Journey B after confirming no changes remain.
 
 ---
 
@@ -584,19 +523,9 @@ The following drift categories from ADR 123 are **not covered** by CLI e2e tests
 
 ---
 
-### Journey X: Migration Show Variants
+### ~~Journey X: Migration Show Variants~~ — MERGED INTO B
 
-> Inspecting migrations by different selectors.
-
-**Preconditions**: Migration chain with 2+ migrations.
-
-| Step | Command | Expected Behavior | Exit | Recording |
-|---|---|---|---|---|
-| X.01 | `migration show` | Shows **latest** migration. | 0 | `migration-show-variants/01-show-latest` |
-| X.02 | `migration show sha256:<prefix>` | Shows migration matching hash prefix (git-style). | 0 | `migration-show-variants/02-show-by-hash` |
-| X.03 | `migration show ./migrations/<dir>` | Shows migration by directory path. | 0 | `migration-show-variants/03-show-by-path` |
-| X.04 | `migration show sha` | **Fails**: ambiguous prefix. Suggests longer prefix. | 1 | `migration-show-variants/04-show-ambiguous-prefix` |
-| X.05 | `migration show sha256:nonexistent` | **Fails**: no migration found for prefix. | 1 | `migration-show-variants/05-show-not-found` |
+> Merged: now B/X.01, B/X.03, B/X.05 — tail steps in Journey B reusing its migration chain. B.03 already tested `migration show` (latest); the merged steps add by-path lookup and not-found error.
 
 ---
 
@@ -632,25 +561,25 @@ The following drift categories from ADR 123 are **not covered** by CLI e2e tests
 
 Scenarios × CLI commands. "Happy" = exit 0 within a happy-path or recovery context. "Error" = exit ≠ 0 or drift detection. "JSON" = `--json` output tested.
 
+Removed journeys (~~H, I, J, P4, P5~~) excluded. Merged steps (Q, R, X) shown under B.
+
 | Command | Happy | Error | JSON |
 |---|---|---|---|
-| `contract emit` | A.01, B.01, C.01, C.03, D.01, E.01, F.02, F.06, G.02, G.06, N.05, Y.01–Y.04, Z.01 | T.01–T.04 | I.01 |
+| `contract emit` | A.01, B.01, C.01, C.03, D.01, E.01, F.02, F.06, G.02, G.06, N.05, Y.01–Y.03, Z.01 | T.01–T.04 | — |
 | `db init` | A.03, A.04, K.04 | O.01, V.01, W.01 | — |
 | `db init --dry-run` | A.02 | O.02, V.02 | — |
 | `db update` | D.03, D.04, L.03, M.04, N.06, O.03 | E.03, E.05 | E.06, E.07 |
 | `db update -y` | E.04 | — | E.07 |
 | `db update --dry-run` | D.02, E.02 | — | — |
-| `db verify` | A.05, B.09, C.08, D.05, F.05, K.05, L.04, M.01, N.01, O.04, P2.04 | K.01, L.01, P2.01, S.01–S.04, U.01, W.02 | A.09, I.03 |
-| `db schema-verify` | A.06, A.07, F.03, G.07, H.01, M.05, N.02, N.07, P2.02 | G.03, H.02, K.02, L.02, M.02, N.03 | A.10, I.04 |
-| `db sign` | F.04, G.08, H.03, P2.03 | G.04 | F.09, G.05 |
+| `db verify` | A.05, B.09, C.08, D.05, F.05, K.05, L.04, M.01, N.01, O.04, P2.04 | K.01, L.01, P2.01, S.01–S.04, U.01, W.02 | A.09 |
+| `db schema-verify` | A.06, A.07, F.03, G.07, M.05, N.02, N.07, P2.02 | G.03, K.02, L.02, M.02, N.03 | A.10 |
+| `db sign` | F.04, G.08, P2.03 | G.04 | F.09, G.05 |
 | `db introspect` | A.08, F.01, G.01, K.03, M.03, N.04 | — | — |
-| `migration plan` | B.02, C.02, C.04, F.07, L.05, P.02, P3.03, P5.02, Z.02 | — | — |
-| `migration plan` (no-op) | R.01 | — | — |
-| `migration apply` | B.07, C.06, F.08, L.06, P.03, P3.04, P4.04, P5.03, Q.01, Z.03 | P3.02, P4.01, P5.01 | I.02 |
-| `migration status` | B.05, B.06, B.08, C.05, C.07, P.01, P.04, P4.02, P4.05, Q.02, Z.04 | P3.01 | B.10 |
-| `migration show` | B.03, X.01–X.03 | X.04, X.05 | — |
+| `migration plan` | B.02, C.02, C.04, F.07, L.05, P.02, P3.03, Z.02 | — | B/R.01 |
+| `migration apply` | B.07, C.06, F.08, L.06, P.03, P3.04, Z.03 | P3.02 | B/Q.01 |
+| `migration status` | B.05, B.06, B.08, C.05, C.07, P.01, P.04, Z.04 | P3.01 | B.10 |
+| `migration show` | B.03, B/X.01, B/X.03 | B/X.05 | — |
 | `migration verify` | B.04 | — | — |
-| `--help` / `--version` | J.01–J.06 | J.07 | — |
 
 ---
 
@@ -658,31 +587,29 @@ Scenarios × CLI commands. "Happy" = exit 0 within a happy-path or recovery cont
 
 ### File Structure
 
-Journeys with shared preconditions are grouped into the same test file. This reduces the file count from 20 → 13, which:
+Journeys with shared preconditions are grouped into the same test file. After consolidation (removing redundant journeys, merging edge cases into B), this yields 10 test files:
 - Lowers peak concurrent PGlite instances (grouped journeys run sequentially within a file, each with its own `describe`/`beforeAll`/`afterAll`)
 - Keeps related scenarios co-located for easier maintenance
 - Non-database files (`help-and-flags`, `config-errors`) use short timeouts
 
 ```
 test/integration/test/
-├── cli-journeys/                                  # NEW: Journey-based e2e tests
+├── cli-journeys/                                  # Journey-based e2e tests
 │   ├── greenfield-setup.e2e.test.ts               # Journey A
-│   ├── schema-evolution-migrations.e2e.test.ts    # Journeys B + Z (both: init → plan → apply)
+│   ├── schema-evolution-migrations.e2e.test.ts    # Journeys B (+ merged Q, R, X) + Z
 │   ├── multi-step-migration.e2e.test.ts           # Journey C
-│   ├── db-update-workflows.e2e.test.ts            # Journeys D + E + O (all start from init'd DB, test db update variants)
-│   ├── brownfield-adoption.e2e.test.ts            # Journeys F + G + H (all brownfield variants)
-│   ├── ci-pipeline.e2e.test.ts                    # Journey I (JSON-only)
-│   ├── help-and-flags.e2e.test.ts                 # Journeys J + Y (no DB needed)
-│   ├── drift-schema.e2e.test.ts                   # Journeys M + N (init'd DB + manual DDL drift)
-│   ├── drift-marker.e2e.test.ts                   # Journeys K + L + P + P2 (marker-related drift)
-│   ├── drift-migration-dag.e2e.test.ts            # Journeys P3 + P4 + P5 (chain breakage, partial apply, no-path)
-│   ├── migration-edge-cases.e2e.test.ts           # Journeys Q + R + X
-│   ├── connection-and-contract-errors.e2e.test.ts # Journeys S + W + U + V (error scenarios)
+│   ├── db-update-workflows.e2e.test.ts            # Journeys D + E + O
+│   ├── brownfield-adoption.e2e.test.ts            # Journeys F + G
+│   ├── help-and-flags.e2e.test.ts                 # Journey Y only (no DB needed)
+│   ├── drift-schema.e2e.test.ts                   # Journeys M + N
+│   ├── drift-marker.e2e.test.ts                   # Journeys K + L + P + P2
+│   ├── drift-migration-dag.e2e.test.ts            # Journey P3 only
+│   ├── connection-and-contract-errors.e2e.test.ts # Journeys S + W + U + V
 │   └── config-errors.e2e.test.ts                  # Journey T (no DB needed)
 ├── utils/
 │   ├── cli-test-helpers.ts                        # Existing helpers
-│   ├── journey-test-helpers.ts                    # NEW: Journey lifecycle helpers
-│   └── recording-helpers.ts                       # NEW: ASCII golden-file helpers
+│   ├── journey-test-helpers.ts                    # Journey lifecycle helpers
+│   └── recording-helpers.ts                       # ASCII golden-file helpers (future)
 ```
 
 **Grouping rationale:**
@@ -690,19 +617,17 @@ test/integration/test/
 | File | Journeys | Shared precondition | PGlite instances |
 |---|---|---|---|
 | `greenfield-setup` | A | Empty DB | 1 |
-| `schema-evolution-migrations` | B, Z | Init'd DB → plan → apply | 2 (sequential) |
+| `schema-evolution-migrations` | B (+Q,R,X), Z | Init'd DB → plan → apply | 2 (sequential) |
 | `multi-step-migration` | C | Init'd DB → multi-plan → apply | 1 |
 | `db-update-workflows` | D, E, O | Init'd DB → db update variants | 3 (sequential) |
-| `brownfield-adoption` | F, G, H | Pre-existing tables via raw SQL | 3 (sequential) |
-| `ci-pipeline` | I | Init'd DB (JSON-only) | 1 |
-| `help-and-flags` | J, Y | None | 0 |
+| `brownfield-adoption` | F, G | Pre-existing tables via raw SQL | 2 (sequential) |
+| `help-and-flags` | Y | None | 0 |
 | `drift-schema` | M, N | Init'd DB + manual DDL | 2 (sequential) |
 | `drift-marker` | K, L, P, P2 | Marker-related drift states | 4 (sequential) |
-| `drift-migration-dag` | P3, P4, P5 | Migration chain breakage, partial apply, no-path | 3 (sequential) |
-| `migration-edge-cases` | Q, R, X | Post-migration chain | 3 (sequential) |
+| `drift-migration-dag` | P3 | Migration chain breakage | 1 |
 | `connection-and-contract-errors` | S, W, U, V | Various error states | 1–2 |
 | `config-errors` | T | None | 0 |
-| **Total** | **30 journeys** | | **~23 instances across 13 files** |
+| **Total** | **22 journeys** | | **~17 instances across 11 files** |
 
 With 4 vitest workers: at most 4 files run concurrently, so peak PGlite count ≤ 4 (since journeys within a file run sequentially).
 
@@ -836,10 +761,11 @@ All commands now produce consistent `CliErrorEnvelope` JSON on failure. For `db 
 
 ### Scenario Coverage
 
-- [x] All 30 journeys (A–Z + P2–P5) have corresponding e2e test files
+- [x] 22 journeys (A–G, K–P, P2–P3, S–Z; Q/R/X merged into B) have corresponding e2e test files across 10 files (+ config-errors = 11 files)
 - [x] Each journey is a single `it()` block with descriptive assertion labels per step (e.g., `'A.03: db init'`)
 - [x] Tests assert on: exit code, key output content (not exact strings), database state after each step
 - [x] JSON variant journeys assert on JSON envelope keys and value types
+- [x] Removed journeys (H, I, J, P4, P5) are covered by other journeys or command-specific tests
 
 ### Recording Coverage (separate from tests — manual/on-demand only)
 
@@ -857,7 +783,7 @@ All commands now produce consistent `CliErrorEnvelope` JSON on failure. For `db 
 - [x] Journeys parallelize across vitest workers (file-level parallelism, 4 workers)
 - [x] Contract swap helper allows evolving schema mid-journey
 - [x] Raw SQL helper uses connect-execute-disconnect (never holds persistent connection)
-- [x] Non-database journeys (J, Y, T, W) use short timeouts, not `spinUpPpgDev`
+- [x] Non-database journeys (Y, T) use short timeouts, not `spinUpPpgDev`
 - [x] Tests work in CI (timeouts account for `TEST_TIMEOUT_MULTIPLIER`)
 
 ### Fixture Coverage
@@ -891,18 +817,20 @@ All commands now produce consistent `CliErrorEnvelope` JSON on failure. For `db 
 
 ### Phase 2: Happy Path Journeys (tests)
 
-- [x] Implement Journeys B–I e2e tests (all happy paths)
+- [x] Implement Journeys B–G e2e tests (all happy paths)
 - [x] Verify parallelism works across 4 vitest workers
+- [x] Removed H (redundant with N), I (JSON covered inline), J (help has no regression value)
 
 ### Phase 3: Drift & Error Journeys (tests)
 
-- [x] Implement Journeys K–P, P2–P5 e2e tests (drift scenarios)
+- [x] Implement Journeys K–P, P2–P3 e2e tests (drift scenarios)
 - [x] Implement Journeys S, T, U, V, W e2e tests (connection/config/target errors)
-- [x] Implement Journeys Q, R, X e2e tests (migration edge cases)
+- [x] Merged Q, R, X into Journey B as tail steps
+- [x] Removed P4, P5 (covered by cli.migration-apply.e2e.test.ts)
 
 ### Phase 4: Remaining Tests + Polish
 
-- [x] Implement Journey J + Y e2e tests (help/discovery, global flags — no DB)
+- [x] Implement Journey Y e2e test (global flags — no DB)
 - [x] Cross-reference coverage matrix against implemented tests
 
 ### Phase 5: Recordings (independent from tests)
