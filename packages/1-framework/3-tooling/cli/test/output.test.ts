@@ -7,7 +7,6 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import { parseGlobalFlags } from '../src/utils/global-flags';
 import {
   formatIntrospectJson,
   formatIntrospectOutput,
@@ -15,7 +14,8 @@ import {
   formatSchemaVerifyOutput,
   formatSignJson,
   formatSignOutput,
-} from '../src/utils/output';
+} from '../src/utils/formatters/verify';
+import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('formatIntrospectOutput', () => {
   const createSchemaView = (): CoreSchemaView => ({
@@ -110,16 +110,15 @@ describe('formatIntrospectOutput', () => {
     const output = formatIntrospectOutput(result, schemaView, flags);
     const lines = output.split('\n').map(stripAnsi);
 
-    // Root should be first line
-    expect(lines[0]).toContain('sql schema (tables: 2)');
-    // First entity should have tree character
-    const userLine = lines.find((line) => line.includes('table user'));
-    expect(userLine).toBeDefined();
-    expect(userLine).toMatch(/[├└].*table user/);
-    // Fields should be indented
-    const idFieldLine = lines.find((line) => line.includes('id: pg/int4@1'));
-    expect(idFieldLine).toBeDefined();
-    expect(idFieldLine).toMatch(/[├└].*id: pg\/int4@1/);
+    // Exact tree structure: prefix is accumulated so depth-2 nodes
+    // get the ancestor continuation guide (│) from depth 1.
+    expect(lines[0]).toBe('sql schema (tables: 2)');
+    expect(lines[1]).toBe('├─ table user');
+    expect(lines[2]).toBe('│  ├─ id: pg/int4@1 (not null)');
+    expect(lines[3]).toBe('│  ├─ email: pg/text@1 (not null)');
+    expect(lines[4]).toBe('│  └─ index user_email_unique');
+    expect(lines[5]).toBe('└─ table post');
+    expect(lines[6]).toBe('   └─ id: pg/int4@1 (not null)');
   });
 
   it('renders root with no children', () => {
@@ -159,22 +158,6 @@ describe('formatIntrospectOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('Total time: 123ms');
-  });
-
-  it('applies timestamps prefix when enabled', () => {
-    const schemaView = createSchemaView();
-    const result = createResult();
-    const flags = parseGlobalFlags({ timestamps: true, 'no-color': true });
-
-    const output = formatIntrospectOutput(result, schemaView, flags);
-    const lines = output.split('\n');
-
-    // All lines should start with timestamp prefix
-    for (const line of lines) {
-      if (line.trim()) {
-        expect(line).toMatch(/^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/);
-      }
-    }
   });
 
   it('applies colors when enabled', () => {
@@ -550,21 +533,6 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toContain('pass=3');
     expect(stripped).toContain('warn=0');
     expect(stripped).toContain('fail=1');
-  });
-
-  it('applies timestamps prefix when enabled', () => {
-    const result = createResult();
-    const flags = parseGlobalFlags({ timestamps: true, 'no-color': true });
-
-    const output = formatSchemaVerifyOutput(result, flags);
-    const lines = output.split('\n');
-
-    // All non-empty lines should start with timestamp prefix
-    for (const line of lines) {
-      if (line.trim()) {
-        expect(line).toMatch(/^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/);
-      }
-    }
   });
 
   it('applies colors when enabled', () => {

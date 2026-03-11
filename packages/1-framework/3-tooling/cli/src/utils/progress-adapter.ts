@@ -1,14 +1,13 @@
-import ora from 'ora';
+import type { SpinnerResult } from '@clack/prompts';
 import type { ControlProgressEvent, OnControlProgress } from '../control-api/types';
 import type { GlobalFlags } from './global-flags';
+import type { TerminalUI } from './terminal-ui';
 
 /**
  * Options for creating a progress adapter.
  */
 interface ProgressAdapterOptions {
-  /**
-   * Global flags that control progress output behavior (quiet, json, color).
-   */
+  readonly ui: TerminalUI;
   readonly flags: GlobalFlags;
 }
 
@@ -16,33 +15,26 @@ interface ProgressAdapterOptions {
  * State for tracking active spans in the progress adapter.
  */
 interface SpanState {
-  readonly spinner: ReturnType<typeof ora>;
+  readonly spinner: SpinnerResult;
   readonly startTime: number;
+  readonly label: string;
 }
 
 /**
  * Creates a progress adapter that converts control-api progress events
- * into CLI spinner/progress output.
+ * into CLI spinner/progress output on stderr.
  *
  * The adapter:
  * - Starts/succeeds spinners for top-level span boundaries
  * - Prints per-operation lines for nested spans (e.g., migration operations under 'apply')
  * - Respects quiet/json/non-TTY flags (no-op in those cases)
- *
- * @param options - Progress adapter configuration
- * @returns An onProgress callback compatible with control-api operations
  */
 export function createProgressAdapter(options: ProgressAdapterOptions): OnControlProgress {
-  const { flags } = options;
+  const { ui, flags } = options;
 
-  // Skip progress if quiet, JSON output, or non-TTY
-  const shouldShowProgress = !flags.quiet && flags.json !== 'object' && process.stdout.isTTY;
-
-  if (!shouldShowProgress) {
-    // Return a no-op callback
-    return () => {
-      // No-op
-    };
+  // Skip progress if quiet, JSON output, or non-interactive
+  if (flags.quiet || flags.json || !ui.isInteractive) {
+    return () => {};
   }
 
   // Track active spans by spanId
@@ -50,37 +42,34 @@ export function createProgressAdapter(options: ProgressAdapterOptions): OnContro
 
   return (event: ControlProgressEvent) => {
     if (event.kind === 'spanStart') {
-      // Nested spans (with parentSpanId) are printed as lines, not spinners
+      // Nested spans (with parentSpanId) are printed as step lines
       if (event.parentSpanId) {
-        console.log(`  → ${event.label}...`);
+        ui.step(`${event.label}...`);
         return;
       }
 
       // Top-level spans get a spinner
-      const spinner = ora({
-        text: event.label,
-        color: flags.color !== false ? 'cyan' : false,
-      }).start();
+      const spinner = ui.spinner();
+      spinner.start(event.label);
 
       activeSpans.set(event.spanId, {
         spinner,
         startTime: Date.now(),
+        label: event.label,
       });
     } else if (event.kind === 'spanEnd') {
-      // Complete the spinner for this span (only top-level spans have spinners)
       const spanState = activeSpans.get(event.spanId);
       if (spanState) {
         const elapsed = Date.now() - spanState.startTime;
         if (event.outcome === 'error') {
-          spanState.spinner.fail(`${spanState.spinner.text} (failed)`);
+          spanState.spinner.error(`${spanState.label} (failed)`);
         } else if (event.outcome === 'skipped') {
-          spanState.spinner.info(`${spanState.spinner.text} (skipped)`);
+          spanState.spinner.stop(`${spanState.label} (skipped)`);
         } else {
-          spanState.spinner.succeed(`${spanState.spinner.text} (${elapsed}ms)`);
+          spanState.spinner.stop(`${spanState.label} (${elapsed}ms)`);
         }
         activeSpans.delete(event.spanId);
       }
-      // Nested span ends are no-ops (could log completion if needed)
     }
   };
 }

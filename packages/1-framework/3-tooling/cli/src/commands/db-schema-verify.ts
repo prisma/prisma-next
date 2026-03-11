@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
 import type { VerifyDatabaseSchemaResult } from '@prisma-next/core-control-plane/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { ContractValidationError } from '../control-api/errors';
@@ -12,38 +12,27 @@ import {
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
-  errorJsonFormatNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
+  addGlobalOptions,
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
+  setCommandExamples,
 } from '../utils/command-helpers';
+import { formatStyledHeader } from '../utils/formatters/styled';
+import { formatSchemaVerifyJson, formatSchemaVerifyOutput } from '../utils/formatters/verify';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import {
-  formatCommandHelp,
-  formatSchemaVerifyJson,
-  formatSchemaVerifyOutput,
-  formatStyledHeader,
-} from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
-interface DbSchemaVerifyOptions {
+interface DbSchemaVerifyOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly json?: string | boolean;
   readonly strict?: boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly vv?: boolean;
-  readonly trace?: boolean;
-  readonly timestamps?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
 }
 
 /**
@@ -52,6 +41,7 @@ interface DbSchemaVerifyOptions {
 async function executeDbSchemaVerifyCommand(
   options: DbSchemaVerifyOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
 ): Promise<Result<VerifyDatabaseSchemaResult, CliStructuredError>> {
   // Load config
   const config = await loadConfig(options.config);
@@ -60,9 +50,7 @@ async function executeDbSchemaVerifyCommand(
     : 'prisma-next.config.ts';
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
-
-  // Output header
-  if (flags.json !== 'object' && !flags.quiet) {
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
@@ -77,7 +65,7 @@ async function executeDbSchemaVerifyCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Load contract file
@@ -118,6 +106,7 @@ async function executeDbSchemaVerifyCommand(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for db schema-verify (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'db schema-verify',
       }),
     );
   }
@@ -137,7 +126,7 @@ async function executeDbSchemaVerifyCommand(
   });
 
   // Create progress adapter
-  const onProgress = createProgressAdapter({ flags });
+  const onProgress = createProgressAdapter({ ui, flags });
 
   try {
     const schemaVerifyResult = await client.schemaVerify({
@@ -146,11 +135,6 @@ async function executeDbSchemaVerifyCommand(
       connection: dbConnection,
       onProgress,
     });
-
-    // Add blank line after all async operations if spinners were shown
-    if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
-      console.log('');
-    }
 
     return ok(schemaVerifyResult);
   } catch (error) {
@@ -187,49 +171,29 @@ export function createDbSchemaVerifyCommand(): Command {
       'column types, constraints, and extensions. Reports any mismatches via a contract-shaped\n' +
       'verification tree. This is a read-only operation that does not modify the database.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const flags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags });
-      },
-    })
+  setCommandExamples(command, [
+    'prisma-next db schema-verify --db $DATABASE_URL',
+    'prisma-next db schema-verify --db $DATABASE_URL --strict',
+  ]);
+  addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object)', false)
     .option('--strict', 'Strict mode: extra schema elements cause failures', false)
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
     .action(async (options: DbSchemaVerifyOptions) => {
       const flags = parseGlobalFlags(options);
 
-      // Validate JSON format option
-      if (flags.json === 'ndjson') {
-        const result = notOk(
-          errorJsonFormatNotSupported({
-            command: 'db schema-verify',
-            format: 'ndjson',
-            supportedFormats: ['object'],
-          }),
-        );
-        const exitCode = handleResult(result, flags);
-        process.exit(exitCode);
-      }
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const result = await executeDbSchemaVerifyCommand(options, flags);
+      const result = await executeDbSchemaVerifyCommand(options, flags, ui);
 
       // Handle result - formats output and returns exit code
-      const exitCode = handleResult(result, flags, (schemaVerifyResult) => {
-        if (flags.json === 'object') {
-          console.log(formatSchemaVerifyJson(schemaVerifyResult));
+      const exitCode = handleResult(result, flags, ui, (schemaVerifyResult) => {
+        if (flags.json) {
+          ui.output(formatSchemaVerifyJson(schemaVerifyResult));
         } else {
           const output = formatSchemaVerifyOutput(schemaVerifyResult, flags);
           if (output) {
-            console.log(output);
+            ui.log(output);
           }
         }
       });

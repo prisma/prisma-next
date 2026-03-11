@@ -29,26 +29,23 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { resolveContractPath, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  addGlobalOptions,
+  resolveContractPath,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
+import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import { formatCommandHelp, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
-interface MigrationPlanOptions {
+interface MigrationPlanOptions extends CommonCommandOptions {
   readonly config?: string;
   readonly name?: string;
   readonly from?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly vv?: boolean;
-  readonly trace?: boolean;
-  readonly timestamps?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
 }
 
 export interface MigrationPlanResult {
@@ -86,6 +83,7 @@ function mapMigrationToolsError(error: unknown): CliStructuredError {
 async function executeMigrationPlanCommand(
   options: MigrationPlanOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<MigrationPlanResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
@@ -102,7 +100,7 @@ async function executeMigrationPlanCommand(
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
-  if (flags.json !== 'object' && !flags.quiet) {
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
@@ -121,7 +119,7 @@ async function executeMigrationPlanCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Load contract file (the "to" contract)
@@ -338,34 +336,26 @@ export function createMigrationPlanCommand(): Command {
       'produces a new migration package with the required operations. No database\n' +
       'connection is needed — this is a fully offline operation.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const flags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags });
-      },
-    })
+  setCommandExamples(command, [
+    'prisma-next migration plan',
+    'prisma-next migration plan --name add-users-table',
+  ]);
+  addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--name <slug>', 'Name slug for the migration directory', 'migration')
     .option('--from <hash>', 'Explicit starting contract hash (overrides migration chain leaf)')
-    .option('--json [format]', 'Output as JSON (object)', false)
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
     .action(async (options: MigrationPlanOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
-      const result = await executeMigrationPlanCommand(options, flags, startTime);
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const result = await executeMigrationPlanCommand(options, flags, ui, startTime);
 
-      const exitCode = handleResult(result, flags, (planResult) => {
-        if (flags.json === 'object') {
-          console.log(JSON.stringify(planResult, null, 2));
+      const exitCode = handleResult(result, flags, ui, (planResult) => {
+        if (flags.json) {
+          ui.output(JSON.stringify(planResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationPlanOutput(planResult, flags));
+          ui.log(formatMigrationPlanOutput(planResult, flags));
         }
       });
 

@@ -5,6 +5,7 @@
 export type { CliErrorConflict, CliErrorEnvelope } from '@prisma-next/core-control-plane/errors';
 export {
   CliStructuredError,
+  ERROR_CODE_DESTRUCTIVE_CHANGES,
   errorConfigFileNotFound,
   errorConfigValidation,
   errorContractConfigMissing,
@@ -16,7 +17,6 @@ export {
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorHashMismatch,
-  errorJsonFormatNotSupported,
   errorMarkerMissing,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,

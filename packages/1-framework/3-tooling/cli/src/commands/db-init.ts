@@ -6,27 +6,30 @@ import type { DbInitFailure } from '../control-api/types';
 import {
   CliStructuredError,
   errorContractValidationFailed,
-  errorJsonFormatNotSupported,
   errorMigrationPlanningFailed,
   errorRunnerFailed,
   errorRuntime,
   errorUnexpected,
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
-import { sanitizeErrorMessage, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  sanitizeErrorMessage,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
+import {
+  formatMigrationApplyOutput,
+  formatMigrationJson,
+  formatMigrationPlanOutput,
+  type MigrationCommandResult,
+} from '../utils/formatters/migrations';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   addMigrationCommandOptions,
   prepareMigrationContext,
 } from '../utils/migration-command-scaffold';
-import {
-  formatCommandHelp,
-  formatMigrationApplyOutput,
-  formatMigrationJson,
-  formatMigrationPlanOutput,
-  type MigrationCommandResult,
-} from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
 type DbInitOptions = MigrationCommandOptions;
 
@@ -96,10 +99,11 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
 async function executeDbInitCommand(
   options: DbInitOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<MigrationCommandResult, CliStructuredError>> {
   // Prepare shared migration context (config, contract, connection, client)
-  const ctxResult = await prepareMigrationContext(options, flags, {
+  const ctxResult = await prepareMigrationContext(options, flags, ui, {
     commandName: 'db init',
     description: 'Bootstrap a database to match the current contract',
     url: 'https://pris.ly/db-init',
@@ -113,7 +117,7 @@ async function executeDbInitCommand(
     // Call dbInit with connection and progress callback
     const result = await client.dbInit({
       contractIR: contractJson,
-      mode: options.plan ? 'plan' : 'apply',
+      mode: options.dryRun ? 'plan' : 'apply',
       connection: dbConnection,
       onProgress,
     });
@@ -197,45 +201,32 @@ export function createDbInitCommand(): Command {
     'Initializes a database to match your emitted contract using additive-only operations.\n' +
       'Creates any missing tables, columns, indexes, and constraints defined in your contract.\n' +
       'Leaves existing compatible structures in place, surfaces conflicts when destructive changes\n' +
-      'would be required, and signs the database to track contract state. Use --plan to\n' +
+      'would be required, and signs the database to track contract state. Use --dry-run to\n' +
       'preview changes without applying.',
   );
+  setCommandExamples(command, [
+    'prisma-next db init --db $DATABASE_URL',
+    'prisma-next db init --db $DATABASE_URL --dry-run',
+  ]);
   addMigrationCommandOptions(command);
-  command.configureHelp({
-    formatHelp: (cmd) => {
-      const flags = parseGlobalFlags({});
-      return formatCommandHelp({ command: cmd, flags });
-    },
-  });
   command.action(async (options: DbInitOptions) => {
     const flags = parseGlobalFlags(options);
     const startTime = Date.now();
 
-    // Validate JSON format option
-    if (flags.json === 'ndjson') {
-      const result = notOk(
-        errorJsonFormatNotSupported({
-          command: 'db init',
-          format: 'ndjson',
-          supportedFormats: ['object'],
-        }),
-      );
-      const exitCode = handleResult(result, flags);
-      process.exit(exitCode);
-    }
+    const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-    const result = await executeDbInitCommand(options, flags, startTime);
+    const result = await executeDbInitCommand(options, flags, ui, startTime);
 
-    const exitCode = handleResult(result, flags, (dbInitResult) => {
-      if (flags.json === 'object') {
-        console.log(formatMigrationJson(dbInitResult));
+    const exitCode = handleResult(result, flags, ui, (dbInitResult) => {
+      if (flags.json) {
+        ui.output(formatMigrationJson(dbInitResult));
       } else {
         const output =
           dbInitResult.mode === 'plan'
             ? formatMigrationPlanOutput(dbInitResult, flags)
             : formatMigrationApplyOutput(dbInitResult, flags);
         if (output) {
-          console.log(output);
+          ui.log(output);
         }
       }
     });

@@ -9,23 +9,20 @@ import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import {
+  addGlobalOptions,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
+import { formatMigrationShowOutput } from '../utils/formatters/migrations';
+import { formatStyledHeader } from '../utils/formatters/styled';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import { formatCommandHelp, formatMigrationShowOutput, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
-interface MigrationShowOptions {
+interface MigrationShowOptions extends CommonCommandOptions {
   readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly vv?: boolean;
-  readonly trace?: boolean;
-  readonly timestamps?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
 }
 
 export interface MigrationShowResult {
@@ -84,6 +81,7 @@ async function executeMigrationShowCommand(
   target: string | undefined,
   options: MigrationShowOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
 ): Promise<Result<MigrationShowResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -96,7 +94,7 @@ async function executeMigrationShowCommand(
   );
   const migrationsRelative = relative(process.cwd(), migrationsDir);
 
-  if (flags.json !== 'object' && !flags.quiet) {
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'migrations', value: migrationsRelative },
@@ -110,7 +108,7 @@ async function executeMigrationShowCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   let pkg: MigrationPackage;
@@ -216,35 +214,28 @@ export function createMigrationShowCommand(): Command {
       'Accepts a directory path, a hash prefix (git-style), or defaults to the\n' +
       'latest migration.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const defaultFlags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags: defaultFlags });
-      },
-    })
+  setCommandExamples(command, [
+    'prisma-next migration show',
+    'prisma-next migration show sha256:a1b2c3',
+  ]);
+  addGlobalOptions(command)
     .argument(
       '[target]',
       'Migration directory path or migrationId hash prefix (defaults to latest)',
     )
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object)', false)
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output')
-    .option('-vv, --trace', 'Trace output')
-    .option('--timestamps', 'Add timestamps to output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
     .action(async (target: string | undefined, options: MigrationShowOptions) => {
       const flags = parseGlobalFlags(options);
 
-      const result = await executeMigrationShowCommand(target, options, flags);
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const exitCode = handleResult(result, flags, (showResult) => {
-        if (flags.json === 'object') {
-          console.log(JSON.stringify(showResult, null, 2));
+      const result = await executeMigrationShowCommand(target, options, flags, ui);
+
+      const exitCode = handleResult(result, flags, ui, (showResult) => {
+        if (flags.json) {
+          ui.output(JSON.stringify(showResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationShowOutput(showResult, flags));
+          ui.log(formatMigrationShowOutput(showResult, flags));
         }
       });
 

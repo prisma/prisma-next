@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { ContractValidationError } from '../control-api/errors';
@@ -14,40 +14,29 @@ import {
   errorDriverRequired,
   errorFileNotFound,
   errorHashMismatch,
-  errorJsonFormatNotSupported,
   errorMarkerMissing,
   errorRuntime,
   errorTargetMismatch,
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
+  addGlobalOptions,
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
+  setCommandExamples,
 } from '../utils/command-helpers';
+import { formatStyledHeader } from '../utils/formatters/styled';
+import { formatVerifyJson, formatVerifyOutput } from '../utils/formatters/verify';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import {
-  formatCommandHelp,
-  formatStyledHeader,
-  formatVerifyJson,
-  formatVerifyOutput,
-} from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
-interface DbVerifyOptions {
+interface DbVerifyOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly vv?: boolean;
-  readonly trace?: boolean;
-  readonly timestamps?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
 }
 
 /**
@@ -81,6 +70,7 @@ function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredErro
 async function executeDbVerifyCommand(
   options: DbVerifyOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
 ): Promise<Result<VerifyDatabaseResult, CliStructuredError>> {
   // Load config
   const config = await loadConfig(options.config);
@@ -91,7 +81,7 @@ async function executeDbVerifyCommand(
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
   // Output header
-  if (flags.json !== 'object' && !flags.quiet) {
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
@@ -106,7 +96,7 @@ async function executeDbVerifyCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Load contract file
@@ -147,6 +137,7 @@ async function executeDbVerifyCommand(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for db verify (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'db verify',
       }),
     );
   }
@@ -166,7 +157,7 @@ async function executeDbVerifyCommand(
   });
 
   // Create progress adapter
-  const onProgress = createProgressAdapter({ flags });
+  const onProgress = createProgressAdapter({ ui, flags });
 
   try {
     const verifyResult = await client.verify({
@@ -174,11 +165,6 @@ async function executeDbVerifyCommand(
       connection: dbConnection,
       onProgress,
     });
-
-    // Add blank line after all async operations if spinners were shown
-    if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
-      console.log('');
-    }
 
     // If verification failed, map to CLI structured error
     if (!verifyResult.ok) {
@@ -219,47 +205,26 @@ export function createDbVerifyCommand(): Command {
     'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
       'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const flags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags });
-      },
-    })
+  setCommandExamples(command, [
+    'prisma-next db verify --db $DATABASE_URL',
+    'prisma-next db verify --db $DATABASE_URL --json',
+  ]);
+  addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object)', false)
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
     .action(async (options: DbVerifyOptions) => {
       const flags = parseGlobalFlags(options);
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      // Validate JSON format option
-      if (flags.json === 'ndjson') {
-        const result = notOk(
-          errorJsonFormatNotSupported({
-            command: 'db verify',
-            format: 'ndjson',
-            supportedFormats: ['object'],
-          }),
-        );
-        const exitCode = handleResult(result, flags);
-        process.exit(exitCode);
-      }
+      const result = await executeDbVerifyCommand(options, flags, ui);
 
-      const result = await executeDbVerifyCommand(options, flags);
-
-      const exitCode = handleResult(result, flags, (verifyResult) => {
-        if (flags.json === 'object') {
-          console.log(formatVerifyJson(verifyResult));
+      const exitCode = handleResult(result, flags, ui, (verifyResult) => {
+        if (flags.json) {
+          ui.output(formatVerifyJson(verifyResult));
         } else {
           const output = formatVerifyOutput(verifyResult, flags);
           if (output) {
-            console.log(output);
+            ui.log(output);
           }
         }
       });

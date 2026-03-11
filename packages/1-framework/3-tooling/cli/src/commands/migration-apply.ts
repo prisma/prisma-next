@@ -20,31 +20,22 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
+  addGlobalOptions,
   maskConnectionUrl,
   resolveContractPath,
   setCommandDescriptions,
+  setCommandExamples,
 } from '../utils/command-helpers';
+import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
+import { formatStyledHeader } from '../utils/formatters/styled';
+import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import {
-  formatCommandHelp,
-  formatMigrationApplyCommandOutput,
-  formatStyledHeader,
-} from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
-interface MigrationApplyCommandOptions {
+interface MigrationApplyCommandOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly vv?: boolean;
-  readonly trace?: boolean;
-  readonly timestamps?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
 }
 
 export interface MigrationApplyResult {
@@ -98,6 +89,7 @@ function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
 async function executeMigrationApplyCommand(
   options: MigrationApplyCommandOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
@@ -116,6 +108,7 @@ async function executeMigrationApplyCommand(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for migration apply (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'migration apply',
       }),
     );
   }
@@ -161,7 +154,7 @@ async function executeMigrationApplyCommand(
     );
   }
 
-  if (flags.json !== 'object' && !flags.quiet) {
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'migrations', value: migrationsRelative },
@@ -176,7 +169,7 @@ async function executeMigrationApplyCommand(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Read migrations and build migration chain model (offline — no DB needed)
@@ -343,9 +336,9 @@ async function executeMigrationApplyCommand(
       pendingMigrations.push(packageToStep(pkg));
     }
 
-    if (!flags.quiet && flags.json !== 'object') {
+    if (!flags.quiet && !flags.json) {
       for (const migration of pendingMigrations) {
-        console.log(`  Applying ${migration.dirName}...`);
+        ui.step(`Pending ${migration.dirName}`);
       }
     }
 
@@ -394,33 +387,23 @@ export function createMigrationApplyCommand(): Command {
       'migrations are pending, then executes them sequentially. Each migration runs\n' +
       'in its own transaction. Does not plan new migrations — run `migration plan` first.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const defaultFlags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags: defaultFlags });
-      },
-    })
+  setCommandExamples(command, ['prisma-next migration apply --db $DATABASE_URL']);
+  addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object)', false)
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
     .action(async (options: MigrationApplyCommandOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
-      const result = await executeMigrationApplyCommand(options, flags, startTime);
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const exitCode = handleResult(result, flags, (applyResult) => {
-        if (flags.json === 'object') {
-          console.log(JSON.stringify(applyResult, null, 2));
+      const result = await executeMigrationApplyCommand(options, flags, ui, startTime);
+
+      const exitCode = handleResult(result, flags, ui, (applyResult) => {
+        if (flags.json) {
+          ui.output(JSON.stringify(applyResult, null, 2));
         } else if (!flags.quiet) {
-          console.log(formatMigrationApplyCommandOutput(applyResult, flags));
+          ui.log(formatMigrationApplyCommandOutput(applyResult, flags));
         }
       });
 

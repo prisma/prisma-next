@@ -1,10 +1,10 @@
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import { parseGlobalFlags } from '../src/utils/global-flags';
 import {
   formatMigrationApplyCommandOutput,
   formatMigrationVerifyCommandOutput,
-} from '../src/utils/output';
+} from '../src/utils/formatters/migrations';
+import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('formatMigrationApplyCommandOutput', () => {
   it('formats no-op apply output', () => {

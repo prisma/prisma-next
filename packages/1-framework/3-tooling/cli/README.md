@@ -57,7 +57,7 @@ Emit `contract.json` and `contract.d.ts` from `config.contract`.
 
 **Canonical command:**
 ```bash
-prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Config File Requirements:**
@@ -87,7 +87,6 @@ Options:
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
 - `-vv, --trace`: Trace output (deep internals, stack traces)
-- `--timestamps`: Add timestamps to output
 - `--color/--no-color`: Force/disable color output
 
 Examples:
@@ -98,8 +97,8 @@ prisma-next contract emit
 # JSON output
 prisma-next contract emit --json
 
-# Verbose output with timestamps
-prisma-next contract emit -v --timestamps
+# Verbose output
+prisma-next contract emit -v
 ```
 
 ### `prisma-next db verify`
@@ -108,7 +107,7 @@ Verify that a database instance matches the emitted contract by checking marker 
 
 **Command:**
 ```bash
-prisma-next db verify [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next db verify [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 Options:
@@ -118,7 +117,6 @@ Options:
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
 - `-vv, --trace`: Trace output (deep internals, stack traces)
-- `--timestamps`: Add timestamps to output
 - `--color/--no-color`: Force/disable color output
 
 Examples:
@@ -132,8 +130,8 @@ prisma-next db verify --db postgresql://user:pass@localhost/db
 # JSON output
 prisma-next db verify --json
 
-# Verbose output with timestamps
-prisma-next db verify -v --timestamps
+# Verbose output
+prisma-next db verify -v
 ```
 
 **Config File Requirements:**
@@ -265,7 +263,7 @@ Inspect the live database schema and display it as a human-readable tree or mach
 
 **Command:**
 ```bash
-prisma-next db introspect [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next db introspect [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 Options:
@@ -275,7 +273,6 @@ Options:
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
 - `-vv, --trace`: Trace output (deep internals, stack traces)
-- `--timestamps`: Add timestamps to output
 - `--color/--no-color`: Force/disable color output
 
 Examples:
@@ -289,8 +286,8 @@ prisma-next db introspect --db postgresql://user:pass@localhost/db
 # JSON output
 prisma-next db introspect --json
 
-# Verbose output with timestamps
-prisma-next db introspect -v --timestamps
+# Verbose output
+prisma-next db introspect -v
 ```
 
 **Config File Requirements:**
@@ -417,7 +414,7 @@ Mark the database as matching the emitted contract by writing or updating the co
 
 **Command:**
 ```bash
-prisma-next db sign [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next db sign [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 Options:
@@ -427,7 +424,6 @@ Options:
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
 - `-vv, --trace`: Trace output (deep internals, stack traces)
-- `--timestamps`: Add timestamps to output
 - `--color/--no-color`: Force/disable color output
 
 Examples:
@@ -441,8 +437,8 @@ prisma-next db sign --db postgresql://user:pass@localhost/db
 # JSON output
 prisma-next db sign --json
 
-# Verbose output with timestamps
-prisma-next db sign -v --timestamps
+# Verbose output
+prisma-next db sign -v
 ```
 
 **Config File Requirements:**
@@ -623,18 +619,17 @@ Initialize a database schema from the contract. This command plans and applies *
 
 **Command:**
 ```bash
-prisma-next db init [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next db init [--db <url>] [--config <path>] [--dry-run] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 Options:
 - `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
-- `--plan`: Only show the migration plan, do not apply it
+- `--dry-run`: Only show the migration plan, do not apply it
 - `--json [format]`: Output as JSON (`object` only; `ndjson` is not supported for this command)
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
 - `-vv, --trace`: Trace output (deep internals, stack traces)
-- `--timestamps`: Add timestamps to output
 - `--color/--no-color`: Force/disable color output
 
 Examples:
@@ -643,7 +638,7 @@ Examples:
 prisma-next db init
 
 # Preview migration plan without applying
-prisma-next db init --plan
+prisma-next db init --dry-run
 
 # Specify database URL
 prisma-next db init --db postgresql://user:pass@localhost/db
@@ -692,7 +687,7 @@ export default defineConfig({
 7. **Plan Migration**: Calls `planner.plan()` with the contract IR, schema IR, additive-only policy, and `frameworkComponents` (the active target/adapter/extension descriptors)
    - On conflict: Returns a structured failure with conflict list
    - On success: Returns a migration plan with operations
-8. **Apply Migration** (if not `--plan`):
+8. **Apply Migration** (if not `--dry-run`):
    - Calls `runner.execute()` to apply the plan
    - After execution, verifies schema matches contract
    - Writes contract marker (and records a ledger entry via the target runner)
@@ -715,7 +710,7 @@ prisma-next db init ➜ Bootstrap a database to match the current contract
 Destination hash: sha256:abc123...
 
 This is a dry run. No changes were applied.
-Run without --plan to apply changes.
+Run without --dry-run to apply changes.
 ```
 
 **Output Format (TTY - Apply Mode):**
@@ -775,7 +770,7 @@ Applying migration plan and verifying schema...
 **Behavior Notes:**
 
 - If the database already has a marker that matches the destination contract, `db init` succeeds as a noop (0 operations planned/executed).
-- If the database has a marker that does **not** match the destination contract, `db init` fails (including in `--plan` mode). Use `db init` for bootstrapping; use your migration workflow to reconcile existing databases.
+- If the database has a marker that does **not** match the destination contract, `db init` fails (including in `--dry-run` mode). Use `db init` for bootstrapping; use your migration workflow to reconcile existing databases.
 
 ### `prisma-next db update`
 
@@ -786,11 +781,13 @@ Update your database schema to match the currently emitted contract.
 - Works on any database, whether or not it has been initialized with `db init` (creates the signature table if missing)
 - Allows `additive`, `widening`, and `destructive` operation classes where supported by planner/runner
 - Disables per-operation runner execution checks by default (precheck/postcheck/idempotency)
-- In `--plan` mode for SQL targets, prints a DDL preview derived from planned operations
+- In `--dry-run` mode for SQL targets, prints a DDL preview derived from planned operations
+- In interactive mode, destructive plans require confirmation before apply
+- In non-interactive mode, destructive plans fail unless `-y, --yes` is provided
 
 **Command:**
 ```bash
-prisma-next db update [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next db update [--db <url>] [--config <path>] [--dry-run] [-y|--yes] [--interactive|--no-interactive] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Error codes (additional to shared CLI/runtime codes):**
@@ -842,7 +839,7 @@ The `contract.output` field specifies the path to `contract.json`. This is the c
 Plan a migration from contract changes. Compares the emitted contract against the latest on-disk migration state and produces a new migration package with the required operations. No database connection is needed — fully offline.
 
 ```bash
-prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
@@ -852,7 +849,6 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
-- `--timestamps`: Add timestamps to output
 
 **What it does:**
 1. Loads config and reads `contract.json` (the "to" contract)
@@ -866,7 +862,7 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 Display a migration package's operations, DDL preview, and metadata. Accepts a directory path, a hash prefix (git-style matching against `migrationId`), or defaults to the latest migration.
 
 ```bash
-prisma-next migration show [target] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next migration show [target] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
@@ -875,7 +871,6 @@ prisma-next migration show [target] [--config <path>] [--json] [-v] [-q] [--time
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output
-- `--timestamps`: Add timestamps to output
 
 **What it does:**
 1. If `target` is a path (contains `/` or `\`), reads that directory directly
@@ -893,7 +888,7 @@ Show the migration graph and applied status. Adapts based on context:
 - **Without DB connection**: Shows the graph structure from disk only
 
 ```bash
-prisma-next migration status [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next migration status [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
@@ -902,7 +897,6 @@ prisma-next migration status [--db <url>] [--config <path>] [--json] [-v] [-q] [
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output
-- `--timestamps`: Add timestamps to output
 
 **What it does:**
 1. Reads migration packages from disk and reconstructs the chain
@@ -918,7 +912,7 @@ prisma-next migration status [--db <url>] [--config <path>] [--json] [-v] [-q] [
 Apply planned migrations to the database. Executes previously planned migrations (created by `migration plan`). Compares the database marker against the migration chain to determine which migrations are pending, then executes them sequentially. Each migration runs in its own transaction. Does not plan new migrations — run `migration plan` first.
 
 ```bash
-prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
@@ -927,7 +921,6 @@ prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [-
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
-- `--timestamps`: Add timestamps to output
 
 **What it does:**
 1. Reads attested migration packages from `config.migrations.dir`
@@ -1002,13 +995,13 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - Exit codes: 0 (success), 1 (runtime error), 2 (usage/config error)
 - **Error Handling**: Uses `exitOverride()` to catch unhandled errors (non-structured errors that fail fast) and print stack traces. Commands handle structured errors themselves via `process.exit()`.
 - **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
-- **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma-next" title with command tree; command help shows "prisma-next <command> ➜ <description>" with options and docs URLs. See `utils/output.ts` for help formatters.
+- **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma-next" title with command tree; command help shows "prisma-next <command> ➜ <description>" with options and docs URLs. See `utils/formatters/help.ts` for help formatters.
 - **Command Descriptions**: See the “Command Descriptions” section above for `setCommandDescriptions()` usage.
 
 ### Contract Emit Command (`commands/contract-emit.ts`)
 - Canonical command implementation using commander
-- Supports global flags (JSON, verbosity, color, timestamps)
-- **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern (`performAction`), and `process.exit()`. Commands wrap logic in `performAction()`, process results with `handleResult()`, and call `process.exit(exitCode)` directly. See `.cursor/rules/cli-error-handling.mdc` for details.
+- Supports global flags (JSON, verbosity, color, interactive, yes)
+- **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern, and `process.exit()`. Commands return `Result<T, CliStructuredError>`, process results with `handleResult()`, and call `process.exit(exitCode)` directly. See `.cursor/rules/cli-error-handling.mdc` for details.
 - Loads the user's config module (`prisma-next.config.ts`)
 - Resolves contract from provider:
   - Calls `config.contract.source()` and expects `Result<ContractIR, Diagnostics>`
@@ -1029,7 +1022,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 
 ### Error Handling (`utils/errors.ts`, `utils/cli-errors.ts`, `utils/result.ts`, `utils/result-handler.ts`)
 - **Structured Errors**: Call sites throw `CliStructuredError` instances with full context (why, fix, docsUrl, etc.)
-- **Result Pattern**: Commands wrap logic in `performAction()` which only catches `CliStructuredError` instances
+- **Result Pattern**: Commands return `Result<T, CliStructuredError>` and use `handleResult()` for output and exit codes
 - **Error Conversion**: `CliStructuredError.toEnvelope()` converts errors to envelopes for output formatting
 - **Result Processing**: `handleResult()` processes Results, formats output, and returns exit codes
 - **Exit Codes**:
@@ -1044,7 +1037,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Removed**: `pack-assembly.ts` has been removed. Pack assembly is now handled by family instances. For SQL family, tests can import pack-based helpers directly from `packages/2-sql/3-tooling/family/src/core/assembly.ts` using relative paths.
 - Assembly logic is family-specific and owned by each family's instance implementation (e.g., `createSqlFamilyInstance` in `@prisma-next/family-sql`).
 
-### Output Formatting (`utils/output.ts`)
+### Output Formatting (`utils/formatters/`)
 - **Command Output Formatters**: Format human-readable output for commands (emit, verify, etc.)
   - Paths are shown as relative paths from current working directory (using `relative(process.cwd(), path)`)
   - Success indicators use consistent checkmark (✔) throughout

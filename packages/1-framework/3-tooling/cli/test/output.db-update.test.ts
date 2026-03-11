@@ -1,12 +1,12 @@
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import { parseGlobalFlags } from '../src/utils/global-flags';
 import {
   formatMigrationApplyOutput,
   formatMigrationJson,
   formatMigrationPlanOutput,
   type MigrationCommandResult,
-} from '../src/utils/output';
+} from '../src/utils/formatters/migrations';
+import { parseGlobalFlags } from '../src/utils/global-flags';
 
 function createPlanResult(overrides?: Partial<MigrationCommandResult>): MigrationCommandResult {
   return {
@@ -97,7 +97,7 @@ describe('formatMigrationPlanOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('dry run');
-    expect(stripped).toContain('Run without --plan');
+    expect(stripped).toContain('Run without --dry-run');
   });
 
   it('shows tree characters', () => {

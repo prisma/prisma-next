@@ -14,10 +14,11 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from './cli-errors';
-import { maskConnectionUrl, resolveContractPath } from './command-helpers';
+import { addGlobalOptions, maskConnectionUrl, resolveContractPath } from './command-helpers';
+import { formatStyledHeader } from './formatters/styled';
 import type { GlobalFlags } from './global-flags';
-import { formatStyledHeader } from './output';
 import { createProgressAdapter } from './progress-adapter';
+import type { TerminalUI } from './terminal-ui';
 
 /**
  * Resolved context for a migration command.
@@ -52,8 +53,9 @@ export interface MigrationCommandDescriptor {
  * Returns a Result with either the resolved context or a structured error.
  */
 export async function prepareMigrationContext(
-  options: { readonly db?: string; readonly config?: string; readonly plan?: boolean },
+  options: { readonly db?: string; readonly config?: string; readonly dryRun?: boolean },
   flags: GlobalFlags,
+  ui: TerminalUI,
   descriptor: MigrationCommandDescriptor,
 ): Promise<Result<MigrationContext, CliStructuredError>> {
   // Load config
@@ -64,8 +66,8 @@ export async function prepareMigrationContext(
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
-  // Output header
-  if (flags.json !== 'object' && !flags.quiet) {
+  // Output header to stderr (decoration)
+  if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
@@ -73,8 +75,8 @@ export async function prepareMigrationContext(
     if (options.db) {
       details.push({ label: 'database', value: maskConnectionUrl(options.db) });
     }
-    if (options.plan) {
-      details.push({ label: 'mode', value: 'plan (dry run)' });
+    if (options.dryRun) {
+      details.push({ label: 'mode', value: 'dry run' });
     }
     const header = formatStyledHeader({
       command: descriptor.commandName,
@@ -83,7 +85,7 @@ export async function prepareMigrationContext(
       details,
       flags,
     });
-    console.log(header);
+    ui.stderr(header);
   }
 
   // Load contract file
@@ -125,6 +127,7 @@ export async function prepareMigrationContext(
     return notOk(
       errorDatabaseConnectionRequired({
         why: `Database connection is required for ${descriptor.commandName} (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: descriptor.commandName,
       }),
     );
   }
@@ -158,7 +161,7 @@ export async function prepareMigrationContext(
   });
 
   // Create progress adapter
-  const onProgress = createProgressAdapter({ flags });
+  const onProgress = createProgressAdapter({ ui, flags });
 
   return ok({
     client,
@@ -176,15 +179,9 @@ export async function prepareMigrationContext(
  * Registers the shared CLI options for migration commands (db init, db update).
  */
 export function addMigrationCommandOptions(command: Command): Command {
+  addGlobalOptions(command);
   return command
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--plan', 'Preview planned operations without applying', false)
-    .option('--json [format]', 'Output as JSON (object)', false)
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output');
+    .option('--dry-run', 'Preview planned operations without applying', false);
 }

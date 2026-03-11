@@ -194,11 +194,15 @@ export function errorFileNotFound(
  */
 export function errorDatabaseConnectionRequired(options?: {
   readonly why?: string;
+  readonly commandName?: string;
 }): CliStructuredError {
+  const runHint = options?.commandName
+    ? `Run \`prisma-next ${options.commandName} --db <url>\``
+    : 'Provide `--db <url>`';
   return new CliStructuredError('4005', 'Database connection is required', {
     domain: 'CLI',
     why: options?.why ?? 'Database connection is required for this command',
-    fix: 'Provide `--db <url>` or set `db: { connection: "postgres://…" }` in prisma-next.config.ts',
+    fix: `${runHint}, or set \`db: { connection: "postgres://…" }\` in prisma-next.config.ts`,
   });
 }
 
@@ -440,8 +444,11 @@ export function errorRunnerFailed(
   });
 }
 
+/** Error code for destructive changes that require explicit confirmation. */
+export const ERROR_CODE_DESTRUCTIVE_CHANGES = '3030';
+
 /**
- * Destructive operations require explicit confirmation via --accept-data-loss.
+ * Destructive operations require explicit confirmation via -y/--yes.
  */
 export function errorDestructiveChanges(
   summary: string,
@@ -451,10 +458,10 @@ export function errorDestructiveChanges(
     readonly meta?: Record<string, unknown>;
   },
 ): CliStructuredError {
-  return new CliStructuredError('3030', summary, {
+  return new CliStructuredError(ERROR_CODE_DESTRUCTIVE_CHANGES, summary, {
     domain: 'RTM',
     why: options?.why ?? 'Planned operations include destructive changes that require confirmation',
-    fix: options?.fix ?? 'Use `--plan` to preview, then re-run with `--accept-data-loss`',
+    fix: options?.fix ?? 'Re-run with `-y` to apply, or use `--dry-run` to preview first',
     ...(options?.meta ? { meta: options.meta } : {}),
   });
 }

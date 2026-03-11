@@ -5,32 +5,34 @@ import { ContractValidationError } from '../control-api/errors';
 import type { DbUpdateFailure } from '../control-api/types';
 import {
   CliStructuredError,
+  ERROR_CODE_DESTRUCTIVE_CHANGES,
   errorContractValidationFailed,
   errorDestructiveChanges,
-  errorJsonFormatNotSupported,
   errorMigrationPlanningFailed,
   errorRunnerFailed,
   errorUnexpected,
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
-import { sanitizeErrorMessage, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  sanitizeErrorMessage,
+  setCommandDescriptions,
+  setCommandExamples,
+} from '../utils/command-helpers';
+import {
+  formatMigrationApplyOutput,
+  formatMigrationJson,
+  formatMigrationPlanOutput,
+  type MigrationCommandResult,
+} from '../utils/formatters/migrations';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   addMigrationCommandOptions,
   prepareMigrationContext,
 } from '../utils/migration-command-scaffold';
-import {
-  formatCommandHelp,
-  formatMigrationApplyOutput,
-  formatMigrationJson,
-  formatMigrationPlanOutput,
-  type MigrationCommandResult,
-} from '../utils/output';
 import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
 
-type DbUpdateOptions = MigrationCommandOptions & {
-  readonly acceptDataLoss?: boolean;
-};
+type DbUpdateOptions = MigrationCommandOptions;
 
 /**
  * Maps a DbUpdateFailure to a CliStructuredError for consistent error handling.
@@ -51,7 +53,7 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
   if (failure.code === 'DESTRUCTIVE_CHANGES') {
     return errorDestructiveChanges(failure.summary, {
       ...ifDefined('why', failure.why),
-      fix: 'Use `prisma-next db update --plan` to preview, then re-run with `--accept-data-loss` to apply destructive changes',
+      fix: 'Re-run with `-y` to apply destructive changes, or use `--dry-run` to preview first',
       ...ifDefined('meta', failure.meta),
     });
   }
@@ -66,10 +68,11 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
 async function executeDbUpdateCommand(
   options: DbUpdateOptions,
   flags: GlobalFlags,
+  ui: TerminalUI,
   startTime: number,
 ): Promise<Result<MigrationCommandResult, CliStructuredError>> {
   // Prepare shared migration context (config, contract, connection, client)
-  const ctxResult = await prepareMigrationContext(options, flags, {
+  const ctxResult = await prepareMigrationContext(options, flags, ui, {
     commandName: 'db update',
     description: 'Update your database schema to match your contract',
     url: 'https://pris.ly/db-update',
@@ -83,9 +86,9 @@ async function executeDbUpdateCommand(
     // Call dbUpdate with connection and progress callback
     const result = await client.dbUpdate({
       contractIR: contractJson,
-      mode: options.plan ? 'plan' : 'apply',
+      mode: options.dryRun ? 'plan' : 'apply',
       connection: dbConnection,
-      ...(options.acceptDataLoss ? { acceptDataLoss: true } : {}),
+      ...(flags.yes ? { acceptDataLoss: true } : {}),
       onProgress,
     });
 
@@ -169,47 +172,60 @@ export function createDbUpdateCommand(): Command {
     'Update your database schema to match your contract',
     'Compares your database schema to the emitted contract and applies the necessary\n' +
       'changes. Works on any database, whether or not it has been initialized with `db init`.\n' +
-      'Use --plan to preview operations before applying.',
+      'Destructive operations prompt for confirmation in interactive mode. Use -y to\n' +
+      'auto-accept or --dry-run to preview first.',
   );
+  setCommandExamples(command, [
+    'prisma-next db update --db $DATABASE_URL',
+    'prisma-next db update --db $DATABASE_URL --dry-run',
+  ]);
   addMigrationCommandOptions(command);
-  command.option(
-    '--accept-data-loss',
-    'Confirm destructive operations (required when plan includes drops or type changes)',
-    false,
-  );
-  command.configureHelp({
-    formatHelp: (cmd) => {
-      const flags = parseGlobalFlags({});
-      return formatCommandHelp({ command: cmd, flags });
-    },
-  });
   command.action(async (options: DbUpdateOptions) => {
     const flags = parseGlobalFlags(options);
     const startTime = Date.now();
 
-    if (flags.json === 'ndjson') {
-      const result = notOk(
-        errorJsonFormatNotSupported({
-          command: 'db update',
-          format: 'ndjson',
-          supportedFormats: ['object'],
-        }),
-      );
-      const exitCode = handleResult(result, flags);
-      process.exit(exitCode);
+    const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+
+    let result = await executeDbUpdateCommand(options, flags, ui, startTime);
+
+    // Interactive confirmation for destructive operations:
+    // When the control API rejects destructive changes, prompt the user instead of failing.
+    // In non-interactive mode (CI, piped, --no-interactive, --json), the error is returned as-is.
+    if (
+      !result.ok &&
+      result.failure.code === ERROR_CODE_DESTRUCTIVE_CHANGES &&
+      flags.interactive &&
+      !flags.json &&
+      !flags.yes
+    ) {
+      const meta = result.failure.meta as
+        | { destructiveOperations?: readonly { id: string; label: string }[] }
+        | undefined;
+      const destructiveOps = meta?.destructiveOperations ?? [];
+
+      if (destructiveOps.length > 0) {
+        ui.warn(
+          `${destructiveOps.length} destructive operation(s) that may cause data loss:\n${destructiveOps.map((op) => `  ${ui.yellow('▸')} ${op.label}`).join('\n')}`,
+        );
+      }
+
+      const confirmed = await ui.confirm('Apply destructive changes? This cannot be undone.');
+
+      if (confirmed) {
+        result = await executeDbUpdateCommand(options, { ...flags, yes: true }, ui, Date.now());
+      }
     }
 
-    const result = await executeDbUpdateCommand(options, flags, startTime);
-    const exitCode = handleResult(result, flags, (dbUpdateResult) => {
-      if (flags.json === 'object') {
-        console.log(formatMigrationJson(dbUpdateResult));
+    const exitCode = handleResult(result, flags, ui, (dbUpdateResult) => {
+      if (flags.json) {
+        ui.output(formatMigrationJson(dbUpdateResult));
       } else {
         const output =
           dbUpdateResult.mode === 'plan'
             ? formatMigrationPlanOutput(dbUpdateResult, flags)
             : formatMigrationApplyOutput(dbUpdateResult, flags);
         if (output) {
-          console.log(output);
+          ui.log(output);
         }
       }
     });

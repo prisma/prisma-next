@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add a `migration show` subcommand that renders migration package contents using the existing `formatMigrationPlanOutput` renderer (same as `db update --plan`), with operation class badges, DDL preview, and destructive operation warnings. Support git-style hash prefix resolution for targeting specific migrations. Integrate into `migration plan` so users see the full detail at plan time.
+Add a `migration show` subcommand that renders migration package contents using the existing `formatMigrationPlanOutput` renderer (same as `db update --dry-run`), with operation class badges, DDL preview, and destructive operation warnings. Support git-style hash prefix resolution for targeting specific migrations. Integrate into `migration plan` so users see the full detail at plan time.
 
 **Spec:** `projects/migration-show/spec.md`
 
@@ -63,7 +63,7 @@ Build the `migration show` command, hash prefix resolution, destructive warning,
 | DDL preview always shown | Unit | ✅ | Always rendered when sql present |
 | Draft indicator for `edgeId: null` | Unit | ✅ | Shows "(draft — not yet attested)" |
 | `migration plan` includes class badges + DDL | Unit | ✅ | Updated local formatter |
-| Destructive warning in `db update --plan` | Unit | ✅ | `output.db-update.test.ts` |
+| Destructive warning in `db update --dry-run` | Unit | ✅ | `output.db-update.test.ts` |
 | `pnpm lint:deps` passes | CI | ✅ | 0 violations |
 | Existing tests pass | CI | ✅ | 241 CLI + 67 migration-tools |
 

@@ -1,12 +1,12 @@
 # Summary
 
-Add a `migration show` subcommand that displays the contents of a migration package in the same human-readable format used by `db update --plan`, including operation class badges (`[additive]`, `[destructive]`, `[widening]`). Integrate it into `migration plan` so newly planned migrations are displayed immediately. This gives users visibility into destructive operations at the moment they're most relevant — plan time — without requiring confirmation flags that create friction in CI.
+Add a `migration show` subcommand that displays the contents of a migration package in the same human-readable format used by `db update --dry-run`, including operation class badges (`[additive]`, `[destructive]`, `[widening]`). Integrate it into `migration plan` so newly planned migrations are displayed immediately. This gives users visibility into destructive operations at the moment they're most relevant — plan time — without requiring confirmation flags that create friction in CI.
 
 # Description
 
 Today, `migration plan` writes a migration package to disk and prints a minimal summary (operation IDs and labels). It does not show operation classes, SQL previews, or any warning about destructive operations. A user who adds a `DROP COLUMN` to their contract sees the same output as someone who adds a column — there's no visual signal that the migration includes data-loss operations.
 
-Meanwhile, `db update --plan` has a rich output format that shows each operation with its class badge (`[additive]`, `[destructive]`), a DDL preview, and clear visual hierarchy. This format already exists and is well-tested.
+Meanwhile, `db update --dry-run` has a rich output format that shows each operation with its class badge (`[additive]`, `[destructive]`), a DDL preview, and clear visual hierarchy. This format already exists and is well-tested.
 
 The goal is to:
 1. Create `migration show` as a standalone command for inspecting any on-disk migration
@@ -32,7 +32,7 @@ This is a UX improvement, not a policy gate. No `--accept-data-loss` flag is nee
   - If the prefix matches multiple migrations, list the ambiguous matches with their directory names and `edgeId` values so the user can disambiguate
   - If the prefix matches nothing, error with "No migration found matching prefix"
 - No database connection required (fully offline)
-- Output format reuses the existing `formatMigrationPlanOutput` from `output.ts` (same renderer as `db update --plan`):
+- Output format reuses the existing `formatMigrationPlanOutput` from `output.ts` (same renderer as `db update --dry-run`):
   - Operation tree with class badges (`[additive]`, `[destructive]`, `[widening]`)
   - `from` and `to` hashes
   - `edgeId` and attestation status (attested vs draft)
@@ -57,13 +57,13 @@ This is a UX improvement, not a policy gate. No `--accept-data-loss` flag is nee
 ### FR-4: SQL preview in show output
 
 - Read the `ops.json` and display SQL statements from each operation's `execute` steps
-- Format as a DDL preview block (same style as `db update --plan`)
+- Format as a DDL preview block (same style as `db update --dry-run`)
 - Always shown (not verbose-only) — the DDL preview is the primary value of `migration show`
 
 ## Non-Functional Requirements
 
 ### NFR-1: Code reuse
-- Reuse the existing `formatMigrationPlanOutput` in `output.ts` (used by `db update --plan` and `db init --plan`) for rendering
+- Reuse the existing `formatMigrationPlanOutput` in `output.ts` (used by `db update --dry-run` and `db init --dry-run`) for rendering
 - Delete the local `formatMigrationPlanOutput` in `migration-plan.ts` and replace with a call to the shared one
 - Do not create a new formatting function — extend the existing one if needed
 
@@ -104,7 +104,7 @@ This is a UX improvement, not a policy gate. No `--accept-data-loss` flag is nee
 
 # References
 
-- `db update --plan` output formatter: `packages/1-framework/3-tooling/cli/src/utils/output.ts` (`formatMigrationPlanOutput`)
+- `db update --dry-run` output formatter: `packages/1-framework/3-tooling/cli/src/utils/output.ts` (`formatMigrationPlanOutput`)
 - `migration plan` command: `packages/1-framework/3-tooling/cli/src/commands/migration-plan.ts`
 - Migration I/O: `packages/1-framework/3-tooling/migration/src/io.ts`
 - Migration types: `packages/1-framework/3-tooling/migration/src/types.ts`
@@ -123,7 +123,7 @@ Destructive operations are surfaced as a prominent warning in `migration show` a
 - Requiring `--accept-data-loss` in CI creates friction without adding safety (CI would either hardcode it, defeating the purpose, or need to inspect migration files to decide)
 - The human review checkpoint is the PR review, and `migration show` ensures reviewers can see what they're approving
 
-This differs from `db update --accept-data-loss` which is appropriate because `db update` plans and applies in a single command with no intermediate review step.
+This differs from `db update -y` which is appropriate because `db update` plans and applies in a single command with no intermediate review step.
 
 ## RD-2: Default to latest migration when no target provided
 

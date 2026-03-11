@@ -25,17 +25,29 @@ import {
 // Fixture subdirectory for db-verify tests
 const fixtureSubdir = 'db-verify';
 
+/**
+ * Extracts JSON from mixed output that may contain Clack decoration lines.
+ * Finds the outermost `{ ... }` block in the joined output.
+ */
+function extractJson(lines: string[]): unknown {
+  const joined = lines.join('\n');
+  const start = joined.indexOf('{');
+  const end = joined.lastIndexOf('}');
+  if (start === -1 || end === -1) {
+    throw new Error(`No JSON object found in output:\n${joined}`);
+  }
+  return JSON.parse(joined.slice(start, end + 1));
+}
+
 withTempDir(({ createTempDir }) => {
   describe('db verify command (e2e)', () => {
     let consoleOutput: string[] = [];
-    let consoleErrors: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
       // Set up console and process.exit mocks
       const mocks = setupCommandMocks();
       consoleOutput = mocks.consoleOutput;
-      consoleErrors = mocks.consoleErrors;
       cleanupMocks = mocks.cleanup;
     });
 
@@ -105,10 +117,12 @@ withTempDir(({ createTempDir }) => {
             const exitCode = getExitCode();
             expect(exitCode).toBe(0);
 
-            // Parse and verify JSON output (only from this command)
-            // When --json is set, output should be clean JSON only
-            const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
-            const parsed = JSON.parse(output) as Record<string, unknown>;
+            // Parse and verify JSON output (only from this command).
+            // consoleOutput may contain Clack decoration from stderr; extract the JSON block.
+            const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+              string,
+              unknown
+            >;
             expect(parsed).toMatchObject({
               ok: true,
               summary: expect.any(String),
@@ -130,7 +144,6 @@ withTempDir(({ createTempDir }) => {
             expect((parsed['marker'] as { storageHash: string }).storageHash).toBe(
               contract.storageHash,
             );
-            expect(consoleErrors.length).toBe(0);
           },
           // Use random ports to avoid conflicts in CI (no options = random ports)
           {},
@@ -174,6 +187,10 @@ withTempDir(({ createTempDir }) => {
           const contractJsonPath = join(testDir, 'output', 'contract.json');
           loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
+          // Clear console output before running the command we want to test
+          // (previous commands like 'contract emit' may have added output)
+          const outputStartIndex = consoleOutput.length;
+
           const command = createDbVerifyCommand();
           const verifyCwd1 = process.cwd();
           try {
@@ -189,17 +206,18 @@ withTempDir(({ createTempDir }) => {
           const exitCode = getExitCode();
           expect(exitCode).not.toBe(0);
 
-          const errorOutput = consoleErrors.join('\n');
-          expect(() => JSON.parse(errorOutput)).not.toThrow();
-
-          const parsed = JSON.parse(errorOutput);
+          // Parse only the db verify output (skip earlier contract emit output).
+          const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+            string,
+            unknown
+          >;
           expect(parsed).toMatchObject({
             code: 'PN-RTM-3001',
             summary: expect.any(String),
             why: expect.any(String),
             fix: expect.any(String),
           });
-          expect(parsed.summary).toContain('Database not signed');
+          expect(parsed['summary']).toContain('Database not signed');
         });
       },
       timeouts.spinUpPpgDev,
@@ -266,10 +284,12 @@ withTempDir(({ createTempDir }) => {
           const exitCode = getExitCode();
           expect(exitCode).toBe(0);
 
-          // Parse and verify JSON output (only from this command)
-          // When --json is used, only JSON should be output
-          const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
-          const parsed = JSON.parse(output) as Record<string, unknown>;
+          // Parse and verify JSON output (only from this command).
+          // consoleOutput may contain Clack decoration from stderr; extract the JSON block.
+          const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+            string,
+            unknown
+          >;
           expect(parsed).toMatchObject({
             ok: true,
             summary: expect.any(String),
@@ -346,17 +366,15 @@ withTempDir(({ createTempDir }) => {
           const exitCode = getExitCode();
           expect(exitCode).not.toBe(0);
 
-          const errorOutput = consoleErrors.join('\n');
-          expect(() => JSON.parse(errorOutput)).not.toThrow();
-
-          const parsed = JSON.parse(errorOutput);
+          // consoleOutput may contain Clack decoration alongside JSON; extract the JSON block.
+          const parsed = extractJson(consoleOutput) as Record<string, unknown>;
           expect(parsed).toMatchObject({
             code: 'PN-RTM-3001',
             summary: expect.any(String),
             why: expect.any(String),
             fix: expect.any(String),
           });
-          expect(parsed.summary).toContain('Database not signed');
+          expect(parsed['summary']).toContain('Database not signed');
         });
       },
       timeouts.spinUpPpgDev,
@@ -459,17 +477,15 @@ withTempDir(({ createTempDir }) => {
           const exitCode = getExitCode();
           expect(exitCode).not.toBe(0);
 
-          const errorOutput = consoleErrors.join('\n');
-          expect(() => JSON.parse(errorOutput)).not.toThrow();
-
-          const parsed = JSON.parse(errorOutput);
+          // consoleOutput may contain Clack decoration alongside JSON; extract the JSON block.
+          const parsed = extractJson(consoleOutput) as Record<string, unknown>;
           expect(parsed).toMatchObject({
             code: 'PN-CLI-4010',
             summary: expect.any(String),
             why: expect.any(String),
             fix: expect.any(String),
           });
-          expect(parsed.summary).toContain('Driver is required');
+          expect(parsed['summary']).toContain('Driver is required');
         });
       },
       timeouts.spinUpPpgDev,
