@@ -48,7 +48,7 @@ describe('PostgresControlAdapter', () => {
 
       expect(result).toEqual({
         tables: {},
-        extensions: [],
+        dependencies: [],
         annotations: {
           pg: {
             schema: 'public',
@@ -1169,7 +1169,10 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.extensions).toEqual(['uuid-ossp', 'pgcrypto']);
+      expect(result.dependencies).toEqual([
+        { id: 'postgres.extension.uuid-ossp' },
+        { id: 'postgres.extension.pgcrypto' },
+      ]);
     });
 
     it('handles custom schema name', async () => {

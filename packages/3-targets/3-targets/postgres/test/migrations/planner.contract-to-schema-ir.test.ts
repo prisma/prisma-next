@@ -1,7 +1,16 @@
 import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { MigrationPlannerResult } from '@prisma-next/core-control-plane/types';
-import { contractToSchemaIR, detectDestructiveChanges } from '@prisma-next/family-sql/control';
+import type {
+  CodecControlHooks,
+  ComponentDatabaseDependency,
+  MigrationPlannerResult,
+  SqlControlExtensionDescriptor,
+} from '@prisma-next/family-sql/control';
+import {
+  contractToSchemaIR as contractToSchemaIRImpl,
+  detectDestructiveChanges,
+} from '@prisma-next/family-sql/control';
 import type {
   SqlContract,
   SqlStorage,
@@ -52,9 +61,18 @@ function createTestContract(
   };
 }
 
+function contractToSchemaIR(
+  contract: SqlContract<SqlStorage> | null,
+  options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
+) {
+  return contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });
+}
+
 function planFromStorages(from: SqlStorage | null, to: SqlStorage): MigrationPlannerResult {
   const toContract = createTestContract(to);
-  const fromSchemaIR = contractToSchemaIR(from ?? { tables: {} }, expandParameterizedNativeType);
+  const fromSchemaIR = contractToSchemaIR(from ? createTestContract(from) : null, {
+    expandNativeType: expandParameterizedNativeType,
+  });
   const planner = createPostgresMigrationPlanner();
   return planner.plan({
     contract: toContract,
@@ -83,7 +101,9 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(storage);
-    const schemaIR = contractToSchemaIR(storage, expandParameterizedNativeType);
+    const schemaIR = contractToSchemaIR(createTestContract(storage), {
+      expandNativeType: expandParameterizedNativeType,
+    });
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -116,7 +136,9 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(storage);
-    const emptySchemaIR = contractToSchemaIR({ tables: {} }, expandParameterizedNativeType);
+    const emptySchemaIR = contractToSchemaIR(null, {
+      expandNativeType: expandParameterizedNativeType,
+    });
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -174,7 +196,9 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(toStorage);
-    const fromSchemaIR = contractToSchemaIR(fromStorage, expandParameterizedNativeType);
+    const fromSchemaIR = contractToSchemaIR(createTestContract(fromStorage), {
+      expandNativeType: expandParameterizedNativeType,
+    });
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -223,7 +247,9 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const contract = createTestContract(storage);
-    const schemaIR = contractToSchemaIR(storage, expandParameterizedNativeType);
+    const schemaIR = contractToSchemaIR(createTestContract(storage), {
+      expandNativeType: expandParameterizedNativeType,
+    });
     const planner = createPostgresMigrationPlanner();
 
     const result = planner.plan({
@@ -555,5 +581,323 @@ describe('planner — type and nullability change behavior', () => {
       );
       expect(nullConflict).toBeDefined();
     }
+  });
+});
+
+// --- Comprehensive incremental migration test (prisma-next-demo-like contract) ---
+
+const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
+  id: 'postgres.extension.vector',
+  label: 'Enable vector extension',
+  install: [
+    {
+      id: 'extension.vector',
+      label: 'Enable extension "vector"',
+      summary: 'Ensures the vector extension is available for pgvector operations',
+      operationClass: 'additive',
+      target: { id: 'postgres' },
+      precheck: [
+        {
+          description: 'verify extension "vector" is not already enabled',
+          sql: "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
+        },
+      ],
+      execute: [
+        {
+          description: 'create extension "vector"',
+          sql: 'CREATE EXTENSION IF NOT EXISTS vector',
+        },
+      ],
+      postcheck: [
+        {
+          description: 'confirm extension "vector" is enabled',
+          sql: "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
+        },
+      ],
+    },
+  ],
+};
+
+function createPgvectorComponent(): SqlControlExtensionDescriptor<'postgres'> {
+  return {
+    kind: 'extension',
+    id: 'pgvector',
+    familyId: 'sql',
+    targetId: 'postgres',
+    version: '0.0.0-test',
+    operationSignatures: () => [],
+    databaseDependencies: { init: [pgvectorDependency] },
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
+  };
+}
+
+function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', string> {
+  const parameterizedTypeHooks: CodecControlHooks = {
+    expandNativeType: expandParameterizedNativeType,
+  };
+
+  // Intentionally minimal test double for planner/contractToSchemaIR wiring.
+  // Concrete enum hook behavior is covered in adapter enum-control-hooks tests.
+  const enumHooks: CodecControlHooks = {
+    planTypeOperations: ({ typeName, typeInstance, schema, schemaName }) => {
+      const values = typeInstance.typeParams?.['values'] as string[] | undefined;
+      if (!values || values.length === 0) return { operations: [] };
+
+      const storageTypes = (schema.annotations?.['pg'] as Record<string, unknown> | undefined)?.[
+        'storageTypes'
+      ] as Record<string, unknown> | undefined;
+
+      if (storageTypes?.[typeInstance.nativeType]) {
+        return { operations: [] };
+      }
+
+      return {
+        operations: [
+          {
+            id: `type.${typeName}`,
+            label: `Create type ${typeName}`,
+            operationClass: 'additive' as const,
+            target: { id: 'postgres' },
+            precheck: [],
+            execute: [
+              {
+                description: `create type "${typeName}"`,
+                sql: `CREATE TYPE "${schemaName ?? 'public'}"."${typeInstance.nativeType}" AS ENUM (${values.map((v) => `'${v}'`).join(', ')})`,
+              },
+            ],
+            postcheck: [],
+          },
+        ],
+      };
+    },
+  };
+
+  return {
+    kind: 'adapter',
+    id: 'test-adapter',
+    familyId: 'sql',
+    targetId: 'postgres',
+    version: '0.0.0-test',
+    types: {
+      codecTypes: {
+        controlPlaneHooks: {
+          'sql/char@1': parameterizedTypeHooks,
+          'pg/timestamptz@1': parameterizedTypeHooks,
+          'pg/enum@1': enumHooks,
+        },
+      },
+    },
+  };
+}
+
+const DEMO_BASE_STORAGE: SqlStorage = {
+  tables: {
+    user: table({
+      columns: {
+        id: col({
+          nativeType: 'character',
+          codecId: 'sql/char@1',
+          typeParams: { length: 36 },
+        }),
+        email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+        createdAt: col({
+          nativeType: 'timestamptz',
+          codecId: 'pg/timestamptz@1',
+          default: { kind: 'function', expression: 'now()' },
+        }),
+        kind: col({
+          nativeType: 'user_type',
+          codecId: 'pg/enum@1',
+          typeRef: 'user_type',
+        }),
+      },
+      primaryKey: { columns: ['id'] },
+      uniques: [{ columns: ['email'] }],
+    }),
+    post: table({
+      columns: {
+        id: col({
+          nativeType: 'character',
+          codecId: 'sql/char@1',
+          typeParams: { length: 36 },
+        }),
+        title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+        userId: col({
+          nativeType: 'character',
+          codecId: 'sql/char@1',
+          typeParams: { length: 36 },
+        }),
+        createdAt: col({
+          nativeType: 'timestamptz',
+          codecId: 'pg/timestamptz@1',
+          default: { kind: 'function', expression: 'now()' },
+        }),
+        embedding: col({
+          nativeType: 'vector',
+          codecId: 'pg/vector@1',
+          nullable: true,
+        }),
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [
+        {
+          columns: ['userId'],
+          references: { table: 'user', columns: ['id'] },
+          constraint: true,
+          index: true,
+        },
+      ],
+    }),
+  },
+  types: {
+    user_type: {
+      codecId: 'pg/enum@1',
+      nativeType: 'user_type',
+      typeParams: { values: ['admin', 'user'] },
+    },
+  },
+};
+
+function createDemoContract(
+  storage: SqlStorage,
+  overrides?: Partial<SqlContract<SqlStorage>>,
+): SqlContract<SqlStorage> {
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    storageHash: coreHash('sha256:demo'),
+    profileHash: profileHash('sha256:demo-profile'),
+    storage,
+    models: {},
+    relations: {},
+    mappings: {},
+    capabilities: {},
+    extensionPacks: { pgvector: {} },
+    meta: {},
+    sources: {},
+    ...overrides,
+  };
+}
+
+describe('incremental migration with full contract surface (extensions, enums, FKs)', () => {
+  const frameworkComponents = [createPgvectorComponent(), createAdapterHooksComponent()];
+
+  it('only emits ops for the actual change when adding a column to an existing table', () => {
+    const toStorage: SqlStorage = {
+      ...DEMO_BASE_STORAGE,
+      tables: {
+        ...DEMO_BASE_STORAGE.tables,
+        user: table({
+          ...DEMO_BASE_STORAGE.tables['user']!,
+          columns: {
+            ...DEMO_BASE_STORAGE.tables['user']!.columns,
+            name: col({ nativeType: 'text', codecId: 'pg/text@1', nullable: true }),
+          },
+        }),
+      },
+    };
+
+    const fromSchemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
+      expandNativeType: expandParameterizedNativeType,
+      frameworkComponents,
+    });
+    const toContract = createDemoContract(toStorage);
+    const planner = createPostgresMigrationPlanner();
+
+    const result = planner.plan({
+      contract: toContract,
+      schema: fromSchemaIR,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+
+    const opIds = result.plan.operations.map((op) => op.id);
+
+    expect(opIds).toEqual(['column.user.name']);
+    expect(opIds).not.toContain('extension.vector');
+    expect(opIds.filter((id) => id.startsWith('type.'))).toHaveLength(0);
+  });
+
+  it('produces no ops when from and to storages are identical (with extensions and types)', () => {
+    const fromSchemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
+      expandNativeType: expandParameterizedNativeType,
+      frameworkComponents,
+    });
+    const toContract = createDemoContract(DEMO_BASE_STORAGE);
+    const planner = createPostgresMigrationPlanner();
+
+    const result = planner.plan({
+      contract: toContract,
+      schema: fromSchemaIR,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+
+    expect(result.plan.operations).toHaveLength(0);
+  });
+
+  it('emits all ops on initial migration from empty state', () => {
+    const fromSchemaIR = contractToSchemaIR(null, {
+      expandNativeType: expandParameterizedNativeType,
+    });
+    const toContract = createDemoContract(DEMO_BASE_STORAGE);
+    const planner = createPostgresMigrationPlanner();
+
+    const result = planner.plan({
+      contract: toContract,
+      schema: fromSchemaIR,
+      policy: { allowedOperationClasses: ['additive'] },
+      frameworkComponents,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+
+    const opIds = result.plan.operations.map((op) => op.id);
+    expect(opIds).toContain('extension.vector');
+    expect(opIds.some((id) => id.startsWith('type.'))).toBe(true);
+    expect(opIds.some((id) => id.startsWith('table.'))).toBe(true);
+  });
+
+  it('contractToSchemaIR derives dependencies from framework components', () => {
+    const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
+      expandNativeType: expandParameterizedNativeType,
+      frameworkComponents,
+    });
+    expect(schemaIR.dependencies).toContainEqual({ id: 'postgres.extension.vector' });
+  });
+
+  it('contractToSchemaIR derives annotations from contract storage types', () => {
+    const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
+      expandNativeType: expandParameterizedNativeType,
+      frameworkComponents,
+    });
+    const pgAnnotations = schemaIR.annotations?.['pg'] as Record<string, unknown> | undefined;
+    const storageTypes = pgAnnotations?.['storageTypes'] as Record<string, unknown> | undefined;
+    expect(storageTypes).toBeDefined();
+    expect(storageTypes?.['user_type']).toMatchObject({
+      codecId: 'pg/enum@1',
+      nativeType: 'user_type',
+    });
+  });
+
+  it('contractToSchemaIR defaults to empty dependencies when no framework components given', () => {
+    const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
+      expandNativeType: expandParameterizedNativeType,
+    });
+    expect(schemaIR.dependencies).toEqual([]);
   });
 });

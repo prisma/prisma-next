@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { selectIncludeStrategy } from '../src/include-strategy';
-import { createTestContract } from './helpers';
+import { getTestContract } from './helpers';
 
 describe('selectIncludeStrategy', () => {
   it('returns multiQuery when include capabilities are absent', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const strategy = selectIncludeStrategy(contract);
 
     expect(strategy).toBe('multiQuery');
@@ -12,7 +12,7 @@ describe('selectIncludeStrategy', () => {
 
   it('returns correlated when jsonAgg is enabled without lateral', () => {
     const contract = {
-      ...createTestContract(),
+      ...getTestContract(),
       capabilities: {
         jsonAgg: {
           enabled: true,
@@ -26,7 +26,7 @@ describe('selectIncludeStrategy', () => {
 
   it('returns lateral when both lateral and jsonAgg are enabled', () => {
     const contract = {
-      ...createTestContract(),
+      ...getTestContract(),
       capabilities: {
         lateral: {
           enabled: true,
@@ -43,7 +43,7 @@ describe('selectIncludeStrategy', () => {
 
   it('reads object capabilities via enabled flag', () => {
     const contract = {
-      ...createTestContract(),
+      ...getTestContract(),
       capabilities: {
         lateral: { enabled: true },
         jsonAgg: { enabled: false, fallback: true },
@@ -56,12 +56,12 @@ describe('selectIncludeStrategy', () => {
 
   it('accepts top-level boolean capability flags', () => {
     const contract = {
-      ...createTestContract(),
+      ...getTestContract(),
       capabilities: {
         lateral: true,
         jsonAgg: true,
       },
-    } as unknown as ReturnType<typeof createTestContract>;
+    } as unknown as ReturnType<typeof getTestContract>;
 
     const strategy = selectIncludeStrategy(contract);
     expect(strategy).toBe('lateral');
@@ -69,12 +69,12 @@ describe('selectIncludeStrategy', () => {
 
   it('ignores non-boolean, non-object capability values', () => {
     const contract = {
-      ...createTestContract(),
+      ...getTestContract(),
       capabilities: {
         lateral: 'yes',
         jsonAgg: true,
       },
-    } as unknown as ReturnType<typeof createTestContract>;
+    } as unknown as ReturnType<typeof getTestContract>;
 
     const strategy = selectIncludeStrategy(contract);
     expect(strategy).toBe('correlated');

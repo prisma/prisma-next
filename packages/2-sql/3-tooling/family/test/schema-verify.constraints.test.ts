@@ -1,4 +1,3 @@
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
@@ -375,15 +374,16 @@ describe('verifySqlSchema - constraints', () => {
     });
   });
 
-  describe('extension missing', () => {
-    it('returns extension_missing issue when required extension is not in schema', () => {
+  describe('dependency missing', () => {
+    it('returns dependency_missing issue when required dependency is not in schema', () => {
+      const dependencyId = 'postgres.extension.vector';
       const contract = createTestContract({
         user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
       });
 
       const schema = createTestSchemaIR(
         { user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }) },
-        [], // No extensions
+        [], // No dependencies
       );
 
       const frameworkComponents = [
@@ -396,21 +396,9 @@ describe('verifySqlSchema - constraints', () => {
           databaseDependencies: {
             init: [
               {
-                id: 'postgres.extension.vector',
+                id: dependencyId,
                 label: 'Enable vector extension',
                 install: [],
-                verifyDatabaseDependencyInstalled: (s: SqlSchemaIR) => {
-                  if (!s.extensions.includes('vector')) {
-                    return [
-                      {
-                        kind: 'extension_missing',
-                        table: '',
-                        message: 'Extension "vector" is missing from database',
-                      },
-                    ];
-                  }
-                  return [];
-                },
               },
             ],
           },
@@ -428,7 +416,8 @@ describe('verifySqlSchema - constraints', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          kind: 'extension_missing',
+          kind: 'dependency_missing',
+          message: `Dependency "${dependencyId}" is missing from database`,
         }),
       );
     });

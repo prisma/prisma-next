@@ -1,7 +1,7 @@
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
-import { createTestContract } from '../helpers';
+import { getTestContract } from '../helpers';
 import {
   createPgIntegrationRuntime,
   type PgIntegrationRuntime,
@@ -11,22 +11,22 @@ import {
 export { timeouts };
 
 export function createUsersCollection(runtime: PgIntegrationRuntime) {
-  const contract = createTestContract();
+  const contract = getTestContract();
   return new Collection({ contract, runtime }, 'User');
 }
 
 export function createPostsCollection(runtime: PgIntegrationRuntime) {
-  const contract = createTestContract();
+  const contract = getTestContract();
   return new Collection({ contract, runtime }, 'Post');
 }
 
 export function createReturningUsersCollection(runtime: PgIntegrationRuntime) {
-  const contract = withReturningCapability(createTestContract());
+  const contract = withReturningCapability(getTestContract());
   return new Collection({ contract, runtime }, 'User');
 }
 
 export function createReturningPostsCollection(runtime: PgIntegrationRuntime) {
-  const contract = withReturningCapability(createTestContract());
+  const contract = withReturningCapability(getTestContract());
   return new Collection({ contract, runtime }, 'Post');
 }
 

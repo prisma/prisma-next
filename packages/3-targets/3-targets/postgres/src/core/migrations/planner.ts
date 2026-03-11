@@ -9,6 +9,7 @@ import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
+  ComponentDatabaseDependency,
   MigrationOperationPolicy,
   SqlMigrationPlanner,
   SqlMigrationPlannerPlanOptions,
@@ -16,6 +17,7 @@ import type {
   SqlPlannerConflict,
 } from '@prisma-next/family-sql/control';
 import {
+  collectInitDependencies,
   createMigrationPlan,
   extractCodecControlHooks,
   plannerFailure,
@@ -28,13 +30,14 @@ import type {
   StorageColumn,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
+import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
 import { buildReconciliationPlan } from './planner-reconciliation';
 
 export type OperationClass =
-  | 'extension'
+  | 'dependency'
   | 'type'
   | 'table'
   | 'column'
@@ -61,7 +64,6 @@ type PlannerDatabaseDependency = {
   readonly id: string;
   readonly label: string;
   readonly install: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
-  readonly verifyDatabaseDependencyInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
 };
 
 export interface PostgresPlanTargetDetails {
@@ -187,14 +189,15 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const seenDependencyIds = new Set<string>();
     const seenOperationIds = new Set<string>();
 
+    const installedIds = new Set(options.schema.dependencies.map((d) => d.id));
+
     for (const dependency of dependencies) {
       if (seenDependencyIds.has(dependency.id)) {
         continue;
       }
       seenDependencyIds.add(dependency.id);
 
-      const issues = dependency.verifyDatabaseDependencyInstalled(options.schema);
-      if (issues.length === 0) {
+      if (installedIds.has(dependency.id)) {
         continue;
       }
 
@@ -203,8 +206,6 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
           continue;
         }
         seenOperationIds.add(installOp.id);
-        // SQL family components are expected to provide compatible target details. This would be better if
-        // the type system could enforce it but it's not likely to occur in practice.
         operations.push(installOp as SqlMigrationPlanOperation<PostgresPlanTargetDetails>);
       }
     }
@@ -263,21 +264,8 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   private collectDependencies(
     options: PlannerOptionsWithComponents,
   ): ReadonlyArray<PlannerDatabaseDependency> {
-    const components = options.frameworkComponents;
-    if (components.length === 0) {
-      return [];
-    }
-    const deps: PlannerDatabaseDependency[] = [];
-    for (const component of components) {
-      if (!isSqlDependencyProvider(component)) {
-        continue;
-      }
-      const initDeps = component.databaseDependencies?.init;
-      if (initDeps && initDeps.length > 0) {
-        deps.push(...initDeps);
-      }
-    }
-    return sortDependencies(deps);
+    const dependencies = collectInitDependencies(options.frameworkComponents);
+    return sortDependencies(dependencies.filter(isPostgresPlannerDependency));
   }
 
   private buildTableOperations(
@@ -521,7 +509,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
         if (lookup && hasIndex(lookup, index.columns)) {
           continue;
         }
-        const indexName = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
+        const indexName = index.name ?? defaultIndexName(tableName, index.columns);
         operations.push({
           id: `index.${tableName}.${indexName}`,
           label: `Create index ${indexName} on ${tableName}`,
@@ -580,7 +568,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
         // Skip if the index already exists in the database
         if (lookup && hasIndex(lookup, fk.columns)) continue;
 
-        const indexName = `${tableName}_${fk.columns.join('_')}_idx`;
+        const indexName = defaultIndexName(tableName, fk.columns);
         operations.push({
           id: `index.${tableName}.${indexName}`,
           label: `Create FK-backing index ${indexName} on ${tableName}`,
@@ -704,35 +692,16 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   }
 }
 
-function isSqlDependencyProvider(component: unknown): component is {
-  readonly databaseDependencies?: {
-    readonly init?: readonly PlannerDatabaseDependency[];
-  };
-} {
-  if (typeof component !== 'object' || component === null) {
-    return false;
-  }
-  const record = component as Record<string, unknown>;
-
-  // If present, enforce familyId match to avoid mixing families at runtime.
-  if (Object.hasOwn(record, 'familyId') && record['familyId'] !== 'sql') {
-    return false;
-  }
-
-  if (!Object.hasOwn(record, 'databaseDependencies')) {
-    return false;
-  }
-  const deps = record['databaseDependencies'];
-  return deps === undefined || (typeof deps === 'object' && deps !== null);
-}
-
 function sortDependencies(
   dependencies: ReadonlyArray<PlannerDatabaseDependency>,
 ): ReadonlyArray<PlannerDatabaseDependency> {
-  if (dependencies.length <= 1) {
-    return dependencies;
-  }
   return [...dependencies].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function isPostgresPlannerDependency(
+  dependency: ComponentDatabaseDependency<unknown>,
+): dependency is PlannerDatabaseDependency {
+  return dependency.install.every((operation) => operation.target.id === 'postgres');
 }
 
 function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): string {

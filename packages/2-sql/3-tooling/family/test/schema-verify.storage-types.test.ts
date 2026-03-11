@@ -28,7 +28,6 @@ describe('verifySqlSchema - storage types', () => {
       verifyType: ({ typeName }) => [
         {
           kind: 'type_missing',
-          table: '',
           typeName,
           message: `Type "${typeName}" is missing`,
         },

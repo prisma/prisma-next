@@ -1,14 +1,19 @@
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/core-control-plane/types';
 import type {
   ForeignKey,
   Index,
+  SqlContract,
   SqlStorage,
   StorageColumn,
   StorageTable,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
+import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type {
+  DependencyIR,
+  SqlAnnotations,
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
@@ -17,6 +22,7 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { collectInitDependencies } from './types';
 
 function convertDefault(def: ColumnDefault): string {
   if (def.kind === 'function') {
@@ -98,13 +104,31 @@ function convertTable(
     columns[colName] = convertColumn(colName, colDef, expandNativeType);
   }
 
+  const satisfiedIndexColumns = new Set([
+    ...table.indexes.map((idx) => idx.columns.join(',')),
+    ...table.uniques.map((unique) => unique.columns.join(',')),
+    ...(table.primaryKey ? [table.primaryKey.columns.join(',')] : []),
+  ]);
+  const fkBackingIndexes: SqlIndexIR[] = [];
+  for (const fk of table.foreignKeys) {
+    if (fk.index === false) continue;
+    const key = fk.columns.join(',');
+    if (satisfiedIndexColumns.has(key)) continue;
+    fkBackingIndexes.push({
+      columns: fk.columns,
+      unique: false,
+      name: defaultIndexName(name, fk.columns),
+    });
+    satisfiedIndexColumns.add(key);
+  }
+
   return {
     name,
     columns,
     ...(table.primaryKey != null ? { primaryKey: table.primaryKey } : {}),
     foreignKeys: table.foreignKeys.map(convertForeignKey),
     uniques: table.uniques.map(convertUnique),
-    indexes: table.indexes.map(convertIndex),
+    indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
   };
 }
 
@@ -153,29 +177,77 @@ export function detectDestructiveChanges(
   return conflicts;
 }
 
+export interface ContractToSchemaIROptions {
+  readonly annotationNamespace: string;
+  readonly expandNativeType?: NativeTypeExpander;
+  readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+}
+
 /**
- * Converts a contract's `SqlStorage` to `SqlSchemaIR`.
+ * Converts an `SqlContract` to `SqlSchemaIR`.
  *
- * Drops codec metadata (`codecId`, `typeRef`) since the schema IR only represents structural
- * information. When `expandNativeType` is provided, parameterized types are expanded
- * (e.g. `character` + `{ length: 36 }` → `character(36)`) so the resulting IR compares
- * correctly against the "to" contract during planning.
+ * Reads `contract.storage` for tables, `contract.storage.types` for type
+ * annotations, and derives database dependencies from `frameworkComponents`
+ * (each component's `databaseDependencies.init[].id`).
+ * Storage-type annotations are written under `options.annotationNamespace`.
  *
- * `extensions` is always `[]` — the planner resolves extension dependencies from framework
- * components, and an empty array means "nothing installed yet" which is correct for the
- * "from" side of a diff.
+ * Drops codec metadata (`codecId`, `typeRef`) since the schema IR only represents
+ * structural information. When `expandNativeType` is provided, parameterized types
+ * are expanded (e.g. `character` + `{ length: 36 }` → `character(36)`) so the
+ * resulting IR compares correctly against the "to" contract during planning.
+ *
+ * Returns an empty schema IR when `contract` is `null` (new project).
  */
 export function contractToSchemaIR(
-  storage: SqlStorage,
-  expandNativeType?: NativeTypeExpander,
+  contract: SqlContract<SqlStorage> | null,
+  options: ContractToSchemaIROptions,
 ): SqlSchemaIR {
+  if (options.annotationNamespace.length === 0) {
+    throw new Error('annotationNamespace must be a non-empty string');
+  }
+
+  if (!contract) {
+    return { tables: {}, dependencies: [] };
+  }
+
+  const storage = contract.storage;
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
-    tables[tableName] = convertTable(tableName, tableDef, expandNativeType);
+    tables[tableName] = convertTable(tableName, tableDef, options.expandNativeType);
   }
+
+  const dependencies = deduplicateDependencyIRs(
+    collectInitDependencies(options.frameworkComponents ?? []),
+  );
+  const annotations = deriveAnnotations(storage, options.annotationNamespace);
 
   return {
     tables,
-    extensions: [],
+    dependencies,
+    ...ifDefined('annotations', annotations),
   };
+}
+
+function deduplicateDependencyIRs(
+  deps: readonly { readonly id: string }[],
+): readonly DependencyIR[] {
+  const seen = new Set<string>();
+  const result: DependencyIR[] = [];
+  for (const dep of deps) {
+    if (dep.id.trim().length === 0) {
+      throw new Error('Dependency id must be a non-empty string');
+    }
+    if (seen.has(dep.id)) continue;
+    seen.add(dep.id);
+    result.push({ id: dep.id });
+  }
+  return result;
+}
+
+function deriveAnnotations(
+  storage: SqlStorage,
+  annotationNamespace: string,
+): SqlAnnotations | undefined {
+  if (!storage.types || Object.keys(storage.types).length === 0) return undefined;
+  return { [annotationNamespace]: { storageTypes: storage.types } };
 }

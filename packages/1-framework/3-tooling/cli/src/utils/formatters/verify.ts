@@ -169,7 +169,7 @@ function renderSchemaTree(
         }
         break;
       }
-      case 'extension': {
+      case 'dependency': {
         // Parse extension message formats similar to schema-verify
         // "extensionName extension is enabled" -> cyan extensionName, dim rest
         const extMatch = node.label.match(/^([^\s]+)\s+(extension is enabled)$/);
@@ -388,7 +388,7 @@ function renderSchemaVerificationTree(
         labelColor = dim;
         formattedLabel = labelColor(node.name);
         break;
-      case 'extension': {
+      case 'dependency': {
         // Parse specific extension message formats
         // "database is postgres" -> dim "database is", cyan "postgres"
         const dbMatch = node.name.match(/^database is\s+(.+)$/);
