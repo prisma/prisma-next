@@ -19,7 +19,7 @@ Model database-side prerequisites as **component-owned database dependencies**, 
 - migration execution (runner + post-apply schema verification)
 - pure schema verification over schema IR
 
-The CLI passes a **list of configured framework components** (`frameworkComponents`) into planning/execution/verification. SQL-family code structurally narrows the components that declare `databaseDependencies` and evaluates their dependency hooks.
+The CLI passes a **list of configured framework components** (`frameworkComponents`) into planning/execution/verification. SQL-family code structurally narrows the components that declare `databaseDependencies` and consumes their declared dependency metadata.
 
 The target architecture is that components own both:
 
@@ -42,9 +42,9 @@ A component can declare `databaseDependencies.init`, where each dependency provi
 - a stable `id` (e.g., `postgres.extension.vector`)
 - a human `label`
 - `install` operations (`SqlMigrationPlanOperation`) for `db init`
-- component-owned verification logic (pure over `SqlSchemaIR`) that determines installed-state for that dependency
+- (future target architecture) component-owned verification logic (pure over `SqlSchemaIR`) that determines installed-state for that dependency
 
-Planner and verifier stay structural consumers: they rely on component-owned verification outputs and avoid target-level fuzzy matching or inference from `contract.extensionPacks`.
+Planner and verifier stay structural consumers: they avoid target-level fuzzy matching or inference from `contract.extensionPacks`.
 
 ### Schema IR representation
 
@@ -52,7 +52,7 @@ Planner and verifier stay structural consumers: they rely on component-owned ver
 
 - **Introspection** (online path): the adapter maps database objects to dependency IDs. For Postgres, `pg_extension` rows are mapped using the convention `postgres.extension.<extname>`.
 - **`contractToSchemaIR`** (offline path): dependency IDs are collected from active framework components' `databaseDependencies.init[].id`.
-- **Planner**: uses component-owned verification outcomes to decide skip/emit for dependency install ops.
+- **Planner** (current v1): uses dependency-ID presence (`requiredId ∈ schemaIR.dependencies`) to decide skip/emit for dependency install ops.
 
 ### Data sources
 
@@ -85,6 +85,17 @@ The current implementation intentionally simplifies verification to adapter-owne
 - This works for the current dependency set because all active dependencies are extension-shaped and map cleanly from `pg_extension`.
 
 This is a temporary compromise, not the target architecture. When non-extension dependency shapes emerge (for example, prerequisites represented by functions, settings, or catalog/table facts), we should restore component-owned verification through component-contributed detectors/hooks that project installed-state facts into `SqlSchemaIR.dependencies`, while keeping planner/verifier matching structural.
+
+### Known limitation (accepted for now)
+
+The v1 model is intentionally narrow and has a known source-of-truth limitation:
+
+- **Live path** (`db update`, `db schema-verify`): dependency IDs come from adapter introspection of the database.
+- **Offline path** (`migration plan`): dependency IDs are synthesized from currently active `frameworkComponents`.
+
+This means offline dependency evidence is currently composition-coupled and not a first-class projection derived from historical `fromContract` dependency state. The model is acceptable for extension-shaped presence checks today, but insufficient for richer extension-owned dependency semantics (for example, auth plugins that require structural or behavioral invariants beyond ID presence).
+
+Related design issue: planner inputs are asymmetric (`from` as `SqlSchemaIR`, `to` as contract), which increases the risk that dependency semantics stay distributed across code paths instead of being represented in one canonical diff surface.
 
 ## Related
 
