@@ -85,14 +85,18 @@ export type SqlTableIR = {
   readonly annotations?: SqlAnnotations; // table-level metadata
 };
 
+export type DependencyIR = {
+  readonly id: string;
+};
+
 /**
  * SQL Schema IR representing the complete database schema.
  * This is the target-agnostic representation used for verification and migration planning.
  */
 export type SqlSchemaIR = {
   readonly tables: Record<string, SqlTableIR>;
-  readonly extensions: readonly string[]; // logical extension ids or DB extension names
   readonly annotations?: SqlAnnotations; // extensible global metadata
+  readonly dependencies: readonly DependencyIR[];
 };
 
 /**

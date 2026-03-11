@@ -87,7 +87,7 @@ function isAdditiveIssue(issue: SchemaIssue): boolean {
     case 'type_values_mismatch':
     case 'missing_table':
     case 'missing_column':
-    case 'extension_missing':
+    case 'dependency_missing':
       return true;
     case 'primary_key_mismatch':
       return issue.actual === undefined;
@@ -510,7 +510,7 @@ function convertIssueToConflict(issue: SchemaIssue): SqlPlannerConflict | null {
     case 'foreign_key_mismatch':
       return buildConflict('foreignKeyConflict', issue);
     // Additive issue kinds (missing_table, missing_column, type_missing, type_values_mismatch,
-    // extension_missing) are filtered by isAdditiveIssue before reaching this method.
+    // dependency_missing) are filtered by isAdditiveIssue before reaching this method.
     // If a new SchemaIssue kind is introduced, add a mapping here so it becomes a conflict
     // rather than being silently ignored.
     default:

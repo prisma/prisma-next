@@ -692,7 +692,6 @@ export const pgEnumControlHooks: CodecControlHooks = {
       return [
         {
           kind: 'type_missing',
-          table: '',
           typeName,
           message: `Type "${typeName}" is missing from database`,
         },
@@ -702,7 +701,6 @@ export const pgEnumControlHooks: CodecControlHooks = {
       return [
         {
           kind: 'type_values_mismatch',
-          table: '',
           typeName,
           expected: desired.join(', '),
           actual: existing.join(', '),

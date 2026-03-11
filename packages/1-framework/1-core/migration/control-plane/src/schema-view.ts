@@ -15,7 +15,7 @@
  * // SqlSchemaIR structure:
  * // {
  * //   tables: { user: { columns: {...}, primaryKey: {...}, ... }, ... },
- * //   extensions: ['pgvector'],
+ * //   dependencies: [{ id: 'postgres.extension.vector' }],
  * //   annotations: {...}
  * // }
  *
@@ -47,9 +47,9 @@
  * //         ]
  * //       },
  * //       {
- * //         kind: 'extension',
- * //         id: 'extension-pgvector',
- * //         label: 'extension pgvector',
+ * //         kind: 'dependency',
+ * //         id: 'dependency-postgres.extension.pgvector',
+ * //         label: 'pgvector extension is enabled',
  * //         meta: { ... }
  * //       }
  * //     ]
@@ -72,7 +72,7 @@ export type SchemaNodeKind =
   | 'entity'
   | 'field'
   | 'index'
-  | 'extension';
+  | 'dependency';
 
 /**
  * A node in the schema tree.

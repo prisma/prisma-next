@@ -1,10 +1,34 @@
-import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type {
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import {
-  contractToSchemaIR,
+  contractToSchemaIR as contractToSchemaIRImpl,
   detectDestructiveChanges,
 } from '../src/core/migrations/contract-to-schema-ir';
+
+function wrap(storage: SqlStorage): SqlContract<SqlStorage> {
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    storageHash: coreHash('sha256:test'),
+    profileHash: profileHash('sha256:test'),
+    storage,
+    models: {},
+    relations: {},
+    mappings: {},
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    sources: {},
+  };
+}
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
@@ -25,14 +49,20 @@ function table(
   };
 }
 
+function contractToSchemaIR(
+  contract: SqlContract<SqlStorage> | null,
+  options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
+): SqlSchemaIR {
+  return contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });
+}
+
 describe('contractToSchemaIR', () => {
   it('converts empty storage to empty schema IR', () => {
-    const storage: SqlStorage = { tables: {} };
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(null);
 
     expect(result).toEqual<SqlSchemaIR>({
       tables: {},
-      extensions: [],
+      dependencies: [],
     });
   });
 
@@ -49,7 +79,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
 
     expect(result.tables['User']).toBeDefined();
     expect(result.tables['User']!.name).toBe('User');
@@ -76,7 +106,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     const column = result.tables['T']!.columns['a']!;
 
     expect(column).toEqual({ name: 'a', nativeType: 'vector', nullable: false });
@@ -112,7 +142,7 @@ describe('contractToSchemaIR', () => {
       return input.nativeType;
     };
 
-    const result = contractToSchemaIR(storage, expand);
+    const result = contractToSchemaIR(wrap(storage), { expandNativeType: expand });
     expect(result.tables['T']!.columns['id']!.nativeType).toBe('character(36)');
     expect(result.tables['T']!.columns['name']!.nativeType).toBe('text');
   });
@@ -132,7 +162,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['id']!.nativeType).toBe('character');
   });
 
@@ -150,7 +180,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['status']!.default).toBe("'active'");
   });
 
@@ -168,7 +198,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['author']!.default).toBe("'O''Reilly'");
   });
 
@@ -186,7 +216,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['textValue']!.default).toBe("'a''b''''c'");
   });
 
@@ -204,7 +234,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['createdAt']!.default).toBe('now()');
   });
 
@@ -219,7 +249,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.columns['name']!.default).toBeUndefined();
     expect('default' in result.tables['T']!.columns['name']!).toBe(false);
   });
@@ -236,7 +266,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.primaryKey).toEqual({ columns: ['id'], name: 'T_pkey' });
   });
 
@@ -252,7 +282,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.uniques).toEqual([{ columns: ['email'], name: 'T_email_key' }]);
   });
 
@@ -268,7 +298,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.indexes).toEqual([
       { columns: ['email'], name: 'T_email_idx', unique: false },
     ]);
@@ -294,7 +324,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['Post']!.foreignKeys).toEqual([
       {
         columns: ['authorId'],
@@ -317,12 +347,12 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(Object.keys(result.tables)).toEqual(expect.arrayContaining(['User', 'Post']));
     expect(Object.keys(result.tables)).toHaveLength(2);
   });
 
-  it('ignores SqlStorage.types (codec metadata)', () => {
+  it('propagates storage types into annotations', () => {
     const storage: SqlStorage = {
       tables: {
         T: table({
@@ -340,12 +370,54 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
-    expect(result.extensions).toEqual([]);
+    const result = contractToSchemaIR(wrap(storage));
+    expect(result.dependencies).toEqual([]);
     expect(result.tables['T']!.columns['embedding']!.nativeType).toBe('vector');
+    expect((result.annotations as Record<string, unknown>)?.['pg']).toMatchObject({
+      storageTypes: {
+        Embedding: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          typeParams: { dimensions: 1536 },
+        },
+      },
+    });
   });
 
-  it('sets extensions to empty array', () => {
+  it('writes storage type annotations using the configured namespace', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: {
+            embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
+          },
+        }),
+      },
+      types: {
+        Embedding: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          typeParams: { dimensions: 1536 },
+        },
+      },
+    };
+
+    const result = contractToSchemaIRImpl(wrap(storage), {
+      annotationNamespace: 'custom',
+    });
+    expect((result.annotations as Record<string, unknown>)?.['custom']).toMatchObject({
+      storageTypes: {
+        Embedding: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          typeParams: { dimensions: 1536 },
+        },
+      },
+    });
+    expect((result.annotations as Record<string, unknown>)?.['pg']).toBeUndefined();
+  });
+
+  it('sets dependencies to empty array', () => {
     const storage: SqlStorage = {
       tables: {
         T: table({
@@ -354,8 +426,74 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
-    expect(result.extensions).toEqual([]);
+    const result = contractToSchemaIR(wrap(storage));
+    expect(result.dependencies).toEqual([]);
+  });
+
+  it('deduplicates dependency IDs from framework components', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: { id: col({ nativeType: 'text' }) },
+        }),
+      },
+    };
+
+    const frameworkComponents = [
+      {
+        kind: 'extension',
+        id: 'dep-a',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.0-test',
+        databaseDependencies: {
+          init: [
+            { id: 'postgres.extension.vector', label: 'vector', install: [] },
+            { id: 'postgres.extension.vector', label: 'vector duplicate', install: [] },
+          ],
+        },
+      },
+    ] as unknown as NonNullable<
+      Omit<
+        Parameters<typeof contractToSchemaIRImpl>[1],
+        'annotationNamespace'
+      >['frameworkComponents']
+    >;
+
+    const result = contractToSchemaIR(wrap(storage), { frameworkComponents });
+    expect(result.dependencies).toEqual([{ id: 'postgres.extension.vector' }]);
+  });
+
+  it('throws for empty dependency IDs from framework components', () => {
+    const storage: SqlStorage = {
+      tables: {
+        T: table({
+          columns: { id: col({ nativeType: 'text' }) },
+        }),
+      },
+    };
+
+    const frameworkComponents = [
+      {
+        kind: 'extension',
+        id: 'dep-a',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.0-test',
+        databaseDependencies: {
+          init: [{ id: '', label: 'invalid', install: [] }],
+        },
+      },
+    ] as unknown as NonNullable<
+      Omit<
+        Parameters<typeof contractToSchemaIRImpl>[1],
+        'annotationNamespace'
+      >['frameworkComponents']
+    >;
+
+    expect(() => contractToSchemaIR(wrap(storage), { frameworkComponents })).toThrow(
+      'Dependency id must be a non-empty string',
+    );
   });
 
   it('handles unique constraints without names', () => {
@@ -371,7 +509,7 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['T']!.uniques[0]).toEqual({ columns: ['a', 'b'] });
   });
 
@@ -392,12 +530,97 @@ describe('contractToSchemaIR', () => {
       },
     };
 
-    const result = contractToSchemaIR(storage);
+    const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['Post']!.foreignKeys[0]).toEqual({
       columns: ['authorId'],
       referencedTable: 'User',
       referencedColumns: ['id'],
     });
+  });
+
+  it('does not synthesize FK backing index when FK columns match primary key columns', () => {
+    const storage: SqlStorage = {
+      tables: {
+        User: table({
+          columns: { id: col({ nativeType: 'text' }) },
+          primaryKey: { columns: ['id'] },
+        }),
+        Post: table({
+          columns: { userId: col({ nativeType: 'text' }) },
+          primaryKey: { columns: ['userId'] },
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              references: { table: 'User', columns: ['id'] },
+              constraint: true,
+              index: true,
+            },
+          ],
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(wrap(storage));
+    expect(result.tables['Post']!.indexes).toEqual([]);
+  });
+
+  it('does not synthesize FK backing index when FK columns match unique columns', () => {
+    const storage: SqlStorage = {
+      tables: {
+        User: table({
+          columns: { id: col({ nativeType: 'text' }) },
+          primaryKey: { columns: ['id'] },
+        }),
+        Post: table({
+          columns: { userId: col({ nativeType: 'text' }) },
+          uniques: [{ columns: ['userId'] }],
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              references: { table: 'User', columns: ['id'] },
+              constraint: true,
+              index: true,
+            },
+          ],
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(wrap(storage));
+    expect(result.tables['Post']!.indexes).toEqual([]);
+  });
+
+  it('deduplicates synthesized FK backing indexes for repeated FK column sets', () => {
+    const storage: SqlStorage = {
+      tables: {
+        User: table({
+          columns: { id: col({ nativeType: 'text' }) },
+          primaryKey: { columns: ['id'] },
+        }),
+        Post: table({
+          columns: { userId: col({ nativeType: 'text' }) },
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              references: { table: 'User', columns: ['id'] },
+              constraint: true,
+              index: true,
+            },
+            {
+              columns: ['userId'],
+              references: { table: 'User', columns: ['id'] },
+              constraint: true,
+              index: true,
+            },
+          ],
+        }),
+      },
+    };
+
+    const result = contractToSchemaIR(wrap(storage));
+    expect(result.tables['Post']!.indexes).toEqual([
+      { columns: ['userId'], unique: false, name: 'Post_userId_idx' },
+    ]);
   });
 });
 

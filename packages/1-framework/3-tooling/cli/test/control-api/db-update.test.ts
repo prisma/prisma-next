@@ -24,7 +24,7 @@ function createMockFamilyInstance(overrides?: {
   return {
     familyId: 'sql',
     readMarker: overrides?.readMarker ?? (async () => null),
-    introspect: overrides?.introspect ?? (async () => ({ tables: {}, extensions: [] })),
+    introspect: overrides?.introspect ?? (async () => ({ tables: {}, dependencies: [] })),
     validateContractIR: (ir: unknown) => ir as ContractIR,
   } as unknown as ControlFamilyInstance<'sql'>;
 }

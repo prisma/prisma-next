@@ -451,7 +451,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
           indexes: [],
         },
       },
-      extensions: [],
+      dependencies: [],
       annotations: {
         pg: {
           storageTypes: {

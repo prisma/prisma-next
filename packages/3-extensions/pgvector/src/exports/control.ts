@@ -1,23 +1,8 @@
-import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   ComponentDatabaseDependencies,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { pgvectorOperationSignature, pgvectorPackMeta } from '../core/descriptor-meta';
-
-function verifyVectorExtensionInstalled(schema: SqlSchemaIR): readonly SchemaIssue[] {
-  if (!schema.extensions.includes('vector')) {
-    return [
-      {
-        kind: 'extension_missing',
-        table: '',
-        message: 'Extension "vector" is missing from database (required by pgvector)',
-      },
-    ];
-  }
-  return [];
-}
 
 const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
   init: [
@@ -51,7 +36,6 @@ const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
           ],
         },
       ],
-      verifyDatabaseDependencyInstalled: verifyVectorExtensionInstalled,
     },
   ],
 };

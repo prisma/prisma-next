@@ -14,8 +14,10 @@ exports[`db introspect command (e2e) > outputs JSON envelope with real database 
         "version": "17.5",
       },
     },
-    "extensions": [
-      "plpgsql",
+    "dependencies": [
+      {
+        "id": "postgres.extension.plpgsql",
+      },
     ],
     "tables": {
       "user": {
@@ -79,5 +81,5 @@ contract
 │  │  └─ name: text (nullable)
 │  ├─ primary key: id
 │  └─ unique index user_email_unique
-└─ plpgsql extension is enabled"
+└─ plpgsql dependency is installed"
 `;

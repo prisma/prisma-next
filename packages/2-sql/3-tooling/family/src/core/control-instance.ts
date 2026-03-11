@@ -24,6 +24,7 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
+import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
@@ -665,7 +666,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           }
 
           for (const index of table.indexes) {
-            const name = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
+            const name = index.name ?? defaultIndexName(tableName, index.columns);
             const label = index.unique ? `unique index ${name}` : `index ${name}`;
             children.push({
               kind: 'index',
@@ -705,13 +706,16 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         },
       );
 
-      const extensionNodes: readonly SchemaTreeNode[] = schema.extensions.map((extName) => ({
-        kind: 'extension',
-        id: `extension-${extName}`,
-        label: `${extName} extension is enabled`,
-      }));
+      const dependencyNodes: readonly SchemaTreeNode[] = schema.dependencies.map((dep) => {
+        const shortName = dep.id.split('.').pop() ?? dep.id;
+        return {
+          kind: 'dependency',
+          id: `dependency-${dep.id}`,
+          label: `${shortName} dependency is installed`,
+        };
+      });
 
-      const rootChildren = [...tableNodes, ...extensionNodes];
+      const rootChildren = [...tableNodes, ...dependencyNodes];
 
       const rootNode: SchemaTreeNode = {
         kind: 'root',

@@ -33,7 +33,6 @@ export interface ComponentDatabaseDependency<TTargetDetails> {
   readonly id: string;
   readonly label: string;
   readonly install: readonly SqlMigrationPlanOperation<TTargetDetails>[];
-  readonly verifyDatabaseDependencyInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
 }
 
 export interface ComponentDatabaseDependencies<TTargetDetails> {
@@ -42,6 +41,23 @@ export interface ComponentDatabaseDependencies<TTargetDetails> {
 
 export interface DatabaseDependencyProvider {
   readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
+}
+
+export function isDatabaseDependencyProvider(value: unknown): value is DatabaseDependencyProvider {
+  return typeof value === 'object' && value !== null && 'databaseDependencies' in value;
+}
+
+export function collectInitDependencies(
+  components: ReadonlyArray<unknown>,
+): readonly ComponentDatabaseDependency<unknown>[] {
+  const result: ComponentDatabaseDependency<unknown>[] = [];
+  for (const component of components) {
+    if (!isDatabaseDependencyProvider(component)) continue;
+    const deps = component.databaseDependencies?.init;
+    if (!deps) continue;
+    result.push(...deps);
+  }
+  return result;
 }
 
 export interface StorageTypePlanResult<TTargetDetails> {
@@ -144,8 +160,6 @@ export type SqlPlannerConflictKind =
   | 'indexIncompatible'
   | 'foreignKeyConflict'
   | 'missingButNonAdditive'
-  | 'unsupportedExtension'
-  | 'extensionMissing'
   | 'unsupportedOperation';
 
 export interface SqlPlannerConflictLocation {
@@ -153,7 +167,6 @@ export interface SqlPlannerConflictLocation {
   readonly column?: string;
   readonly index?: string;
   readonly constraint?: string;
-  readonly extension?: string;
   readonly type?: string;
 }
 
