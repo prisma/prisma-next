@@ -26,44 +26,6 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
-        'src/cli.ts',
-        // Exclude formatting/wrangling files - these are tested via e2e tests
-        'src/utils/output.ts',
-        'src/utils/formatters/**',
-        'src/utils/terminal-ui.ts',
-        'src/utils/command-helpers.ts',
-        'src/utils/global-flags.ts',
-        // Exclude command files - mostly Commander.js setup and delegation to family instance,
-        // tested via e2e tests in @prisma-next/integration-tests (test/integration/test/cli.*.e2e.test.ts)
-        'src/commands/contract-emit.ts',
-        'src/commands/db-init.ts',
-        'src/commands/db-introspect.ts',
-        'src/commands/db-schema-verify.ts',
-        'src/commands/db-sign.ts',
-        'src/commands/db-update.ts',
-        'src/commands/db-verify.ts',
-        'src/commands/migration-apply.ts',
-        'src/commands/migration-plan.ts',
-        'src/commands/migration-show.ts',
-        'src/commands/migration-status.ts',
-        'src/commands/migration-verify.ts',
-        // Exclude error factory functions - just constructors
-        'src/utils/cli-errors.ts',
-        // Exclude config loader - mostly file I/O and error handling, tested via e2e tests
-        'src/config-loader.ts',
-        // Exclude spinner, progress, and shutdown utilities - UI/UX and process-level code
-        'src/utils/spinner.ts',
-        'src/utils/progress-adapter.ts',
-        'src/utils/shutdown.ts',
-        // Exclude migration command scaffold - orchestration code tested via e2e tests
-        'src/utils/migration-command-scaffold.ts',
-        // Exclude defensive error handling branches that are hard to test meaningfully
-        'src/api/emit-contract.ts', // Non-Error exception handling (lines 104-105)
-        'src/load-ts-contract.ts', // Bundle content undefined and non-Error exceptions (lines 170-171, 211)
-        // Control API is tested via integration tests (test/integration/test/control-api.test.ts).
-        // Unit tests with mocked components only test orchestration wiring, not real behavior.
-        // Coverage is measured in integration tests, not package-level coverage.
-        'src/control-api/**',
       ],
       thresholds: {
         lines: 95,
