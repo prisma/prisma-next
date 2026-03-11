@@ -636,6 +636,8 @@ function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', st
     expandNativeType: expandParameterizedNativeType,
   };
 
+  // Intentionally minimal test double for planner/contractToSchemaIR wiring.
+  // Concrete enum hook behavior is covered in adapter enum-control-hooks tests.
   const enumHooks: CodecControlHooks = {
     planTypeOperations: ({ typeName, typeInstance, schema, schemaName }) => {
       const values = typeInstance.typeParams?.['values'] as string[] | undefined;
