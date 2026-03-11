@@ -1,8 +1,8 @@
-import { relative, resolve } from 'node:path';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {

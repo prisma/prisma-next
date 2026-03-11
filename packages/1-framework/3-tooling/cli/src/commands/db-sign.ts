@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
 import type {
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { ContractValidationError } from '../control-api/errors';
