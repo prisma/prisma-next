@@ -81,5 +81,5 @@ contract
 │  │  └─ name: text (nullable)
 │  ├─ primary key: id
 │  └─ unique index user_email_unique
-└─ plpgsql extension is enabled"
+└─ plpgsql dependency is installed"
 `;
