@@ -1,6 +1,7 @@
 export type { CliErrorConflict, CliErrorEnvelope } from '../errors';
 export {
   CliStructuredError,
+  ERROR_CODE_DESTRUCTIVE_CHANGES,
   errorConfigFileNotFound,
   errorConfigValidation,
   errorContractConfigMissing,
