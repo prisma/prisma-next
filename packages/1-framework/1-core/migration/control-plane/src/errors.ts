@@ -444,6 +444,9 @@ export function errorRunnerFailed(
   });
 }
 
+/** Error code for destructive changes that require explicit confirmation. */
+export const ERROR_CODE_DESTRUCTIVE_CHANGES = '3030';
+
 /**
  * Destructive operations require explicit confirmation via -y/--yes.
  */
@@ -455,7 +458,7 @@ export function errorDestructiveChanges(
     readonly meta?: Record<string, unknown>;
   },
 ): CliStructuredError {
-  return new CliStructuredError('3030', summary, {
+  return new CliStructuredError(ERROR_CODE_DESTRUCTIVE_CHANGES, summary, {
     domain: 'RTM',
     why: options?.why ?? 'Planned operations include destructive changes that require confirmation',
     fix: options?.fix ?? 'Re-run with `-y` to apply, or use `--dry-run` to preview first',

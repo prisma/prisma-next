@@ -5,6 +5,7 @@ import { ContractValidationError } from '../control-api/errors';
 import type { DbUpdateFailure } from '../control-api/types';
 import {
   CliStructuredError,
+  ERROR_CODE_DESTRUCTIVE_CHANGES,
   errorContractValidationFailed,
   errorDestructiveChanges,
   errorMigrationPlanningFailed,
@@ -192,7 +193,7 @@ export function createDbUpdateCommand(): Command {
     // In non-interactive mode (CI, piped, --no-interactive, --json), the error is returned as-is.
     if (
       !result.ok &&
-      result.failure.code === '3030' &&
+      result.failure.code === ERROR_CODE_DESTRUCTIVE_CHANGES &&
       flags.interactive &&
       !flags.json &&
       !flags.yes
