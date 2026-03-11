@@ -1,15 +1,17 @@
-import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
+import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   ComponentDatabaseDependency,
   MigrationPlannerResult,
+  NativeTypeExpander,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import {
   contractToSchemaIR as contractToSchemaIRImpl,
   detectDestructiveChanges,
+  extractCodecControlHooks,
 } from '@prisma-next/family-sql/control';
 import type {
   SqlContract,
@@ -19,6 +21,13 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+
+const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
+const expandParameterizedNativeType: NativeTypeExpander = (input) => {
+  if (!input.codecId) return input.nativeType;
+  const hooks = adapterCodecHooks.get(input.codecId);
+  return hooks?.expandNativeType?.(input) ?? input.nativeType;
+};
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
