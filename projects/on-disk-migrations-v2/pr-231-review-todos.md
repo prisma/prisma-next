@@ -23,7 +23,7 @@ wmadden argues the PR shifts dependency detection from component-owned to adapte
 
 - [x] **ADR 154 — verify method question** (`docs/architecture docs/adrs/ADR 154 - Component-owned database dependencies.md:41`)
   Asks: "Isn't the verify method needed to detect whether the dependency is installed in the database schema?"
-  **Resolved:** ADR 154 now explicitly documents the accepted limitation: verification remains ID-presence based (`requiredId ∈ schema.dependencies`) and broader dependency-shape detection is deferred follow-up work.
+  **Resolved:** ADR 154 now separates target architecture from implementation status. The Decision/Model sections describe component-owned verification as the intended end-state, and a dedicated "Current implementation compromise (v1)" section documents today's adapter-owned `requiredId ∈ schema.dependencies` simplification and the intent to restore component-owned verification for non-extension dependency shapes.
 
 - [x] **FK-backing index name duplication** (`contract-to-schema-ir.ts:114`)
   "This name generation looks like it doesn't belong here. It must exist in at least one other place and these two locations should share a common implementation."
@@ -97,3 +97,43 @@ jkomyno suggests squashing 6 commits into 3 for cleaner history:
 - Keep commit 1 (preparatory fix)
 - Squash commits 2 + 5 + 6 (refactor + regression fixes)
 - Squash commits 3 + 4 (docs + spec status update)
+
+---
+
+## wmadden latest review follow-ups (resolved)
+
+Latest wmadden review context:
+- Review comment: [pullrequestreview-3923363607](https://github.com/prisma/prisma-next/pull/231#pullrequestreview-3923363607)
+- Latest note (approved) says only two blockers remained; those blockers were ADR wording + `SchemaIssue.table` and are now addressed.
+
+Remaining non-blocking items from that same long review are now resolved:
+
+- [x] **NB-F01: `SqlPlannerConflictLocation.extension` field is stale**
+  - Location: `packages/2-sql/3-tooling/family/src/core/migrations/types.ts`
+  - **Resolved:** Removed `extension?: string` from `SqlPlannerConflictLocation`.
+  - Validation: ran `pnpm --filter @prisma-next/family-sql typecheck`.
+  - Commit: `92d589d94`.
+
+- [x] **NB-F03: `deduplicateDependencyIRs` skips empty IDs silently**
+  - Location: `packages/2-sql/3-tooling/family/src/core/migrations/contract-to-schema-ir.ts`
+  - **Resolved:** Replaced silent skip with fail-fast validation: empty/whitespace IDs now throw `Dependency id must be a non-empty string`; dedup for valid IDs remains unchanged.
+  - Tests added:
+    - `deduplicates dependency IDs from framework components`
+    - `throws for empty dependency IDs from framework components`
+    - (both in `packages/2-sql/3-tooling/family/test/contract-to-schema-ir.test.ts`)
+  - Validation: ran `pnpm --filter @prisma-next/family-sql test -- test/contract-to-schema-ir.test.ts test/schema-view.test.ts`.
+  - Commit: `92d589d94`.
+
+- [x] **NB-F04: planner test helper duplicates enum planning logic**
+  - Location: `packages/3-targets/3-targets/postgres/test/migrations/planner.contract-to-schema-ir.test.ts`
+  - **Resolved:** Kept the test-double approach intentionally and documented it in-place with a clarifying comment:
+    - the helper is a minimal double for planner/`contractToSchemaIR` wiring,
+    - concrete enum hook semantics are covered in adapter enum hook tests.
+  - Commit: `98ac30e50`.
+
+- [x] **NIT-F01: dependency schema-tree label still says "extension"**
+  - Location: `packages/2-sql/3-tooling/family/src/core/control-instance.ts`
+  - **Resolved:** Updated dependency node label from `${shortName} extension is enabled` to `${shortName} dependency is installed`.
+  - Test added: `renders dependency nodes with dependency-oriented wording` in `packages/2-sql/3-tooling/family/test/schema-view.test.ts`.
+  - Validation: covered by `pnpm --filter @prisma-next/family-sql test -- test/contract-to-schema-ir.test.ts test/schema-view.test.ts`.
+  - Commit: `92d589d94`.
