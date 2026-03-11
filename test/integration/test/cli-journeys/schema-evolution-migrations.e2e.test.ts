@@ -2,9 +2,15 @@
  * Journeys B + Z: Schema Evolution via Migrations + Init-to-Migrations Transition
  *
  * Journey B: Developer evolves the schema through the migration workflow.
+ *   Also includes merged edge cases from former Journeys Q, R, X:
+ *   - Q: migration apply noop (already up-to-date)
+ *   - R: migration plan noop (contract unchanged)
+ *   - X: migration show variants (by path, not found)
  * Journey Z: Developer starts with db init, then switches to migrations.
  */
 
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -106,6 +112,44 @@ withTempDir(({ createTempDir }) => {
           mode: 'online',
           migrations: expect.any(Array),
         });
+
+        // --- Merged from Journey Q: migration apply noop (already up-to-date) ---
+
+        // Q.01: migration apply --json (already up-to-date)
+        const applyNoop = await runMigrationApply(ctx, ['--json']);
+        expect(applyNoop.exitCode, 'Q.01: migration apply noop').toBe(0);
+        const noopApplyData = parseJsonOutput(applyNoop);
+        expect(noopApplyData, 'Q.01: 0 applied').toMatchObject({
+          ok: true,
+          migrationsApplied: 0,
+        });
+
+        // --- Merged from Journey R: migration plan noop (contract unchanged) ---
+
+        // R.01: migration plan --json (no changes — contract matches leaf)
+        const planNoop = await runMigrationPlan(ctx, ['--json']);
+        expect(planNoop.exitCode, 'R.01: migration plan noop').toBe(0);
+        const noopPlanData = parseJsonOutput(planNoop);
+        expect(noopPlanData, 'R.01: noop flag').toMatchObject({ noOp: true });
+
+        // --- Merged from Journey X: migration show variants ---
+
+        // X.01: migration show (latest — already tested in B.03, verify again post-apply)
+        const showLatest = await runMigrationShow(ctx);
+        expect(showLatest.exitCode, 'X.01: show latest').toBe(0);
+
+        // X.03: migration show by path (first migration dir)
+        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationDirs = readdirSync(migrationsDir).sort();
+        if (migrationDirs.length > 0) {
+          const firstDir = migrationDirs[0]!;
+          const showByPath = await runMigrationShow(ctx, [join('migrations', firstDir)]);
+          expect(showByPath.exitCode, 'X.03: show by path').toBe(0);
+        }
+
+        // X.05: migration show with non-existent prefix
+        const showNotFound = await runMigrationShow(ctx, ['sha256:nonexistent123']);
+        expect(showNotFound.exitCode, 'X.05: show not found').toBe(1);
       },
       timeouts.spinUpPpgDev,
     );
