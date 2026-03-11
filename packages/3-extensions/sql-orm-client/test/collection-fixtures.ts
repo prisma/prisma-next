@@ -1,10 +1,10 @@
 import { Collection } from '../src/collection';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, createTestContract } from './helpers';
+import { createMockRuntime, getTestContract } from './helpers';
 
 export type TestModelName = Extract<keyof TestContract['models'], string>;
 
-export const baseContract = createTestContract();
+export const baseContract = getTestContract();
 
 export function createCollectionFor<ModelName extends TestModelName>(
   modelName: ModelName,

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
-import { createTestContract } from './helpers';
+import { getTestContract } from './helpers';
 
 describe('createModelAccessor', () => {
-  const contract = createTestContract();
+  const contract = getTestContract();
 
   function expectBinaryExpr(
     actual: unknown,
@@ -276,9 +276,9 @@ describe('createModelAccessor', () => {
 
   it('throws when relation metadata misses model references or join columns', () => {
     const missingToContract = {
-      ...createTestContract(),
+      ...getTestContract(),
       relations: {
-        ...createTestContract().relations,
+        ...getTestContract().relations,
         users: {
           posts: {
             on: {
@@ -291,9 +291,9 @@ describe('createModelAccessor', () => {
     };
 
     const brokenJoinContract = {
-      ...createTestContract(),
+      ...getTestContract(),
       relations: {
-        ...createTestContract().relations,
+        ...getTestContract().relations,
         users: {
           posts: {
             to: 'Post',
@@ -327,25 +327,25 @@ describe('createModelAccessor', () => {
 
   it('supports composite relation joins and firstChild fallback projection', () => {
     const compositeContract = {
-      ...createTestContract(),
+      ...getTestContract(),
       mappings: {
-        ...createTestContract().mappings,
+        ...getTestContract().mappings,
         modelToTable: {
-          ...createTestContract().mappings.modelToTable,
+          ...getTestContract().mappings.modelToTable,
           User: 'users_alt',
         },
       },
       models: {
-        ...createTestContract().models,
+        ...getTestContract().models,
         User: {
-          ...createTestContract().models.User,
+          ...getTestContract().models.User,
           storage: {
             table: 'users_alt',
           },
         },
       },
       relations: {
-        ...createTestContract().relations,
+        ...getTestContract().relations,
         users_alt: {
           posts: {
             to: 'Post',
@@ -418,7 +418,7 @@ describe('createModelAccessor', () => {
   });
 
   it('resolves model tables from storage metadata when modelToTable mappings are missing', () => {
-    const base = createTestContract();
+    const base = getTestContract();
     const storageFallbackContract = {
       ...base,
       mappings: {
@@ -443,7 +443,7 @@ describe('createModelAccessor', () => {
   });
 
   it('falls back to the model name when table mappings are unavailable', () => {
-    const base = createTestContract();
+    const base = getTestContract();
     const modelNameFallbackContract = {
       ...base,
       mappings: {
@@ -492,7 +492,7 @@ describe('createModelAccessor', () => {
   });
 
   it('throws when relation metadata omits join arrays', () => {
-    const base = createTestContract();
+    const base = getTestContract();
     const contractWithoutJoinArrays = {
       ...base,
       relations: {

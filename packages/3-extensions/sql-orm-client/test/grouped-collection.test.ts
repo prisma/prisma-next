@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCollectionFor } from './collection-fixtures';
-import { createTestContract } from './helpers';
+import { getTestContract } from './helpers';
 
 describe('GroupedCollection', () => {
   it('groupBy().aggregate() maps grouped columns back to model fields', async () => {
@@ -149,7 +149,7 @@ describe('GroupedCollection', () => {
   });
 
   it('groupBy().having() falls back to raw field names when field mappings are missing', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const { collection, runtime } = createCollectionFor('Post', {
       ...contract,
       mappings: {

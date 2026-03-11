@@ -7,7 +7,7 @@ import {
   hasNestedMutationCallbacks,
 } from '../src/mutation-executor';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, createTestContract } from './helpers';
+import { createMockRuntime, getTestContract } from './helpers';
 
 function withTransaction(runtime: MockRuntime) {
   const commit = vi.fn(async () => undefined);
@@ -74,7 +74,7 @@ const userIdFilter: WhereExpr = {
 
 describe('mutation-executor', () => {
   it('hasNestedMutationCallbacks() detects callbacks only on relation fields', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
 
     expect(
       hasNestedMutationCallbacks(contract, 'User', {
@@ -97,7 +97,7 @@ describe('mutation-executor', () => {
   });
 
   it('hasNestedMutationCallbacks() tolerates malformed relation metadata and unknown models', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const malformed = {
       ...contract,
       relations: {
@@ -146,7 +146,7 @@ describe('mutation-executor', () => {
   });
 
   it('buildPrimaryKeyFilterFromRow() resolves mapped keys and throws when missing', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
 
     expect(buildPrimaryKeyFilterFromRow(contract, 'User', { id: 7 })).toEqual({ id: 7 });
 
@@ -156,7 +156,7 @@ describe('mutation-executor', () => {
   });
 
   it('buildPrimaryKeyFilterFromRow() falls back when column mappings are missing', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
 
     const withoutColumnToField = {
       ...contract,
@@ -192,7 +192,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() commits transactions on success', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
     const transactional = withTransaction(runtime);
@@ -210,7 +210,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() supports transaction scopes without commit/rollback hooks', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
@@ -233,7 +233,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() rolls back transactions on failures', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[]]);
     const transactional = withTransaction(runtime);
@@ -252,7 +252,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() releases scoped connections when no transaction is available', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
@@ -272,7 +272,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() validates relation mutator input shapes', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
 
     await expect(
@@ -305,7 +305,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() rejects unsupported disconnect() in create graphs', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
 
     await expect(
@@ -339,7 +339,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() validates connect/create payloads for parent-owned relations', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
 
     await expect(
@@ -406,7 +406,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() rejects M:N nested mutations', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     const withManyToMany = {
       ...contract,
@@ -439,7 +439,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() supports parent-owned nested create() payloads', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 5, name: 'Author', email: 'author@example.com' }],
@@ -469,7 +469,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedCreateMutation() tolerates sparse parent/child column pairs', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const sparseAuthorRelation = {
       ...contract,
       relations: {
@@ -509,7 +509,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedUpdateMutation() returns null when no row matches filters', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[]]);
 
@@ -525,7 +525,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedUpdateMutation() applies parent-owned disconnect updates', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 1, title: 'Post', user_id: 5, views: 10 }],
@@ -546,7 +546,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedUpdateMutation() keeps existing rows when update-returning returns no row', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }], []]);
 
@@ -562,7 +562,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedUpdateMutation() validates child-owned connect and disconnect criteria', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
 
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
@@ -623,7 +623,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedUpdateMutation() supports composite child joins and sparse relation columns', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const compositeRelationContract = {
       ...contract,
       relations: {
@@ -657,7 +657,7 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedUpdateMutation() validates parent row shape for child-owned mutations', async () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ name: 'Alice', email: 'alice@example.com' }]]);
 

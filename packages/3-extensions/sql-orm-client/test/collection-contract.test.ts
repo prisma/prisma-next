@@ -8,11 +8,11 @@ import {
   resolvePrimaryKeyColumn,
   resolveUpsertConflictColumns,
 } from '../src/collection-contract';
-import { createTestContract } from './helpers';
+import { getTestContract } from './helpers';
 
 describe('collection-contract capability detection', () => {
   it('detects top-level capability flags', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const withTopLevelCapability = {
       ...contract,
       capabilities: { returning: true },
@@ -22,7 +22,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('detects target-scoped capability flags from generated contracts', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const withTargetCapability = {
       ...contract,
       capabilities: {
@@ -38,7 +38,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('assertReturningCapability accepts target-scoped returning flags', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const withTargetCapability = {
       ...contract,
       capabilities: {
@@ -52,14 +52,14 @@ describe('collection-contract capability detection', () => {
   });
 
   it('assertReturningCapability throws when returning is unavailable', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     expect(() => assertReturningCapability(contract, 'create()')).toThrow(
       /requires contract capability "returning"/,
     );
   });
 
   it('resolveIncludeRelation() reads relation metadata from contract.relations', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
 
     expect(resolveIncludeRelation(contract, 'User', 'posts')).toEqual({
       relatedModelName: 'Post',
@@ -71,7 +71,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('resolveIncludeRelation() falls back to legacy model relation metadata', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const legacyContract = {
       ...contract,
       relations: {
@@ -102,7 +102,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('resolveIncludeRelation() legacy fallback uses "id" when parent primary key is unavailable', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const legacyWithoutPk = {
       ...contract,
       relations: {
@@ -139,7 +139,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('resolveIncludeRelation() throws for missing or malformed relations', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
 
     expect(() => resolveIncludeRelation(contract, 'User', 'missing')).toThrow(/not found/);
 
@@ -160,7 +160,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('resolveIncludeRelation() handles incomplete relation metadata and malformed legacy relations', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
 
     const incompleteRelation = {
       ...contract,
@@ -195,7 +195,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('resolveUpsertConflictColumns() maps explicit criteria and falls back to primary key', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
 
     expect(resolveUpsertConflictColumns(contract, 'Post', { userId: 'x', title: 'y' })).toEqual([
       'user_id',
@@ -206,7 +206,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('resolveUpsertConflictColumns() falls back for unmapped fields and unknown models', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
 
     expect(resolveUpsertConflictColumns(contract, 'Post', { unknownField: 'x' })).toEqual([
       'unknownField',
@@ -217,7 +217,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('resolveModelTableName() and resolvePrimaryKeyColumn() apply fallback behavior', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
 
     expect(resolveModelTableName(contract, 'User')).toBe('users');
     expect(resolveModelTableName(contract, 'UnknownModel')).toBe('unknownmodel');
@@ -226,7 +226,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('resolveModelTableName() falls back to model storage metadata when mapping is missing', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const withStorageFallback = {
       ...contract,
       mappings: {
@@ -263,7 +263,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('hasContractCapability() checks nested object flags and invalid target entries', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const withNestedCapability = {
       ...contract,
       capabilities: {
@@ -281,7 +281,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('hasContractCapability() returns false when capabilities are absent', () => {
-    const contract = createTestContract();
+    const contract = getTestContract();
     const withoutCapabilities = {
       ...contract,
       capabilities: undefined,
