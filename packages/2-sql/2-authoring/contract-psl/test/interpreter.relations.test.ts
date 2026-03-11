@@ -239,7 +239,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

@@ -56,8 +56,18 @@ export interface MutationDefaultGeneratorDescriptor {
     | undefined;
 }
 
+export interface ControlMutationDefaultEntry {
+  readonly lower: (input: {
+    readonly call: ParsedDefaultFunctionCall;
+    readonly context: DefaultFunctionLoweringContext;
+  }) => unknown;
+  readonly usageSignatures?: readonly string[];
+}
+
+export type ControlMutationDefaultRegistry = ReadonlyMap<string, ControlMutationDefaultEntry>;
+
 export interface ControlMutationDefaults {
-  readonly defaultFunctionRegistry: DefaultFunctionRegistry;
+  readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
   readonly generatorDescriptors: readonly MutationDefaultGeneratorDescriptor[];
 }
 
@@ -217,7 +227,7 @@ export function parseDefaultFunctionCall(
   };
 }
 
-function formatSupportedFunctionList(registry: DefaultFunctionRegistry): string {
+function formatSupportedFunctionList(registry: ControlMutationDefaultRegistry): string {
   const signatures = Array.from(registry.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .flatMap(([functionName, entry]) => {
@@ -231,12 +241,12 @@ function formatSupportedFunctionList(registry: DefaultFunctionRegistry): string 
 
 export function lowerDefaultFunctionWithRegistry(input: {
   readonly call: ParsedDefaultFunctionCall;
-  readonly registry: DefaultFunctionRegistry;
+  readonly registry: ControlMutationDefaultRegistry;
   readonly context: DefaultFunctionLoweringContext;
 }): LoweredDefaultResult {
   const entry = input.registry.get(input.call.name);
   if (entry) {
-    return entry.lower({ call: input.call, context: input.context });
+    return entry.lower({ call: input.call, context: input.context }) as LoweredDefaultResult;
   }
   const supportedFunctionList = formatSupportedFunctionList(input.registry);
 
