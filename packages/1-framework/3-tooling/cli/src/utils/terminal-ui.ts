@@ -10,11 +10,12 @@ import { shutdownSignal } from './shutdown';
  * - **stderr** — all decoration (spinners, logs, notes, intro/outro). Visible in terminal, invisible in pipes.
  *
  * Rules:
- * 1. All methods except `output()` write to stderr via Clack's `{ output: process.stderr }` — but only in interactive mode.
- * 2. `output(data)` writes to stdout only when piped — it checks `process.stdout.isTTY` and is a no-op in interactive terminals.
- * 3. When stdout is piped, ALL decoration is suppressed — `isInteractive` gates every decoration method.
- * 4. Never write data to stderr — decoration methods are for human context only.
- * 5. Never write decoration to stdout — it breaks pipes, `$(...)` captures, and `> file` redirects.
+ * 1. All methods except `output()` and `error()` write to stderr only in interactive mode.
+ * 2. `output(data)` always writes to stdout — if a command calls it, there is data to emit.
+ * 3. `error()` always writes to stderr — errors matter even when piped.
+ * 4. All other decoration is suppressed when piped — `isInteractive` gates every other decoration method.
+ * 5. Never write data to stderr — decoration methods are for human context only.
+ * 6. Never write decoration to stdout — it breaks pipes, `$(...)` captures, and `> file` redirects.
  */
 export class TerminalUI {
   /**
@@ -36,8 +37,7 @@ export class TerminalUI {
   }) {
     // --interactive/--no-interactive override TTY detection
     this.isInteractive = options?.interactive ?? !!process.stdout.isTTY;
-    this.useColor =
-      options?.color ?? (this.isInteractive && !process.env['NO_COLOR'] && !process.env['CI']);
+    this.useColor = options?.color ?? this.isInteractive;
   }
 
   // ---------------------------------------------------------------------------
