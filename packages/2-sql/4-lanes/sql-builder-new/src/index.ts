@@ -36,11 +36,13 @@ export type StorageTableToScopeTable<T extends StorageTable> = {
   };
 };
 
-export type WithField<
-  Source,
-  FromScope extends ScopeTable,
-  Column extends keyof FromScope,
-> = Expand<Source & { [K in Column]: FromScope[K] }>;
+type WithField<Source, Field extends ScopeField, Alias extends string> = Expand<
+  Source & { [K in Alias]: Field }
+>;
+
+type ExtractScopeFields<T extends Record<string, Expression<ScopeField>>> = {
+  [K in keyof T]: T[K] extends Expression<infer F extends ScopeField> ? F : never;
+};
 
 export type FieldProxy<AvailableScope extends Scope> = {
   [K in keyof AvailableScope['topLevel']]: Expression<AvailableScope['topLevel'][K]>;
@@ -93,6 +95,8 @@ export type Functions<CT extends Record<string, { readonly input: unknown }>> = 
   or: (...ors: ExpressionOrValue<BooleanCodecType, CT>[]) => Expression<BooleanCodecType>;
 };
 
+/// Given a row type of { <fieldName>: { codecId: <codecId>, nullable: <nullable> } }, return a record of { <fieldName>: <codecOutputType> }
+/// Also resolves nullability of the field.
 export type ResolveRow<
   Row extends Record<string, ScopeField>,
   CodecTypes extends Record<string, { readonly output: unknown }>,
@@ -115,7 +119,7 @@ type NullableScope<S extends Scope> = {
   };
 };
 
-export interface SelectBuilder<
+export interface SelectQueryBuilder<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField> = {},
@@ -123,34 +127,52 @@ export interface SelectBuilder<
   innerJoin<OtherScope extends Scope>(
     other: ScopeHolder<OtherScope>,
     on: ExpressionBuilder<AvailableScope & OtherScope, CodecTypes>,
-  ): SelectBuilder<CodecTypes, AvailableScope & OtherScope, RowType>;
+  ): SelectQueryBuilder<CodecTypes, AvailableScope & OtherScope, RowType>;
 
   outerLeftJoin<OtherScope extends Scope>(
     other: ScopeHolder<OtherScope>,
     on: ExpressionBuilder<AvailableScope & OtherScope, CodecTypes>,
-  ): SelectBuilder<CodecTypes, AvailableScope & NullableScope<OtherScope>, RowType>;
+  ): SelectQueryBuilder<CodecTypes, AvailableScope & NullableScope<OtherScope>>;
 
   outerRightJoin<OtherScope extends Scope>(
     other: ScopeHolder<OtherScope>,
     on: ExpressionBuilder<AvailableScope & OtherScope, CodecTypes>,
-  ): SelectBuilder<CodecTypes, NullableScope<AvailableScope> & OtherScope, RowType>;
+  ): SelectQueryBuilder<CodecTypes, NullableScope<AvailableScope> & OtherScope>;
 
   outerFullJoin<OtherScope extends Scope>(
     other: ScopeHolder<OtherScope>,
     on: ExpressionBuilder<AvailableScope & OtherScope, CodecTypes>,
-  ): SelectBuilder<CodecTypes, NullableScope<AvailableScope> & NullableScope<OtherScope>, RowType>;
+  ): SelectQueryBuilder<CodecTypes, NullableScope<AvailableScope> & NullableScope<OtherScope>>;
 
-  select<Column extends keyof AvailableScope['topLevel']>(
+  select<Column extends keyof AvailableScope['topLevel'] & string>(
     column: Column,
-  ): SelectBuilder<
+  ): SelectQueryBuilder<
     CodecTypes,
     AvailableScope,
-    WithField<RowType, AvailableScope['topLevel'], Column>
+    WithField<RowType, AvailableScope['topLevel'][Column], Column>
   >;
+
+  select<Alias extends string, Column extends keyof AvailableScope['topLevel']>(
+    alias: Alias,
+    column: Column,
+  ): SelectQueryBuilder<
+    CodecTypes,
+    AvailableScope,
+    WithField<RowType, AvailableScope['topLevel'][Column], Alias>
+  >;
+
+  select<Alias extends string, Field extends ScopeField>(
+    alias: Alias,
+    expr: (fields: FieldProxy<AvailableScope>, fns: Functions<CodecTypes>) => Expression<Field>,
+  ): SelectQueryBuilder<CodecTypes, AvailableScope, WithField<RowType, Field, Alias>>;
+
+  select<Result extends Record<string, Expression<ScopeField>>>(
+    callback: (fields: FieldProxy<AvailableScope>, fns: Functions<CodecTypes>) => Result,
+  ): SelectQueryBuilder<CodecTypes, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>>;
 
   where(
     expr: ExpressionBuilder<AvailableScope, CodecTypes>,
-  ): SelectBuilder<CodecTypes, AvailableScope, RowType>;
+  ): SelectQueryBuilder<CodecTypes, AvailableScope, RowType>;
 
   first(): Promise<ResolveRow<RowType, CodecTypes>>;
 }
