@@ -1,8 +1,8 @@
 import type { DefaultScope, SelectBuilder } from '../src';
 import type { CodecTypes, Tables } from './fixtures/generated/contract';
 
-declare const users: SelectBuilder<CodecTypes, DefaultScope<Tables['users']>>;
-declare const posts: SelectBuilder<CodecTypes, DefaultScope<Tables['posts']>>;
+declare const users: SelectBuilder<CodecTypes, DefaultScope<'users', Tables['users']>>;
+declare const posts: SelectBuilder<CodecTypes, DefaultScope<'posts', Tables['posts']>>;
 
 const simple = await users
   .select('id')
@@ -23,7 +23,7 @@ void inner;
 const left = await users
   .outerLeftJoin(posts, (f, fns) => fns.eq(f.id, f.user_id))
   .select('name')
-  .select('embedding')
+  .select('title')
   .first();
 
 void left;
@@ -43,3 +43,11 @@ const full = await users
   .first();
 
 void full;
+
+const filedNameConflict = await users
+  .innerJoin(posts, (f, fns) => fns.eq(f.id, f.user_id))
+  .where((f, fns) => fns.eq(f.users.id, f.posts.id))
+  .select('name')
+  .select('title');
+
+void filedNameConflict;
