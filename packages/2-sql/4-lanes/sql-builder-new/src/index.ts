@@ -60,6 +60,13 @@ export type FieldProxy<AvailableScope extends Scope> = {
   };
 };
 
+export type MergeScopes<A extends Scope, B extends Scope> = {
+  topLevel: Expand<
+    Omit<A['topLevel'], keyof B['topLevel']> & Omit<B['topLevel'], keyof A['topLevel']>
+  >;
+  namespaces: Expand<A['namespaces'] & B['namespaces']>;
+};
+
 export type ExpressionOrValue<
   T extends ScopeField,
   CT extends Record<string, { readonly input: unknown }>,
@@ -128,23 +135,26 @@ type NullableScope<S extends Scope> = {
 export interface JoinCapable<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
   innerJoin<OtherScope extends Scope>(
     other: ScopeHolder<OtherScope>,
-    on: ExpressionBuilder<AvailableScope & OtherScope, CodecTypes>,
-  ): JoinedTables<CodecTypes, AvailableScope & OtherScope>;
+    on: ExpressionBuilder<MergeScopes<AvailableScope, OtherScope>, CodecTypes>,
+  ): JoinedTables<CodecTypes, MergeScopes<AvailableScope, OtherScope>>;
 
   outerLeftJoin<OtherScope extends Scope>(
     other: ScopeHolder<OtherScope>,
-    on: ExpressionBuilder<AvailableScope & OtherScope, CodecTypes>,
-  ): JoinedTables<CodecTypes, AvailableScope & NullableScope<OtherScope>>;
+    on: ExpressionBuilder<MergeScopes<AvailableScope, OtherScope>, CodecTypes>,
+  ): JoinedTables<CodecTypes, MergeScopes<AvailableScope, NullableScope<OtherScope>>>;
 
   outerRightJoin<OtherScope extends Scope>(
     other: ScopeHolder<OtherScope>,
-    on: ExpressionBuilder<AvailableScope & OtherScope, CodecTypes>,
-  ): JoinedTables<CodecTypes, NullableScope<AvailableScope> & OtherScope>;
+    on: ExpressionBuilder<MergeScopes<AvailableScope, OtherScope>, CodecTypes>,
+  ): JoinedTables<CodecTypes, MergeScopes<NullableScope<AvailableScope>, OtherScope>>;
 
   outerFullJoin<OtherScope extends Scope>(
     other: ScopeHolder<OtherScope>,
-    on: ExpressionBuilder<AvailableScope & OtherScope, CodecTypes>,
-  ): JoinedTables<CodecTypes, NullableScope<AvailableScope> & NullableScope<OtherScope>>;
+    on: ExpressionBuilder<MergeScopes<AvailableScope, OtherScope>, CodecTypes>,
+  ): JoinedTables<
+    CodecTypes,
+    MergeScopes<NullableScope<AvailableScope>, NullableScope<OtherScope>>
+  >;
 }
 
 export interface SelectCapable<
@@ -160,14 +170,6 @@ export interface SelectCapable<
     WithFields<RowType, AvailableScope['topLevel'], Columns>
   >;
 
-  select<Alias extends string, Column extends keyof AvailableScope['topLevel']>(
-    alias: Alias,
-    column: Column,
-  ): SelectQueryBuilder<
-    CodecTypes,
-    AvailableScope,
-    WithField<RowType, AvailableScope['topLevel'][Column], Alias>
-  >;
   select<Alias extends string, Field extends ScopeField>(
     alias: Alias,
     expr: (fields: FieldProxy<AvailableScope>, fns: Functions<CodecTypes>) => Expression<Field>,
