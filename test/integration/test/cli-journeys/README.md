@@ -35,6 +35,7 @@ pnpm test:journeys
 | `ref-routing.e2e.test.ts` | **Staging ahead via refs (P-5)**: production=C1, staging=C2 on same DB. Apply `--ref staging` advances staging; production unaffected. **Marker ahead of ref (P-6)**: after staging apply, DB at C2 but production ref at C1 — apply fails, status reports ahead-of-ref |
 | `adopt-migrations.e2e.test.ts` | **Adopting migrations (P-9)**: DB managed via `db update` (at C2). Baseline migration EMPTY→C2 is no-op. Incremental C2→C3 applies normally. Status shows both migrations applied |
 | `diamond-convergence.e2e.test.ts` | **Diamond convergence**: Two environments (staging, production) diverge from C1 via independent branches (C1→C2→C3 and C1→C4), then converge to C5. Uses two PGlite instances with separate configs sharing the same migration graph on disk. Verifies both DBs reach C5 via their respective merge migrations and status shows 0 pending for both refs |
+| `interleaved-db-update.e2e.test.ts` | **Interleaved db update + migrations**: User on migrations (∅→C1→C2) runs `db update` to C3 instead of `migration plan`. Retroactive `migration plan` creates the C2→C3 edge, `migration apply` is a noop (DB already at C3). Future migrations (C3→C4) resume normally. Documents that `migration plan` is offline (uses graph leaf, not DB marker) |
 
 ### Drift detection and recovery
 
