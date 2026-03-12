@@ -39,6 +39,41 @@ function extractJson(lines: string[]): unknown {
   return JSON.parse(joined.slice(start, end + 1));
 }
 
+async function writeMatchingMarker(
+  connectionString: string,
+  contract: SqlContract<SqlStorage>,
+): Promise<void> {
+  await withClient(connectionString, async (client) => {
+    await executeStatement(client, ensureSchemaStatement);
+    await executeStatement(client, ensureTableStatement);
+
+    const write = writeContractMarker({
+      storageHash: contract.storageHash,
+      profileHash: contract.profileHash ?? contract.storageHash,
+      contractJson: contract,
+      canonicalVersion: 1,
+    });
+    await executeStatement(client, write.insert);
+  });
+}
+
+async function createMatchingSchemaAndMarker(
+  connectionString: string,
+  contract: SqlContract<SqlStorage>,
+): Promise<void> {
+  await withClient(connectionString, async (client) => {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "user" (
+        id integer NOT NULL,
+        email text NOT NULL,
+        PRIMARY KEY ("id")
+      )
+    `);
+  });
+
+  await writeMatchingMarker(connectionString, contract);
+}
+
 withTempDir(({ createTempDir }) => {
   describe('db verify command (e2e)', () => {
     let consoleOutput: string[] = [];
@@ -84,21 +119,7 @@ withTempDir(({ createTempDir }) => {
             const contractJsonPath = join(testDir, 'output', 'contract.json');
             const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
-            await withClient(connectionString, async (client) => {
-              // Setup marker schema and table
-              await executeStatement(client, ensureSchemaStatement);
-              await executeStatement(client, ensureTableStatement);
-
-              // Write marker matching contract
-              const write = writeContractMarker({
-                storageHash: contract.storageHash,
-                profileHash: contract.profileHash ?? contract.storageHash,
-                contractJson: contract,
-                canonicalVersion: 1,
-              });
-              await executeStatement(client, write.insert);
-              // withClient will close the client after this callback returns
-            });
+            await createMatchingSchemaAndMarker(connectionString, contract);
 
             // Clear console output before running the command we want to test
             // (previous commands like 'contract emit' may have added output)
@@ -125,6 +146,7 @@ withTempDir(({ createTempDir }) => {
             >;
             expect(parsed).toMatchObject({
               ok: true,
+              mode: 'full',
               summary: expect.any(String),
               contract: {
                 storageHash: expect.any(String),
@@ -134,6 +156,15 @@ withTempDir(({ createTempDir }) => {
               },
               target: {
                 expected: expect.any(String),
+              },
+              schema: {
+                summary: expect.any(String),
+                counts: {
+                  pass: expect.any(Number),
+                  warn: expect.any(Number),
+                  fail: expect.any(Number),
+                  totalNodes: expect.any(Number),
+                },
               },
             });
 
@@ -148,6 +179,61 @@ withTempDir(({ createTempDir }) => {
           // Use random ports to avoid conflicts in CI (no options = random ports)
           {},
         );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'exits with code 1 when marker matches but schema verification fails',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
+
+          const emitCommand = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testDir);
+            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          const contractJsonPath = join(testDir, 'output', 'contract.json');
+          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+          await writeMatchingMarker(connectionString, contract);
+
+          const outputStartIndex = consoleOutput.length;
+
+          const command = createDbVerifyCommand();
+          const verifyCwd = process.cwd();
+          try {
+            process.chdir(testDir);
+            await expect(
+              executeCommand(command, ['--config', configPath, '--json']),
+            ).rejects.toThrow('process.exit called');
+          } finally {
+            process.chdir(verifyCwd);
+          }
+
+          expect(getExitCode()).toBe(1);
+
+          const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+            string,
+            unknown
+          >;
+          expect(parsed).toMatchObject({
+            ok: false,
+            summary: expect.stringContaining('does not satisfy contract'),
+            schema: expect.anything(),
+          });
+        });
       },
       timeouts.spinUpPpgDev,
     );
@@ -224,7 +310,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'outputs JSON when --json flag is provided via driver',
+      'outputs JSON in fast mode when --fast flag is provided',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           // Set up test directory from fixtures with db config
@@ -251,21 +337,7 @@ withTempDir(({ createTempDir }) => {
           const contractJsonPath = join(testDir, 'output', 'contract.json');
           const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
 
-          await withClient(connectionString, async (client) => {
-            // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
-
-            // Write marker matching contract
-            const write = writeContractMarker({
-              storageHash: contract.storageHash,
-              profileHash: contract.profileHash ?? contract.storageHash,
-              contractJson: contract,
-              canonicalVersion: 1,
-            });
-            await executeStatement(client, write.insert);
-            // withClient will close the client after this callback returns
-          });
+          await writeMatchingMarker(connectionString, contract);
 
           // Clear console output before running the command we want to test
           // (previous commands like 'contract emit' may have added output)
@@ -275,7 +347,7 @@ withTempDir(({ createTempDir }) => {
           const verifyCwd2 = process.cwd();
           try {
             process.chdir(testDir);
-            await executeCommand(command, ['--config', configPath, '--json']);
+            await executeCommand(command, ['--config', configPath, '--json', '--fast']);
           } finally {
             process.chdir(verifyCwd2);
           }
@@ -292,6 +364,7 @@ withTempDir(({ createTempDir }) => {
           >;
           expect(parsed).toMatchObject({
             ok: true,
+            mode: 'fast',
             summary: expect.any(String),
             contract: {
               storageHash: expect.any(String),
@@ -304,10 +377,12 @@ withTempDir(({ createTempDir }) => {
             },
             meta: {
               contractPath: expect.any(String),
+              schemaVerification: 'skipped',
             },
             timings: {
               total: expect.any(Number),
             },
+            warning: expect.stringContaining('Schema verification skipped'),
           });
         });
       },
