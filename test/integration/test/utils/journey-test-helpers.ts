@@ -162,6 +162,8 @@ export const contractFixtures = {
   'contract-phone': join(JOURNEY_FIXTURES_DIR, 'contract-phone.ts'),
   'contract-bio': join(JOURNEY_FIXTURES_DIR, 'contract-bio.ts'),
   'contract-phone-bio': join(JOURNEY_FIXTURES_DIR, 'contract-phone-bio.ts'),
+  'contract-avatar': join(JOURNEY_FIXTURES_DIR, 'contract-avatar.ts'),
+  'contract-all': join(JOURNEY_FIXTURES_DIR, 'contract-all.ts'),
 } as const;
 
 export type ContractVariant = keyof typeof contractFixtures;
