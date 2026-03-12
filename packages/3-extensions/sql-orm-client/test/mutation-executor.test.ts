@@ -1,4 +1,9 @@
-import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  ColumnRef,
+  LiteralExpr,
+  type WhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildPrimaryKeyFilterFromRow,
@@ -44,33 +49,9 @@ function withConnection(runtime: MockRuntime, onRelease: () => void) {
   });
 }
 
-const postIdFilter: WhereExpr = {
-  kind: 'bin',
-  op: 'eq',
-  left: {
-    kind: 'col',
-    table: 'posts',
-    column: 'id',
-  },
-  right: {
-    kind: 'literal',
-    value: 1,
-  },
-};
+const postIdFilter: WhereExpr = BinaryExpr.eq(ColumnRef.of('posts', 'id'), LiteralExpr.of(1));
 
-const userIdFilter: WhereExpr = {
-  kind: 'bin',
-  op: 'eq',
-  left: {
-    kind: 'col',
-    table: 'users',
-    column: 'id',
-  },
-  right: {
-    kind: 'literal',
-    value: 1,
-  },
-};
+const userIdFilter: WhereExpr = BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1));
 
 describe('mutation-executor', () => {
   it('hasNestedMutationCallbacks() detects callbacks only on relation fields', () => {

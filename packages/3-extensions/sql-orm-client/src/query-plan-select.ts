@@ -1,31 +1,25 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  BinaryOp,
-  BoundWhereExpr,
-  Expression,
+import {
+  AndExpr,
+  type AstRewriter,
+  BinaryExpr,
+  type BinaryOp,
+  type BoundWhereExpr,
+  ColumnRef,
+  DerivedTableSource,
+  EqColJoinOn,
   JoinAst,
+  JsonArrayAggExpr,
+  JsonObjectExpr,
+  ListLiteralExpr,
+  LiteralExpr,
+  OrderByItem,
+  OrExpr,
   ProjectionItem,
   SelectAst,
-  WhereExpr,
-} from '@prisma-next/sql-relational-core/ast';
-import {
-  createAndExpr,
-  createBinaryExpr,
-  createColumnRef,
-  createDerivedTableSource,
-  createJoin,
-  createJsonAggExpr,
-  createJsonBuildObjectExpr,
-  createLiteralExpr,
-  createLiteralListFromValues,
-  createOrderByItem,
-  createOrExpr,
-  createProjectionItem,
-  createSelectAstBuilder,
-  createSubqueryExpr,
-  createTableSource,
-  createTrueExpr,
-  mapExpressionDeep,
+  SubqueryExpr,
+  TableSource,
+  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, resolveTableColumns } from './query-plan-meta';
@@ -47,28 +41,28 @@ function buildProjection(
       ? [...selectedFields]
       : resolveTableColumns(contract, tableName);
 
-  return columns.map((column) => createProjectionItem(column, createColumnRef(tableRef, column)));
+  return columns.map((column) => ProjectionItem.of(column, ColumnRef.of(tableRef, column)));
 }
 
 function toOrderBy(
   tableName: string,
   orderBy: readonly OrderExpr[] | undefined,
-): ReadonlyArray<{ expr: Expression; dir: 'asc' | 'desc' }> | undefined {
+): ReadonlyArray<OrderByItem> | undefined {
   if (!orderBy || orderBy.length === 0) {
     return undefined;
   }
 
-  return orderBy.map((entry) =>
-    createOrderByItem(createColumnRef(tableName, entry.column), entry.direction),
+  return orderBy.map(
+    (entry) => new OrderByItem(ColumnRef.of(tableName, entry.column), entry.direction),
   );
 }
 
 function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): WhereExpr {
   const comparator: BinaryOp = entry.direction === 'asc' ? 'gt' : 'lt';
-  return createBinaryExpr(
+  return new BinaryExpr(
     comparator,
-    createColumnRef(tableName, entry.column),
-    createLiteralExpr(entry.value),
+    ColumnRef.of(tableName, entry.column),
+    LiteralExpr.of(entry.value),
   );
 }
 
@@ -81,10 +75,9 @@ function buildLexicographicCursorWhere(
 
     for (const prefixEntry of entries.slice(0, index)) {
       branchExprs.push(
-        createBinaryExpr(
-          'eq',
-          createColumnRef(tableName, prefixEntry.column),
-          createLiteralExpr(prefixEntry.value),
+        BinaryExpr.eq(
+          ColumnRef.of(tableName, prefixEntry.column),
+          LiteralExpr.of(prefixEntry.value),
         ),
       );
     }
@@ -94,14 +87,14 @@ function buildLexicographicCursorWhere(
       return branchExprs[0] as WhereExpr;
     }
 
-    return createAndExpr(branchExprs);
+    return AndExpr.of(branchExprs);
   });
 
   if (branches.length === 1) {
     return branches[0] as WhereExpr;
   }
 
-  return createOrExpr(branches);
+  return OrExpr.of(branches);
 }
 
 function buildCursorWhere(
@@ -133,21 +126,21 @@ function buildCursorWhere(
   return buildLexicographicCursorWhere(tableName, entries);
 }
 
-function createTableRefRemapper(fromTable: string, toTable: string) {
-  return mapExpressionDeep({
-    col: (col) => (col.table === fromTable ? createColumnRef(toTable, col.column) : col),
+function createTableRefRemapper(fromTable: string, toTable: string): AstRewriter {
+  return {
+    columnRef: (col) => (col.table === fromTable ? ColumnRef.of(toTable, col.column) : col),
     tableSource: (source) => {
-      if (source.alias === fromTable) return createTableSource(source.name, toTable);
+      if (source.alias === fromTable) return TableSource.named(source.name, toTable);
       if (!source.alias && source.name === fromTable)
-        return createTableSource(source.name, toTable);
+        return TableSource.named(source.name, toTable);
       return source;
     },
-    joinOnEqCol: (on) => ({
-      ...on,
-      left: on.left.table === fromTable ? createColumnRef(toTable, on.left.column) : on.left,
-      right: on.right.table === fromTable ? createColumnRef(toTable, on.right.column) : on.right,
-    }),
-  });
+    eqColJoinOn: (on) =>
+      EqColJoinOn.of(
+        on.left.table === fromTable ? ColumnRef.of(toTable, on.left.column) : on.left,
+        on.right.table === fromTable ? ColumnRef.of(toTable, on.right.column) : on.right,
+      ),
+  };
 }
 
 function buildStateWhere(
@@ -163,7 +156,7 @@ function buildStateWhere(
     filterTableName && filterTableName !== tableName
       ? state.filters.map((filter) => ({
           ...filter,
-          expr: createTableRefRemapper(filterTableName, tableName).where(filter.expr),
+          expr: filter.expr.rewrite(createTableRefRemapper(filterTableName, tableName)),
         }))
       : state.filters;
   const filters = cursorWhere
@@ -178,9 +171,9 @@ function buildIncludeOrderArtifacts(
   rowAlias: string,
   orderBy: readonly OrderExpr[] | undefined,
 ): {
-  readonly childOrderBy: ReadonlyArray<{ expr: Expression; dir: 'asc' | 'desc' }> | undefined;
+  readonly childOrderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly hiddenOrderProjection: ReadonlyArray<ProjectionItem>;
-  readonly aggregateOrderBy: ReadonlyArray<{ expr: Expression; dir: 'asc' | 'desc' }> | undefined;
+  readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
 } {
   const childOrderBy = toOrderBy(childTableRef, orderBy);
   if (!childOrderBy || childOrderBy.length === 0) {
@@ -192,14 +185,14 @@ function buildIncludeOrderArtifacts(
   }
 
   const hiddenOrderProjection = childOrderBy.map((orderItem, index) =>
-    createProjectionItem(`${relationName}__order_${index}`, orderItem.expr),
+    ProjectionItem.of(`${relationName}__order_${index}`, orderItem.expr),
   );
   const aggregateOrderBy = hiddenOrderProjection.map((projection, index) => {
     const orderItem = childOrderBy[index];
     if (!orderItem) {
       throw new Error(`Missing include order metadata at index ${index}`);
     }
-    return createOrderByItem(createColumnRef(rowAlias, projection.alias), orderItem.dir);
+    return new OrderByItem(ColumnRef.of(rowAlias, projection.alias), orderItem.dir);
   });
 
   return {
@@ -218,7 +211,7 @@ function buildIncludeChildRowsSelect(
   readonly childRows: SelectAst;
   readonly childProjection: ReadonlyArray<ProjectionItem>;
   readonly rowsAlias: string;
-  readonly aggregateOrderBy: ReadonlyArray<{ expr: Expression; dir: 'asc' | 'desc' }> | undefined;
+  readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly params: readonly unknown[];
   readonly paramDescriptors: BoundWhereExpr['paramDescriptors'];
 } {
@@ -242,42 +235,37 @@ function buildIncludeChildRowsSelect(
   const childWhere = buildStateWhere(childTableRef, childState, {
     filterTableName: include.relatedTableName,
   });
-  const joinExpr = createBinaryExpr(
-    'eq',
-    createColumnRef(childTableRef, include.fkColumn),
-    createColumnRef(parentTableName, include.parentPkColumn),
+  const joinExpr = BinaryExpr.eq(
+    ColumnRef.of(childTableRef, include.fkColumn),
+    ColumnRef.of(parentTableName, include.parentPkColumn),
   );
   const shiftedChildWhere =
     childWhere && paramOffset > 0 ? offsetBoundWhereExpr(childWhere, paramOffset) : childWhere;
-  const whereExpr = shiftedChildWhere
-    ? createAndExpr([joinExpr, shiftedChildWhere.expr])
-    : joinExpr;
+  const whereExpr = shiftedChildWhere ? AndExpr.of([joinExpr, shiftedChildWhere.expr]) : joinExpr;
 
-  const builder = createSelectAstBuilder(
-    createTableSource(include.relatedTableName, childTableAlias),
-  )
-    .project([...childProjection, ...hiddenOrderProjection])
-    .where(whereExpr);
+  let childRows = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+    .withProject([...childProjection, ...hiddenOrderProjection])
+    .withWhere(whereExpr);
 
   if (childOrderBy) {
-    builder.orderBy(childOrderBy);
+    childRows = childRows.withOrderBy(childOrderBy);
   }
   if (childState.distinctOn && childState.distinctOn.length > 0) {
-    builder.distinctOn(
-      childState.distinctOn.map((column) => createColumnRef(childTableRef, column)),
+    childRows = childRows.withDistinctOn(
+      childState.distinctOn.map((column) => ColumnRef.of(childTableRef, column)),
     );
   } else if (childState.distinct && childState.distinct.length > 0) {
-    builder.distinct(true);
+    childRows = childRows.withDistinct(true);
   }
   if (childState.limit !== undefined) {
-    builder.limit(childState.limit);
+    childRows = childRows.withLimit(childState.limit);
   }
   if (childState.offset !== undefined) {
-    builder.offset(childState.offset);
+    childRows = childRows.withOffset(childState.offset);
   }
 
   return {
-    childRows: builder.build(),
+    childRows,
     childProjection,
     rowsAlias,
     aggregateOrderBy,
@@ -300,26 +288,24 @@ function buildLateralIncludeArtifacts(
   const { childRows, childProjection, rowsAlias, aggregateOrderBy, params, paramDescriptors } =
     buildIncludeChildRowsSelect(contract, parentTableName, include, paramOffset);
   const lateralAlias = `${include.relationName}_lateral`;
+  const jsonObjectExpr = JsonObjectExpr.fromEntries(
+    childProjection.map((item) =>
+      JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
+    ),
+  );
 
-  const aggregateQuery = createSelectAstBuilder(createDerivedTableSource(rowsAlias, childRows))
-    .project([
-      createProjectionItem(
-        include.relationName,
-        createJsonAggExpr(createJsonBuildObjectExpr(rowsAlias, childProjection), aggregateOrderBy),
-      ),
-    ])
-    .build();
+  const aggregateQuery = SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProject([
+    ProjectionItem.of(
+      include.relationName,
+      JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
+    ),
+  ]);
 
   return {
-    join: createJoin(
-      'left',
-      createDerivedTableSource(lateralAlias, aggregateQuery),
-      createTrueExpr(),
-      true,
-    ),
-    projection: createProjectionItem(
+    join: JoinAst.left(DerivedTableSource.as(lateralAlias, aggregateQuery), AndExpr.true(), true),
+    projection: ProjectionItem.of(
       include.relationName,
-      createColumnRef(lateralAlias, include.relationName),
+      ColumnRef.of(lateralAlias, include.relationName),
     ),
     params,
     paramDescriptors,
@@ -338,17 +324,20 @@ function buildCorrelatedIncludeProjection(
 } {
   const { childRows, childProjection, rowsAlias, aggregateOrderBy, params, paramDescriptors } =
     buildIncludeChildRowsSelect(contract, parentTableName, include, paramOffset);
-  const aggregateQuery = createSelectAstBuilder(createDerivedTableSource(rowsAlias, childRows))
-    .project([
-      createProjectionItem(
-        include.relationName,
-        createJsonAggExpr(createJsonBuildObjectExpr(rowsAlias, childProjection), aggregateOrderBy),
-      ),
-    ])
-    .build();
+  const jsonObjectExpr = JsonObjectExpr.fromEntries(
+    childProjection.map((item) =>
+      JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
+    ),
+  );
+  const aggregateQuery = SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProject([
+    ProjectionItem.of(
+      include.relationName,
+      JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
+    ),
+  ]);
 
   return {
-    projection: createProjectionItem(include.relationName, createSubqueryExpr(aggregateQuery)),
+    projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(aggregateQuery)),
     params,
     paramDescriptors,
   };
@@ -375,33 +364,33 @@ function buildSelectAst(
   const where = options.where ?? buildStateWhere(tableName, state);
   const orderBy = toOrderBy(tableName, state.orderBy);
 
-  const builder = createSelectAstBuilder(createTableSource(tableName)).project(projection);
+  let ast = SelectAst.from(TableSource.named(tableName)).withProject(projection);
   if (where) {
-    builder.where(where.expr);
+    ast = ast.withWhere(where.expr);
   }
   if (orderBy) {
-    builder.orderBy(orderBy);
+    ast = ast.withOrderBy(orderBy);
   }
   if (state.selectedFields === undefined) {
-    builder.selectAllIntent({ table: tableName });
+    ast = ast.withSelectAllIntent({ table: tableName });
   }
   if (state.distinctOn && state.distinctOn.length > 0) {
-    builder.distinctOn(state.distinctOn.map((column) => createColumnRef(tableName, column)));
+    ast = ast.withDistinctOn(state.distinctOn.map((column) => ColumnRef.of(tableName, column)));
   } else if (state.distinct && state.distinct.length > 0) {
-    builder.distinct(true);
+    ast = ast.withDistinct(true);
   }
   if (state.limit !== undefined) {
-    builder.limit(state.limit);
+    ast = ast.withLimit(state.limit);
   }
   if (state.offset !== undefined) {
-    builder.offset(state.offset);
+    ast = ast.withOffset(state.offset);
   }
   if (options.joins && options.joins.length > 0) {
-    builder.joins(options.joins);
+    ast = ast.withJoins(options.joins);
   }
 
   return {
-    ast: builder.build(),
+    ast,
     params: [...(where?.params ?? []), ...(options.extraParams ?? [])],
     paramDescriptors: [
       ...(where?.paramDescriptors ?? []),
@@ -430,10 +419,9 @@ export function compileRelationSelect(
   parentPks: readonly unknown[],
   nestedState: CollectionState,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const inFilter: WhereExpr = createBinaryExpr(
-    'in',
-    createColumnRef(relatedTableName, fkColumn),
-    createLiteralListFromValues(parentPks),
+  const inFilter: WhereExpr = BinaryExpr.in(
+    ColumnRef.of(relatedTableName, fkColumn),
+    ListLiteralExpr.fromValues(parentPks),
   );
 
   return compileSelect(contract, relatedTableName, {

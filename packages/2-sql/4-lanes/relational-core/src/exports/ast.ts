@@ -1,5 +1,4 @@
 export * from '../ast/adapter-types';
-export * from '../ast/builders';
 export * from '../ast/codec-types';
 export * from '../ast/common';
 export * from '../ast/delete';
@@ -13,4 +12,3 @@ export * from '../ast/sql-codecs';
 export * from '../ast/types';
 export * from '../ast/update';
 export * from '../ast/util';
-export * from '../ast/visitors';

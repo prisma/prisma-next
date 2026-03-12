@@ -1,20 +1,21 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import {
-  createAggregateExpr,
-  createBinaryExpr,
-  createColumnRef,
-  createDerivedTableSource,
-  createExistsExpr,
-  createJsonArrayAggExpr,
-  createJsonObjectEntry,
-  createJsonObjectExpr,
-  createOrderByItem,
-  createProjectionItem,
-  createSelectAst,
-  createTableRef,
+  AggregateExpr,
+  BinaryExpr,
+  ColumnRef,
+  DerivedTableSource,
+  ExistsExpr,
+  JoinAst,
+  JsonArrayAggExpr,
+  JsonObjectExpr,
+  OperationExpr,
+  OrderByItem,
+  ParamRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { CompiledQuery } from 'kysely';
 import { describe, expect, it, vi } from 'vitest';
@@ -76,85 +77,53 @@ function createDescriptor(index: number, name: string): ParamDescriptor {
 }
 
 function createNestedWhereAst(): SelectAst {
-  const derivedUsers = createSelectAst({
-    from: createTableRef('user'),
-    project: [createProjectionItem('id', createColumnRef('user', 'id'))],
-    where: createBinaryExpr('eq', createColumnRef('user', 'kind'), {
-      kind: 'param',
-      index: 4,
-      name: 'kind',
-    }),
-  });
+  const derivedUsers = SelectAst.from(TableSource.named('user'))
+    .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+    .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'kind'), ParamRef.of(4, 'kind')));
 
-  const derivedPosts = createSelectAst({
-    from: createTableRef('post'),
-    project: [createProjectionItem('id', createColumnRef('post', 'id'))],
-    where: createBinaryExpr('eq', createColumnRef('post', 'title'), {
-      kind: 'param',
-      index: 5,
-      name: 'title',
-    }),
-  });
+  const derivedPosts = SelectAst.from(TableSource.named('post'))
+    .withProject([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
+    .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'title'), ParamRef.of(5, 'title')));
 
-  const orderedTitleExpr = {
-    kind: 'operation' as const,
+  const orderedTitleExpr = OperationExpr.function({
     method: 'lower',
     forTypeId: 'pg/text@1',
-    self: createColumnRef('matching_posts', 'title'),
-    args: [{ kind: 'param' as const, index: 6, name: 'fallback' }],
-    returns: { kind: 'builtin' as const, type: 'string' as const },
-    lowering: {
-      targetFamily: 'sql' as const,
-      strategy: 'function' as const,
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-      template: 'lower(${self}, ${arg0})',
-    },
-  };
+    self: ColumnRef.of('matching_posts', 'title'),
+    args: [ParamRef.of(6, 'fallback')],
+    returns: { kind: 'builtin', type: 'string' },
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+    template: 'lower(${self}, ${arg0})',
+  });
 
-  const existsSubquery = createSelectAst({
-    from: createDerivedTableSource('matching_users', derivedUsers),
-    joins: [
-      {
-        kind: 'join',
-        joinType: 'left',
-        source: createDerivedTableSource('matching_posts', derivedPosts),
-        lateral: false,
-        on: createBinaryExpr('eq', createColumnRef('matching_posts', 'userId'), {
-          kind: 'param',
-          index: 2,
-          name: 'userId',
-        }),
-      },
-    ],
-    project: [
-      createProjectionItem(
+  const existsSubquery = SelectAst.from(DerivedTableSource.as('matching_users', derivedUsers))
+    .withJoins([
+      JoinAst.left(
+        DerivedTableSource.as('matching_posts', derivedPosts),
+        BinaryExpr.eq(ColumnRef.of('matching_posts', 'userId'), ParamRef.of(2, 'userId')),
+      ),
+    ])
+    .withProject([
+      ProjectionItem.of(
         'items',
-        createJsonArrayAggExpr(
-          createJsonObjectExpr([
-            createJsonObjectEntry('id', createColumnRef('matching_posts', 'id')),
+        JsonArrayAggExpr.of(
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('id', ColumnRef.of('matching_posts', 'id')),
           ]),
           'emptyArray',
-          [createOrderByItem(orderedTitleExpr, 'desc')],
+          [OrderByItem.desc(orderedTitleExpr)],
         ),
       ),
-    ],
-    having: createBinaryExpr('gt', createAggregateExpr('count'), {
-      kind: 'param',
-      index: 3,
-      name: 'minCount',
-    }),
-    orderBy: [createOrderByItem(orderedTitleExpr, 'asc')],
-  });
+    ])
+    .withHaving(BinaryExpr.gt(AggregateExpr.count(), ParamRef.of(3, 'minCount')))
+    .withOrderBy([OrderByItem.asc(orderedTitleExpr)]);
 
-  return createSelectAst({
-    from: createTableRef('user'),
-    project: [createProjectionItem('id', createColumnRef('user', 'id'))],
-    where: createExistsExpr(false, existsSubquery),
-  });
+  return SelectAst.from(TableSource.named('user'))
+    .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+    .withWhere(ExistsExpr.exists(existsSubquery));
 }
 
 describe('buildKyselyWhereExpr nested AST traversal', () => {
-  it('collects and remaps params across derived-table select shapes', () => {
+  it('collects and remaps params across nested rich ASTs', () => {
     vi.mocked(buildKyselyPlan).mockReturnValue({
       ast: createNestedWhereAst(),
       params: ['unused', 'join-user-id', 1, 'admin', 'Hello', 'untitled'],
@@ -184,42 +153,27 @@ describe('buildKyselyWhereExpr nested AST traversal', () => {
     expect(bound.params).toEqual(['join-user-id', 1, 'admin', 'Hello', 'untitled']);
     expect(bound.paramDescriptors.map((descriptor) => descriptor.index)).toEqual([1, 2, 3, 4, 5]);
 
-    expect(bound.expr.kind).toBe('exists');
-    if (bound.expr.kind !== 'exists') {
-      throw new Error('expected exists expression');
-    }
-
-    const subquery = bound.expr.subquery;
-    expect(subquery.from.kind).toBe('derivedTable');
-    if (subquery.from.kind === 'derivedTable') {
-      expect(subquery.from.query.where?.kind).toBe('bin');
-      if (subquery.from.query.where?.kind === 'bin') {
-        expect(subquery.from.query.where.right).toMatchObject({ kind: 'param', index: 3 });
-      }
-    }
+    expect(bound.expr).toBeInstanceOf(ExistsExpr);
+    const exists = bound.expr as ExistsExpr;
+    const subquery = exists.subquery;
+    expect(subquery.from).toBeInstanceOf(DerivedTableSource);
+    expect(((subquery.from as DerivedTableSource).query.where as BinaryExpr).right).toEqual(
+      ParamRef.of(3, 'kind'),
+    );
 
     const join = subquery.joins?.[0];
-    expect(join?.source.kind).toBe('derivedTable');
-    if (join?.source.kind === 'derivedTable' && join.on.kind === 'bin') {
-      expect(join.on.right).toMatchObject({ kind: 'param', index: 1 });
-      expect(join.source.query.where?.kind).toBe('bin');
-      if (join.source.query.where?.kind === 'bin') {
-        expect(join.source.query.where.right).toMatchObject({ kind: 'param', index: 4 });
-      }
-    }
+    expect(join?.source).toBeInstanceOf(DerivedTableSource);
+    expect((join?.on as BinaryExpr).right).toEqual(ParamRef.of(1, 'userId'));
+    expect(((join?.source as DerivedTableSource).query.where as BinaryExpr).right).toEqual(
+      ParamRef.of(4, 'title'),
+    );
 
-    expect(subquery.having?.kind).toBe('bin');
-    if (subquery.having?.kind === 'bin') {
-      expect(subquery.having.right).toMatchObject({ kind: 'param', index: 2 });
-    }
+    expect((subquery.having as BinaryExpr).right).toEqual(ParamRef.of(2, 'minCount'));
 
     const aggregate = subquery.project[0]?.expr;
-    expect(aggregate?.kind).toBe('jsonArrayAgg');
-    if (aggregate?.kind === 'jsonArrayAgg') {
-      expect(aggregate.orderBy?.[0]?.expr.kind).toBe('operation');
-      if (aggregate.orderBy?.[0]?.expr.kind === 'operation') {
-        expect(aggregate.orderBy[0].expr.args[0]).toMatchObject({ kind: 'param', index: 5 });
-      }
-    }
+    expect(aggregate).toBeInstanceOf(JsonArrayAggExpr);
+    expect(((aggregate as JsonArrayAggExpr).orderBy?.[0]?.expr as OperationExpr).args[0]).toEqual(
+      ParamRef.of(5, 'fallback'),
+    );
   });
 });

@@ -1,20 +1,21 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
+import {
   AggregateExpr,
-  BoundWhereExpr,
-  Expression,
+  AndExpr,
+  BinaryExpr,
+  type BoundWhereExpr,
+  ColumnRef,
+  ExistsExpr,
+  type Expression,
   ListLiteralExpr,
   LiteralExpr,
+  NullCheckExpr,
+  OrExpr,
   ParamRef,
   ProjectionItem,
-  WhereExpr,
-} from '@prisma-next/sql-relational-core/ast';
-import {
-  createAggregateExpr,
-  createColumnRef,
-  createProjectionItem,
-  createSelectAstBuilder,
-  createTableSource,
+  SelectAst,
+  TableSource,
+  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan } from './query-plan-meta';
@@ -23,29 +24,29 @@ import { combineWhereFilters } from './where-utils';
 
 function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>): AggregateExpr {
   if (selector.fn === 'count') {
-    return createAggregateExpr('count');
+    return AggregateExpr.count();
   }
 
   if (!selector.column) {
     throw new Error(`Aggregate selector "${selector.fn}" requires a field`);
   }
 
-  return createAggregateExpr(selector.fn, createColumnRef(tableName, selector.column));
+  return new AggregateExpr(selector.fn, ColumnRef.of(tableName, selector.column));
 }
 
 function validateGroupedComparable(
   value: Expression | ParamRef | LiteralExpr | ListLiteralExpr,
 ): Expression | LiteralExpr | ListLiteralExpr {
-  if (value.kind === 'param') {
+  if (value instanceof ParamRef) {
     throw new Error('ParamRef is not supported in grouped having expressions');
   }
 
-  if (value.kind === 'literal') {
+  if (value instanceof LiteralExpr) {
     return value;
   }
 
-  if (value.kind === 'listLiteral') {
-    if (value.values.some((entry) => entry.kind === 'param')) {
+  if (value instanceof ListLiteralExpr) {
+    if (value.values.some((entry) => entry instanceof ParamRef)) {
       throw new Error('ParamRef is not supported in grouped having expressions');
     }
     return value;
@@ -55,7 +56,7 @@ function validateGroupedComparable(
 }
 
 function validateGroupedMetricExpr(expr: Expression): AggregateExpr {
-  if (expr.kind !== 'aggregate') {
+  if (!(expr instanceof AggregateExpr)) {
     throw new Error('groupBy().having() only supports aggregate metric expressions');
   }
 
@@ -63,29 +64,31 @@ function validateGroupedMetricExpr(expr: Expression): AggregateExpr {
 }
 
 function validateGroupedHavingExpr(expr: WhereExpr): WhereExpr {
-  if (expr.kind === 'and' || expr.kind === 'or') {
-    return {
-      ...expr,
-      exprs: expr.exprs.map((child) => validateGroupedHavingExpr(child)),
-    };
+  if (expr instanceof AndExpr) {
+    return AndExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
   }
 
-  if (expr.kind === 'exists') {
-    throw new Error(`Unsupported grouped having expression kind "${expr.kind}"`);
+  if (expr instanceof OrExpr) {
+    return OrExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
   }
 
-  if (expr.kind === 'nullCheck') {
-    return {
-      ...expr,
-      expr: validateGroupedMetricExpr(expr.expr),
-    };
+  if (expr instanceof ExistsExpr) {
+    throw new Error(`Unsupported grouped having expression kind "${expr.constructor.name}"`);
   }
 
-  return {
-    ...expr,
-    left: validateGroupedMetricExpr(expr.left),
-    right: validateGroupedComparable(expr.right),
-  };
+  if (expr instanceof NullCheckExpr) {
+    return new NullCheckExpr(validateGroupedMetricExpr(expr.expr), expr.isNull);
+  }
+
+  if (expr instanceof BinaryExpr) {
+    return new BinaryExpr(
+      expr.op,
+      validateGroupedMetricExpr(expr.left),
+      validateGroupedComparable(expr.right),
+    );
+  }
+
+  throw new Error(`Unsupported grouped having expression node "${expr.constructor.name}"`);
 }
 
 export function compileAggregate(
@@ -100,20 +103,15 @@ export function compileAggregate(
   }
 
   const project: ProjectionItem[] = entries.map(([alias, selector]) =>
-    createProjectionItem(alias, toAggregateExpr(tableName, selector)),
+    ProjectionItem.of(alias, toAggregateExpr(tableName, selector)),
   );
-  const builder = createSelectAstBuilder(createTableSource(tableName)).project(project);
+  let ast = SelectAst.from(TableSource.named(tableName)).withProject(project);
   const where = combineWhereFilters(filters);
   if (where) {
-    builder.where(where.expr);
+    ast = ast.withWhere(where.expr);
   }
 
-  return buildOrmQueryPlan(
-    contract,
-    builder.build(),
-    where?.params ?? [],
-    where?.paramDescriptors ?? [],
-  );
+  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
 }
 
 export function compileGroupedAggregate(
@@ -134,30 +132,23 @@ export function compileGroupedAggregate(
   }
 
   const projection: ProjectionItem[] = [
-    ...groupByColumns.map((column) =>
-      createProjectionItem(column, createColumnRef(tableName, column)),
-    ),
+    ...groupByColumns.map((column) => ProjectionItem.of(column, ColumnRef.of(tableName, column))),
     ...entries.map(([alias, selector]) =>
-      createProjectionItem(alias, toAggregateExpr(tableName, selector)),
+      ProjectionItem.of(alias, toAggregateExpr(tableName, selector)),
     ),
   ];
 
-  const builder = createSelectAstBuilder(createTableSource(tableName))
-    .project(projection)
-    .groupBy(groupByColumns.map((column) => createColumnRef(tableName, column)));
+  let ast = SelectAst.from(TableSource.named(tableName))
+    .withProject(projection)
+    .withGroupBy(groupByColumns.map((column) => ColumnRef.of(tableName, column)));
   const where = combineWhereFilters(filters);
   if (where) {
-    builder.where(where.expr);
+    ast = ast.withWhere(where.expr);
   }
 
   if (havingExpr) {
-    builder.having(validateGroupedHavingExpr(havingExpr));
+    ast = ast.withHaving(validateGroupedHavingExpr(havingExpr));
   }
 
-  return buildOrmQueryPlan(
-    contract,
-    builder.build(),
-    where?.params ?? [],
-    where?.paramDescriptors ?? [],
-  );
+  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
 }

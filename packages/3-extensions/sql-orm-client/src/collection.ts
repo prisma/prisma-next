@@ -1,6 +1,15 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ToWhereExpr, WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  AndExpr,
+  BinaryExpr,
+  ExistsExpr,
+  NullCheckExpr,
+  OrExpr,
+  type ToWhereExpr,
+  type WhereArg,
+  type WhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import {
@@ -96,12 +105,12 @@ import { createBoundWhereExpr } from './where-utils';
 type WhereDirectInput = WhereArg;
 
 function isWhereExprInput(value: unknown): value is WhereExpr {
-  if (typeof value !== 'object' || value === null || !('kind' in value)) {
-    return false;
-  }
-  const kind = (value as { kind?: unknown }).kind;
   return (
-    kind === 'bin' || kind === 'exists' || kind === 'nullCheck' || kind === 'and' || kind === 'or'
+    value instanceof BinaryExpr ||
+    value instanceof ExistsExpr ||
+    value instanceof NullCheckExpr ||
+    value instanceof AndExpr ||
+    value instanceof OrExpr
   );
 }
 

@@ -1,162 +1,90 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';
-import { createSelectAst } from '../../src/ast/select';
-import type { ColumnRef, OperationExpr, SelectAst } from '../../src/ast/types';
-
-function createTestOperationExpr(self: ColumnRef): OperationExpr {
-  return {
-    kind: 'operation',
-    method: 'test',
-    forTypeId: 'pg/text@1',
-    self,
-    args: [],
-    returns: { kind: 'builtin', type: 'string' },
-    lowering: {
-      targetFamily: 'sql',
-      strategy: 'function',
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-      template: 'test(${self})',
-    },
-  };
-}
-
-function createTestSubquery(tableName: string): SelectAst {
-  return createSelectAst({
-    from: createTableRef(tableName),
-    project: [
-      {
-        alias: 'id',
-        expr: createColumnRef(tableName, 'id'),
-      },
-    ],
-  });
-}
+import {
+  AndExpr,
+  BinaryExpr,
+  ExistsExpr,
+  ListLiteralExpr,
+  NullCheckExpr,
+  OrExpr,
+} from '../../src/ast/predicate';
+import { col, lit, lowerExpr, param, simpleSelect } from './test-helpers';
 
 describe('ast/predicate', () => {
-  describe('createBinaryExpr', () => {
-    it('creates binary expr with column ref and param ref', () => {
-      const left = createColumnRef('user', 'id');
-      const right = createParamRef(0, 'userId');
-      const binaryExpr = createBinaryExpr('eq', left, right);
+  it('creates binary expressions across comparable operands', () => {
+    const left = lowerExpr(col('user', 'email'));
+    const list = ListLiteralExpr.of([param(0, 'firstId'), param(1, 'secondId')]);
 
-      expect(binaryExpr).toMatchObject({
-        kind: 'bin',
-        op: 'eq',
-        left,
-        right,
-      });
-    });
-
-    it('creates binary expr with operation expr and param ref', () => {
-      const left = createTestOperationExpr(createColumnRef('user', 'email'));
-      const right = createParamRef(0, 'value');
-      const binaryExpr = createBinaryExpr('eq', left, right);
-
-      expect(binaryExpr.left).toBe(left);
-      expect(binaryExpr.right).toBe(right);
-    });
-
-    it('creates binary expr with different param ref index', () => {
-      const left = createColumnRef('user', 'email');
-      const right = createParamRef(1, 'email');
-      const binaryExpr = createBinaryExpr('eq', left, right);
-
-      expect(binaryExpr.right).toMatchObject({
-        kind: 'param',
-        index: 1,
-        name: 'email',
-      });
-    });
-
-    it('creates binary expr with column ref on the right', () => {
-      const left = createColumnRef('user', 'id');
-      const right = createColumnRef('post', 'userId');
-      const binaryExpr = createBinaryExpr('eq', left, right);
-
-      expect(binaryExpr).toMatchObject({
-        kind: 'bin',
-        op: 'eq',
-        left,
-        right: { kind: 'col', table: 'post', column: 'userId' },
-      });
-    });
-
-    it.each([
-      'eq',
-      'neq',
-      'gt',
-      'lt',
-      'gte',
-      'lte',
-      'like',
-      'ilike',
-      'in',
-      'notIn',
-    ] as const)('creates binary expr with %s operator', (op) => {
-      const left = createColumnRef('user', 'id');
-      const right = createColumnRef('post', 'userId');
-      const binaryExpr = createBinaryExpr(op, left, right);
-
-      expect(binaryExpr.op).toBe(op);
-      expect(binaryExpr.right.kind).toBe('col');
-    });
-
-    it('creates binary expr with list literal right-hand side', () => {
-      const left = createColumnRef('user', 'id');
-      const right = {
-        kind: 'listLiteral' as const,
-        values: [createParamRef(0, 'firstId'), createParamRef(1, 'secondId')],
-      };
-      const binaryExpr = createBinaryExpr('in', left, right);
-
-      expect(binaryExpr).toMatchObject({
-        kind: 'bin',
-        op: 'in',
-        right,
-      });
-    });
-
-    it('creates binary expr with operation expr and column ref on the right', () => {
-      const left = createTestOperationExpr(createColumnRef('user', 'email'));
-      const right = createColumnRef('post', 'email');
-      const binaryExpr = createBinaryExpr('eq', left, right);
-
-      expect(binaryExpr.left).toBe(left);
-      expect(binaryExpr.right).toMatchObject({
-        kind: 'col',
-        table: 'post',
-        column: 'email',
-      });
-    });
+    expect(BinaryExpr.eq(col('user', 'id'), param(2, 'userId'))).toEqual(
+      new BinaryExpr('eq', col('user', 'id'), param(2, 'userId')),
+    );
+    expect(BinaryExpr.eq(left, col('post', 'email')).left).toEqual(left);
+    expect(BinaryExpr.in(col('user', 'id'), list).right).toEqual(list);
   });
 
-  describe('createExistsExpr', () => {
-    it('creates exists expr with subquery', () => {
-      const subquery = createTestSubquery('user');
-      const existsExpr = createExistsExpr(false, subquery);
+  it.each([
+    'eq',
+    'neq',
+    'gt',
+    'lt',
+    'gte',
+    'lte',
+    'like',
+    'ilike',
+    'in',
+    'notIn',
+  ] as const)('stores the %s operator', (op) => {
+    const expr = new BinaryExpr(op, col('user', 'id'), col('post', 'userId'));
+    expect(expr.op).toBe(op);
+    expect(expr.right).toEqual(col('post', 'userId'));
+  });
 
-      expect(existsExpr).toMatchObject({
-        kind: 'exists',
-        not: false,
-        subquery,
-      });
-    });
+  it('negates binary, null-check, and composite predicates through not()', () => {
+    expect(BinaryExpr.eq(col('user', 'id'), param(0)).not()).toEqual(
+      BinaryExpr.neq(col('user', 'id'), param(0)),
+    );
+    expect(NullCheckExpr.isNull(col('user', 'deletedAt')).not()).toEqual(
+      NullCheckExpr.isNotNull(col('user', 'deletedAt')),
+    );
+    expect(
+      AndExpr.of([
+        BinaryExpr.eq(col('user', 'id'), param(0)),
+        NullCheckExpr.isNull(col('user', 'deletedAt')),
+      ]).not(),
+    ).toEqual(
+      OrExpr.of([
+        BinaryExpr.neq(col('user', 'id'), param(0)),
+        NullCheckExpr.isNotNull(col('user', 'deletedAt')),
+      ]),
+    );
+  });
 
-    it('creates exists expr with not flag', () => {
-      const subquery = createTestSubquery('user');
-      const existsExpr = createExistsExpr(true, subquery);
+  it('creates exists and not-exists predicates around select subqueries', () => {
+    const subquery = simpleSelect('post', ['id']);
 
-      expect(existsExpr.not).toBe(true);
-      expect(existsExpr.subquery).toBe(subquery);
-    });
+    const existsExpr = ExistsExpr.exists(subquery);
+    const notExistsExpr = ExistsExpr.notExists(subquery);
 
-    it('creates exists expr with different table subquery', () => {
-      const subquery = createTestSubquery('post');
-      const existsExpr = createExistsExpr(false, subquery);
+    expect(existsExpr.subquery).toEqual(subquery);
+    expect(existsExpr.notExists).toBe(false);
+    expect(notExistsExpr.notExists).toBe(true);
+    expect(notExistsExpr.not()).toEqual(existsExpr);
+  });
 
-      expect(existsExpr.subquery).toBe(subquery);
-      expect(existsExpr.subquery.from).toMatchObject({ kind: 'table', name: 'post' });
-    });
+  it('collects refs across nested predicate trees', () => {
+    const where = OrExpr.of([
+      BinaryExpr.eq(lowerExpr(col('user', 'email')), lit('a@example.com')),
+      ExistsExpr.exists(
+        simpleSelect('post', ['id']).withWhere(
+          BinaryExpr.eq(col('post', 'userId'), col('user', 'id')),
+        ),
+      ),
+    ]);
+
+    expect(where.collectColumnRefs()).toEqual([
+      col('user', 'email'),
+      col('post', 'id'),
+      col('post', 'userId'),
+      col('user', 'id'),
+    ]);
   });
 });

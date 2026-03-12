@@ -1,16 +1,16 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { BinaryExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import {
-  createBinaryExpr,
-  createColumnRef,
-  createExistsExpr,
-  createLiteralExpr,
-  createLiteralListFromValues,
-  createNullCheckExpr,
-  createProjectionItem,
-  createSelectAstBuilder,
-  createTableSource,
-  createTrueExpr,
+  AndExpr,
+  BinaryExpr,
+  ColumnRef,
+  ExistsExpr,
+  ListLiteralExpr,
+  LiteralExpr,
+  NullCheckExpr,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { and, not } from './filters';
 import type { ComparisonMethods, ModelAccessor, RelationFilterAccessor } from './types';
@@ -77,30 +77,26 @@ function createScalarFieldAccessor(
   tableName: string,
   columnName: string,
 ): ComparisonMethods<unknown> {
-  const left = createColumnRef(tableName, columnName);
+  const left = ColumnRef.of(tableName, columnName);
 
   const methods: Partial<ComparisonMethods<unknown>> = {};
   for (const op of COMPARISON_OPS) {
     if (op === 'in' || op === 'notIn') {
       methods[op] = ((values: readonly unknown[]): BinaryExpr =>
-        createBinaryExpr(
+        new BinaryExpr(
           op,
           left,
-          createLiteralListFromValues(values),
+          ListLiteralExpr.fromValues(values),
         )) as ComparisonMethods<unknown>[typeof op];
       continue;
     }
 
     methods[op] = ((value: unknown): BinaryExpr =>
-      createBinaryExpr(
-        op,
-        left,
-        createLiteralExpr(value),
-      )) as ComparisonMethods<unknown>[typeof op];
+      new BinaryExpr(op, left, LiteralExpr.of(value))) as ComparisonMethods<unknown>[typeof op];
   }
 
-  methods.isNull = () => createNullCheckExpr(left, true);
-  methods.isNotNull = () => createNullCheckExpr(left, false);
+  methods.isNull = () => NullCheckExpr.isNull(left);
+  methods.isNotNull = () => NullCheckExpr.isNotNull(left);
   methods.asc = () => ({
     column: columnName,
     direction: 'asc',
@@ -170,7 +166,7 @@ function buildExistsExpr<TContract extends SqlContract<SqlStorage>>(
 
   if (options.mode === 'every') {
     if (!childWhere) {
-      return createTrueExpr();
+      return AndExpr.true();
     }
     existsNot = true;
     subqueryWhere = and(joinWhere, not(childWhere));
@@ -184,14 +180,13 @@ function buildExistsExpr<TContract extends SqlContract<SqlStorage>>(
   }
 
   const selectProjectionColumn = firstChildColumn(relation) ?? 'id';
-  const subquery = createSelectAstBuilder(createTableSource(relatedTableName))
-    .project([
-      createProjectionItem('_exists', createColumnRef(relatedTableName, selectProjectionColumn)),
+  const subquery = SelectAst.from(TableSource.named(relatedTableName))
+    .withProject([
+      ProjectionItem.of('_exists', ColumnRef.of(relatedTableName, selectProjectionColumn)),
     ])
-    .where(subqueryWhere)
-    .build();
+    .withWhere(subqueryWhere);
 
-  return createExistsExpr(existsNot, subquery);
+  return existsNot ? ExistsExpr.notExists(subquery) : ExistsExpr.exists(subquery);
 }
 
 function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
@@ -254,10 +249,9 @@ function buildJoinWhere(
     }
 
     joinExprs.push(
-      createBinaryExpr(
-        'eq',
-        createColumnRef(childTableName, childCol),
-        createColumnRef(parentTableName, parentCol),
+      BinaryExpr.eq(
+        ColumnRef.of(childTableName, childCol),
+        ColumnRef.of(parentTableName, parentCol),
       ),
     );
   }

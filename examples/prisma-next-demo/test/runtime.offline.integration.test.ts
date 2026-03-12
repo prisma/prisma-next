@@ -1,3 +1,4 @@
+import { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/prisma/db';
 
@@ -10,8 +11,13 @@ describe('static context (no runtime)', () => {
     const tables = db.schema.tables;
     const plan = db.sql.from(tables.user).select({ id: tables.user.columns.id }).limit(1).build();
 
+    expect(plan.ast).toBeInstanceOf(SelectAst);
     expect(plan).toMatchObject({
-      ast: { kind: 'select' },
+      ast: {
+        from: { name: 'user' },
+        limit: 1,
+        project: [{ alias: 'id', expr: { table: 'user', column: 'id' } }],
+      },
       meta: { lane: 'dsl' },
     });
   });

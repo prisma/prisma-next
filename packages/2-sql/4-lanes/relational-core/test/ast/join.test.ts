@@ -5,12 +5,11 @@ import {
   textColumn as textColumnType,
 } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createDerivedTableSource, createTableRef } from '../../src/ast/common';
-import { createJoin, createJoinOnBuilder, createJoinOnExpr } from '../../src/ast/join';
-import { createSelectAst } from '../../src/ast/select';
-import type { JoinOnExpr, TableRef } from '../../src/ast/types';
+import { createJoinOnBuilder } from '../../src/ast/join';
+import { DerivedTableSource, EqColJoinOn, JoinAst } from '../../src/exports/ast';
 import { schema } from '../../src/schema';
 import { createStubAdapter, createTestContext } from '../utils';
+import { col, simpleSelect, table } from './test-helpers';
 
 type TestContract = SqlContract<
   {
@@ -92,193 +91,77 @@ describe('ast/join', () => {
     mappings: {},
   });
 
-  describe('createJoin', () => {
-    it('creates inner join', () => {
-      const table: TableRef = createTableRef('post');
-      const on: JoinOnExpr = createJoinOnExpr(
-        createColumnRef('user', 'id'),
-        createColumnRef('post', 'userId'),
-      );
+  it('creates inner, left, right, and full joins with rich classes', () => {
+    const on = EqColJoinOn.of(col('user', 'id'), col('post', 'userId'));
 
-      const join = createJoin('inner', table, on);
-
-      expect(join).toEqual({
-        kind: 'join',
-        joinType: 'inner',
-        source: table,
-        lateral: false,
-        on,
-      });
-    });
-
-    it('creates left join', () => {
-      const table: TableRef = createTableRef('post');
-      const on: JoinOnExpr = createJoinOnExpr(
-        createColumnRef('user', 'id'),
-        createColumnRef('post', 'userId'),
-      );
-
-      const join = createJoin('left', table, on);
-
-      expect(join.joinType).toBe('left');
-    });
-
-    it('creates right join', () => {
-      const table: TableRef = createTableRef('post');
-      const on: JoinOnExpr = createJoinOnExpr(
-        createColumnRef('user', 'id'),
-        createColumnRef('post', 'userId'),
-      );
-
-      const join = createJoin('right', table, on);
-
-      expect(join.joinType).toBe('right');
-    });
-
-    it('creates full join', () => {
-      const table: TableRef = createTableRef('post');
-      const on: JoinOnExpr = createJoinOnExpr(
-        createColumnRef('user', 'id'),
-        createColumnRef('post', 'userId'),
-      );
-
-      const join = createJoin('full', table, on);
-
-      expect(join.joinType).toBe('full');
-    });
-
-    it('rejects lateral joins for table sources', () => {
-      const table: TableRef = createTableRef('post');
-      const on: JoinOnExpr = createJoinOnExpr(
-        createColumnRef('user', 'id'),
-        createColumnRef('post', 'userId'),
-      );
-
-      expect(() => createJoin('inner', table, on, true)).toThrow(
-        'LATERAL is only valid for derived tables',
-      );
-    });
-
-    it('creates lateral joins for derived tables', () => {
-      const derived = createDerivedTableSource(
-        'post_subquery',
-        createSelectAst({
-          from: createTableRef('post'),
-          project: [{ alias: 'userId', expr: createColumnRef('post', 'userId') }],
-        }),
-      );
-      const on: JoinOnExpr = createJoinOnExpr(
-        createColumnRef('user', 'id'),
-        createColumnRef('post_subquery', 'userId'),
-      );
-
-      const join = createJoin('inner', derived, on, true);
-
-      expect(join).toEqual({
-        kind: 'join',
-        joinType: 'inner',
-        source: derived,
-        lateral: true,
-        on,
-      });
-    });
+    expect(JoinAst.inner(table('post'), on)).toEqual(new JoinAst('inner', table('post'), on));
+    expect(JoinAst.left(table('post'), on).joinType).toBe('left');
+    expect(JoinAst.right(table('post'), on).joinType).toBe('right');
+    expect(JoinAst.full(table('post'), on).joinType).toBe('full');
   });
 
-  describe('createJoinOnExpr', () => {
-    it('creates join on expr with left and right column refs', () => {
-      const left = createColumnRef('user', 'id');
-      const right = createColumnRef('post', 'userId');
+  it('creates lateral joins for derived sources', () => {
+    const derived = DerivedTableSource.as('post_subquery', simpleSelect('post', ['userId']));
+    const on = EqColJoinOn.of(col('user', 'id'), col('post_subquery', 'userId'));
 
-      const joinOnExpr = createJoinOnExpr(left, right);
+    const join = JoinAst.inner(derived, on, true);
 
-      expect(joinOnExpr).toEqual({
-        kind: 'eqCol',
-        left,
-        right,
-      });
-    });
-
-    it('creates join on expr with different columns', () => {
-      const left = createColumnRef('user', 'email');
-      const right = createColumnRef('post', 'authorEmail');
-
-      const joinOnExpr = createJoinOnExpr(left, right);
-
-      expect(joinOnExpr.kind).toBe('eqCol');
-      if (joinOnExpr.kind === 'eqCol') {
-        expect(joinOnExpr.left).toBe(left);
-        expect(joinOnExpr.right).toBe(right);
-      }
-    });
+    expect(join.source).toEqual(derived);
+    expect(join.lateral).toBe(true);
+    expect(join.on).toEqual(on);
   });
 
-  describe('createJoinOnBuilder', () => {
-    it('creates join on builder', () => {
-      const builder = createJoinOnBuilder();
-      expect(builder).toBeDefined();
-      expect(typeof builder.eqCol).toBe('function');
+  it('rewrites join predicates through the AST rewriter', () => {
+    const join = JoinAst.inner(
+      table('post'),
+      EqColJoinOn.of(col('user', 'id'), col('post', 'userId')),
+    );
+
+    const rewritten = join.rewrite({
+      tableSource: (source) => (source.name === 'post' ? table('article') : source),
+      eqColJoinOn: (on) =>
+        EqColJoinOn.of(col(`rewritten_${on.left.table}`, on.left.column), on.right),
     });
 
-    it('creates join on predicate with valid column builders', () => {
-      const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
-      const tables = schema(context).tables;
+    expect(rewritten.source).toEqual(table('article'));
+    expect(rewritten.on).toEqual(
+      EqColJoinOn.of(col('rewritten_user', 'id'), col('post', 'userId')),
+    );
+  });
 
-      const builder = createJoinOnBuilder();
-      const predicate = builder.eqCol(tables.user.columns.id, tables.post.columns.userId);
+  it('creates join-on predicates from valid column builders', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
 
-      expect(predicate).toBeDefined();
-      expect(predicate.kind).toBe('join-on');
-      expect(predicate.left).toBe(tables.user.columns.id);
-      expect(predicate.right).toBe(tables.post.columns.userId);
-    });
+    const predicate = createJoinOnBuilder().eqCol(
+      tables.user.columns.id,
+      tables.post.columns.userId,
+    );
 
-    it('throws error when left operand is not a column builder', () => {
-      const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
-      const tables = schema(context).tables;
+    expect(predicate.kind).toBe('join-on');
+    expect(predicate.left).toBe(tables.user.columns.id);
+    expect(predicate.right).toBe(tables.post.columns.userId);
+  });
 
-      const builder = createJoinOnBuilder();
+  it('rejects invalid join-on operands and self-joins', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const builder = createJoinOnBuilder();
 
-      expect(() => {
-        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        builder.eqCol(null as any, tables.post.columns.userId);
-      }).toThrow('Join ON left operand must be a column');
+    expect(() => {
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+      builder.eqCol(null as any, tables.post.columns.userId);
+    }).toThrow('Join ON left operand must be a column');
 
-      expect(() => {
-        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        builder.eqCol(undefined as any, tables.post.columns.userId);
-      }).toThrow('Join ON left operand must be a column');
-    });
+    expect(() => {
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+      builder.eqCol(tables.user.columns.id, null as any);
+    }).toThrow('Join ON right operand must be a column');
 
-    it('throws error when right operand is not a column builder', () => {
-      const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
-      const tables = schema(context).tables;
-
-      const builder = createJoinOnBuilder();
-
-      expect(() => {
-        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        builder.eqCol(tables.user.columns.id, null as any);
-      }).toThrow('Join ON right operand must be a column');
-
-      expect(() => {
-        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        builder.eqCol(tables.user.columns.id, undefined as any);
-      }).toThrow('Join ON right operand must be a column');
-    });
-
-    it('throws error for self-joins', () => {
-      const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
-      const tables = schema(context).tables;
-
-      const builder = createJoinOnBuilder();
-
-      expect(() => {
-        builder.eqCol(tables.user.columns.id, tables.user.columns.id);
-      }).toThrow('Self-joins are not supported in MVP');
-    });
+    expect(() => {
+      builder.eqCol(tables.user.columns.id, tables.user.columns.id);
+    }).toThrow('Self-joins are not supported in MVP');
   });
 });

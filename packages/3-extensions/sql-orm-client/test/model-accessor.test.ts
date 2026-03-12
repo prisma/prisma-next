@@ -1,3 +1,15 @@
+import {
+  AndExpr,
+  BinaryExpr,
+  ColumnRef,
+  ExistsExpr,
+  ListLiteralExpr,
+  LiteralExpr,
+  NullCheckExpr,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
 import { getTestContract } from './helpers';
@@ -5,273 +17,141 @@ import { getTestContract } from './helpers';
 describe('createModelAccessor', () => {
   const contract = getTestContract();
 
-  function expectBinaryExpr(
+  function expectBinaryLiteral(
     actual: unknown,
     table: string,
     column: string,
-    op: string,
+    op: BinaryExpr['op'],
     value: unknown,
   ) {
-    expect(actual).toEqual({
-      kind: 'bin',
-      op,
-      left: {
-        kind: 'col',
-        table,
-        column,
-      },
-      right: {
-        kind: 'literal',
-        value,
-      },
-    });
+    expect(actual).toEqual(new BinaryExpr(op, ColumnRef.of(table, column), LiteralExpr.of(value)));
   }
 
-  it('creates FilterExpr with eq operator', () => {
-    const accessor = createModelAccessor(contract, 'User');
-    const filter = accessor['name']!.eq('Alice');
-    expectBinaryExpr(filter, 'users', 'name', 'eq', 'Alice');
+  it('creates scalar comparison operators and maps fields to columns', () => {
+    const user = createModelAccessor(contract, 'User');
+    const post = createModelAccessor(contract, 'Post');
+
+    expectBinaryLiteral(user['name']!.eq('Alice'), 'users', 'name', 'eq', 'Alice');
+    expectBinaryLiteral(
+      user['email']!.neq('test@example.com'),
+      'users',
+      'email',
+      'neq',
+      'test@example.com',
+    );
+    expectBinaryLiteral(post['views']!.gt(1000), 'posts', 'views', 'gt', 1000);
+    expectBinaryLiteral(post['views']!.lt(100), 'posts', 'views', 'lt', 100);
+    expectBinaryLiteral(post['id']!.gte(5), 'posts', 'id', 'gte', 5);
+    expectBinaryLiteral(post['id']!.lte(10), 'posts', 'id', 'lte', 10);
+    expectBinaryLiteral(post['userId']!.eq(42), 'posts', 'user_id', 'eq', 42);
+    expectBinaryLiteral(user['name']!.like('%Ali%'), 'users', 'name', 'like', '%Ali%');
+    expectBinaryLiteral(user['name']!.ilike('%ali%'), 'users', 'name', 'ilike', '%ali%');
   });
 
-  it('creates FilterExpr with neq operator', () => {
-    const accessor = createModelAccessor(contract, 'User');
-    const filter = accessor['email']!.neq('test@example.com');
-    expectBinaryExpr(filter, 'users', 'email', 'neq', 'test@example.com');
-  });
-
-  it('creates FilterExpr with gt operator', () => {
+  it('creates list literal, null check, and order directive helpers', () => {
     const accessor = createModelAccessor(contract, 'Post');
-    const filter = accessor['views']!.gt(1000);
-    expectBinaryExpr(filter, 'posts', 'views', 'gt', 1000);
-  });
 
-  it('creates FilterExpr with lt operator', () => {
-    const accessor = createModelAccessor(contract, 'Post');
-    const filter = accessor['views']!.lt(100);
-    expectBinaryExpr(filter, 'posts', 'views', 'lt', 100);
-  });
-
-  it('creates FilterExpr with gte operator', () => {
-    const accessor = createModelAccessor(contract, 'Post');
-    const filter = accessor['id']!.gte(5);
-    expectBinaryExpr(filter, 'posts', 'id', 'gte', 5);
-  });
-
-  it('creates FilterExpr with lte operator', () => {
-    const accessor = createModelAccessor(contract, 'Post');
-    const filter = accessor['id']!.lte(10);
-    expectBinaryExpr(filter, 'posts', 'id', 'lte', 10);
-  });
-
-  it('maps field names to column names via fieldToColumn', () => {
-    const accessor = createModelAccessor(contract, 'Post');
-    const filter = accessor['userId']!.eq(42);
-    expectBinaryExpr(filter, 'posts', 'user_id', 'eq', 42);
-  });
-
-  it('uses field name as column name when no mapping exists', () => {
-    const accessor = createModelAccessor(contract, 'Post');
-    const filter = accessor['id']!.eq(1);
-    expectBinaryExpr(filter, 'posts', 'id', 'eq', 1);
-  });
-
-  it('creates like and ilike operators', () => {
-    const accessor = createModelAccessor(contract, 'User');
-    expectBinaryExpr(accessor['name']!.like('%Ali%'), 'users', 'name', 'like', '%Ali%');
-    expectBinaryExpr(accessor['name']!.ilike('%ali%'), 'users', 'name', 'ilike', '%ali%');
-  });
-
-  it('creates listLiteral nodes for in and notIn operators', () => {
-    const accessor = createModelAccessor(contract, 'Post');
-    expect(accessor['id']!.in([1, 2, 3])).toEqual({
-      kind: 'bin',
-      op: 'in',
-      left: { kind: 'col', table: 'posts', column: 'id' },
-      right: {
-        kind: 'listLiteral',
-        values: [
-          { kind: 'literal', value: 1 },
-          { kind: 'literal', value: 2 },
-          { kind: 'literal', value: 3 },
-        ],
-      },
-    });
-    expect(accessor['id']!.notIn([4, 5])).toEqual({
-      kind: 'bin',
-      op: 'notIn',
-      left: { kind: 'col', table: 'posts', column: 'id' },
-      right: {
-        kind: 'listLiteral',
-        values: [
-          { kind: 'literal', value: 4 },
-          { kind: 'literal', value: 5 },
-        ],
-      },
-    });
-  });
-
-  it('creates null check expressions', () => {
-    const accessor = createModelAccessor(contract, 'User');
-    expect(accessor['email']!.isNull()).toEqual({
-      kind: 'nullCheck',
-      expr: { kind: 'col', table: 'users', column: 'email' },
-      isNull: true,
-    });
-    expect(accessor['email']!.isNotNull()).toEqual({
-      kind: 'nullCheck',
-      expr: { kind: 'col', table: 'users', column: 'email' },
-      isNull: false,
-    });
-  });
-
-  it('creates order directives with asc and desc', () => {
-    const accessor = createModelAccessor(contract, 'Post');
+    expect(accessor['id']!.in([1, 2, 3])).toEqual(
+      BinaryExpr.in(ColumnRef.of('posts', 'id'), ListLiteralExpr.fromValues([1, 2, 3])),
+    );
+    expect(accessor['id']!.notIn([4, 5])).toEqual(
+      BinaryExpr.notIn(ColumnRef.of('posts', 'id'), ListLiteralExpr.fromValues([4, 5])),
+    );
     expect(accessor['id']!.asc()).toEqual({ column: 'id', direction: 'asc' });
     expect(accessor['id']!.desc()).toEqual({ column: 'id', direction: 'desc' });
+
+    const user = createModelAccessor(contract, 'User');
+    expect(user['email']!.isNull()).toEqual(NullCheckExpr.isNull(ColumnRef.of('users', 'email')));
+    expect(user['email']!.isNotNull()).toEqual(
+      NullCheckExpr.isNotNull(ColumnRef.of('users', 'email')),
+    );
   });
 
   it('creates some() relation filters as EXISTS subqueries', () => {
     const accessor = createModelAccessor(contract, 'User');
-    expect(accessor['posts']!.some()).toEqual({
-      kind: 'exists',
-      not: false,
-      subquery: {
-        kind: 'select',
-        from: { kind: 'table', name: 'posts' },
-        project: [{ alias: '_exists', expr: { kind: 'col', table: 'posts', column: 'user_id' } }],
-        where: {
-          kind: 'bin',
-          op: 'eq',
-          left: { kind: 'col', table: 'posts', column: 'user_id' },
-          right: { kind: 'col', table: 'users', column: 'id' },
-        },
-      },
-    });
+
+    expect(accessor['posts']!.some()).toEqual(
+      ExistsExpr.exists(
+        SelectAst.from(TableSource.named('posts'))
+          .withProject([ProjectionItem.of('_exists', ColumnRef.of('posts', 'user_id'))])
+          .withWhere(BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id'))),
+      ),
+    );
   });
 
   it('creates none() and every() relation filters with NOT EXISTS semantics', () => {
     const accessor = createModelAccessor(contract, 'User');
 
-    expect(accessor['posts']!.none({ views: 10 })).toMatchObject({
-      kind: 'exists',
-      not: true,
-      subquery: {
-        where: {
-          kind: 'and',
-          exprs: [
-            { kind: 'bin', op: 'eq' },
-            { kind: 'bin', op: 'eq' },
-          ],
-        },
-      },
-    });
+    const noneExpr = accessor['posts']!.none({ views: 10 }) as ExistsExpr;
+    expect(noneExpr.notExists).toBe(true);
+    expect(noneExpr.subquery.where).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+        BinaryExpr.eq(ColumnRef.of('posts', 'views'), LiteralExpr.of(10)),
+      ]),
+    );
 
-    expect(accessor['posts']!.every((post) => post['views']!.gt(10))).toMatchObject({
-      kind: 'exists',
-      not: true,
-      subquery: {
-        where: {
-          kind: 'and',
-          exprs: [
-            { kind: 'bin', op: 'eq' },
-            { kind: 'bin', op: 'lte' },
-          ],
-        },
-      },
-    });
+    const everyExpr = accessor['posts']!.every((post) => post['views']!.gt(10)) as ExistsExpr;
+    expect(everyExpr.notExists).toBe(true);
+    expect(everyExpr.subquery.where).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+        BinaryExpr.lte(ColumnRef.of('posts', 'views'), LiteralExpr.of(10)),
+      ]),
+    );
   });
 
-  it('creates none() filters without child predicates and treats every({}) as vacuously true', () => {
+  it('treats every({}) as vacuously true and none() as a plain anti-exists join', () => {
     const accessor = createModelAccessor(contract, 'User');
 
-    expect(accessor['posts']!.every({})).toEqual({
-      kind: 'and',
-      exprs: [],
-    });
+    expect(accessor['posts']!.every({})).toEqual(AndExpr.true());
 
-    expect(accessor['posts']!.none()).toMatchObject({
-      kind: 'exists',
-      not: true,
-      subquery: {
-        where: { kind: 'bin', op: 'eq' },
-      },
-    });
+    const expr = accessor['posts']!.none() as ExistsExpr;
+    expect(expr.notExists).toBe(true);
+    expect(expr.subquery.where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+    );
   });
 
   it('supports nested relation filters', () => {
     const accessor = createModelAccessor(contract, 'User');
+    const expr = accessor['posts']!.some((post) =>
+      post['comments']!.some((comment) => comment['body']!.like('%urgent%')),
+    ) as ExistsExpr;
 
-    expect(
-      accessor['posts']!.some((post) =>
-        post['comments']!.some((comment) => comment['body']!.like('%urgent%')),
-      ),
-    ).toMatchObject({
-      kind: 'exists',
-      not: false,
-      subquery: {
-        where: {
-          kind: 'and',
-          exprs: [
-            { kind: 'bin', op: 'eq' },
-            {
-              kind: 'exists',
-              not: false,
-            },
-          ],
-        },
-      },
-    });
+    expect(expr.subquery.where).toBeInstanceOf(AndExpr);
+    const where = expr.subquery.where as AndExpr;
+    expect(where.exprs[1]).toBeInstanceOf(ExistsExpr);
   });
 
-  it('returns undefined for symbol property access on accessor proxy', () => {
-    const accessor = createModelAccessor(contract, 'User');
-    expect((accessor as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
+  it('keeps proxy symbol access undefined and relation shorthand maps null and undefined', () => {
+    const user = createModelAccessor(contract, 'User');
+    expect((user as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
+
+    const someUnknown = user['posts']!.some({ unknown: 'value' }) as ExistsExpr;
+    expect(someUnknown.subquery.where).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+        BinaryExpr.eq(ColumnRef.of('posts', 'unknown'), LiteralExpr.of('value')),
+      ]),
+    );
+
+    const someUndefined = user['posts']!.some({ unknown: undefined }) as ExistsExpr;
+    expect(someUndefined.subquery.where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+    );
+
+    const post = createModelAccessor(contract, 'Post');
+    const nullExpr = post['comments']!.some({ body: null }) as ExistsExpr;
+    expect(nullExpr.subquery.where).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(ColumnRef.of('comments', 'post_id'), ColumnRef.of('posts', 'id')),
+        NullCheckExpr.isNull(ColumnRef.of('comments', 'body')),
+      ]),
+    );
   });
 
-  it('relation shorthand ignores unknown fields and returns undefined for empty predicates', () => {
-    const accessor = createModelAccessor(contract, 'User');
-
-    expect(accessor['posts']!.some({ unknown: 'value' })).toMatchObject({
-      kind: 'exists',
-      not: false,
-      subquery: {
-        where: {
-          kind: 'and',
-          exprs: [
-            { kind: 'bin', op: 'eq' },
-            { kind: 'bin', op: 'eq' },
-          ],
-        },
-      },
-    });
-
-    expect(accessor['posts']!.some({ unknown: undefined })).toMatchObject({
-      kind: 'exists',
-      not: false,
-      subquery: {
-        where: { kind: 'bin', op: 'eq' },
-      },
-    });
-  });
-
-  it('relation shorthand maps null to isNull filters', () => {
-    const accessor = createModelAccessor(contract, 'Post');
-
-    expect(accessor['comments']!.some({ body: null })).toMatchObject({
-      kind: 'exists',
-      subquery: {
-        where: {
-          kind: 'and',
-          exprs: [
-            { kind: 'bin', op: 'eq' },
-            { kind: 'nullCheck', isNull: true },
-          ],
-        },
-      },
-    });
-  });
-
-  it('throws when relation metadata misses model references or join columns', () => {
+  it('throws when relation metadata is incomplete', () => {
     const missingToContract = {
       ...getTestContract(),
       relations: {
@@ -322,7 +202,7 @@ describe('createModelAccessor', () => {
     ).toThrow(/missing join columns/);
   });
 
-  it('supports composite relation joins and firstChild fallback projection', () => {
+  it('supports composite relation joins and first-child fallback projection', () => {
     const compositeContract = {
       ...getTestContract(),
       mappings: {
@@ -356,31 +236,21 @@ describe('createModelAccessor', () => {
       },
     };
 
-    expect(
-      (
-        createModelAccessor(compositeContract as never, 'User') as unknown as Record<
-          string,
-          { some: () => unknown }
-        >
-      )['posts']!.some(),
-    ).toMatchObject({
-      kind: 'exists',
-      subquery: {
-        project: [
-          {
-            alias: '_exists',
-            expr: { kind: 'col', table: 'posts', column: 'user_id' },
-          },
-        ],
-        where: {
-          kind: 'and',
-          exprs: [
-            { kind: 'bin', op: 'eq' },
-            { kind: 'bin', op: 'eq' },
-          ],
-        },
-      },
-    });
+    const compositeExpr = (
+      createModelAccessor(compositeContract as never, 'User') as unknown as Record<
+        string,
+        { some: () => unknown }
+      >
+    )['posts']!.some() as ExistsExpr;
+    expect(compositeExpr.subquery.project).toEqual([
+      ProjectionItem.of('_exists', ColumnRef.of('posts', 'user_id')),
+    ]);
+    expect(compositeExpr.subquery.where).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users_alt', 'id')),
+        BinaryExpr.eq(ColumnRef.of('posts', 'title'), ColumnRef.of('users_alt', 'email')),
+      ]),
+    );
 
     const noChildColsContract = {
       ...compositeContract,
@@ -399,22 +269,18 @@ describe('createModelAccessor', () => {
       },
     };
 
-    expect(
-      (
-        createModelAccessor(noChildColsContract as never, 'User') as unknown as Record<
-          string,
-          { some: () => unknown }
-        >
-      )['posts']!.some(),
-    ).toMatchObject({
-      kind: 'exists',
-      subquery: {
-        project: [{ expr: { column: 'id' } }],
-      },
-    });
+    const fallbackExpr = (
+      createModelAccessor(noChildColsContract as never, 'User') as unknown as Record<
+        string,
+        { some: () => unknown }
+      >
+    )['posts']!.some() as ExistsExpr;
+    expect(fallbackExpr.subquery.project).toEqual([
+      ProjectionItem.of('_exists', ColumnRef.of('posts', 'id')),
+    ]);
   });
 
-  it('resolves model tables from storage metadata when modelToTable mappings are missing', () => {
+  it('falls back to storage metadata and model names when table mappings are missing', () => {
     const base = getTestContract();
     const storageFallbackContract = {
       ...base,
@@ -433,14 +299,10 @@ describe('createModelAccessor', () => {
       },
     };
 
-    const accessor = createModelAccessor(storageFallbackContract as never, 'User');
-    expect(accessor['name']!.eq('Alice')).toMatchObject({
-      left: { table: 'users_storage', column: 'name' },
-    });
-  });
+    expect(
+      createModelAccessor(storageFallbackContract as never, 'User')['name']!.eq('Alice'),
+    ).toEqual(BinaryExpr.eq(ColumnRef.of('users_storage', 'name'), LiteralExpr.of('Alice')));
 
-  it('falls back to the model name when table mappings are unavailable', () => {
-    const base = getTestContract();
     const modelNameFallbackContract = {
       ...base,
       mappings: {
@@ -458,37 +320,25 @@ describe('createModelAccessor', () => {
       relations: {},
     };
 
-    const accessor = createModelAccessor(modelNameFallbackContract as never, 'User');
-    expect(accessor['name']!.eq('Alice')).toMatchObject({
-      left: { table: 'User', column: 'name' },
-    });
+    expect(
+      createModelAccessor(modelNameFallbackContract as never, 'User')['name']!.eq('Alice'),
+    ).toEqual(BinaryExpr.eq(ColumnRef.of('User', 'name'), LiteralExpr.of('Alice')));
   });
 
-  it('relation shorthand combines multiple fields with and()', () => {
+  it('combines relation shorthand fields with and() and rejects missing join arrays', () => {
     const accessor = createModelAccessor(contract, 'User');
-    const predicate = accessor['posts']!.some({ title: 'A', views: 1 });
+    const predicate = accessor['posts']!.some({ title: 'A', views: 1 }) as ExistsExpr;
 
-    expect(predicate).toMatchObject({
-      kind: 'exists',
-      subquery: {
-        where: {
-          kind: 'and',
-          exprs: [
-            { kind: 'bin', op: 'eq' },
-            {
-              kind: 'and',
-              exprs: [
-                { kind: 'bin', op: 'eq' },
-                { kind: 'bin', op: 'eq' },
-              ],
-            },
-          ],
-        },
-      },
-    });
-  });
+    expect(predicate.subquery.where).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+        AndExpr.of([
+          BinaryExpr.eq(ColumnRef.of('posts', 'title'), LiteralExpr.of('A')),
+          BinaryExpr.eq(ColumnRef.of('posts', 'views'), LiteralExpr.of(1)),
+        ]),
+      ]),
+    );
 
-  it('throws when relation metadata omits join arrays', () => {
     const base = getTestContract();
     const contractWithoutJoinArrays = {
       ...base,

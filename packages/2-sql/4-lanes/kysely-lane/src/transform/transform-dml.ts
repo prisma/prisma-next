@@ -1,14 +1,13 @@
-import type {
+import {
   ColumnRef,
+  DefaultValueExpr,
   DeleteAst,
   InsertAst,
-  InsertOnConflictAst,
-  InsertValue,
+  InsertOnConflict,
+  type InsertValue,
   ParamRef,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { createDefaultValueExpr } from '@prisma-next/sql-relational-core/ast';
-import { ifDefined } from '@prisma-next/utils/defined';
 import {
   DefaultInsertValueNode,
   type DeleteQueryNode,
@@ -38,7 +37,7 @@ import { expandSelectAll } from './transform-select';
 import { resolveColumnRef, transformTableRef, validateColumn } from './transform-validate';
 
 function assertParamRef(value: ReturnType<typeof transformValue>): ParamRef {
-  if (value.kind !== 'param') {
+  if (!(value instanceof ParamRef)) {
     throw new KyselyTransformError(
       'Only parameterized VALUES are supported in Kysely transform lane',
       KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
@@ -103,7 +102,7 @@ function transformOnConflictUpdateValue(
       }
 
       validateColumn(ctx.contract, tableName, refColumn);
-      return { kind: 'col', table: 'excluded', column: refColumn };
+      return ColumnRef.of('excluded', refColumn);
     }
 
     return resolveColumnRef(node, ctx, tableName);
@@ -121,7 +120,7 @@ function transformOnConflict(
   node: OnConflictNode | undefined,
   ctx: TransformContext,
   tableName: string,
-): InsertOnConflictAst | undefined {
+): InsertOnConflict | undefined {
   if (!node) {
     return undefined;
   }
@@ -146,10 +145,7 @@ function transformOnConflict(
   }
 
   if (node.doNothing === true) {
-    return {
-      columns,
-      action: { kind: 'doNothing' },
-    };
+    return InsertOnConflict.on(columns).doNothing();
   }
 
   if (node.updates && node.updates.length > 0) {
@@ -173,13 +169,7 @@ function transformOnConflict(
       );
     }
 
-    return {
-      columns,
-      action: {
-        kind: 'doUpdateSet',
-        set,
-      },
-    };
+    return InsertOnConflict.on(columns).doUpdateSet(set);
   }
 
   throw new KyselyTransformError(
@@ -204,16 +194,14 @@ export function transformInsert(node: InsertQueryNode, ctx: TransformContext): I
     if (node.defaultValues === true) {
       const insertReturning = transformReturning(node.returning, ctx, tableRef.name);
 
-      return {
-        kind: 'insert',
-        table: tableRef,
-        rows: [{}],
-        ...ifDefined('onConflict', insertOnConflict),
-        ...ifDefined(
-          'returning',
-          insertReturning && insertReturning.length > 0 ? insertReturning : undefined,
-        ),
-      };
+      let ast = InsertAst.into(tableRef);
+      if (insertOnConflict) {
+        ast = ast.withOnConflict(insertOnConflict);
+      }
+      if (insertReturning && insertReturning.length > 0) {
+        ast = ast.withReturning(insertReturning);
+      }
+      return ast;
     }
 
     throw new KyselyTransformError(
@@ -268,12 +256,12 @@ export function transformInsert(node: InsertQueryNode, ctx: TransformContext): I
 
         const valueNode = rowValues[index];
         if (valueNode === undefined) {
-          valuesRecord[columnName] = createDefaultValueExpr();
+          valuesRecord[columnName] = new DefaultValueExpr();
           continue;
         }
 
         if (isOperationNode(valueNode) && DefaultInsertValueNode.is(valueNode)) {
-          valuesRecord[columnName] = createDefaultValueExpr();
+          valuesRecord[columnName] = new DefaultValueExpr();
           continue;
         }
 
@@ -290,16 +278,14 @@ export function transformInsert(node: InsertQueryNode, ctx: TransformContext): I
 
   const insertReturning = transformReturning(node.returning, ctx, tableRef.name);
 
-  return {
-    kind: 'insert',
-    table: tableRef,
-    rows,
-    ...ifDefined('onConflict', insertOnConflict),
-    ...ifDefined(
-      'returning',
-      insertReturning && insertReturning.length > 0 ? insertReturning : undefined,
-    ),
-  };
+  let ast = InsertAst.into(tableRef).withRows(rows);
+  if (insertOnConflict) {
+    ast = ast.withOnConflict(insertOnConflict);
+  }
+  if (insertReturning && insertReturning.length > 0) {
+    ast = ast.withReturning(insertReturning);
+  }
+  return ast;
 }
 
 export function transformUpdate(node: UpdateQueryNode, ctx: TransformContext): UpdateAst {
@@ -325,16 +311,14 @@ export function transformUpdate(node: UpdateQueryNode, ctx: TransformContext): U
   const where = transformWhereExpr(unwrapWhereNode(node.where), ctx, tableRef.name);
   const updateReturning = transformReturning(node.returning, ctx, tableRef.name);
 
-  return {
-    kind: 'update',
-    table: tableRef,
-    set: setRecord,
-    ...ifDefined('where', where ?? undefined),
-    ...ifDefined(
-      'returning',
-      updateReturning && updateReturning.length > 0 ? updateReturning : undefined,
-    ),
-  };
+  let ast = UpdateAst.table(tableRef).withSet(setRecord);
+  if (where) {
+    ast = ast.withWhere(where);
+  }
+  if (updateReturning && updateReturning.length > 0) {
+    ast = ast.withReturning(updateReturning);
+  }
+  return ast;
 }
 
 export function transformDelete(node: DeleteQueryNode, ctx: TransformContext): DeleteAst {
@@ -342,13 +326,12 @@ export function transformDelete(node: DeleteQueryNode, ctx: TransformContext): D
   const where = transformWhereExpr(unwrapWhereNode(node.where), ctx, tableRef.name);
   const deleteReturning = transformReturning(node.returning, ctx, tableRef.name);
 
-  return {
-    kind: 'delete',
-    table: tableRef,
-    ...ifDefined('where', where ?? undefined),
-    ...ifDefined(
-      'returning',
-      deleteReturning && deleteReturning.length > 0 ? deleteReturning : undefined,
-    ),
-  };
+  let ast = DeleteAst.from(tableRef);
+  if (where) {
+    ast = ast.withWhere(where);
+  }
+  if (deleteReturning && deleteReturning.length > 0) {
+    ast = ast.withReturning(deleteReturning);
+  }
+  return ast;
 }

@@ -1,3 +1,4 @@
+import { AggregateExpr, BinaryExpr, ColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createCollectionFor } from './collection-fixtures';
 import { getTestContract, isSelectAst } from './helpers';
@@ -32,13 +33,13 @@ describe('GroupedCollection', () => {
     if (!isSelectAst(firstAst)) {
       throw new Error('Expected first execution plan to be a select SQL query plan');
     }
-    expect(firstAst.having?.kind).toBe('bin');
-    if (firstAst.having?.kind === 'bin') {
-      expect(firstAst.having.left).toMatchObject({ kind: 'aggregate', fn: 'count' });
+    expect(firstAst.having).toBeInstanceOf(BinaryExpr);
+    if (firstAst.having instanceof BinaryExpr) {
+      expect(firstAst.having.left).toEqual(AggregateExpr.count());
     }
     const totalViewsProjection = firstAst.project.find((item) => item.alias === 'totalViews');
-    expect(totalViewsProjection?.expr.kind).toBe('aggregate');
-    if (totalViewsProjection?.expr.kind === 'aggregate') {
+    expect(totalViewsProjection?.expr).toBeInstanceOf(AggregateExpr);
+    if (totalViewsProjection?.expr instanceof AggregateExpr) {
       expect(totalViewsProjection.expr.fn).toBe('sum');
     }
   });
@@ -101,7 +102,7 @@ describe('GroupedCollection', () => {
           return undefined;
         }
         const having = entry.plan.ast.having;
-        if (!having || having.kind !== 'bin' || having.left.kind !== 'aggregate') {
+        if (!(having instanceof BinaryExpr) || !(having.left instanceof AggregateExpr)) {
           return undefined;
         }
         return `${having.left.fn}:${having.op}`;
@@ -218,10 +219,10 @@ describe('GroupedCollection', () => {
           return undefined;
         }
         const having = entry.plan.ast.having;
-        if (!having || having.kind !== 'bin' || having.left.kind !== 'aggregate') {
+        if (!(having instanceof BinaryExpr) || !(having.left instanceof AggregateExpr)) {
           return undefined;
         }
-        return having.left.expr?.kind === 'col'
+        return having.left.expr instanceof ColumnRef
           ? `${having.left.expr.table}:${having.left.expr.column}`
           : undefined;
       })

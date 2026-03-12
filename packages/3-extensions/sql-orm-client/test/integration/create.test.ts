@@ -1,3 +1,4 @@
+import { DefaultValueExpr, InsertAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   createReturningUsersCollection,
@@ -5,6 +6,28 @@ import {
   timeouts,
   withCollectionRuntime,
 } from './helpers';
+
+function expectInsertBatchAst(ast: unknown): asserts ast is InsertAst {
+  expect(ast).toBeInstanceOf(InsertAst);
+  if (!(ast instanceof InsertAst)) {
+    throw new Error('Expected execution to emit an insert AST');
+  }
+
+  expect(ast.rows).toEqual([
+    {
+      id: ParamRef.of(1, 'id'),
+      name: ParamRef.of(2, 'name'),
+      email: ParamRef.of(3, 'email'),
+      invited_by_id: ParamRef.of(4, 'invited_by_id'),
+    },
+    {
+      id: ParamRef.of(5, 'id'),
+      name: ParamRef.of(6, 'name'),
+      email: ParamRef.of(7, 'email'),
+      invited_by_id: new DefaultValueExpr(),
+    },
+  ]);
+}
 
 describe('integration/create', () => {
   it(
@@ -53,23 +76,7 @@ describe('integration/create', () => {
           { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null },
         ]);
         expect(runtime.executions).toHaveLength(1);
-        expect(runtime.executions[0]?.ast).toMatchObject({
-          kind: 'insert',
-          rows: [
-            {
-              id: { kind: 'param', index: 1 },
-              name: { kind: 'param', index: 2 },
-              email: { kind: 'param', index: 3 },
-              invited_by_id: { kind: 'param', index: 4 },
-            },
-            {
-              id: { kind: 'param', index: 5 },
-              name: { kind: 'param', index: 6 },
-              email: { kind: 'param', index: 7 },
-              invited_by_id: { kind: 'default' },
-            },
-          ],
-        });
+        expectInsertBatchAst(runtime.executions[0]?.ast);
 
         const rows = await runtime.query<{ id: number; name: string; email: string }>(
           'select id, name, email from users order by id',
@@ -96,23 +103,7 @@ describe('integration/create', () => {
         ]);
         expect(count).toBe(2);
         expect(runtime.executions).toHaveLength(1);
-        expect(runtime.executions[0]?.ast).toMatchObject({
-          kind: 'insert',
-          rows: [
-            {
-              id: { kind: 'param', index: 1 },
-              name: { kind: 'param', index: 2 },
-              email: { kind: 'param', index: 3 },
-              invited_by_id: { kind: 'param', index: 4 },
-            },
-            {
-              id: { kind: 'param', index: 5 },
-              name: { kind: 'param', index: 6 },
-              email: { kind: 'param', index: 7 },
-              invited_by_id: { kind: 'default' },
-            },
-          ],
-        });
+        expectInsertBatchAst(runtime.executions[0]?.ast);
 
         const rows = await runtime.query<{ id: number; name: string }>(
           'select id, name from users order by id',

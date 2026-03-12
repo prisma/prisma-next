@@ -87,7 +87,7 @@ export type IncludeRefinementResult<
       ? IncludeScalar<unknown> | IncludeCombine<Record<string, unknown>>
       : never);
 
-export declare const RowType: unique symbol;
+export const RowType = Symbol('RowType');
 
 export interface RowSelection<T> {
   [RowType]: T;
