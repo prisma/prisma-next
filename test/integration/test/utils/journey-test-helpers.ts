@@ -126,7 +126,9 @@ type ContractVariant =
   | 'contract-v3'
   | 'contract-phone'
   | 'contract-bio'
-  | 'contract-phone-bio';
+  | 'contract-phone-bio'
+  | 'contract-avatar'
+  | 'contract-all';
 
 /**
  * Swaps the active contract in the test directory to a different variant.
