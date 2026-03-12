@@ -1,9 +1,11 @@
 /**
- * Journey A: Greenfield Setup
+ * Greenfield Setup (Journey A)
  *
- * A developer starts a new project with an empty database.
- * Steps: emit → init dry-run → init → init idempotent → verify → schema-verify →
- *        schema-verify strict → introspect → verify json → schema-verify json
+ * A developer starts a new project with an empty database and walks through
+ * the full initialization lifecycle: emit a contract, dry-run the init to
+ * preview planned operations, apply it for real, confirm idempotency on
+ * re-run, then verify the marker and schema (tolerant and strict). Finishes
+ * with introspection and JSON output variants of verify/schema-verify.
  */
 
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';

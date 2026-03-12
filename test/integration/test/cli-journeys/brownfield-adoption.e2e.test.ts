@@ -1,10 +1,12 @@
 /**
- * Journeys F + G: Brownfield Adoption
+ * Brownfield Adoption (Journeys F + G)
  *
- * Journey F: Adopt Prisma Next on an existing database with tables.
- * Journey G: Brownfield with schema mismatch.
+ * F — Adopt Prisma on an existing database: introspect the live schema, emit a
+ *     matching contract, schema-verify, sign the marker, then evolve via db update.
  *
- * (Journey H was removed — tolerant vs strict is covered by Journey N in drift-schema.e2e.test.ts)
+ * G — Brownfield with schema mismatch: emit a contract that doesn't match the
+ *     database (extra column), observe schema-verify and sign failures, fix the
+ *     contract to match, and successfully sign.
  */
 
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';

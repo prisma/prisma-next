@@ -1,10 +1,16 @@
 /**
- * Journeys S + W + U + V: Connection and Contract Error Scenarios
+ * Connection and Contract Error Scenarios (Journeys S + W + U + V)
  *
- * Journey S: Connection failures.
- * Journey W: No contract emitted yet.
- * Journey U: Target mismatch.
- * Journey V: db init on non-empty unmanaged database.
+ * S — Connection failure: db verify without a database connection configured.
+ *
+ * W — No contract emitted yet: db init and db verify fail when contract.json
+ *     has not been generated.
+ *
+ * U — Target mismatch: contract.json is tampered to say "mysql" while the
+ *     config targets postgres. db verify reports the mismatch.
+ *
+ * V — Unmanaged database init: db init on a database with pre-existing tables
+ *     that match the contract (created via raw SQL, no prisma_contract schema).
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';

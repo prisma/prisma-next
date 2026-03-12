@@ -1,9 +1,16 @@
 /**
- * Journeys D + E + O: Database Update Workflows
+ * Database Update Workflows (Journeys D + E + O)
  *
- * Journey D: Direct update without migrations (additive only).
- * Journey E: Destructive update with confirmation.
- * Journey O: db init on already-initialized DB with different contract.
+ * D — Direct update without migrations: swap to an additive contract, dry-run
+ *     to preview changes, apply, confirm noop on re-run, then verify.
+ *
+ * E — Destructive update with confirmation: swap to a contract that drops a
+ *     column, test that --no-interactive blocks destructive changes, --json
+ *     returns an error envelope, and --json -y auto-accepts and succeeds.
+ *
+ * O — Re-init conflict: after initializing with one contract, swap to another
+ *     and observe that db init fails (marker hash mismatch). Recovery via
+ *     db update.
  */
 
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';

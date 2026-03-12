@@ -1,12 +1,9 @@
 /**
- * Journey Y: Global Flag Behavior
+ * Global Flag Behavior (Journey Y)
  *
- * Verifying global flags (--no-color, -q, -v) work consistently.
- * No database needed.
- *
- * (Journey J was removed — help output testing has near-zero regression value)
- * (Journey I was removed — JSON output is tested per-command in A.09, A.10, B.10,
- *  and in isolated command tests)
+ * Verifies that global CLI flags work consistently: --no-color suppresses ANSI
+ * codes, -q (quiet) reduces output, and -v (verbose) increases output. Uses
+ * contract emit as the test command since it requires no database.
  */
 
 import { timeouts } from '@prisma-next/test-utils';

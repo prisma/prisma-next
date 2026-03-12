@@ -1,8 +1,15 @@
 /**
- * Journeys M + N: Schema Drift Scenarios
+ * Schema Drift Scenarios (Journeys M + N)
  *
- * Journey M: Phantom drift — marker OK but schema diverged via manual DDL.
- * Journey N: Manual DDL added extra column.
+ * M — Phantom drift: after initialization, a DBA drops a column via manual DDL.
+ *     db verify still passes (marker hash unchanged — false positive), but
+ *     db schema-verify catches the missing column. Recovery via db update fails
+ *     because re-adding a NOT NULL column to an existing table is unrecoverable
+ *     without manual intervention.
+ *
+ * N — Extra column drift: a DBA adds a column via manual DDL. Tolerant
+ *     schema-verify passes (extras OK), strict schema-verify fails. Recovery
+ *     by expanding the contract to include a new column, then db update.
  */
 
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';

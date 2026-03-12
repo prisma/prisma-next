@@ -1,12 +1,15 @@
 /**
- * Journeys B + Z: Schema Evolution via Migrations + Init-to-Migrations Transition
+ * Schema Evolution via Migrations (Journeys B + Z)
  *
- * Journey B: Developer evolves the schema through the migration workflow.
- *   Also includes merged edge cases from former Journeys Q, R, X:
- *   - Q: migration apply noop (already up-to-date)
- *   - R: migration plan noop (contract unchanged)
- *   - X: migration show variants (by path, not found)
- * Journey Z: Developer starts with db init, then switches to migrations.
+ * B — Full migration lifecycle: plan a migration, show its details, verify the
+ *     planned directory, check status (offline and online), apply, confirm all
+ *     applied, then db verify. Also covers edge cases merged from former
+ *     standalone journeys: apply when already up-to-date (noop), plan when
+ *     contract is unchanged (noop), and migration show variants (by path,
+ *     not-found prefix).
+ *
+ * Z — Transition from db init to migrations: initialize with db init, then
+ *     switch to the migration workflow by planning and applying a migration.
  */
 
 import { readdirSync } from 'node:fs';

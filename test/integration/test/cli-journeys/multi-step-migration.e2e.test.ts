@@ -1,7 +1,10 @@
 /**
- * Journey C: Multi-Step Migration Chain
+ * Multi-Step Migration Chain (Journey C)
  *
- * Developer plans multiple migrations before applying them all at once.
+ * A developer plans two migrations (base → additive, additive → v3) without
+ * applying either, then applies both at once. Verifies that migration status
+ * correctly reports pending and applied states, and that db verify passes
+ * after the batch apply.
  */
 
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';

@@ -1,11 +1,10 @@
 /**
- * Journey P3: Migration DAG Drift — Chain Breakage
+ * Migration DAG Drift — Chain Breakage (Journey P3)
  *
- * Journey P3: Chain breakage (migration directory deleted).
- *
- * (Journey P4 was removed — partial apply/resume is covered by cli.migration-apply.e2e.test.ts)
- * (Journey P5 was removed — no-path scenario is covered by cli.migration-apply.e2e.test.ts,
- *  and recovery pattern is identical to P3)
+ * After building a migration chain (initial → add-name → add-posts), the
+ * add-posts directory is deleted from disk. migration status reports the
+ * broken chain, migration apply fails (no path to destination), and recovery
+ * is achieved by re-planning the missing edge and applying it.
  */
 
 import { readdirSync, rmSync } from 'node:fs';

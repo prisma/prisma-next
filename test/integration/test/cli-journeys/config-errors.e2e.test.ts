@@ -1,7 +1,10 @@
 /**
- * Journey T: Config File Errors
+ * Config File Errors (Journey T)
  *
- * Missing or invalid configuration scenarios. No database needed.
+ * Verifies that contract emit fails gracefully for broken configuration:
+ * missing config file, explicit nonexistent path, invalid TypeScript syntax,
+ * and a config that compiles but is missing the contract field. No database
+ * needed.
  */
 
 import { writeFileSync } from 'node:fs';

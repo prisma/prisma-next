@@ -1,10 +1,19 @@
 /**
- * Journeys K + L + P + P2: Marker Drift Scenarios
+ * Marker Drift Scenarios (Journeys K + L + P + P2)
  *
- * Journey K: Missing marker (never initialized).
- * Journey L: Stale marker (contract changed, DB not updated).
- * Journey P: Mixed mode (db update through multiple versions).
- * Journey P2: Corrupt marker.
+ * K — Missing marker: contract emitted but db init never run. db verify and
+ *     schema-verify both fail. Recovery via db init.
+ *
+ * L — Stale marker: database initialized, then contract changed without
+ *     updating the DB. db verify fails (hash mismatch). Recovery via db update.
+ *
+ * P — Mixed-mode evolution: iterate through multiple contract versions using
+ *     db update (no migration files). Verifies that the marker stays consistent
+ *     across successive updates.
+ *
+ * P2 — Corrupt marker: marker row overwritten with garbage via raw SQL.
+ *      db verify fails, but db schema-verify passes (schema intact).
+ *      Recovery via db sign.
  */
 
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
