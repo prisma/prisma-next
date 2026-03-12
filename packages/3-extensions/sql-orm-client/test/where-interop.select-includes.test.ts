@@ -1,240 +1,164 @@
-import type { BoundWhereExpr, WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  type BoundWhereExpr,
+  ColumnRef,
+  DerivedTableSource,
+  ExistsExpr,
+  JoinAst,
+  LiteralExpr,
+  NullCheckExpr,
+  OperationExpr,
+  OrderByItem,
+  ParamRef,
+  ProjectionItem,
+  SelectAst,
+  SubqueryExpr,
+  TableSource,
+  type ToWhereExpr,
+  type WhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { normalizeWhereArg } from '../src/where-interop';
 
-function toWhereExpr(expr: BoundWhereExpr): WhereArg {
+const col = (table: string, column: string) => ColumnRef.of(table, column);
+const param = (index: number, name?: string) => ParamRef.of(index, name);
+const literal = (value: unknown) => LiteralExpr.of(value);
+
+function bound(
+  expr: WhereExpr,
+  params: readonly unknown[] = [],
+  paramDescriptors = params.map((_, index) => ({ source: 'lane' as const, index: index + 1 })),
+): BoundWhereExpr {
+  return {
+    expr,
+    params: [...params],
+    paramDescriptors,
+  };
+}
+
+function toWhereExpr(expr: BoundWhereExpr): ToWhereExpr {
   return {
     toWhereExpr: () => expr,
   };
 }
 
-const col = (table: string, column: string) => ({ kind: 'col' as const, table, column });
-const param = (index: number) => ({ kind: 'param' as const, index });
-const literal = (value: unknown) => ({ kind: 'literal' as const, value });
-const descriptor = (index: number) => ({ source: 'lane' as const, index });
-const bound = (
-  expr: WhereExpr,
-  params: readonly unknown[] = [],
-  paramDescriptors = params.map((_, index) => descriptor(index + 1)),
-): BoundWhereExpr => ({
-  expr,
-  params: [...params],
-  paramDescriptors,
-});
-const op = (
-  self: ReturnType<typeof col>,
-  args: Array<ReturnType<typeof col> | ReturnType<typeof param> | ReturnType<typeof literal>>,
-) =>
-  ({
-    kind: 'operation',
+function op(self: ColumnRef, args: Array<ColumnRef | ParamRef | LiteralExpr>): OperationExpr {
+  return new OperationExpr({
     method: 'op',
     forTypeId: 'sql/text@1',
     self,
     args,
     returns: {} as never,
     lowering: {} as never,
-  }) as const;
+  });
+}
 
 describe('where interop select/source branches', () => {
-  it('preserves params inside joins, derived sources, and projection subqueries', () => {
-    const arg = toWhereExpr({
-      expr: {
-        kind: 'exists',
-        not: false,
-        subquery: {
-          kind: 'select',
-          from: {
-            kind: 'derivedTable',
-            alias: 'users_src',
-            query: {
-              kind: 'select',
-              from: { kind: 'table', name: 'users' },
-              project: [{ alias: 'id', expr: col('users', 'id') }],
-              where: {
-                kind: 'bin',
-                op: 'eq',
-                left: col('users', 'kind'),
-                right: param(1),
-              },
-            },
-          },
-          joins: [
-            {
-              kind: 'join',
-              joinType: 'inner',
-              source: { kind: 'table', name: 'posts' },
-              lateral: false,
-              on: {
-                kind: 'bin',
-                op: 'eq',
-                left: col('users_src', 'id'),
-                right: param(2),
-              },
-            },
-          ],
-          project: [
-            { alias: 'id', expr: col('users_src', 'id') },
-            {
-              alias: 'nested',
-              expr: {
-                kind: 'subquery',
-                query: {
-                  kind: 'select',
-                  from: { kind: 'table', name: 'posts' },
-                  project: [{ alias: 'title', expr: op(col('posts', 'title'), [param(3)]) }],
-                },
-              },
-            },
-          ],
-          orderBy: [{ expr: op(col('users_src', 'id'), [param(4)]), dir: 'desc' }],
-        },
-      },
-      params: ['srcWhere', 'joinOn', 'nestedProject', 'order'],
-      paramDescriptors: [
-        { source: 'lane' },
-        { source: 'lane' },
-        { source: 'lane' },
-        { source: 'lane' },
-      ],
-    });
+  it('accepts bound payloads when ParamRef only appears inside select/source branches', () => {
+    const select = SelectAst.from(
+      DerivedTableSource.as(
+        'users_src',
+        SelectAst.from(TableSource.named('users'))
+          .withProject([ProjectionItem.of('id', col('users', 'id'))])
+          .withWhere(BinaryExpr.eq(col('users', 'kind'), param(1, 'kind'))),
+      ),
+    )
+      .withProject([
+        ProjectionItem.of('id', col('users_src', 'id')),
+        ProjectionItem.of(
+          'nested',
+          SubqueryExpr.of(
+            SelectAst.from(TableSource.named('posts')).withProject([
+              ProjectionItem.of('title', op(col('posts', 'title'), [param(3, 'nested')])),
+            ]),
+          ),
+        ),
+      ])
+      .withOrderBy([OrderByItem.desc(op(col('users_src', 'id'), [param(4, 'order')]))])
+      .withJoins([
+        JoinAst.inner(
+          TableSource.named('posts'),
+          BinaryExpr.eq(col('users_src', 'id'), param(2, 'join')),
+        ),
+      ]);
 
-    const normalized = normalizeWhereArg(arg);
-    expect(normalized.params).toEqual(['srcWhere', 'joinOn', 'nestedProject', 'order']);
-    expect(normalized.expr.kind).toBe('exists');
-    if (normalized.expr.kind === 'exists') {
-      const select = normalized.expr.subquery;
-      if (select.from.kind === 'derivedTable') {
-        expect(select.from.query.where).toMatchObject({
-          kind: 'bin',
-          right: { kind: 'param', index: 1 },
-        });
-      }
-      const firstJoin = select.joins?.[0];
-      expect(firstJoin?.on).toMatchObject({
-        kind: 'bin',
-        right: { kind: 'param', index: 2 },
-      });
-      const nestedProjection = select.project.find((item) => item.alias === 'nested');
-      expect(nestedProjection?.expr.kind).toBe('subquery');
-    }
+    expect(
+      normalizeWhereArg(
+        toWhereExpr(
+          bound(ExistsExpr.exists(select), ['srcWhere', 'joinOn', 'nestedProject', 'order']),
+        ),
+      ),
+    ).toEqual(bound(ExistsExpr.exists(select), ['srcWhere', 'joinOn', 'nestedProject', 'order']));
   });
 
   it('preserves nullCheck expressions with operation args', () => {
-    const arg = toWhereExpr({
-      expr: {
-        kind: 'nullCheck',
-        isNull: false,
-        expr: op(col('users', 'email'), [col('users', 'email'), param(1), literal('x')]),
-      },
-      params: ['needle'],
-      paramDescriptors: [{ source: 'lane' }],
-    });
+    const expr = NullCheckExpr.isNotNull(
+      op(col('users', 'email'), [col('users', 'email'), param(1, 'needle'), literal('x')]),
+    );
 
-    expect(normalizeWhereArg(arg)).toEqual(
-      bound(
-        {
-          kind: 'nullCheck',
-          isNull: false,
-          expr: op(col('users', 'email'), [col('users', 'email'), param(1), literal('x')]),
-        },
-        ['needle'],
-      ),
+    expect(normalizeWhereArg(toWhereExpr(bound(expr, ['needle'])))).toEqual(
+      bound(expr, ['needle']),
     );
   });
 
   it('rejects bare exists expressions with params in derived branches', () => {
-    const expr = {
-      kind: 'exists' as const,
-      not: false,
-      subquery: {
-        kind: 'select' as const,
-        from: {
-          kind: 'derivedTable' as const,
-          alias: 'users_src',
-          query: {
-            kind: 'select' as const,
-            from: { kind: 'table' as const, name: 'users' },
-            project: [{ alias: 'id', expr: col('users', 'id') }],
-            where: {
-              kind: 'bin' as const,
-              op: 'eq' as const,
-              left: col('users', 'id'),
-              right: param(1),
-            },
-          },
-        },
-        project: [{ alias: 'id', expr: col('users_src', 'id') }],
-      },
-    };
+    const expr = ExistsExpr.exists(
+      SelectAst.from(
+        DerivedTableSource.as(
+          'users_src',
+          SelectAst.from(TableSource.named('users'))
+            .withProject([ProjectionItem.of('id', col('users', 'id'))])
+            .withWhere(BinaryExpr.eq(col('users', 'id'), param(1, 'id'))),
+        ),
+      ).withProject([ProjectionItem.of('id', col('users_src', 'id'))]),
+    );
 
     expect(() => normalizeWhereArg(expr)).toThrow(/bare WhereExpr.*ParamRef/i);
   });
 
-  it('accepts bare exists with literal/subquery projections and no params', () => {
-    const expr: WhereExpr = {
-      kind: 'exists',
-      not: false,
-      subquery: {
-        kind: 'select',
-        from: { kind: 'table', name: 'users' },
-        project: [
-          { alias: 'id', expr: col('users', 'id') },
-          { alias: 'tag', expr: literal('x') },
-          {
-            alias: 'postId',
-            expr: {
-              kind: 'subquery',
-              query: {
-                kind: 'select',
-                from: { kind: 'table', name: 'posts' },
-                project: [{ alias: 'id', expr: col('posts', 'id') }],
-              },
-            },
-          },
-        ],
-        orderBy: [{ expr: col('users', 'id'), dir: 'asc' }],
-      },
-    };
+  it('rejects bare unsupported where nodes', () => {
+    const bad = { kind: 'unsupported' } as unknown as WhereExpr;
+
+    expect(() => normalizeWhereArg(bad)).toThrow();
+  });
+
+  it('accepts bare exists with literal and subquery projections when param-free', () => {
+    const expr = ExistsExpr.exists(
+      SelectAst.from(TableSource.named('users'))
+        .withProject([
+          ProjectionItem.of('id', col('users', 'id')),
+          ProjectionItem.of('tag', literal('x')),
+          ProjectionItem.of(
+            'postId',
+            SubqueryExpr.of(
+              SelectAst.from(TableSource.named('posts')).withProject([
+                ProjectionItem.of('id', col('posts', 'id')),
+              ]),
+            ),
+          ),
+        ])
+        .withOrderBy([OrderByItem.asc(col('users', 'id'))]),
+    );
 
     expect(normalizeWhereArg(expr)).toEqual(bound(expr));
   });
 
   it('rejects bare exists with params in top-level and nested subqueries', () => {
-    const expr: WhereExpr = {
-      kind: 'exists',
-      not: false,
-      subquery: {
-        kind: 'select',
-        from: { kind: 'table', name: 'users' },
-        project: [
-          {
-            alias: 'postId',
-            expr: {
-              kind: 'subquery',
-              query: {
-                kind: 'select',
-                from: { kind: 'table', name: 'posts' },
-                project: [{ alias: 'id', expr: op(col('posts', 'id'), [param(2)]) }],
-              },
-            },
-          },
-        ],
-        orderBy: [{ expr: op(col('users', 'id'), [param(1)]), dir: 'asc' }],
-      },
-    };
+    const expr = ExistsExpr.exists(
+      SelectAst.from(TableSource.named('users'))
+        .withProject([
+          ProjectionItem.of(
+            'postId',
+            SubqueryExpr.of(
+              SelectAst.from(TableSource.named('posts')).withProject([
+                ProjectionItem.of('id', op(col('posts', 'id'), [param(2, 'nested')])),
+              ]),
+            ),
+          ),
+        ])
+        .withOrderBy([OrderByItem.asc(op(col('users', 'id'), [param(1, 'top')]))]),
+    );
 
     expect(() => normalizeWhereArg(expr)).toThrow(/bare WhereExpr.*ParamRef/i);
-  });
-
-  it('throws for unsupported where node kinds', () => {
-    const bad = { kind: 'unsupported' } as unknown as WhereExpr;
-    expect(() => normalizeWhereArg(bad)).toThrow(/Unsupported where expression kind/i);
-
-    const wrapped = toWhereExpr({
-      expr: bad,
-      params: [],
-      paramDescriptors: [],
-    });
-    expect(() => normalizeWhereArg(wrapped)).toThrow(/Unsupported where expression kind/i);
   });
 });

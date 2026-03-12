@@ -1,25 +1,19 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
-import type {
-  Expression,
-  JoinAst,
-  ProjectionItem,
-  TableRef,
-  WhereExpr,
-} from '@prisma-next/sql-relational-core/ast';
 import {
-  createAndExpr,
-  createBinaryExpr,
-  createColumnRef,
-  createDerivedTableSource,
-  createJoin,
-  createJsonAggExpr,
-  createJsonBuildObjectExpr,
-  createOrderByItem,
-  createProjectionItem,
-  createSelectAstBuilder,
-  createTableSource,
-  createTrueExpr,
+  AndExpr,
+  BinaryExpr,
+  ColumnRef,
+  DerivedTableSource,
+  JoinAst,
+  JsonArrayAggExpr,
+  JsonObjectExpr,
+  OrderByItem,
+  ProjectionItem,
+  SelectAst,
+  type TableRef,
+  TableSource,
+  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
@@ -30,7 +24,6 @@ import type {
   NestedProjection,
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
-import { isOperationExpr } from '@prisma-next/sql-relational-core/utils/guards';
 import {
   errorChildProjectionMustBeSpecified,
   errorLimitMustBeNonNegativeInteger,
@@ -185,22 +178,14 @@ function buildIncludeOrderArtifacts(
   include: IncludeState,
   rowsAlias: string,
 ): {
-  readonly childOrderBy: ReadonlyArray<{ expr: Expression; dir: 'asc' | 'desc' }> | undefined;
+  readonly childOrderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly hiddenOrderProjection: ReadonlyArray<ProjectionItem>;
-  readonly aggregateOrderBy: ReadonlyArray<{ expr: Expression; dir: 'asc' | 'desc' }> | undefined;
+  readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
 } {
   const childOrderBy = include.childOrderBy
     ? (() => {
         const orderBy = include.childOrderBy as OrderBuilder<string, StorageColumn, unknown>;
-        const orderExpr = orderBy.expr;
-        const expr = (() => {
-          if (isOperationExpr(orderExpr)) {
-            return orderExpr;
-          }
-          const colBuilder = orderExpr as { table: string; column: string };
-          return createColumnRef(colBuilder.table, colBuilder.column);
-        })();
-        return [createOrderByItem(expr, orderBy.dir)];
+        return [new OrderByItem(orderBy.expr, orderBy.dir)];
       })()
     : undefined;
 
@@ -213,14 +198,14 @@ function buildIncludeOrderArtifacts(
   }
 
   const hiddenOrderProjection = childOrderBy.map((orderItem, index) =>
-    createProjectionItem(`${include.alias}__order_${index}`, orderItem.expr),
+    ProjectionItem.of(`${include.alias}__order_${index}`, orderItem.expr),
   );
   const aggregateOrderBy = hiddenOrderProjection.map((projection, index) => {
     const orderItem = childOrderBy[index];
     if (!orderItem) {
       throw new Error(`Missing include order metadata at index ${index}`);
     }
-    return createOrderByItem(createColumnRef(rowsAlias, projection.alias), orderItem.dir);
+    return new OrderByItem(ColumnRef.of(rowsAlias, projection.alias), orderItem.dir);
   });
 
   return {
@@ -236,7 +221,7 @@ function buildChildProjectionItems(include: IncludeState): ProjectionItem[] {
     if (!column || !alias) {
       errorMissingColumnForAlias(alias ?? 'unknown', idx);
     }
-    return createProjectionItem(alias, column.toExpr());
+    return ProjectionItem.of(alias, column.toExpr());
   });
 }
 
@@ -266,12 +251,11 @@ export function buildIncludeJoinArtifact(
 
   const onLeft = include.on.left as { table: string; column: string };
   const onRight = include.on.right as { table: string; column: string };
-  const onExpr = createBinaryExpr(
-    'eq',
-    createColumnRef(onLeft.table, onLeft.column),
-    createColumnRef(onRight.table, onRight.column),
+  const onExpr = BinaryExpr.eq(
+    ColumnRef.of(onLeft.table, onLeft.column),
+    ColumnRef.of(onRight.table, onRight.column),
   );
-  const rowsWhere = childWhere ? createAndExpr([onExpr, childWhere]) : onExpr;
+  const rowsWhere = childWhere ? AndExpr.of([onExpr, childWhere]) : onExpr;
 
   const childProjectItems = buildChildProjectionItems(include);
   const rowsAlias = `${include.alias}__rows`;
@@ -279,37 +263,34 @@ export function buildIncludeJoinArtifact(
     include,
     rowsAlias,
   );
-  const childRowsBuilder = createSelectAstBuilder(
-    createTableSource(include.table.name, include.table.alias),
-  ).project([...childProjectItems, ...hiddenOrderProjection]);
-  childRowsBuilder.where(rowsWhere);
+  let childRowsAst = SelectAst.from(TableSource.named(include.table.name, include.table.alias))
+    .withProject([...childProjectItems, ...hiddenOrderProjection])
+    .withWhere(rowsWhere);
   if (childOrderBy) {
-    childRowsBuilder.orderBy(childOrderBy);
+    childRowsAst = childRowsAst.withOrderBy(childOrderBy);
   }
   if (typeof include.childLimit === 'number') {
-    childRowsBuilder.limit(include.childLimit);
+    childRowsAst = childRowsAst.withLimit(include.childLimit);
   }
 
   const aggregatedAlias = `${include.alias}_lateral`;
-  const jsonObjectExpr = createJsonBuildObjectExpr(rowsAlias, childProjectItems);
-  const jsonAggExpr = createJsonAggExpr(jsonObjectExpr, aggregateOrderBy);
+  const jsonObjectExpr = JsonObjectExpr.fromEntries(
+    childProjectItems.map((item) =>
+      JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
+    ),
+  );
+  const jsonAggExpr = JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy);
 
-  const aggregateSelect = createSelectAstBuilder(
-    createDerivedTableSource(rowsAlias, childRowsBuilder.build()),
-  )
-    .project([createProjectionItem(include.alias, jsonAggExpr)])
-    .build();
+  const aggregateSelect = SelectAst.from(
+    DerivedTableSource.as(rowsAlias, childRowsAst),
+  ).withProject([ProjectionItem.of(include.alias, jsonAggExpr)]);
 
   return {
-    join: createJoin(
-      'left',
-      createDerivedTableSource(aggregatedAlias, aggregateSelect),
-      createTrueExpr(),
+    join: JoinAst.left(
+      DerivedTableSource.as(aggregatedAlias, aggregateSelect),
+      AndExpr.true(),
       true,
     ),
-    projection: createProjectionItem(
-      include.alias,
-      createColumnRef(aggregatedAlias, include.alias),
-    ),
+    projection: ProjectionItem.of(include.alias, ColumnRef.of(aggregatedAlias, include.alias)),
   };
 }

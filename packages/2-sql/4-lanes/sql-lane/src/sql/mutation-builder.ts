@@ -1,13 +1,13 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ColumnRef, ParamRef, TableRef } from '@prisma-next/sql-relational-core/ast';
 import {
-  createColumnRef,
-  createDeleteAstBuilder,
-  createInsertAstBuilder,
-  createParamRef,
-  createTableRef,
-  createUpdateAstBuilder,
+  ColumnRef,
+  DeleteAst,
+  InsertAst,
+  ParamRef,
+  type TableRef,
+  TableSource,
+  UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -147,7 +147,7 @@ export class InsertBuilderImpl<
         ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
       });
 
-      values[columnName] = createParamRef(index, paramName);
+      values[columnName] = ParamRef.of(index, paramName);
     }
 
     const appliedDefaults = this.context.applyMutationDefaults({
@@ -172,19 +172,19 @@ export class InsertBuilderImpl<
         nativeType: columnMeta.nativeType,
         nullable: columnMeta.nullable,
       });
-      values[defaultValue.column] = createParamRef(index, defaultValue.column);
+      values[defaultValue.column] = ParamRef.of(index, defaultValue.column);
     }
 
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
       // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
-      return createColumnRef(c.table, c.column);
+      return ColumnRef.of(c.table, c.column);
     });
 
-    const ast = createInsertAstBuilder(createTableRef(this.table.name))
-      .values(values)
-      .returning(returning)
-      .build();
+    let ast = InsertAst.into(TableSource.named(this.table.name)).withValues(values);
+    if (returning.length > 0) {
+      ast = ast.withReturning(returning);
+    }
 
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
@@ -321,7 +321,7 @@ export class UpdateBuilderImpl<
         ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
       });
 
-      set[columnName] = createParamRef(index, paramName);
+      set[columnName] = ParamRef.of(index, paramName);
     }
 
     const appliedDefaults = this.context.applyMutationDefaults({
@@ -346,7 +346,7 @@ export class UpdateBuilderImpl<
         nativeType: columnMeta.nativeType,
         nullable: columnMeta.nullable,
       });
-      set[defaultValue.column] = createParamRef(index, defaultValue.column);
+      set[defaultValue.column] = ParamRef.of(index, defaultValue.column);
     }
 
     const whereResult = buildWhereExpr(
@@ -368,14 +368,13 @@ export class UpdateBuilderImpl<
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
       // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
-      return createColumnRef(c.table, c.column);
+      return ColumnRef.of(c.table, c.column);
     });
 
-    const ast = createUpdateAstBuilder(createTableRef(this.table.name))
-      .set(set)
-      .where(whereExpr)
-      .returning(returning)
-      .build();
+    let ast = UpdateAst.table(TableSource.named(this.table.name)).withSet(set).withWhere(whereExpr);
+    if (returning.length > 0) {
+      ast = ast.withReturning(returning);
+    }
 
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
@@ -496,13 +495,13 @@ export class DeleteBuilderImpl<
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
       // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
-      return createColumnRef(c.table, c.column);
+      return ColumnRef.of(c.table, c.column);
     });
 
-    const ast = createDeleteAstBuilder(createTableRef(this.table.name))
-      .where(whereExpr)
-      .returning(returning)
-      .build();
+    let ast = DeleteAst.from(TableSource.named(this.table.name)).withWhere(whereExpr);
+    if (returning.length > 0) {
+      ast = ast.withReturning(returning);
+    }
 
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {

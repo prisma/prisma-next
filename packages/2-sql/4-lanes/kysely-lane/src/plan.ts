@@ -47,11 +47,14 @@ export function buildKyselyPlan<Row>(
   }
   const params = compiledQuery.parameters.slice(0, paramDescriptors.length);
 
-  const annotations: { sql?: string; codecs?: Record<string, string> } = {
+  const annotations: { sql?: string; codecs?: Record<string, string>; limit?: number } = {
     sql: REDACTED_SQL,
   };
   if (metaAdditions.projectionTypes && Object.keys(metaAdditions.projectionTypes).length > 0) {
     annotations.codecs = { ...metaAdditions.projectionTypes };
+  }
+  if (metaAdditions.limit !== undefined) {
+    annotations.limit = metaAdditions.limit;
   }
 
   return {

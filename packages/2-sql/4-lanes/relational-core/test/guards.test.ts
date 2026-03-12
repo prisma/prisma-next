@@ -1,48 +1,90 @@
 import { describe, expect, it } from 'vitest';
+import { ColumnRef, OperationExpr, TableSource } from '../src/exports/ast';
+import type { ExpressionBuilder, ParamPlaceholder } from '../src/types';
 import {
-  createAggregateExpr,
-  createBinaryExpr,
-  createColumnRef,
-  createJsonArrayAggExpr,
-  createJsonObjectEntry,
-  createJsonObjectExpr,
-  createLiteralExpr,
-  createProjectionItem,
-  createSelectAstBuilder,
-  createSubqueryExpr,
-  createTableSource,
-} from '../src/exports/ast';
-import { collectColumnRefs } from '../src/utils/guards';
+  expressionFromSource,
+  getColumnInfo,
+  isExpressionBuilder,
+  isExpressionSource,
+  isParamPlaceholder,
+  isValueSource,
+  toExpression,
+} from '../src/utils/guards';
+
+const placeholder: ParamPlaceholder = { kind: 'param-placeholder', name: 'id' };
+
+function expressionBuilder(expr: OperationExpr): ExpressionBuilder {
+  return {
+    kind: 'expression',
+    expr,
+    columnMeta: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+    eq: () => {
+      throw new Error('unused');
+    },
+    neq: () => {
+      throw new Error('unused');
+    },
+    gt: () => {
+      throw new Error('unused');
+    },
+    lt: () => {
+      throw new Error('unused');
+    },
+    gte: () => {
+      throw new Error('unused');
+    },
+    lte: () => {
+      throw new Error('unused');
+    },
+    asc: () => {
+      throw new Error('unused');
+    },
+    desc: () => {
+      throw new Error('unused');
+    },
+    toExpr: () => expr,
+    get __jsType() {
+      return undefined;
+    },
+  };
+}
 
 describe('utils/guards', () => {
-  it('collects column refs from jsonObject/jsonArrayAgg expression trees', () => {
-    const expr = createJsonArrayAggExpr(
-      createJsonObjectExpr([
-        createJsonObjectEntry('id', createColumnRef('post', 'id')),
-        createJsonObjectEntry('title', createColumnRef('post', 'title')),
-        createJsonObjectEntry('static', createLiteralExpr('x')),
-      ]),
-      'emptyArray',
-      [{ expr: createColumnRef('post', 'createdAt'), dir: 'desc' }],
-    );
+  it('recognizes builders, placeholders, and expression sources', () => {
+    const expr = OperationExpr.function({
+      method: 'lower',
+      forTypeId: 'pg/text@1',
+      self: ColumnRef.of('user', 'email'),
+      args: [],
+      returns: { kind: 'builtin', type: 'string' },
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+      template: 'lower(${self})',
+    });
+    const builder = expressionBuilder(expr);
 
-    expect(collectColumnRefs(expr)).toEqual([
-      createColumnRef('post', 'id'),
-      createColumnRef('post', 'title'),
-      createColumnRef('post', 'createdAt'),
-    ]);
+    expect(isParamPlaceholder(placeholder)).toBe(true);
+    expect(isExpressionBuilder(builder)).toBe(true);
+    expect(isExpressionSource(builder)).toBe(true);
+    expect(isValueSource(builder)).toBe(true);
+    expect(isValueSource(placeholder)).toBe(true);
   });
 
-  it('collects column refs from aggregate expressions used in non-projection slots', () => {
-    const metricExpr = createAggregateExpr('sum', createColumnRef('post', 'views'));
-    const subquery = createSelectAstBuilder(createTableSource('post'))
-      .project([createProjectionItem('id', createColumnRef('post', 'id'))])
-      .where(createBinaryExpr('gt', metricExpr, createLiteralExpr(10)))
-      .build();
+  it('derives expressions and base column info from operation expressions', () => {
+    const expr = OperationExpr.function({
+      method: 'lower',
+      forTypeId: 'pg/text@1',
+      self: ColumnRef.of('user', 'email'),
+      args: [],
+      returns: { kind: 'builtin', type: 'string' },
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+      template: 'lower(${self})',
+    });
+    const builder = expressionBuilder(expr);
 
-    expect(collectColumnRefs(createSubqueryExpr(subquery))).toEqual([
-      createColumnRef('post', 'id'),
-      createColumnRef('post', 'views'),
-    ]);
+    expect(toExpression(builder)).toBe(expr);
+    expect(expressionFromSource(builder)).toBe(expr);
+    expect(getColumnInfo(expr)).toEqual({ table: 'user', column: 'email' });
+    expect(getColumnInfo(builder)).toEqual({ table: 'user', column: 'email' });
+    expect(TableSource.named('user').collectRefs()).toEqual({ tables: ['user'], columns: [] });
   });
 });

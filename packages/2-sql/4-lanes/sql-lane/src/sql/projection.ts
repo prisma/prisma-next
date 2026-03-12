@@ -1,5 +1,5 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
-import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import { ColumnRef } from '@prisma-next/sql-relational-core/ast';
 import type { AnyExpressionSource, NestedProjection } from '@prisma-next/sql-relational-core/types';
 import { isExpressionSource } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
@@ -94,7 +94,7 @@ export function buildProjectionState(
         table: matchingInclude.table.name,
         column: '',
         columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
-        toExpr: () => createColumnRef(matchingInclude.table.name, ''),
+        toExpr: () => ColumnRef.of(matchingInclude.table.name, ''),
       } as AnyExpressionSource);
     } else if (isExpressionSource(value)) {
       const alias = tracker.register([key]);

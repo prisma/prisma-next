@@ -1,21 +1,19 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
 import type { Plugin, PluginContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
-import type {
+import {
   DeleteAst,
-  FromSource,
+  DerivedTableSource,
+  type FromSource,
   QueryAst,
   SelectAst,
+  TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 
-const QUERY_AST_KINDS = new Set(['select', 'insert', 'update', 'delete']);
-
 function isSqlQueryAst(ast: unknown): ast is QueryAst {
-  if (ast === null || typeof ast !== 'object' || !('kind' in ast)) return false;
-  const kind = (ast as { kind: string }).kind;
-  return typeof kind === 'string' && QUERY_AST_KINDS.has(kind);
+  return ast instanceof QueryAst;
 }
 
 export interface LintsOptions {
@@ -57,17 +55,20 @@ function lintError(code: string, message: string, details?: Record<string, unkno
 }
 
 function getFromSourceTableDetail(source: FromSource): string | undefined {
-  if (source.kind === 'table') {
+  if (source instanceof TableSource) {
     return source.name;
   }
-  return source.alias;
+  if (source instanceof DerivedTableSource) {
+    return source.alias;
+  }
+  return undefined;
 }
 
 function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
   const findings: LintFinding[] = [];
 
-  if (ast.kind === 'delete') {
-    const deleteAst = ast as DeleteAst;
+  if (ast instanceof DeleteAst) {
+    const deleteAst = ast;
     if (deleteAst.where === undefined) {
       findings.push({
         code: 'LINT.DELETE_WITHOUT_WHERE',
@@ -79,8 +80,8 @@ function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
     }
   }
 
-  if (ast.kind === 'update') {
-    const updateAst = ast as UpdateAst;
+  if (ast instanceof UpdateAst) {
+    const updateAst = ast;
     if (updateAst.where === undefined) {
       findings.push({
         code: 'LINT.UPDATE_WITHOUT_WHERE',
@@ -92,8 +93,8 @@ function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
     }
   }
 
-  if (ast.kind === 'select') {
-    const selectAst = ast as SelectAst;
+  if (ast instanceof SelectAst) {
+    const selectAst = ast;
     if (selectAst.limit === undefined) {
       const table = getFromSourceTableDetail(selectAst.from);
       findings.push({

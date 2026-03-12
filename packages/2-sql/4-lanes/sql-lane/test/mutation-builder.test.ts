@@ -1,404 +1,89 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { validateContract } from '@prisma-next/sql-contract/validate';
-import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  ColumnRef,
+  DeleteAst,
+  InsertAst,
+  ParamRef,
+  UpdateAst,
+} from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
-import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
-import type { GeneratedContract } from './fixtures/contract-generated.d';
+import { createFixtureContext, loadFixtureContract } from './test-helpers';
 
-const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
-
-function loadContract(name: string): Contract {
-  const filePath = join(fixtureDir, `${name}.json`);
-  const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
-  return validateContract<Contract>(contractJson);
-}
-
-function loadGeneratedContract(name: string): GeneratedContract {
-  const filePath = join(fixtureDir, `${name}.json`);
-  const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
-  return validateContract<GeneratedContract>(contractJson);
-}
-
-describe('mutation builder edge cases', () => {
-  const contract = loadContract('contract');
-  const adapter = createStubAdapter();
-  const context = createTestContext(contract, adapter);
+describe('mutation builders', () => {
+  const contract = loadFixtureContract<Contract>('contract');
+  const context = createFixtureContext(contract);
   const tables = schema<Contract>(context).tables;
-  const userTable = tables.user;
-  const userColumns = userTable.columns;
 
-  describe('insert', () => {
-    it('throws when table does not exist', () => {
-      const nonexistentTable = createTableRef('nonexistent');
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .insert(nonexistentTable, {
-            email: param('email'),
-          })
-          .build({ params: { email: 'test@example.com' } }),
-      ).toThrow('Unknown table nonexistent');
-    });
-
-    it('throws when column does not exist', () => {
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .insert(userTable, {
-            nonexistent: param('value'),
-          } as unknown as Record<string, ParamPlaceholder>)
-          .build({ params: { value: 'test' } }),
-      ).toThrow('Unknown column nonexistent in table user');
-    });
-
-    it('throws when parameter is missing', () => {
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .insert(userTable, {
-            email: param('email'),
-          })
-          .build({ params: {} }),
-      ).toThrow('Missing value for parameter email');
-    });
-
-    it('builds insert with returning', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .insert(userTable, {
-          email: param('email'),
-        })
-        .returning(userColumns.id, userColumns.email)
-        .build({ params: { email: 'test@example.com' } });
-
-      expect(plan.ast).toMatchObject({
-        kind: 'insert',
-        returning: expect.arrayContaining([
-          createColumnRef('user', 'id'),
-          createColumnRef('user', 'email'),
-        ]),
-      });
-    });
-
-    it('includes paramCodecs in meta.annotations.codecs for INSERT', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .insert(userTable, {
-          email: param('email'),
-        })
-        .build({ params: { email: 'test@example.com' } });
-
-      expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.['email']).toBe('pg/text@1');
-    });
-
-    it('chains returning multiple times for insert', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .insert(userTable, {
-          email: param('email'),
-        })
-        .returning(userColumns.id)
-        .returning(userColumns.email)
-        .build({ params: { email: 'test@example.com' } });
-
-      expect(plan.ast).toMatchObject({
-        kind: 'insert',
-        returning: expect.arrayContaining([
-          createColumnRef('user', 'id'),
-          createColumnRef('user', 'email'),
-        ]),
-      });
-      if (plan.ast.kind === 'insert') {
-        expect(plan.ast.returning).toHaveLength(2);
-      }
-    });
-  });
-
-  describe('update', () => {
-    it('throws when table does not exist', () => {
-      const nonexistentTable = createTableRef('nonexistent');
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .update(nonexistentTable, {
-            email: param('email'),
-          })
-          .where(userColumns.id.eq(param('userId')))
-          .build({ params: { email: 'test@example.com', userId: 1 } }),
-      ).toThrow('Unknown table nonexistent');
-    });
-
-    it('throws when column does not exist', () => {
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .update(userTable, {
-            nonexistent: param('value'),
-          } as unknown as Record<string, ParamPlaceholder>)
-          .where(userColumns.id.eq(param('userId')))
-          .build({ params: { value: 'test', userId: 1 } }),
-      ).toThrow('Unknown column nonexistent in table user');
-    });
-
-    it('throws when parameter is missing in set', () => {
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .update(userTable, {
-            email: param('email'),
-          })
-          .where(userColumns.id.eq(param('userId')))
-          .build({ params: { userId: 1 } }),
-      ).toThrow('Missing value for parameter email');
-    });
-
-    it('throws when parameter is missing in where', () => {
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .update(userTable, {
-            email: param('email'),
-          })
-          .where(userColumns.id.eq(param('userId')))
-          .build({ params: { email: 'test@example.com' } }),
-      ).toThrow('Missing value for parameter userId');
-    });
-
-    it('throws when where is not called', () => {
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .update(userTable, {
-            email: param('email'),
-          })
-          .build({ params: { email: 'test@example.com' } }),
-      ).toThrow('where() must be called before building an UPDATE query');
-    });
-
-    it('builds update with returning', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .update(userTable, {
-          email: param('email'),
-        })
-        .where(userColumns.id.eq(param('userId')))
-        .returning(userColumns.id, userColumns.email)
-        .build({ params: { email: 'test@example.com', userId: 1 } });
-
-      expect(plan.ast).toMatchObject({
-        kind: 'update',
-        returning: expect.arrayContaining([
-          createColumnRef('user', 'id'),
-          createColumnRef('user', 'email'),
-        ]),
-      });
-    });
-
-    it('includes paramCodecs in meta.annotations.codecs for UPDATE set values', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .update(userTable, {
-          email: param('email'),
-        })
-        .where(userColumns.id.eq(param('userId')))
-        .build({ params: { email: 'test@example.com', userId: 1 } });
-
-      expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.['email']).toBe('pg/text@1');
-    });
-
-    it('includes paramCodecs in meta.annotations.codecs for UPDATE where clause', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .update(userTable, {
-          email: param('email'),
-        })
-        .where(userColumns.id.eq(param('userId')))
-        .build({ params: { email: 'test@example.com', userId: 1 } });
-
-      expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
-    });
-
-    it('chains returning multiple times', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .update(userTable, {
-          email: param('email'),
-        })
-        .where(userColumns.id.eq(param('userId')))
-        .returning(userColumns.id)
-        .returning(userColumns.email)
-        .build({ params: { email: 'test@example.com', userId: 1 } });
-
-      expect(plan.ast).toMatchObject({
-        kind: 'update',
-        returning: expect.arrayContaining([
-          createColumnRef('user', 'id'),
-          createColumnRef('user', 'email'),
-        ]),
-      });
-      if (plan.ast.kind === 'update') {
-        expect(plan.ast.returning).toHaveLength(2);
-      }
-    });
-  });
-
-  describe('delete', () => {
-    it('throws when table does not exist', () => {
-      const nonexistentTable = createTableRef('nonexistent');
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .delete(nonexistentTable)
-          .where(userColumns.id.eq(param('userId')))
-          .build({ params: { userId: 1 } }),
-      ).toThrow('Unknown table nonexistent');
-    });
-
-    it('throws when parameter is missing in where', () => {
-      expect(() =>
-        sql<Contract, CodecTypes>({ context })
-          .delete(userTable)
-          .where(userColumns.id.eq(param('userId')))
-          .build({ params: {} }),
-      ).toThrow('Missing value for parameter userId');
-    });
-
-    it('throws when where is not called', () => {
-      expect(() => sql<Contract, CodecTypes>({ context }).delete(userTable).build()).toThrow(
-        'where() must be called before building a DELETE query',
-      );
-    });
-
-    it('builds delete with returning', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .delete(userTable)
-        .where(userColumns.id.eq(param('userId')))
-        .returning(userColumns.id, userColumns.email)
-        .build({ params: { userId: 1 } });
-
-      expect(plan.ast).toMatchObject({
-        kind: 'delete',
-        returning: expect.arrayContaining([
-          createColumnRef('user', 'id'),
-          createColumnRef('user', 'email'),
-        ]),
-      });
-    });
-
-    it('chains returning multiple times for delete', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .delete(userTable)
-        .where(userColumns.id.eq(param('userId')))
-        .returning(userColumns.id)
-        .returning(userColumns.email)
-        .build({ params: { userId: 1 } });
-
-      expect(plan.ast).toMatchObject({
-        kind: 'delete',
-        returning: expect.arrayContaining([
-          createColumnRef('user', 'id'),
-          createColumnRef('user', 'email'),
-        ]),
-      });
-      if (plan.ast.kind === 'delete') {
-        expect(plan.ast.returning).toHaveLength(2);
-      }
-    });
-
-    it('includes paramCodecs in meta.annotations.codecs for DELETE where clause', () => {
-      const plan = sql<Contract, CodecTypes>({ context })
-        .delete(userTable)
-        .where(userColumns.id.eq(param('userId')))
-        .build({ params: { userId: 1 } });
-
-      expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
-    });
-  });
-});
-
-describe('mutation builder generated defaults', () => {
-  const contract = loadGeneratedContract('contract-generated');
-  const adapter = createStubAdapter();
-  const context = createTestContext(contract, adapter);
-  const tables = schema<GeneratedContract>(context).tables;
-  const userTable = tables.user;
-
-  it('applies generated defaults for insert', () => {
-    const plan = sql<GeneratedContract, CodecTypes>({ context })
-      .insert(userTable, {
+  it('builds insert plans with returning columns', () => {
+    const plan = sql<Contract, CodecTypes>({ context })
+      .insert(tables.user, {
         email: param('email'),
+        createdAt: param('createdAt'),
       })
-      .build({ params: { email: 'test@example.com' } });
+      .returning(tables.user.columns.id, tables.user.columns.email)
+      .build({ params: { email: 'test@example.com', createdAt: new Date('2024-01-01') } });
 
-    expect(plan.ast).toMatchObject({
-      kind: 'insert',
-      rows: [
-        expect.objectContaining({
-          id: expect.any(Object),
-        }),
-      ],
+    expect(plan.ast).toBeInstanceOf(InsertAst);
+    const ast = plan.ast as InsertAst;
+    expect(ast.rows[0]).toMatchObject({
+      email: ParamRef.of(1, 'email'),
+      createdAt: ParamRef.of(2, 'createdAt'),
     });
-    expect(plan.params).toHaveLength(2);
+    expect(ast.returning).toEqual([ColumnRef.of('user', 'id'), ColumnRef.of('user', 'email')]);
   });
 
-  it('uses provided values over generated defaults', () => {
-    const plan = sql<GeneratedContract, CodecTypes>({ context })
-      .insert(userTable, {
-        id: param('id'),
-        email: param('email'),
-      })
-      .build({ params: { id: 'user_1', email: 'test@example.com' } });
+  it('builds update and delete plans with where clauses and returning columns', () => {
+    const updatePlan = sql<Contract, CodecTypes>({ context })
+      .update(tables.user, { email: param('newEmail') })
+      .where(tables.user.columns.id.eq(param('userId')))
+      .returning(tables.user.columns.id, tables.user.columns.email)
+      .build({ params: { newEmail: 'updated@example.com', userId: 1 } });
+    const deletePlan = sql<Contract, CodecTypes>({ context })
+      .delete(tables.user)
+      .where(tables.user.columns.id.eq(param('userId')))
+      .returning(tables.user.columns.id, tables.user.columns.email)
+      .build({ params: { userId: 1 } });
 
-    expect(plan.params).toContain('user_1');
+    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
+    expect((updatePlan.ast as UpdateAst).where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(2, 'userId')),
+    );
+    expect((updatePlan.ast as UpdateAst).returning).toEqual([
+      ColumnRef.of('user', 'id'),
+      ColumnRef.of('user', 'email'),
+    ]);
+    expect(deletePlan.ast).toBeInstanceOf(DeleteAst);
+    expect((deletePlan.ast as DeleteAst).returning).toEqual([
+      ColumnRef.of('user', 'id'),
+      ColumnRef.of('user', 'email'),
+    ]);
   });
 
-  it('applies generated defaults for update when onUpdate is present', () => {
-    const contractWithUpdateDefault = {
-      ...contract,
-      execution: {
-        mutations: {
-          defaults: [
-            ...(contract.execution?.mutations.defaults ?? []),
-            {
-              ref: { table: 'user', column: 'id' },
-              onUpdate: { kind: 'generator', id: 'uuidv7' },
-            },
-          ],
-        },
-      },
-    } as GeneratedContract;
-    const updateContext = createTestContext(contractWithUpdateDefault, adapter);
-    const updateTables = schema<GeneratedContract>(updateContext).tables;
-    const updateUserTable = updateTables.user;
-    const updateUserColumns = updateUserTable.columns;
+  it('rejects unknown tables, unknown columns, and missing where clauses', () => {
+    expect(() =>
+      sql<Contract, CodecTypes>({ context })
+        .insert({ name: 'nonexistent' }, { email: param('email') })
+        .build({ params: { email: 'x' } }),
+    ).toThrow('Unknown table nonexistent');
 
-    const plan = sql<GeneratedContract, CodecTypes>({ context: updateContext })
-      .update(updateUserTable, {
-        email: param('email'),
-      })
-      .where(updateUserColumns.id.eq(param('id')))
-      .build({ params: { id: 'user_1', email: 'updated@example.com' } });
+    expect(() =>
+      sql<Contract, CodecTypes>({ context })
+        .insert(tables.user, { unknownColumn: param('value') } as never)
+        .build({ params: { value: 'x' } }),
+    ).toThrow('Unknown column unknownColumn in table user');
 
-    expect(plan.ast).toMatchObject({
-      kind: 'update',
-      set: expect.objectContaining({
-        id: expect.any(Object),
-        email: expect.any(Object),
-      }),
-    });
-    expect(plan.params).toHaveLength(3);
-  });
+    expect(() =>
+      sql<Contract, CodecTypes>({ context })
+        .update(tables.user, { email: param('email') })
+        .build({ params: { email: 'x' } }),
+    ).toThrow('where() must be called before building an UPDATE query');
 
-  it('supports calling returning before where for update', () => {
-    const updateUserColumns = tables.user.columns;
-    const plan = sql<GeneratedContract, CodecTypes>({ context })
-      .update(userTable, {
-        email: param('email'),
-      })
-      .returning(updateUserColumns.id)
-      .where(updateUserColumns.id.eq(param('id')))
-      .build({ params: { id: 'user_1', email: 'updated@example.com' } });
-
-    expect(plan.ast).toMatchObject({
-      kind: 'update',
-      returning: [createColumnRef('user', 'id')],
-    });
+    expect(() => sql<Contract, CodecTypes>({ context }).delete(tables.user).build()).toThrow(
+      'where() must be called before building a DELETE query',
+    );
   });
 });

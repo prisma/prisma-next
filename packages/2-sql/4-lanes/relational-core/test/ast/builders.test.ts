@@ -1,139 +1,101 @@
 import { describe, expect, it } from 'vitest';
+import { OrderByItem } from '../../src/ast/order';
+import { BinaryExpr } from '../../src/ast/predicate';
 import {
-  createDeleteAstBuilder,
-  createInsertAstBuilder,
-  createInsertOnConflictAstBuilder,
-  createSelectAstBuilder,
-  createUpdateAstBuilder,
-  doNothing,
-  doUpdateSet,
-} from '../../src/ast/builders';
-import {
-  createColumnRef,
-  createDefaultValueExpr,
-  createParamRef,
-  createTableRef,
-} from '../../src/ast/common';
-import { createBinaryExpr } from '../../src/ast/predicate';
+  DefaultValueExpr,
+  DeleteAst,
+  DoNothingConflictAction,
+  DoUpdateSetConflictAction,
+  InsertAst,
+  InsertOnConflict,
+  SelectAst,
+  UpdateAst,
+} from '../../src/exports/ast';
+import { col, param, table } from './test-helpers';
 
 describe('ast/builders', () => {
-  it('builds select ast with fluent low-level builder', () => {
-    const userTable = createTableRef('user');
-    const idExpr = createColumnRef('user', 'id');
-    const emailExpr = createColumnRef('user', 'email');
-    const where = createBinaryExpr('eq', idExpr, createParamRef(1, 'id'));
+  it('builds select ASTs through fluent rich-node methods', () => {
+    const ast = SelectAst.from(table('user'))
+      .addProject('id', col('user', 'id'))
+      .withWhere(BinaryExpr.eq(col('user', 'id'), param(1, 'id')))
+      .withOrderBy([OrderByItem.asc(col('user', 'id'))])
+      .withDistinct()
+      .withDistinctOn([col('user', 'email')])
+      .withGroupBy([col('user', 'id')])
+      .withHaving(BinaryExpr.gt(col('user', 'id'), param(2, 'minId')))
+      .withLimit(10)
+      .withOffset(5);
 
-    const ast = createSelectAstBuilder(userTable)
-      .project([{ alias: 'id', expr: idExpr }])
-      .where(where)
-      .orderBy([{ expr: idExpr, dir: 'asc' }])
-      .distinct()
-      .distinctOn([emailExpr])
-      .groupBy([idExpr])
-      .having(createBinaryExpr('gt', idExpr, createParamRef(2, 'minId')))
-      .limit(10)
-      .offset(5)
-      .build();
-
-    expect(ast.kind).toBe('select');
-    expect(ast.from).toEqual(userTable);
-    expect(ast.project).toEqual([{ alias: 'id', expr: idExpr }]);
-    expect(ast.where).toEqual(where);
+    expect(ast.from).toEqual(table('user'));
+    expect(ast.project).toEqual([{ alias: 'id', expr: col('user', 'id') }]);
+    expect(ast.where).toEqual(BinaryExpr.eq(col('user', 'id'), param(1, 'id')));
     expect(ast.distinct).toBe(true);
-    expect(ast.distinctOn).toEqual([emailExpr]);
-    expect(ast.groupBy).toEqual([idExpr]);
+    expect(ast.distinctOn).toEqual([col('user', 'email')]);
+    expect(ast.groupBy).toEqual([col('user', 'id')]);
     expect(ast.limit).toBe(10);
     expect(ast.offset).toBe(5);
   });
 
-  it('builds insert ast with onConflict update set', () => {
-    const table = createTableRef('user');
-    const onConflict = createInsertOnConflictAstBuilder([createColumnRef('user', 'id')])
-      .doUpdateSet({ email: createParamRef(3, 'email') })
-      .build();
-    const ast = createInsertAstBuilder(table)
-      .values({
-        id: createParamRef(1, 'id'),
-        email: createParamRef(2, 'email'),
+  it('builds insert ASTs with on-conflict update sets', () => {
+    const ast = InsertAst.into(table('user'))
+      .withValues({
+        id: param(1, 'id'),
+        email: param(2, 'email'),
       })
-      .onConflict(onConflict)
-      .returning([createColumnRef('user', 'id')])
-      .build();
+      .withOnConflict(
+        InsertOnConflict.on([col('user', 'id')]).doUpdateSet({ email: param(3, 'email') }),
+      )
+      .withReturning([col('user', 'id')]);
 
-    expect(ast.kind).toBe('insert');
-    expect(ast.onConflict).toEqual({
-      columns: [createColumnRef('user', 'id')],
-      action: doUpdateSet({ email: createParamRef(3, 'email') }),
-    });
+    expect(ast.onConflict?.columns).toEqual([col('user', 'id')]);
+    expect(ast.onConflict?.action).toBeInstanceOf(DoUpdateSetConflictAction);
+    expect(ast.returning).toEqual([col('user', 'id')]);
   });
 
-  it('builds insert ast with onConflict doNothing', () => {
-    const table = createTableRef('user');
-    const onConflict = createInsertOnConflictAstBuilder([createColumnRef('user', 'id')])
-      .doNothing()
-      .build();
-    const ast = createInsertAstBuilder(table)
-      .values({
-        id: createParamRef(1, 'id'),
+  it('builds insert ASTs with do-nothing conflicts and explicit row lists', () => {
+    const conflictAst = InsertAst.into(table('user'))
+      .withValues({
+        id: param(1, 'id'),
       })
-      .onConflict(onConflict)
-      .build();
-
-    expect(ast.onConflict).toEqual({
-      columns: [createColumnRef('user', 'id')],
-      action: doNothing(),
-    });
-  });
-
-  it('builds insert ast with explicit rows and default cells', () => {
-    const table = createTableRef('user');
-    const ast = createInsertAstBuilder(table)
-      .rows([
-        {
-          id: createParamRef(1, 'id'),
-          email: createParamRef(2, 'email'),
-        },
-        {
-          id: createParamRef(3, 'id2'),
-          email: createDefaultValueExpr(),
-        },
-      ])
-      .build();
-
-    expect(ast.rows).toEqual([
+      .withOnConflict(InsertOnConflict.on([col('user', 'id')]).doNothing());
+    const rowAst = InsertAst.into(table('user')).withRows([
       {
-        id: createParamRef(1, 'id'),
-        email: createParamRef(2, 'email'),
+        id: param(1, 'id'),
+        email: param(2, 'email'),
       },
       {
-        id: createParamRef(3, 'id2'),
-        email: createDefaultValueExpr(),
+        id: param(3, 'id2'),
+        email: new DefaultValueExpr(),
       },
     ]);
+
+    expect(conflictAst.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+    expect(rowAst.rows).toEqual([
+      {
+        id: param(1, 'id'),
+        email: param(2, 'email'),
+      },
+      {
+        id: param(3, 'id2'),
+        email: new DefaultValueExpr(),
+      },
+    ]);
+    expect(InsertAst.into(table('user')).withRows([]).rows).toEqual([]);
   });
 
-  it('preserves explicit empty insert rows', () => {
-    const table = createTableRef('user');
-    const ast = createInsertAstBuilder(table).rows([]).build();
+  it('builds update and delete ASTs fluently', () => {
+    const where = BinaryExpr.eq(col('user', 'id'), param(1, 'id'));
+    const updateAst = UpdateAst.table(table('user'))
+      .withSet({ email: param(2, 'email') })
+      .withWhere(where)
+      .withReturning([col('user', 'id')]);
+    const deleteAst = DeleteAst.from(table('user'))
+      .withWhere(where)
+      .withReturning([col('user', 'id')]);
 
-    expect(ast.rows).toEqual([]);
-  });
-
-  it('builds update and delete ast', () => {
-    const where = createBinaryExpr('eq', createColumnRef('user', 'id'), createParamRef(1, 'id'));
-    const updateAst = createUpdateAstBuilder(createTableRef('user'))
-      .set({ email: createParamRef(2, 'email') })
-      .where(where)
-      .returning([createColumnRef('user', 'id')])
-      .build();
-    const deleteAst = createDeleteAstBuilder(createTableRef('user'))
-      .where(where)
-      .returning([createColumnRef('user', 'id')])
-      .build();
-
-    expect(updateAst.kind).toBe('update');
-    expect(deleteAst.kind).toBe('delete');
     expect(updateAst.where).toEqual(where);
     expect(deleteAst.where).toEqual(where);
+    expect(updateAst.returning).toEqual([col('user', 'id')]);
+    expect(deleteAst.returning).toEqual([col('user', 'id')]);
   });
 });

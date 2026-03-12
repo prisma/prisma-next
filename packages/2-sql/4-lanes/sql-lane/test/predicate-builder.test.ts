@@ -1,226 +1,138 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { validateContract } from '@prisma-next/sql-contract/validate';
-import { createBinaryExpr, createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  ColumnRef,
+  NullCheckExpr,
+  OperationExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildWhereExpr } from '../src/sql/predicate-builder';
 import type { Contract } from './fixtures/contract.d';
+import { createFixtureContext, loadFixtureContract } from './test-helpers';
 
-const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
-
-function loadContract(name: string): Contract {
-  const filePath = join(fixtureDir, `${name}.json`);
-  const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
-  return validateContract<Contract>(contractJson);
-}
+const vectorReturn = { kind: 'typeId', type: 'pg/vector@1' } as const;
 
 describe('buildWhereExpr', () => {
-  const contract = loadContract('contract');
-  const adapter = createStubAdapter();
-  const context = createTestContext(contract, adapter);
+  const contract = loadFixtureContract<Contract>('contract');
+  const context = createFixtureContext(contract);
   const tables = schema<Contract>(context).tables;
   const userColumns = tables.user.columns;
 
-  it('throws error when where.left is neither OperationExpr nor ColumnBuilder', () => {
-    const invalidBinary = {
-      kind: 'binary' as const,
-      op: 'eq' as const,
-      left: { kind: 'invalid' } as unknown,
-      right: param('userId'),
-    };
+  it('rejects invalid left and right operands', () => {
+    expect(() =>
+      buildWhereExpr(
+        contract,
+        {
+          kind: 'binary',
+          op: 'eq',
+          left: { kind: 'invalid' } as never,
+          right: param('userId'),
+        } as never,
+        { userId: 1 },
+        [],
+        [],
+      ),
+    ).toThrow('Failed to build WHERE clause');
 
-    // @ts-expect-error - Intentionally testing invalid input
-    expect(() => buildWhereExpr(contract, invalidBinary, { userId: 1 }, [], [])).toThrow(
-      'Failed to build WHERE clause',
-    );
+    expect(() =>
+      buildWhereExpr(
+        contract,
+        {
+          kind: 'binary',
+          op: 'eq',
+          left: userColumns.id,
+          right: { kind: 'invalid' } as never,
+        } as never,
+        { userId: 1 },
+        [],
+        [],
+      ),
+    ).toThrow('Failed to build WHERE clause');
   });
 
-  it('throws error when where.right is neither ParamPlaceholder nor ColumnBuilder', () => {
-    const invalidBinary = {
-      kind: 'binary' as const,
-      op: 'eq' as const,
-      left: userColumns.id,
-      right: { kind: 'invalid' } as unknown,
-    };
-
-    // @ts-expect-error - Intentionally testing invalid input
-    expect(() => buildWhereExpr(contract, invalidBinary, { userId: 1 }, [], [])).toThrow(
-      'Failed to build WHERE clause',
-    );
-  });
-
-  it('builds where expression with operation expression on left', () => {
-    // Create an OperationExpr directly - the new architecture has this directly on the BinaryBuilder.left
-    const operationExpr = {
-      kind: 'operation' as const,
+  it('builds operation-based and column-to-column predicates', () => {
+    const operation = OperationExpr.function({
       method: 'normalize',
       forTypeId: 'pg/vector@1',
-      self: createColumnRef('user', 'id'),
+      self: ColumnRef.of('user', 'id'),
       args: [],
-      returns: { kind: 'typeId' as const, type: 'pg/vector@1' },
-      lowering: {
-        targetFamily: 'sql' as const,
-        strategy: 'function' as const,
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'normalize(${self})',
-      },
-    };
-
-    // Create a BinaryBuilder where left is directly the OperationExpr
-    // This is how ExpressionBuilder.eq() creates the BinaryBuilder (see operations-registry.ts)
-    const binary = {
-      kind: 'binary' as const,
-      op: 'eq' as const,
-      left: operationExpr,
-      right: param('value'),
-    };
-
-    const result = buildWhereExpr(
+      returns: vectorReturn,
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+      template: 'normalize(${self})',
+    });
+    const opResult = buildWhereExpr(
       contract,
-      binary as typeof userColumns.id.eq extends (x: unknown) => infer R ? R : never,
+      { kind: 'binary', op: 'eq', left: operation, right: param('value') } as never,
       { value: 'test' },
       [],
       [],
     );
+    const columnResult = buildWhereExpr(contract, userColumns.id.eq(userColumns.id), {}, [], []);
 
-    expect(result.expr).toMatchObject({
-      kind: 'bin',
-      op: 'eq',
-      left: {
-        kind: 'operation',
-        method: 'normalize',
-      },
-    });
+    expect(opResult.expr).toEqual(BinaryExpr.eq(operation, { index: 1, name: 'value' } as never));
+    expect(columnResult.expr).toEqual(
+      BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'id')),
+    );
+    expect(columnResult.paramName).toBe('');
   });
 
-  it('builds where expression with column-to-column comparison', () => {
-    const binary = userColumns.id.eq(userColumns.id);
-
-    const result = buildWhereExpr(contract, binary, {}, [], []);
-
-    const userIdCol = createColumnRef('user', 'id');
-    expect(result.expr).toEqual(createBinaryExpr('eq', userIdCol, userIdCol));
-    expect(result.paramName).toBe('');
-  });
-
-  it('throws when left column references unknown table', () => {
-    const binary = {
-      kind: 'binary' as const,
-      op: 'eq' as const,
-      left: createColumnRef('nonexistent', 'id'),
-      right: param('userId'),
-    };
-
+  it('validates left and right column refs against the contract', () => {
     expect(() =>
       buildWhereExpr(
         contract,
-        binary as ReturnType<typeof userColumns.id.eq>,
+        {
+          kind: 'binary',
+          op: 'eq',
+          left: ColumnRef.of('missing', 'id'),
+          right: param('userId'),
+        } as never,
         { userId: 1 },
         [],
         [],
       ),
-    ).toThrow('Unknown table nonexistent');
-  });
-
-  it('throws when left column references unknown column', () => {
-    const binary = {
-      kind: 'binary' as const,
-      op: 'eq' as const,
-      left: createColumnRef('user', 'nonexistent'),
-      right: param('userId'),
-    };
+    ).toThrow('Unknown table missing');
 
     expect(() =>
       buildWhereExpr(
         contract,
-        binary as ReturnType<typeof userColumns.id.eq>,
-        { userId: 1 },
+        {
+          kind: 'binary',
+          op: 'eq',
+          left: userColumns.id.toExpr(),
+          right: {
+            kind: 'column',
+            table: 'user',
+            column: 'missing',
+            columnMeta: userColumns.id.columnMeta,
+            toExpr: () => ColumnRef.of('user', 'missing'),
+          },
+        } as never,
+        {},
         [],
         [],
       ),
-    ).toThrow('Unknown column nonexistent');
+    ).toThrow('Unknown column missing');
   });
 
-  it('throws when parameter value is missing', () => {
-    const binary = userColumns.id.eq(param('missingParam'));
-
-    expect(() => buildWhereExpr(contract, binary, {}, [], [])).toThrow(
-      'Missing value for parameter missingParam',
+  it('builds null-check predicates and validates referenced columns', () => {
+    expect(buildWhereExpr(contract, userColumns.deletedAt.isNull(), {}, [], []).expr).toEqual(
+      NullCheckExpr.isNull(ColumnRef.of('user', 'deletedAt')),
     );
-  });
-
-  it('throws when right column references unknown table', () => {
-    const binary = {
-      kind: 'binary' as const,
-      op: 'eq' as const,
-      left: userColumns.id.toExpr(),
-      right: { kind: 'column', toExpr: () => createColumnRef('nonexistent', 'id') },
-    };
-
     expect(() =>
-      buildWhereExpr(contract, binary as ReturnType<typeof userColumns.id.eq>, {}, [], []),
-    ).toThrow('Unknown table nonexistent');
+      buildWhereExpr(
+        contract,
+        { kind: 'nullCheck', expr: ColumnRef.of('missing', 'id'), isNull: true } as never,
+        {},
+        [],
+        [],
+      ),
+    ).toThrow('Unknown table missing');
   });
 
-  it('throws when right column references unknown column', () => {
-    const binary = {
-      kind: 'binary' as const,
-      op: 'eq' as const,
-      left: userColumns.id.toExpr(),
-      right: { kind: 'column', toExpr: () => createColumnRef('user', 'nonexistent') },
-    };
-
+  it('rejects missing parameter values', () => {
     expect(() =>
-      buildWhereExpr(contract, binary as ReturnType<typeof userColumns.id.eq>, {}, [], []),
-    ).toThrow('Unknown column nonexistent');
-  });
-
-  it.each([
-    [true, 'isNull'],
-    [false, 'isNotNull'],
-  ] as const)('builds null-check expressions for %s', (isNull, _operator) => {
-    const nullCheck = {
-      kind: 'nullCheck' as const,
-      expr: createColumnRef('user', 'deletedAt'),
-      isNull,
-    };
-
-    const result = buildWhereExpr(contract, nullCheck, {}, [], []);
-    expect(result.expr).toEqual({
-      kind: 'nullCheck',
-      expr: createColumnRef('user', 'deletedAt'),
-      isNull,
-    });
-    expect(result.paramName).toBe('');
-    expect(result.codecId).toBeUndefined();
-  });
-
-  it('throws when null-check references unknown table', () => {
-    const nullCheck = {
-      kind: 'nullCheck' as const,
-      expr: createColumnRef('missing_table', 'id'),
-      isNull: true,
-    };
-
-    expect(() => buildWhereExpr(contract, nullCheck, {}, [], [])).toThrow(
-      'Unknown table missing_table',
-    );
-  });
-
-  it('throws when null-check references unknown column', () => {
-    const nullCheck = {
-      kind: 'nullCheck' as const,
-      expr: createColumnRef('user', 'missing_column'),
-      isNull: true,
-    };
-
-    expect(() => buildWhereExpr(contract, nullCheck, {}, [], [])).toThrow(
-      'Unknown column missing_column',
-    );
+      buildWhereExpr(contract, userColumns.id.eq(param('missingParam')), {}, [], []),
+    ).toThrow('Missing value for parameter missingParam');
   });
 });

@@ -1,8 +1,8 @@
 import {
-  createLiteralExpr,
-  createProjectionItem,
-  createSelectAst,
-  createTableSource,
+  LiteralExpr,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
@@ -16,10 +16,9 @@ import { createMockRuntime, getTestContract } from './helpers';
 
 function makeCompiled(sqlText = 'select 1'): SqlQueryPlan<Record<string, unknown>> {
   return {
-    ast: createSelectAst({
-      from: createTableSource('users'),
-      project: [createProjectionItem('_sql', createLiteralExpr(sqlText))],
-    }),
+    ast: SelectAst.from(TableSource.named('users')).withProject([
+      ProjectionItem.of('_sql', LiteralExpr.of(sqlText)),
+    ]),
     params: [],
     meta: {
       target: 'postgres',

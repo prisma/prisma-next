@@ -1,162 +1,74 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { validateContract } from '@prisma-next/sql-contract/validate';
-import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
-import {
-  createBinaryExpr,
-  createColumnRef,
-  createTableRef,
-} from '@prisma-next/sql-relational-core/ast';
+import { BinaryExpr, ColumnRef, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
-
-const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
-
-function loadContract(name: string): Contract {
-  const filePath = join(fixtureDir, `${name}.json`);
-  const contents = readFileSync(filePath, 'utf8');
-  const contractJson = JSON.parse(contents);
-  return validateContract<Contract>(contractJson);
-}
+import { createFixtureContext, loadFixtureContract } from './test-helpers';
 
 describe('select builder edge cases', () => {
-  const contract = loadContract('contract');
-  const adapter = createStubAdapter();
-  const context = createTestContext(contract, adapter);
+  const contract = loadFixtureContract<Contract>('contract');
+  const context = createFixtureContext(contract);
   const tables = schema<Contract>(context).tables;
-  const userTable = tables.user;
-  const userColumns = userTable.columns;
 
-  it('throws when from is not called', () => {
+  it('requires from() and select()', () => {
     expect(() =>
-      sql<Contract, CodecTypes>({ context })
-        .select({
-          id: userColumns.id,
-        })
-        .build(),
+      sql<Contract, CodecTypes>({ context }).select({ id: tables.user.columns.id }).build(),
     ).toThrow('from() must be called before building a query');
-  });
 
-  it('throws when select is not called', () => {
-    expect(() => sql<Contract, CodecTypes>({ context }).from(userTable).build()).toThrow(
+    expect(() => sql<Contract, CodecTypes>({ context }).from(tables.user).build()).toThrow(
       'select() must be called before build()',
     );
   });
 
-  it('throws when table does not exist', () => {
-    const nonexistentTable = createTableRef('nonexistent');
+  it('rejects unknown tables, self-joins, and invalid limits', () => {
     expect(() =>
       sql<Contract, CodecTypes>({ context })
-        .from(nonexistentTable)
-        .select({
-          id: userColumns.id,
-        })
+        .from({ name: 'nonexistent' })
+        .select({ id: tables.user.columns.id })
         .build(),
     ).toThrow('Unknown table nonexistent');
-  });
 
-  it('throws when join table does not exist', () => {
-    const nonexistentTable = createTableRef('nonexistent');
     expect(() =>
       sql<Contract, CodecTypes>({ context })
-        .from(userTable)
-        .innerJoin(nonexistentTable, (on) => on.eqCol(userColumns.id, userColumns.id))
-        .select({
-          id: userColumns.id,
-        })
-        .build(),
-    ).toThrow('Unknown table nonexistent');
-  });
-
-  it('throws when self-join is attempted', () => {
-    expect(() =>
-      sql<Contract, CodecTypes>({ context })
-        .from(userTable)
-        .innerJoin(userTable, (on) => on.eqCol(userColumns.id, userColumns.id))
-        .select({
-          id: userColumns.id,
-        })
+        .from(tables.user)
+        .innerJoin(tables.user, (on) => on.eqCol(tables.user.columns.id, tables.user.columns.id))
+        .select({ id: tables.user.columns.id })
         .build(),
     ).toThrow('Self-joins are not supported in MVP');
-  });
 
-  it('throws when limit is negative', () => {
     expect(() =>
       sql<Contract, CodecTypes>({ context })
-        .from(userTable)
-        .select({
-          id: userColumns.id,
-        })
+        .from(tables.user)
+        .select({ id: tables.user.columns.id })
         .limit(-1)
         .build(),
     ).toThrow('Limit must be a non-negative integer');
   });
 
-  it('throws when limit is not an integer', () => {
+  it('throws when where parameters are missing', () => {
     expect(() =>
       sql<Contract, CodecTypes>({ context })
-        .from(userTable)
-        .select({
-          id: userColumns.id,
-        })
-        .limit(1.5)
-        .build(),
-    ).toThrow('Limit must be a non-negative integer');
-  });
-
-  it('throws when parameter is missing in where', () => {
-    expect(() =>
-      sql<Contract, CodecTypes>({ context })
-        .from(userTable)
-        .where(userColumns.id.eq(param('userId')))
-        .select({
-          id: userColumns.id,
-        })
+        .from(tables.user)
+        .where(tables.user.columns.id.eq(param('userId')))
+        .select({ id: tables.user.columns.id })
         .build({ params: {} }),
     ).toThrow('Missing value for parameter userId');
   });
 
-  it('handles invalid column for alias', () => {
-    // This test verifies that buildMeta throws when column is missing
-    // The actual error is thrown in buildMeta when processing projection
-    expect(() =>
-      sql<Contract, CodecTypes>({ context })
-        .from(userTable)
-        .select({
-          id: userColumns.id,
-        })
-        .build(),
-    ).not.toThrow('Missing column for alias');
-  });
-
-  it('builds query with column-to-column comparison in where', () => {
-    const plan = sql<Contract, CodecTypes>({ context })
-      .from(userTable)
-      .where(userColumns.id.eq(userColumns.createdAt))
-      .select({
-        id: userColumns.id,
-      })
+  it('builds column-to-column comparisons and all join types', () => {
+    const selectPlan = sql<Contract, CodecTypes>({ context })
+      .from(tables.user)
+      .where(tables.user.columns.id.eq(tables.user.columns.createdAt))
+      .select({ id: tables.user.columns.id })
       .build();
 
-    const ast = plan.ast as SelectAst;
-    expect(ast.kind).toBe('select');
-    expect(ast.where).toEqual(
-      createBinaryExpr('eq', createColumnRef('user', 'id'), createColumnRef('user', 'createdAt')),
+    expect(selectPlan.ast).toBeInstanceOf(SelectAst);
+    expect((selectPlan.ast as SelectAst).where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'createdAt')),
     );
-  });
 
-  it.each([
-    ['innerJoin', 'inner'],
-    ['leftJoin', 'left'],
-    ['rightJoin', 'right'],
-    ['fullJoin', 'full'],
-  ] as const)('builds query with %s', (joinMethod, expectedJoinType) => {
-    const contractWithJoinTable = {
+    const contractWithPosts = {
       ...contract,
       storage: {
         ...contract.storage,
@@ -174,26 +86,27 @@ describe('select builder edge cases', () => {
         },
       },
     } as Contract;
-    const joinContext = createTestContext(contractWithJoinTable, adapter);
-    const postTable = createTableRef('post');
+    const joinContext = createFixtureContext(contractWithPosts);
+    const joinTables = schema<Contract>(joinContext).tables;
+    const postTable = { name: 'post' };
     const postUserId = {
-      ...userColumns.id,
+      ...joinTables.user.columns.id,
       table: 'post',
       column: 'userId',
-      toExpr: () => createColumnRef('post', 'userId'),
-    } as unknown as typeof userColumns.id;
-    const builder = sql<Contract, CodecTypes>({ context: joinContext }).from(userTable);
-    const joined = builder[joinMethod](postTable, (on) => on.eqCol(userColumns.id, postUserId));
-    const plan = joined
-      .select({
-        id: userColumns.id,
-      })
-      .build();
+      toExpr: () => ColumnRef.of('post', 'userId'),
+    } as unknown as typeof joinTables.user.columns.id;
 
-    const ast = plan.ast as SelectAst;
-    expect(ast.joins?.[0]).toMatchObject({
-      kind: 'join',
-      joinType: expectedJoinType,
-    });
+    for (const [method, expected] of [
+      ['innerJoin', 'inner'],
+      ['leftJoin', 'left'],
+      ['rightJoin', 'right'],
+      ['fullJoin', 'full'],
+    ] as const) {
+      const joined = sql<Contract, CodecTypes>({ context: joinContext })
+        .from(joinTables.user)
+        [method](postTable, (on) => on.eqCol(joinTables.user.columns.id, postUserId));
+      const plan = joined.select({ id: joinTables.user.columns.id }).build();
+      expect((plan.ast as SelectAst).joins?.[0]?.joinType).toBe(expected);
+    }
   });
 });

@@ -2,13 +2,18 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type {
   Adapter,
-  DeleteAst,
   InsertAst,
   LoweredStatement,
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  createCodecRegistry,
+  DeleteAst,
+  OperationExpr,
+  ParamRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
@@ -120,14 +125,16 @@ describe('delete with vector operations', () => {
       .where(binary)
       .build({ params: { other: [1, 2, 3], threshold: 0.5 } });
 
-    expect(plan.ast).toMatchObject({
-      kind: 'delete',
-      table: { name: 'user' },
-      where: expect.objectContaining({
-        kind: 'bin',
-        op: 'eq',
-      }),
-    });
+    expect(plan.ast).toBeInstanceOf(DeleteAst);
+    const ast = plan.ast as DeleteAst;
+    expect(ast.table.name).toBe('user');
+    expect(ast.where).toBeInstanceOf(BinaryExpr);
+    const where = ast.where as BinaryExpr;
+    expect(where.op).toBe('eq');
+    expect(where.left).toBeInstanceOf(OperationExpr);
+    const left = where.left as OperationExpr;
+    expect(left.method).toBe('cosineDistance');
+    expect(left.args).toEqual([ParamRef.of(0, 'other')]);
     expect(plan.params).toContain(0.5);
   });
 });
