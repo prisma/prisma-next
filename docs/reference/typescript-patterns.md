@@ -500,9 +500,9 @@ if (isColumnBuilder(where.left)) {
   // TypeScript knows where.left is ColumnBuilder here
 }
 
-// ✅ CORRECT: Use type predicate to check and extract
-const operationExpr = getOperationExpr(where.left);
-if (operationExpr) {
+// ✅ CORRECT: Narrow to the explicit builder shape
+if (isExpressionBuilder(where.left)) {
+  const operationExpr = where.left.expr;
   // TypeScript knows operationExpr is OperationExpr here
 }
 ```
@@ -585,25 +585,20 @@ export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
 }
 
 /**
- * Helper to extract operation expression from builder.
- * Returns OperationExpr if present, undefined otherwise.
+ * Type predicate to check if a value is an ExpressionBuilder.
  */
-export function getOperationExpr(
-  builder: AnyColumnBuilder | OperationExpr,
-): OperationExpr | undefined {
-  if (isOperationExpr(builder)) {
-    return builder;
-  }
-  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
-  return builderWithExpr._operationExpr;
+export function isExpressionBuilder(value: unknown): value is ExpressionBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'expression'
+  );
 }
 ```
 
-**Note**: The `getOperationExpr` helper still uses a cast internally, but it's:
-- Centralized in one place
-- Documented and tested
-- Used consistently across the codebase
-- Better than having blind casts everywhere
+**Note**: Prefer explicit builder shapes such as `ExpressionBuilder` over hidden implementation properties.
+That keeps narrowing local, removes dependency on `_operationExpr`, and lets TypeScript follow the real API surface.
 
 ### Related Patterns
 

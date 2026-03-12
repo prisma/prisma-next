@@ -1,15 +1,12 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  AggregateExpr,
-  BinaryOp,
-  BoundWhereExpr,
-  WhereExpr,
-} from '@prisma-next/sql-relational-core/ast';
 import {
-  createAggregateExpr,
-  createBinaryExpr,
-  createColumnRef,
-  createLiteralExpr,
+  AggregateExpr,
+  BinaryExpr,
+  type BinaryOp,
+  type BoundWhereExpr,
+  ColumnRef,
+  LiteralExpr,
+  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { mapStorageRowToModelFields } from './collection-runtime';
@@ -133,11 +130,11 @@ function createHavingBuilder<TContract extends SqlContract<SqlStorage>, ModelNam
     fn: Exclude<AggregateExpr['fn'], 'count'>,
     fieldName: string,
   ): AggregateExpr =>
-    createAggregateExpr(fn, createColumnRef(tableName, fieldToColumn[fieldName] ?? fieldName));
+    new AggregateExpr(fn, ColumnRef.of(tableName, fieldToColumn[fieldName] ?? fieldName));
 
   return {
     count() {
-      return createHavingComparisonMethods<number>(createAggregateExpr('count'));
+      return createHavingComparisonMethods<number>(AggregateExpr.count());
     },
     sum(field) {
       return createHavingComparisonMethods<number | null>(createMetricExpr('sum', field as string));
@@ -158,7 +155,7 @@ function createHavingComparisonMethods<T extends number | null>(
   metric: AggregateExpr,
 ): HavingComparisonMethods<T> {
   const buildBinaryExpr = (op: BinaryOp, value: unknown): WhereExpr =>
-    createBinaryExpr(op, metric, createLiteralExpr(value));
+    new BinaryExpr(op, metric, LiteralExpr.of(value));
 
   return {
     eq(value) {

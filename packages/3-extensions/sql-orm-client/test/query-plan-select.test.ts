@@ -1,14 +1,21 @@
-import type { BoundWhereExpr, WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  AndExpr,
+  BinaryExpr,
+  type BoundWhereExpr,
+  ColumnRef,
+  DerivedTableSource,
+  ParamRef,
+  SubqueryExpr,
+  type ToWhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { compileSelectWithIncludeStrategy } from '../src/query-plan-select';
 import { baseContract, createCollection } from './collection-fixtures';
 import { isSelectAst } from './helpers';
 
-const col = (table: string, column: string) => ({ kind: 'col' as const, table, column });
-const param = (index: number) => ({ kind: 'param' as const, index });
 const descriptor = (index: number) => ({ source: 'lane' as const, index });
 const bound = (
-  expr: WhereExpr,
+  expr: BinaryExpr,
   params: readonly unknown[] = [],
   paramDescriptors = params.map((_, index) => descriptor(index + 1)),
 ): BoundWhereExpr => ({
@@ -16,7 +23,7 @@ const bound = (
   params,
   paramDescriptors,
 });
-const toWhereExpr = (value: BoundWhereExpr): WhereArg => ({
+const toWhereExpr = (value: BoundWhereExpr): ToWhereExpr => ({
   toWhereExpr: () => value,
 });
 
@@ -26,29 +33,13 @@ describe('compileSelectWithIncludeStrategy', () => {
     const state = collection
       .where(() =>
         toWhereExpr(
-          bound(
-            {
-              kind: 'bin' as const,
-              op: 'eq' as const,
-              left: col('users', 'name'),
-              right: param(1),
-            },
-            ['Alice'],
-          ),
+          bound(BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')), ['Alice']),
         ),
       )
       .include('posts', (posts) =>
         posts.where(() =>
           toWhereExpr(
-            bound(
-              {
-                kind: 'bin' as const,
-                op: 'gte' as const,
-                left: col('posts', 'views'),
-                right: param(1),
-              },
-              [100],
-            ),
+            bound(BinaryExpr.gte(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'views')), [100]),
           ),
         ),
       ).state;
@@ -62,41 +53,28 @@ describe('compileSelectWithIncludeStrategy', () => {
       throw new Error('Expected select AST');
     }
 
-    expect(plan.ast.where).toMatchObject({
-      kind: 'bin',
-      op: 'eq',
-      left: col('users', 'name'),
-      right: param(1),
-    });
+    expect(plan.ast.where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
+    );
 
     const postsProjection = plan.ast.project.find((item) => item.alias === 'posts');
-    expect(postsProjection?.expr.kind).toBe('subquery');
-    if (postsProjection?.expr.kind !== 'subquery') {
+    expect(postsProjection?.expr).toBeInstanceOf(SubqueryExpr);
+    if (!(postsProjection?.expr instanceof SubqueryExpr)) {
       throw new Error('Expected posts include projection to be a subquery');
     }
 
     const childRowsSource = postsProjection.expr.query.from;
-    expect(childRowsSource.kind).toBe('derivedTable');
-    if (childRowsSource.kind !== 'derivedTable') {
+    expect(childRowsSource).toBeInstanceOf(DerivedTableSource);
+    if (!(childRowsSource instanceof DerivedTableSource)) {
       throw new Error('Expected include aggregate query to select from derived rows');
     }
 
-    expect(childRowsSource.query.where).toEqual({
-      kind: 'and',
-      exprs: [
-        {
-          kind: 'bin',
-          op: 'eq',
-          left: col('posts', 'user_id'),
-          right: col('users', 'id'),
-        },
-        {
-          kind: 'bin',
-          op: 'gte',
-          left: col('posts', 'views'),
-          right: param(2),
-        },
-      ],
-    });
+    expect(childRowsSource.query.where).toBeInstanceOf(AndExpr);
+    expect(childRowsSource.query.where).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+        BinaryExpr.gte(ColumnRef.of('posts', 'views'), ParamRef.of(2, 'views')),
+      ]),
+    );
   });
 });

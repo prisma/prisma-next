@@ -37,6 +37,7 @@ export interface MetaBuildArgs {
   }>;
   readonly where?: AnyBinaryBuilder | AnyUnaryBuilder;
   readonly orderBy?: AnyOrderBuilder;
+  readonly limit?: number;
   readonly paramDescriptors: ParamDescriptor[];
   readonly paramCodecs?: Record<string, string>;
 }

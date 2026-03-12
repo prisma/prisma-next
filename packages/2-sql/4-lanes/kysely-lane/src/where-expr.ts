@@ -2,8 +2,9 @@ import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type BoundWhereExpr,
-  foldExpressionDeep,
-  mapExpressionDeep,
+  ListLiteralExpr,
+  ParamRef,
+  SelectAst,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { CompiledQuery } from 'kysely';
@@ -28,12 +29,11 @@ export function buildKyselyWhereExpr<Row>(
   options: BuildKyselyPlanOptions = {},
 ): ToWhereExpr {
   const plan = buildKyselyPlan(contract, compiledQuery, options);
-  if (plan.ast.kind !== 'select' || !plan.ast.where) {
+  if (!(plan.ast instanceof SelectAst) || !plan.ast.where) {
     throw new Error('whereExpr(...) requires a select query with a where clause');
   }
 
-  const collectIndexes = createParamIndexCollector();
-  const indexes = [...new Set(collectIndexes.where(plan.ast.where))].sort((a, b) => a - b);
+  const indexes = [...new Set(collectParamIndexes(plan.ast.where))].sort((a, b) => a - b);
   if (indexes.length === 0) {
     return new LaneWhereExpr({
       expr: plan.ast.where,
@@ -43,8 +43,7 @@ export function buildKyselyWhereExpr<Row>(
   }
 
   const remap = new Map<number, number>(indexes.map((index, i) => [index, i + 1]));
-  const remapIndexes = createParamIndexRemapper(remap);
-  const remappedExpr = remapIndexes.where(plan.ast.where);
+  const remappedExpr = remapParamIndexes(plan.ast.where, remap);
   const params = indexes.map((index) => {
     if (index <= 0 || index > plan.params.length) {
       throw new Error(`whereExpr(...) payload is invalid: missing param value for index ${index}`);
@@ -81,34 +80,38 @@ function findDescriptorByIndex(
   throw new Error(`whereExpr(...) payload is invalid: missing param descriptor for index ${index}`);
 }
 
-function createParamIndexRemapper(remap: ReadonlyMap<number, number>) {
-  return mapExpressionDeep({
-    param: (p) => {
-      const newIndex = remap.get(p.index);
+function remapParamIndexes(
+  expr: BoundWhereExpr['expr'],
+  remap: ReadonlyMap<number, number>,
+): BoundWhereExpr['expr'] {
+  return expr.rewrite({
+    paramRef: (paramRef) => {
+      const newIndex = remap.get(paramRef.index);
       if (newIndex === undefined) {
-        throw new Error(`whereExpr(...) payload is invalid: unknown ParamRef index ${p.index}`);
+        throw new Error(
+          `whereExpr(...) payload is invalid: unknown ParamRef index ${paramRef.index}`,
+        );
       }
-      return { ...p, index: newIndex };
+      return paramRef.withIndex(newIndex);
     },
-    listLiteral: (list) => ({
-      ...list,
-      values: list.values.map((v) => {
-        if (v.kind !== 'param') return v;
-        const newIndex = remap.get(v.index);
-        if (newIndex === undefined) {
-          throw new Error(`whereExpr(...) payload is invalid: unknown ParamRef index ${v.index}`);
-        }
-        return { ...v, index: newIndex };
-      }),
-    }),
+    listLiteral: (list) =>
+      new ListLiteralExpr(
+        list.values.map((value) => {
+          if (!(value instanceof ParamRef)) {
+            return value;
+          }
+          const newIndex = remap.get(value.index);
+          if (newIndex === undefined) {
+            throw new Error(
+              `whereExpr(...) payload is invalid: unknown ParamRef index ${value.index}`,
+            );
+          }
+          return value.withIndex(newIndex);
+        }),
+      ),
   });
 }
 
-function createParamIndexCollector() {
-  return foldExpressionDeep<number[]>({
-    empty: [],
-    combine: (a, b) => [...a, ...b],
-    param: (p) => [p.index],
-    listLiteral: (list) => list.values.flatMap((v) => (v.kind === 'param' ? [v.index] : [])),
-  });
+function collectParamIndexes(expr: BoundWhereExpr['expr']): number[] {
+  return expr.collectParamRefs().map((paramRef) => paramRef.index);
 }

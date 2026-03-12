@@ -1,7 +1,9 @@
 import {
-  createColumnRef,
-  createParamRef,
+  ColumnRef,
+  DefaultValueExpr,
   type InsertAst,
+  InsertAst as InsertAstClass,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { compileInsertCount, compileInsertReturning } from '../src/query-plan';
@@ -9,7 +11,7 @@ import { withReturningCapability } from './collection-fixtures';
 import { getTestContract } from './helpers';
 
 function assertInsertAst(ast: unknown): asserts ast is InsertAst {
-  expect(ast).toMatchObject({ kind: 'insert' });
+  expect(ast).toBeInstanceOf(InsertAstClass);
 }
 
 describe('query plan mutations', () => {
@@ -36,23 +38,23 @@ describe('query plan mutations', () => {
       10,
     ]);
     expect(plan.ast.rows).toHaveLength(2);
-    expect(plan.ast.rows[0]).toEqual({
-      id: createParamRef(1, 'id'),
-      name: createParamRef(2, 'name'),
-      email: createParamRef(3, 'email'),
-      invited_by_id: { kind: 'default' },
+    expect(plan.ast.rows[0]).toMatchObject({
+      id: ParamRef.of(1, 'id'),
+      name: ParamRef.of(2, 'name'),
+      email: ParamRef.of(3, 'email'),
     });
+    expect(plan.ast.rows[0]?.['invited_by_id']).toBeInstanceOf(DefaultValueExpr);
     expect(plan.ast.rows[1]).toEqual({
-      id: createParamRef(4, 'id'),
-      name: createParamRef(5, 'name'),
-      email: createParamRef(6, 'email'),
-      invited_by_id: createParamRef(7, 'invited_by_id'),
+      id: ParamRef.of(4, 'id'),
+      name: ParamRef.of(5, 'name'),
+      email: ParamRef.of(6, 'email'),
+      invited_by_id: ParamRef.of(7, 'invited_by_id'),
     });
     expect(plan.ast.returning).toEqual([
-      createColumnRef('users', 'email'),
-      createColumnRef('users', 'id'),
-      createColumnRef('users', 'invited_by_id'),
-      createColumnRef('users', 'name'),
+      ColumnRef.of('users', 'email'),
+      ColumnRef.of('users', 'id'),
+      ColumnRef.of('users', 'invited_by_id'),
+      ColumnRef.of('users', 'name'),
     ]);
   });
 

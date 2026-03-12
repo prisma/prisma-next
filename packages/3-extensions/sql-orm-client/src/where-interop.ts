@@ -4,7 +4,6 @@ import type {
   WhereArg,
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import { foldExpressionDeep } from '@prisma-next/sql-relational-core/ast';
 
 export function normalizeWhereArg(arg: undefined): undefined;
 export function normalizeWhereArg(arg: WhereArg): BoundWhereExpr;
@@ -99,25 +98,10 @@ function assertBareWhereExprIsParamFree(expr: WhereExpr): void {
   }
 }
 
-const detector = foldExpressionDeep<boolean>({
-  empty: false,
-  combine: (a, b) => a || b,
-  isAbsorbing: (v) => v,
-  param: () => true,
-  listLiteral: (list) => list.values.some((v) => v.kind === 'param'),
-});
-
 function whereExprContainsParamRef(expr: WhereExpr): boolean {
-  return detector.where(expr);
+  return expr.collectParamRefs().length > 0;
 }
 
-const collector = foldExpressionDeep<number[]>({
-  empty: [],
-  combine: (a, b) => [...a, ...b],
-  param: (p) => [p.index],
-  listLiteral: (list) => list.values.flatMap((v) => (v.kind === 'param' ? [v.index] : [])),
-});
-
 function collectParamRefIndexes(expr: WhereExpr): number[] {
-  return collector.where(expr);
+  return expr.collectParamRefs().map((paramRef) => paramRef.index);
 }

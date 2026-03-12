@@ -1,4 +1,10 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import {
+  ColumnRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
 import { executeQueryPlan } from '../src/execute-query-plan';
@@ -8,11 +14,9 @@ describe('execute query plan', () => {
     const execute = vi.fn();
     const executor = { execute };
     const plan: SqlQueryPlan<{ id: number }> = {
-      ast: {
-        kind: 'select',
-        from: { kind: 'table', name: 'users' },
-        project: [{ alias: 'id', expr: { kind: 'col', table: 'users', column: 'id' } }],
-      },
+      ast: SelectAst.from(TableSource.named('users')).withProject([
+        ProjectionItem.of('id', ColumnRef.of('users', 'id')),
+      ]),
       params: [],
       meta: {
         target: 'postgres',

@@ -1,51 +1,29 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { AndExpr, BinaryExpr, OrExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import {
-  createAndExpr,
-  createBinaryExpr,
-  createColumnRef,
-  createLiteralExpr,
-  createNullCheckExpr,
-  createOrExpr,
-  createTrueExpr,
+  AndExpr,
+  BinaryExpr,
+  ColumnRef,
+  LiteralExpr,
+  NullCheckExpr,
+  OrExpr,
+  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ShorthandWhereFilter } from './types';
 
 export function and(...exprs: WhereExpr[]): AndExpr {
-  return createAndExpr(exprs);
+  return AndExpr.of(exprs);
 }
 
 export function or(...exprs: WhereExpr[]): OrExpr {
-  return createOrExpr(exprs);
+  return OrExpr.of(exprs);
 }
 
 export function not(expr: WhereExpr): WhereExpr {
-  switch (expr.kind) {
-    case 'bin':
-      return negateBinary(expr);
-    case 'and':
-      return createOrExpr(expr.exprs.map(not));
-    case 'or':
-      return createAndExpr(expr.exprs.map(not));
-    case 'exists':
-      return {
-        ...expr,
-        not: !expr.not,
-      };
-    case 'nullCheck':
-      return {
-        ...expr,
-        isNull: !expr.isNull,
-      };
-    default: {
-      const neverExpr: never = expr;
-      throw new Error(`Unsupported where expression kind for not(): ${String(neverExpr)}`);
-    }
-  }
+  return expr.not();
 }
 
 export function all(): WhereExpr {
-  return createTrueExpr();
+  return AndExpr.true();
 }
 
 export function shorthandToWhereExpr<
@@ -75,14 +53,14 @@ export function shorthandToWhereExpr<
     }
 
     const columnName = fieldToColumn[fieldName] ?? fieldName;
-    const left = createColumnRef(tableName, columnName);
+    const left = ColumnRef.of(tableName, columnName);
 
     if (value === null) {
-      exprs.push(createNullCheckExpr(left, true));
+      exprs.push(NullCheckExpr.isNull(left));
       continue;
     }
 
-    exprs.push(createBinaryExpr('eq', left, createLiteralExpr(value)));
+    exprs.push(BinaryExpr.eq(left, LiteralExpr.of(value)));
   }
 
   if (exprs.length === 0) {
@@ -90,39 +68,4 @@ export function shorthandToWhereExpr<
   }
 
   return exprs.length === 1 ? exprs[0] : and(...exprs);
-}
-
-function negateBinary(expr: BinaryExpr): BinaryExpr {
-  return {
-    ...expr,
-    op: negateBinaryOp(expr.op),
-  };
-}
-
-function negateBinaryOp(op: BinaryExpr['op']): BinaryExpr['op'] {
-  switch (op) {
-    case 'eq':
-      return 'neq';
-    case 'neq':
-      return 'eq';
-    case 'gt':
-      return 'lte';
-    case 'lt':
-      return 'gte';
-    case 'gte':
-      return 'lt';
-    case 'lte':
-      return 'gt';
-    case 'in':
-      return 'notIn';
-    case 'notIn':
-      return 'in';
-    case 'like':
-    case 'ilike':
-      throw new Error(`Operator "${op}" is not negatable without explicit NOT support in the AST`);
-    default: {
-      const neverOp: never = op;
-      throw new Error(`Unknown binary operator: ${String(neverOp)}`);
-    }
-  }
 }

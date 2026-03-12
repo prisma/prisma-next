@@ -1,6 +1,10 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { BoundWhereExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
-import { createAndExpr, mapExpressionDeep } from '@prisma-next/sql-relational-core/ast';
+import {
+  AndExpr,
+  type BoundWhereExpr,
+  ParamRef,
+  type WhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
 
 export function createBoundWhereExpr(expr: WhereExpr): BoundWhereExpr {
   return {
@@ -33,18 +37,9 @@ function offsetWhereExprParams(expr: WhereExpr, offset: number): WhereExpr {
     return expr;
   }
 
-  return mapExpressionDeep({
-    param: (param) => ({
-      ...param,
-      index: param.index + offset,
-    }),
-    listLiteral: (list) => ({
-      ...list,
-      values: list.values.map((value) =>
-        value.kind === 'param' ? { ...value, index: value.index + offset } : value,
-      ),
-    }),
-  }).where(expr);
+  return expr.rewrite({
+    paramRef: (param) => new ParamRef(param.index + offset, param.name),
+  });
 }
 
 export function offsetBoundWhereExpr(bound: BoundWhereExpr, offset: number): BoundWhereExpr {
@@ -85,7 +80,7 @@ export function combineWhereFilters(
   }
 
   return {
-    expr: createAndExpr(shiftedFilters.map((filter) => filter.expr)),
+    expr: AndExpr.of(shiftedFilters.map((filter) => filter.expr)),
     params: shiftedFilters.flatMap((filter) => filter.params),
     paramDescriptors: shiftedFilters.flatMap((filter) => filter.paramDescriptors),
   };
@@ -100,5 +95,5 @@ export function combinePlainWhereExprs(filters: readonly WhereExpr[]): WhereExpr
     return filters[0];
   }
 
-  return createAndExpr(filters);
+  return AndExpr.of(filters);
 }

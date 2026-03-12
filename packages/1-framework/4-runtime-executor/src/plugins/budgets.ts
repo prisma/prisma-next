@@ -119,43 +119,28 @@ function estimateRows(
   tableRows: Record<string, number>,
   defaultTableRows: number,
 ): number | null {
-  if (!plan.ast) {
-    return null;
-  }
-
   const table = plan.meta.refs?.tables?.[0];
   if (!table) {
     return null;
   }
 
   const tableEstimate = tableRows[table] ?? defaultTableRows;
+  const annotations = plan.meta.annotations as { limit?: number; LIMIT?: number } | undefined;
+  const limit =
+    typeof annotations?.limit === 'number'
+      ? annotations.limit
+      : typeof annotations?.LIMIT === 'number'
+        ? annotations.LIMIT
+        : undefined;
 
-  if (
-    plan.ast &&
-    typeof plan.ast === 'object' &&
-    'kind' in plan.ast &&
-    plan.ast.kind === 'select' &&
-    'limit' in plan.ast &&
-    typeof plan.ast.limit === 'number'
-  ) {
-    return Math.min(plan.ast.limit, tableEstimate);
+  if (typeof limit === 'number') {
+    return Math.min(limit, tableEstimate);
   }
 
   return tableEstimate;
 }
 
 function hasDetectableLimit(plan: ExecutionPlan): boolean {
-  if (
-    plan.ast &&
-    typeof plan.ast === 'object' &&
-    'kind' in plan.ast &&
-    plan.ast.kind === 'select' &&
-    'limit' in plan.ast &&
-    typeof plan.ast.limit === 'number'
-  ) {
-    return true;
-  }
-
   const annotations = plan.meta.annotations as { limit?: number; LIMIT?: number } | undefined;
   return typeof annotations?.limit === 'number' || typeof annotations?.LIMIT === 'number';
 }

@@ -1,67 +1,65 @@
-import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import {
-  createBinaryExpr,
-  createColumnRef,
-  createDerivedTableSource,
-  createJoin,
-  createProjectionItem,
-  createSelectAstBuilder,
-  createSubqueryExpr,
-  createTableSource,
-  createTrueExpr,
+  BinaryExpr,
+  ColumnRef,
+  DerivedTableSource,
+  JoinAst,
+  JsonArrayAggExpr,
+  ProjectionItem,
+  SelectAst,
+  SubqueryExpr,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 
-describe('Include AST modeling', () => {
-  it('models include-style lateral join with a derived source', () => {
-    const includeAggregate = createSelectAstBuilder(createTableSource('post'))
-      .project([createProjectionItem('posts', createColumnRef('post', 'id'))])
-      .build();
+describe('include AST shapes', () => {
+  it('represents lateral include aggregates as derived-table joins', () => {
+    const includeAggregate = SelectAst.from(
+      DerivedTableSource.as(
+        'posts__rows',
+        SelectAst.from(TableSource.named('post')).withProject([
+          ProjectionItem.of('id', ColumnRef.of('post', 'id')),
+        ]),
+      ),
+    ).withProject([
+      ProjectionItem.of(
+        'posts',
+        JsonArrayAggExpr.of(ColumnRef.of('posts__rows', 'id'), 'emptyArray'),
+      ),
+    ]);
 
-    const selectAst: SelectAst = createSelectAstBuilder(createTableSource('user'))
-      .project([
-        createProjectionItem('id', createColumnRef('user', 'id')),
-        createProjectionItem('posts', createColumnRef('posts_lateral', 'posts')),
+    const selectAst = SelectAst.from(TableSource.named('user'))
+      .withProject([
+        ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+        ProjectionItem.of('posts', ColumnRef.of('posts_lateral', 'posts')),
       ])
-      .joins([
-        createJoin(
-          'left',
-          createDerivedTableSource('posts_lateral', includeAggregate),
-          createTrueExpr(),
+      .withJoins([
+        JoinAst.left(
+          DerivedTableSource.as('posts_lateral', includeAggregate),
+          BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'id')),
           true,
         ),
-      ])
-      .build();
+      ]);
 
-    const join = selectAst.joins?.[0];
-    expect(join).toEqual({
-      kind: 'join',
-      joinType: 'left',
-      source: createDerivedTableSource('posts_lateral', includeAggregate),
-      lateral: true,
-      on: createTrueExpr(),
-    });
+    expect(selectAst.joins?.[0]?.lateral).toBe(true);
+    expect(selectAst.joins?.[0]?.source).toBeInstanceOf(DerivedTableSource);
+    expect(
+      (selectAst.joins?.[0]?.source as DerivedTableSource).query.project[0]?.expr,
+    ).toBeInstanceOf(JsonArrayAggExpr);
   });
 
-  it('models include-style correlated projection via subquery expression', () => {
-    const childQuery = createSelectAstBuilder(createTableSource('post'))
-      .project([createProjectionItem('posts', createColumnRef('post', 'id'))])
-      .where(
-        createBinaryExpr('eq', createColumnRef('post', 'userId'), createColumnRef('user', 'id')),
-      )
-      .build();
+  it('represents scalar include subqueries as subquery expressions', () => {
+    const childQuery = SelectAst.from(TableSource.named('post'))
+      .withProject([ProjectionItem.of('posts', ColumnRef.of('post', 'id'))])
+      .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')));
 
-    const selectAst: SelectAst = createSelectAstBuilder(createTableSource('user'))
-      .project([
-        createProjectionItem('id', createColumnRef('user', 'id')),
-        createProjectionItem('posts', createSubqueryExpr(childQuery)),
-      ])
-      .build();
+    const selectAst = SelectAst.from(TableSource.named('user')).withProject([
+      ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+      ProjectionItem.of('posts', SubqueryExpr.of(childQuery)),
+    ]);
 
-    const posts = selectAst.project.find((item) => item.alias === 'posts');
-    expect(posts?.expr.kind).toBe('subquery');
-    expect(posts?.expr.kind === 'subquery' ? posts.expr.query.where : undefined).toEqual(
-      createBinaryExpr('eq', createColumnRef('post', 'userId'), createColumnRef('user', 'id')),
+    expect(selectAst.project[1]?.expr).toBeInstanceOf(SubqueryExpr);
+    expect((selectAst.project[1]?.expr as SubqueryExpr).query.where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')),
     );
   });
 });

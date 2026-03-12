@@ -3,10 +3,10 @@ import { hasAllCapabilities } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type {
-  BinaryOp,
-  Expression,
-  ExpressionSource,
+import {
+  type BinaryOp,
+  type Expression,
+  type ExpressionSource,
   LiteralExpr,
   OperationExpr,
   ParamRef,
@@ -79,11 +79,7 @@ function executeOperation(
       if (!isParamPlaceholder(arg)) {
         throw planInvalid(`Argument ${i} must be a parameter placeholder`);
       }
-      operationArgs.push({
-        kind: 'param',
-        index: 0,
-        name: arg.name,
-      });
+      operationArgs.push(new ParamRef(0, arg.name));
     } else if (argSpec.kind === 'typeId') {
       // Accept ExpressionSource (ColumnBuilder or ExpressionBuilder)
       if (!isExpressionSource(arg)) {
@@ -94,22 +90,18 @@ function executeOperation(
       // Use toExpr() to get the Expression
       operationArgs.push(arg.toExpr());
     } else if (argSpec.kind === 'literal') {
-      operationArgs.push({
-        kind: 'literal',
-        value: arg,
-      });
+      operationArgs.push(new LiteralExpr(arg));
     }
   }
 
-  const operationExpr: OperationExpr = {
-    kind: 'operation',
+  const operationExpr = new OperationExpr({
     method: signature.method,
     forTypeId: signature.forTypeId,
     self: selfExpr,
     args: operationArgs,
     returns: signature.returns,
     lowering: signature.lowering,
-  };
+  });
 
   const returnTypeId = signature.returns.kind === 'typeId' ? signature.returns.type : undefined;
   const returnColumnMeta: StorageColumn = returnTypeId

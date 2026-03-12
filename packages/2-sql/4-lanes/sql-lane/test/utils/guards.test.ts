@@ -1,325 +1,105 @@
-import type { ColumnRef, OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import {
-  createColumnRef,
-  createLiteralExpr,
-  createParamRef,
+  ColumnRef,
+  LiteralExpr,
+  OperationExpr,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
-import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import {
-  collectColumnRefs,
-  extractBaseColumnRef,
+  expressionFromSource,
   getColumnInfo,
+  getColumnMeta,
   isColumnBuilder,
-  isOperationExpr,
+  isExpressionBuilder,
+  isExpressionSource,
+  isParamPlaceholder,
+  isValueSource,
+  toExpression,
 } from '@prisma-next/sql-relational-core/utils/guards';
 import { describe, expect, it } from 'vitest';
+import type { Contract } from '../fixtures/contract.d';
+import { createFixtureContext, loadFixtureContract } from '../test-helpers';
+
+const vectorReturn = { kind: 'typeId', type: 'pg/vector@1' } as const;
+
+function normalize(column: ColumnRef): OperationExpr {
+  return OperationExpr.function({
+    method: 'normalize',
+    forTypeId: 'pg/vector@1',
+    self: column,
+    args: [],
+    returns: vectorReturn,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+    template: 'normalize(${self})',
+  });
+}
 
 describe('guards', () => {
-  describe('extractBaseColumnRef', () => {
-    it('returns ColumnRef directly when expr is ColumnRef', () => {
-      const colRef: ColumnRef = createColumnRef('user', 'id');
-      const result = extractBaseColumnRef(colRef);
-      expect({
-        isColRef: result === colRef,
-        table: result.table,
-        column: result.column,
-      }).toMatchObject({
-        isColRef: true,
-        table: 'user',
-        column: 'id',
-      });
-    });
+  const contract = loadFixtureContract<Contract>('contract');
+  const context = createFixtureContext(contract);
+  const tables = schema<Contract>(context).tables;
 
-    it('recursively unwraps OperationExpr to find base ColumnRef', () => {
-      const baseCol: ColumnRef = createColumnRef('user', 'id');
-      const operation1: OperationExpr = {
-        kind: 'operation',
-        method: 'normalize',
-        forTypeId: 'pg/vector@1',
-        self: baseCol,
-        args: [],
-        returns: { kind: 'typeId', type: 'pg/vector@1' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'normalize(${self})',
-        },
-      };
-      const operation2: OperationExpr = {
-        kind: 'operation',
-        method: 'cosineDistance',
-        forTypeId: 'pg/vector@1',
-        self: operation1,
-        args: [],
-        returns: { kind: 'builtin', type: 'number' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'infix',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: '${self} <=> ${arg0}',
-        },
-      };
-
-      const result = extractBaseColumnRef(operation2);
-      expect({
-        equalsBaseCol: result === baseCol,
-        table: result.table,
-        column: result.column,
-      }).toMatchObject({
-        equalsBaseCol: true,
-        table: 'user',
-        column: 'id',
-      });
+  it('reads column info from builders and operation expressions', () => {
+    expect(getColumnInfo(tables.user.columns.id)).toEqual({ table: 'user', column: 'id' });
+    expect(getColumnInfo(normalize(ColumnRef.of('user', 'embedding')))).toEqual({
+      table: 'user',
+      column: 'embedding',
     });
   });
 
-  describe('collectColumnRefs', () => {
-    it('returns single ColumnRef for ColumnRef input', () => {
-      const colRef: ColumnRef = createColumnRef('user', 'id');
-      const result = collectColumnRefs(colRef);
-      expect(result).toEqual([colRef]);
-    });
+  it('identifies builder and source shapes', () => {
+    const builder = tables.user.columns.id;
+    const expressionBuilder = {
+      kind: 'expression' as const,
+      expr: normalize(ColumnRef.of('user', 'embedding')),
+      columnMeta: { nativeType: 'vector', codecId: 'pg/vector@1', nullable: false },
+      eq: builder.eq,
+      neq: builder.neq,
+      gt: builder.gt,
+      lt: builder.lt,
+      gte: builder.gte,
+      lte: builder.lte,
+      asc: builder.asc,
+      desc: builder.desc,
+      toExpr: () => normalize(ColumnRef.of('user', 'embedding')),
+      __jsType: undefined as never,
+    };
 
-    it('returns empty array for ParamRef', () => {
-      const paramRef: ParamRef = createParamRef(1, 'userId');
-      const result = collectColumnRefs(paramRef);
-      expect(result).toEqual([]);
-    });
+    expect(isColumnBuilder(builder)).toBe(true);
+    expect(isExpressionBuilder(expressionBuilder)).toBe(true);
+    expect(isExpressionSource(builder)).toBe(true);
+    expect(isExpressionSource(expressionBuilder)).toBe(true);
+    expect(isValueSource(builder)).toBe(true);
+    expect(isValueSource({ kind: 'param-placeholder', name: 'id' })).toBe(true);
+  });
 
-    it('returns empty array for LiteralExpr', () => {
-      const literalExpr = createLiteralExpr('test');
-      const result = collectColumnRefs(literalExpr);
-      expect(result).toEqual([]);
-    });
+  it('converts sources to rich expressions', () => {
+    const builder = tables.user.columns.id;
 
-    it('collects ColumnRefs from nested OperationExpr', () => {
-      const col1: ColumnRef = createColumnRef('user', 'id');
-      const col2: ColumnRef = createColumnRef('user', 'email');
-      const operation: OperationExpr = {
-        kind: 'operation',
-        method: 'eq',
-        forTypeId: 'pg/int4@1',
-        self: col1,
-        args: [col2],
-        returns: { kind: 'builtin', type: 'boolean' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: '${self} = ${arg0}',
-        },
-      };
+    expect(toExpression(builder)).toEqual(ColumnRef.of('user', 'id'));
+    expect(expressionFromSource(builder)).toEqual(ColumnRef.of('user', 'id'));
+  });
 
-      const result = collectColumnRefs(operation);
-      expect(result).toHaveLength(2);
-      expect(result).toContainEqual(col1);
-      expect(result).toContainEqual(col2);
-    });
+  it('extracts column metadata', () => {
+    const builder = tables.user.columns.id;
 
-    it('collects ColumnRefs from deeply nested OperationExpr', () => {
-      const col1: ColumnRef = createColumnRef('user', 'id');
-      const col2: ColumnRef = createColumnRef('user', 'email');
-      const innerOp: OperationExpr = {
-        kind: 'operation',
-        method: 'normalize',
-        forTypeId: 'pg/vector@1',
-        self: col1,
-        args: [],
-        returns: { kind: 'typeId', type: 'pg/vector@1' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'normalize(${self})',
-        },
-      };
-      const outerOp: OperationExpr = {
-        kind: 'operation',
-        method: 'cosineDistance',
-        forTypeId: 'pg/vector@1',
-        self: innerOp,
-        args: [col2],
-        returns: { kind: 'builtin', type: 'number' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'infix',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: '${self} <=> ${arg0}',
-        },
-      };
-
-      const result = collectColumnRefs(outerOp);
-      expect(result).toHaveLength(2);
-      expect(result).toContainEqual(col1);
-      expect(result).toContainEqual(col2);
+    expect(getColumnMeta(builder)).toEqual({
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
     });
   });
 
-  describe('isOperationExpr', () => {
-    it('returns true for OperationExpr', () => {
-      const colRef: ColumnRef = createColumnRef('user', 'id');
-      const operation: OperationExpr = {
-        kind: 'operation',
-        method: 'normalize',
-        forTypeId: 'pg/vector@1',
-        self: colRef,
-        args: [],
-        returns: { kind: 'typeId', type: 'pg/vector@1' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'normalize(${self})',
-        },
-      };
-
-      expect(isOperationExpr(operation)).toBe(true);
-    });
-
-    it('returns false for ColumnBuilder', () => {
-      const columnBuilder = {
-        kind: 'column' as const,
-        table: 'user',
-        column: 'id',
-        columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      } as ColumnBuilder;
-
-      expect(isOperationExpr(columnBuilder)).toBe(false);
-    });
-
-    it('returns false for null', () => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-      expect(isOperationExpr(null as any)).toBe(false);
-    });
-
-    it('returns false for undefined', () => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-      expect(isOperationExpr(undefined as any)).toBe(false);
-    });
-
-    it('returns false for plain object without kind', () => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-      expect(isOperationExpr({ table: 'user', column: 'id' } as any)).toBe(false);
-    });
+  it('identifies param placeholders', () => {
+    expect(isParamPlaceholder({ kind: 'param-placeholder', name: 'userId' })).toBe(true);
+    expect(isParamPlaceholder({ kind: 'param-placeholder' })).toBe(false);
+    expect(isParamPlaceholder(null)).toBe(false);
   });
 
-  describe('getColumnInfo', () => {
-    it('extracts table and column from ColumnBuilder', () => {
-      const columnBuilder = {
-        kind: 'column' as const,
-        table: 'user',
-        column: 'id',
-        columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      } as ColumnBuilder;
-
-      const result = getColumnInfo(columnBuilder);
-      expect(result).toEqual({ table: 'user', column: 'id' });
-    });
-
-    it('extracts table and column from OperationExpr by unwrapping', () => {
-      const baseCol: ColumnRef = createColumnRef('user', 'id');
-      const operation: OperationExpr = {
-        kind: 'operation',
-        method: 'normalize',
-        forTypeId: 'pg/vector@1',
-        self: baseCol,
-        args: [],
-        returns: { kind: 'typeId', type: 'pg/vector@1' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'normalize(${self})',
-        },
-      };
-
-      const result = getColumnInfo(operation);
-      expect(result).toEqual({ table: 'user', column: 'id' });
-    });
-
-    it('extracts table and column from deeply nested OperationExpr', () => {
-      const baseCol: ColumnRef = createColumnRef('user', 'id');
-      const innerOp: OperationExpr = {
-        kind: 'operation',
-        method: 'normalize',
-        forTypeId: 'pg/vector@1',
-        self: baseCol,
-        args: [],
-        returns: { kind: 'typeId', type: 'pg/vector@1' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'normalize(${self})',
-        },
-      };
-      const outerOp: OperationExpr = {
-        kind: 'operation',
-        method: 'cosineDistance',
-        forTypeId: 'pg/vector@1',
-        self: innerOp,
-        args: [],
-        returns: { kind: 'builtin', type: 'number' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'infix',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: '${self} <=> ${arg0}',
-        },
-      };
-
-      const result = getColumnInfo(outerOp);
-      expect(result).toEqual({ table: 'user', column: 'id' });
-    });
-  });
-
-  describe('isColumnBuilder', () => {
-    it('returns true for ColumnBuilder', () => {
-      const columnBuilder = {
-        kind: 'column' as const,
-        table: 'user',
-        column: 'id',
-        columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      } as ColumnBuilder;
-
-      expect(isColumnBuilder(columnBuilder)).toBe(true);
-    });
-
-    it('returns false for OperationExpr', () => {
-      const colRef: ColumnRef = createColumnRef('user', 'id');
-      const operation: OperationExpr = {
-        kind: 'operation',
-        method: 'normalize',
-        forTypeId: 'pg/vector@1',
-        self: colRef,
-        args: [],
-        returns: { kind: 'typeId', type: 'pg/vector@1' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'normalize(${self})',
-        },
-      };
-
-      expect(isColumnBuilder(operation)).toBe(false);
-    });
-
-    it('returns false for null', () => {
-      expect(isColumnBuilder(null)).toBe(false);
-    });
-
-    it('returns false for undefined', () => {
-      expect(isColumnBuilder(undefined)).toBe(false);
-    });
-
-    it('returns false for plain object without kind', () => {
-      expect(isColumnBuilder({ table: 'user', column: 'id' })).toBe(false);
-    });
-
-    it('returns false for object with wrong kind', () => {
-      expect(isColumnBuilder({ kind: 'operation' })).toBe(false);
-    });
+  it('rejects plain values as builders or sources', () => {
+    expect(isColumnBuilder({ kind: 'operation' })).toBe(false);
+    expect(isExpressionBuilder({ kind: 'column' })).toBe(false);
+    expect(isExpressionSource(LiteralExpr.of('x'))).toBe(false);
+    expect(isValueSource(ParamRef.of(1, 'id'))).toBe(false);
   });
 });

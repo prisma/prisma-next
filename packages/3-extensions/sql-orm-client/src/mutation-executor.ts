@@ -1,10 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { BoundWhereExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
-import {
-  createBinaryExpr,
-  createColumnRef,
-  createLiteralExpr,
-} from '@prisma-next/sql-relational-core/ast';
+import { BinaryExpr, ColumnRef, LiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import { resolveModelTableName, resolvePrimaryKeyColumn } from './collection-contract';
 import {
   acquireRuntimeScope,
@@ -551,10 +547,9 @@ function buildChildJoinWhere(
 
   for (const [childColumn, parentValue] of childValues.entries()) {
     exprs.push(
-      createBinaryExpr(
-        'eq',
-        createColumnRef(relation.relatedTableName, childColumn),
-        createLiteralExpr(parentValue),
+      BinaryExpr.eq(
+        ColumnRef.of(relation.relatedTableName, childColumn),
+        LiteralExpr.of(parentValue),
       ),
     );
   }

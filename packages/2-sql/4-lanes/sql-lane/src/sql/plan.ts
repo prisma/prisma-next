@@ -1,12 +1,9 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { Expression } from '@prisma-next/sql-relational-core/ast';
-import { compact } from '@prisma-next/sql-relational-core/ast';
+import { compact, type Expression } from '@prisma-next/sql-relational-core/ast';
 import type { AnyExpressionSource } from '@prisma-next/sql-relational-core/types';
 import {
-  collectColumnRefs,
   isColumnBuilder,
   isExpressionBuilder,
-  isOperationExpr,
 } from '@prisma-next/sql-relational-core/utils/guards';
 import type { MetaBuildArgs } from '../types/internal';
 import { assertColumnBuilder } from '../utils/assertions';
@@ -20,8 +17,7 @@ function collectRefsFromExpressionSource(
   refsColumns: Map<string, { table: string; column: string }>,
 ): void {
   if (isExpressionBuilder(source)) {
-    // ExpressionBuilder has an OperationExpr - collect all column refs
-    const allRefs = collectColumnRefs(source.expr);
+    const allRefs = source.expr.collectColumnRefs();
     for (const ref of allRefs) {
       refsColumns.set(`${ref.table}.${ref.column}`, {
         table: ref.table,
@@ -45,18 +41,10 @@ function collectRefsFromExpression(
   expr: Expression,
   refsColumns: Map<string, { table: string; column: string }>,
 ): void {
-  if (isOperationExpr(expr)) {
-    const allRefs = collectColumnRefs(expr);
-    for (const ref of allRefs) {
-      refsColumns.set(`${ref.table}.${ref.column}`, {
-        table: ref.table,
-        column: ref.column,
-      });
-    }
-  } else if (expr.kind === 'col') {
-    refsColumns.set(`${expr.table}.${expr.column}`, {
-      table: expr.table,
-      column: expr.column,
+  for (const ref of expr.collectColumnRefs()) {
+    refsColumns.set(`${ref.table}.${ref.column}`, {
+      table: ref.table,
+      column: ref.column,
     });
   }
 }
@@ -111,15 +99,10 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
-        // Handle UnaryBuilder (e.g., NullCheckBuilder) - it only has 'expr' property
         if (include.childWhere.kind === 'nullCheck') {
-          const expr: Expression = include.childWhere.expr;
-          collectRefsFromExpression(expr, refsColumns);
+          collectRefsFromExpression(include.childWhere.expr, refsColumns);
         } else {
-          // BinaryBuilder - has 'left' and 'right' properties
-          // childWhere.left is Expression (already converted at builder creation time)
           collectRefsFromExpression(include.childWhere.left, refsColumns);
-          // Handle right side of child WHERE clause - can be ParamPlaceholder or ExpressionSource
           const childWhereRight = include.childWhere.right;
           if (isColumnBuilder(childWhereRight) || isExpressionBuilder(childWhereRight)) {
             collectRefsFromExpressionSource(childWhereRight, refsColumns);
@@ -135,31 +118,10 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
   }
 
   if (args.where) {
-    // Handle UnaryBuilder (e.g., NullCheckBuilder) - it only has 'expr' property
     if (args.where.kind === 'nullCheck') {
-      const expr: Expression = args.where.expr;
-      collectRefsFromExpression(expr, refsColumns);
+      collectRefsFromExpression(args.where.expr, refsColumns);
     } else {
-      // BinaryBuilder - has 'left' and 'right' properties
-      // args.where.left is Expression (already converted at builder creation time)
-      const leftExpr: Expression = args.where.left;
-      if (isOperationExpr(leftExpr) || leftExpr.kind === 'subquery') {
-        const allRefs = collectColumnRefs(leftExpr);
-        for (const ref of allRefs) {
-          refsColumns.set(`${ref.table}.${ref.column}`, {
-            table: ref.table,
-            column: ref.column,
-          });
-        }
-      } else if (leftExpr.kind === 'col') {
-        // leftExpr is ColumnRef
-        refsColumns.set(`${leftExpr.table}.${leftExpr.column}`, {
-          table: leftExpr.table,
-          column: leftExpr.column,
-        });
-      }
-
-      // Handle right side of WHERE clause - can be ParamPlaceholder or AnyExpressionSource
+      collectRefsFromExpression(args.where.left, refsColumns);
       const whereRight = args.where.right;
       if (isColumnBuilder(whereRight) || isExpressionBuilder(whereRight)) {
         collectRefsFromExpressionSource(whereRight, refsColumns);
@@ -168,23 +130,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
   }
 
   if (args.orderBy) {
-    // args.orderBy.expr is Expression (already converted at builder creation time)
-    const orderByExpr: Expression = args.orderBy.expr;
-    if (isOperationExpr(orderByExpr) || orderByExpr.kind === 'subquery') {
-      const allRefs = collectColumnRefs(orderByExpr);
-      for (const ref of allRefs) {
-        refsColumns.set(`${ref.table}.${ref.column}`, {
-          table: ref.table,
-          column: ref.column,
-        });
-      }
-    } else if (orderByExpr.kind === 'col') {
-      // orderByExpr is ColumnRef
-      refsColumns.set(`${orderByExpr.table}.${orderByExpr.column}`, {
-        table: orderByExpr.table,
-        column: orderByExpr.column,
-      });
-    }
+    collectRefsFromExpression(args.orderBy.expr, refsColumns);
   }
 
   // Build projection map - mark include aliases with special marker
@@ -294,8 +240,13 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       projection: projectionMap,
       projectionTypes: Object.keys(projectionTypes).length > 0 ? projectionTypes : undefined,
       annotations:
-        Object.keys(allCodecs).length > 0
-          ? Object.freeze({ codecs: Object.freeze(allCodecs) })
+        Object.keys(allCodecs).length > 0 || args.limit !== undefined
+          ? Object.freeze(
+              compact({
+                codecs: Object.keys(allCodecs).length > 0 ? Object.freeze(allCodecs) : undefined,
+                limit: args.limit,
+              }),
+            )
           : undefined,
       paramDescriptors: args.paramDescriptors,
       profileHash: args.contract.profileHash,
