@@ -40,6 +40,12 @@ type WithField<Source, Field extends ScopeField, Alias extends string> = Expand<
   Source & { [K in Alias]: Field }
 >;
 
+type WithFields<
+  Source,
+  FromScope extends ScopeTable,
+  Columns extends readonly (keyof FromScope)[],
+> = Expand<Source & Pick<FromScope, Columns[number]>>;
+
 type ExtractScopeFields<T extends Record<string, Expression<ScopeField>>> = {
   [K in keyof T]: T[K] extends Expression<infer F extends ScopeField> ? F : never;
 };
@@ -146,12 +152,12 @@ export interface SelectCapable<
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField> = {},
 > {
-  select<Column extends keyof AvailableScope['topLevel'] & string>(
-    column: Column,
+  select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
+    ...columns: Columns
   ): SelectQueryBuilder<
     CodecTypes,
     AvailableScope,
-    WithField<RowType, AvailableScope['topLevel'][Column], Column>
+    WithFields<RowType, AvailableScope['topLevel'], Columns>
   >;
 
   select<Alias extends string, Column extends keyof AvailableScope['topLevel']>(
