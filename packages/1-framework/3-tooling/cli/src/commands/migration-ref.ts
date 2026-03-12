@@ -9,8 +9,8 @@ import { Command } from 'commander';
 import { resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
+import { formatCommandHelp } from '../utils/formatters/help';
 import { parseGlobalFlags } from '../utils/global-flags';
-import { formatCommandHelp } from '../utils/output';
 
 function resolveRefsPath(configPath?: string, config?: { migrations?: { dir?: string } }): string {
   const base = configPath ? resolve(configPath, '..') : process.cwd();
