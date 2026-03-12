@@ -157,6 +157,40 @@ export function buildMigrationEntries(
   return entries;
 }
 
+/**
+ * Resolve the migration chain to display in status output.
+ *
+ * When offline or the marker is at EMPTY, the chain is simply the shortest
+ * path from EMPTY to the target — all structural paths are equivalent per
+ * the spec, so the deterministic shortest path is the canonical display.
+ *
+ * When online with a non-empty marker, the chain routes *through* the marker:
+ * EMPTY→marker (applied history) + marker→target (pending edges). This ensures
+ * the displayed chain includes the marker node so applied/pending status is
+ * correct. Without this, BFS from EMPTY to target could pick a shortest path
+ * that bypasses the marker entirely (e.g. in a diamond graph), causing the
+ * marker to appear "diverged" when it isn't.
+ */
+function resolveDisplayChain(
+  graph: MigrationGraph,
+  targetHash: string,
+  markerHash: string | undefined,
+): readonly MigrationChainEntry[] | null {
+  if (markerHash === undefined || markerHash === EMPTY_CONTRACT_HASH) {
+    return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+  }
+
+  const toMarker = findPath(graph, EMPTY_CONTRACT_HASH, markerHash);
+  if (!toMarker) return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+
+  if (markerHash === targetHash) return toMarker;
+
+  const fromMarker = findPath(graph, markerHash, targetHash);
+  if (!fromMarker) return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+
+  return [...toMarker, ...fromMarker];
+}
+
 async function executeMigrationStatusCommand(
   options: MigrationStatusOptions,
   flags: GlobalFlags,
@@ -307,16 +341,6 @@ async function executeMigrationStatusCommand(
     throw error;
   }
 
-  const chain = findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
-  if (!chain) {
-    return notOk(
-      errorRuntime('Cannot reconstruct migration chain', {
-        why: `No path from ${EMPTY_CONTRACT_HASH} to target ${targetHash}`,
-        fix: 'The migration history may have gaps. Check the migrations directory for missing or corrupted packages.',
-      }),
-    );
-  }
-
   let markerHash: string | undefined;
   let mode: 'online' | 'offline' = 'offline';
 
@@ -342,6 +366,17 @@ async function executeMigrationStatusCommand(
         ui.warn('Could not connect to database — showing offline status');
       }
     }
+  }
+
+  const chain = resolveDisplayChain(graph, targetHash, mode === 'online' ? markerHash : undefined);
+
+  if (!chain) {
+    return notOk(
+      errorRuntime('Cannot reconstruct migration chain', {
+        why: `No path from ${EMPTY_CONTRACT_HASH} to target ${targetHash}`,
+        fix: 'The migration history may have gaps. Check the migrations directory for missing or corrupted packages.',
+      }),
+    );
   }
 
   const entries = buildMigrationEntries(
