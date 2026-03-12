@@ -213,6 +213,24 @@ function createCliBinWrapper(name: string, cwd?: string): string {
   return wrapperDir;
 }
 
+// --- VHS PATH construction ---
+
+/**
+ * Builds a minimal PATH for VHS tape files.
+ * Only includes the wrapper directory, the Node.js binary directory,
+ * and standard system paths. Avoids leaking the developer's full PATH
+ * (personal tool installations, editor integrations, etc.) into committed tapes.
+ */
+function buildVhsPath(wrapperDir: string): string {
+  const nodeBinDir = dirname(process.execPath);
+  // VHS needs ttyd (and optionally ffmpeg) which live alongside the vhs binary.
+  const vhsBinDir = dirname(execSync('which vhs', { encoding: 'utf-8' }).trim());
+  const systemPaths = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+  // Deduplicate while preserving order
+  const parts = [wrapperDir, nodeBinDir, vhsBinDir, ...systemPaths.split(':')];
+  return [...new Set(parts)].join(':');
+}
+
 // --- VHS tape generation ---
 
 /**
@@ -520,7 +538,7 @@ async function recordOne(opts: {
     `${group}-${recording.name}`,
     setup !== 'none' ? LEGACY_WORKSPACE_DIR : undefined,
   );
-  const vhsPath = `${wrapperDir}:${process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin'}`;
+  const vhsPath = buildVhsPath(wrapperDir);
 
   const maxHeight = config.vhs.height * 2;
   let height = config.vhs.height;
@@ -657,7 +675,7 @@ async function recordJourneyStep(ctx: JourneyContext, step: JourneyStep): Promis
   }
 
   const wrapperDir = createCliBinWrapper(`${slug}-${name}`, workspaceDir);
-  const vhsPath = `${wrapperDir}:${process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin'}`;
+  const vhsPath = buildVhsPath(wrapperDir);
 
   // Ensure database connection is available before recording
   await waitForDb(connectionString);
