@@ -52,25 +52,7 @@ exports[`ESLint Plugin Rule Validation > should handle 'valid' case: 'delete-que
 }
 `;
 
-exports[`ESLint Plugin Rule Validation > should handle 'valid' case: 'insert-query.ts' > valid-delete-query 1`] = `
-{
-  "errorCount": 0,
-  "filePath": "delete-query.ts",
-  "messages": [],
-  "warningCount": 0,
-}
-`;
-
 exports[`ESLint Plugin Rule Validation > should handle 'valid' case: 'insert-query.ts' > valid-insert-query 1`] = `
-{
-  "errorCount": 0,
-  "filePath": "insert-query.ts",
-  "messages": [],
-  "warningCount": 0,
-}
-`;
-
-exports[`ESLint Plugin Rule Validation > should handle 'valid' case: 'select-with-limit.ts' > valid-insert-query 1`] = `
 {
   "errorCount": 0,
   "filePath": "insert-query.ts",
