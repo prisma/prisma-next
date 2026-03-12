@@ -1,15 +1,15 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { BoundWhereExpr } from '@prisma-next/sql-relational-core/ast';
 import {
-  createColumnRef,
-  createDefaultValueExpr,
-  createDeleteAstBuilder,
-  createInsertAstBuilder,
-  createInsertOnConflictAstBuilder,
-  createParamRef,
-  createTableRef,
-  createUpdateAstBuilder,
+  type BoundWhereExpr,
+  ColumnRef,
+  DefaultValueExpr,
+  DeleteAst,
+  InsertAst,
+  InsertOnConflict,
+  ParamRef,
+  TableSource,
+  UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, resolveTableColumns } from './query-plan-meta';
@@ -25,7 +25,7 @@ function buildReturningColumns(
       ? [...returningColumns]
       : resolveTableColumns(contract, tableName);
 
-  return columns.map((column) => createColumnRef(tableName, column));
+  return columns.map((column) => ColumnRef.of(tableName, column));
 }
 
 function createColumnParamDescriptor(
@@ -56,17 +56,17 @@ function toParamAssignments(
   values: Record<string, unknown>,
   startIndex = 1,
 ): {
-  readonly assignments: Record<string, ReturnType<typeof createParamRef>>;
+  readonly assignments: Record<string, ParamRef>;
   readonly params: readonly unknown[];
   readonly paramDescriptors: readonly ParamDescriptor[];
 } {
-  const assignments: Record<string, ReturnType<typeof createParamRef>> = {};
+  const assignments: Record<string, ParamRef> = {};
   const params: unknown[] = [];
   const paramDescriptors: ParamDescriptor[] = [];
   let index = startIndex;
 
   for (const [column, value] of Object.entries(values)) {
-    assignments[column] = createParamRef(index, column);
+    assignments[column] = ParamRef.of(index, column);
     params.push(value);
     paramDescriptors.push(createColumnParamDescriptor(contract, tableName, column, index));
     index += 1;
@@ -84,9 +84,7 @@ function normalizeInsertRows(
   tableName: string,
   rows: readonly Record<string, unknown>[],
 ): {
-  readonly rows: ReadonlyArray<
-    Record<string, ReturnType<typeof createParamRef> | ReturnType<typeof createDefaultValueExpr>>
-  >;
+  readonly rows: ReadonlyArray<Record<string, ParamRef | DefaultValueExpr>>;
   readonly params: readonly unknown[];
   readonly paramDescriptors: readonly ParamDescriptor[];
 } {
@@ -111,19 +109,16 @@ function normalizeInsertRows(
       return {};
     }
 
-    const normalizedRow: Record<
-      string,
-      ReturnType<typeof createParamRef> | ReturnType<typeof createDefaultValueExpr>
-    > = {};
+    const normalizedRow: Record<string, ParamRef | DefaultValueExpr> = {};
     for (const column of orderedColumns) {
       if (Object.hasOwn(row, column)) {
-        normalizedRow[column] = createParamRef(index, column);
+        normalizedRow[column] = ParamRef.of(index, column);
         params.push(row[column]);
         paramDescriptors.push(createColumnParamDescriptor(contract, tableName, column, index));
         index += 1;
         continue;
       }
-      normalizedRow[column] = createDefaultValueExpr();
+      normalizedRow[column] = new DefaultValueExpr();
     }
     return normalizedRow;
   });
@@ -146,10 +141,9 @@ export function compileInsertReturning(
     params,
     paramDescriptors,
   } = normalizeInsertRows(contract, tableName, rows);
-  const ast = createInsertAstBuilder(createTableRef(tableName))
-    .rows(normalizedRows)
-    .returning(buildReturningColumns(contract, tableName, returningColumns))
-    .build();
+  const ast = InsertAst.into(TableSource.named(tableName))
+    .withRows(normalizedRows)
+    .withReturning(buildReturningColumns(contract, tableName, returningColumns));
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
@@ -163,7 +157,7 @@ export function compileInsertCount(
     params,
     paramDescriptors,
   } = normalizeInsertRows(contract, tableName, rows);
-  const ast = createInsertAstBuilder(createTableRef(tableName)).rows(normalizedRows).build();
+  const ast = InsertAst.into(TableSource.named(tableName)).withRows(normalizedRows);
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
@@ -180,21 +174,18 @@ export function compileUpsertReturning(
   const updateAssignments = hasUpdateValues
     ? toParamAssignments(contract, tableName, updateValues, createAssignments.params.length + 1)
     : undefined;
-  const onConflictBuilder = createInsertOnConflictAstBuilder(
-    conflictColumns.map((column) => createColumnRef(tableName, column)),
-  );
-  if (updateAssignments) {
-    onConflictBuilder.doUpdateSet(updateAssignments.assignments);
-  } else {
-    onConflictBuilder.doNothing();
-  }
-  const onConflict = onConflictBuilder.build();
+  const onConflict = updateAssignments
+    ? InsertOnConflict.on(
+        conflictColumns.map((column) => ColumnRef.of(tableName, column)),
+      ).doUpdateSet(updateAssignments.assignments)
+    : InsertOnConflict.on(
+        conflictColumns.map((column) => ColumnRef.of(tableName, column)),
+      ).doNothing();
 
-  const ast = createInsertAstBuilder(createTableRef(tableName))
-    .values(createAssignments.assignments)
-    .onConflict(onConflict)
-    .returning(buildReturningColumns(contract, tableName, returningColumns))
-    .build();
+  const ast = InsertAst.into(TableSource.named(tableName))
+    .withValues(createAssignments.assignments)
+    .withOnConflict(onConflict)
+    .withReturning(buildReturningColumns(contract, tableName, returningColumns));
 
   return buildOrmQueryPlan(
     contract,
@@ -221,14 +212,13 @@ export function compileUpdateReturning(
     tableName,
     setValues,
   );
-  const builder = createUpdateAstBuilder(createTableRef(tableName))
-    .set(assignments)
-    .returning(buildReturningColumns(contract, tableName, returningColumns));
+  let ast = UpdateAst.table(TableSource.named(tableName))
+    .withSet(assignments)
+    .withReturning(buildReturningColumns(contract, tableName, returningColumns));
   const shiftedWhere = where ? offsetBoundWhereExpr(where, params.length) : undefined;
   if (shiftedWhere) {
-    builder.where(shiftedWhere.expr);
+    ast = ast.withWhere(shiftedWhere.expr);
   }
-  const ast = builder.build();
   return buildOrmQueryPlan(
     contract,
     ast,
@@ -249,12 +239,11 @@ export function compileUpdateCount(
     tableName,
     setValues,
   );
-  const builder = createUpdateAstBuilder(createTableRef(tableName)).set(assignments);
+  let ast = UpdateAst.table(TableSource.named(tableName)).withSet(assignments);
   const shiftedWhere = where ? offsetBoundWhereExpr(where, params.length) : undefined;
   if (shiftedWhere) {
-    builder.where(shiftedWhere.expr);
+    ast = ast.withWhere(shiftedWhere.expr);
   }
-  const ast = builder.build();
   return buildOrmQueryPlan(
     contract,
     ast,
@@ -270,13 +259,12 @@ export function compileDeleteReturning(
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereFilters(filters);
-  const builder = createDeleteAstBuilder(createTableRef(tableName)).returning(
+  let ast = DeleteAst.from(TableSource.named(tableName)).withReturning(
     buildReturningColumns(contract, tableName, returningColumns),
   );
   if (where) {
-    builder.where(where.expr);
+    ast = ast.withWhere(where.expr);
   }
-  const ast = builder.build();
   return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
 }
 
@@ -286,10 +274,9 @@ export function compileDeleteCount(
   filters: readonly BoundWhereExpr[],
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereFilters(filters);
-  const builder = createDeleteAstBuilder(createTableRef(tableName));
+  let ast = DeleteAst.from(TableSource.named(tableName));
   if (where) {
-    builder.where(where.expr);
+    ast = ast.withWhere(where.expr);
   }
-  const ast = builder.build();
   return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
 }

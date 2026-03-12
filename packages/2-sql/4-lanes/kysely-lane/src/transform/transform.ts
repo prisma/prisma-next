@@ -9,7 +9,7 @@
  */
 import type { PlanRefs } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { QueryAst } from '@prisma-next/sql-relational-core/ast';
+import { ColumnRef, type QueryAst, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { DeleteQueryNode, InsertQueryNode, SelectQueryNode, UpdateQueryNode } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
@@ -22,55 +22,7 @@ import { transformSelect } from './transform-select';
 export type { TransformResult };
 
 function extractRefsFromAst(ast: QueryAst): PlanRefs {
-  const tables = new Set<string>();
-  const columns: Array<{ table: string; column: string }> = [];
-  const columnKeys = new Set<string>();
-
-  function visit(node: unknown): void {
-    if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) {
-      node.forEach(visit);
-      return;
-    }
-    const n = node as Record<string, unknown>;
-    const kind = n['kind'];
-    const name = n['name'];
-    const table = n['table'];
-    const column = n['column'];
-    if (kind === 'table' && typeof name === 'string') {
-      tables.add(name);
-      return;
-    }
-    if (kind === 'col' && typeof table === 'string' && typeof column === 'string') {
-      if (table === 'excluded') {
-        return;
-      }
-      tables.add(table);
-      const key = `${table}.${column}`;
-      if (!columnKeys.has(key)) {
-        columnKeys.add(key);
-        columns.push({ table, column });
-      }
-      return;
-    }
-    for (const value of Object.values(n)) {
-      visit(value);
-    }
-  }
-
-  visit(ast);
-  const sortedTables = [...tables].sort((a, b) => a.localeCompare(b));
-  const sortedColumns = [...columns].sort((a, b) => {
-    const tableCompare = a.table.localeCompare(b.table);
-    if (tableCompare !== 0) {
-      return tableCompare;
-    }
-    return a.column.localeCompare(b.column);
-  });
-  return {
-    tables: sortedTables,
-    columns: sortedColumns,
-  };
+  return ast.collectRefs();
 }
 
 export interface TransformResultWithParams extends TransformResult {
@@ -125,17 +77,17 @@ export function transformKyselyToPnAst(
 
   let projection: Record<string, string> | undefined;
   let projectionTypes: Record<string, string> | undefined;
-  if (ast.kind === 'select') {
+  if (ast instanceof SelectAst) {
     projection = Object.fromEntries(
       ast.project.map((projected) => [
         projected.alias,
-        projected.expr.kind === 'col' ? projected.expr.column : projected.alias,
+        projected.expr instanceof ColumnRef ? projected.expr.column : projected.alias,
       ]),
     );
 
     projectionTypes = {};
     for (const projected of ast.project) {
-      if (projected.expr.kind === 'col') {
+      if (projected.expr instanceof ColumnRef) {
         const column =
           ctx.contract.storage.tables[projected.expr.table]?.columns[projected.expr.column];
         if (column) {
@@ -153,7 +105,8 @@ export function transformKyselyToPnAst(
       'projectionTypes',
       projectionTypes && Object.keys(projectionTypes).length > 0 ? projectionTypes : undefined,
     ),
-    ...ifDefined('selectAllIntent', ast.kind === 'select' ? ast.selectAllIntent : undefined),
+    ...ifDefined('selectAllIntent', ast instanceof SelectAst ? ast.selectAllIntent : undefined),
+    ...ifDefined('limit', ast instanceof SelectAst ? ast.limit : undefined),
   };
 
   return { ast, metaAdditions };
@@ -206,17 +159,17 @@ export function transformKyselyToPnAstCollectingParams(
 
   let projection: Record<string, string> | undefined;
   let projectionTypes: Record<string, string> | undefined;
-  if (ast.kind === 'select') {
+  if (ast instanceof SelectAst) {
     projection = Object.fromEntries(
       ast.project.map((projected) => [
         projected.alias,
-        projected.expr.kind === 'col' ? projected.expr.column : projected.alias,
+        projected.expr instanceof ColumnRef ? projected.expr.column : projected.alias,
       ]),
     );
 
     projectionTypes = {};
     for (const projected of ast.project) {
-      if (projected.expr.kind === 'col') {
+      if (projected.expr instanceof ColumnRef) {
         const column =
           ctx.contract.storage.tables[projected.expr.table]?.columns[projected.expr.column];
         if (column) {
@@ -234,7 +187,8 @@ export function transformKyselyToPnAstCollectingParams(
       'projectionTypes',
       projectionTypes && Object.keys(projectionTypes).length > 0 ? projectionTypes : undefined,
     ),
-    ...ifDefined('selectAllIntent', ast.kind === 'select' ? ast.selectAllIntent : undefined),
+    ...ifDefined('selectAllIntent', ast instanceof SelectAst ? ast.selectAllIntent : undefined),
+    ...ifDefined('limit', ast instanceof SelectAst ? ast.limit : undefined),
   };
 
   return { ast, params: ctx.params, metaAdditions };

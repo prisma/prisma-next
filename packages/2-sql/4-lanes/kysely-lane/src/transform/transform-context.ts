@@ -10,6 +10,7 @@ export interface TransformResult {
     readonly projection?: Record<string, string> | ReadonlyArray<string>;
     readonly projectionTypes?: Record<string, string>;
     readonly selectAllIntent?: { table?: string };
+    readonly limit?: number;
   };
 }
 

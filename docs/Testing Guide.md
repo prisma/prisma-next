@@ -461,22 +461,24 @@ const database = await createDevDatabase();
 
 ### AST Node Creation
 
-**Pattern:** Use factory functions instead of manual object creation for AST nodes
+**Pattern:** Use the rich AST classes and static helpers instead of manual object creation
 
-**Available factory functions from `@prisma-next/sql-relational-core/ast`:**
-- `createColumnRef(table, column)` - Creates a `ColumnRef`
-- `createParamRef(index, name?)` - Creates a `ParamRef`
-- `createLiteralExpr(value)` - Creates a `LiteralExpr`
-- `createTableRef(name)` - Creates a `TableRef`
-- `createBinaryExpr(op, left, right)` - Creates a `BinaryExpr` (from `ast/predicate`)
+**Available AST helpers from `@prisma-next/sql-relational-core/ast`:**
+- `ColumnRef.of(table, column)` - Creates a `ColumnRef`
+- `ParamRef.of(index, name?)` - Creates a `ParamRef`
+- `LiteralExpr.of(value)` - Creates a `LiteralExpr`
+- `TableSource.named(name, alias?)` - Creates a table source
+- `BinaryExpr.eq(left, right)` and the related static constructors - Create a `BinaryExpr`
 
 ```typescript
-// ✅ CORRECT: Use factory functions
-import { createColumnRef, createParamRef, createLiteralExpr } from '@prisma-next/sql-relational-core/ast';
+// ✅ CORRECT: Use AST classes and helpers
+import { BinaryExpr, ColumnRef, LiteralExpr, ParamRef, TableSource } from '@prisma-next/sql-relational-core/ast';
 
-const colRef: ColumnRef = createColumnRef('user', 'id');
-const paramRef: ParamRef = createParamRef(1, 'userId');
-const literalExpr: LiteralExpr = createLiteralExpr('test');
+const colRef = ColumnRef.of('user', 'id');
+const paramRef = ParamRef.of(1, 'userId');
+const literalExpr = LiteralExpr.of('test');
+const table = TableSource.named('user');
+const predicate = BinaryExpr.eq(colRef, paramRef);
 ```
 
 ```typescript
@@ -486,11 +488,11 @@ const paramRef: ParamRef = { kind: 'param', index: 1, name: 'userId' };
 const literalExpr: LiteralExpr = { kind: 'literal', value: 'test' };
 ```
 
-**Why?** Factory functions ensure consistency, type safety, and make refactoring easier. Manual object creation duplicates AST structure definitions and is error-prone.
+**Why?** The rich AST helpers ensure consistency, type safety, and make refactoring easier. Manual object creation duplicates AST structure definitions and is error-prone.
 
-**Exception:** `OperationExpr` objects are complex and don't have a factory function (the `createOperationExpr` function just returns the operation as-is). Manual creation is acceptable for `OperationExpr` in tests.
+**Exception:** `OperationExpr` objects still need structured construction, typically via `OperationExpr.function(...)` in tests.
 
-See `.cursor/rules/use-ast-factories.mdc` for detailed guidelines.
+See `.cursor/rules/use-ast-factories.mdc` for the current AST construction guidance.
 
 ### ContractIR Factory Functions
 
@@ -1015,4 +1017,3 @@ pnpm --filter @prisma-next/sql-runtime typecheck
 - **Type Testing:** `.cursor/rules/vitest-expect-typeof.mdc`
 - **TypeScript Patterns:** `.cursor/rules/typescript-patterns.mdc` (DRY Test Patterns section)
 - **Agent Reference:** `AGENTS.md`
-

@@ -1,3 +1,4 @@
+import { BinaryExpr, ColumnRef, LiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import type { TestContract } from './helpers';
@@ -33,8 +34,8 @@ describe('Collection construction', () => {
     const collection = new PostCollection({ contract, runtime }, 'Post');
     const scoped = collection.popular();
     expect(scoped.state.filters).toHaveLength(1);
-    expect(scoped.state.filters[0]).toMatchObject({
-      expr: { kind: 'bin', op: 'gt' },
+    expect(scoped.state.filters[0]).toEqual({
+      expr: BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(1000)),
       params: [],
       paramDescriptors: [],
     });

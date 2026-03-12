@@ -1,3 +1,4 @@
+import { AggregateExpr, BinaryExpr, LiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { isSelectAst } from '../helpers';
 import { createPostsCollection, timeouts, withCollectionRuntime } from './helpers';
@@ -62,18 +63,7 @@ describe('integration/groupBy', () => {
         if (!isSelectAst(ast)) {
           throw new Error('Expected grouped query to emit a select AST plan');
         }
-        expect(ast.having).toEqual({
-          kind: 'bin',
-          op: 'gt',
-          left: {
-            kind: 'aggregate',
-            fn: 'count',
-          },
-          right: {
-            kind: 'literal',
-            value: 1,
-          },
-        });
+        expect(ast.having).toEqual(BinaryExpr.gt(AggregateExpr.count(), LiteralExpr.of(1)));
       });
     },
     timeouts.spinUpPpgDev,

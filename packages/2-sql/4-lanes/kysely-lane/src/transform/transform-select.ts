@@ -1,12 +1,10 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
+import {
   ColumnRef,
-  Expression,
   JoinAst,
-  LiteralExpr,
+  ProjectionItem,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { ifDefined } from '@prisma-next/utils/defined';
 import {
   ReferenceNode,
   SelectAllNode,
@@ -36,7 +34,7 @@ export function expandSelectAll(
   const cols = Object.keys(tableDef.columns).sort();
   return cols.map((column) => ({
     alias: column,
-    expr: { kind: 'col', table, column },
+    expr: ColumnRef.of(table, column),
   }));
 }
 
@@ -88,10 +86,12 @@ export function transformSelections(
   ctx: TransformContext,
   fromTable: string,
 ): SelectAst['project'] {
-  const project: Array<{ alias: string; expr: Expression | LiteralExpr }> = [];
+  const project: ProjectionItem[] = [];
 
   if (!selections || selections.length === 0) {
-    return expandSelectAll(fromTable, ctx.contract).map(({ alias, expr }) => ({ alias, expr }));
+    return expandSelectAll(fromTable, ctx.contract).map(({ alias, expr }) =>
+      ProjectionItem.of(alias, expr),
+    );
   }
 
   for (const selection of selections) {
@@ -102,22 +102,24 @@ export function transformSelections(
       const table = resolveSelectAllTable(selectionNode, ctx, fromTable);
       const expanded = expandSelectAll(table, ctx.contract);
       for (const { alias, expr } of expanded) {
-        project.push({ alias, expr });
+        project.push(ProjectionItem.of(alias, expr));
       }
       continue;
     }
 
     if (ReferenceNode.is(selectionNode)) {
       const colRef = resolveColumnRef(selectionNode, ctx, fromTable);
-      project.push({ alias: explicitAlias ?? colRef.column, expr: colRef });
+      project.push(ProjectionItem.of(explicitAlias ?? colRef.column, colRef));
       continue;
     }
 
     const colRef = resolveColumnRef(selectionNode, ctx, fromTable);
-    project.push({
-      alias: explicitAlias ?? getColumnName(selectionNode) ?? `col_${project.length}`,
-      expr: colRef,
-    });
+    project.push(
+      ProjectionItem.of(
+        explicitAlias ?? getColumnName(selectionNode) ?? `col_${project.length}`,
+        colRef,
+      ),
+    );
   }
 
   return project;
@@ -226,13 +228,14 @@ export function transformSelect(node: SelectQueryNode, ctx: TransformContext): S
   const joins: JoinAst[] = [];
   for (const { joinNode, tableRef } of resolvedJoins) {
     const onExpr = transformJoinOn(unwrapOnNode(joinNode.on), ctx, fromTable, tableRef.name);
-    joins.push({
-      kind: 'join',
-      joinType: mapJoinType(joinNode.joinType as string),
-      source: tableRef,
-      lateral: isLateralJoinType(joinNode.joinType as string),
-      on: onExpr,
-    });
+    joins.push(
+      new JoinAst(
+        mapJoinType(joinNode.joinType as string),
+        tableRef,
+        onExpr,
+        isLateralJoinType(joinNode.joinType as string),
+      ),
+    );
   }
 
   let selectAllTable: string | undefined;
@@ -249,17 +252,21 @@ export function transformSelect(node: SelectQueryNode, ctx: TransformContext): S
     }
   }
 
-  return {
-    kind: 'select',
-    from: fromRef,
-    ...ifDefined('joins', joins.length > 0 ? joins : undefined),
-    project,
-    ...ifDefined('where', where ?? undefined),
-    ...ifDefined('orderBy', orderBy && orderBy.length > 0 ? orderBy : undefined),
-    ...ifDefined('limit', limit),
-    ...ifDefined(
-      'selectAllIntent',
-      selectAllTable !== undefined ? { table: selectAllTable } : undefined,
-    ),
-  };
+  let ast = SelectAst.from(fromRef).withProject(project);
+  if (joins.length > 0) {
+    ast = ast.withJoins(joins);
+  }
+  if (where) {
+    ast = ast.withWhere(where);
+  }
+  if (orderBy && orderBy.length > 0) {
+    ast = ast.withOrderBy(orderBy);
+  }
+  if (limit !== undefined) {
+    ast = ast.withLimit(limit);
+  }
+  if (selectAllTable !== undefined) {
+    ast = ast.withSelectAllIntent({ table: selectAllTable });
+  }
+  return ast;
 }

@@ -1,275 +1,109 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createJoin, createJoinOnExpr } from '../../src/ast/join';
-import { createOrderByItem } from '../../src/ast/order';
-import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';
-import { createSelectAst } from '../../src/ast/select';
-import type {
-  BinaryExpr,
-  ColumnRef,
+import { BinaryExpr } from '../../src/ast/predicate';
+import {
+  DerivedTableSource,
+  EqColJoinOn,
   ExistsExpr,
   JoinAst,
-  OperationExpr,
+  OrderByItem,
   SelectAst,
-  TableRef,
-} from '../../src/ast/types';
+} from '../../src/exports/ast';
+import { col, lowerExpr, param, simpleSelect, table } from './test-helpers';
 
 describe('ast/select', () => {
-  describe('createSelectAst', () => {
-    it('creates select ast with from and project', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        {
-          alias: 'id',
-          expr: createColumnRef('user', 'id') as ColumnRef,
-        },
-        {
-          alias: 'email',
-          expr: createColumnRef('user', 'email') as ColumnRef,
-        },
-      ];
+  it('creates select ASTs with from and project', () => {
+    const selectAst = SelectAst.from(table('user'))
+      .addProject('id', col('user', 'id'))
+      .addProject('email', col('user', 'email'));
 
-      const selectAst = createSelectAst({ from, project });
+    expect(selectAst.from).toEqual(table('user'));
+    expect(selectAst.project).toEqual([
+      { alias: 'id', expr: col('user', 'id') },
+      { alias: 'email', expr: col('user', 'email') },
+    ]);
+    expect(selectAst.joins).toBeUndefined();
+    expect(selectAst.where).toBeUndefined();
+    expect(selectAst.orderBy).toBeUndefined();
+    expect(selectAst.limit).toBeUndefined();
+    expect(selectAst.selectAllIntent).toBeUndefined();
+  });
 
-      expect(selectAst).toEqual({
-        kind: 'select',
-        from,
-        project,
-      });
-      expect(selectAst.kind).toBe('select');
-      expect(selectAst.from).toBe(from);
-      expect(selectAst.project).toBe(project);
-      expect(selectAst.joins).toBeUndefined();
-      expect(selectAst.where).toBeUndefined();
-      expect(selectAst.orderBy).toBeUndefined();
-      expect(selectAst.limit).toBeUndefined();
-      expect(selectAst.selectAllIntent).toBeUndefined();
+  it('supports fluent optional clauses immutably', () => {
+    const base = SelectAst.from(table('user')).addProject('id', col('user', 'id'));
+    const where = BinaryExpr.eq(col('user', 'id'), param(0, 'userId'));
+    const selectAst = base
+      .withJoins([
+        JoinAst.left(table('post'), EqColJoinOn.of(col('user', 'id'), col('post', 'userId'))),
+      ])
+      .withWhere(where)
+      .withOrderBy([OrderByItem.asc(col('user', 'id'))])
+      .withLimit(10)
+      .withDistinct()
+      .withDistinctOn([col('user', 'email')])
+      .withGroupBy([col('user', 'id')])
+      .withHaving(BinaryExpr.gt(col('user', 'id'), param(1, 'minId')))
+      .withOffset(3)
+      .withSelectAllIntent({ table: 'user' });
+
+    expect(base.joins).toBeUndefined();
+    expect(base.where).toBeUndefined();
+    expect(selectAst.joins).toHaveLength(1);
+    expect(selectAst.where).toEqual(where);
+    expect(selectAst.orderBy).toEqual([OrderByItem.asc(col('user', 'id'))]);
+    expect(selectAst.limit).toBe(10);
+    expect(selectAst.distinct).toBe(true);
+    expect(selectAst.distinctOn).toEqual([col('user', 'email')]);
+    expect(selectAst.groupBy).toEqual([col('user', 'id')]);
+    expect(selectAst.having).toEqual(BinaryExpr.gt(col('user', 'id'), param(1, 'minId')));
+    expect(selectAst.offset).toBe(3);
+    expect(selectAst.selectAllIntent).toEqual({ table: 'user' });
+  });
+
+  it('stores operation and exists expressions inside project and where clauses', () => {
+    const subquery = simpleSelect('post', ['id']);
+    const selectAst = SelectAst.from(table('user'))
+      .addProject('result', lowerExpr(col('user', 'email')))
+      .withWhere(ExistsExpr.exists(subquery));
+
+    expect(selectAst.project[0]?.expr).toEqual(lowerExpr(col('user', 'email')));
+    expect(selectAst.where).toBeInstanceOf(ExistsExpr);
+    expect((selectAst.where as ExistsExpr).subquery).toEqual(subquery);
+  });
+
+  it('rewrites nested selects, joins, and expressions', () => {
+    const derived = DerivedTableSource.as('posts', simpleSelect('post', ['userId']));
+    const selectAst = SelectAst.from(table('user'))
+      .addProject('email', lowerExpr(col('user', 'email')))
+      .withJoins([
+        JoinAst.inner(derived, EqColJoinOn.of(col('user', 'id'), col('posts', 'userId')), true),
+      ])
+      .withWhere(BinaryExpr.eq(col('user', 'id'), param(0, 'userId')));
+
+    const rewritten = selectAst.rewrite({
+      tableSource: (source) => (source.name === 'user' ? table('member') : source),
+      columnRef: (expr) => (expr.table === 'user' ? col('member', expr.column) : expr),
+      paramRef: (expr) => expr.withIndex(expr.index + 1),
     });
 
-    it('creates select ast with selectAllIntent', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        { alias: 'id', expr: createColumnRef('user', 'id') as ColumnRef },
-        { alias: 'email', expr: createColumnRef('user', 'email') as ColumnRef },
-      ];
+    expect(rewritten.from).toEqual(table('member'));
+    expect(rewritten.project[0]?.expr).toEqual(lowerExpr(col('member', 'email')));
+    expect(rewritten.where).toEqual(BinaryExpr.eq(col('member', 'id'), param(1, 'userId')));
+    expect((rewritten.joins?.[0]?.source as DerivedTableSource).query.project).toEqual([
+      { alias: 'userId', expr: col('post', 'userId') },
+    ]);
+  });
 
-      const selectAst = createSelectAst({ from, project, selectAllIntent: { table: 'user' } });
+  it('drops empty optional collections back to undefined', () => {
+    const selectAst = SelectAst.from(table('user'))
+      .addProject('id', col('user', 'id'))
+      .withJoins([])
+      .withOrderBy([])
+      .withDistinctOn([])
+      .withGroupBy([]);
 
-      expect(selectAst.selectAllIntent).toEqual({ table: 'user' });
-    });
-
-    it('creates select ast with joins', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        {
-          alias: 'id',
-          expr: createColumnRef('user', 'id') as ColumnRef,
-        },
-      ];
-      const joins: JoinAst[] = [
-        createJoin(
-          'inner',
-          createTableRef('post'),
-          createJoinOnExpr(createColumnRef('user', 'id'), createColumnRef('post', 'userId')),
-        ),
-      ];
-
-      const selectAst = createSelectAst({ from, project, joins });
-
-      expect(selectAst.joins).toBe(joins);
-      expect(selectAst.joins).toHaveLength(1);
-    });
-
-    it('creates select ast with where clause', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        {
-          alias: 'id',
-          expr: createColumnRef('user', 'id') as ColumnRef,
-        },
-      ];
-      const where: BinaryExpr = createBinaryExpr(
-        'eq',
-        createColumnRef('user', 'id'),
-        createParamRef(0, 'userId'),
-      );
-
-      const selectAst = createSelectAst({ from, project, where });
-
-      expect(selectAst.where).toBe(where);
-    });
-
-    it('creates select ast with orderBy', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        {
-          alias: 'id',
-          expr: createColumnRef('user', 'id') as ColumnRef,
-        },
-      ];
-      const orderBy = [
-        createOrderByItem(createColumnRef('user', 'id'), 'asc'),
-        createOrderByItem(createColumnRef('user', 'email'), 'desc'),
-      ];
-
-      const selectAst = createSelectAst({ from, project, orderBy });
-
-      expect(selectAst.orderBy).toBe(orderBy);
-      expect(selectAst.orderBy).toHaveLength(2);
-    });
-
-    it('creates select ast with limit', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        {
-          alias: 'id',
-          expr: createColumnRef('user', 'id') as ColumnRef,
-        },
-      ];
-      const limit = 10;
-
-      const selectAst = createSelectAst({ from, project, limit });
-
-      expect(selectAst.limit).toBe(10);
-    });
-
-    it('creates select ast with distinct/distinctOn/groupBy/having/offset', () => {
-      const from: TableRef = createTableRef('user');
-      const idExpr = createColumnRef('user', 'id');
-      const emailExpr = createColumnRef('user', 'email');
-      const project = [{ alias: 'id', expr: idExpr as ColumnRef }];
-      const having = createBinaryExpr('gt', idExpr, createParamRef(1, 'minId'));
-
-      const selectAst = createSelectAst({
-        from,
-        project,
-        distinct: true,
-        distinctOn: [emailExpr],
-        groupBy: [idExpr],
-        having,
-        offset: 3,
-      });
-
-      expect(selectAst.distinct).toBe(true);
-      expect(selectAst.distinctOn).toEqual([emailExpr]);
-      expect(selectAst.groupBy).toEqual([idExpr]);
-      expect(selectAst.having).toEqual(having);
-      expect(selectAst.offset).toBe(3);
-    });
-
-    it('creates select ast with all optional fields', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        {
-          alias: 'id',
-          expr: createColumnRef('user', 'id') as ColumnRef,
-        },
-      ];
-      const joins: JoinAst[] = [
-        createJoin(
-          'left',
-          createTableRef('post'),
-          createJoinOnExpr(createColumnRef('user', 'id'), createColumnRef('post', 'userId')),
-        ),
-      ];
-      const where: BinaryExpr = createBinaryExpr(
-        'eq',
-        createColumnRef('user', 'id'),
-        createParamRef(0, 'userId'),
-      );
-      const orderBy = [createOrderByItem(createColumnRef('user', 'id'), 'asc')];
-      const limit = 5;
-
-      const selectAst = createSelectAst({ from, project, joins, where, orderBy, limit });
-
-      expect(selectAst.joins).toBe(joins);
-      expect(selectAst.where).toBe(where);
-      expect(selectAst.orderBy).toBe(orderBy);
-      expect(selectAst.limit).toBe(limit);
-    });
-
-    it('creates select ast with operation expr in project', () => {
-      const from: TableRef = createTableRef('user');
-      const operationExpr: OperationExpr = {
-        kind: 'operation',
-        method: 'test',
-        forTypeId: 'pg/text@1',
-        self: createColumnRef('user', 'email'),
-        args: [],
-        returns: { kind: 'builtin', type: 'string' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'test(${self})',
-        },
-      };
-      const project = [
-        {
-          alias: 'result',
-          expr: operationExpr,
-        },
-      ];
-
-      const selectAst = createSelectAst({ from, project });
-
-      expect(selectAst.project[0]?.expr).toBe(operationExpr);
-    });
-
-    it('creates select ast with exists expr in where', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        {
-          alias: 'id',
-          expr: createColumnRef('user', 'id') as ColumnRef,
-        },
-      ];
-      const subquery: SelectAst = createSelectAst({
-        from: createTableRef('post'),
-        project: [
-          {
-            alias: 'id',
-            expr: createColumnRef('post', 'id') as ColumnRef,
-          },
-        ],
-      });
-      const where: ExistsExpr = createExistsExpr(false, subquery);
-
-      const selectAst = createSelectAst({ from, project, where });
-
-      expect(selectAst.where).toBe(where);
-      expect(selectAst.where?.kind).toBe('exists');
-    });
-
-    it('removes undefined optional fields', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        {
-          alias: 'id',
-          expr: createColumnRef('user', 'id') as ColumnRef,
-        },
-      ];
-
-      const selectAst = createSelectAst({ from, project });
-
-      expect('joins' in selectAst).toBe(false);
-      expect('where' in selectAst).toBe(false);
-      expect('orderBy' in selectAst).toBe(false);
-      expect('limit' in selectAst).toBe(false);
-    });
-
-    it('removes empty arrays from optional fields', () => {
-      const from: TableRef = createTableRef('user');
-      const project = [
-        {
-          alias: 'id',
-          expr: createColumnRef('user', 'id') as ColumnRef,
-        },
-      ];
-
-      const selectAst = createSelectAst({ from, project, joins: [] });
-
-      expect('joins' in selectAst).toBe(false);
-    });
+    expect(selectAst.joins).toBeUndefined();
+    expect(selectAst.orderBy).toBeUndefined();
+    expect(selectAst.distinctOn).toBeUndefined();
+    expect(selectAst.groupBy).toBeUndefined();
   });
 });

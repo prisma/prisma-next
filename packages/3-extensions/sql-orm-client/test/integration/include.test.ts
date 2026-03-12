@@ -1,3 +1,11 @@
+import {
+  ColumnRef,
+  DerivedTableSource,
+  JsonArrayAggExpr,
+  JsonObjectExpr,
+  OrderByItem,
+  SubqueryExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { getTestContract, isSelectAst } from '../helpers';
@@ -323,26 +331,23 @@ describe('integration/include', () => {
         const includeJoin = ast.joins?.find(
           (join) =>
             join.lateral &&
-            join.source.kind === 'derivedTable' &&
+            join.source instanceof DerivedTableSource &&
             join.source.alias === 'posts_lateral',
         );
         expect(includeJoin).toBeDefined();
-        if (includeJoin?.source.kind === 'derivedTable') {
+        if (includeJoin?.source instanceof DerivedTableSource) {
           const includeAggregateProjection = includeJoin.source.query.project[0];
-          expect(includeAggregateProjection?.expr.kind).toBe('jsonArrayAgg');
-          if (includeAggregateProjection?.expr.kind === 'jsonArrayAgg') {
+          expect(includeAggregateProjection?.expr).toBeInstanceOf(JsonArrayAggExpr);
+          if (includeAggregateProjection?.expr instanceof JsonArrayAggExpr) {
             expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
-            expect(includeAggregateProjection.expr.expr.kind).toBe('jsonObject');
+            expect(includeAggregateProjection.expr.expr).toBeInstanceOf(JsonObjectExpr);
             expect(includeAggregateProjection.expr.orderBy).toEqual([
-              {
-                expr: { kind: 'col', table: 'posts__rows', column: 'posts__order_0' },
-                dir: 'asc',
-              },
+              OrderByItem.asc(ColumnRef.of('posts__rows', 'posts__order_0')),
             ]);
           }
           const rowsSource = includeJoin.source.query.from;
-          expect(rowsSource.kind).toBe('derivedTable');
-          if (rowsSource.kind === 'derivedTable') {
+          expect(rowsSource).toBeInstanceOf(DerivedTableSource);
+          if (rowsSource instanceof DerivedTableSource) {
             expect(rowsSource.query.limit).toBe(1);
             expect(rowsSource.query.offset).toBe(1);
             expect(rowsSource.query.project.map((item) => item.alias)).toContain('posts__order_0');
@@ -420,28 +425,21 @@ describe('integration/include', () => {
         const includeJoin = ast.joins?.find(
           (join) =>
             join.lateral &&
-            join.source.kind === 'derivedTable' &&
+            join.source instanceof DerivedTableSource &&
             join.source.alias === 'invitedUsers_lateral',
         );
         expect(includeJoin).toBeDefined();
-        if (includeJoin?.source.kind === 'derivedTable') {
+        if (includeJoin?.source instanceof DerivedTableSource) {
           const includeAggregateProjection = includeJoin.source.query.project[0];
-          expect(includeAggregateProjection?.expr.kind).toBe('jsonArrayAgg');
-          if (includeAggregateProjection?.expr.kind === 'jsonArrayAgg') {
+          expect(includeAggregateProjection?.expr).toBeInstanceOf(JsonArrayAggExpr);
+          if (includeAggregateProjection?.expr instanceof JsonArrayAggExpr) {
             expect(includeAggregateProjection.expr.orderBy).toEqual([
-              {
-                expr: {
-                  kind: 'col',
-                  table: 'invitedUsers__rows',
-                  column: 'invitedUsers__order_0',
-                },
-                dir: 'asc',
-              },
+              OrderByItem.asc(ColumnRef.of('invitedUsers__rows', 'invitedUsers__order_0')),
             ]);
           }
           const rowsSource = includeJoin.source.query.from;
-          expect(rowsSource.kind).toBe('derivedTable');
-          if (rowsSource.kind === 'derivedTable') {
+          expect(rowsSource).toBeInstanceOf(DerivedTableSource);
+          if (rowsSource instanceof DerivedTableSource) {
             expect(rowsSource.query.project.map((item) => item.alias)).toContain(
               'invitedUsers__order_0',
             );
@@ -487,13 +485,13 @@ describe('integration/include', () => {
         }
         expect(ast.joins ?? []).toHaveLength(0);
         const postsProjection = ast.project.find((item) => item.alias === 'posts');
-        expect(postsProjection?.expr.kind).toBe('subquery');
-        if (postsProjection?.expr.kind === 'subquery') {
+        expect(postsProjection?.expr).toBeInstanceOf(SubqueryExpr);
+        if (postsProjection?.expr instanceof SubqueryExpr) {
           const includeAggregateProjection = postsProjection.expr.query.project[0];
-          expect(includeAggregateProjection?.expr.kind).toBe('jsonArrayAgg');
-          if (includeAggregateProjection?.expr.kind === 'jsonArrayAgg') {
+          expect(includeAggregateProjection?.expr).toBeInstanceOf(JsonArrayAggExpr);
+          if (includeAggregateProjection?.expr instanceof JsonArrayAggExpr) {
             expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
-            expect(includeAggregateProjection.expr.expr.kind).toBe('jsonObject');
+            expect(includeAggregateProjection.expr.expr).toBeInstanceOf(JsonObjectExpr);
           }
         }
       });
@@ -565,25 +563,18 @@ describe('integration/include', () => {
           throw new Error('Expected select AST for correlated self-relation include query');
         }
         const invitedUsersProjection = ast.project.find((item) => item.alias === 'invitedUsers');
-        expect(invitedUsersProjection?.expr.kind).toBe('subquery');
-        if (invitedUsersProjection?.expr.kind === 'subquery') {
+        expect(invitedUsersProjection?.expr).toBeInstanceOf(SubqueryExpr);
+        if (invitedUsersProjection?.expr instanceof SubqueryExpr) {
           const includeAggregateProjection = invitedUsersProjection.expr.query.project[0];
-          expect(includeAggregateProjection?.expr.kind).toBe('jsonArrayAgg');
-          if (includeAggregateProjection?.expr.kind === 'jsonArrayAgg') {
+          expect(includeAggregateProjection?.expr).toBeInstanceOf(JsonArrayAggExpr);
+          if (includeAggregateProjection?.expr instanceof JsonArrayAggExpr) {
             expect(includeAggregateProjection.expr.orderBy).toEqual([
-              {
-                expr: {
-                  kind: 'col',
-                  table: 'invitedUsers__rows',
-                  column: 'invitedUsers__order_0',
-                },
-                dir: 'asc',
-              },
+              OrderByItem.asc(ColumnRef.of('invitedUsers__rows', 'invitedUsers__order_0')),
             ]);
           }
           const rowsSource = invitedUsersProjection.expr.query.from;
-          expect(rowsSource.kind).toBe('derivedTable');
-          if (rowsSource.kind === 'derivedTable') {
+          expect(rowsSource).toBeInstanceOf(DerivedTableSource);
+          if (rowsSource instanceof DerivedTableSource) {
             expect(rowsSource.query.project.map((item) => item.alias)).toContain(
               'invitedUsers__order_0',
             );

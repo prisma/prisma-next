@@ -1,14 +1,14 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { RuntimeQueryable } from '../src/types';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
 
 export function isSelectAst(ast: unknown): ast is SelectAst {
-  return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
+  return ast instanceof SelectAst;
 }
 
 const baseTestContract = validateContract<Contract>(contractJson);

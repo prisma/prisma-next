@@ -1,12 +1,12 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
-import type { ProjectionItem, TableRef } from '@prisma-next/sql-relational-core/ast';
 import {
   createJoinOnBuilder,
-  createOrderByItem,
-  createProjectionItem,
-  createSelectAstBuilder,
-  createTableSource,
+  OrderByItem,
+  ProjectionItem,
+  SelectAst,
+  type TableRef,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -310,8 +310,7 @@ export class SelectBuilderImpl<
     const orderByClause = this.state.orderBy
       ? (() => {
           const orderBy = this.state.orderBy as OrderBuilder<string, StorageColumn, unknown>;
-          // orderBy.expr is already an Expression (ColumnRef or OperationExpr)
-          return [createOrderByItem(orderBy.expr, orderBy.dir)];
+          return [new OrderByItem(orderBy.expr, orderBy.dir)];
         })()
       : undefined;
 
@@ -336,27 +335,25 @@ export class SelectBuilderImpl<
       if (includeProjection) {
         projectEntries.push(includeProjection);
       } else if (column && isExpressionBuilder(column)) {
-        projectEntries.push(createProjectionItem(alias, column.expr));
+        projectEntries.push(ProjectionItem.of(alias, column.expr));
       } else if (column) {
-        projectEntries.push(createProjectionItem(alias, column.toExpr()));
+        projectEntries.push(ProjectionItem.of(alias, column.toExpr()));
       }
     }
 
-    const astBuilder = createSelectAstBuilder(createTableSource(table.name, table.alias))
-      .project(projectEntries)
-      .where(whereExpr);
-
+    let ast = SelectAst.from(TableSource.named(table.name, table.alias))
+      .withProject(projectEntries)
+      .withWhere(whereExpr);
     const allJoins = [...joins, ...includeArtifacts.map((artifact) => artifact.join)];
     if (allJoins.length > 0) {
-      astBuilder.joins(allJoins);
+      ast = ast.withJoins(allJoins);
     }
     if (orderByClause) {
-      astBuilder.orderBy(orderByClause);
+      ast = ast.withOrderBy(orderByClause);
     }
     if (this.state.limit !== undefined) {
-      astBuilder.limit(this.state.limit);
+      ast = ast.withLimit(this.state.limit);
     }
-    const ast = astBuilder.build();
 
     const planMeta = buildMeta({
       contract: this.contract,
@@ -368,6 +365,7 @@ export class SelectBuilderImpl<
       paramCodecs,
       where: this.state.where,
       orderBy: this.state.orderBy,
+      limit: this.state.limit,
     } as {
       contract: SqlContract<SqlStorage>;
       table: TableRef;
@@ -376,6 +374,7 @@ export class SelectBuilderImpl<
       includes?: ReadonlyArray<IncludeState>;
       where?: BinaryBuilder | UnaryBuilder;
       orderBy?: AnyOrderBuilder;
+      limit?: number;
       paramDescriptors: ParamDescriptor[];
       paramCodecs?: Record<string, string>;
     });
