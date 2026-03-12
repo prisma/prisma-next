@@ -1,3 +1,5 @@
+import { ifDefined } from '@prisma-next/utils/defined';
+
 /**
  * CLI error envelope for output formatting.
  * This is the serialized form of a CliStructuredError.
@@ -440,7 +442,7 @@ export function errorSchemaVerificationFailed(options: {
     fix: 'Run `prisma-next db update` to reconcile, or adjust your contract to match the database',
     meta: {
       verificationResult: options.verificationResult,
-      ...(options.issues ? { issues: options.issues } : {}),
+      ...ifDefined('issues', options.issues),
     },
   });
 }
