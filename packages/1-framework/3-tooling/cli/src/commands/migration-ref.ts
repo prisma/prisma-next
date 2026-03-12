@@ -8,7 +8,7 @@ import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { Command } from 'commander';
 import { resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import { addGlobalOptions, setCommandDescriptions } from '../utils/command-helpers';
 import { formatCommandHelp } from '../utils/formatters/help';
 import { parseGlobalFlags } from '../utils/global-flags';
 
@@ -24,15 +24,10 @@ function createRefSetCommand(): Command {
     'Set a ref to a contract hash',
     'Sets a named ref to point to a contract hash in migrations/refs.json.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => formatCommandHelp({ command: cmd, flags: parseGlobalFlags({}) }),
-    })
+  addGlobalOptions(command)
     .argument('<name>', 'Ref name (e.g., staging, production)')
     .argument('<hash>', 'Contract hash to point to')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON', false)
-    .option('-q, --quiet', 'Quiet mode')
     .action(
       async (
         name: string,
@@ -81,14 +76,9 @@ function createRefGetCommand(): Command {
     'Get the hash for a ref',
     'Reads a named ref from migrations/refs.json and prints its contract hash.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => formatCommandHelp({ command: cmd, flags: parseGlobalFlags({}) }),
-    })
+  addGlobalOptions(command)
     .argument('<name>', 'Ref name to look up')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON', false)
-    .option('-q, --quiet', 'Quiet mode')
     .action(
       async (
         name: string,
@@ -123,14 +113,9 @@ function createRefGetCommand(): Command {
 function createRefDeleteCommand(): Command {
   const command = new Command('delete');
   setCommandDescriptions(command, 'Delete a ref', 'Removes a named ref from migrations/refs.json.');
-  command
-    .configureHelp({
-      formatHelp: (cmd) => formatCommandHelp({ command: cmd, flags: parseGlobalFlags({}) }),
-    })
+  addGlobalOptions(command)
     .argument('<name>', 'Ref name to delete')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON', false)
-    .option('-q, --quiet', 'Quiet mode')
     .action(
       async (
         name: string,
@@ -174,13 +159,8 @@ function createRefListCommand(): Command {
     'List all refs',
     'Lists all named refs from migrations/refs.json.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => formatCommandHelp({ command: cmd, flags: parseGlobalFlags({}) }),
-    })
+  addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON', false)
-    .option('-q, --quiet', 'Quiet mode')
     .action(async (options: { config?: string; json?: string | boolean; quiet?: boolean }) => {
       const flags = parseGlobalFlags(options);
       const config = await loadConfig(options.config);
@@ -221,7 +201,7 @@ export function createMigrationRefCommand(): Command {
     'Manage named refs in migrations/refs.json. Refs map logical environment\n' +
       'names (e.g., staging, production) to contract hashes.',
   );
-  command.configureHelp({
+  addGlobalOptions(command).configureHelp({
     formatHelp: (cmd) => formatCommandHelp({ command: cmd, flags: parseGlobalFlags({}) }),
     subcommandDescription: () => '',
   });
