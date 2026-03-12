@@ -28,7 +28,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey P3: Chain Breakage', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();

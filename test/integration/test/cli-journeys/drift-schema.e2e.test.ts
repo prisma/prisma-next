@@ -34,7 +34,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey M: Phantom Drift', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();
@@ -92,7 +92,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey N: Extra Column Drift', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();
@@ -137,13 +137,12 @@ withTempDir(({ createTempDir }) => {
         expect(introspect.exitCode, 'N.04: db introspect').toBe(0);
         expect(stripAnsi(introspect.stdout), 'N.04: shows age column').toContain('age');
 
-        // N.05: Expand contract to include name column, emit
+        // N.05: Evolve contract (adds 'name' column — 'age' remains as unmanaged extra)
         swapContract(ctx, 'contract-additive');
         const emitExpanded = await runContractEmit(ctx);
         expect(emitExpanded.exitCode, 'N.05: contract emit expanded').toBe(0);
 
-        // N.06: db update (contract now has 'name' col DB doesn't have — update adds 'name')
-        // N.06: db update (contract now has 'name' col DB doesn't have — update adds 'name')
+        // N.06: db update (adds 'name' column; 'age' stays as extra — not resolved by this update)
         // Use --no-interactive to avoid hanging on potential confirmation prompts
         const update = await runDbUpdate(ctx, ['--no-interactive']);
         // db update may fail if the planner classifies adding NOT NULL column as destructive
@@ -153,7 +152,7 @@ withTempDir(({ createTempDir }) => {
           expect(updateY.exitCode, 'N.06: db update with -y').toBe(0);
         }
 
-        // N.07: db schema-verify tolerant (passes — contract columns are present)
+        // N.07: db schema-verify tolerant (passes — all contract columns present; 'age' tolerated as extra)
         const tolerantAfter = await runDbSchemaVerify(ctx);
         expect(tolerantAfter.exitCode, 'N.07: tolerant passes after update').toBe(0);
       },

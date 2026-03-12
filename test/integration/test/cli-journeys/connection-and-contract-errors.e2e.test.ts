@@ -56,7 +56,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey W: No Contract Yet', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();
@@ -92,7 +92,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey U: Target Mismatch', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();
@@ -138,7 +138,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey V: Unmanaged DB Init', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();
@@ -168,14 +168,14 @@ withTempDir(({ createTempDir }) => {
         const emit = await runContractEmit(ctx);
         expect(emit.exitCode, 'V.pre: emit').toBe(0);
 
+        // V.02: db init --dry-run (run before mutating init to verify non-mutating preview)
+        const dryRun = await runDbInit(ctx, ['--dry-run']);
+        expect([0, 1], 'V.02: dry-run completes').toContain(dryRun.exitCode);
+
         // V.01: db init — tables already exist, should handle gracefully
         const init = await runDbInit(ctx);
         // Behavior depends on planner: may succeed (tables match) or fail (conflict)
         expect([0, 1], 'V.01: db init completes').toContain(init.exitCode);
-
-        // V.02: db init --dry-run
-        const dryRun = await runDbInit(ctx, ['--dry-run']);
-        expect([0, 1], 'V.02: dry-run completes').toContain(dryRun.exitCode);
       },
       timeouts.spinUpPpgDev,
     );

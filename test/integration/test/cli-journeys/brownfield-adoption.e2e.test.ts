@@ -39,7 +39,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey F: Brownfield Adoption', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();
@@ -105,7 +105,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey G: Brownfield Mismatch', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();

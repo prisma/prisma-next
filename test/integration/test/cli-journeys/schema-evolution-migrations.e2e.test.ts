@@ -40,7 +40,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey B: Schema Evolution via Migrations', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();
@@ -85,14 +85,10 @@ withTempDir(({ createTempDir }) => {
         const verify = await runMigrationVerify(ctx, ['--dir', `migrations/${migDir}`]);
         expect(verify.exitCode, 'B.04: migration verify').toBe(0);
 
-        // B.05: migration status (offline — no --db flag, uses filesystem only)
-        const statusOffline = await runMigrationStatus(ctx);
-        expect(statusOffline.exitCode, 'B.05: migration status offline').toBe(0);
-
-        // B.06: migration status (online — config has db.connection)
-        const statusOnline = await runMigrationStatus(ctx);
-        expect(statusOnline.exitCode, 'B.06: migration status online').toBe(0);
-        expect(stripAnsi(statusOnline.stdout), 'B.06: shows pending').toContain('Pending');
+        // B.05: migration status (pre-apply — shows pending migration)
+        const statusPreApply = await runMigrationStatus(ctx);
+        expect(statusPreApply.exitCode, 'B.05: migration status pre-apply').toBe(0);
+        expect(stripAnsi(statusPreApply.stdout), 'B.05: shows pending').toContain('Pending');
 
         // B.07: migration apply
         const apply = await runMigrationApply(ctx);
@@ -163,7 +159,7 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   describe('Journey Z: Init-to-Migrations Transition', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();

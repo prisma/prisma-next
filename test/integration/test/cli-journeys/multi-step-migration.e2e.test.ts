@@ -25,7 +25,7 @@ import {
 withTempDir(({ createTempDir }) => {
   describe('Journey C: Multi-Step Migration Chain', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();

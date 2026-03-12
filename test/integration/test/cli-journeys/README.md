@@ -42,6 +42,6 @@ pnpm test:journeys
 ## Design principles
 
 - **Single `it()` per journey**: Steps run sequentially within one test, identified by assertion labels (e.g., `expect(exitCode, 'A.03: db init').toBe(0)`). This avoids test-ordering fragility and keeps each test self-contained.
-- **Database isolation**: Each `describe` block gets its own PGlite instance via `beforeAll`/`afterAll`. Journeys within a file share no database state.
+- **Database isolation**: Each journey (`describe` block) gets its own PGlite instance via `beforeAll`/`afterAll`. Journeys within a file share no database state.
 - **Parallel at file level**: Vitest parallelizes across files (4 workers). Steps within a journey are sequential.
 - **Behavior over flags**: Assertions target exit codes, JSON shape keys, and state transitions — not exact flag names or output strings.

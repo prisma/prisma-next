@@ -83,7 +83,7 @@ export function setupJourney(options: JourneySetupOptions): JourneyContext {
     : 'prisma-next.config.ts';
   let configContent = readFileSync(join(JOURNEY_FIXTURES_DIR, configFileName), 'utf-8');
   if (connectionString) {
-    configContent = configContent.replace(/\{\{DB_URL\}\}/g, connectionString);
+    configContent = configContent.replace(/\{\{DB_URL\}\}/g, () => connectionString);
   }
   const configPath = join(testDir, 'prisma-next.config.ts');
   writeFileSync(configPath, configContent, 'utf-8');
@@ -160,9 +160,11 @@ async function runCommand(
         stdout: mocks.consoleOutput.join('\n'),
         stderr: mocks.consoleErrors.join('\n'),
       };
-    } catch {
+    } catch (error) {
+      const exitCode = getExitCode();
+      if (exitCode === null) throw error; // unexpected error, not a CLI exit
       return {
-        exitCode: getExitCode() ?? 1,
+        exitCode,
         stdout: mocks.consoleOutput.join('\n'),
         stderr: mocks.consoleErrors.join('\n'),
       };
@@ -192,9 +194,11 @@ async function runCommandRaw(
         stdout: mocks.consoleOutput.join('\n'),
         stderr: mocks.consoleErrors.join('\n'),
       };
-    } catch {
+    } catch (error) {
+      const exitCode = getExitCode();
+      if (exitCode === null) throw error; // unexpected error, not a CLI exit
       return {
-        exitCode: getExitCode() ?? 1,
+        exitCode,
         stdout: mocks.consoleOutput.join('\n'),
         stderr: mocks.consoleErrors.join('\n'),
       };

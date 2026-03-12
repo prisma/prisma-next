@@ -27,7 +27,7 @@ import {
 withTempDir(({ createTempDir }) => {
   describe('Journey A: Greenfield Setup', () => {
     let connectionString: string;
-    let closeDb: () => Promise<void>;
+    let closeDb: () => Promise<void> = async () => {};
 
     beforeAll(async () => {
       const db = await createDevDatabase();
