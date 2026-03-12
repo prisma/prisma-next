@@ -1,8 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type {
-  SignDatabaseResult,
-  VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
+import type { VerifyDatabaseSchemaResult } from '@prisma-next/core-control-plane/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -25,39 +22,27 @@ import {
   setCommandExamples,
 } from '../utils/command-helpers';
 import { formatStyledHeader } from '../utils/formatters/styled';
-import {
-  formatSchemaVerifyJson,
-  formatSchemaVerifyOutput,
-  formatSignJson,
-  formatSignOutput,
-} from '../utils/formatters/verify';
+import { formatSchemaVerifyJson, formatSchemaVerifyOutput } from '../utils/formatters/verify';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface DbSignOptions extends CommonCommandOptions {
+interface DbSchemaVerifyOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
+  readonly strict?: boolean;
 }
 
 /**
- * Failure type for db sign command.
- * Either an infrastructure error (CliStructuredError) or a logical failure (schema verification failed).
+ * Executes the db schema-verify command and returns a structured Result.
  */
-type DbSignFailure = CliStructuredError | VerifyDatabaseSchemaResult;
-
-/**
- * Executes the db sign command and returns a structured Result.
- * Success: SignDatabaseResult (sign happened)
- * Failure: CliStructuredError (infra error) or VerifyDatabaseSchemaResult (schema mismatch)
- */
-async function executeDbSignCommand(
-  options: DbSignOptions,
+async function executeDbSchemaVerifyCommand(
+  options: DbSchemaVerifyOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
-): Promise<Result<SignDatabaseResult, DbSignFailure>> {
+): Promise<Result<VerifyDatabaseSchemaResult, CliStructuredError>> {
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -65,8 +50,6 @@ async function executeDbSignCommand(
     : 'prisma-next.config.ts';
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
-
-  // Output header
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
@@ -76,9 +59,9 @@ async function executeDbSignCommand(
       details.push({ label: 'database', value: maskConnectionUrl(options.db) });
     }
     const header = formatStyledHeader({
-      command: 'db sign',
-      description: 'Sign the database with your contract so you can safely run queries',
-      url: 'https://pris.ly/db-sign',
+      command: 'db schema-verify',
+      description: 'Check whether the database schema satisfies your contract',
+      url: 'https://pris.ly/db-schema-verify',
       details,
       flags,
     });
@@ -122,15 +105,15 @@ async function executeDbSignCommand(
   if (!dbConnection) {
     return notOk(
       errorDatabaseConnectionRequired({
-        why: `Database connection is required for db sign (set db.connection in ${configPath}, or pass --db <url>)`,
-        commandName: 'db sign',
+        why: `Database connection is required for db schema-verify (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'db schema-verify',
       }),
     );
   }
 
   // Check for driver
   if (!config.driver) {
-    return notOk(errorDriverRequired({ why: 'Config.driver is required for db sign' }));
+    return notOk(errorDriverRequired({ why: 'Config.driver is required for db schema-verify' }));
   }
 
   // Create control client
@@ -146,28 +129,14 @@ async function executeDbSignCommand(
   const onProgress = createProgressAdapter({ ui, flags });
 
   try {
-    // Step 1: Schema verification - connect here
     const schemaVerifyResult = await client.schemaVerify({
       contractIR: contractJson,
-      strict: false,
+      strict: options.strict ?? false,
       connection: dbConnection,
       onProgress,
     });
 
-    // If schema verification failed, return as failure
-    if (!schemaVerifyResult.ok) {
-      return notOk(schemaVerifyResult);
-    }
-
-    // Step 2: Sign (already connected from schemaVerify)
-    const signResult = await client.sign({
-      contractIR: contractJson,
-      contractPath,
-      configPath,
-      onProgress,
-    });
-
-    return ok(signResult);
+    return ok(schemaVerifyResult);
   } catch (error) {
     // Driver already throws CliStructuredError for connection failures
     if (error instanceof CliStructuredError) {
@@ -185,7 +154,7 @@ async function executeDbSignCommand(
     // Wrap unexpected errors
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Unexpected error during db sign: ${error instanceof Error ? error.message : String(error)}`,
+        why: `Unexpected error during db schema-verify: ${error instanceof Error ? error.message : String(error)}`,
       }),
     );
   } finally {
@@ -193,59 +162,51 @@ async function executeDbSignCommand(
   }
 }
 
-export function createDbSignCommand(): Command {
-  const command = new Command('sign');
+export function createDbSchemaVerifyCommand(): Command {
+  const command = new Command('schema-verify');
   setCommandDescriptions(
     command,
-    'Sign the database with your contract so you can safely run queries',
-    'Verifies that your database schema satisfies the emitted contract, and if so, writes or\n' +
-      'updates the database signature. This command is idempotent and safe to run\n' +
-      'in CI/deployment pipelines. The signature records that this database instance is aligned\n' +
-      'with a specific contract version.',
+    'Check whether the database schema satisfies your contract',
+    'Verifies that your database schema satisfies the emitted contract. Compares table structures,\n' +
+      'column types, constraints, and extensions. Reports any mismatches via a contract-shaped\n' +
+      'verification tree. This is a read-only operation that does not modify the database.',
   );
-  setCommandExamples(command, ['prisma-next db sign --db $DATABASE_URL']);
+  setCommandExamples(command, [
+    'prisma-next db schema-verify --db $DATABASE_URL',
+    'prisma-next db schema-verify --db $DATABASE_URL --strict',
+  ]);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .action(async (options: DbSignOptions) => {
+    .option('--strict', 'Strict mode: extra schema elements cause failures', false)
+    .action(async (options: DbSchemaVerifyOptions) => {
       const flags = parseGlobalFlags(options);
 
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const result = await executeDbSignCommand(options, flags, ui);
+      const result = await executeDbSchemaVerifyCommand(options, flags, ui);
 
-      if (result.ok) {
-        // Success - format sign output
+      // Handle result - formats output and returns exit code
+      const exitCode = handleResult(result, flags, ui, (schemaVerifyResult) => {
         if (flags.json) {
-          ui.output(formatSignJson(result.value));
+          ui.output(formatSchemaVerifyJson(schemaVerifyResult));
         } else {
-          const output = formatSignOutput(result.value, flags);
+          const output = formatSchemaVerifyOutput(schemaVerifyResult, flags);
           if (output) {
             ui.log(output);
           }
         }
-        process.exit(0);
-      }
+      });
 
-      // Failure - determine type and handle appropriately
-      const failure = result.failure;
-
-      if (failure instanceof CliStructuredError) {
-        // Infrastructure error - use standard handler
-        const exitCode = handleResult(result as Result<never, CliStructuredError>, flags, ui);
+      // For logical schema mismatches, check if verification passed
+      // Infra errors already handled by handleResult (returns non-zero exit code)
+      if (result.ok && !result.value.ok) {
+        // Schema verification failed - exit with code 1
+        process.exit(1);
+      } else {
+        // Success or infra error - use exit code from handleResult
         process.exit(exitCode);
       }
-
-      // Schema verification failed - format and print schema verification output
-      if (flags.json) {
-        ui.output(formatSchemaVerifyJson(failure));
-      } else {
-        const output = formatSchemaVerifyOutput(failure, flags);
-        if (output) {
-          ui.log(output);
-        }
-      }
-      process.exit(1);
     });
 
   return command;
