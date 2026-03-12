@@ -162,7 +162,7 @@ async function runCommand(
       };
     } catch (error) {
       const exitCode = getExitCode();
-      if (exitCode === null) throw error; // unexpected error, not a CLI exit
+      if (exitCode == null) throw error; // unexpected error, not a CLI exit
       return {
         exitCode,
         stdout: mocks.consoleOutput.join('\n'),
@@ -196,7 +196,7 @@ async function runCommandRaw(
       };
     } catch (error) {
       const exitCode = getExitCode();
-      if (exitCode === null) throw error; // unexpected error, not a CLI exit
+      if (exitCode == null) throw error; // unexpected error, not a CLI exit
       return {
         exitCode,
         stdout: mocks.consoleOutput.join('\n'),
