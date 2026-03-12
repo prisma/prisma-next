@@ -1,5 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import type { SignDatabaseResult } from '@prisma-next/core-control-plane/types';
+import type {
+  SignDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -12,7 +15,6 @@ import {
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
-  errorSchemaVerificationFailed,
   errorUnexpected,
 } from '../utils/cli-errors';
 import {
@@ -24,6 +26,7 @@ import {
 } from '../utils/command-helpers';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import {
+  formatSchemaVerifyJson,
   formatSchemaVerifyOutput,
   formatSignJson,
   formatSignOutput,
@@ -40,15 +43,21 @@ interface DbSignOptions extends CommonCommandOptions {
 }
 
 /**
+ * Failure type for db sign command.
+ * Either an infrastructure error (CliStructuredError) or a logical failure (schema verification failed).
+ */
+type DbSignFailure = CliStructuredError | VerifyDatabaseSchemaResult;
+
+/**
  * Executes the db sign command and returns a structured Result.
  * Success: SignDatabaseResult (sign happened)
- * Failure: CliStructuredError (infra error or schema verification failure)
+ * Failure: CliStructuredError (infra error) or VerifyDatabaseSchemaResult (schema mismatch)
  */
 async function executeDbSignCommand(
   options: DbSignOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
-): Promise<Result<SignDatabaseResult, CliStructuredError>> {
+): Promise<Result<SignDatabaseResult, DbSignFailure>> {
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -145,15 +154,9 @@ async function executeDbSignCommand(
       onProgress,
     });
 
-    // If schema verification failed, map to structured error
+    // If schema verification failed, return as failure
     if (!schemaVerifyResult.ok) {
-      return notOk(
-        errorSchemaVerificationFailed({
-          summary: schemaVerifyResult.summary,
-          verificationResult: schemaVerifyResult as unknown as Record<string, unknown>,
-          issues: schemaVerifyResult.schema.issues,
-        }),
-      );
+      return notOk(schemaVerifyResult);
     }
 
     // Step 2: Sign (already connected from schemaVerify)
@@ -211,30 +214,38 @@ export function createDbSignCommand(): Command {
 
       const result = await executeDbSignCommand(options, flags, ui);
 
-      // On failure with schema verification data, render the tree before the error (for TTY).
-      if (!result.ok && !flags.json) {
-        const verificationResult = result.failure.meta?.['verificationResult'] as
-          | Parameters<typeof formatSchemaVerifyOutput>[0]
-          | undefined;
-        if (verificationResult) {
-          const output = formatSchemaVerifyOutput(verificationResult, flags);
+      if (result.ok) {
+        // Success - format sign output
+        if (flags.json) {
+          ui.output(formatSignJson(result.value));
+        } else {
+          const output = formatSignOutput(result.value, flags);
           if (output) {
             ui.log(output);
           }
         }
+        process.exit(0);
       }
 
-      const exitCode = handleResult(result, flags, ui, (signResult) => {
-        if (flags.json) {
-          ui.output(formatSignJson(signResult));
-        } else {
-          const output = formatSignOutput(signResult, flags);
-          if (output) {
-            ui.log(output);
-          }
+      // Failure - determine type and handle appropriately
+      const failure = result.failure;
+
+      if (failure instanceof CliStructuredError) {
+        // Infrastructure error - use standard handler
+        const exitCode = handleResult(result as Result<never, CliStructuredError>, flags, ui);
+        process.exit(exitCode);
+      }
+
+      // Schema verification failed - format and print schema verification output
+      if (flags.json) {
+        ui.output(formatSchemaVerifyJson(failure));
+      } else {
+        const output = formatSchemaVerifyOutput(failure, flags);
+        if (output) {
+          ui.log(output);
         }
-      });
-      process.exit(exitCode);
+      }
+      process.exit(1);
     });
 
   return command;
