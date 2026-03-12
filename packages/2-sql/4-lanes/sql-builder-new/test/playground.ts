@@ -1,9 +1,9 @@
 import { expectTypeOf } from 'vitest';
-import type { DefaultScope, SelectQueryBuilder } from '../src';
+import type { TableProxy } from '../src';
 import type { CodecTypes, Tables } from './fixtures/generated/contract';
 
-declare const users: SelectQueryBuilder<CodecTypes, DefaultScope<'users', Tables['users']>>;
-declare const posts: SelectQueryBuilder<CodecTypes, DefaultScope<'posts', Tables['posts']>>;
+declare const users: TableProxy<CodecTypes, 'users', Tables['users']>;
+declare const posts: TableProxy<CodecTypes, 'posts', Tables['posts']>;
 
 // Basic column select
 const simple = await users
@@ -53,11 +53,12 @@ expectTypeOf(full).toEqualTypeOf<{ name: string | null; title: string | null }>(
 // Field name conflict resolved via namespaces
 const filedNameConflict = await users
   .innerJoin(posts, (f, fns) => fns.eq(f.id, f.user_id))
-  .where((f, fns) => fns.eq(f.users.id, f.posts.id))
   .select('name')
-  .select('title');
+  .select('title')
+  .where((f, fns) => fns.eq(f.users.id, f.posts.id))
+  .first();
 
-void filedNameConflict;
+expectTypeOf(filedNameConflict).toEqualTypeOf<{ name: string; title: string }>();
 
 // Aliased column select
 const aliased = await users.select('userName', 'name').first();
