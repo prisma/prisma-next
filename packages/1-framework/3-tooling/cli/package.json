@@ -110,6 +110,10 @@
       "types": "./dist/commands/migration-apply.d.mts",
       "import": "./dist/commands/migration-apply.mjs"
     },
+    "./commands/migration-ref": {
+      "types": "./dist/commands/migration-ref.d.mts",
+      "import": "./dist/commands/migration-ref.mjs"
+    },
     "./config-loader": {
       "types": "./dist/config-loader.d.mts",
       "import": "./dist/config-loader.mjs"

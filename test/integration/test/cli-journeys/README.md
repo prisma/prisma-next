@@ -20,8 +20,20 @@ pnpm test:journeys
 | `greenfield-setup.e2e.test.ts` | New project with empty database: emit a contract, dry-run init to preview operations, apply init, confirm idempotency on re-run, verify marker and schema (tolerant + strict), introspect, and JSON output variants of verify/schema-verify |
 | `schema-evolution-migrations.e2e.test.ts` | **Migration lifecycle**: plan a migration, show its details, verify the planned directory, check status (offline + online), apply, confirm all applied, db verify. Also covers edge cases: apply when already up-to-date (noop), plan when contract is unchanged (noop), show by path and not-found. **Init-to-migrations transition**: initialize with `db init`, then switch to the migration workflow |
 | `multi-step-migration.e2e.test.ts` | Planning two migrations (base → additive → v3) without applying either, then batch-applying both at once. Verifies pending/applied status reporting |
+| `migration-plan-details.e2e.test.ts` | **Plan JSON envelope**: full `--json` output shape with operations, attestation round-trip (plan → verify). **Destructive planning**: drop-column migration produces destructive operation class |
+| `migration-apply-edge-cases.e2e.test.ts` | **No path**: apply fails when contract changed without planning. **Resume**: partial failure (NOT NULL violation) leaves marker at last success, re-apply resumes. **Destructive apply**: single drop-column migration verifies column removed + marker updated. **Multi-step destructive**: three-migration batch (create → add → drop) in one apply |
 | `db-update-workflows.e2e.test.ts` | **Direct update**: `db update` without migrations (additive-only, dry-run, noop). **Destructive update**: drops a column, tests `--no-interactive` rejection, `--json` error envelope, and `--json -y` auto-accept. **Re-init conflict**: `db init` on an already-initialized DB with a different contract fails; recovery via `db update` |
 | `brownfield-adoption.e2e.test.ts` | **Adopt Prisma on existing DB**: introspect → emit matching contract → schema-verify → sign → verify → evolve via db update. **Schema mismatch**: emit a contract that doesn't match the DB, observe sign/schema-verify failures, fix contract, retry |
+
+### Graph features and refs
+
+| File | What it covers |
+|---|---|
+| `rollback-cycle.e2e.test.ts` | **Rollback cycle (P-2)**: C1→C2→C1 creates a cycle. `findLeaf` fails with `NO_RESOLVABLE_LEAF`. Plan with `--from` bypasses cycle, apply recovers |
+| `converging-paths.e2e.test.ts` | **Converging paths (P-3)**: two paths to the same target (C1→C2→C3 and C1→C3 direct). Pathfinder selects shortest path (2 steps not 3) |
+| `divergence-and-refs.e2e.test.ts` | **Same-base divergence (P-4)**: two edges from C1 (C1→C2, C1→C3). Status without `--ref` fails with `AMBIGUOUS_LEAF`. Ref-based resolution routes apply to the correct branch |
+| `ref-routing.e2e.test.ts` | **Staging ahead via refs (P-5)**: production=C1, staging=C2 on same DB. Apply `--ref staging` advances staging; production unaffected. **Marker ahead of ref (P-6)**: after staging apply, DB at C2 but production ref at C1 — apply fails, status reports ahead-of-ref |
+| `adopt-migrations.e2e.test.ts` | **Adopting migrations (P-9)**: DB managed via `db update` (at C2). Baseline migration EMPTY→C2 is no-op. Incremental C2→C3 applies normally. Status shows both migrations applied |
 
 ### Drift detection and recovery
 

@@ -16,6 +16,7 @@ import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
+import { createMigrationRefCommand } from '@prisma-next/cli/commands/migration-ref';
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createMigrationVerifyCommand } from '@prisma-next/cli/commands/migration-verify';
@@ -119,9 +120,13 @@ export function setupJourneyNoDb(createTempDir: () => string): JourneyContext {
 type ContractVariant =
   | 'contract-base'
   | 'contract-additive'
+  | 'contract-additive-required'
   | 'contract-destructive'
   | 'contract-add-table'
-  | 'contract-v3';
+  | 'contract-v3'
+  | 'contract-phone'
+  | 'contract-bio'
+  | 'contract-phone-bio';
 
 /**
  * Swaps the active contract in the test directory to a different variant.
@@ -296,6 +301,20 @@ export async function runMigrationVerify(
 ): Promise<CommandResult> {
   // migration verify doesn't support --config, use runCommandRaw
   return runCommandRaw(createMigrationVerifyCommand(), ctx.testDir, extraArgs);
+}
+
+export async function runMigrationRef(
+  ctx: JourneyContext,
+  subcommandArgs: readonly string[],
+): Promise<CommandResult> {
+  const [subcommand, ...rest] = subcommandArgs;
+  return runCommandRaw(createMigrationRefCommand(), ctx.testDir, [
+    subcommand!,
+    '--config',
+    ctx.configPath,
+    '--no-color',
+    ...rest,
+  ]);
 }
 
 /**

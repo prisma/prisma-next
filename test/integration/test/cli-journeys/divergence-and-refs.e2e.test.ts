@@ -1,0 +1,108 @@
+/**
+ * Same-Base Divergence (Journey L — spec scenario P-4/S-4)
+ *
+ * Tests that divergent migration branches (two edges from the same source)
+ * produce AMBIGUOUS_LEAF and that refs resolve the ambiguity. Creates:
+ *   C1 → C2 (add-phone, on disk but not applied)
+ *   C1 → C3 (add-bio, via --from C1)
+ * Without --ref, status errors. With ref production=C3, apply routes via C1→C3.
+ */
+
+import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import stripAnsi from 'strip-ansi';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { withTempDir } from '../utils/cli-test-helpers';
+import {
+  type JourneyContext,
+  parseJsonOutput,
+  runContractEmit,
+  runMigrationApply,
+  runMigrationPlan,
+  runMigrationRef,
+  runMigrationStatus,
+  setupJourney,
+  swapContract,
+} from '../utils/journey-test-helpers';
+
+withTempDir(({ createTempDir }) => {
+  describe('Journey L: Same-Base Divergence (P-4/S-4)', () => {
+    let connectionString: string;
+    let closeDb: () => Promise<void> = async () => {};
+
+    beforeAll(async () => {
+      const db = await createDevDatabase();
+      connectionString = db.connectionString;
+      closeDb = db.close;
+    }, timeouts.spinUpPpgDev);
+
+    afterAll(async () => {
+      await closeDb();
+    });
+
+    it(
+      'divergent branches → AMBIGUOUS_LEAF → ref-based resolution',
+      async () => {
+        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+
+        // L.01: emit base (C1) → plan + apply init
+        const emit0 = await runContractEmit(ctx);
+        expect(emit0.exitCode, 'L.01: emit C1').toBe(0);
+        const plan0 = await runMigrationPlan(ctx, ['--name', 'init', '--json']);
+        expect(plan0.exitCode, 'L.01: plan init').toBe(0);
+        const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
+        const apply0 = await runMigrationApply(ctx);
+        expect(apply0.exitCode, 'L.01: apply init').toBe(0);
+
+        // L.02: swap to contract-phone (C2) → emit → plan add-phone (don't apply)
+        swapContract(ctx, 'contract-phone');
+        const emit1 = await runContractEmit(ctx);
+        expect(emit1.exitCode, 'L.02: emit C2').toBe(0);
+        const plan1 = await runMigrationPlan(ctx, ['--name', 'add-phone', '--json']);
+        expect(plan1.exitCode, 'L.02: plan C1→C2').toBe(0);
+        const c2Hash = parseJsonOutput<{ to: string }>(plan1).to;
+
+        // L.03: swap to contract-bio (C3) → emit → plan with --from C1 (C1→C3 divergent edge)
+        swapContract(ctx, 'contract-bio');
+        const emit2 = await runContractEmit(ctx);
+        expect(emit2.exitCode, 'L.03: emit C3').toBe(0);
+        const plan2 = await runMigrationPlan(ctx, [
+          '--name',
+          'add-bio',
+          '--from',
+          c1Hash,
+          '--json',
+        ]);
+        expect(plan2.exitCode, 'L.03: plan C1→C3').toBe(0);
+        const c3Hash = parseJsonOutput<{ to: string }>(plan2).to;
+        expect(c3Hash, 'L.03: C3 differs from C2').not.toBe(c2Hash);
+
+        // L.04: status without --ref fails with AMBIGUOUS_LEAF
+        const statusFail = await runMigrationStatus(ctx, ['--json']);
+        expect(statusFail.exitCode, 'L.04: status fails').toBe(1);
+        const failOutput = stripAnsi(statusFail.stdout + statusFail.stderr);
+        expect(failOutput, 'L.04: mentions ambiguous leaf').toMatch(
+          /ambiguous|AMBIGUOUS_LEAF|multiple.*leaf/i,
+        );
+
+        // L.05: set ref production=C3
+        const refSet = await runMigrationRef(ctx, ['set', 'production', c3Hash]);
+        expect(refSet.exitCode, 'L.05: ref set production').toBe(0);
+
+        // L.06: apply with --ref production → routes via C1→C3
+        const applyRef = await runMigrationApply(ctx, ['--ref', 'production', '--json']);
+        expect(applyRef.exitCode, 'L.06: apply --ref production').toBe(0);
+        const applyResult = parseJsonOutput<{
+          ok: boolean;
+          migrationsApplied: number;
+          markerHash: string;
+        }>(applyRef);
+        expect(applyResult.ok, 'L.06: ok').toBe(true);
+
+        // L.07: status with --ref production
+        const statusRef = await runMigrationStatus(ctx, ['--ref', 'production', '--json']);
+        expect(statusRef.exitCode, 'L.07: status --ref production').toBe(0);
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+});
