@@ -53,6 +53,28 @@ describe('adapter-postgres codecs', () => {
       const result = timestampCodec.decode('2024-01-15T10:30:00.000Z');
       expect(result).toBe('2024-01-15T10:30:00.000Z');
     });
+
+    it('encodes strings as-is', () => {
+      expect(timestampCodec.encode('2024-01-15T10:30:00.000Z')).toBe('2024-01-15T10:30:00.000Z');
+    });
+  });
+
+  describe('timestamptz codec', () => {
+    const timestamptzCodec = codecDefinitions.timestamptz.codec as {
+      encode: (value: string | Date) => string;
+      decode: (wire: string | Date) => string;
+    };
+
+    it('encodes Date values to ISO strings', () => {
+      const date = new Date('2024-01-15T10:30:00Z');
+      expect(timestamptzCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
+    });
+
+    it('keeps strings and already-decoded values stable', () => {
+      const wire = '2024-01-15T10:30:00.000Z';
+      expect(timestamptzCodec.encode(wire)).toBe(wire);
+      expect(timestamptzCodec.decode(wire)).toBe(wire);
+    });
   });
 
   describe('json codec', () => {
@@ -88,6 +110,10 @@ describe('adapter-postgres codecs', () => {
 
     it('decodes JSON string to array', () => {
       expect(jsonbCodec.decode('[1,true,{"x":1}]')).toEqual([1, true, { x: 1 }]);
+    });
+
+    it('passes through already-decoded values', () => {
+      expect(jsonbCodec.decode({ key: 'value' })).toEqual({ key: 'value' });
     });
   });
 
