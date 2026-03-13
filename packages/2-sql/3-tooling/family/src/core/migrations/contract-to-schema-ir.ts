@@ -1,6 +1,6 @@
-import type { TargetBoundComponentDescriptor } from "@prisma-next/contract/framework-components";
-import type { ColumnDefault } from "@prisma-next/contract/types";
-import type { MigrationPlannerConflict } from "@prisma-next/core-control-plane/types";
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { MigrationPlannerConflict } from '@prisma-next/core-control-plane/types';
 import type {
   ForeignKey,
   Index,
@@ -9,8 +9,8 @@ import type {
   StorageColumn,
   StorageTable,
   UniqueConstraint,
-} from "@prisma-next/sql-contract/types";
-import { defaultIndexName } from "@prisma-next/sql-schema-ir/naming";
+} from '@prisma-next/sql-contract/types';
+import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type {
   DependencyIR,
   SqlAnnotations,
@@ -20,9 +20,9 @@ import type {
   SqlSchemaIR,
   SqlTableIR,
   SqlUniqueIR,
-} from "@prisma-next/sql-schema-ir/types";
-import { ifDefined } from "@prisma-next/utils/defined";
-import { collectInitDependencies } from "./types";
+} from '@prisma-next/sql-schema-ir/types';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { collectInitDependencies } from './types';
 
 /**
  * Target-specific callback that expands a column's base `nativeType` and optional
@@ -49,22 +49,19 @@ export type NativeTypeExpander = (input: {
  * `NativeTypeExpander`: the target provides its renderer when calling
  * `contractToSchemaIR`, keeping the family layer target-agnostic.
  */
-export type DefaultRenderer = (
-  def: ColumnDefault,
-  column: StorageColumn,
-) => string;
+export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => string;
 
 function convertColumn(
   name: string,
   column: StorageColumn,
   expandNativeType: NativeTypeExpander | undefined,
-  renderDefault: DefaultRenderer,
+  renderDefault: DefaultRenderer | undefined,
 ): SqlColumnIR {
   const nativeType = expandNativeType
     ? expandNativeType({
         nativeType: column.nativeType,
         codecId: column.codecId,
-        ...ifDefined("typeParams", column.typeParams),
+        ...ifDefined('typeParams', column.typeParams),
       })
     : column.nativeType;
   return {
@@ -72,10 +69,8 @@ function convertColumn(
     nativeType,
     nullable: column.nullable,
     ...ifDefined(
-      "default",
-      column.default != null
-        ? renderDefault(column.default, column)
-        : undefined,
+      'default',
+      column.default != null && renderDefault ? renderDefault(column.default, column) : undefined,
     ),
   };
 }
@@ -108,27 +103,22 @@ function convertTable(
   name: string,
   table: StorageTable,
   expandNativeType: NativeTypeExpander | undefined,
-  renderDefault: DefaultRenderer,
+  renderDefault: DefaultRenderer | undefined,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIR> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
-    columns[colName] = convertColumn(
-      colName,
-      colDef,
-      expandNativeType,
-      renderDefault,
-    );
+    columns[colName] = convertColumn(colName, colDef, expandNativeType, renderDefault);
   }
 
   const satisfiedIndexColumns = new Set([
-    ...table.indexes.map((idx) => idx.columns.join(",")),
-    ...table.uniques.map((unique) => unique.columns.join(",")),
-    ...(table.primaryKey ? [table.primaryKey.columns.join(",")] : []),
+    ...table.indexes.map((idx) => idx.columns.join(',')),
+    ...table.uniques.map((unique) => unique.columns.join(',')),
+    ...(table.primaryKey ? [table.primaryKey.columns.join(',')] : []),
   ]);
   const fkBackingIndexes: SqlIndexIR[] = [];
   for (const fk of table.foreignKeys) {
     if (fk.index === false) continue;
-    const key = fk.columns.join(",");
+    const key = fk.columns.join(',');
     if (satisfiedIndexColumns.has(key)) continue;
     fkBackingIndexes.push({
       columns: fk.columns,
@@ -163,15 +153,14 @@ export function detectDestructiveChanges(
 ): readonly MigrationPlannerConflict[] {
   if (!from) return [];
 
-  const hasOwn = (value: object, key: string): boolean =>
-    Object.hasOwn(value, key);
+  const hasOwn = (value: object, key: string): boolean => Object.hasOwn(value, key);
 
   const conflicts: MigrationPlannerConflict[] = [];
 
   for (const tableName of Object.keys(from.tables)) {
     if (!hasOwn(to.tables, tableName)) {
       conflicts.push({
-        kind: "tableRemoved",
+        kind: 'tableRemoved',
         summary: `Table "${tableName}" was removed`,
       });
       continue;
@@ -184,7 +173,7 @@ export function detectDestructiveChanges(
     for (const columnName of Object.keys(fromTable.columns)) {
       if (!hasOwn(toTable.columns, columnName)) {
         conflicts.push({
-          kind: "columnRemoved",
+          kind: 'columnRemoved',
           summary: `Column "${tableName}"."${columnName}" was removed`,
         });
       }
@@ -197,10 +186,8 @@ export function detectDestructiveChanges(
 export interface ContractToSchemaIROptions {
   readonly annotationNamespace: string;
   readonly expandNativeType?: NativeTypeExpander;
-  readonly renderDefault: DefaultRenderer;
-  readonly frameworkComponents?: ReadonlyArray<
-    TargetBoundComponentDescriptor<"sql", string>
-  >;
+  readonly renderDefault?: DefaultRenderer;
+  readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**
@@ -223,7 +210,7 @@ export function contractToSchemaIR(
   options: ContractToSchemaIROptions,
 ): SqlSchemaIR {
   if (options.annotationNamespace.length === 0) {
-    throw new Error("annotationNamespace must be a non-empty string");
+    throw new Error('annotationNamespace must be a non-empty string');
   }
 
   if (!contract) {
@@ -249,7 +236,7 @@ export function contractToSchemaIR(
   return {
     tables,
     dependencies,
-    ...ifDefined("annotations", annotations),
+    ...ifDefined('annotations', annotations),
   };
 }
 
@@ -273,7 +260,6 @@ function deriveAnnotations(
   storage: SqlStorage,
   annotationNamespace: string,
 ): SqlAnnotations | undefined {
-  if (!storage.types || Object.keys(storage.types).length === 0)
-    return undefined;
+  if (!storage.types || Object.keys(storage.types).length === 0) return undefined;
   return { [annotationNamespace]: { storageTypes: storage.types } };
 }
