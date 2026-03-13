@@ -1,8 +1,8 @@
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
-export declare const Scope: unique symbol;
 export declare const ExpressionType: unique symbol;
+export declare const JoinOuterScope: unique symbol;
 
 type Expand<T> = { [K in keyof T]: T[K] } & unknown;
 
@@ -14,8 +14,11 @@ export type Scope = {
   namespaces: Record<string, ScopeTable>;
 };
 
-export type ScopeHolder<T extends Scope> = {
-  [Scope]: T;
+export type JoinSource<Row extends ScopeTable, Alias extends string> = {
+  [JoinOuterScope]: {
+    topLevel: Row;
+    namespaces: Record<Alias, Row>;
+  };
 };
 
 export type Expression<T extends ScopeField> = {
@@ -133,27 +136,33 @@ type NullableScope<S extends Scope> = {
 };
 
 export interface JoinCapable<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
-  innerJoin<OtherScope extends Scope>(
-    other: ScopeHolder<OtherScope>,
-    on: ExpressionBuilder<MergeScopes<AvailableScope, OtherScope>, CodecTypes>,
-  ): JoinedTables<CodecTypes, MergeScopes<AvailableScope, OtherScope>>;
+  innerJoin<Other extends JoinSource<ScopeTable, string | never>>(
+    other: Other,
+    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, CodecTypes>,
+  ): JoinedTables<CodecTypes, MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>>;
 
-  outerLeftJoin<OtherScope extends Scope>(
-    other: ScopeHolder<OtherScope>,
-    on: ExpressionBuilder<MergeScopes<AvailableScope, OtherScope>, CodecTypes>,
-  ): JoinedTables<CodecTypes, MergeScopes<AvailableScope, NullableScope<OtherScope>>>;
-
-  outerRightJoin<OtherScope extends Scope>(
-    other: ScopeHolder<OtherScope>,
-    on: ExpressionBuilder<MergeScopes<AvailableScope, OtherScope>, CodecTypes>,
-  ): JoinedTables<CodecTypes, MergeScopes<NullableScope<AvailableScope>, OtherScope>>;
-
-  outerFullJoin<OtherScope extends Scope>(
-    other: ScopeHolder<OtherScope>,
-    on: ExpressionBuilder<MergeScopes<AvailableScope, OtherScope>, CodecTypes>,
+  outerLeftJoin<Other extends JoinSource<ScopeTable, string | never>>(
+    other: Other,
+    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, CodecTypes>,
   ): JoinedTables<
     CodecTypes,
-    MergeScopes<NullableScope<AvailableScope>, NullableScope<OtherScope>>
+    MergeScopes<AvailableScope, NullableScope<Other[typeof JoinOuterScope]>>
+  >;
+
+  outerRightJoin<Other extends JoinSource<ScopeTable, string | never>>(
+    other: Other,
+    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, CodecTypes>,
+  ): JoinedTables<
+    CodecTypes,
+    MergeScopes<NullableScope<AvailableScope>, Other[typeof JoinOuterScope]>
+  >;
+
+  outerFullJoin<Other extends JoinSource<ScopeTable, string | never>>(
+    other: Other,
+    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, CodecTypes>,
+  ): JoinedTables<
+    CodecTypes,
+    MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>
   >;
 }
 
@@ -164,7 +173,7 @@ export interface SelectCapable<
 > {
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
     ...columns: Columns
-  ): SelectQueryBuilder<
+  ): SelectQuery<
     CodecTypes,
     AvailableScope,
     WithFields<RowType, AvailableScope['topLevel'], Columns>
@@ -173,35 +182,41 @@ export interface SelectCapable<
   select<Alias extends string, Field extends ScopeField>(
     alias: Alias,
     expr: (fields: FieldProxy<AvailableScope>, fns: Functions<CodecTypes>) => Expression<Field>,
-  ): SelectQueryBuilder<CodecTypes, AvailableScope, WithField<RowType, Field, Alias>>;
+  ): SelectQuery<CodecTypes, AvailableScope, WithField<RowType, Field, Alias>>;
 
   select<Result extends Record<string, Expression<ScopeField>>>(
     callback: (fields: FieldProxy<AvailableScope>, fns: Functions<CodecTypes>) => Result,
-  ): SelectQueryBuilder<CodecTypes, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>>;
+  ): SelectQuery<CodecTypes, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>>;
 }
 
 export interface JoinedTables<CodecTypes extends CodecTypesBase, AvailableScope extends Scope>
-  extends ScopeHolder<AvailableScope>,
-    JoinCapable<CodecTypes, AvailableScope>,
+  extends JoinCapable<CodecTypes, AvailableScope>,
     SelectCapable<CodecTypes, AvailableScope> {}
 
 export interface TableProxy<
   CodecTypes extends CodecTypesBase,
   Name extends string,
   Table extends StorageTable,
+  Alias extends string = Name,
   AvailableScope extends Scope = DefaultScope<Name, Table>,
-> extends ScopeHolder<DefaultScope<Name, Table>>,
+> extends JoinSource<StorageTableToScopeTable<Table>, Alias>,
     JoinCapable<CodecTypes, AvailableScope>,
-    SelectCapable<CodecTypes, AvailableScope> {}
+    SelectCapable<CodecTypes, AvailableScope> {
+  as<Alias extends string>(
+    newAlias: Alias,
+  ): TableProxy<CodecTypes, Name, Table, Alias, AvailableScope>;
+}
 
-export interface SelectQueryBuilder<
+export interface SelectQuery<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-> extends ScopeHolder<AvailableScope>,
-    SelectCapable<CodecTypes, AvailableScope, RowType> {
+> extends SelectCapable<CodecTypes, AvailableScope, RowType> {
   where(
     expr: ExpressionBuilder<AvailableScope, CodecTypes>,
-  ): SelectQueryBuilder<CodecTypes, AvailableScope, RowType>;
+  ): SelectQuery<CodecTypes, AvailableScope, RowType>;
+
+  as<Alias extends string>(newAlias: Alias): JoinSource<RowType, Alias>;
+
   first(): Promise<ResolveRow<RowType, CodecTypes>>;
 }
