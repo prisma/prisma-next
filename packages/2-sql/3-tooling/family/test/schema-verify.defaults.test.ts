@@ -18,24 +18,21 @@ import {
 const testNormalizer: DefaultNormalizer = (rawDefault: string): ColumnDefault | undefined => {
   const trimmed = rawDefault.trim();
 
-  // now() / CURRENT_TIMESTAMP / clock_timestamp() and cast-wrapped variants
-  const timestampCore = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP|clock_timestamp\s*\(\s*\))$/i;
+  // Timestamp defaults: now()/CURRENT_TIMESTAMP → 'now()', clock_timestamp() → 'clock_timestamp()'
+  const nowPattern = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP)$/i;
+  const clockPattern = /^clock_timestamp\s*\(\s*\)$/i;
   const timestampCastSuffix = /::timestamp(?:tz|\s+(?:with|without)\s+time\s+zone)?$/i;
-  if (timestampCore.test(trimmed)) {
-    return { kind: 'function', expression: 'now()' };
-  }
+  if (nowPattern.test(trimmed)) return { kind: 'function', expression: 'now()' };
+  if (clockPattern.test(trimmed)) return { kind: 'function', expression: 'clock_timestamp()' };
   if (timestampCastSuffix.test(trimmed)) {
     let inner = trimmed.replace(timestampCastSuffix, '').trim();
     if (inner.startsWith('(') && inner.endsWith(')')) {
       inner = inner.slice(1, -1).trim();
     }
-    if (timestampCore.test(inner)) {
-      return { kind: 'function', expression: 'now()' };
-    }
+    if (nowPattern.test(inner)) return { kind: 'function', expression: 'now()' };
+    if (clockPattern.test(inner)) return { kind: 'function', expression: 'clock_timestamp()' };
     inner = inner.replace(/::text$/i, '').trim();
-    if (/^'now'$/i.test(inner)) {
-      return { kind: 'function', expression: 'now()' };
-    }
+    if (/^'now'$/i.test(inner)) return { kind: 'function', expression: 'now()' };
   }
 
   // NULL or NULL::type

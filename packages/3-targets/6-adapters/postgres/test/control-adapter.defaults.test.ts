@@ -245,9 +245,10 @@ describe('parsePostgresDefault normalizer', () => {
       kind: 'function',
       expression: 'now()',
     });
+    // clock_timestamp() is distinct from now() — returns wall-clock time, not transaction time
     expect(parsePostgresDefault('clock_timestamp()')).toEqual({
       kind: 'function',
-      expression: 'now()',
+      expression: 'clock_timestamp()',
     });
 
     // UUID function
@@ -389,12 +390,22 @@ describe('parsePostgresDefault normalizes cast-wrapped timestamp defaults', () =
     { input: 'CURRENT_TIMESTAMP::timestamptz' },
     { input: '(CURRENT_TIMESTAMP)::timestamptz' },
     { input: '(now())::timestamp without time zone' },
-    { input: 'clock_timestamp()::timestamptz' },
     { input: 'current_timestamp' },
   ])('normalizes "$input" to now()', ({ input }) => {
     expect(parsePostgresDefault(input)).toEqual({
       kind: 'function',
       expression: 'now()',
+    });
+  });
+
+  it.each([
+    { input: 'clock_timestamp()::timestamptz' },
+    { input: 'clock_timestamp()::timestamp without time zone' },
+    { input: '(clock_timestamp())::timestamptz' },
+  ])('normalizes "$input" to clock_timestamp()', ({ input }) => {
+    expect(parsePostgresDefault(input)).toEqual({
+      kind: 'function',
+      expression: 'clock_timestamp()',
     });
   });
 });

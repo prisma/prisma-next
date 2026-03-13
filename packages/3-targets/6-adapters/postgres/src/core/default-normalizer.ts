@@ -5,7 +5,8 @@ import type { ColumnDefault } from '@prisma-next/contract/types';
  * These are compiled once at module load time rather than on each function call.
  */
 const NEXTVAL_PATTERN = /^nextval\s*\(/i;
-const TIMESTAMP_PATTERN = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP|clock_timestamp\s*\(\s*\))$/i;
+const NOW_FUNCTION_PATTERN = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP)$/i;
+const CLOCK_TIMESTAMP_PATTERN = /^clock_timestamp\s*\(\s*\)$/i;
 const TIMESTAMP_CAST_SUFFIX = /::timestamp(?:tz|\s+(?:with|without)\s+time\s+zone)?$/i;
 const TEXT_CAST_SUFFIX = /::text$/i;
 const NOW_LITERAL_PATTERN = /^'now'$/i;
@@ -18,16 +19,22 @@ const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
 const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/;
 
 /**
- * Checks whether an expression is a timestamp default function, including
- * cast-wrapped forms that Postgres may return:
- *   ('now'::text)::timestamp without time zone
- *   now()::timestamptz
- *   CURRENT_TIMESTAMP::timestamp with time zone
+ * Returns the canonical expression for a timestamp default function, or undefined
+ * if the expression is not a recognized timestamp default.
+ *
+ * Keeps now()/CURRENT_TIMESTAMP and clock_timestamp() distinct:
+ * - now(), CURRENT_TIMESTAMP, ('now'::text)::timestamp... → 'now()'
+ * - clock_timestamp(), clock_timestamp()::timestamptz → 'clock_timestamp()'
+ *
+ * These are semantically different in Postgres: now() returns the transaction
+ * start time (constant within a transaction), while clock_timestamp() returns
+ * the actual wall-clock time (can differ across rows in a single INSERT).
  */
-function isTimestampDefault(expr: string): boolean {
-  if (TIMESTAMP_PATTERN.test(expr)) return true;
+function canonicalizeTimestampDefault(expr: string): string | undefined {
+  if (NOW_FUNCTION_PATTERN.test(expr)) return 'now()';
+  if (CLOCK_TIMESTAMP_PATTERN.test(expr)) return 'clock_timestamp()';
 
-  if (!TIMESTAMP_CAST_SUFFIX.test(expr)) return false;
+  if (!TIMESTAMP_CAST_SUFFIX.test(expr)) return undefined;
 
   let inner = expr.replace(TIMESTAMP_CAST_SUFFIX, '').trim();
 
@@ -36,11 +43,14 @@ function isTimestampDefault(expr: string): boolean {
     inner = inner.slice(1, -1).trim();
   }
 
-  if (TIMESTAMP_PATTERN.test(inner)) return true;
+  if (NOW_FUNCTION_PATTERN.test(inner)) return 'now()';
+  if (CLOCK_TIMESTAMP_PATTERN.test(inner)) return 'clock_timestamp()';
 
   // Handle 'now'::text form (Postgres casts the string literal 'now' through ::text)
   inner = inner.replace(TEXT_CAST_SUFFIX, '').trim();
-  return NOW_LITERAL_PATTERN.test(inner);
+  if (NOW_LITERAL_PATTERN.test(inner)) return 'now()';
+
+  return undefined;
 }
 
 /**
@@ -67,9 +77,10 @@ export function parsePostgresDefault(
     return { kind: 'function', expression: 'autoincrement()' };
   }
 
-  // now() / CURRENT_TIMESTAMP / clock_timestamp() and cast-wrapped variants
-  if (isTimestampDefault(trimmed)) {
-    return { kind: 'function', expression: 'now()' };
+  // Timestamp defaults: now()/CURRENT_TIMESTAMP → 'now()', clock_timestamp() → 'clock_timestamp()'
+  const canonicalTimestamp = canonicalizeTimestampDefault(trimmed);
+  if (canonicalTimestamp) {
+    return { kind: 'function', expression: canonicalTimestamp };
   }
 
   // gen_random_uuid()
