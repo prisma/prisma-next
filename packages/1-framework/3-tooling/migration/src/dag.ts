@@ -214,7 +214,7 @@ function findDivergencePoint(
     const ancestors = new Set<string>();
     const queue = [leaf];
     while (queue.length > 0) {
-      const current = queue.shift()!;
+      const current = queue.shift() as string;
       if (ancestors.has(current)) continue;
       ancestors.add(current);
       const incoming = graph.reverseChain.get(current);
