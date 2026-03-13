@@ -7,7 +7,6 @@
  */
 
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
 import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
@@ -21,6 +20,7 @@ import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createMigrationVerifyCommand } from '@prisma-next/cli/commands/migration-verify';
 import type { Command } from 'commander';
+import { join } from 'pathe';
 import { executeCommand, getExitCode, setupCommandMocks } from './cli-test-helpers';
 
 // ---------------------------------------------------------------------------
@@ -359,13 +359,9 @@ export function parseJsonOutput<T = Record<string, unknown>>(result: CommandResu
  */
 export function getMigrationDirs(ctx: JourneyContext): string[] {
   const migrationsDir = join(ctx.testDir, 'migrations');
-  try {
-    return readdirSync(migrationsDir)
-      .filter((d) => !d.startsWith('.'))
-      .sort();
-  } catch {
-    return [];
-  }
+  return readdirSync(migrationsDir)
+    .filter((d) => !d.startsWith('.'))
+    .sort();
 }
 
 /**
