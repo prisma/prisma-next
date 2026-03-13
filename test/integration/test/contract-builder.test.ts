@@ -7,6 +7,7 @@ import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-contra
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { sql } from '@prisma-next/sql-lane/sql';
+import { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -192,7 +193,7 @@ describe('builder integration', () => {
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract>({ context })
+    const plan = sql<typeof contract>({ context })
       .from(userTable)
       .select({
         id: userTable.columns.id!,
@@ -201,17 +202,16 @@ describe('builder integration', () => {
       .build();
 
     // Runtime checks
-    expect(_plan.ast).toBeDefined();
-    expect((_plan.ast as { kind: string })?.kind).toBe('select');
-    expect(_plan.meta.storageHash).toBe('sha256:test-core');
+    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.meta.storageHash).toBe('sha256:test-core');
 
     // Type checks - verify plan types are specific
-    expectTypeOf(_plan.meta.storageHash).toEqualTypeOf<string>();
+    expectTypeOf(plan.meta.storageHash).toEqualTypeOf<string>();
     // Note: plan.ast type checking is complex due to plan structure
     // We verify it exists at runtime above
 
     // Verify ResultType inference works with specific types
-    type Row = ResultType<typeof _plan>;
+    type Row = ResultType<typeof plan>;
     // Type inference may widen types, so we verify the codec outputs directly
     type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();

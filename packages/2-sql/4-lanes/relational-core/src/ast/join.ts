@@ -1,28 +1,7 @@
 import { planInvalid } from '@prisma-next/plan';
 import type { AnyColumnBuilder, JoinOnBuilder, JoinOnPredicate } from '../types';
 import { isColumnBuilder } from '../types';
-import type { ColumnRef, JoinAst, JoinOnExpr, TableRef } from './types';
-
-export function createJoin(
-  joinType: 'inner' | 'left' | 'right' | 'full',
-  table: TableRef,
-  on: JoinOnExpr,
-): JoinAst {
-  return {
-    kind: 'join',
-    joinType,
-    table,
-    on,
-  };
-}
-
-export function createJoinOnExpr(left: ColumnRef, right: ColumnRef): JoinOnExpr {
-  return {
-    kind: 'eqCol',
-    left,
-    right,
-  };
-}
+import { EqColJoinOn, type FromSource, JoinAst } from './types';
 
 class JoinOnBuilderImpl implements JoinOnBuilder {
   eqCol(left: AnyColumnBuilder, right: AnyColumnBuilder): JoinOnPredicate {
@@ -34,7 +13,6 @@ class JoinOnBuilderImpl implements JoinOnBuilder {
       throw planInvalid('Join ON right operand must be a column');
     }
 
-    // TypeScript can't narrow ColumnBuilder properly, so we assert
     const leftCol = left as unknown as { table: string; column: string };
     const rightCol = right as unknown as { table: string; column: string };
     if (leftCol.table === rightCol.table) {
@@ -48,6 +26,8 @@ class JoinOnBuilderImpl implements JoinOnBuilder {
     };
   }
 }
+
+export { EqColJoinOn, JoinAst, type FromSource };
 
 export function createJoinOnBuilder(): JoinOnBuilder {
   return new JoinOnBuilderImpl();

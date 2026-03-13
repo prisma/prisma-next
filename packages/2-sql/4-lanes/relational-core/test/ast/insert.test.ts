@@ -1,99 +1,84 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createInsertAst } from '../../src/ast/insert';
-import type { ColumnRef, ParamRef, TableRef } from '../../src/ast/types';
+import {
+  DefaultValueExpr,
+  DoNothingConflictAction,
+  DoUpdateSetConflictAction,
+  InsertAst,
+  InsertOnConflict,
+} from '../../src/exports/ast';
+import { col, param, table } from './test-helpers';
 
 describe('ast/insert', () => {
-  describe('createInsertAst', () => {
-    it('creates insert ast with table and values', () => {
-      const table: TableRef = createTableRef('user');
-      const values: Record<string, ColumnRef | ParamRef> = {
-        id: createParamRef(0, 'id'),
-        email: createParamRef(1, 'email'),
-      };
-
-      const insertAst = createInsertAst({ table, values });
-
-      expect(insertAst).toEqual({
-        kind: 'insert',
-        table,
-        values,
-      });
-      expect(insertAst.kind).toBe('insert');
-      expect(insertAst.table).toBe(table);
-      expect(insertAst.values).toBe(values);
-      expect(insertAst.returning).toBeUndefined();
+  it('creates insert ASTs with a single values row', () => {
+    const insertAst = InsertAst.into(table('user')).withValues({
+      id: param(0, 'id'),
+      email: param(1, 'email'),
     });
 
-    it('creates insert ast with returning clause', () => {
-      const table: TableRef = createTableRef('user');
-      const values: Record<string, ColumnRef | ParamRef> = {
-        id: createParamRef(0, 'id'),
-        email: createParamRef(1, 'email'),
-      };
-      const returning: ColumnRef[] = [
-        createColumnRef('user', 'id'),
-        createColumnRef('user', 'email'),
-      ];
+    expect(insertAst.table).toEqual(table('user'));
+    expect(insertAst.rows).toEqual([
+      {
+        id: param(0, 'id'),
+        email: param(1, 'email'),
+      },
+    ]);
+    expect(insertAst.returning).toBeUndefined();
+  });
 
-      const insertAst = createInsertAst({ table, values, returning });
+  it('creates insert ASTs with returning columns', () => {
+    const insertAst = InsertAst.into(table('user'))
+      .withValues({
+        id: param(0, 'id'),
+        email: param(1, 'email'),
+      })
+      .withReturning([col('user', 'id'), col('user', 'email')]);
 
-      expect(insertAst).toEqual({
-        kind: 'insert',
-        table,
-        values,
-        returning,
-      });
-      expect(insertAst.returning).toBe(returning);
-      expect(insertAst.returning).toHaveLength(2);
+    expect(insertAst.returning).toEqual([col('user', 'id'), col('user', 'email')]);
+  });
+
+  it('creates insert ASTs with multiple rows and explicit defaults', () => {
+    const insertAst = InsertAst.into(table('user')).withRows([
+      {
+        id: param(0, 'id'),
+        email: param(1, 'email'),
+      },
+      {
+        id: param(2, 'id2'),
+        email: new DefaultValueExpr(),
+      },
+    ]);
+
+    expect(insertAst.rows[1]?.['email']).toEqual(new DefaultValueExpr());
+  });
+
+  it('preserves empty value objects and explicit empty row lists', () => {
+    expect(InsertAst.into(table('user')).withValues({}).rows).toEqual([{}]);
+    expect(InsertAst.into(table('user')).withRows([]).rows).toEqual([]);
+  });
+
+  it('stores on-conflict update actions', () => {
+    const onConflict = InsertOnConflict.on([col('user', 'id')]).doUpdateSet({
+      email: param(2, 'updatedEmail'),
     });
+    const insertAst = InsertAst.into(table('user'))
+      .withValues({
+        id: param(0, 'id'),
+        email: param(1, 'email'),
+      })
+      .withOnConflict(onConflict);
 
-    it('creates insert ast with column refs in values', () => {
-      const table: TableRef = createTableRef('user');
-      const values: Record<string, ColumnRef | ParamRef> = {
-        id: createColumnRef('user', 'id'),
-        email: createParamRef(0, 'email'),
-      };
-
-      const insertAst = createInsertAst({ table, values });
-
-      expect(insertAst.values).toBe(values);
-      expect(insertAst.values['id']).toEqual(createColumnRef('user', 'id'));
-      expect(insertAst.values['email']).toEqual(createParamRef(0, 'email'));
+    expect(insertAst.onConflict?.columns).toEqual([col('user', 'id')]);
+    expect(insertAst.onConflict?.action).toBeInstanceOf(DoUpdateSetConflictAction);
+    expect((insertAst.onConflict?.action as DoUpdateSetConflictAction).set).toEqual({
+      email: param(2, 'updatedEmail'),
     });
+  });
 
-    it('creates insert ast without returning clause', () => {
-      const table: TableRef = createTableRef('post');
-      const values: Record<string, ColumnRef | ParamRef> = {
-        title: createParamRef(0, 'title'),
-        content: createParamRef(1, 'content'),
-      };
+  it('stores on-conflict do-nothing actions', () => {
+    const insertAst = InsertAst.into(table('user'))
+      .withValues({ id: param(0, 'id') })
+      .withOnConflict(InsertOnConflict.on([col('user', 'id')]).doNothing());
 
-      const insertAst = createInsertAst({ table, values });
-
-      expect(insertAst.returning).toBeUndefined();
-    });
-
-    it('creates insert ast with single returning column', () => {
-      const table: TableRef = createTableRef('user');
-      const values: Record<string, ColumnRef | ParamRef> = {
-        id: createParamRef(0, 'id'),
-      };
-      const returning: ColumnRef[] = [createColumnRef('user', 'id')];
-
-      const insertAst = createInsertAst({ table, values, returning });
-
-      expect(insertAst.returning).toHaveLength(1);
-      expect(insertAst.returning?.[0]).toEqual(createColumnRef('user', 'id'));
-    });
-
-    it('creates insert ast with empty values object', () => {
-      const table: TableRef = createTableRef('user');
-      const values: Record<string, ColumnRef | ParamRef> = {};
-
-      const insertAst = createInsertAst({ table, values });
-
-      expect(insertAst.values).toEqual({});
-    });
+    expect(insertAst.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
   });
 });

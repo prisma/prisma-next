@@ -1,4 +1,5 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
+import { ColumnRef } from '@prisma-next/sql-relational-core/ast';
 import type { AnyExpressionSource, NestedProjection } from '@prisma-next/sql-relational-core/types';
 import { isExpressionSource } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
@@ -81,20 +82,19 @@ export function buildProjectionState(
 
   for (const [key, value] of Object.entries(projection)) {
     if (value === true) {
-      // Boolean true means this is an include reference
+      // Boolean true marks an include projection alias. The concrete expression
+      // is stitched during include AST construction.
       const matchingInclude = includes?.find((inc) => inc.alias === key);
       if (!matchingInclude) {
         errorIncludeAliasNotFound(key);
       }
-      // For include references, we track the alias but use a placeholder object
-      // The actual handling happens in AST building where we create includeRef
       aliases.push(key);
       columns.push({
         kind: 'column',
         table: matchingInclude.table.name,
         column: '',
         columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
-        toExpr: () => ({ kind: 'col', table: matchingInclude.table.name, column: '' }),
+        toExpr: () => ColumnRef.of(matchingInclude.table.name, ''),
       } as AnyExpressionSource);
     } else if (isExpressionSource(value)) {
       const alias = tracker.register([key]);

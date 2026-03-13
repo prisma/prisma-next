@@ -1,14 +1,17 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { BinaryOp, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  AggregateExpr,
+  BinaryExpr,
+  type BinaryOp,
+  type BoundWhereExpr,
+  ColumnRef,
+  LiteralExpr,
+  type WhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { mapStorageRowToModelFields } from './collection-runtime';
-import {
-  compileGroupedAggregate,
-  compileHavingMetricColumn,
-  GROUPED_HAVING_TABLE,
-} from './kysely-compiler';
-import { combineWhereFilters } from './kysely-compiler-where';
-import { executeCompiledQuery } from './raw-compiled-query';
+import { executeQueryPlan } from './execute-query-plan';
+import { compileGroupedAggregate } from './query-plan';
 import type {
   AggregateBuilder,
   AggregateResult,
@@ -18,10 +21,11 @@ import type {
   HavingBuilder,
   HavingComparisonMethods,
 } from './types';
+import { combinePlainWhereExprs } from './where-utils';
 
 interface GroupedCollectionInit {
   readonly tableName: string;
-  readonly baseFilters: readonly WhereExpr[];
+  readonly baseFilters: readonly BoundWhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
   readonly havingFilters: readonly WhereExpr[];
@@ -40,7 +44,7 @@ export class GroupedCollection<
   readonly ctx: CollectionContext<TContract>;
   readonly modelName: ModelName;
   readonly tableName: string;
-  readonly baseFilters: readonly WhereExpr[];
+  readonly baseFilters: readonly BoundWhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
   readonly havingFilters: readonly WhereExpr[];
@@ -62,7 +66,9 @@ export class GroupedCollection<
   having(
     predicate: (having: HavingBuilder<TContract, ModelName>) => WhereExpr,
   ): GroupedCollection<TContract, ModelName, GroupFields> {
-    const havingExpr = predicate(createHavingBuilder(this.ctx.contract, this.modelName));
+    const havingExpr = predicate(
+      createHavingBuilder(this.ctx.contract, this.modelName, this.tableName),
+    );
     return new GroupedCollection(this.ctx, this.modelName, {
       tableName: this.tableName,
       baseFilters: this.baseFilters,
@@ -90,17 +96,16 @@ export class GroupedCollection<
     }
 
     const compiled = compileGroupedAggregate(
+      this.ctx.contract,
       this.tableName,
       this.baseFilters,
       this.groupByColumns,
       aggregateSpec,
-      combineWhereFilters(this.havingFilters),
+      combinePlainWhereExprs(this.havingFilters),
     );
-    const rows = await executeCompiledQuery<Record<string, unknown>>(
+    const rows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
-      this.ctx.contract,
       compiled,
-      { lane: 'orm-client' },
     ).toArray();
 
     return rows.map((row) => {
@@ -118,53 +123,39 @@ export class GroupedCollection<
 function createHavingBuilder<TContract extends SqlContract<SqlStorage>, ModelName extends string>(
   contract: TContract,
   modelName: ModelName,
+  tableName: string,
 ): HavingBuilder<TContract, ModelName> {
   const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
+  const createMetricExpr = (
+    fn: Exclude<AggregateExpr['fn'], 'count'>,
+    fieldName: string,
+  ): AggregateExpr =>
+    new AggregateExpr(fn, ColumnRef.of(tableName, fieldToColumn[fieldName] ?? fieldName));
+
   return {
     count() {
-      return createHavingComparisonMethods('count');
+      return createHavingComparisonMethods<number>(AggregateExpr.count());
     },
     sum(field) {
-      const fieldName = field as string;
-      return createHavingComparisonMethods(
-        compileHavingMetricColumn('sum', fieldToColumn[fieldName] ?? fieldName),
-      );
+      return createHavingComparisonMethods<number | null>(createMetricExpr('sum', field as string));
     },
     avg(field) {
-      const fieldName = field as string;
-      return createHavingComparisonMethods(
-        compileHavingMetricColumn('avg', fieldToColumn[fieldName] ?? fieldName),
-      );
+      return createHavingComparisonMethods<number | null>(createMetricExpr('avg', field as string));
     },
     min(field) {
-      const fieldName = field as string;
-      return createHavingComparisonMethods(
-        compileHavingMetricColumn('min', fieldToColumn[fieldName] ?? fieldName),
-      );
+      return createHavingComparisonMethods<number | null>(createMetricExpr('min', field as string));
     },
     max(field) {
-      const fieldName = field as string;
-      return createHavingComparisonMethods(
-        compileHavingMetricColumn('max', fieldToColumn[fieldName] ?? fieldName),
-      );
+      return createHavingComparisonMethods<number | null>(createMetricExpr('max', field as string));
     },
   };
 }
 
-function createHavingComparisonMethods(metric: string): HavingComparisonMethods<number | null> {
-  const buildBinaryExpr = (op: BinaryOp, value: unknown): WhereExpr => ({
-    kind: 'bin',
-    op,
-    left: {
-      kind: 'col',
-      table: GROUPED_HAVING_TABLE,
-      column: metric,
-    },
-    right: {
-      kind: 'literal',
-      value,
-    },
-  });
+function createHavingComparisonMethods<T extends number | null>(
+  metric: AggregateExpr,
+): HavingComparisonMethods<T> {
+  const buildBinaryExpr = (op: BinaryOp, value: unknown): WhereExpr =>
+    new BinaryExpr(op, metric, LiteralExpr.of(value));
 
   return {
     eq(value) {

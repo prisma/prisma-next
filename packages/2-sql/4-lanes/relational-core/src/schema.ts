@@ -8,7 +8,7 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
-import type { BinaryOp, ColumnRef, ExpressionSource, TableRef } from './ast/types';
+import { type BinaryOp, ColumnRef, type ExpressionSource, type TableRef } from './ast/types';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type { ExecutionContext } from './query-lane-context';
 import type {
@@ -68,11 +68,7 @@ export class ColumnBuilderImpl<
    * This is the canonical way to get an AST node from a builder.
    */
   toExpr(): ColumnRef {
-    return Object.freeze({
-      kind: 'col' as const,
-      table: this.table,
-      column: this.column,
-    });
+    return new ColumnRef(this.table, this.column);
   }
 
   private createBinaryBuilder(

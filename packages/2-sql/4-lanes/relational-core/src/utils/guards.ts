@@ -1,12 +1,5 @@
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
-import type {
-  ColumnRef,
-  Expression,
-  ExpressionSource,
-  LiteralExpr,
-  OperationExpr,
-  ParamRef,
-} from '../ast/types';
+import { type Expression, type ExpressionSource, OperationExpr } from '../ast/types';
 import type {
   AnyColumnBuilder,
   AnyExpressionSource,
@@ -44,46 +37,6 @@ export function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
 }
 
 /**
- * Recursively extracts the base ColumnRef from an OperationExpr.
- * If the expression is already a ColumnRef, it is returned directly.
- */
-export function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef {
-  if (expr.kind === 'col') {
-    return expr;
-  }
-  return extractBaseColumnRef(expr.self);
-}
-
-/**
- * Recursively collects all ColumnRef nodes from an expression tree.
- * Handles nested OperationExpr structures by traversing both self and args.
- */
-export function collectColumnRefs(
-  expr: ColumnRef | ParamRef | LiteralExpr | OperationExpr,
-): ColumnRef[] {
-  if (expr.kind === 'col') {
-    return [expr];
-  }
-  if (expr.kind === 'operation') {
-    const refs: ColumnRef[] = collectColumnRefs(expr.self);
-    for (const arg of expr.args) {
-      refs.push(...collectColumnRefs(arg));
-    }
-    return refs;
-  }
-  return [];
-}
-
-/**
- * Type predicate to check if an expression is an OperationExpr.
- */
-export function isOperationExpr(
-  expr: AnyExpressionSource | OperationExpr | Expression,
-): expr is OperationExpr {
-  return typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'operation';
-}
-
-/**
  * Helper to extract table and column from a ColumnBuilder, ExpressionBuilder, or OperationExpr.
  * For ExpressionBuilder or OperationExpr, recursively unwraps to find the base ColumnRef.
  */
@@ -91,12 +44,12 @@ export function getColumnInfo(expr: AnyExpressionSource | OperationExpr): {
   table: string;
   column: string;
 } {
-  if (isOperationExpr(expr)) {
-    const baseCol = extractBaseColumnRef(expr);
+  if (expr instanceof OperationExpr) {
+    const baseCol = expr.baseColumnRef();
     return { table: baseCol.table, column: baseCol.column };
   }
   if (isExpressionBuilder(expr)) {
-    const baseCol = extractBaseColumnRef(expr.expr);
+    const baseCol = expr.expr.baseColumnRef();
     return { table: baseCol.table, column: baseCol.column };
   }
   // expr is ColumnBuilder - TypeScript can't narrow properly
@@ -168,26 +121,4 @@ export function expressionFromSource(source: AnyExpressionSource): Expression {
  */
 export function isValueSource(value: unknown): value is ValueSource {
   return isParamPlaceholder(value) || isExpressionSource(value);
-}
-
-/**
- * Extracts and returns an OperationExpr from a builder.
- * Returns the OperationExpr if the builder is an OperationExpr or has an _operationExpr property,
- * otherwise returns undefined.
- *
- * @deprecated Use isExpressionBuilder() instead. This function exists for backward compatibility
- * with code that uses the hidden _operationExpr property pattern.
- *
- * @design-note: This function accesses the hidden `_operationExpr` property, which is a code smell.
- * The ExpressionBuilder type (introduced in the operation-expr-refactoring) provides a cleaner
- * approach by explicitly representing operation results as a distinct type.
- */
-export function getOperationExpr(
-  builder: AnyColumnBuilder | OperationExpr,
-): OperationExpr | undefined {
-  if (isOperationExpr(builder)) {
-    return builder;
-  }
-  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
-  return builderWithExpr._operationExpr;
 }

@@ -11,7 +11,7 @@ import {
   textColumn as textColumnType,
 } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { BinaryOp } from '../src/ast/types';
+import { type BinaryOp, ColumnRef } from '../src/ast/types';
 import { param } from '../src/param';
 import type { SchemaHandle } from '../src/schema';
 import { schema } from '../src/schema';
@@ -321,9 +321,10 @@ describe('schema', () => {
       expect(binary).toMatchObject({
         kind: 'binary',
         op,
-        left: { kind: 'col', table: 'user', column: 'id' },
         right: emailColumn, // ExpressionSource is stored in right
       });
+      expect(binary).toHaveProperty('left');
+      expect((binary as { left: unknown }).left).toEqual(ColumnRef.of('user', 'id'));
     });
   });
 
