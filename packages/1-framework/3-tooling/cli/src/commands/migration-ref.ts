@@ -127,7 +127,7 @@ function createRefDeleteCommand(): Command {
 
         try {
           const refs = await readRefs(refsPath);
-          if (!(name in refs)) {
+          if (!Object.hasOwn(refs, name)) {
             console.error(`Ref "${name}" does not exist.`);
             process.exit(1);
           }
