@@ -378,6 +378,97 @@ describe('parsePostgresDefault strips type casts from string literals', () => {
   });
 });
 
+describe('parsePostgresDefault normalizes cast-wrapped timestamp defaults', () => {
+  it.each([
+    { input: "('now'::text)::timestamp without time zone" },
+    { input: "('now'::text)::timestamp with time zone" },
+    { input: "('now'::text)::timestamptz" },
+    { input: 'now()::timestamp without time zone' },
+    { input: 'now()::timestamptz' },
+    { input: 'CURRENT_TIMESTAMP::timestamp without time zone' },
+    { input: 'CURRENT_TIMESTAMP::timestamptz' },
+    { input: '(CURRENT_TIMESTAMP)::timestamptz' },
+    { input: '(now())::timestamp without time zone' },
+    { input: 'clock_timestamp()::timestamptz' },
+    { input: 'current_timestamp' },
+  ])('normalizes "$input" to now()', ({ input }) => {
+    expect(parsePostgresDefault(input)).toEqual({
+      kind: 'function',
+      expression: 'now()',
+    });
+  });
+});
+
+describe('parsePostgresDefault rejects non-timestamp expressions with timestamp casts', () => {
+  it.each([
+    { input: 'random()::timestamptz', expectedExpr: 'random()::timestamptz' },
+    { input: "'yesterday'::timestamp without time zone", expectedValue: 'yesterday' },
+    { input: "'2024-01-01'::timestamp without time zone", expectedValue: '2024-01-01' },
+  ])('does not normalize "$input" to now()', ({ input, expectedExpr, expectedValue }) => {
+    const result = parsePostgresDefault(input);
+    if (expectedExpr) {
+      expect(result).toEqual({ kind: 'function', expression: expectedExpr });
+    } else {
+      expect(result).toEqual({ kind: 'literal', value: expectedValue });
+    }
+  });
+});
+
+describe('parsePostgresDefault normalizes NULL defaults', () => {
+  it.each([
+    { input: 'NULL' },
+    { input: 'null' },
+    { input: 'NULL::text' },
+    { input: 'NULL::integer' },
+    { input: 'NULL::character varying' },
+    { input: 'NULL::character varying(255)' },
+    { input: 'NULL::"MyEnum"' },
+    { input: 'NULL::jsonb' },
+  ])('normalizes "$input" to null literal', ({ input }) => {
+    expect(parsePostgresDefault(input)).toEqual({
+      kind: 'literal',
+      value: null,
+    });
+  });
+});
+
+describe('parsePostgresDefault handles extension type defaults', () => {
+  it('parses citext string literal with cast', () => {
+    expect(parsePostgresDefault("'hello'::citext", 'citext')).toEqual({
+      kind: 'literal',
+      value: 'hello',
+    });
+  });
+
+  it('parses ltree string literal with cast', () => {
+    expect(parsePostgresDefault("'root.child'::ltree", 'ltree')).toEqual({
+      kind: 'literal',
+      value: 'root.child',
+    });
+  });
+
+  it('parses gen_random_uuid() for uuid columns', () => {
+    expect(parsePostgresDefault('gen_random_uuid()', 'uuid')).toEqual({
+      kind: 'function',
+      expression: 'gen_random_uuid()',
+    });
+  });
+
+  it('parses empty jsonb object default', () => {
+    expect(parsePostgresDefault("'{}'::jsonb", 'jsonb')).toEqual({
+      kind: 'literal',
+      value: {},
+    });
+  });
+
+  it('parses empty jsonb array default', () => {
+    expect(parsePostgresDefault("'[]'::jsonb", 'jsonb')).toEqual({
+      kind: 'literal',
+      value: [],
+    });
+  });
+});
+
 describe('parsePostgresDefault parses JSON literals for json/jsonb columns', () => {
   it('parses object literal for jsonb native type', () => {
     expect(parsePostgresDefault('\'{"key": "default"}\'::jsonb', 'jsonb')).toEqual({
