@@ -5,6 +5,7 @@ export declare const ExpressionType: unique symbol;
 export declare const JoinOuterScope: unique symbol;
 
 type Expand<T> = { [K in keyof T]: T[K] } & unknown;
+type EmptyRow = Record<never, ScopeField>;
 
 export type ScopeField = { codecId: string; nullable: boolean };
 export type ScopeTable = Record<string, ScopeField>;
@@ -135,6 +136,12 @@ type NullableScope<S extends Scope> = {
   };
 };
 
+export interface LateralBuilder<CodecTypes extends CodecTypesBase, ParentScope extends Scope> {
+  from<Other extends JoinSource<ScopeTable, string | never>>(
+    other: Other,
+  ): SelectQuery<CodecTypes, MergeScopes<ParentScope, Other[typeof JoinOuterScope]>, EmptyRow>;
+}
+
 export interface JoinCapable<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
   innerJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
@@ -164,12 +171,35 @@ export interface JoinCapable<CodecTypes extends CodecTypesBase, AvailableScope e
     CodecTypes,
     MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>
   >;
+
+  lateralJoin<Alias extends string, LateralRow extends Record<string, ScopeField>>(
+    alias: Alias,
+    builder: (
+      lateral: LateralBuilder<CodecTypes, AvailableScope>,
+    ) => SelectQuery<CodecTypes, Scope, LateralRow>,
+  ): JoinedTables<
+    CodecTypes,
+    MergeScopes<AvailableScope, { topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>
+  >;
+
+  outerLateralJoin<Alias extends string, LateralRow extends Record<string, ScopeField>>(
+    alias: Alias,
+    builder: (
+      lateral: LateralBuilder<CodecTypes, AvailableScope>,
+    ) => SelectQuery<CodecTypes, Scope, LateralRow>,
+  ): JoinedTables<
+    CodecTypes,
+    MergeScopes<
+      AvailableScope,
+      NullableScope<{ topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>
+    >
+  >;
 }
 
 export interface SelectCapable<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
-  RowType extends Record<string, ScopeField> = {},
+  RowType extends Record<string, ScopeField> = EmptyRow,
 > {
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
     ...columns: Columns
