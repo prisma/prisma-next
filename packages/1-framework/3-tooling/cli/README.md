@@ -103,16 +103,17 @@ prisma-next contract emit -v
 
 ### `prisma-next db verify`
 
-Verify that a database instance matches the emitted contract by checking marker presence, hash equality, and target compatibility.
+Verify that a database instance matches the emitted contract by checking the marker first and, by default, the live schema structure second.
 
 **Command:**
 ```bash
-prisma-next db verify [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
+prisma-next db verify [--db <url>] [--config <path>] [--fast] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 Options:
 - `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--fast`: Skip structural schema verification and only check the database marker
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
@@ -126,6 +127,9 @@ prisma-next db verify
 
 # Specify database URL
 prisma-next db verify --db postgresql://user:pass@localhost/db
+
+# Marker-only verification when callers accept the trade-off
+prisma-next db verify --db postgresql://user:pass@localhost/db --fast
 
 # JSON output
 prisma-next db verify --json
@@ -165,36 +169,52 @@ export default defineConfig({
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
 3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
-4. **Verify**: Calls `familyInstance.verify()` which:
+4. **Verify Marker**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
    - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
    - Compares target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
-  - Compares storage hash: Returns `PN-RTM-3002` if `storageHash` doesn't match
+   - Compares storage hash: Returns `PN-RTM-3002` if `storageHash` doesn't match
    - Compares profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
    - Checks codec coverage (optional): Compares contract column types against supported codec types and reports missing codecs
+5. **Verify Schema (default)**: Unless `--fast` is provided, calls `familyInstance.schemaVerify()` in tolerant mode to catch structural drift such as missing tables or columns created by manual DDL.
 
 **Output Format (TTY):**
 
 Success:
 ```
-✔ Database matches contract
+✔ Database signature and schema match contract
+  verification: marker + schema
   storageHash: sha256:abc123...
   profileHash: sha256:def456...
 ```
 
-Failure:
+Fast-mode success:
+```
+✔ Database marker matches contract
+  verification: marker only (--fast)
+  storageHash: sha256:abc123...
+  profileHash: sha256:def456...
+
+⚠ Schema verification skipped because --fast was provided. Run `prisma-next db schema-verify` to detect structural drift.
+```
+
+Marker failure:
 ```
 ✖ Marker missing (PN-RTM-3001)
   Why: Contract marker not found in database
   Fix: Run `prisma-next db sign --db <url>` to create marker
 ```
 
+Schema drift failure:
+`db verify` prints the same schema verification tree and JSON payload as `db schema-verify`, then exits with code 1.
+
 **Output Format (JSON):**
 
 ```json
 {
   "ok": true,
-  "summary": "Database matches contract",
+  "summary": "Database signature and schema match contract",
+  "mode": "full",
   "contract": {
     "storageHash": "sha256:abc123...",
     "profileHash": "sha256:def456..."
@@ -207,9 +227,20 @@ Failure:
     "expected": "postgres"
   },
   "missingCodecs": [],
+  "schema": {
+    "summary": "Database schema satisfies contract",
+    "counts": {
+      "pass": 12,
+      "warn": 0,
+      "fail": 0,
+      "totalNodes": 12
+    },
+    "strict": false
+  },
   "meta": {
     "configPath": "/path/to/prisma-next.config.ts",
-    "contractPath": "/path/to/src/prisma/contract.json"
+    "contractPath": "/path/to/src/prisma/contract.json",
+    "schemaVerification": "performed"
   },
   "timings": {
     "total": 42
@@ -223,6 +254,7 @@ Failure:
 - `PN-RTM-3001`: Marker missing - Contract marker not found in database
 - `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
 - `PN-RTM-3003`: Target mismatch - Contract target does not match config target
+- Exit code 1 with schema verification payload: Structural drift detected after marker verification passed
 
 **Family Requirements:**
 
@@ -255,7 +287,7 @@ interface ControlFamilyInstance {
 
 Use `createControlPlaneStack()` from `@prisma-next/core-control-plane/stack` to create the stack with sensible defaults (`driver` defaults to `undefined`, `extensionPacks` defaults to `[]`).
 
-The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles reading the marker, comparing hashes, and checking codec coverage internally.
+The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles marker checks, and `db verify` follows it with `schemaVerify()` unless `--fast` is provided.
 
 ### `prisma-next db introspect`
 
@@ -581,7 +613,7 @@ For updated markers:
 
 **Relationship to Other Commands:**
 - **`db schema-verify`**: `db sign` calls `schemaVerify` as a precondition before writing the marker. If schema verification fails, `db sign` exits without writing the marker.
-- **`db verify`**: `db verify` checks that the marker exists and matches the contract. `db sign` writes the marker that `db verify` checks.
+- **`db verify`**: `db verify` checks that the marker exists and matches the contract, then runs tolerant schema verification by default. `db sign` writes the marker that `db verify` checks. Use `db verify --fast` for marker-only verification.
 
 **Idempotency:**
 The `db sign` command is idempotent and safe to run multiple times:

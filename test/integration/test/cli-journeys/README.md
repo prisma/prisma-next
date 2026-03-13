@@ -27,7 +27,7 @@ pnpm test:journeys
 
 | File | What it covers |
 |---|---|
-| `drift-schema.e2e.test.ts` | **Phantom drift**: marker OK but schema diverged via manual DDL (dropped column); `db verify` gives a false positive, `db schema-verify` catches the missing column. **Extra column drift**: DBA adds a column via manual DDL; tolerant schema-verify passes, strict fails; recover by expanding the contract and running `db update` |
+| `drift-schema.e2e.test.ts` | **Phantom drift**: marker OK but schema diverged via manual DDL (dropped column); `db verify` now fails by default because it runs structural verification, while `db verify --fast` reproduces marker-only verification. **Extra column drift**: DBA adds a column via manual DDL; tolerant `db verify` / `db schema-verify` pass, strict schema-verify fails; recover by expanding the contract and running `db update` |
 | `drift-marker.e2e.test.ts` | **Missing marker**: contract emitted but `db init` never run — verify/schema-verify fail, init recovers. **Stale marker**: contract changed without updating DB — verify fails, `db update` recovers. **Mixed-mode evolution**: iterate through multiple contract versions using `db update` (no migration files). **Corrupt marker**: marker row overwritten with garbage — verify fails, schema-verify passes (schema intact), `db sign` recovers |
 | `drift-migration-dag.e2e.test.ts` | **Chain breakage**: after building a migration chain, a migration directory is deleted from disk. `migration apply` fails (no path to destination), recovery by re-planning the missing edge |
 
