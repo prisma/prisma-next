@@ -120,6 +120,9 @@ describe('json-schema-validator', () => {
 
       const result = validate(42);
       expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.errors[0]!.path).toBe('/');
+      }
     });
 
     it('returns first error in fail-fast mode', () => {

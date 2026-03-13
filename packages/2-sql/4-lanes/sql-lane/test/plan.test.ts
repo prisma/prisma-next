@@ -126,4 +126,41 @@ describe('buildMeta', () => {
       userId: 'pg/int4@1',
     });
   });
+
+  it('tracks include null-check refs and builtin operation return types', () => {
+    const operationExpr = OperationExpr.function({
+      method: 'vectorLength',
+      forTypeId: 'pg/vector@1',
+      self: ColumnRef.of('user', 'id'),
+      args: [],
+      returns: { kind: 'builtin', type: 'number' },
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+      template: 'vector_length(${self})',
+    });
+
+    const meta = buildMeta({
+      contract,
+      table: { name: 'user' },
+      projection: {
+        aliases: ['length', 'posts'],
+        columns: [createExpressionBuilder(operationExpr), createColumnBuilder('post', '')],
+      },
+      includes: [
+        {
+          alias: 'posts',
+          table: { name: 'post' },
+          on: { left: userColumns.id, right: userColumns.id },
+          childProjection: { aliases: ['id'], columns: [userColumns.id] },
+          childWhere: userColumns.deletedAt.isNull(),
+          childOrderBy: userColumns.email.desc(),
+        },
+      ],
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'deletedAt' });
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'email' });
+    expect(meta.projectionTypes).toEqual({ length: 'number' });
+    expect(meta.annotations?.codecs).toBeUndefined();
+  });
 });

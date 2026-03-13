@@ -38,6 +38,20 @@ describe('IncludeChildBuilderImpl', () => {
     expect(state.childLimit).toBe(10);
   });
 
+  it('preserves projection, orderBy, and limit when chaining where() after select()', () => {
+    const state = new IncludeChildBuilderImpl(contract, { name: 'user' })
+      .select({ id: tables.user.columns.id })
+      .limit(3)
+      .orderBy(tables.user.columns.email.desc())
+      .where(tables.user.columns.email.eq(param('email')))
+      .getState();
+
+    expect(state.childProjection.aliases).toEqual(['id']);
+    expect(state.childWhere).toEqual(tables.user.columns.email.eq(param('email')));
+    expect(state.childOrderBy?.dir).toBe('desc');
+    expect(state.childLimit).toBe(3);
+  });
+
   it('validates include limits', () => {
     const builder = new IncludeChildBuilderImpl(contract, { name: 'user' }).select({
       id: tables.user.columns.id,
