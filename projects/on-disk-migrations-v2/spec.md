@@ -211,6 +211,8 @@ A developer uses `db update` for rapid local iteration but migrations for stagin
 
 **Behavior:** This is the expected development workflow. `db update` and migrations operate on the same contract hash space — `db update` writes the contract hash to the marker table, and `migration apply` reads the marker to determine the starting point. The two mechanisms are interoperable as long as the developer plans migrations before deploying.
 
+**Ledger gap on the dev database:** On the developer's local database, `migration apply` sees that the marker is already at C2 (advanced by `db update`) and reports "Already up to date" — no DDL runs and no ledger entry is written. The `add-phone` migration appears as "applied" in `migration status` (the marker is at its `to` hash), but the ledger has no record of it because it was never executed against this database. On fresh databases (staging, production, teammate machines), `migration apply` executes the migration normally and the ledger is complete. This gap is only on databases where `db update` was used as a shortcut, and only visible in the raw ledger table — no CLI command surfaces the discrepancy. It would matter if a future feature relies on the ledger as a complete audit trail; today the marker is the sole source of truth for pathfinding and status.
+
 **Limitation:** If the developer runs `db update` on a shared database (e.g., a shared staging instance) and also applies migrations to it, the marker may advance past the migration graph's expectation. This produces a standard marker-mismatch error and requires the developer to plan a migration that accounts for the current state.
 
 ## S-9: Adopting migrations on an existing production database
