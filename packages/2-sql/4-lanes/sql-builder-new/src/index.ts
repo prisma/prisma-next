@@ -83,6 +83,19 @@ export type ExpressionBuilder<
   CT extends Record<string, { readonly input: unknown }>,
 > = (fields: FieldProxy<AvailableScope>, fns: Functions<CT>) => Expression<BooleanCodecType>;
 
+type OrderByDirection = 'asc' | 'desc';
+type OrderByNulls = 'first' | 'last';
+
+type OrderByOptions = {
+  direction?: OrderByDirection;
+  nulls?: OrderByNulls;
+};
+
+type OrderByScope<AvailableScope extends Scope, RowType extends Record<string, ScopeField>> = {
+  topLevel: Expand<AvailableScope['topLevel'] & RowType>;
+  namespaces: AvailableScope['namespaces'];
+};
+
 export type Functions<CT extends Record<string, { readonly input: unknown }>> = {
   eq: <CodecId extends string>(
     a: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>,
@@ -244,6 +257,23 @@ export interface SelectQuery<
 > extends SelectCapable<CodecTypes, AvailableScope, RowType> {
   where(
     expr: ExpressionBuilder<AvailableScope, CodecTypes>,
+  ): SelectQuery<CodecTypes, AvailableScope, RowType>;
+
+  limit(count: number): SelectQuery<CodecTypes, AvailableScope, RowType>;
+
+  offset(count: number): SelectQuery<CodecTypes, AvailableScope, RowType>;
+
+  orderBy(
+    field: (keyof RowType | keyof AvailableScope['topLevel']) & string,
+    options?: OrderByOptions,
+  ): SelectQuery<CodecTypes, AvailableScope, RowType>;
+
+  orderBy(
+    expr: (
+      fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
+      fns: Functions<CodecTypes>,
+    ) => Expression<ScopeField>,
+    options?: OrderByOptions,
   ): SelectQuery<CodecTypes, AvailableScope, RowType>;
 
   as<Alias extends string>(newAlias: Alias): JoinSource<RowType, Alias>;
