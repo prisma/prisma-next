@@ -401,21 +401,7 @@ async function executeMigrationStatusCommand(
     if (!markerInChain) {
       summary = `Database marker does not match any migration — was the database managed with 'db update'?`;
     } else if (refHash && markerHash !== undefined) {
-      if (markerHash === refHash) {
-        summary = `At ref "${refName}" target`;
-      } else {
-        const pathToRef = findPath(graph, markerHash, refHash);
-        if (pathToRef) {
-          summary = `${pathToRef.length} edge(s) behind ref "${refName}"`;
-        } else {
-          const pathFromRef = findPath(graph, refHash, markerHash);
-          if (pathFromRef) {
-            summary = `${pathFromRef.length} edge(s) ahead of ref "${refName}"`;
-          } else {
-            summary = `No path between marker and ref "${refName}" target`;
-          }
-        }
-      }
+      summary = summarizeRefDistance(graph, markerHash, refHash, refName!);
     } else {
       const pendingCount = entries.filter((e) => e.status === 'pending').length;
       const appliedCount = entries.filter((e) => e.status === 'applied').length;
@@ -497,9 +483,9 @@ async function executeMigrationStatusCommand(
     contractHash,
     summary,
     diagnostics,
-    ...(markerHash !== undefined ? { markerHash } : {}),
-    ...(refName !== undefined ? { refName } : {}),
-    ...(refHash !== undefined ? { refHash } : {}),
+    ...ifDefined('markerHash', markerHash),
+    ...ifDefined('refName', refName),
+    ...ifDefined('refHash', refHash),
     ...(pathDecision ? { pathDecision } : {}),
   };
   return ok(result);
@@ -541,4 +527,21 @@ export function createMigrationStatusCommand(): Command {
     });
 
   return command;
+}
+
+function summarizeRefDistance(
+  graph: MigrationGraph,
+  markerHash: string,
+  refHash: string,
+  refName: string,
+): string {
+  if (markerHash === refHash) return `At ref "${refName}" target`;
+
+  const pathToRef = findPath(graph, markerHash, refHash);
+  if (pathToRef) return `${pathToRef.length} edge(s) behind ref "${refName}"`;
+
+  const pathFromRef = findPath(graph, refHash, markerHash);
+  if (pathFromRef) return `${pathFromRef.length} edge(s) ahead of ref "${refName}"`;
+
+  return `No path between marker and ref "${refName}" target`;
 }
