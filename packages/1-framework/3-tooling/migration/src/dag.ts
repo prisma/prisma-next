@@ -4,6 +4,7 @@ import {
   errorAmbiguousLeaf,
   errorDuplicateMigrationId,
   errorNoResolvableLeaf,
+  errorNoRoot,
   errorSelfLoop,
 } from './errors';
 import type { MigrationChainEntry, MigrationGraph, MigrationPackage } from './types';
@@ -276,11 +277,17 @@ export function findReachableLeaves(graph: MigrationGraph, fromHash: string): re
 
 /**
  * Find the leaf contract hash of the migration graph reachable from
- * EMPTY_CONTRACT_HASH. Throws AMBIGUOUS_LEAF if multiple leaves exist.
+ * EMPTY_CONTRACT_HASH. Throws NO_ROOT if the graph has nodes but none
+ * originate from the empty hash (e.g. root migration was deleted).
+ * Throws AMBIGUOUS_LEAF if multiple leaves exist.
  */
 export function findLeaf(graph: MigrationGraph): string {
   if (graph.nodes.size === 0) {
     return EMPTY_CONTRACT_HASH;
+  }
+
+  if (!graph.nodes.has(EMPTY_CONTRACT_HASH)) {
+    throw errorNoRoot([...graph.nodes]);
   }
 
   const leaves = findReachableLeaves(graph, EMPTY_CONTRACT_HASH);
