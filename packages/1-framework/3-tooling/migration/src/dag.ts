@@ -202,6 +202,49 @@ export function findPathWithDecision(
 }
 
 /**
+ * Walk ancestors of each leaf back from the leaves to find the last node
+ * that appears on all paths. Returns `fromHash` if no shared ancestor is found.
+ */
+function findDivergencePoint(
+  graph: MigrationGraph,
+  fromHash: string,
+  leaves: readonly string[],
+): string {
+  const ancestorSets = leaves.map((leaf) => {
+    const ancestors = new Set<string>();
+    const queue = [leaf];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (ancestors.has(current)) continue;
+      ancestors.add(current);
+      const incoming = graph.reverseChain.get(current);
+      if (incoming) {
+        for (const edge of incoming) {
+          queue.push(edge.from);
+        }
+      }
+    }
+    return ancestors;
+  });
+
+  const commonAncestors = [...(ancestorSets[0] ?? [])].filter((node) =>
+    ancestorSets.every((s) => s.has(node)),
+  );
+
+  let deepest = fromHash;
+  let deepestDepth = -1;
+  for (const ancestor of commonAncestors) {
+    const path = findPath(graph, fromHash, ancestor);
+    const depth = path ? path.length : 0;
+    if (depth > deepestDepth) {
+      deepestDepth = depth;
+      deepest = ancestor;
+    }
+  }
+  return deepest;
+}
+
+/**
  * Find all leaf nodes reachable from `fromHash` via forward edges.
  * A leaf is a node with no outgoing edges in the graph.
  */
@@ -251,7 +294,15 @@ export function findLeaf(graph: MigrationGraph): string {
   }
 
   if (leaves.length > 1) {
-    throw errorAmbiguousLeaf(leaves);
+    const divergencePoint = findDivergencePoint(graph, EMPTY_CONTRACT_HASH, leaves);
+    const branches = leaves.map((leaf) => {
+      const path = findPath(graph, divergencePoint, leaf);
+      return {
+        leaf,
+        edges: (path ?? []).map((e) => ({ dirName: e.dirName, from: e.from, to: e.to })),
+      };
+    });
+    throw errorAmbiguousLeaf(leaves, { divergencePoint, branches });
   }
 
   const leaf = leaves[0];

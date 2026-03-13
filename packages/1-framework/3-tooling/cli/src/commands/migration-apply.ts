@@ -59,6 +59,12 @@ export interface MigrationApplyResult {
     readonly alternativeCount: number;
     readonly tieBreakReasons: readonly string[];
     readonly refName?: string;
+    readonly selectedPath: readonly {
+      readonly dirName: string;
+      readonly migrationId: string | null;
+      readonly from: string;
+      readonly to: string;
+    }[];
   };
   readonly timings: {
     readonly total: number;
@@ -344,6 +350,12 @@ async function executeMigrationApplyCommand(
       alternativeCount: decision.alternativeCount,
       tieBreakReasons: decision.tieBreakReasons,
       ...ifDefined('refName', decision.refName),
+      selectedPath: decision.selectedPath.map((entry) => ({
+        dirName: entry.dirName,
+        migrationId: entry.migrationId,
+        from: entry.from,
+        to: entry.to,
+      })),
     };
 
     if (pendingPath.length === 0) {
