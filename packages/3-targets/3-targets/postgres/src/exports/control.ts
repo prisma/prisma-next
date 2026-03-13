@@ -1,4 +1,3 @@
-import { expandParameterizedNativeType } from '@prisma-next/adapter-postgres/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
