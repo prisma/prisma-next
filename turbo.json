@@ -33,6 +33,11 @@
     "lint": {
       "inputs": ["src/**", "test/**"]
     },
+    "record": {
+      "dependsOn": ["build"],
+      "inputs": ["scripts/record.ts", "recordings/config.ts", "recordings/fixtures/**"],
+      "outputs": ["recordings/svgs/**", "recordings/ascii/**"]
+    },
     "clean": {
       "cache": false
     }
