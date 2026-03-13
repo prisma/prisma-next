@@ -102,8 +102,8 @@ Migration commands support selecting a target via refs.
 
 `--json` outputs for migration commands include enough metadata for agents and CI to reason about:
 
-- chosen path (edge IDs and contract hashes),
-- path-decision metadata (alternative count, tie-break reasons),
+- chosen path as `pathDecision.selectedPath` (each entry: `dirName`, `migrationId`, `from`, `to`),
+- path-decision metadata (policy ID, alternative count, tie-break reasons),
 - no-op reason when applicable,
 - ref reads/writes,
 - and divergence/branch diagnostics when errors occur.
@@ -170,7 +170,7 @@ Alice commits `C1 -> C2`. Bob commits `C1 -> C3`. Both merged to main.
 
 Graph: `C1 -> C2`, `C1 -> C3`.
 
-**Behavior:** DB marker at `C1`, no explicit target specified. Pathfinder detects two unapplied paths to distinct leaves (`C2` and `C3`). This is a hard error with diagnostics: "Divergent branches from C1: C1->C2 and C1->C3. Resolve by rebasing one branch onto the other's target."
+**Behavior:** DB marker at `C1`, no explicit target specified. Pathfinder detects two unapplied paths to distinct leaves (`C2` and `C3`). This is a hard error with actionable diagnostics: the error identifies `C1` as the divergence point, lists each branch with its leaf hash (`C2`, `C3`), and suggests resolution via `migration ref set` or `--from` to specify the intended target explicitly.
 
 If an explicit target is specified (e.g., `--ref production` pointing to `C3`), the pathfinder selects `C1 -> C3`. The `C1 -> C2` edge is not on any path to `C3` and is inert.
 
@@ -391,7 +391,7 @@ pnpm prisma-next migration status
 
 **Expected:** Step 5 applies C1→C3 via contract.json's implicit target (contract.json hash = C3). `migration status` without `--ref` errors with `AMBIGUOUS_LEAF` on the divergent graph. `migration status --ref production` succeeds, showing the correct chain EMPTY→C1→C3.
 
-**Result (post-fix):** PASS. Step 5 correctly applies C1→C3 — `migration apply` uses contract.json's storageHash (C3) as the implicit target, which is by design (the contract.json hash acts as "I want this state"). `migration status` without `--ref` correctly errors with `AMBIGUOUS_LEAF` listing both leaves (C2 and C3). After setting `production` ref to C3, `migration status --ref production` works on the divergent graph without error, showing EMPTY→C1→C3 with both migrations applied.
+**Result (post-fix):** PASS. Step 5 correctly applies C1→C3 — `migration apply` uses contract.json's storageHash (C3) as the implicit target, which is by design (the contract.json hash acts as "I want this state"). `migration status` without `--ref` correctly errors with `AMBIGUOUS_LEAF`, identifying C1 as the divergence point and listing both branches with their leaf hashes (C2 and C3). After setting `production` ref to C3, `migration status --ref production` works on the divergent graph without error, showing EMPTY→C1→C3 with both migrations applied.
 
 **Design note:** `migration apply` always resolves its target from `contract.json` (or `--ref`), so divergence detection via `AMBIGUOUS_LEAF` is surfaced through `migration status` (without `--ref`) and `migration plan` (without `--from`), not through `migration apply`. This is intentional — the contract.json hash is the user's declaration of the desired state.
 
