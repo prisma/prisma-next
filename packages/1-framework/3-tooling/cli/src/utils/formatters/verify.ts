@@ -6,6 +6,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
@@ -14,10 +15,40 @@ import { createColorFormatter, formatDim, isVerbose } from './helpers';
 // Verify Output Formatters
 // ============================================================================
 
+export interface DbVerifyCommandSuccessResult {
+  readonly ok: true;
+  readonly mode: 'full' | 'fast';
+  readonly summary: string;
+  readonly contract: VerifyDatabaseResult['contract'];
+  readonly marker?: VerifyDatabaseResult['marker'];
+  readonly target: VerifyDatabaseResult['target'];
+  readonly missingCodecs?: VerifyDatabaseResult['missingCodecs'];
+  readonly codecCoverageSkipped?: VerifyDatabaseResult['codecCoverageSkipped'];
+  readonly schema?: {
+    readonly summary: string;
+    readonly counts: VerifyDatabaseSchemaResult['schema']['counts'];
+    readonly strict: boolean;
+  };
+  readonly warning?: string;
+  readonly meta?:
+    | (NonNullable<VerifyDatabaseResult['meta']> & {
+        readonly schemaVerification: 'performed' | 'skipped';
+      })
+    | {
+        readonly schemaVerification: 'performed' | 'skipped';
+      };
+  readonly timings: {
+    readonly total: number;
+  };
+}
+
 /**
  * Formats human-readable output for database verify.
  */
-export function formatVerifyOutput(result: VerifyDatabaseResult, flags: GlobalFlags): string {
+export function formatVerifyOutput(
+  result: DbVerifyCommandSuccessResult,
+  flags: GlobalFlags,
+): string {
   if (flags.quiet) {
     return '';
   }
@@ -26,17 +57,25 @@ export function formatVerifyOutput(result: VerifyDatabaseResult, flags: GlobalFl
 
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
-  const formatRed = createColorFormatter(useColor, red);
+  const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  if (result.ok) {
-    lines.push(`${formatGreen('✔')} ${result.summary}`);
-    lines.push(`${formatDimText(`  storageHash: ${result.contract.storageHash}`)}`);
-    if (result.contract.profileHash) {
-      lines.push(`${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
-    }
-  } else {
-    lines.push(`${formatRed('✖')} ${result.summary} (${result.code})`);
+  lines.push(`${formatGreen('✔')} ${result.summary}`);
+  lines.push(
+    `${formatDimText(`  verification: ${result.mode === 'full' ? 'marker + schema' : 'marker only (--fast)'}`)}`,
+  );
+  lines.push(`${formatDimText(`  storageHash: ${result.contract.storageHash}`)}`);
+  if (result.contract.profileHash) {
+    lines.push(`${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
+  }
+  if (result.mode === 'full' && result.schema && isVerbose(flags, 1)) {
+    lines.push(
+      `${formatDimText(`  schema: pass=${result.schema.counts.pass} warn=${result.schema.counts.warn} fail=${result.schema.counts.fail}`)}`,
+    );
+  }
+  if (result.warning) {
+    lines.push('');
+    lines.push(`${formatYellow('⚠')} ${result.warning}`);
   }
 
   if (isVerbose(flags, 1)) {
@@ -54,16 +93,19 @@ export function formatVerifyOutput(result: VerifyDatabaseResult, flags: GlobalFl
 /**
  * Formats JSON output for database verify.
  */
-export function formatVerifyJson(result: VerifyDatabaseResult): string {
+export function formatVerifyJson(result: DbVerifyCommandSuccessResult): string {
   const output = {
     ok: result.ok,
-    ...(result.code ? { code: result.code } : {}),
     summary: result.summary,
+    mode: result.mode,
     contract: result.contract,
-    ...(result.marker ? { marker: result.marker } : {}),
+    ...ifDefined('marker', result.marker),
     target: result.target,
-    ...(result.missingCodecs ? { missingCodecs: result.missingCodecs } : {}),
-    ...(result.meta ? { meta: result.meta } : {}),
+    ...ifDefined('missingCodecs', result.missingCodecs),
+    ...ifDefined('codecCoverageSkipped', result.codecCoverageSkipped),
+    ...ifDefined('schema', result.schema),
+    ...ifDefined('warning', result.warning),
+    ...ifDefined('meta', result.meta),
     timings: result.timings,
   };
 
