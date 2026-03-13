@@ -133,7 +133,7 @@ export function errorInvalidRefs(refsPath: string, reason: string): MigrationToo
 
 export function errorInvalidRefName(refName: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_REF_NAME', 'Invalid ref name', {
-    why: `Ref name "${refName}" is invalid. Names must be lowercase alphanumeric with hyphens or forward slashes, no path traversal.`,
+    why: `Ref name "${refName}" is invalid. Names must be lowercase alphanumeric with hyphens or forward slashes (no "." or ".." segments).`,
     fix: `Use a valid ref name (e.g., "staging", "envs/production").`,
     details: { refName },
   });

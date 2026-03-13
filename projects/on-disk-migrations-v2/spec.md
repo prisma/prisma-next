@@ -85,7 +85,7 @@ Note on collaboration workflows: divergence typically surfaces when work from di
 Refs map a logical environment name to a contract hash, stored in `migrations/refs.json`.
 
 - Format: `{ "head": "<hash>", "staging": "<hash>", "production": "<hash>" }`
-- Ref names are bare keys (no `ref:` prefix). Names must pass strict validation: alphanumeric, hyphens, forward slashes, no path traversal sequences.
+- Ref names are bare keys (no `ref:` prefix). Names must pass strict validation: alphanumeric, hyphens, forward slashes (no `.` or `..` segments).
 - The file is version-controlled alongside migration artifacts.
 - Ref reads are a JSON parse. Ref writes are atomic (write-tmp + rename).
 
