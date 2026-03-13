@@ -128,6 +128,54 @@ describe('buildWhereExpr', () => {
         [],
       ),
     ).toThrow('Unknown table missing');
+
+    expect(() =>
+      buildWhereExpr(
+        contract,
+        { kind: 'nullCheck', expr: ColumnRef.of('user', 'missing'), isNull: true } as never,
+        {},
+        [],
+        [],
+      ),
+    ).toThrow('Unknown column missing in table user');
+  });
+
+  it('validates missing columns and tables on the right side', () => {
+    expect(() =>
+      buildWhereExpr(
+        contract,
+        {
+          kind: 'binary',
+          op: 'eq',
+          left: ColumnRef.of('user', 'missing'),
+          right: param('userId'),
+        } as never,
+        { userId: 1 },
+        [],
+        [],
+      ),
+    ).toThrow('Unknown column missing in table user');
+
+    expect(() =>
+      buildWhereExpr(
+        contract,
+        {
+          kind: 'binary',
+          op: 'eq',
+          left: userColumns.id.toExpr(),
+          right: {
+            kind: 'column',
+            table: 'missing',
+            column: 'id',
+            columnMeta: userColumns.id.columnMeta,
+            toExpr: () => ColumnRef.of('missing', 'id'),
+          },
+        } as never,
+        {},
+        [],
+        [],
+      ),
+    ).toThrow('Unknown table missing');
   });
 
   it('rejects missing parameter values', () => {

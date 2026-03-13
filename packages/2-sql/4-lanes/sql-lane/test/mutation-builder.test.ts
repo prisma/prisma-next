@@ -86,4 +86,64 @@ describe('mutation builders', () => {
       'where() must be called before building a DELETE query',
     );
   });
+
+  it('applies execution defaults for create and update mutations', () => {
+    const contractWithDefaults = {
+      ...contract,
+      execution: {
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'email' },
+              onCreate: { kind: 'generator', id: 'nanoid', params: { size: 8 } },
+            },
+            {
+              ref: { table: 'user', column: 'deletedAt' },
+              onUpdate: { kind: 'generator', id: 'nanoid', params: { size: 6 } },
+            },
+          ],
+        },
+      },
+    } satisfies Contract;
+    const contextWithDefaults = createFixtureContext(contractWithDefaults);
+    const defaultTables = schema<typeof contractWithDefaults>(contextWithDefaults).tables;
+
+    const insertPlan = sql<typeof contractWithDefaults, CodecTypes>({
+      context: contextWithDefaults,
+    })
+      .insert(defaultTables.user, {
+        createdAt: param('createdAt'),
+      })
+      .build({ params: { createdAt: new Date('2024-01-01T00:00:00.000Z') } });
+
+    expect(insertPlan.ast).toBeInstanceOf(InsertAst);
+    expect(insertPlan.params).toHaveLength(2);
+    expect((insertPlan.ast as InsertAst).rows[0]).toMatchObject({
+      createdAt: ParamRef.of(1, 'createdAt'),
+      email: ParamRef.of(2, 'email'),
+    });
+    expect(typeof insertPlan.params[1]).toBe('string');
+    expect((insertPlan.params[1] as string).length).toBe(8);
+
+    const updatePlan = sql<typeof contractWithDefaults, CodecTypes>({
+      context: contextWithDefaults,
+    })
+      .update(defaultTables.user, {
+        email: param('newEmail'),
+      })
+      .where(defaultTables.user.columns.id.eq(param('userId')))
+      .build({ params: { newEmail: 'updated@example.com', userId: 1 } });
+
+    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
+    expect(updatePlan.params).toHaveLength(3);
+    expect((updatePlan.ast as UpdateAst).set).toMatchObject({
+      email: ParamRef.of(1, 'newEmail'),
+      deletedAt: ParamRef.of(2, 'deletedAt'),
+    });
+    expect((updatePlan.ast as UpdateAst).where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(3, 'userId')),
+    );
+    expect(typeof updatePlan.params[1]).toBe('string');
+    expect((updatePlan.params[1] as string).length).toBe(6);
+  });
 });

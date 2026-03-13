@@ -23,7 +23,10 @@ describe('projection', () => {
     expect(generateAlias(['user', 'id'])).toBe('user_id');
     expect(tracker.register(['user', 'id'])).toBe('user_id');
     expect(tracker.getPath('user_id')).toEqual(['user', 'id']);
+    expect(tracker.has('user_id')).toBe(true);
+    expect(tracker.has('missing')).toBe(false);
     expect(() => tracker.register(['user', 'id'])).toThrow('Alias collision');
+    expect(() => generateAlias([])).toThrow('Alias path cannot be empty');
   });
 
   it('flattens simple and nested projections', () => {

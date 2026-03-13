@@ -1,12 +1,21 @@
 import {
   ColumnRef,
   DefaultValueExpr,
+  DeleteAst,
+  DoNothingConflictAction,
   type InsertAst,
   InsertAst as InsertAstClass,
   ParamRef,
+  UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { compileInsertCount, compileInsertReturning } from '../src/query-plan';
+import {
+  compileDeleteCount,
+  compileInsertCount,
+  compileInsertReturning,
+  compileUpdateCount,
+  compileUpsertReturning,
+} from '../src/query-plan';
 import { withReturningCapability } from './collection-fixtures';
 import { getTestContract } from './helpers';
 
@@ -65,5 +74,40 @@ describe('query plan mutations', () => {
     assertInsertAst(plan.ast);
     expect(plan.params).toEqual([]);
     expect(plan.ast.rows).toEqual([{}, {}]);
+  });
+
+  it('compileUpsertReturning() uses DO NOTHING and default returning columns when update is empty', () => {
+    const contract = withReturningCapability(getTestContract());
+    const plan = compileUpsertReturning(
+      contract,
+      'users',
+      { id: 10, name: 'Alice', email: 'alice@example.com' },
+      {},
+      ['email'],
+      undefined,
+    );
+
+    assertInsertAst(plan.ast);
+    expect(plan.ast.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+    expect(plan.params).toEqual([10, 'Alice', 'alice@example.com']);
+    expect(plan.ast.returning).toEqual(
+      Object.keys(contract.storage.tables.users.columns).map((column) =>
+        ColumnRef.of('users', column),
+      ),
+    );
+  });
+
+  it('compileUpdateCount() and compileDeleteCount() omit WHERE when filters are empty', () => {
+    const contract = getTestContract();
+
+    const updatePlan = compileUpdateCount(contract, 'users', { name: 'Alice' }, []);
+    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
+    expect((updatePlan.ast as UpdateAst).where).toBeUndefined();
+    expect(updatePlan.params).toEqual(['Alice']);
+
+    const deletePlan = compileDeleteCount(contract, 'users', []);
+    expect(deletePlan.ast).toBeInstanceOf(DeleteAst);
+    expect((deletePlan.ast as DeleteAst).where).toBeUndefined();
+    expect(deletePlan.params).toEqual([]);
   });
 });

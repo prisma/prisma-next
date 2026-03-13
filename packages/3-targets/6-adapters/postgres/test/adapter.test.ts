@@ -1,14 +1,19 @@
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   AggregateExpr,
+  AndExpr,
   BinaryExpr,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
+  ExistsExpr,
   InsertAst,
   InsertOnConflict,
   JsonObjectExpr,
+  ListLiteralExpr,
   LiteralExpr,
+  NullCheckExpr,
+  OperationExpr,
   ParamRef,
   ProjectionItem,
   QueryAst,
@@ -33,6 +38,9 @@ const contract = validateContract<PostgresContract>({
           id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
           email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           createdAt: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz', nullable: false },
+          profile: { codecId: 'pg/jsonb@1', nativeType: 'jsonb', nullable: true },
+          metadata: { codecId: 'pg/json@1', nativeType: 'json', nullable: true },
+          vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
         },
         uniques: [],
         indexes: [],
@@ -133,5 +141,82 @@ describe('Postgres adapter', () => {
         params: [],
       }),
     ).toThrow('INSERT requires at least one row');
+  });
+
+  it('lowers distinct, exists, null checks, and typed JSON parameters in WHERE clauses', () => {
+    const existsSubquery = SelectAst.from(TableSource.named('post'))
+      .withProject([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
+      .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')));
+    const vectorLength = OperationExpr.function({
+      method: 'vectorLength',
+      forTypeId: 'pg/vector@1',
+      self: ColumnRef.of('user', 'vector'),
+      args: [],
+      returns: { kind: 'builtin', type: 'number' },
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+      template: 'vector_length(${self})',
+    });
+    const scalarSubquery = SelectAst.from(TableSource.named('post'))
+      .withProject([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
+      .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')));
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withDistinctOn([ColumnRef.of('user', 'email')])
+      .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(
+        AndExpr.of([
+          ExistsExpr.notExists(existsSubquery),
+          NullCheckExpr.isNull(vectorLength),
+          NullCheckExpr.isNotNull(SubqueryExpr.of(scalarSubquery)),
+          BinaryExpr.eq(ColumnRef.of('user', 'profile'), ParamRef.of(1, 'profile')),
+          BinaryExpr.eq(ColumnRef.of('user', 'metadata'), ParamRef.of(2, 'metadata')),
+          BinaryExpr.in(ColumnRef.of('user', 'id'), ListLiteralExpr.fromValues([])),
+          BinaryExpr.notIn(ColumnRef.of('user', 'id'), ListLiteralExpr.fromValues([])),
+        ]),
+      );
+
+    const lowered = adapter.lower(ast, {
+      contract,
+      params: [{ active: true }, { source: 'test' }],
+    });
+
+    expect(lowered.body.sql).toBe(
+      [
+        'SELECT DISTINCT ON ("user"."email") "user"."id" AS "id"',
+        'FROM "user"',
+        'WHERE (NOT EXISTS (SELECT "post"."id" AS "id" FROM "post" WHERE "post"."userId" = "user"."id")',
+        'AND (vector_length("user"."vector")) IS NULL',
+        'AND ((SELECT "post"."id" AS "id" FROM "post" WHERE "post"."userId" = "user"."id")) IS NOT NULL',
+        'AND "user"."profile" = $1::jsonb',
+        'AND "user"."metadata" = $2::json',
+        'AND FALSE',
+        'AND TRUE)',
+      ].join(' '),
+    );
+  });
+
+  it('lowers default-value inserts with DO NOTHING conflict handling', () => {
+    const ast = InsertAst.into(TableSource.named('user'))
+      .withRows([{}])
+      .withOnConflict(InsertOnConflict.on([ColumnRef.of('user', 'email')]).doNothing());
+
+    expect(adapter.lower(ast, { contract, params: [] }).body.sql).toBe(
+      'INSERT INTO "user" DEFAULT VALUES ON CONFLICT ("email") DO NOTHING',
+    );
+  });
+
+  it('renders bigint, date, array, object, and undefined literals in projections', () => {
+    const ast = SelectAst.from(TableSource.named('user')).withProject([
+      ProjectionItem.of('bigintValue', LiteralExpr.of(12n)),
+      ProjectionItem.of('createdAtLiteral', LiteralExpr.of(new Date('2024-01-01T00:00:00.000Z'))),
+      ProjectionItem.of('arrayValue', LiteralExpr.of([1, 'two'])),
+      ProjectionItem.of('jsonValue', LiteralExpr.of({ ok: true })),
+      ProjectionItem.of('missingValue', LiteralExpr.of(undefined)),
+    ]);
+
+    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+
+    expect(sql).toBe(
+      `SELECT 12 AS "bigintValue", '2024-01-01T00:00:00.000Z' AS "createdAtLiteral", ARRAY[1, 'two'] AS "arrayValue", '{"ok":true}' AS "jsonValue", NULL AS "missingValue" FROM "user"`,
+    );
   });
 });
