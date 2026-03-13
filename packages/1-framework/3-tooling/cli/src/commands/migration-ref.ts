@@ -51,7 +51,7 @@ function createRefSetCommand(): Command {
           const updated = { ...refs, [name]: hash };
           await writeRefs(refsPath, updated);
 
-          if (flags.json === 'object') {
+          if (flags.json) {
             console.log(JSON.stringify({ ok: true, ref: name, hash }));
           } else if (!flags.quiet) {
             console.log(`Set ref "${name}" → ${hash}`);
@@ -92,7 +92,7 @@ function createRefGetCommand(): Command {
           const refs = await readRefs(refsPath);
           const hash = resolveRef(refs, name);
 
-          if (flags.json === 'object') {
+          if (flags.json) {
             console.log(JSON.stringify({ ok: true, ref: name, hash }));
           } else {
             console.log(hash);
@@ -134,7 +134,7 @@ function createRefDeleteCommand(): Command {
           const { [name]: _, ...remaining } = refs;
           await writeRefs(refsPath, remaining);
 
-          if (flags.json === 'object') {
+          if (flags.json) {
             console.log(JSON.stringify({ ok: true, ref: name, deleted: true }));
           } else if (!flags.quiet) {
             console.log(`Deleted ref "${name}"`);
@@ -170,7 +170,7 @@ function createRefListCommand(): Command {
         const refs = await readRefs(refsPath);
         const entries = Object.entries(refs);
 
-        if (flags.json === 'object') {
+        if (flags.json) {
           console.log(JSON.stringify({ ok: true, refs }));
         } else if (!flags.quiet) {
           if (entries.length === 0) {

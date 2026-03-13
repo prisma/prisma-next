@@ -92,11 +92,26 @@ export function errorSelfLoop(dirName: string, hash: string): MigrationToolsErro
   });
 }
 
-export function errorAmbiguousLeaf(leaves: readonly string[]): MigrationToolsError {
+export function errorAmbiguousLeaf(
+  leaves: readonly string[],
+  context?: {
+    divergencePoint: string;
+    branches: readonly {
+      leaf: string;
+      edges: readonly { dirName: string; from: string; to: string }[];
+    }[];
+  },
+): MigrationToolsError {
+  const divergenceInfo = context
+    ? `\nDivergence point: ${context.divergencePoint}\nBranches:\n${context.branches.map((b) => `  → ${b.leaf} (${b.edges.length} edge(s): ${b.edges.map((e) => e.dirName).join(' → ') || 'direct'})`).join('\n')}`
+    : '';
   return new MigrationToolsError('MIGRATION.AMBIGUOUS_LEAF', 'Ambiguous migration graph', {
-    why: `Multiple leaf nodes found: ${leaves.join(', ')}. The migration graph has diverged — this typically happens when two developers plan migrations from the same starting point.`,
-    fix: 'Delete one of the conflicting migration directories, then re-run `migration plan` to re-plan it from the remaining branch. Or use --from <hash> to explicitly select a starting point.',
-    details: { leaves },
+    why: `Multiple leaf nodes found: ${leaves.join(', ')}. The migration graph has diverged — this typically happens when two developers plan migrations from the same starting point.${divergenceInfo}`,
+    fix: 'Use `migration ref set <name> <hash>` to target a specific branch, delete one of the conflicting migration directories and re-run `migration plan`, or use --from <hash> to explicitly select a starting point.',
+    details: {
+      leaves,
+      ...(context ? { divergencePoint: context.divergencePoint, branches: context.branches } : {}),
+    },
   });
 }
 

@@ -39,6 +39,9 @@ describe('MigrationApplyResult JSON shape', () => {
         toHash: 'sha256:b',
         alternativeCount: 0,
         tieBreakReasons: [],
+        selectedPath: [
+          { dirName: 'm1', migrationId: 'sha256:mid', from: 'sha256:a', to: 'sha256:b' },
+        ],
       },
       timings: { total: 42 },
     };
@@ -58,6 +61,7 @@ describe('MigrationApplyResult JSON shape', () => {
       [
         "alternativeCount",
         "fromHash",
+        "selectedPath",
         "tieBreakReasons",
         "toHash",
       ]
@@ -78,6 +82,9 @@ describe('MigrationApplyResult JSON shape', () => {
         alternativeCount: 1,
         tieBreakReasons: ['at sha256:a: 2 candidates, selected by tie-break'],
         refName: 'production',
+        selectedPath: [
+          { dirName: 'm1', migrationId: 'sha256:mid', from: 'sha256:a', to: 'sha256:b' },
+        ],
       },
       timings: { total: 10 },
     };
@@ -86,6 +93,7 @@ describe('MigrationApplyResult JSON shape', () => {
         "alternativeCount",
         "fromHash",
         "refName",
+        "selectedPath",
         "tieBreakReasons",
         "toHash",
       ]
@@ -133,6 +141,7 @@ describe('MigrationStatusResult JSON shape', () => {
         alternativeCount: 0,
         tieBreakReasons: [],
         refName: 'production',
+        selectedPath: [],
       },
       summary: 'At ref "production" target',
       diagnostics: [],
