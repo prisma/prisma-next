@@ -857,7 +857,7 @@ function buildColumnDefaultSql(
   }
 }
 
-function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
+export function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
   const isJsonColumn = column?.nativeType === 'json' || column?.nativeType === 'jsonb';
 
   if (value instanceof Date) {

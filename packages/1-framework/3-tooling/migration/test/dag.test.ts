@@ -7,6 +7,8 @@ import {
   findLatestMigration,
   findLeaf,
   findPath,
+  findPathWithDecision,
+  findReachableLeaves,
   reconstructGraph,
 } from '../src/dag';
 import { MigrationToolsError } from '../src/errors';
@@ -19,10 +21,10 @@ function pkg(
   from: string,
   to: string,
   dirName: string,
-  parentMigrationId: string | null = null,
   createdAt = '2026-02-25T14:00:00.000Z',
+  labels: readonly string[] = [],
 ): MigrationPackage {
-  const manifest = createTestManifest({ from, to, parentMigrationId, createdAt });
+  const manifest = createTestManifest({ from, to, createdAt, labels });
   const ops = createTestOps();
   const migrationId = computeMigrationId(
     { ...manifest, createdAt: `${createdAt}-${migrationCounter++}` },
@@ -37,14 +39,7 @@ function pkg(
 }
 
 function chain(...specs: Array<[string, string, string]>): MigrationPackage[] {
-  const packages: MigrationPackage[] = [];
-  let parentId: string | null = null;
-  for (const [from, to, dirName] of specs) {
-    const p = pkg(from!, to!, dirName!, parentId);
-    packages.push(p);
-    parentId = p.manifest.migrationId;
-  }
-  return packages;
+  return specs.map(([from, to, dirName]) => pkg(from!, to!, dirName!));
 }
 
 const E = EMPTY_CONTRACT_HASH;
@@ -75,13 +70,10 @@ describe('reconstructGraph', () => {
     expect(graph.forwardChain.get('H2')).toHaveLength(1);
   });
 
-  it('builds migrationById and childrenByParentId indexes', () => {
+  it('builds migrationById index', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
     expect(graph.migrationById.size).toBe(2);
-    expect(graph.childrenByParentId.get(null)).toHaveLength(1);
-    const rootMigration = graph.childrenByParentId.get(null)![0]!;
-    expect(graph.childrenByParentId.get(rootMigration.migrationId!)).toHaveLength(1);
   });
 
   it('rejects self-loop with code MIGRATION.SELF_LOOP', () => {
@@ -101,7 +93,7 @@ describe('reconstructGraph', () => {
 
   it('rejects duplicate migrationId values', () => {
     const first = pkg(E, 'H1', 'm1');
-    const secondBase = pkg('H1', 'H2', 'm2', first.manifest.migrationId);
+    const secondBase = pkg('H1', 'H2', 'm2');
     const second = {
       ...secondBase,
       manifest: {
@@ -132,29 +124,35 @@ describe('findLeaf', () => {
     expect(findLeaf(graph)).toBe('H3');
   });
 
-  it('handles revisited contract hashes (A→B→A)', () => {
+  it('throws NO_RESOLVABLE_LEAF on cycle-without-exit (A→B→A)', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2'], ['H2', 'H1', 'm3']);
     const graph = reconstructGraph(packages);
-    expect(findLeaf(graph)).toBe('H1');
+    try {
+      findLeaf(graph);
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      const mte = e as MigrationToolsError;
+      expect(mte.code).toBe('MIGRATION.NO_RESOLVABLE_LEAF');
+      expect(mte.fix).toContain('--from');
+      expect(mte.details).toHaveProperty('reachableNodes');
+    }
   });
 
-  it('handles longer revisit chains (A→B→C→A)', () => {
+  it('handles cycle with an exit node', () => {
     const packages = chain(
       [E, 'H1', 'm1'],
       ['H1', 'H2', 'm2'],
-      ['H2', 'H3', 'm3'],
-      ['H3', 'H1', 'm4'],
+      ['H2', 'H1', 'm3'],
+      ['H1', 'H3', 'm4'],
     );
     const graph = reconstructGraph(packages);
-    expect(findLeaf(graph)).toBe('H1');
+    expect(findLeaf(graph)).toBe('H3');
   });
 
   it('errors on branching with code MIGRATION.AMBIGUOUS_LEAF', () => {
-    const root = chain([E, 'H1', 'm1']);
-    const rootMigrationId = root[0]!.manifest.migrationId;
-    const branch1 = pkg('H1', 'H2a', 'm2a', rootMigrationId);
-    const branch2 = pkg('H1', 'H2b', 'm2b', rootMigrationId);
-    const graph = reconstructGraph([...root, branch1, branch2]);
+    const packages = chain([E, 'H1', 'm1'], ['H1', 'H2a', 'm2a'], ['H1', 'H2b', 'm2b']);
+    const graph = reconstructGraph(packages);
     try {
       findLeaf(graph);
       expect.fail('expected error');
@@ -167,20 +165,27 @@ describe('findLeaf', () => {
       expect(mte.fix).toContain('--from');
     }
   });
+});
 
-  it('errors with MIGRATION.NO_ROOT when no root edges exist', () => {
-    const p1 = pkg('A', 'B', 'm1', 'sha256:nonexistent');
-    const graph = reconstructGraph([p1]);
-    try {
-      findLeaf(graph);
-      expect.fail('expected error');
-    } catch (e) {
-      expect(MigrationToolsError.is(e)).toBe(true);
-      const mte = e as MigrationToolsError;
-      expect(mte.code).toBe('MIGRATION.NO_ROOT');
-      expect(mte.category).toBe('MIGRATION');
-      expect(mte.details).toHaveProperty('nodes');
-    }
+describe('findReachableLeaves', () => {
+  it('returns single leaf for linear chain', () => {
+    const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
+    const graph = reconstructGraph(packages);
+    expect(findReachableLeaves(graph, E)).toEqual(['H2']);
+  });
+
+  it('returns multiple leaves for branching graph', () => {
+    const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2'], ['H1', 'H3', 'm3']);
+    const graph = reconstructGraph(packages);
+    const leaves = findReachableLeaves(graph, E);
+    expect(leaves).toHaveLength(2);
+    expect(leaves).toContain('H2');
+    expect(leaves).toContain('H3');
+  });
+
+  it('returns start node if it has no outgoing edges', () => {
+    const graph = reconstructGraph([]);
+    expect(findReachableLeaves(graph, 'orphan')).toEqual(['orphan']);
   });
 });
 
@@ -197,15 +202,6 @@ describe('findLatestMigration', () => {
     expect(latest).not.toBeNull();
     expect(latest!.dirName).toBe('m2');
     expect(latest!.to).toBe('H2');
-  });
-
-  it('returns the latest migration for revisited hashes', () => {
-    const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2'], ['H2', 'H1', 'm3']);
-    const graph = reconstructGraph(packages);
-    const latest = findLatestMigration(graph);
-    expect(latest).not.toBeNull();
-    expect(latest!.dirName).toBe('m3');
-    expect(latest!.to).toBe('H1');
   });
 });
 
@@ -232,22 +228,18 @@ describe('findPath', () => {
     expect(path).toEqual([]);
   });
 
-  it('finds path through revisited hashes (A→B→A)', () => {
-    const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2'], ['H2', 'H1', 'm3']);
+  it('finds shortest path when multiple paths exist', () => {
+    const packages = [
+      pkg(E, 'H1', 'm1'),
+      pkg('H1', 'H2', 'm2'),
+      pkg('H2', 'H3', 'm3'),
+      pkg('H1', 'H3', 'm_shortcut'),
+    ];
     const graph = reconstructGraph(packages);
-
-    const fullPath = findPath(graph, E, 'H1');
-    expect(fullPath).not.toBeNull();
-    expect(fullPath!.map((e) => e.dirName)).toEqual(['m1', 'm2', 'm3']);
-  });
-
-  it('finds partial path from intermediate hash to leaf with revisit', () => {
-    const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2'], ['H2', 'H1', 'm3']);
-    const graph = reconstructGraph(packages);
-
-    const partial = findPath(graph, 'H2', 'H1');
-    expect(partial).not.toBeNull();
-    expect(partial!.map((e) => e.dirName)).toEqual(['m3']);
+    const path = findPath(graph, 'H1', 'H3');
+    expect(path).not.toBeNull();
+    expect(path!).toHaveLength(1);
+    expect(path![0]!.dirName).toBe('m_shortcut');
   });
 
   it('finds sub-path in middle of chain', () => {
@@ -264,6 +256,16 @@ describe('findPath', () => {
     const path = findPath(graph, 'H0', 'H2');
     expect(path).not.toBeNull();
     expect(path!.map((e) => e.dirName)).toEqual(['m1', 'm2']);
+  });
+
+  it('uses deterministic tie-breaking (createdAt ascending)', () => {
+    const early = pkg('H1', 'H2', 'm_early', '2026-01-01T00:00:00.000Z');
+    const late = pkg('H1', 'H2', 'm_late', '2026-12-01T00:00:00.000Z');
+    const graph = reconstructGraph([pkg(E, 'H1', 'm0'), early, late]);
+    const path = findPath(graph, 'H1', 'H2');
+    expect(path).not.toBeNull();
+    expect(path!).toHaveLength(1);
+    expect(path![0]!.dirName).toBe('m_early');
   });
 });
 
@@ -311,5 +313,88 @@ describe('detectOrphans', () => {
     const packages = chain(['H0', 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
     expect(detectOrphans(graph)).toEqual([]);
+  });
+});
+
+describe('findPathWithDecision', () => {
+  it('returns no-op decision when from === to', () => {
+    const packages = chain([E, 'H1', 'm1']);
+    const graph = reconstructGraph(packages);
+    const decision = findPathWithDecision(graph, 'H1', 'H1');
+    expect(decision).not.toBeNull();
+    expect(decision!.selectedPath).toEqual([]);
+    expect(decision!.fromHash).toBe('H1');
+    expect(decision!.toHash).toBe('H1');
+    expect(decision!.alternativeCount).toBe(0);
+    expect(decision!.tieBreakReasons).toEqual([]);
+  });
+
+  it('returns null when no path exists', () => {
+    const packages = chain([E, 'H1', 'm1']);
+    const graph = reconstructGraph(packages);
+    expect(findPathWithDecision(graph, 'H1', 'H99')).toBeNull();
+  });
+
+  it('includes ref metadata when provided', () => {
+    const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
+    const graph = reconstructGraph(packages);
+    const decision = findPathWithDecision(graph, 'H1', 'H2', 'production');
+    expect(decision).not.toBeNull();
+    expect(decision!.refName).toBe('production');
+  });
+
+  it('omits ref metadata when not provided', () => {
+    const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
+    const graph = reconstructGraph(packages);
+    const decision = findPathWithDecision(graph, 'H1', 'H2');
+    expect(decision).not.toBeNull();
+    expect(decision!.refName).toBeUndefined();
+  });
+
+  it('reports alternative count for converging paths', () => {
+    const packages = [
+      pkg(E, 'H1', 'm1'),
+      pkg('H1', 'H2', 'm2'),
+      pkg('H2', 'H3', 'm3'),
+      pkg('H1', 'H3', 'm_shortcut'),
+    ];
+    const graph = reconstructGraph(packages);
+    const decision = findPathWithDecision(graph, 'H1', 'H3');
+    expect(decision).not.toBeNull();
+    expect(decision!.selectedPath).toHaveLength(1);
+    expect(decision!.alternativeCount).toBeGreaterThan(0);
+  });
+
+  it('output shape matches expected keys', () => {
+    const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
+    const graph = reconstructGraph(packages);
+    const decision = findPathWithDecision(graph, E, 'H2', 'staging');
+    expect(decision).not.toBeNull();
+    expect(Object.keys(decision!).sort()).toMatchInlineSnapshot(`
+      [
+        "alternativeCount",
+        "fromHash",
+        "refName",
+        "selectedPath",
+        "tieBreakReasons",
+        "toHash",
+      ]
+    `);
+  });
+
+  it('output shape without ref matches expected keys', () => {
+    const packages = chain([E, 'H1', 'm1']);
+    const graph = reconstructGraph(packages);
+    const decision = findPathWithDecision(graph, E, 'H1');
+    expect(decision).not.toBeNull();
+    expect(Object.keys(decision!).sort()).toMatchInlineSnapshot(`
+      [
+        "alternativeCount",
+        "fromHash",
+        "selectedPath",
+        "tieBreakReasons",
+        "toHash",
+      ]
+    `);
   });
 });

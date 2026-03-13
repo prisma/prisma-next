@@ -40,13 +40,11 @@ function createManifest(
   to: string,
   toContract: ContractIR,
   fromContract: ContractIR | null = null,
-  parentMigrationId: string | null = null,
 ): MigrationManifest {
   return {
     from,
     to,
     migrationId: null,
-    parentMigrationId,
     kind: 'regular',
     fromContract,
     toContract,
@@ -114,22 +112,22 @@ async function setupChain(migrationsDir: string) {
     createManifest(EMPTY_CONTRACT_HASH, 'sha256:hash-a', contractA),
     [createOp('table.user', 'Create table "user"', 'additive')],
   );
-  const migrationId1 = await attestMigration(path1);
+  await attestMigration(path1);
 
   const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_email');
   const path2 = join(migrationsDir, dir2);
   await writeMigrationPackage(
     path2,
-    createManifest('sha256:hash-a', 'sha256:hash-b', contractB, contractA, migrationId1),
+    createManifest('sha256:hash-a', 'sha256:hash-b', contractB, contractA),
     [createOp('column.user.email', 'Add column "email" on "user"', 'additive')],
   );
-  const migrationId2 = await attestMigration(path2);
+  await attestMigration(path2);
 
   const dir3 = formatMigrationDirName(new Date(2026, 0, 3, 10, 0), 'add_post');
   const path3 = join(migrationsDir, dir3);
   await writeMigrationPackage(
     path3,
-    createManifest('sha256:hash-b', 'sha256:hash-c', contractC, contractB, migrationId2),
+    createManifest('sha256:hash-b', 'sha256:hash-c', contractC, contractB),
     [
       createOp('table.post', 'Create table "post"', 'additive'),
       createOp('column.post.legacy', 'Drop column "legacy" on "post"', 'destructive'),
@@ -283,7 +281,7 @@ describe('formatMigrationStatusOutput', () => {
             status: 'unknown',
           },
         ],
-        leafHash: 'sha256:hash-b',
+        targetHash: 'sha256:hash-b',
         contractHash: 'sha256:hash-b',
         summary: '2 migration(s) on disk',
       },
@@ -324,7 +322,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         markerHash: 'sha256:hash-a',
-        leafHash: 'sha256:hash-b',
+        targetHash: 'sha256:hash-b',
         contractHash: 'sha256:hash-b',
         summary: "1 pending migration(s) — run 'prisma-next migration apply' to apply",
       },
@@ -355,7 +353,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         markerHash: 'sha256:hash-a',
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary: 'Database is up to date (1 migration applied)',
       },
@@ -386,7 +384,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         markerHash: 'sha256:totally-different',
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary:
           "Database marker does not match any migration — was the database managed with 'db update'?",
@@ -416,7 +414,7 @@ describe('formatMigrationStatusOutput', () => {
             status: 'unknown',
           },
         ],
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-b',
         summary: '1 migration(s) on disk',
         diagnostics: [
@@ -453,7 +451,7 @@ describe('formatMigrationStatusOutput', () => {
             status: 'unknown',
           },
         ],
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary: '1 migration(s) on disk',
         diagnostics: [
@@ -489,7 +487,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         markerHash: 'sha256:hash-a',
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary: 'Database is up to date (1 migration applied)',
         diagnostics: [
@@ -524,7 +522,7 @@ describe('formatMigrationStatusOutput', () => {
             status: 'unknown',
           },
         ],
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary: '1 migration(s) on disk',
       },
@@ -541,7 +539,7 @@ describe('formatMigrationStatusOutput', () => {
       {
         mode: 'offline',
         migrations: [],
-        leafHash: EMPTY_CONTRACT_HASH,
+        targetHash: EMPTY_CONTRACT_HASH,
         contractHash: EMPTY_CONTRACT_HASH,
         summary: 'No migrations found',
       },
@@ -559,7 +557,7 @@ describe('formatMigrationStatusOutput', () => {
       {
         mode: 'online',
         migrations: [],
-        leafHash: EMPTY_CONTRACT_HASH,
+        targetHash: EMPTY_CONTRACT_HASH,
         contractHash: 'sha256:some-new-hash',
         summary: 'No migrations found',
         markerHash: EMPTY_CONTRACT_HASH,
@@ -589,7 +587,7 @@ describe('formatMigrationStatusOutput', () => {
       {
         mode: 'offline',
         migrations: [],
-        leafHash: EMPTY_CONTRACT_HASH,
+        targetHash: EMPTY_CONTRACT_HASH,
         contractHash: EMPTY_CONTRACT_HASH,
         summary: 'No migrations found',
       },

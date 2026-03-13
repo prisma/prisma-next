@@ -1,14 +1,21 @@
 import { readFile } from 'node:fs/promises';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
-import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import {
+  findLeaf,
+  findPath,
+  findPathWithDecision,
+  reconstructGraph,
+} from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
   MigrationChainEntry,
   MigrationGraph,
   MigrationPackage,
 } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -32,6 +39,7 @@ import { TerminalUI } from '../utils/terminal-ui';
 interface MigrationStatusOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
+  readonly ref?: string;
 }
 
 export interface MigrationStatusEntry {
@@ -57,8 +65,23 @@ export interface MigrationStatusResult {
   readonly mode: 'online' | 'offline';
   readonly migrations: readonly MigrationStatusEntry[];
   readonly markerHash?: string;
-  readonly leafHash: string;
+  readonly targetHash: string;
   readonly contractHash: string;
+  readonly refName?: string;
+  readonly refHash?: string;
+  readonly pathDecision?: {
+    readonly fromHash: string;
+    readonly toHash: string;
+    readonly alternativeCount: number;
+    readonly tieBreakReasons: readonly string[];
+    readonly refName?: string;
+    readonly selectedPath: readonly {
+      readonly dirName: string;
+      readonly migrationId: string | null;
+      readonly from: string;
+      readonly to: string;
+    }[];
+  };
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
 }
@@ -140,6 +163,40 @@ export function buildMigrationEntries(
   return entries;
 }
 
+/**
+ * Resolve the migration chain to display in status output.
+ *
+ * When offline or the marker is at EMPTY, the chain is simply the shortest
+ * path from EMPTY to the target — all structural paths are equivalent per
+ * the spec, so the deterministic shortest path is the canonical display.
+ *
+ * When online with a non-empty marker, the chain routes *through* the marker:
+ * EMPTY→marker (applied history) + marker→target (pending edges). This ensures
+ * the displayed chain includes the marker node so applied/pending status is
+ * correct. Without this, BFS from EMPTY to target could pick a shortest path
+ * that bypasses the marker entirely (e.g. in a diamond graph), causing the
+ * marker to appear "diverged" when it isn't.
+ */
+function resolveDisplayChain(
+  graph: MigrationGraph,
+  targetHash: string,
+  markerHash: string | undefined,
+): readonly MigrationChainEntry[] | null {
+  if (markerHash === undefined || markerHash === EMPTY_CONTRACT_HASH) {
+    return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+  }
+
+  const toMarker = findPath(graph, EMPTY_CONTRACT_HASH, markerHash);
+  if (!toMarker) return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+
+  if (markerHash === targetHash) return toMarker;
+
+  const fromMarker = findPath(graph, markerHash, targetHash);
+  if (!fromMarker) return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+
+  return [...toMarker, ...fromMarker];
+}
+
 async function executeMigrationStatusCommand(
   options: MigrationStatusOptions,
   flags: GlobalFlags,
@@ -159,6 +216,28 @@ async function executeMigrationStatusCommand(
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
 
+  let refName: string | undefined;
+  let refHash: string | undefined;
+  if (options.ref) {
+    refName = options.ref;
+    const refsPath = resolve(migrationsDir, 'refs.json');
+    try {
+      const refs = await readRefs(refsPath);
+      refHash = resolveRef(refs, refName);
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(
+          errorRuntime(error.message, {
+            why: error.why,
+            fix: error.fix,
+            meta: { code: error.code },
+          }),
+        );
+      }
+      throw error;
+    }
+  }
+
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
@@ -166,6 +245,9 @@ async function executeMigrationStatusCommand(
     ];
     if (dbConnection && hasDriver) {
       details.push({ label: 'database', value: maskConnectionUrl(String(dbConnection)) });
+    }
+    if (refName) {
+      details.push({ label: 'ref', value: refName });
     }
     const header = formatStyledHeader({
       command: 'migration status',
@@ -244,7 +326,7 @@ async function executeMigrationStatusCommand(
       ok: true,
       mode: dbConnection && hasDriver ? 'online' : 'offline',
       migrations: [],
-      leafHash: EMPTY_CONTRACT_HASH,
+      targetHash: EMPTY_CONTRACT_HASH,
       contractHash,
       summary: 'No migrations found',
       diagnostics,
@@ -252,10 +334,10 @@ async function executeMigrationStatusCommand(
   }
 
   let graph: MigrationGraph;
-  let leafHash: string;
+  let targetHash: string;
   try {
     graph = reconstructGraph(attested);
-    leafHash = findLeaf(graph);
+    targetHash = refHash ?? findLeaf(graph);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -263,16 +345,6 @@ async function executeMigrationStatusCommand(
       );
     }
     throw error;
-  }
-
-  const chain = findPath(graph, EMPTY_CONTRACT_HASH, leafHash);
-  if (!chain) {
-    return notOk(
-      errorRuntime('Cannot reconstruct migration chain', {
-        why: `No path from ${EMPTY_CONTRACT_HASH} to leaf ${leafHash}`,
-        fix: 'The migration history may have gaps. Check the migrations directory for missing or corrupted packages.',
-      }),
-    );
   }
 
   let markerHash: string | undefined;
@@ -302,6 +374,17 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  const chain = resolveDisplayChain(graph, targetHash, mode === 'online' ? markerHash : undefined);
+
+  if (!chain) {
+    return notOk(
+      errorRuntime('Cannot reconstruct migration chain', {
+        why: `No path from ${EMPTY_CONTRACT_HASH} to target ${targetHash}`,
+        fix: 'The migration history may have gaps. Check the migrations directory for missing or corrupted packages.',
+      }),
+    );
+  }
+
   const entries = buildMigrationEntries(
     chain,
     attested,
@@ -317,6 +400,8 @@ async function executeMigrationStatusCommand(
   if (mode === 'online') {
     if (!markerInChain) {
       summary = `Database marker does not match any migration — was the database managed with 'db update'?`;
+    } else if (refHash && markerHash !== undefined) {
+      summary = summarizeRefDistance(graph, markerHash, refHash, refName!);
     } else {
       const pendingCount = entries.filter((e) => e.status === 'pending').length;
       const appliedCount = entries.filter((e) => e.status === 'applied').length;
@@ -332,7 +417,7 @@ async function executeMigrationStatusCommand(
     summary = `${entries.length} migration(s) on disk`;
   }
 
-  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== leafHash) {
+  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== targetHash) {
     diagnostics.push({
       code: 'CONTRACT.AHEAD',
       severity: 'warn',
@@ -370,15 +455,38 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  let pathDecision: MigrationStatusResult['pathDecision'];
+  if (mode === 'online' && markerHash !== undefined) {
+    const decision = findPathWithDecision(graph, markerHash, targetHash, refName);
+    if (decision) {
+      pathDecision = {
+        fromHash: decision.fromHash,
+        toHash: decision.toHash,
+        alternativeCount: decision.alternativeCount,
+        tieBreakReasons: decision.tieBreakReasons,
+        ...ifDefined('refName', decision.refName),
+        selectedPath: decision.selectedPath.map((entry) => ({
+          dirName: entry.dirName,
+          migrationId: entry.migrationId,
+          from: entry.from,
+          to: entry.to,
+        })),
+      };
+    }
+  }
+
   const result: MigrationStatusResult = {
     ok: true,
     mode,
     migrations: entries,
-    leafHash,
+    targetHash,
     contractHash,
     summary,
     diagnostics,
-    ...(markerHash !== undefined ? { markerHash } : {}),
+    ...ifDefined('markerHash', markerHash),
+    ...ifDefined('refName', refName),
+    ...ifDefined('refHash', refHash),
+    ...(pathDecision ? { pathDecision } : {}),
   };
   return ok(result);
 }
@@ -399,6 +507,7 @@ export function createMigrationStatusCommand(): Command {
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
+    .option('--ref <name>', 'Target ref name from migrations/refs.json')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
 
@@ -418,4 +527,21 @@ export function createMigrationStatusCommand(): Command {
     });
 
   return command;
+}
+
+function summarizeRefDistance(
+  graph: MigrationGraph,
+  markerHash: string,
+  refHash: string,
+  refName: string,
+): string {
+  if (markerHash === refHash) return `At ref "${refName}" target`;
+
+  const pathToRef = findPath(graph, markerHash, refHash);
+  if (pathToRef) return `${pathToRef.length} edge(s) behind ref "${refName}"`;
+
+  const pathFromRef = findPath(graph, refHash, markerHash);
+  if (pathFromRef) return `${pathFromRef.length} edge(s) ahead of ref "${refName}"`;
+
+  return `No path between marker and ref "${refName}" target`;
 }
