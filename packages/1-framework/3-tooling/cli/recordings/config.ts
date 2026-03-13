@@ -93,7 +93,7 @@ export interface RecordingsConfig {
 export const config: RecordingsConfig = {
   vhs: {
     shell: 'bash',
-    width: 1480,
+    width: 1160,
     height: 750,
     fontSize: 16,
     fontFamily: 'JetBrains Mono',
@@ -248,6 +248,14 @@ export const config: RecordingsConfig = {
           dbState: 'initialized, schema matches contract',
           sleepAfterEnter: '10s',
         },
+        {
+          ordinal: '11',
+          slug: 'db-verify-jq',
+          command: "prisma-next db verify | jq '.contract'",
+          description: 'Pipe structured output to jq (auto-JSON when piped)',
+          dbState: 'initialized, marker matches contract',
+          sleepAfterEnter: '5s',
+        },
       ],
     },
 
@@ -398,15 +406,23 @@ export const config: RecordingsConfig = {
       steps: [
         {
           ordinal: '01',
-          slug: 'db-verify-false-positive',
+          slug: 'db-verify-fail',
           command: 'prisma-next db verify',
-          description: 'Verify passes — marker is stale but hash still matches!',
+          description: 'Verify catches drift — structural schema check detects missing column',
           dbState: 'manual DDL dropped email column, marker untouched',
           before: [{ type: 'sql', query: 'ALTER TABLE "user" DROP COLUMN "email"' }],
           sleepAfterEnter: '10s',
         },
         {
           ordinal: '02',
+          slug: 'db-verify-fast-pass',
+          command: 'prisma-next db verify --fast',
+          description: 'Marker-only verification still passes — hash unchanged',
+          dbState: 'email column dropped, marker row untouched',
+          sleepAfterEnter: '10s',
+        },
+        {
+          ordinal: '03',
           slug: 'db-schema-verify-fail',
           command: 'prisma-next db schema-verify',
           description: 'Schema verify catches the drift — missing email column',
@@ -414,7 +430,7 @@ export const config: RecordingsConfig = {
           sleepAfterEnter: '10s',
         },
         {
-          ordinal: '03',
+          ordinal: '04',
           slug: 'db-introspect-diverged',
           command: 'prisma-next db introspect',
           description: 'Introspect shows schema without email column',
@@ -422,20 +438,12 @@ export const config: RecordingsConfig = {
           sleepAfterEnter: '10s',
         },
         {
-          ordinal: '04',
-          slug: 'db-update-recovery',
-          command: 'prisma-next db update',
-          description: 'Recovery — re-add missing column, re-sign marker',
+          ordinal: '05',
+          slug: 'db-update-fail',
+          command: 'prisma-next db update -y',
+          description: 'Recovery fails — cannot re-add NOT NULL column without default',
           dbState: 'email column missing, contract expects it',
           sleepAfterEnter: '12s',
-        },
-        {
-          ordinal: '05',
-          slug: 'db-schema-verify-pass',
-          command: 'prisma-next db schema-verify',
-          description: 'Schema verify passes after recovery',
-          dbState: 'schema restored, marker matches contract',
-          sleepAfterEnter: '10s',
         },
       ],
     },

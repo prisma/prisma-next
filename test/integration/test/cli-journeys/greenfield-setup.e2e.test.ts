@@ -11,6 +11,7 @@
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { parseGlobalFlags } from '../../../../packages/1-framework/3-tooling/cli/src/utils/global-flags';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -115,6 +116,17 @@ withTempDir(({ createTempDir }) => {
         expect(schemaVerifyJson.exitCode, 'A.10: db schema-verify json').toBe(0);
         const svData = parseJsonOutput(schemaVerifyJson);
         expect(svData, 'A.10: json ok').toMatchObject({ ok: true });
+
+        // A.11: auto-JSON when stdout is piped (isTTY = false)
+        const savedIsTTY = process.stdout.isTTY;
+        try {
+          (process.stdout as { isTTY?: boolean }).isTTY = undefined;
+          const pipedFlags = parseGlobalFlags({});
+          expect(pipedFlags.json, 'A.11: auto-json when piped').toBe(true);
+          expect(pipedFlags.interactive, 'A.11: non-interactive when piped').toBe(false);
+        } finally {
+          process.stdout.isTTY = savedIsTTY;
+        }
       },
       timeouts.spinUpPpgDev,
     );
