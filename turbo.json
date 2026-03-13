@@ -15,6 +15,11 @@
       "inputs": ["src/**", "test/**", "dist/**"],
       "env": ["TEST_TIMEOUT_MULTIPLIER"]
     },
+    "test:journeys": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "test/**", "dist/**"],
+      "env": ["TEST_TIMEOUT_MULTIPLIER"]
+    },
     "test:coverage": {
       "dependsOn": ["^build"],
       "inputs": ["src/**", "test/**", "dist/**"],
