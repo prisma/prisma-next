@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
@@ -11,7 +11,9 @@ import {
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
@@ -729,5 +731,116 @@ describe('resolveDisplayChain', { timeout: timeouts.databaseOperation }, () => {
     expect(chain).not.toBeNull();
     expect(chain!.length).toBe(2);
     expect(chain![1]!.to).toBe('sha256:hash-b');
+  });
+});
+
+describe('readRefs error surface (F01/F04)', () => {
+  it('returns empty object for missing refs.json', async () => {
+    const tempDir = await createTempDir('missing-refs');
+    const refs = await readRefs(join(tempDir, 'refs.json'));
+    expect(refs).toEqual({});
+  });
+
+  it('throws MigrationToolsError for malformed JSON', async () => {
+    const tempDir = await createTempDir('bad-json');
+    const refsPath = join(tempDir, 'refs.json');
+    await writeFile(refsPath, '{ not valid json !!!');
+
+    await expect(readRefs(refsPath)).rejects.toSatisfy((error: unknown) => {
+      return (
+        MigrationToolsError.is(error) &&
+        error.code === 'MIGRATION.INVALID_REFS' &&
+        error.message.includes('Invalid refs.json')
+      );
+    });
+  });
+
+  it('throws MigrationToolsError for invalid ref names', async () => {
+    const tempDir = await createTempDir('bad-names');
+    const refsPath = join(tempDir, 'refs.json');
+    await writeFile(refsPath, JSON.stringify({ 'UPPER-CASE': 'sha256:empty' }));
+
+    await expect(readRefs(refsPath)).rejects.toSatisfy((error: unknown) => {
+      return MigrationToolsError.is(error) && error.code === 'MIGRATION.INVALID_REFS';
+    });
+  });
+
+  it('throws MigrationToolsError for invalid ref values', async () => {
+    const tempDir = await createTempDir('bad-values');
+    const refsPath = join(tempDir, 'refs.json');
+    await writeFile(refsPath, JSON.stringify({ staging: 'not-a-hash' }));
+
+    await expect(readRefs(refsPath)).rejects.toSatisfy((error: unknown) => {
+      return MigrationToolsError.is(error) && error.code === 'MIGRATION.INVALID_REFS';
+    });
+  });
+});
+
+describe('CONTRACT.AHEAD diagnostic under --ref (F04)', () => {
+  it('emits CONTRACT.AHEAD when contract differs from target in non-ref mode', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'offline',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            migrationId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'unknown',
+          },
+        ],
+        targetHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-b',
+        summary: '1 migration(s) on disk',
+        diagnostics: [
+          {
+            code: 'CONTRACT.AHEAD',
+            severity: 'warn',
+            message: 'Contract has changed since the last migration was planned',
+            hints: [
+              "Run 'prisma-next migration plan' to generate a migration for the current contract",
+            ],
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('Contract is ahead');
+    expect(stripped).toContain('migration plan');
+  });
+
+  it('suppresses CONTRACT.AHEAD hint in ref mode (contract ahead of ref is expected)', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'online',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            migrationId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'applied',
+          },
+        ],
+        markerHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-b',
+        refs: [{ name: 'production', hash: 'sha256:hash-a', active: true }],
+        summary: 'At ref "production" target',
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).not.toContain('Contract is ahead');
+    expect(stripped).toContain('◄ Contract');
+    expect(stripped).toContain('At ref "production" target');
   });
 });

@@ -228,8 +228,17 @@ async function executeMigrationStatusCommand(
   const refsPath = resolve(migrationsDir, 'refs.json');
   try {
     allRefs = await readRefs(refsPath);
-  } catch {
-    // refs.json missing or unreadable — not an error, just no refs
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      return notOk(
+        errorRuntime(error.message, {
+          why: error.why,
+          fix: error.fix,
+          meta: { code: error.code },
+        }),
+      );
+    }
+    throw error;
   }
 
   if (options.ref) {
@@ -435,7 +444,7 @@ async function executeMigrationStatusCommand(
     summary = `${entries.length} migration(s) on disk`;
   }
 
-  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== targetHash) {
+  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== targetHash && !activeRefHash) {
     diagnostics.push({
       code: 'CONTRACT.AHEAD',
       severity: 'warn',

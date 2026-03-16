@@ -383,7 +383,12 @@ export function formatMigrationStatusOutput(
       if (isLast && entry.to === result.contractHash) {
         marker += `  ${formatCyan('◄ Contract')}`;
       } else if (isLast && result.contractHash !== entry.to) {
-        marker += `  ${formatYellow('◄ Contract is ahead — run migration plan')}`;
+        const hasActiveRef = result.refs?.some((r) => r.active);
+        if (hasActiveRef) {
+          marker += `  ${formatCyan('◄ Contract')}`;
+        } else {
+          marker += `  ${formatYellow('◄ Contract is ahead — run migration plan')}`;
+        }
       }
 
       lines.push(`${formatDimText(treeChar)}─ ${entry.dirName}${statusBadge}${marker}`);
