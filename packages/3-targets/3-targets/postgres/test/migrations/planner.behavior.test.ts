@@ -4,8 +4,8 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import {
+  buildTypeZeroDefaultLiteral,
   createPostgresMigrationPlanner,
-  getTypeZeroDefault,
 } from '../../src/core/migrations/planner';
 
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
@@ -346,7 +346,7 @@ describe('NOT NULL column without default uses temporary default', () => {
   });
 });
 
-describe('getTypeZeroDefault', () => {
+describe('buildTypeZeroDefaultLiteral', () => {
   it.each([
     ['text', "''"],
     ['character', "''"],
@@ -377,13 +377,13 @@ describe('getTypeZeroDefault', () => {
     ['bit', "B'0'"],
     ['bit varying', "B''"],
   ] as const)('returns %s → %s', (nativeType, expected) => {
-    expect(getTypeZeroDefault(nativeType)).toBe(expected);
+    expect(buildTypeZeroDefaultLiteral(nativeType)).toBe(expected);
   });
 
   it('returns null for unknown types (enum, array, extension)', () => {
-    expect(getTypeZeroDefault('my_enum')).toBeNull();
-    expect(getTypeZeroDefault('int4[]')).toBeNull();
-    expect(getTypeZeroDefault('tsvector')).toBeNull();
+    expect(buildTypeZeroDefaultLiteral('my_enum')).toBeNull();
+    expect(buildTypeZeroDefaultLiteral('int4[]')).toBeNull();
+    expect(buildTypeZeroDefaultLiteral('tsvector')).toBeNull();
   });
 });
 

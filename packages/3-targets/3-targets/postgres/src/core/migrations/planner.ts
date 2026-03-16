@@ -351,7 +351,9 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     // default is dropped immediately after the column is added, leaving the column as
     // NOT NULL with no default (matching the contract intent).
     const needsTemporaryDefault = notNull && !hasDefault;
-    const temporaryDefault = needsTemporaryDefault ? getTypeZeroDefault(column.nativeType) : null;
+    const temporaryDefault = needsTemporaryDefault
+      ? buildTypeZeroDefaultLiteral(column.nativeType)
+      : null;
     const precheck = [
       {
         description: `ensure column "${columnName}" is missing`,
@@ -1021,7 +1023,7 @@ function columnHasNoDefaultCheck(opts: { schema: string; table: string; column: 
  *
  * @internal Exported for testing only.
  */
-export function getTypeZeroDefault(nativeType: string): string | null {
+export function buildTypeZeroDefaultLiteral(nativeType: string): string | null {
   switch (nativeType.toLowerCase()) {
     // String types
     case 'text':
@@ -1029,23 +1031,17 @@ export function getTypeZeroDefault(nativeType: string): string | null {
     case 'character varying':
       return "''";
 
-    // Integer types
+    // Numeric types (integer, float, decimal)
     case 'int2':
     case 'int4':
     case 'int8':
     case 'integer':
     case 'bigint':
     case 'smallint':
-      return '0';
-
-    // Float types
     case 'float4':
     case 'float8':
     case 'real':
     case 'double precision':
-      return '0';
-
-    // Numeric/decimal
     case 'numeric':
     case 'decimal':
       return '0';
