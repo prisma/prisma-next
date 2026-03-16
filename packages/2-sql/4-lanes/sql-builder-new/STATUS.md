@@ -20,12 +20,12 @@ A type-level-only SQL query builder DSL with no runtime implementation. Validate
 - **Comparison operators**: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`
 - **Logical operators**: `and`, `or`
 - **Subquery predicates**: `exists`, `notExists`, `in` (subquery or array), `notIn` (subquery or array)
+- **DISTINCT** / **DISTINCT ON (expr, ...)**
 
 ## What's missing
 
 ### Clauses
 
-- **DISTINCT** / **DISTINCT ON (expr, ...)**
 - **WITH** (common table expressions) / **WITH RECURSIVE**
 - **UNION** / **INTERSECT** / **EXCEPT** (and their `ALL` variants)
 - **FOR UPDATE / FOR SHARE / FOR NO KEY UPDATE / FOR KEY SHARE** (row locking)

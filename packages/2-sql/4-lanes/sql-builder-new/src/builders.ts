@@ -133,6 +133,23 @@ export interface TableProxy<
   ): TableProxy<CodecTypes, Name, Table, Alias, AvailableScope>;
 }
 
+export interface Distinctable<
+  CodecTypes extends CodecTypesBase,
+  AvailableScope extends Scope,
+  RowType extends Record<string, ScopeField>,
+> {
+  distinct(): this;
+
+  distinctOn(...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]): this;
+
+  distinctOn(
+    expr: (
+      fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
+      fns: Functions<CodecTypes>,
+    ) => Expression<ScopeField>,
+  ): this;
+}
+
 export interface Paginatable<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
   limit(count: number): this;
   limit(
@@ -167,6 +184,7 @@ export interface SelectQuery<
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
 > extends SelectCapable<CodecTypes, AvailableScope, RowType>,
+    Distinctable<CodecTypes, AvailableScope, RowType>,
     Paginatable<CodecTypes, AvailableScope>,
     Aliasable<RowType>,
     Executable<CodecTypes, RowType>,
@@ -204,7 +222,8 @@ export interface GroupedQuery<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-> extends Paginatable<CodecTypes, AvailableScope>,
+> extends Distinctable<CodecTypes, AvailableScope, RowType>,
+    Paginatable<CodecTypes, AvailableScope>,
     Aliasable<RowType>,
     Executable<CodecTypes, RowType>,
     Subquery<RowType> {
