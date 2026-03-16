@@ -132,10 +132,22 @@ export interface TableProxy<
   ): TableProxy<CodecTypes, Name, Table, Alias, AvailableScope>;
 }
 
-export interface Paginatable {
+export interface Paginatable<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
   limit(count: number): this;
+  limit(
+    expr: (
+      fields: FieldProxy<AvailableScope>,
+      fns: Functions<CodecTypes>,
+    ) => Expression<ScopeField>,
+  ): this;
 
   offset(count: number): this;
+  offset(
+    expr: (
+      fields: FieldProxy<AvailableScope>,
+      fns: Functions<CodecTypes>,
+    ) => Expression<ScopeField>,
+  ): this;
 }
 
 export interface Aliasable<RowType extends Record<string, ScopeField>> {
@@ -154,7 +166,7 @@ export interface SelectQuery<
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
 > extends SelectCapable<CodecTypes, AvailableScope, RowType>,
-    Paginatable,
+    Paginatable<CodecTypes, AvailableScope>,
     Aliasable<RowType>,
     Executable<CodecTypes, RowType> {
   where(
@@ -190,7 +202,7 @@ export interface GroupedQuery<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-> extends Paginatable,
+> extends Paginatable<CodecTypes, AvailableScope>,
     Aliasable<RowType>,
     Executable<CodecTypes, RowType> {
   groupBy(
