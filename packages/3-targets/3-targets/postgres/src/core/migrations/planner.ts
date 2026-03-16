@@ -400,6 +400,14 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
             },
           ]
         : []),
+      ...(temporaryDefault
+        ? [
+            {
+              description: `verify column "${columnName}" has no default after temporary default removal`,
+              sql: columnHasNoDefaultCheck({ schema, table: tableName, column: columnName }),
+            },
+          ]
+        : []),
     ];
 
     return {
@@ -992,6 +1000,17 @@ function tableIsEmptyCheck(qualifiedTableName: string): string {
   return `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedTableName} LIMIT 1)`;
 }
 
+function columnHasNoDefaultCheck(opts: { schema: string; table: string; column: string }): string {
+  return `SELECT NOT EXISTS (
+  SELECT 1
+  FROM information_schema.columns
+  WHERE table_schema = '${escapeLiteral(opts.schema)}'
+    AND table_name = '${escapeLiteral(opts.table)}'
+    AND column_name = '${escapeLiteral(opts.column)}'
+    AND column_default IS NOT NULL
+)`;
+}
+
 /**
  * Returns a type-appropriate zero-value SQL literal for the given PostgreSQL native type.
  * Used as a temporary DEFAULT when adding a NOT NULL column without an explicit default
@@ -1038,10 +1057,11 @@ export function getTypeZeroDefault(nativeType: string): string | null {
     case 'uuid':
       return "'00000000-0000-0000-0000-000000000000'";
 
-    // JSON types
+    // JSON types — use empty object rather than JSON null to avoid
+    // ambiguity with JS null when drivers deserialize the value.
     case 'json':
     case 'jsonb':
-      return "'null'";
+      return "'{}'::jsonb";
 
     // Timestamp types
     case 'timestamp':

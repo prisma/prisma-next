@@ -181,6 +181,11 @@ describe('NOT NULL column without default uses temporary default', () => {
     expect(addCol!.execute[0]!.sql).toContain("DEFAULT ''");
     expect(addCol!.execute[0]!.sql).toContain('NOT NULL');
     expect(addCol!.execute[1]!.sql).toContain('DROP DEFAULT');
+
+    // Postcheck includes verification that temporary default was removed
+    expect(addCol!.postcheck.map((p) => p.description)).toContainEqual(
+      expect.stringContaining('no default'),
+    );
   });
 
   it('emits 2-step execute for NOT NULL int4 column', () => {
@@ -361,8 +366,8 @@ describe('getTypeZeroDefault', () => {
     ['bool', 'false'],
     ['boolean', 'false'],
     ['uuid', "'00000000-0000-0000-0000-000000000000'"],
-    ['json', "'null'"],
-    ['jsonb', "'null'"],
+    ['json', "'{}'::jsonb"],
+    ['jsonb', "'{}'::jsonb"],
     ['timestamp', "'epoch'"],
     ['timestamptz', "'epoch'"],
     ['time', "'00:00:00'"],
