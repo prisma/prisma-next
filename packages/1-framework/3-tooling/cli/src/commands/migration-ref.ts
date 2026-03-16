@@ -5,16 +5,140 @@ import {
   writeRefs,
 } from '@prisma-next/migration-tools/refs';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
+import { CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import { addGlobalOptions, setCommandDescriptions } from '../utils/command-helpers';
 import { formatCommandHelp } from '../utils/formatters/help';
 import { parseGlobalFlags } from '../utils/global-flags';
+import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
+
+interface RefSetResult {
+  readonly ok: true;
+  readonly ref: string;
+  readonly hash: string;
+}
+
+interface RefGetResult {
+  readonly ok: true;
+  readonly ref: string;
+  readonly hash: string;
+}
+
+interface RefDeleteResult {
+  readonly ok: true;
+  readonly ref: string;
+  readonly deleted: true;
+}
+
+interface RefListResult {
+  readonly ok: true;
+  readonly refs: Record<string, string>;
+}
 
 function resolveRefsPath(configPath?: string, config?: { migrations?: { dir?: string } }): string {
   const base = configPath ? resolve(configPath, '..') : process.cwd();
   return resolve(base, config?.migrations?.dir ?? 'migrations', 'refs.json');
+}
+
+function mapError(error: unknown): CliStructuredError {
+  if (MigrationToolsError.is(error)) {
+    return errorRuntime(error.message, {
+      why: error.why,
+      fix: error.fix,
+      meta: { code: error.code },
+    });
+  }
+  return errorUnexpected(error instanceof Error ? error.message : String(error));
+}
+
+function errorInvalidRefName(name: string): CliStructuredError {
+  return errorRuntime(`Invalid ref name "${name}"`, {
+    why: `Ref name "${name}" does not match the required format`,
+    fix: 'Ref names must be lowercase alphanumeric with hyphens or forward slashes, no `.` or `..` segments',
+  });
+}
+
+function errorRefNotFound(name: string): CliStructuredError {
+  return errorRuntime(`Ref "${name}" does not exist`, {
+    why: `No ref named "${name}" found in refs.json`,
+    fix: `Run \`prisma-next migration ref list\` to see available refs, or \`prisma-next migration ref set ${name} <hash>\` to create it`,
+  });
+}
+
+async function executeRefSetCommand(
+  name: string,
+  hash: string,
+  options: { config?: string },
+): Promise<Result<RefSetResult, CliStructuredError>> {
+  if (!validateRefName(name)) {
+    return notOk(errorInvalidRefName(name));
+  }
+
+  try {
+    const config = await loadConfig(options.config);
+    const refsPath = resolveRefsPath(options.config, config);
+    const refs = await readRefs(refsPath);
+    const updated = { ...refs, [name]: hash };
+    await writeRefs(refsPath, updated);
+    return ok({ ok: true as const, ref: name, hash });
+  } catch (error) {
+    if (error instanceof CliStructuredError) return notOk(error);
+    return notOk(mapError(error));
+  }
+}
+
+async function executeRefGetCommand(
+  name: string,
+  options: { config?: string },
+): Promise<Result<RefGetResult, CliStructuredError>> {
+  try {
+    const config = await loadConfig(options.config);
+    const refsPath = resolveRefsPath(options.config, config);
+    const refs = await readRefs(refsPath);
+    const hash = resolveRef(refs, name);
+    return ok({ ok: true as const, ref: name, hash });
+  } catch (error) {
+    if (error instanceof CliStructuredError) return notOk(error);
+    return notOk(mapError(error));
+  }
+}
+
+async function executeRefDeleteCommand(
+  name: string,
+  options: { config?: string },
+): Promise<Result<RefDeleteResult, CliStructuredError>> {
+  try {
+    const config = await loadConfig(options.config);
+    const refsPath = resolveRefsPath(options.config, config);
+    const refs = await readRefs(refsPath);
+    if (!Object.hasOwn(refs, name)) {
+      return notOk(errorRefNotFound(name));
+    }
+    const { [name]: _, ...remaining } = refs;
+    await writeRefs(refsPath, remaining);
+    return ok({ ok: true as const, ref: name, deleted: true as const });
+  } catch (error) {
+    if (error instanceof CliStructuredError) return notOk(error);
+    return notOk(mapError(error));
+  }
+}
+
+async function executeRefListCommand(options: {
+  config?: string;
+}): Promise<Result<RefListResult, CliStructuredError>> {
+  try {
+    const config = await loadConfig(options.config);
+    const refsPath = resolveRefsPath(options.config, config);
+    const refs = await readRefs(refsPath);
+    return ok({ ok: true as const, refs });
+  } catch (error) {
+    if (error instanceof CliStructuredError) return notOk(error);
+    return notOk(mapError(error));
+  }
 }
 
 function createRefSetCommand(): Command {
@@ -35,35 +159,16 @@ function createRefSetCommand(): Command {
         options: { config?: string; json?: string | boolean; quiet?: boolean },
       ) => {
         const flags = parseGlobalFlags(options);
-
-        if (!validateRefName(name)) {
-          console.error(
-            `Invalid ref name "${name}". Names must be lowercase alphanumeric with hyphens or forward slashes.`,
-          );
-          process.exit(1);
-        }
-
-        const config = await loadConfig(options.config);
-        const refsPath = resolveRefsPath(options.config, config);
-
-        try {
-          const refs = await readRefs(refsPath);
-          const updated = { ...refs, [name]: hash };
-          await writeRefs(refsPath, updated);
-
+        const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+        const result = await executeRefSetCommand(name, hash, options);
+        const exitCode = handleResult(result, flags, ui, (value) => {
           if (flags.json) {
-            console.log(JSON.stringify({ ok: true, ref: name, hash }));
+            ui.output(JSON.stringify(value));
           } else if (!flags.quiet) {
-            console.log(`Set ref "${name}" → ${hash}`);
+            ui.output(`Set ref "${value.ref}" → ${value.hash}`);
           }
-        } catch (error) {
-          if (MigrationToolsError.is(error)) {
-            console.error(`Error: ${error.message}\n${error.fix}`);
-          } else {
-            console.error(error instanceof Error ? error.message : String(error));
-          }
-          process.exit(1);
-        }
+        });
+        process.exit(exitCode);
       },
     );
   return command;
@@ -85,26 +190,16 @@ function createRefGetCommand(): Command {
         options: { config?: string; json?: string | boolean; quiet?: boolean },
       ) => {
         const flags = parseGlobalFlags(options);
-        const config = await loadConfig(options.config);
-        const refsPath = resolveRefsPath(options.config, config);
-
-        try {
-          const refs = await readRefs(refsPath);
-          const hash = resolveRef(refs, name);
-
+        const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+        const result = await executeRefGetCommand(name, options);
+        const exitCode = handleResult(result, flags, ui, (value) => {
           if (flags.json) {
-            console.log(JSON.stringify({ ok: true, ref: name, hash }));
+            ui.output(JSON.stringify(value));
           } else {
-            console.log(hash);
+            ui.output(value.hash);
           }
-        } catch (error) {
-          if (MigrationToolsError.is(error)) {
-            console.error(`Error: ${error.message}\n${error.fix}`);
-          } else {
-            console.error(error instanceof Error ? error.message : String(error));
-          }
-          process.exit(1);
-        }
+        });
+        process.exit(exitCode);
       },
     );
   return command;
@@ -122,31 +217,16 @@ function createRefDeleteCommand(): Command {
         options: { config?: string; json?: string | boolean; quiet?: boolean },
       ) => {
         const flags = parseGlobalFlags(options);
-        const config = await loadConfig(options.config);
-        const refsPath = resolveRefsPath(options.config, config);
-
-        try {
-          const refs = await readRefs(refsPath);
-          if (!Object.hasOwn(refs, name)) {
-            console.error(`Ref "${name}" does not exist.`);
-            process.exit(1);
-          }
-          const { [name]: _, ...remaining } = refs;
-          await writeRefs(refsPath, remaining);
-
+        const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+        const result = await executeRefDeleteCommand(name, options);
+        const exitCode = handleResult(result, flags, ui, (value) => {
           if (flags.json) {
-            console.log(JSON.stringify({ ok: true, ref: name, deleted: true }));
+            ui.output(JSON.stringify(value));
           } else if (!flags.quiet) {
-            console.log(`Deleted ref "${name}"`);
+            ui.output(`Deleted ref "${value.ref}"`);
           }
-        } catch (error) {
-          if (MigrationToolsError.is(error)) {
-            console.error(`Error: ${error.message}\n${error.fix}`);
-          } else {
-            console.error(error instanceof Error ? error.message : String(error));
-          }
-          process.exit(1);
-        }
+        });
+        process.exit(exitCode);
       },
     );
   return command;
@@ -163,35 +243,35 @@ function createRefListCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (options: { config?: string; json?: string | boolean; quiet?: boolean }) => {
       const flags = parseGlobalFlags(options);
-      const config = await loadConfig(options.config);
-      const refsPath = resolveRefsPath(options.config, config);
-
-      try {
-        const refs = await readRefs(refsPath);
-        const entries = Object.entries(refs);
-
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const result = await executeRefListCommand(options);
+      const exitCode = handleResult(result, flags, ui, (value) => {
         if (flags.json) {
-          console.log(JSON.stringify({ ok: true, refs }));
+          ui.output(JSON.stringify(value));
         } else if (!flags.quiet) {
+          const entries = Object.entries(value.refs);
           if (entries.length === 0) {
-            console.log('No refs defined');
+            ui.output('No refs defined');
           } else {
-            for (const [name, hash] of entries) {
-              console.log(`${name} → ${hash}`);
+            for (const [refName, hash] of entries) {
+              ui.output(`${refName} → ${hash}`);
             }
           }
         }
-      } catch (error) {
-        if (MigrationToolsError.is(error)) {
-          console.error(`Error: ${error.message}\n${error.fix}`);
-        } else {
-          console.error(error instanceof Error ? error.message : String(error));
-        }
-        process.exit(1);
-      }
+      });
+      process.exit(exitCode);
     });
   return command;
 }
+
+export {
+  executeRefSetCommand,
+  executeRefGetCommand,
+  executeRefDeleteCommand,
+  executeRefListCommand,
+  errorInvalidRefName,
+  errorRefNotFound,
+};
 
 export function createMigrationRefCommand(): Command {
   const command = new Command('ref');
