@@ -123,226 +123,67 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
 });
 
 describe('NOT NULL column without default uses temporary default', () => {
-  const planner = createPostgresMigrationPlanner();
-
   it('emits 2-step execute (add with temp default, drop default) for NOT NULL text column', () => {
-    const contract = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
+    const addCol = planAddColumn('name', {
+      nativeType: 'text',
+      codecId: 'pg/text@1',
+      nullable: false,
     });
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
-      },
-      dependencies: [],
-    };
-
-    const result = planner.plan({
-      contract,
-      schema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') throw new Error('expected success');
-
-    const addCol = result.plan.operations.find((op) => op.id === 'column.user.name');
-    expect(addCol).toBeDefined();
 
     // No empty-table precheck
-    expect(addCol!.precheck.map((p) => p.description)).not.toContainEqual(
+    expect(addCol.precheck.map((p) => p.description)).not.toContainEqual(
       expect.stringContaining('empty'),
     );
 
     // 2-step execute: add with temporary default, then drop default
-    expect(addCol!.execute).toHaveLength(2);
-    expect(addCol!.execute[0]!.sql).toContain("DEFAULT ''");
-    expect(addCol!.execute[0]!.sql).toContain('NOT NULL');
-    expect(addCol!.execute[1]!.sql).toContain('DROP DEFAULT');
+    expect(addCol.execute).toHaveLength(2);
+    expect(addCol.execute[0]!.sql).toContain("DEFAULT ''");
+    expect(addCol.execute[0]!.sql).toContain('NOT NULL');
+    expect(addCol.execute[1]!.sql).toContain('DROP DEFAULT');
 
     // Postcheck includes verification that temporary default was removed
-    expect(addCol!.postcheck.map((p) => p.description)).toContainEqual(
+    expect(addCol.postcheck.map((p) => p.description)).toContainEqual(
       expect.stringContaining('no default'),
     );
   });
 
   it('emits 2-step execute for NOT NULL int4 column', () => {
-    const contract = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              age: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
-      },
-      dependencies: [],
-    };
-
-    const result = planner.plan({
-      contract,
-      schema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
+    const addCol = planAddColumn('age', {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
     });
 
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') throw new Error('expected success');
-
-    const addCol = result.plan.operations.find((op) => op.id === 'column.user.age');
-    expect(addCol).toBeDefined();
-    expect(addCol!.execute).toHaveLength(2);
-    expect(addCol!.execute[0]!.sql).toContain('DEFAULT 0');
-    expect(addCol!.execute[0]!.sql).toContain('NOT NULL');
-    expect(addCol!.execute[1]!.sql).toContain('DROP DEFAULT');
+    expect(addCol.execute).toHaveLength(2);
+    expect(addCol.execute[0]!.sql).toContain('DEFAULT 0');
+    expect(addCol.execute[0]!.sql).toContain('NOT NULL');
+    expect(addCol.execute[1]!.sql).toContain('DROP DEFAULT');
   });
 
   it('skips temporary default for nullable columns', () => {
-    const contract = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              bio: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
-      },
-      dependencies: [],
-    };
-
-    const result = planner.plan({
-      contract,
-      schema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
+    const addCol = planAddColumn('bio', {
+      nativeType: 'text',
+      codecId: 'pg/text@1',
+      nullable: true,
     });
 
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') throw new Error('expected success');
-
-    const addCol = result.plan.operations.find((op) => op.id === 'column.user.bio');
-    expect(addCol).toBeDefined();
-    expect(addCol!.execute).toHaveLength(1);
-    expect(addCol!.execute[0]!.sql).not.toContain('DEFAULT');
-    expect(addCol!.execute[0]!.sql).not.toContain('NOT NULL');
+    expect(addCol.execute).toHaveLength(1);
+    expect(addCol.execute[0]!.sql).not.toContain('DEFAULT');
+    expect(addCol.execute[0]!.sql).not.toContain('NOT NULL');
   });
 
   it('skips temporary default for NOT NULL columns with explicit default', () => {
-    const contract = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              active: {
-                nativeType: 'bool',
-                codecId: 'pg/bool@1',
-                nullable: false,
-                default: { kind: 'literal', value: true },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
-      },
-      dependencies: [],
-    };
-
-    const result = planner.plan({
-      contract,
-      schema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
+    const addCol = planAddColumn('active', {
+      nativeType: 'bool',
+      codecId: 'pg/bool@1',
+      nullable: false,
+      default: { kind: 'literal', value: true },
     });
 
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') throw new Error('expected success');
-
-    const addCol = result.plan.operations.find((op) => op.id === 'column.user.active');
-    expect(addCol).toBeDefined();
     // Single execute step (explicit default, no temporary default needed)
-    expect(addCol!.execute).toHaveLength(1);
-    expect(addCol!.execute[0]!.sql).toContain('DEFAULT true');
-    expect(addCol!.execute[0]!.sql).toContain('NOT NULL');
+    expect(addCol.execute).toHaveLength(1);
+    expect(addCol.execute[0]!.sql).toContain('DEFAULT true');
+    expect(addCol.execute[0]!.sql).toContain('NOT NULL');
   });
 });
 
@@ -449,6 +290,61 @@ function buildUserTableSchema(): SqlSchemaIR['tables'][string] {
     foreignKeys: [],
     indexes: [{ columns: ['email'], name: 'user_email_idx', unique: false }],
   };
+}
+
+/**
+ * Plans adding a single column to the user table and returns the resulting operation.
+ * The schema contains only the `id` column, so the planner generates an ADD COLUMN for `columnName`.
+ */
+function planAddColumn(
+  columnName: string,
+  columnDef: {
+    nativeType: string;
+    codecId: string;
+    nullable: boolean;
+    default?: { kind: 'literal'; value: unknown };
+  },
+) {
+  const planner = createPostgresMigrationPlanner();
+  const contract = createTestContract({
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            [columnName]: columnDef,
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+  });
+  const schema: SqlSchemaIR = {
+    tables: {
+      user: {
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        foreignKeys: [],
+        indexes: [],
+      },
+    },
+    dependencies: [],
+  };
+  const result = planner.plan({
+    contract,
+    schema,
+    policy: INIT_ADDITIVE_POLICY,
+    frameworkComponents: [],
+  });
+  if (result.kind !== 'success') throw new Error('expected planner success');
+  const op = result.plan.operations.find((o) => o.id === `column.user.${columnName}`);
+  if (!op) throw new Error(`operation column.user.${columnName} not found`);
+  return op;
 }
 
 function buildPostTableSchema(): SqlSchemaIR['tables'][string] {
