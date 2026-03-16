@@ -19,8 +19,10 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createMigrationVerifyCommand } from '@prisma-next/cli/commands/migration-verify';
+import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import type { Command } from 'commander';
 import { join } from 'pathe';
+import { afterAll, beforeAll } from 'vitest';
 import { executeCommand, getExitCode, setupCommandMocks } from './cli-test-helpers';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +49,57 @@ export interface JourneyContext {
   testDir: string;
   configPath: string;
   outputDir: string;
+}
+
+// Re-export timeouts so journey tests can import from a single module.
+export { timeouts };
+
+// ---------------------------------------------------------------------------
+// Database lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Registers `beforeAll` / `afterAll` hooks that create and tear down a dev database.
+ * Returns a getter for the connection string (available after `beforeAll` runs).
+ *
+ * Optionally accepts an `onReady` callback that runs inside `beforeAll` with the
+ * connection string — useful for seeding the database with tables / data.
+ *
+ * @example
+ * ```ts
+ * const db = useDevDatabase();
+ * it('works', async () => {
+ *   const ctx = setupJourney({ connectionString: db.connectionString, createTempDir });
+ * });
+ * ```
+ *
+ * @example
+ * ```ts
+ * const db = useDevDatabase({ onReady: (cs) => withClient(cs, c => c.query(SQL)) });
+ * ```
+ */
+export function useDevDatabase(options?: {
+  onReady?: (connectionString: string) => Promise<unknown>;
+}): { readonly connectionString: string } {
+  let connectionString = '';
+  let close: () => Promise<void> = async () => {};
+
+  beforeAll(async () => {
+    const db = await createDevDatabase();
+    connectionString = db.connectionString;
+    close = db.close;
+    await options?.onReady?.(connectionString);
+  }, timeouts.spinUpPpgDev);
+
+  afterAll(async () => {
+    await close();
+  });
+
+  return {
+    get connectionString() {
+      return connectionString;
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -113,22 +166,29 @@ export function setupJourneyNoDb(createTempDir: () => string): JourneyContext {
 }
 
 // ---------------------------------------------------------------------------
-// Contract swapping
+// Contract fixtures
 // ---------------------------------------------------------------------------
 
-type ContractVariant =
-  | 'contract-base'
-  | 'contract-additive'
-  | 'contract-destructive'
-  | 'contract-add-table'
-  | 'contract-v3';
+/**
+ * All available contract fixture files, keyed by variant name.
+ * Add new fixtures here — `ContractVariant` and `swapContract` derive from this automatically.
+ */
+export const contractFixtures = {
+  'contract-base': join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'),
+  'contract-additive': join(JOURNEY_FIXTURES_DIR, 'contract-additive.ts'),
+  'contract-destructive': join(JOURNEY_FIXTURES_DIR, 'contract-destructive.ts'),
+  'contract-add-table': join(JOURNEY_FIXTURES_DIR, 'contract-add-table.ts'),
+  'contract-v3': join(JOURNEY_FIXTURES_DIR, 'contract-v3.ts'),
+} as const;
+
+export type ContractVariant = keyof typeof contractFixtures;
 
 /**
  * Swaps the active contract in the test directory to a different variant.
  * Copies the variant file over `contract.ts` so the config picks it up on next emit.
  */
 export function swapContract(ctx: JourneyContext, variant: ContractVariant): void {
-  const src = join(JOURNEY_FIXTURES_DIR, `${variant}.ts`);
+  const src = contractFixtures[variant];
   const dest = join(ctx.testDir, 'contract.ts');
   copyFileSync(src, dest);
 }
@@ -138,47 +198,14 @@ export function swapContract(ctx: JourneyContext, variant: ContractVariant): voi
 // ---------------------------------------------------------------------------
 
 /**
- * Runs a CLI command in the journey's test directory.
- * Returns a CommandResult with exit code, stdout, and stderr.
+ * Core execution helper — all run* functions delegate to this.
+ * Creates fresh mocks for each invocation so steps don't interfere.
  *
- * This is the core execution helper — all run* functions delegate to it.
- * It creates fresh mocks for each invocation so steps don't interfere.
+ * NOTE: Uses `process.chdir()`, which is process-global. This is safe because
+ * `vitest.journeys.config.ts` uses `pool: 'forks'` (each file runs in its own
+ * process) and tests within a file run sequentially. Do NOT switch to `pool: 'threads'`.
  */
-async function runCommand(
-  command: Command,
-  ctx: JourneyContext,
-  args: readonly string[],
-): Promise<CommandResult> {
-  const mocks = setupCommandMocks();
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(ctx.testDir);
-    try {
-      await executeCommand(command, ['--config', ctx.configPath, '--no-color', ...args]);
-      return {
-        exitCode: 0,
-        stdout: mocks.consoleOutput.join('\n'),
-        stderr: mocks.consoleErrors.join('\n'),
-      };
-    } catch (error) {
-      const exitCode = getExitCode();
-      if (exitCode == null) throw error; // unexpected error, not a CLI exit
-      return {
-        exitCode,
-        stdout: mocks.consoleOutput.join('\n'),
-        stderr: mocks.consoleErrors.join('\n'),
-      };
-    }
-  } finally {
-    process.chdir(originalCwd);
-    mocks.cleanup();
-  }
-}
-
-/**
- * Runs a CLI command without --config (for commands that don't need it, or error tests).
- */
-async function runCommandRaw(
+async function runCommandCore(
   command: Command,
   testDir: string,
   args: readonly string[],
@@ -207,6 +234,24 @@ async function runCommandRaw(
     process.chdir(originalCwd);
     mocks.cleanup();
   }
+}
+
+/** Runs a CLI command with --config in the journey's test directory. */
+async function runCommand(
+  command: Command,
+  ctx: JourneyContext,
+  args: readonly string[],
+): Promise<CommandResult> {
+  return runCommandCore(command, ctx.testDir, ['--config', ctx.configPath, ...args]);
+}
+
+/** Runs a CLI command without --config (for commands that don't need it, or error tests). */
+async function runCommandRaw(
+  command: Command,
+  testDir: string,
+  args: readonly string[],
+): Promise<CommandResult> {
+  return runCommandCore(command, testDir, args);
 }
 
 // ---------------------------------------------------------------------------
