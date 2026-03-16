@@ -1,5 +1,7 @@
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import type {
+  AggregateFunctions,
+  BooleanCodecType,
   Expression,
   ExpressionBuilder,
   ExtractScopeFields,
@@ -101,11 +103,14 @@ export interface SelectCapable<
 
   select<Alias extends string, Field extends ScopeField>(
     alias: Alias,
-    expr: (fields: FieldProxy<AvailableScope>, fns: Functions<CodecTypes>) => Expression<Field>,
+    expr: (
+      fields: FieldProxy<AvailableScope>,
+      fns: AggregateFunctions<CodecTypes>,
+    ) => Expression<Field>,
   ): SelectQuery<CodecTypes, AvailableScope, WithField<RowType, Field, Alias>>;
 
   select<Result extends Record<string, Expression<ScopeField>>>(
-    callback: (fields: FieldProxy<AvailableScope>, fns: Functions<CodecTypes>) => Result,
+    callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<CodecTypes>) => Result,
   ): SelectQuery<CodecTypes, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>>;
 }
 
@@ -127,18 +132,34 @@ export interface TableProxy<
   ): TableProxy<CodecTypes, Name, Table, Alias, AvailableScope>;
 }
 
+export interface Paginatable {
+  limit(count: number): this;
+
+  offset(count: number): this;
+}
+
+export interface Aliasable<RowType extends Record<string, ScopeField>> {
+  as<Alias extends string>(newAlias: Alias): JoinSource<RowType, Alias>;
+}
+
+export interface Executable<
+  CodecTypes extends CodecTypesBase,
+  RowType extends Record<string, ScopeField>,
+> {
+  first(): Promise<ResolveRow<RowType, CodecTypes>>;
+}
+
 export interface SelectQuery<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-> extends SelectCapable<CodecTypes, AvailableScope, RowType> {
+> extends SelectCapable<CodecTypes, AvailableScope, RowType>,
+    Paginatable,
+    Aliasable<RowType>,
+    Executable<CodecTypes, RowType> {
   where(
     expr: ExpressionBuilder<AvailableScope, CodecTypes>,
   ): SelectQuery<CodecTypes, AvailableScope, RowType>;
-
-  limit(count: number): SelectQuery<CodecTypes, AvailableScope, RowType>;
-
-  offset(count: number): SelectQuery<CodecTypes, AvailableScope, RowType>;
 
   orderBy(
     field: (keyof RowType | keyof AvailableScope['topLevel']) & string,
@@ -153,7 +174,53 @@ export interface SelectQuery<
     options?: OrderByOptions,
   ): SelectQuery<CodecTypes, AvailableScope, RowType>;
 
-  as<Alias extends string>(newAlias: Alias): JoinSource<RowType, Alias>;
+  groupBy(
+    ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
+  ): GroupedQuery<CodecTypes, AvailableScope, RowType>;
 
-  first(): Promise<ResolveRow<RowType, CodecTypes>>;
+  groupBy(
+    expr: (
+      fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
+      fns: Functions<CodecTypes>,
+    ) => Expression<ScopeField>,
+  ): GroupedQuery<CodecTypes, AvailableScope, RowType>;
+}
+
+export interface GroupedQuery<
+  CodecTypes extends CodecTypesBase,
+  AvailableScope extends Scope,
+  RowType extends Record<string, ScopeField>,
+> extends Paginatable,
+    Aliasable<RowType>,
+    Executable<CodecTypes, RowType> {
+  groupBy(
+    ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
+  ): GroupedQuery<CodecTypes, AvailableScope, RowType>;
+
+  groupBy(
+    expr: (
+      fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
+      fns: Functions<CodecTypes>,
+    ) => Expression<ScopeField>,
+  ): GroupedQuery<CodecTypes, AvailableScope, RowType>;
+
+  having(
+    expr: (
+      fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
+      fns: AggregateFunctions<CodecTypes>,
+    ) => Expression<BooleanCodecType>,
+  ): GroupedQuery<CodecTypes, AvailableScope, RowType>;
+
+  orderBy(
+    field: (keyof RowType | keyof AvailableScope['topLevel']) & string,
+    options?: OrderByOptions,
+  ): GroupedQuery<CodecTypes, AvailableScope, RowType>;
+
+  orderBy(
+    expr: (
+      fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
+      fns: AggregateFunctions<CodecTypes>,
+    ) => Expression<ScopeField>,
+    options?: OrderByOptions,
+  ): GroupedQuery<CodecTypes, AvailableScope, RowType>;
 }
