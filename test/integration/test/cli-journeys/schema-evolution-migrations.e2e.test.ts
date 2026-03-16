@@ -14,9 +14,8 @@
 
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   getLatestMigrationDir,
@@ -24,6 +23,7 @@ import {
   parseJsonOutput,
   runContractEmit,
   runDbInit,
+  runDbUpdate,
   runDbVerify,
   runMigrationApply,
   runMigrationPlan,
@@ -32,6 +32,8 @@ import {
   runMigrationVerify,
   setupJourney,
   swapContract,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -39,23 +41,15 @@ withTempDir(({ createTempDir }) => {
   // Journey B: Schema Evolution via Migrations
   // -------------------------------------------------------------------------
   describe('Journey B: Schema Evolution via Migrations', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'emit → plan initial → apply → swap → plan v2 → show → verify → status → apply → verify',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: emit base contract and plan initial migration (∅ → base)
         const emit0 = await runContractEmit(ctx);
@@ -158,23 +152,15 @@ withTempDir(({ createTempDir }) => {
   // Journey Z: Transition from db init to Migration Workflow
   // -------------------------------------------------------------------------
   describe('Journey Z: Init-to-Migrations Transition', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → swap → plan (uses --from marker hash) → apply → status',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: initialize with base contract via db init
         const emit0 = await runContractEmit(ctx);
@@ -204,7 +190,7 @@ withTempDir(({ createTempDir }) => {
         const apply = await runMigrationApply(ctx);
         if (apply.exitCode !== 0) {
           // Expected: marker doesn't match chain. Use db update as recovery.
-          const update = await (await import('../utils/journey-test-helpers')).runDbUpdate(ctx);
+          const update = await runDbUpdate(ctx);
           expect(update.exitCode, 'Z.03: db update recovery').toBe(0);
         } else {
           // If apply succeeded, that's fine too
