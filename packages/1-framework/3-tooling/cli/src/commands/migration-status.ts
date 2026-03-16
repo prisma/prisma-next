@@ -33,6 +33,7 @@ import { formatMigrationStatusOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import type { StatusDiagnostic, StatusRef } from '../utils/migration-types';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
@@ -53,12 +54,7 @@ export interface MigrationStatusEntry {
   readonly status: 'applied' | 'pending' | 'unknown';
 }
 
-export interface StatusDiagnostic {
-  readonly code: string;
-  readonly severity: 'warn' | 'info';
-  readonly message: string;
-  readonly hints: readonly string[];
-}
+export type { StatusDiagnostic, StatusRef } from '../utils/migration-types';
 
 export interface MigrationStatusResult {
   readonly ok: true;
@@ -67,8 +63,7 @@ export interface MigrationStatusResult {
   readonly markerHash?: string;
   readonly targetHash: string;
   readonly contractHash: string;
-  readonly refName?: string;
-  readonly refHash?: string;
+  readonly refs?: readonly StatusRef[];
   readonly pathDecision?: {
     readonly fromHash: string;
     readonly toHash: string;
@@ -177,7 +172,7 @@ export function buildMigrationEntries(
  * that bypasses the marker entirely (e.g. in a diamond graph), causing the
  * marker to appear "diverged" when it isn't.
  */
-function resolveDisplayChain(
+export function resolveDisplayChain(
   graph: MigrationGraph,
   targetHash: string,
   markerHash: string | undefined,
@@ -192,9 +187,19 @@ function resolveDisplayChain(
   if (markerHash === targetHash) return toMarker;
 
   const fromMarker = findPath(graph, markerHash, targetHash);
-  if (!fromMarker) return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+  if (fromMarker) return [...toMarker, ...fromMarker];
 
-  return [...toMarker, ...fromMarker];
+  // Marker is ahead of target (or on a disconnected branch).
+  // Try the inverse: target→marker. If it succeeds, the marker is ahead —
+  // show the full chain from EMPTY through the target and on to the marker.
+  const toTarget = findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+  if (!toTarget) return null;
+
+  const targetToMarker = findPath(graph, targetHash, markerHash);
+  if (targetToMarker) return [...toTarget, ...targetToMarker];
+
+  // Genuinely disconnected — fall back to EMPTY→target
+  return toTarget;
 }
 
 async function executeMigrationStatusCommand(
@@ -216,14 +221,21 @@ async function executeMigrationStatusCommand(
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
 
-  let refName: string | undefined;
-  let refHash: string | undefined;
+  let activeRefName: string | undefined;
+  let activeRefHash: string | undefined;
+  let allRefs: Record<string, string> = {};
+
+  const refsPath = resolve(migrationsDir, 'refs.json');
+  try {
+    allRefs = await readRefs(refsPath);
+  } catch {
+    // refs.json missing or unreadable — not an error, just no refs
+  }
+
   if (options.ref) {
-    refName = options.ref;
-    const refsPath = resolve(migrationsDir, 'refs.json');
+    activeRefName = options.ref;
     try {
-      const refs = await readRefs(refsPath);
-      refHash = resolveRef(refs, refName);
+      activeRefHash = resolveRef(allRefs, activeRefName);
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(
@@ -238,6 +250,12 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, hash]) => ({
+    name,
+    hash,
+    active: name === activeRefName,
+  }));
+
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
@@ -246,8 +264,8 @@ async function executeMigrationStatusCommand(
     if (dbConnection && hasDriver) {
       details.push({ label: 'database', value: maskConnectionUrl(String(dbConnection)) });
     }
-    if (refName) {
-      details.push({ label: 'ref', value: refName });
+    if (activeRefName) {
+      details.push({ label: 'ref', value: activeRefName });
     }
     const header = formatStyledHeader({
       command: 'migration status',
@@ -337,7 +355,7 @@ async function executeMigrationStatusCommand(
   let targetHash: string;
   try {
     graph = reconstructGraph(attested);
-    targetHash = refHash ?? findLeaf(graph);
+    targetHash = activeRefHash ?? findLeaf(graph);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -400,8 +418,8 @@ async function executeMigrationStatusCommand(
   if (mode === 'online') {
     if (!markerInChain) {
       summary = `Database marker does not match any migration — was the database managed with 'db update'?`;
-    } else if (refHash && markerHash !== undefined) {
-      summary = summarizeRefDistance(graph, markerHash, refHash, refName!);
+    } else if (activeRefHash && markerHash !== undefined) {
+      summary = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
     } else {
       const pendingCount = entries.filter((e) => e.status === 'pending').length;
       const appliedCount = entries.filter((e) => e.status === 'applied').length;
@@ -457,7 +475,7 @@ async function executeMigrationStatusCommand(
 
   let pathDecision: MigrationStatusResult['pathDecision'];
   if (mode === 'online' && markerHash !== undefined) {
-    const decision = findPathWithDecision(graph, markerHash, targetHash, refName);
+    const decision = findPathWithDecision(graph, markerHash, targetHash, activeRefName);
     if (decision) {
       pathDecision = {
         fromHash: decision.fromHash,
@@ -484,8 +502,7 @@ async function executeMigrationStatusCommand(
     summary,
     diagnostics,
     ...ifDefined('markerHash', markerHash),
-    ...ifDefined('refName', refName),
-    ...ifDefined('refHash', refHash),
+    ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
     ...(pathDecision ? { pathDecision } : {}),
   };
   return ok(result);

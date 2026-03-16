@@ -15,7 +15,7 @@ import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import { buildMigrationEntries } from '../../src/commands/migration-status';
+import { buildMigrationEntries, resolveDisplayChain } from '../../src/commands/migration-status';
 import { formatMigrationStatusOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 
@@ -595,5 +595,139 @@ describe('formatMigrationStatusOutput', () => {
     );
 
     expect(output).toBe('');
+  });
+
+  it('renders active ref in bold and inactive refs as dim', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'online',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            migrationId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'applied',
+          },
+          {
+            dirName: '20260102_100000_add_email',
+            to: 'sha256:hash-b',
+            migrationId: 'sha256:e2',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'applied',
+          },
+        ],
+        markerHash: 'sha256:hash-b',
+        targetHash: 'sha256:hash-b',
+        contractHash: 'sha256:hash-b',
+        refs: [
+          { name: 'staging', hash: 'sha256:hash-a', active: false },
+          { name: 'prod', hash: 'sha256:hash-b', active: true },
+        ],
+        summary: 'Database is up to date (2 migrations applied)',
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('◄ ref:staging');
+    expect(stripped).toContain('◄ ref:prod');
+  });
+
+  it('renders multiple refs pointing to the same hash', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'online',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            migrationId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'applied',
+          },
+        ],
+        markerHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-a',
+        refs: [
+          { name: 'staging', hash: 'sha256:hash-a', active: false },
+          { name: 'prod', hash: 'sha256:hash-a', active: true },
+        ],
+        summary: 'Database is up to date (1 migration applied)',
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('◄ ref:staging');
+    expect(stripped).toContain('◄ ref:prod');
+  });
+});
+
+describe('resolveDisplayChain', { timeout: timeouts.databaseOperation }, () => {
+  it('includes marker in chain when marker is ahead of ref target', async () => {
+    const tempDir = await createTempDir('ahead-of-ref');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    await setupChain(migrationsDir);
+
+    const packages = await readMigrationsDir(migrationsDir);
+    const graph = reconstructGraph(packages);
+
+    const chain = resolveDisplayChain(graph, 'sha256:hash-b', 'sha256:hash-c');
+
+    expect(chain).not.toBeNull();
+    expect(chain!.length).toBe(3);
+    expect(chain!.some((e) => e.to === 'sha256:hash-c')).toBe(true);
+
+    const entries = buildMigrationEntries(chain!, packages, 'sha256:hash-c');
+    expect(entries[0]!.status).toBe('applied');
+    expect(entries[1]!.status).toBe('applied');
+    expect(entries[2]!.status).toBe('applied');
+  });
+
+  it('returns chain to target when marker is behind ref target', async () => {
+    const tempDir = await createTempDir('behind-ref');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    await setupChain(migrationsDir);
+
+    const packages = await readMigrationsDir(migrationsDir);
+    const graph = reconstructGraph(packages);
+
+    const chain = resolveDisplayChain(graph, 'sha256:hash-c', 'sha256:hash-a');
+
+    expect(chain).not.toBeNull();
+    expect(chain!.length).toBe(3);
+
+    const entries = buildMigrationEntries(chain!, packages, 'sha256:hash-a');
+    expect(entries[0]!.status).toBe('applied');
+    expect(entries[1]!.status).toBe('pending');
+    expect(entries[2]!.status).toBe('pending');
+  });
+
+  it('returns chain when marker equals ref target', async () => {
+    const tempDir = await createTempDir('at-ref');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    await setupChain(migrationsDir);
+
+    const packages = await readMigrationsDir(migrationsDir);
+    const graph = reconstructGraph(packages);
+
+    const chain = resolveDisplayChain(graph, 'sha256:hash-b', 'sha256:hash-b');
+
+    expect(chain).not.toBeNull();
+    expect(chain!.length).toBe(2);
+    expect(chain![1]!.to).toBe('sha256:hash-b');
   });
 });

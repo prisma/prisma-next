@@ -125,7 +125,7 @@ describe('MigrationStatusResult JSON shape', () => {
     `);
   });
 
-  it('matches expected keys in online mode with ref', () => {
+  it('matches expected keys in online mode with refs', () => {
     const result: MigrationStatusResult = {
       ok: true,
       mode: 'online',
@@ -133,8 +133,7 @@ describe('MigrationStatusResult JSON shape', () => {
       markerHash: 'sha256:marker',
       targetHash: 'sha256:leaf',
       contractHash: 'sha256:contract',
-      refName: 'production',
-      refHash: 'sha256:ref',
+      refs: [{ name: 'production', hash: 'sha256:ref', active: true }],
       pathDecision: {
         fromHash: 'sha256:marker',
         toHash: 'sha256:ref',
@@ -155,8 +154,7 @@ describe('MigrationStatusResult JSON shape', () => {
         "mode",
         "ok",
         "pathDecision",
-        "refHash",
-        "refName",
+        "refs",
         "summary",
         "targetHash",
       ]
