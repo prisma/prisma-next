@@ -16,6 +16,7 @@ describe('SQL ORM collections with rich AST plans', () => {
 
     const direct = collection.where(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)));
     expect(direct.state.filters[0]?.expr).toBeInstanceOf(BinaryExpr);
+    expect(direct.state.filters[0]?.params).toEqual([1]);
 
     const bound = collection.where({
       toWhereExpr: () => ({

@@ -2,8 +2,8 @@ import {
   type Adapter,
   type AdapterProfile,
   AggregateExpr,
-  AndExpr,
-  BinaryExpr,
+  type AndExpr,
+  type BinaryExpr,
   type CodecParamsDescriptor,
   ColumnRef,
   createCodecRegistry,
@@ -13,7 +13,7 @@ import {
   DoNothingConflictAction,
   DoUpdateSetConflictAction,
   EqColJoinOn,
-  ExistsExpr,
+  type ExistsExpr,
   Expression,
   type FromSource,
   InsertAst,
@@ -25,10 +25,10 @@ import {
   ListLiteralExpr,
   LiteralExpr,
   type LowererContext,
-  NullCheckExpr,
+  type NullCheckExpr,
   OperationExpr,
   type OrderByItem,
-  OrExpr,
+  type OrExpr,
   ParamRef,
   type ProjectionItem,
   type QueryAst,
@@ -245,30 +245,31 @@ function renderSubqueryExpr(expr: SubqueryExpr, contract?: PostgresContract): st
 }
 
 function renderWhere(expr: WhereExpr, contract?: PostgresContract): string {
-  if (expr instanceof ExistsExpr) {
-    const notKeyword = expr.notExists ? 'NOT ' : '';
-    const subquery = renderSelect(expr.subquery, contract);
-    return `${notKeyword}EXISTS (${subquery})`;
-  }
-  if (expr instanceof NullCheckExpr) {
-    return renderNullCheck(expr, contract);
-  }
-  if (expr instanceof AndExpr) {
-    if (expr.exprs.length === 0) {
-      return 'TRUE';
-    }
-    return `(${expr.exprs.map((part) => renderWhere(part, contract)).join(' AND ')})`;
-  }
-  if (expr instanceof OrExpr) {
-    if (expr.exprs.length === 0) {
-      return 'FALSE';
-    }
-    return `(${expr.exprs.map((part) => renderWhere(part, contract)).join(' OR ')})`;
-  }
-  if (!(expr instanceof BinaryExpr)) {
-    throw new Error(`Unsupported where node: ${expr.constructor.name}`);
-  }
-  return renderBinary(expr, contract);
+  return expr.accept<string>({
+    exists(expr) {
+      const notKeyword = expr.notExists ? 'NOT ' : '';
+      const subquery = renderSelect(expr.subquery, contract);
+      return `${notKeyword}EXISTS (${subquery})`;
+    },
+    nullCheck(expr) {
+      return renderNullCheck(expr, contract);
+    },
+    and(expr) {
+      if (expr.exprs.length === 0) {
+        return 'TRUE';
+      }
+      return `(${expr.exprs.map((part) => renderWhere(part, contract)).join(' AND ')})`;
+    },
+    or(expr) {
+      if (expr.exprs.length === 0) {
+        return 'FALSE';
+      }
+      return `(${expr.exprs.map((part) => renderWhere(part, contract)).join(' OR ')})`;
+    },
+    binary(expr) {
+      return renderBinary(expr, contract);
+    },
+  });
 }
 
 function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract): string {

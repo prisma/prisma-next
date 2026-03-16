@@ -3,13 +3,11 @@ import {
   BinaryExpr,
   type BoundWhereExpr,
   ColumnRef,
-  LiteralExpr,
   NullCheckExpr,
   ParamRef,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { createBoundWhereExpr } from '../src/where-utils';
 import {
   baseContract,
   createCollection,
@@ -29,6 +27,29 @@ function bound(
   };
 }
 
+function dslBound(
+  expr: BoundWhereExpr['expr'],
+  params: readonly unknown[],
+  refs: ReadonlyArray<{ table: string; column: string }>,
+): BoundWhereExpr {
+  return {
+    expr,
+    params,
+    paramDescriptors: refs.map((ref, index) => {
+      const columnMeta = baseContract.storage.tables[ref.table]?.columns[ref.column];
+      return {
+        index: index + 1,
+        name: ref.column,
+        source: 'dsl' as const,
+        refs: ref,
+        codecId: columnMeta?.codecId,
+        nativeType: columnMeta?.nativeType,
+        nullable: columnMeta?.nullable,
+      };
+    }),
+  };
+}
+
 describe('Collection', () => {
   describe('chain methods', () => {
     it('where() appends rich filters and stays immutable', () => {
@@ -36,15 +57,25 @@ describe('Collection', () => {
 
       const filtered = collection.where((user) => user.name.eq('Alice'));
       expect(filtered.state.filters).toEqual([
-        createBoundWhereExpr(BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice'))),
+        dslBound(
+          BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
+          ['Alice'],
+          [{ table: 'users', column: 'name' }],
+        ),
       ]);
       expect(collection.state.filters).toEqual([]);
 
       const chained = filtered.where((user) => user.email.neq('old@example.com'));
       expect(chained.state.filters).toEqual([
-        createBoundWhereExpr(BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice'))),
-        createBoundWhereExpr(
-          BinaryExpr.neq(ColumnRef.of('users', 'email'), LiteralExpr.of('old@example.com')),
+        dslBound(
+          BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
+          ['Alice'],
+          [{ table: 'users', column: 'name' }],
+        ),
+        dslBound(
+          BinaryExpr.neq(ColumnRef.of('users', 'email'), ParamRef.of(1, 'email')),
+          ['old@example.com'],
+          [{ table: 'users', column: 'email' }],
         ),
       ]);
     });
@@ -84,11 +115,13 @@ describe('Collection', () => {
       });
 
       expect(filtered.state.filters).toEqual([
-        createBoundWhereExpr(
+        dslBound(
           AndExpr.of([
-            BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+            BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
             NullCheckExpr.isNull(ColumnRef.of('users', 'email')),
           ]),
+          ['Alice'],
+          [{ table: 'users', column: 'name' }],
         ),
       ]);
 
@@ -148,7 +181,11 @@ describe('Collection', () => {
         cardinality: '1:N',
       });
       expect(withPosts.state.includes[0]?.nested.filters).toEqual([
-        createBoundWhereExpr(BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(100))),
+        dslBound(
+          BinaryExpr.gt(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'views')),
+          [100],
+          [{ table: 'posts', column: 'views' }],
+        ),
       ]);
       expect(withPosts.state.includes[0]?.nested.limit).toBe(5);
       expect(collection.state.includes).toEqual([]);
@@ -161,7 +198,11 @@ describe('Collection', () => {
         fn: 'count',
       });
       expect(withPostCount.state.includes[0]?.scalar?.state.filters).toEqual([
-        createBoundWhereExpr(BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(100))),
+        dslBound(
+          BinaryExpr.gt(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'views')),
+          [100],
+          [{ table: 'posts', column: 'views' }],
+        ),
       ]);
 
       const combined = collection.include('posts', (posts) =>

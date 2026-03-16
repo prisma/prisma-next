@@ -6,7 +6,6 @@ import {
   DerivedTableSource,
   JoinAst,
   ListLiteralExpr,
-  LiteralExpr,
   OrExpr,
   ParamRef,
   type SelectAst,
@@ -23,6 +22,18 @@ import { baseContract, createCollection, createCollectionFor } from './collectio
 import { isSelectAst } from './helpers';
 
 const descriptor = (index: number) => ({ source: 'lane' as const, index });
+const dslDescriptor = (table: string, column: string, index: number) => {
+  const columnMeta = baseContract.storage.tables[table]?.columns[column];
+  return {
+    index,
+    name: column,
+    source: 'dsl' as const,
+    refs: { table, column },
+    codecId: columnMeta?.codecId,
+    nativeType: columnMeta?.nativeType,
+    nullable: columnMeta?.nullable,
+  };
+};
 const bound = (
   expr: BinaryExpr,
   params: readonly unknown[] = [],
@@ -103,13 +114,19 @@ describe('compileSelectWithIncludeStrategy', () => {
 
     const plan = compileSelect(baseContract, 'users', state);
     expectSelectAst(plan.ast);
+    expect(plan.params).toEqual(['Alice', 'Alice', 7]);
+    expect(plan.meta.paramDescriptors).toEqual([
+      dslDescriptor('users', 'name', 1),
+      dslDescriptor('users', 'name', 2),
+      dslDescriptor('users', 'id', 3),
+    ]);
 
     expect(plan.ast.where).toEqual(
       OrExpr.of([
-        BinaryExpr.gt(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+        BinaryExpr.gt(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
         AndExpr.of([
-          BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
-          BinaryExpr.lt(ColumnRef.of('users', 'id'), LiteralExpr.of(7)),
+          BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(2, 'name')),
+          BinaryExpr.lt(ColumnRef.of('users', 'id'), ParamRef.of(3, 'id')),
         ]),
       ]),
     );
@@ -124,7 +141,11 @@ describe('compileSelectWithIncludeStrategy', () => {
 
     const plan = compileSelect(baseContract, 'users', state);
     expectSelectAst(plan.ast);
-    expect(plan.ast.where).toEqual(BinaryExpr.gt(ColumnRef.of('users', 'id'), LiteralExpr.of(9)));
+    expect(plan.params).toEqual([9]);
+    expect(plan.meta.paramDescriptors).toEqual([dslDescriptor('users', 'id', 1)]);
+    expect(plan.ast.where).toEqual(
+      BinaryExpr.gt(ColumnRef.of('users', 'id'), ParamRef.of(1, 'id')),
+    );
 
     const invalidState = {
       ...collection.orderBy((user) => user.id.asc()).state,
@@ -144,11 +165,20 @@ describe('compileSelectWithIncludeStrategy', () => {
 
     const plan = compileRelationSelect(baseContract, 'posts', 'user_id', [1, 2], state);
     expectSelectAst(plan.ast);
+    expect(plan.params).toEqual([1, 2, 'Hello']);
+    expect(plan.meta.paramDescriptors).toEqual([
+      dslDescriptor('posts', 'user_id', 1),
+      dslDescriptor('posts', 'user_id', 2),
+      dslDescriptor('posts', 'title', 3),
+    ]);
 
     expect(plan.ast.where).toEqual(
       AndExpr.of([
-        BinaryExpr.in(ColumnRef.of('posts', 'user_id'), ListLiteralExpr.fromValues([1, 2])),
-        BinaryExpr.eq(ColumnRef.of('posts', 'title'), LiteralExpr.of('Hello')),
+        BinaryExpr.in(
+          ColumnRef.of('posts', 'user_id'),
+          ListLiteralExpr.of([ParamRef.of(1, 'user_id'), ParamRef.of(2, 'user_id')]),
+        ),
+        BinaryExpr.eq(ColumnRef.of('posts', 'title'), ParamRef.of(3, 'title')),
       ]),
     );
     expect(plan.ast.limit).toBeUndefined();
