@@ -3,9 +3,9 @@
  *
  * M — Phantom drift: after initialization, a DBA drops a column via manual DDL.
  *     db verify still passes (marker hash unchanged — false positive), but
- *     db schema-verify catches the missing column. Recovery via db update fails
- *     because re-adding a NOT NULL column to an existing table is unrecoverable
- *     without manual intervention.
+ *     db schema-verify catches the missing column. Recovery via db update
+ *     succeeds because the planner uses a temporary default to re-add
+ *     NOT NULL columns to non-empty tables.
  *
  * N — Extra column drift: a DBA adds a column via manual DDL. Tolerant
  *     schema-verify passes (extras OK), strict schema-verify fails. Recovery
@@ -69,13 +69,14 @@ withTempDir(({ createTempDir }) => {
         expect(introspect.exitCode, 'M.03: db introspect').toBe(0);
 
         // M.04: db update recovery
-        // The planner cannot re-add a dropped NOT NULL column to an existing table
-        // because Postgres requires a DEFAULT for NOT NULL columns on non-empty tables
-        // (even if the table is technically empty, the planner validates post-update schema).
-        // db update correctly detects the drift but the runner fails (PN-RTM-3020).
-        // Recovery in this scenario requires manual DDL or db init with a fresh database.
+        // The planner re-adds the dropped NOT NULL column using a temporary default
+        // so the DDL is executable even on non-empty tables.
         const update = await runDbUpdate(ctx, ['-y']);
-        expect(update.exitCode, 'M.04: db update detects unrecoverable drift').toBe(1);
+        expect(update.exitCode, 'M.04: db update recovers from drift').toBe(0);
+
+        // M.05: db schema-verify passes after recovery
+        const schemaVerifyAfter = await runDbSchemaVerify(ctx);
+        expect(schemaVerifyAfter.exitCode, 'M.05: schema-verify passes after update').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );

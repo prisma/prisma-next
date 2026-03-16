@@ -346,16 +346,19 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const qualified = qualifyTableName(schema, tableName);
     const notNull = column.nullable === false;
     const hasDefault = column.default !== undefined;
-    // Only require empty table for NOT NULL columns WITHOUT defaults.
-    // PostgreSQL allows adding NOT NULL columns with defaults to non-empty tables
-    // because the default value is applied to existing rows.
-    const requiresEmptyTable = notNull && !hasDefault;
+    // For NOT NULL columns without an explicit default, use a temporary type-appropriate
+    // zero default so PostgreSQL can add the column to non-empty tables. The temporary
+    // default is dropped immediately after the column is added, leaving the column as
+    // NOT NULL with no default (matching the contract intent).
+    const needsTemporaryDefault = notNull && !hasDefault;
+    const temporaryDefault = needsTemporaryDefault ? getTypeZeroDefault(column.nativeType) : null;
     const precheck = [
       {
         description: `ensure column "${columnName}" is missing`,
         sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
       },
-      ...(requiresEmptyTable
+      // Only require empty table when we can't compute a zero default for the type.
+      ...(needsTemporaryDefault && !temporaryDefault
         ? [
             {
               description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
@@ -367,8 +370,17 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const execute = [
       {
         description: `add column "${columnName}"`,
-        sql: buildAddColumnSql(qualified, columnName, column, codecHooks),
+        sql: buildAddColumnSql(qualified, columnName, column, codecHooks, temporaryDefault),
       },
+      // Drop the temporary default so future inserts must provide an explicit value.
+      ...(temporaryDefault
+        ? [
+            {
+              description: `drop temporary default from column "${columnName}"`,
+              sql: `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
+            },
+          ]
+        : []),
     ];
     const postcheck = [
       {
@@ -980,14 +992,97 @@ function tableIsEmptyCheck(qualifiedTableName: string): string {
   return `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedTableName} LIMIT 1)`;
 }
 
+/**
+ * Returns a type-appropriate zero-value SQL literal for the given PostgreSQL native type.
+ * Used as a temporary DEFAULT when adding a NOT NULL column without an explicit default
+ * to a potentially non-empty table.
+ *
+ * Returns null for unrecognized types (e.g. enums, arrays, extensions), which causes
+ * the planner to fall back to the empty-table precheck.
+ */
+export function getTypeZeroDefault(nativeType: string): string | null {
+  switch (nativeType.toLowerCase()) {
+    // String types
+    case 'text':
+    case 'character':
+    case 'character varying':
+      return "''";
+
+    // Integer types
+    case 'int2':
+    case 'int4':
+    case 'int8':
+    case 'integer':
+    case 'bigint':
+    case 'smallint':
+      return '0';
+
+    // Float types
+    case 'float4':
+    case 'float8':
+    case 'real':
+    case 'double precision':
+      return '0';
+
+    // Numeric/decimal
+    case 'numeric':
+    case 'decimal':
+      return '0';
+
+    // Boolean
+    case 'bool':
+    case 'boolean':
+      return 'false';
+
+    // UUID
+    case 'uuid':
+      return "'00000000-0000-0000-0000-000000000000'";
+
+    // JSON types
+    case 'json':
+    case 'jsonb':
+      return "'null'";
+
+    // Timestamp types
+    case 'timestamp':
+    case 'timestamptz':
+    case 'timestamp with time zone':
+    case 'timestamp without time zone':
+      return "'epoch'";
+
+    // Time types
+    case 'time':
+    case 'timetz':
+    case 'time with time zone':
+    case 'time without time zone':
+      return "'00:00:00'";
+
+    // Interval
+    case 'interval':
+      return "'0'";
+
+    // Bit types
+    case 'bit':
+      return "B'0'";
+    case 'bit varying':
+      return "B''";
+
+    default:
+      return null;
+  }
+}
+
 function buildAddColumnSql(
   qualifiedTableName: string,
   columnName: string,
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
+  temporaryDefault?: string | null,
 ): string {
   const typeSql = buildColumnTypeSql(column, codecHooks);
-  const defaultSql = buildColumnDefaultSql(column.default, column);
+  const defaultSql =
+    buildColumnDefaultSql(column.default, column) ||
+    (temporaryDefault ? `DEFAULT ${temporaryDefault}` : '');
   const parts = [
     `ALTER TABLE ${qualifiedTableName}`,
     `ADD COLUMN ${quoteIdentifier(columnName)} ${typeSql}`,

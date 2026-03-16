@@ -44,7 +44,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
 
   describe('when the marker already matches the destination contract (idempotency)', () => {
     it(
-      'skips executing operations and still writes marker and ledger',
+      'skips executing operations for migration-apply plans (origin set) and still writes marker and ledger',
       { timeout: testTimeout },
       async () => {
         const planner = postgresTargetDescriptor.createPlanner(familyInstance);
@@ -66,9 +66,13 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           frameworkComponents,
         });
 
+        // Simulate a migration-apply re-run: origin is set (non-null) so the runner
+        // should skip operations when the marker already matches the destination.
+        // db update (origin: null) always applies because the planner handles
+        // idempotency through introspection.
         const planWithFailingStep = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          origin: null,
+          origin: toPlanContractInfo(contract),
           destination: toPlanContractInfo(contract),
           operations: [
             {

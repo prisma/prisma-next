@@ -339,6 +339,10 @@ withTempDir(({ createTempDir }) => {
             ]);
 
             // Apply should fail on the second migration because existing rows violate NOT NULL.
+            // Note: migration plan serializes DDL at plan time. The planner's temporary-default
+            // strategy works for db update (live introspection), but migration-plan uses
+            // contract-to-schema diffing which doesn't trigger the ADD COLUMN path for
+            // columns that exist in the "from" schema IR.
             consoleOutput.length = 0;
             let failed = false;
             try {
