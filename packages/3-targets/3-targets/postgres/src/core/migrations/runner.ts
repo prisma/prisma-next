@@ -117,11 +117,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         return markerCheck;
       }
 
-      // Apply plan operations or skip if marker already at destination.
-      // When origin is null (db update mode), the planner works from a live introspection—
-      // its operations reflect actual schema drift—so we always apply them.
-      // When origin is set (migration-apply mode), marker matching means the migration
-      // was already applied, so skipping avoids duplicate execution.
+      // db update (origin: null) always applies; migration-apply (origin set) skips if marker matches.
       const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
       const skipOperations = markerAtDestination && options.plan.origin !== null;
       let applyValue: ApplyPlanSuccessValue;

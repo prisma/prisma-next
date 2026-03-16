@@ -354,13 +354,13 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const temporaryDefault = needsTemporaryDefault
       ? buildTypeZeroDefaultLiteral(column.nativeType)
       : null;
+    const requiresEmptyTableCheck = needsTemporaryDefault && temporaryDefault === null;
     const precheck = [
       {
         description: `ensure column "${columnName}" is missing`,
         sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
       },
-      // Only require empty table when we can't compute a zero default for the type.
-      ...(needsTemporaryDefault && !temporaryDefault
+      ...(requiresEmptyTableCheck
         ? [
             {
               description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
