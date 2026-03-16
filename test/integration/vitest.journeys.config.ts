@@ -8,6 +8,8 @@ export default defineConfig({
     include: ['test/cli-journeys/**/*.e2e.test.ts'],
     testTimeout: timeouts.spinUpPpgDev,
     hookTimeout: timeouts.spinUpPpgDev,
+    // Required (not a preference): journey helpers use process.chdir() and mock
+    // process.exit/console globally. 'threads' would share these across tests.
     pool: 'forks',
     poolOptions: {
       forks: {
