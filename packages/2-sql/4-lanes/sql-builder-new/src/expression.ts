@@ -84,3 +84,22 @@ export type Functions<CT extends Record<string, { readonly input: unknown }>> = 
   and: (...ands: ExpressionOrValue<BooleanCodecType, CT>[]) => Expression<BooleanCodecType>;
   or: (...ors: ExpressionOrValue<BooleanCodecType, CT>[]) => Expression<BooleanCodecType>;
 };
+
+export type CountField = { codecId: 'pg/int8@1'; nullable: false };
+
+export type AggregateFunctions<CT extends Record<string, { readonly input: unknown }>> =
+  Functions<CT> & {
+    count: (expr?: Expression<ScopeField>) => Expression<CountField>;
+    sum: <T extends ScopeField>(
+      expr: Expression<T>,
+    ) => Expression<{ codecId: T['codecId']; nullable: true }>;
+    avg: <T extends ScopeField>(
+      expr: Expression<T>,
+    ) => Expression<{ codecId: T['codecId']; nullable: true }>;
+    min: <T extends ScopeField>(
+      expr: Expression<T>,
+    ) => Expression<{ codecId: T['codecId']; nullable: true }>;
+    max: <T extends ScopeField>(
+      expr: Expression<T>,
+    ) => Expression<{ codecId: T['codecId']; nullable: true }>;
+  };
