@@ -832,7 +832,7 @@ function renderParameterizedTypeSql(
  *
  * Note: autoincrement is handled specially via SERIAL types, so we skip it here.
  */
-function buildColumnDefaultSql(
+export function buildColumnDefaultSql(
   columnDefault: PostgresColumnDefault | undefined,
   column?: StorageColumn,
 ): string {

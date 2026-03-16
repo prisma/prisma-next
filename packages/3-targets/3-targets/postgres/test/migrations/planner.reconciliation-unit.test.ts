@@ -1,6 +1,6 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
-import type { MigrationOperationPolicy } from '@prisma-next/family-sql/control';
+import type { MigrationOperationPolicy, SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import type { PlanningMode } from '../../src/core/migrations/planner';
@@ -76,6 +76,37 @@ function contractWithColumn(
         [table]: {
           columns: {
             [column]: { nativeType, codecId: `pg/${nativeType}@1`, nullable },
+          },
+          primaryKey: { columns: [] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+  };
+}
+
+function contractWithColumnDefault(
+  table: string,
+  column: string,
+  nativeType: string,
+  columnDefault: ColumnDefault,
+  nullable = false,
+): SqlContract<SqlStorage> {
+  const contract = emptyContract();
+  return {
+    ...contract,
+    storage: {
+      tables: {
+        [table]: {
+          columns: {
+            [column]: {
+              nativeType,
+              codecId: `pg/${nativeType}@1`,
+              nullable,
+              default: columnDefault,
+            },
           },
           primaryKey: { columns: [] },
           uniques: [],
@@ -444,16 +475,110 @@ describe('buildReconciliationPlan', () => {
   });
 
   // =========================================================================
-  // Conflict conversion for unhandled issue kinds
+  // Default operations — SET DEFAULT / ALTER DEFAULT
   // =========================================================================
 
-  describe('conflict conversion', () => {
-    it('converts default_mismatch to missingButNonAdditive conflict', () => {
+  describe('column default operations', () => {
+    it('generates additive SET DEFAULT for default_missing', () => {
+      const contract = contractWithColumnDefault('user', 'bio', 'text', {
+        kind: 'literal',
+        value: 'no bio',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_missing',
+            table: 'user',
+            column: 'bio',
+            expected: 'literal(no bio)',
+            message: 'default missing',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]).toMatchObject({
+        id: 'setDefault.user.bio',
+        operationClass: 'additive',
+      });
+      expect(result.operations[0]!.execute[0]!.sql).toContain('SET DEFAULT');
+      expect(result.conflicts).toHaveLength(0);
+    });
+
+    it('generates widening SET DEFAULT for default_mismatch', () => {
+      const contract = contractWithColumnDefault('user', 'status', 'text', {
+        kind: 'literal',
+        value: 'active',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_mismatch',
+            table: 'user',
+            column: 'status',
+            expected: 'active',
+            actual: 'pending',
+            message: 'default mismatch',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]).toMatchObject({
+        id: 'setDefault.user.status',
+        operationClass: 'widening',
+      });
+      expect(result.operations[0]!.execute[0]!.sql).toContain('SET DEFAULT');
+      expect(result.conflicts).toHaveLength(0);
+    });
+
+    it('generates SET DEFAULT with function expression for default_missing', () => {
+      const contract = contractWithColumnDefault('user', 'created_at', 'timestamptz', {
+        kind: 'function',
+        expression: 'now()',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_missing',
+            table: 'user',
+            column: 'created_at',
+            expected: 'now()',
+            message: 'default missing',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]!.execute[0]!.sql).toContain('SET DEFAULT');
+      expect(result.operations[0]!.execute[0]!.sql).toContain('now()');
+    });
+
+    it('returns conflict for default_missing when contract column not found', () => {
+      const result = plan([
+        issue({
+          kind: 'default_missing',
+          table: 'user',
+          column: 'nonexistent',
+          expected: 'literal(foo)',
+          message: 'default missing',
+        }),
+      ]);
+
+      expect(result.operations).toHaveLength(0);
+      expect(result.conflicts).toHaveLength(1);
+      expect(result.conflicts[0]).toMatchObject({ kind: 'missingButNonAdditive' });
+    });
+
+    it('returns conflict for default_mismatch when contract column not found', () => {
       const result = plan([
         issue({
           kind: 'default_mismatch',
           table: 'user',
-          column: 'status',
+          column: 'nonexistent',
           expected: 'active',
           actual: 'pending',
           message: 'default mismatch',
@@ -462,12 +587,107 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations).toHaveLength(0);
       expect(result.conflicts).toHaveLength(1);
-      expect(result.conflicts[0]).toMatchObject({
-        kind: 'missingButNonAdditive',
-        summary: 'default mismatch',
-      });
+      expect(result.conflicts[0]).toMatchObject({ kind: 'missingButNonAdditive' });
     });
 
+    it('returns conflict for default_mismatch when contract column has no default', () => {
+      const contract = contractWithColumn('user', 'status', 'text');
+      const result = plan(
+        [
+          issue({
+            kind: 'default_mismatch',
+            table: 'user',
+            column: 'status',
+            expected: 'active',
+            actual: 'pending',
+            message: 'default mismatch',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(0);
+      expect(result.conflicts).toHaveLength(1);
+    });
+
+    it('converts default_missing to conflict when policy forbids additive', () => {
+      const contract = contractWithColumnDefault('user', 'bio', 'text', {
+        kind: 'literal',
+        value: 'no bio',
+      });
+      const noAdditivePolicy: MigrationOperationPolicy = {
+        allowedOperationClasses: ['widening', 'destructive'],
+      };
+      const result = plan(
+        [
+          issue({
+            kind: 'default_missing',
+            table: 'user',
+            column: 'bio',
+            expected: 'literal(no bio)',
+            message: 'default missing',
+          }),
+        ],
+        { contract, policy: noAdditivePolicy },
+      );
+
+      expect(result.operations).toHaveLength(0);
+      expect(result.conflicts).toHaveLength(1);
+    });
+
+    it('converts default_mismatch to conflict when policy forbids widening', () => {
+      const contract = contractWithColumnDefault('user', 'status', 'text', {
+        kind: 'literal',
+        value: 'active',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_mismatch',
+            table: 'user',
+            column: 'status',
+            expected: 'active',
+            actual: 'pending',
+            message: 'default mismatch',
+          }),
+        ],
+        { contract, policy: ADDITIVE_ONLY_POLICY },
+      );
+
+      expect(result.operations).toHaveLength(0);
+      expect(result.conflicts).toHaveLength(1);
+    });
+
+    it('includes postcheck that verifies column default is set', () => {
+      const contract = contractWithColumnDefault('user', 'bio', 'text', {
+        kind: 'literal',
+        value: 'no bio',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_missing',
+            table: 'user',
+            column: 'bio',
+            expected: 'literal(no bio)',
+            message: 'default missing',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('column_default');
+      expect(postcheckSql).toContain('IS NOT NULL');
+    });
+  });
+
+  // =========================================================================
+  // Conflict conversion for unhandled issue kinds
+  // =========================================================================
+
+  describe('conflict conversion', () => {
     it('converts foreign_key_mismatch (non-additive) to foreignKeyConflict', () => {
       const result = plan([
         issue({

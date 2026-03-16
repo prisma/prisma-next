@@ -1,4 +1,4 @@
-import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
+import { escapeLiteral, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
@@ -10,6 +10,7 @@ import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-co
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PlanningMode, PostgresPlanTargetDetails } from './planner';
 import {
+  buildColumnDefaultSql,
   buildColumnTypeSql,
   buildTargetDetails,
   columnExistsCheck,
@@ -189,11 +190,36 @@ function buildReconciliationOperationFromIssue(options: {
       );
     }
 
-    // Remaining issue kinds (default_missing, default_mismatch, primary_key_mismatch,
-    // unique_constraint_mismatch, index_mismatch, foreign_key_mismatch) do not yet have
-    // reconciliation operation builders. They fall through to the caller, which converts them to
-    // conflicts via convertIssueToConflict. When a new SchemaIssue kind is added, add a
-    // case here if the planner can emit an operation for it; otherwise it becomes a conflict.
+    case 'default_missing': {
+      if (!issue.table || !issue.column) {
+        return null;
+      }
+      const contractCol = getContractColumn(contract, issue.table, issue.column);
+      if (!contractCol?.default) {
+        return null;
+      }
+      return buildSetDefaultOperation(schemaName, issue.table, issue.column, contractCol);
+    }
+
+    case 'default_mismatch': {
+      if (!issue.table || !issue.column) {
+        return null;
+      }
+      if (!mode.allowWidening) {
+        return null;
+      }
+      const contractCol = getContractColumn(contract, issue.table, issue.column);
+      if (!contractCol?.default) {
+        return null;
+      }
+      return buildAlterDefaultOperation(schemaName, issue.table, issue.column, contractCol);
+    }
+
+    // Remaining issue kinds (primary_key_mismatch, unique_constraint_mismatch,
+    // index_mismatch, foreign_key_mismatch) do not yet have reconciliation operation
+    // builders. They fall through to the caller, which converts them to conflicts via
+    // convertIssueToConflict. When a new SchemaIssue kind is added, add a case here if
+    // the planner can emit an operation for it; otherwise it becomes a conflict.
     default:
       return null;
   }
@@ -493,6 +519,101 @@ USING ${quoteIdentifier(columnName)}::${expectedType}`,
       },
     ],
   };
+}
+
+function buildSetDefaultOperation(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+  column: StorageColumn,
+): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  const qualified = qualifyTableName(schemaName, tableName);
+  const defaultClause = buildColumnDefaultSql(column.default, column);
+  return {
+    id: `setDefault.${tableName}.${columnName}`,
+    label: `Set default for ${columnName} on ${tableName}`,
+    summary: `Sets default on column ${columnName} of table ${tableName}`,
+    operationClass: 'additive',
+    target: {
+      id: 'postgres',
+      details: buildTargetDetails('column', columnName, schemaName, tableName),
+    },
+    precheck: [
+      {
+        description: `ensure column "${columnName}" exists`,
+        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+      },
+    ],
+    execute: [
+      {
+        description: `set default on "${columnName}"`,
+        sql: `ALTER TABLE ${qualified}\nALTER COLUMN ${quoteIdentifier(columnName)} SET ${defaultClause}`,
+      },
+    ],
+    postcheck: [
+      {
+        description: `verify column "${columnName}" has a default`,
+        sql: columnDefaultCheck({ schema: schemaName, table: tableName, column: columnName }),
+      },
+    ],
+  };
+}
+
+function buildAlterDefaultOperation(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+  column: StorageColumn,
+): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  const qualified = qualifyTableName(schemaName, tableName);
+  const defaultClause = buildColumnDefaultSql(column.default, column);
+  return {
+    id: `setDefault.${tableName}.${columnName}`,
+    label: `Change default for ${columnName} on ${tableName}`,
+    summary: `Changes default on column ${columnName} of table ${tableName}`,
+    operationClass: 'widening',
+    target: {
+      id: 'postgres',
+      details: buildTargetDetails('column', columnName, schemaName, tableName),
+    },
+    precheck: [
+      {
+        description: `ensure column "${columnName}" exists`,
+        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+      },
+    ],
+    execute: [
+      {
+        description: `change default on "${columnName}"`,
+        sql: `ALTER TABLE ${qualified}\nALTER COLUMN ${quoteIdentifier(columnName)} SET ${defaultClause}`,
+      },
+    ],
+    postcheck: [
+      {
+        description: `verify column "${columnName}" has a default`,
+        sql: columnDefaultCheck({ schema: schemaName, table: tableName, column: columnName }),
+      },
+    ],
+  };
+}
+
+function columnDefaultCheck({
+  schema,
+  table,
+  column,
+}: {
+  schema: string;
+  table: string;
+  column: string;
+}): string {
+  return `SELECT EXISTS (
+  SELECT 1
+  FROM information_schema.columns
+  WHERE table_schema = '${escapeLiteral(schema)}'
+    AND table_name = '${escapeLiteral(table)}'
+    AND column_name = '${escapeLiteral(column)}'
+    AND column_default IS NOT NULL
+)`;
 }
 
 // ============================================================================
