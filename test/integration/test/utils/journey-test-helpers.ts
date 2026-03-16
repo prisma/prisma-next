@@ -19,7 +19,7 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createMigrationVerifyCommand } from '@prisma-next/cli/commands/migration-verify';
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Command } from 'commander';
 import { join } from 'pathe';
 import { afterAll, beforeAll } from 'vitest';
@@ -409,7 +409,6 @@ export async function sql(
   query: string,
   params?: unknown[],
 ): Promise<{ rows: Record<string, unknown>[] }> {
-  const { withClient } = await import('@prisma-next/test-utils');
   return withClient(connectionString, async (client) => {
     const result = await client.query(query, params);
     return { rows: result.rows as Record<string, unknown>[] };
