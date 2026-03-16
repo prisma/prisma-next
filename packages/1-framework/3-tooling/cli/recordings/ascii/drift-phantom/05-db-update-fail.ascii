@@ -30,7 +30,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Recovery fails — cannot re-add NOT NULL column without default [email column missing, contract expects it
+]
 >
 
 
@@ -60,9 +61,9 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Recovery fails — cannot re-add NOT NULL column without default [email column missing, contract expects it
+]
 >
 
 
@@ -92,43 +93,10 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
-> prisma-next db introspect
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
-> prisma-next db introspect
-
+> # Recovery fails — cannot re-add NOT NULL column without default [email column missing, contract expects it
+]
+> prisma-next db update -y
 
 
 
@@ -158,9 +126,9 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
-> prisma-next db introspect
-
+> # Recovery fails — cannot re-add NOT NULL column without default [email column missing, contract expects it
+]
+> prisma-next db update -y
 
 
 
@@ -190,24 +158,56 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
-> prisma-next db introspect
-prisma-next db introspect → Inspect the database schema
+> # Recovery fails — cannot re-add NOT NULL column without default [email column missing, contract expects it
+]
+> prisma-next db update -y
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> # Recovery fails — cannot re-add NOT NULL column without default [email column missing, contract expects it
+]
+> prisma-next db update -y
+prisma-next db update → Update your database schema to match your contract
 │
 │ config:               prisma-next.config.ts
-│ database:             postgres://****:****@127.0.0.1:5433/postgres
+│ contract:             contract.json
 │
-│ Read more             https://pris.ly/db-introspect
+│ Read more             https://pris.ly/db-update
 └
 
 │
-│  contract
-│  ├─ table user
-│  │  ├─ columns
-│  │  │  ├─ email: text (not nullable)
-│  │  │  └─ id: int4 (not nullable)
-│  │  └─ primary key: id
-│  └─ plpgsql dependency is installed
+■  ✖ Database schema does not satisfy contract (4 failures) (PN-RTM-3020)
+│    Why: The resulting database schema does not satisfy the destination contract.
+│    Fix: Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update
+`
+│    Issues (showing 1 of 1):
+│      - [missing_column] Column "user"."email" is missing from database
 >
 
 

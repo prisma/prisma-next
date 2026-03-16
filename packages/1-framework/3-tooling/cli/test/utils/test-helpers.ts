@@ -85,9 +85,6 @@ export function setupCommandMocks(): {
   // Reset exit code tracking
   resetExitCode();
 
-  // Force interactive mode so TerminalUI enables decoration
-  process.stdout.isTTY = true;
-
   // Mock console.log (legacy path)
   console.log = vi.fn((...args: unknown[]) => {
     consoleOutput.push(args.map(String).join(' '));
@@ -119,6 +116,9 @@ export function setupCommandMocks(): {
     }
     return true;
   }) as typeof process.stderr.write;
+
+  // Force interactive mode so TerminalUI enables decoration
+  process.stdout.isTTY = true;
 
   // Mock process.exit to record the exit code and throw
   process.exit = vi.fn((code?: number) => {

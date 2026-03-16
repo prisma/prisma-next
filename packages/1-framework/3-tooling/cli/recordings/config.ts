@@ -265,7 +265,7 @@ export const config: RecordingsConfig = {
       steps: [
         {
           ordinal: '01',
-          slug: 'contract-emit-v2',
+          slug: 'contract-emit-updated',
           command: 'prisma-next contract emit',
           description: 'Emit updated contract with new nullable column',
           dbState: 'initialized with base contract',
@@ -277,7 +277,7 @@ export const config: RecordingsConfig = {
           slug: 'db-update-dry-run',
           command: 'prisma-next db update --dry-run',
           description: 'Preview planned ADD COLUMN operation',
-          dbState: 'initialized with base, contract is v2',
+          dbState: 'initialized, contract updated with new column',
           sleepAfterEnter: '12s',
         },
         {
@@ -285,7 +285,7 @@ export const config: RecordingsConfig = {
           slug: 'db-update-apply',
           command: 'prisma-next db update',
           description: 'Apply additive change, update marker',
-          dbState: 'initialized with base, contract is v2',
+          dbState: 'initialized, contract updated with new column',
           sleepAfterEnter: '12s',
         },
         {
@@ -293,7 +293,7 @@ export const config: RecordingsConfig = {
           slug: 'db-update-noop',
           command: 'prisma-next db update',
           description: 'No-op — database already matches contract',
-          dbState: 'updated to v2, marker matches',
+          dbState: 'updated, marker matches contract',
           sleepAfterEnter: '10s',
         },
         {
@@ -301,7 +301,7 @@ export const config: RecordingsConfig = {
           slug: 'db-verify',
           command: 'prisma-next db verify',
           description: 'Verify marker matches updated contract',
-          dbState: 'updated to v2, marker matches',
+          dbState: 'updated, marker matches contract',
           sleepAfterEnter: '10s',
         },
       ],
@@ -366,7 +366,7 @@ export const config: RecordingsConfig = {
           slug: 'db-verify-fail',
           command: 'prisma-next db verify',
           description: 'Verify fails — marker hash does not match new contract',
-          dbState: 'initialized with base, contract swapped to v2',
+          dbState: 'initialized with base, contract swapped to additive',
           before: [
             { type: 'swap-contract', contract: 'contract-additive.ts' },
             { type: 'emit-contract' },
@@ -378,7 +378,7 @@ export const config: RecordingsConfig = {
           slug: 'db-schema-verify-fail',
           command: 'prisma-next db schema-verify',
           description: 'Schema verify fails — missing name column',
-          dbState: 'base schema, v2 contract expects name column',
+          dbState: 'base schema, contract expects name column',
           sleepAfterEnter: '10s',
         },
         {
@@ -386,7 +386,7 @@ export const config: RecordingsConfig = {
           slug: 'db-update-recovery',
           command: 'prisma-next db update',
           description: 'Recovery — apply pending change, update marker',
-          dbState: 'base schema, v2 contract',
+          dbState: 'base schema, contract expects name column',
           sleepAfterEnter: '12s',
         },
         {
@@ -394,7 +394,7 @@ export const config: RecordingsConfig = {
           slug: 'db-verify-pass',
           command: 'prisma-next db verify',
           description: 'Verify passes after recovery',
-          dbState: 'updated to v2, marker matches',
+          dbState: 'updated, marker matches contract',
           sleepAfterEnter: '10s',
         },
       ],

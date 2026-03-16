@@ -1,5 +1,5 @@
 Set Shell bash
-Set Width 1480
+Set Width 1160
 Set FontSize 16
 Set FontFamily "JetBrains Mono"
 Set Padding 20

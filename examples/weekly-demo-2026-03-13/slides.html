@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prisma Next CLI — Week of March 13</title>
+
+<!-- reveal.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  /* ── Catppuccin Frappe Palette ── */
+  :root {
+    --ctp-base: #303446;
+    --ctp-mantle: #292c3c;
+    --ctp-crust: #232634;
+    --ctp-surface0: #414559;
+    --ctp-surface1: #51576d;
+    --ctp-surface2: #626880;
+    --ctp-overlay0: #737994;
+    --ctp-overlay1: #838ba7;
+    --ctp-text: #c6d0f5;
+    --ctp-subtext0: #a5adce;
+    --ctp-subtext1: #b5bfe2;
+    --ctp-green: #a6d189;
+    --ctp-teal: #81c8be;
+    --ctp-blue: #8caaee;
+    --ctp-red: #e78284;
+    --ctp-yellow: #e5c890;
+    --ctp-peach: #ef9f76;
+    --ctp-mauve: #ca9ee6;
+    --ctp-pink: #f4b8e4;
+  }
+
+  /* ── reveal.js overrides ── */
+  .reveal-viewport {
+    background: var(--ctp-crust);
+  }
+
+  .reveal {
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
+    font-size: 32px;
+    color: var(--ctp-text);
+  }
+
+  .reveal .slides section {
+    text-align: left;
+    padding: 16px 60px 20px;
+    box-sizing: border-box;
+    width: 100% !important;
+    overflow: hidden;
+  }
+
+  /* Recording slides: top-align for max SVG space */
+  .reveal .slides section.recording-slide {
+    padding: 20px 60px 10px;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .recording-slide .section-label { margin-bottom: 0.3em; }
+  .recording-slide h2 { margin-bottom: 0.3em; font-size: 1.3em; }
+  .recording-slide .journey-flow { margin: 0.15em 0 0.3em; }
+  .recording-slide .recording-tabs { margin-bottom: 0.25em; }
+  .recording-slide .recording-wrapper { margin: 0.2em 0 0; flex: 1; min-height: 0; }
+  .recording-slide .small { margin-top: 0.15em; }
+
+  .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+    font-family: 'Geist', system-ui, sans-serif;
+    color: var(--ctp-text);
+    text-transform: none;
+    letter-spacing: -0.03em;
+    font-weight: 600;
+    line-height: 1.15;
+    margin-bottom: 0.6em;
+  }
+
+  .reveal h1 { font-size: 2.4em; font-weight: 700; }
+  .reveal h2 { font-size: 1.5em; }
+  .reveal h3 { font-size: 1.1em; color: var(--ctp-subtext0); font-weight: 500; }
+
+  .reveal p, .reveal li {
+    color: var(--ctp-subtext1);
+    line-height: 1.6;
+    font-size: 0.72em;
+  }
+
+  .reveal ul { list-style: none; padding-left: 0; margin: 0; }
+  .reveal ul li {
+    position: relative;
+    padding-left: 1.4em;
+    margin-bottom: 0.45em;
+  }
+  .reveal ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ctp-teal);
+  }
+
+  .reveal code, .reveal .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88em;
+  }
+
+  .reveal code {
+    background: var(--ctp-surface0);
+    color: var(--ctp-green);
+    padding: 0.12em 0.4em;
+    border-radius: 4px;
+    font-size: 0.82em;
+  }
+
+  .reveal .accent { color: var(--ctp-green); }
+  .reveal .accent-blue { color: var(--ctp-blue); }
+  .reveal .accent-teal { color: var(--ctp-teal); }
+  .reveal .accent-yellow { color: var(--ctp-yellow); }
+  .reveal .accent-red { color: var(--ctp-red); }
+  .reveal .accent-peach { color: var(--ctp-peach); }
+  .reveal .dim { color: var(--ctp-overlay0); }
+  .reveal .small { font-size: 0.6em; }
+
+  /* ── Section labels ── */
+  .section-label {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.42em;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ctp-teal);
+    border: 1px solid var(--ctp-surface1);
+    border-radius: 100px;
+    padding: 0.25em 1em;
+    margin-bottom: 0.8em;
+  }
+
+  /* ── Title slide ── */
+  .title-slide {
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+
+  .title-slide h1 {
+    margin-bottom: 0.15em;
+  }
+
+  .title-slide .subtitle {
+    color: var(--ctp-overlay1);
+    font-size: 0.65em;
+    font-weight: 400;
+    margin: 0;
+  }
+
+  .title-slide .date {
+    color: var(--ctp-surface2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.45em;
+    margin-top: 1.5em;
+  }
+
+  .title-divider {
+    width: 80px;
+    height: 2px;
+    background: var(--ctp-teal);
+    margin: 1.2em auto;
+    border: none;
+  }
+
+  /* ── Flags table ── */
+  .flags-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25em 1.2em;
+    font-size: 0.65em;
+    margin: 0.8em 0;
+  }
+
+  .flags-grid .flag {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ctp-green);
+    white-space: nowrap;
+  }
+
+  .flags-grid .desc {
+    color: var(--ctp-subtext0);
+  }
+
+  /* ── Before/After ── */
+  .before-after {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1em;
+    margin: 0.8em 0;
+    font-size: 0.62em;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .before-after .panel {
+    padding: 1em 1.2em;
+    border-radius: 8px;
+    border: 1px solid var(--ctp-surface1);
+  }
+
+  .before-after .panel-before {
+    background: var(--ctp-crust);
+    border-color: var(--ctp-surface0);
+  }
+
+  .before-after .panel-after {
+    background: var(--ctp-mantle);
+    border-color: var(--ctp-teal);
+    border-opacity: 0.3;
+  }
+
+  .before-after .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75em;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.6em;
+  }
+
+  .before-after .panel-before .panel-label { color: var(--ctp-overlay0); }
+  .before-after .panel-after .panel-label { color: var(--ctp-teal); }
+
+  .before-after ul { margin: 0; }
+  .before-after li { font-size: 1em; margin-bottom: 0.3em; }
+
+  /* ── Arrow items (flag renames) ── */
+  .arrow-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-bottom: 0.3em;
+    font-size: 0.65em;
+  }
+
+  .arrow-item .old {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ctp-red);
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
+
+  .arrow-item .arrow {
+    color: var(--ctp-surface2);
+  }
+
+  .arrow-item .new {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ctp-green);
+    font-weight: 500;
+  }
+
+  /* ── Bug fix highlight ── */
+  .fix-block {
+    background: var(--ctp-mantle);
+    border-left: 3px solid var(--ctp-peach);
+    border-radius: 0 6px 6px 0;
+    padding: 0.8em 1.2em;
+    margin: 0.6em 0;
+    font-size: 0.65em;
+  }
+
+  .fix-block .fix-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.4em;
+  }
+
+  /* ── Recording container ── */
+  .recording-wrapper {
+    position: relative;
+    margin: 0.6em 0;
+  }
+
+  .recording-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.5em;
+    color: var(--ctp-overlay0);
+    margin-bottom: 0.3em;
+  }
+
+  .recording-container {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--ctp-surface1);
+    background: var(--ctp-base);
+  }
+
+  .recording-container object {
+    display: block;
+    width: 1200px;
+    height: 750px;
+    transform-origin: top left;
+    transform: scale(0.7);
+  }
+
+  .recording-container {
+    max-width: 840px;
+    height: 440px;
+  }
+
+  /* ── Journey flow diagrams ── */
+  .journey-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.48em;
+    margin: 0.3em 0 0.6em;
+    flex-wrap: wrap;
+  }
+
+  .journey-flow .step {
+    color: var(--ctp-text);
+    background: var(--ctp-surface0);
+    padding: 0.3em 0.6em;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .journey-flow .step.highlight {
+    background: var(--ctp-teal);
+    color: var(--ctp-crust);
+    font-weight: 600;
+  }
+
+  .journey-flow .step.error {
+    background: var(--ctp-red);
+    color: var(--ctp-crust);
+    font-weight: 600;
+  }
+
+  .journey-flow .step.recovery {
+    background: var(--ctp-green);
+    color: var(--ctp-crust);
+    font-weight: 600;
+  }
+
+  .journey-flow .sep {
+    color: var(--ctp-surface2);
+    padding: 0 0.2em;
+    font-size: 1.1em;
+  }
+
+  /* ── Scenario grid ── */
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8em;
+    margin: 0.5em 0;
+    font-size: 0.62em;
+  }
+
+  .scenario-card {
+    padding: 0.8em 1em;
+    border-radius: 6px;
+    border: 1px solid var(--ctp-surface0);
+    background: var(--ctp-mantle);
+  }
+
+  .scenario-card h4 {
+    font-size: 0.85em;
+    color: var(--ctp-text);
+    margin: 0 0 0.3em;
+    font-weight: 500;
+  }
+
+  .scenario-card p {
+    font-size: 0.9em;
+    color: var(--ctp-overlay1);
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  /* ── Stat row ── */
+  .stat-row {
+    display: flex;
+    gap: 2em;
+    margin: 0.8em 0;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.8em;
+    font-weight: 700;
+    color: var(--ctp-teal);
+    line-height: 1;
+  }
+
+  .stat .label {
+    font-size: 0.5em;
+    color: var(--ctp-overlay0);
+    margin-top: 0.3em;
+  }
+
+  /* ── Wrap-up takeaway ── */
+  .takeaway {
+    font-size: 0.85em;
+    color: var(--ctp-text);
+    line-height: 1.65;
+    max-width: 80%;
+    font-weight: 400;
+  }
+
+  .takeaway strong {
+    color: var(--ctp-teal);
+    font-weight: 600;
+  }
+
+  /* ── Split slide (text + recording side by side) ── */
+  .reveal .slides section.split-slide {
+    display: flex !important;
+    gap: 1.5em;
+    align-items: stretch;
+    padding: 24px 60px 16px;
+  }
+
+  .split-text {
+    flex: 0 0 34%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .split-text .section-label { margin-bottom: 0.4em; }
+  .split-text h2 { font-size: 1.3em; margin-bottom: 0.5em; }
+  .split-text ul { margin: 0; }
+  .split-text li { font-size: 0.58em; margin-bottom: 0.35em; line-height: 1.45; }
+  .split-text code { white-space: nowrap; }
+
+  .split-recording {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .split-recording .recording-tabs { margin-bottom: 0.3em; }
+
+  .split-recording .recording-wrapper {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+  }
+
+  .split-recording .recording-container {
+    max-width: none;
+    height: 100%;
+  }
+
+  .split-recording .recording-container object {
+    width: 1000px;
+    height: 750px;
+    transform: scale(0.6);
+  }
+
+  /* ── Recording tabs (for multi-recording slides) ── */
+  .recording-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 0.4em;
+  }
+
+  .recording-tabs button {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.42em;
+    padding: 0.35em 0.8em;
+    border: 1px solid var(--ctp-surface1);
+    border-radius: 100px;
+    background: transparent;
+    color: var(--ctp-overlay0);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .recording-tabs button:hover {
+    border-color: var(--ctp-surface2);
+    color: var(--ctp-subtext0);
+  }
+
+  .recording-tabs button.active {
+    background: var(--ctp-teal);
+    border-color: var(--ctp-teal);
+    color: var(--ctp-crust);
+    font-weight: 600;
+  }
+
+  /* ── Slide transitions ── */
+  .reveal .slides section {
+    transition: opacity 0.3s ease;
+  }
+
+  /* ── Progress bar ── */
+  .reveal .progress {
+    color: var(--ctp-teal);
+    height: 3px;
+  }
+
+  /* ── Slide number ── */
+  .reveal .slide-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ctp-surface2);
+    background: transparent;
+    right: 16px;
+    bottom: 16px;
+  }
+
+  /* ═══ HARDENING ═══ */
+
+  /* ── Text overflow protection ── */
+  .reveal code {
+    overflow-wrap: break-word;
+    word-break: break-all;
+    max-width: 100%;
+  }
+
+  .reveal li, .reveal p {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+
+  .before-after .panel {
+    min-width: 0; /* allow grid items to shrink */
+    overflow: hidden;
+  }
+
+  .before-after li {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .flags-grid {
+    min-width: 0;
+  }
+
+  .flags-grid > * {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .scenario-card {
+    min-width: 0;
+  }
+
+  .scenario-card p {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ── Flex/Grid child overflow prevention ── */
+  .journey-flow .step {
+    min-width: 0;
+  }
+
+  .stat {
+    min-width: 0;
+  }
+
+  .recording-tabs {
+    flex-wrap: wrap;
+  }
+
+  /* ── Focus styles for keyboard navigation ── */
+  .recording-tabs button:focus-visible {
+    outline: 2px solid var(--ctp-teal);
+    outline-offset: 2px;
+  }
+
+  /* ── Reduced motion ── */
+  @media (prefers-reduced-motion: reduce) {
+    .reveal .slides section {
+      transition: none !important;
+    }
+
+    .recording-tabs button {
+      transition: none;
+    }
+  }
+
+  /* ── SVG load failure fallback ── */
+  .recording-container object {
+    color: var(--ctp-overlay0); /* fallback text color if SVG fails */
+  }
+
+  .recording-container::after {
+    content: '';
+    display: none;
+  }
+
+  .recording-container.load-failed::after {
+    content: 'Recording failed to load';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    inset: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--ctp-overlay0);
+    background: var(--ctp-mantle);
+    border-radius: 10px;
+  }
+
+  /* ── High contrast / forced-colors ── */
+  @media (forced-colors: active) {
+    .section-label,
+    .recording-tabs button,
+    .recording-controls button {
+      border: 1px solid ButtonText;
+    }
+
+    .journey-flow .step {
+      border: 1px solid ButtonText;
+    }
+  }
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 1 — Title
+     ═══════════════════════════════════════════════════ -->
+<section class="title-slide">
+  <h1>Prisma Next <span class="accent-teal">CLI</span></h1>
+  <hr class="title-divider">
+  <p class="subtitle">Alberto Schiabel</p>
+  <p class="date">Week of March 13, 2026</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 2 — CLI Revamp: Architecture & UX
+     ═══════════════════════════════════════════════════ -->
+<section class="split-slide">
+  <div class="split-text">
+    <div class="section-label">CLI Revamp</div>
+    <h2>Architecture &amp; UX</h2>
+
+    <ul>
+      <li>Modular output system &mdash; dedicated formatters per command domain</li>
+      <li>Centralized terminal layer &mdash; spinners, stdout/stderr routing, interactive mode</li>
+      <li><span class="accent">"Did you mean?"</span> suggestions &amp; graceful SIGINT/SIGTERM shutdown</li>
+      <li>Copy-pastable examples in every <code>--help</code>, interactive confirmation for destructive ops</li>
+    </ul>
+  </div>
+
+  <div class="split-recording">
+    <div class="recording-tabs" data-group="revamp" role="tablist" aria-label="CLI revamp recordings">
+      <button class="active" role="tab" aria-selected="true" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/11-db-verify-jq.svg">db verify | jq</button>
+      <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/db-init/help.svg">db init --help</button>
+      <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/db-update/help.svg">db update --help</button>
+    </div>
+
+    <div class="recording-wrapper">
+      <div class="recording-container" data-group="revamp">
+        <object data="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/11-db-verify-jq.svg"
+                type="image/svg+xml"
+                aria-label="Terminal recording: db verify piped to jq">Recording unavailable</object>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 3 — CLI Revamp: Unified Surface
+     ═══════════════════════════════════════════════════ -->
+<section>
+  <div class="section-label">CLI Revamp</div>
+  <h2>Unified Surface</h2>
+
+  <div style="margin-bottom: 0.6em;">
+    <h3 style="margin-bottom: 0.4em;">Flag Renames</h3>
+    <div class="arrow-item">
+      <span class="old">--plan</span>
+      <span class="arrow">&rarr;</span>
+      <span class="new">--dry-run</span>
+    </div>
+    <div class="arrow-item">
+      <span class="old">--accept-data-loss</span>
+      <span class="arrow">&rarr;</span>
+      <span class="new">-y / --yes</span>
+    </div>
+  </div>
+
+  <h3 style="margin-bottom: 0.3em;">Global Flags</h3>
+  <div class="flags-grid">
+    <span class="flag">--json</span>          <span class="desc">Single JSON object to stdout</span>
+    <span class="flag">-q</span>              <span class="desc">Quiet &mdash; errors only</span>
+    <span class="flag">-v / -vv</span>        <span class="desc">Verbose / Trace with timings</span>
+    <span class="flag">--color / --no-color</span> <span class="desc">ANSI color control</span>
+    <span class="flag">-y / --yes</span>      <span class="desc">Auto-accept destructive changes</span>
+    <span class="flag">--trace</span>         <span class="desc">Deep internals + stack traces</span>
+  </div>
+
+  <div style="margin-top: 0.5em;">
+    <h3 style="margin-bottom: 0.3em;"><code>db verify</code> &mdash; Upgraded</h3>
+    <ul>
+      <li>Now checks <span class="accent">marker + structural schema</span> by default</li>
+      <li><code>--fast</code> for marker-only (old behavior)</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 4 — Bug Fixes: Default Normalizer
+     ═══════════════════════════════════════════════════ -->
+<section>
+  <div class="section-label">Bug Fixes</div>
+  <h2>Postgres Default Normalizer</h2>
+
+  <div class="fix-block">
+    <div class="fix-label" style="color: var(--ctp-peach);">Problem</div>
+    <p style="margin: 0; font-size: 1em; color: var(--ctp-subtext1);">
+      Schema verification failed on valid defaults &mdash;
+      cast-wrapped timestamps (<code>now()::timestamp</code>),
+      <code>NULL</code> defaults, and numeric overflow were not
+      normalized to their canonical forms.
+    </p>
+  </div>
+
+  <div class="fix-block" style="border-left-color: var(--ctp-green);">
+    <div class="fix-label" style="color: var(--ctp-green);">Fix</div>
+    <p style="margin: 0; font-size: 1em; color: var(--ctp-subtext1);">
+      Canonical form normalization in <code>default-normalizer.ts</code>
+      &mdash; each default expression is reduced to a single representative
+      form before comparison.
+    </p>
+  </div>
+
+  <div class="fix-block" style="border-left-color: var(--ctp-blue);">
+    <div class="fix-label" style="color: var(--ctp-blue);">Precision</div>
+    <p style="margin: 0; font-size: 1em; color: var(--ctp-subtext1);">
+      <code>clock_timestamp()</code> is now kept distinct from <code>now()</code>
+      &mdash; volatile vs. stable semantics preserved.
+    </p>
+  </div>
+
+  <p class="small dim" style="margin-top: 1em;">
+    Schema verification now correctly matches semantically equivalent defaults.
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 5 — Testing Philosophy
+     ═══════════════════════════════════════════════════ -->
+<section>
+  <div class="section-label">CLI Scenarios</div>
+  <h2>Testing Philosophy</h2>
+
+  <p class="takeaway" style="margin-bottom: 0.8em; font-size: 0.72em;">
+    <strong>Goal:</strong> capture the flows used most often,
+    by the majority of our future users.
+  </p>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="num">12</div>
+      <div class="label">journey test files</div>
+    </div>
+    <div class="stat">
+      <div class="num">3</div>
+      <div class="label">categories</div>
+    </div>
+    <div class="stat">
+      <div class="num">35+</div>
+      <div class="label">SVG recordings</div>
+    </div>
+  </div>
+
+  <div class="scenario-grid" style="margin-top: 0.6em;">
+    <div class="scenario-card">
+      <h4 class="accent">Happy Paths</h4>
+      <p>Greenfield setup, direct update, schema evolution, brownfield adoption</p>
+    </div>
+    <div class="scenario-card">
+      <h4 class="accent-peach">Drift Detection</h4>
+      <p>Phantom drift, missing marker, stale marker, DAG breakage</p>
+    </div>
+    <div class="scenario-card">
+      <h4 class="accent-red">Error Scenarios</h4>
+      <p>Config errors, connection failures, contract mismatches</p>
+    </div>
+    <div class="scenario-card">
+      <h4 class="accent-blue">Ergonomics</h4>
+      <p>Help output, global flags, quiet/verbose modes, JSON output</p>
+    </div>
+  </div>
+
+  <p class="small dim" style="margin-top: 0.3em;">
+    All tests run against real PostgreSQL (PGlite) &mdash; not mocks.
+    Each journey recorded as an animated SVG.
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 6 — Happy Paths (with SVG recordings)
+     ═══════════════════════════════════════════════════ -->
+<section class="recording-slide">
+  <div class="section-label">Happy Paths</div>
+  <h2>Greenfield Setup</h2>
+
+  <p class="dim" style="margin: 0.2em 0 0.4em; font-size: 0.55em;">Full setup from scratch: emit the contract, initialize the database, and verify the result.</p>
+
+  <div class="recording-tabs" data-group="happy" role="tablist" aria-label="Greenfield setup recordings">
+    <button class="active" role="tab" aria-selected="true" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/01-contract-emit.svg">contract emit</button>
+    <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/03-db-init.svg">db init</button>
+    <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/05-db-verify.svg">db verify</button>
+  </div>
+
+  <div class="recording-wrapper">
+    <div class="recording-container" data-group="happy">
+      <object data="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/01-contract-emit.svg"
+              type="image/svg+xml"
+              aria-label="Terminal recording: contract emit">Recording unavailable</object>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 7 — Happy Path: Direct Update + Drift
+     ═══════════════════════════════════════════════════ -->
+<section class="recording-slide">
+  <div class="section-label">Happy Paths</div>
+  <h2>Direct Update</h2>
+
+  <p class="dim" style="margin: 0.2em 0 0.4em; font-size: 0.55em;">Apply a schema change: emit the updated contract, preview with dry-run, apply, and verify.</p>
+
+  <div class="recording-tabs" data-group="update" role="tablist" aria-label="Direct update recordings">
+    <button class="active" role="tab" aria-selected="true" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/direct-update/02-db-update-dry-run.svg">update --dry-run</button>
+    <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/direct-update/03-db-update-apply.svg">update apply</button>
+    <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/direct-update/05-db-verify.svg">verify</button>
+  </div>
+
+  <div class="recording-wrapper">
+    <div class="recording-container" data-group="update">
+      <object data="../../packages/1-framework/3-tooling/cli/recordings/svgs/direct-update/02-db-update-dry-run.svg"
+              type="image/svg+xml"
+              aria-label="Terminal recording: db update dry-run">Recording unavailable</object>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 8 — Drift Detection (with SVG recordings)
+     ═══════════════════════════════════════════════════ -->
+<section class="recording-slide">
+  <div class="section-label">Drift Detection</div>
+  <h2>Phantom Drift Detection</h2>
+
+  <p class="dim" style="margin: 0.2em 0 0.4em; font-size: 0.55em;">After a manual DDL drops a column, <code>db verify</code> now catches it via structural schema check.</p>
+
+  <div class="recording-tabs" data-group="drift" role="tablist" aria-label="Drift detection recordings">
+    <button class="active" role="tab" aria-selected="true" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/drift-phantom/01-db-verify-fail.svg">verify (catches drift)</button>
+    <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/drift-phantom/02-db-verify-fast-pass.svg">verify --fast (marker only)</button>
+    <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/drift-phantom/03-db-schema-verify-fail.svg">schema-verify fail</button>
+  </div>
+
+  <div class="recording-wrapper">
+    <div class="recording-container" data-group="drift">
+      <object data="../../packages/1-framework/3-tooling/cli/recordings/svgs/drift-phantom/01-db-verify-fail.svg"
+              type="image/svg+xml"
+              aria-label="Terminal recording: db verify catches phantom drift">Recording unavailable</object>
+    </div>
+  </div>
+
+  <p class="small dim" style="margin-top: 0.3em;">
+    Also tested: missing marker recovery (via <code>db init</code>) and stale marker recovery (via <code>db update</code>)
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 9 — Wrap-up
+     ═══════════════════════════════════════════════════ -->
+<section class="title-slide">
+  <h2 style="margin-bottom: 0.6em;">Takeaway</h2>
+
+  <p class="takeaway" style="text-align: center; max-width: 75%; margin: 0 auto;">
+    Refining user journeys via <strong>scenario tests</strong> made it easier
+    to identify gaps in the CLI, and <strong>visually understand</strong>
+    our flows through recordings.
+  </p>
+
+  <hr class="title-divider" style="margin: 1em auto;">
+
+  <div class="stat-row" style="justify-content: center;">
+    <div class="stat">
+      <div class="num" style="color: var(--ctp-green);">12</div>
+      <div class="label">journeys</div>
+    </div>
+    <div class="stat">
+      <div class="num" style="color: var(--ctp-teal);">35+</div>
+      <div class="label">recordings</div>
+    </div>
+    <div class="stat">
+      <div class="num" style="color: var(--ctp-blue);">9</div>
+      <div class="label">bug fixes</div>
+    </div>
+  </div>
+
+  <p class="small dim" style="margin-top: 1.5em; text-align: center;">
+    Modular &middot; Tested &middot; Visually Documented
+  </p>
+</section>
+
+</div><!-- /.slides -->
+</div><!-- /.reveal -->
+
+<!-- reveal.js -->
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  slideNumber: true,
+  progress: true,
+  controls: false,
+  controlsTutorial: false,
+  transition: 'fade',
+  transitionSpeed: 'fast',
+  backgroundTransition: 'fade',
+  width: 1200,
+  height: 700,
+  margin: 0.06,
+  center: false,
+});
+
+/* ── Recording Tabs (switch between recordings) ── */
+
+document.querySelectorAll('.recording-tabs').forEach(tabGroup => {
+  const group = tabGroup.dataset.group;
+  const container = tabGroup.parentElement.querySelector(
+    `.recording-container[data-group="${group}"]`
+  );
+  if (!container) return;
+
+  const obj = container.querySelector('object');
+
+  tabGroup.querySelectorAll('button').forEach(tab => {
+    tab.addEventListener('click', () => {
+      // Update active tab + aria
+      tabGroup.querySelectorAll('button').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+
+      // Swap SVG source
+      const src = tab.dataset.src;
+      if (src && obj) {
+        obj.data = src;
+      }
+    });
+  });
+});
+
+/* ── SVG load failure detection ── */
+
+document.querySelectorAll('.recording-container object').forEach(obj => {
+  obj.addEventListener('error', () => {
+    obj.closest('.recording-container')?.classList.add('load-failed');
+  });
+});
+
+</script>
+</body>
+</html>

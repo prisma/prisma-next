@@ -30,7 +30,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Marker-only verification still passes — hash unchanged [email column dropped, marker row untouched]
 >
 
 
@@ -62,7 +62,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Marker-only verification still passes — hash unchanged [email column dropped, marker row untouched]
 >
 
 
@@ -94,8 +94,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
-> prisma-next db introspect
+> # Marker-only verification still passes — hash unchanged [email column dropped, marker row untouched]
+> prisma-next db verify --fast
 
 
 
@@ -126,8 +126,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
-> prisma-next db introspect
+> # Marker-only verification still passes — hash unchanged [email column dropped, marker row untouched]
+> prisma-next db verify --fast
 
 
 
@@ -158,8 +158,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
-> prisma-next db introspect
+> # Marker-only verification still passes — hash unchanged [email column dropped, marker row untouched]
+> prisma-next db verify --fast
 
 
 
@@ -190,26 +190,26 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
-> prisma-next db introspect
-prisma-next db introspect → Inspect the database schema
+> # Marker-only verification still passes — hash unchanged [email column dropped, marker row untouched]
+> prisma-next db verify --fast
+prisma-next db verify → Check whether the database signature and live schema match your contract
 │
 │ config:               prisma-next.config.ts
-│ database:             postgres://****:****@127.0.0.1:5433/postgres
+│ contract:             contract.json
+│ mode:                 fast (marker only)
 │
-│ Read more             https://pris.ly/db-introspect
+│ Read more             https://pris.ly/db-verify
 └
 
 │
-│  contract
-│  ├─ table user
-│  │  ├─ columns
-│  │  │  ├─ email: text (not nullable)
-│  │  │  └─ id: int4 (not nullable)
-│  │  └─ primary key: id
-│  └─ plpgsql dependency is installed
+│  ✔ Database marker matches contract
+│    verification: marker only (--fast)
+│    storageHash: sha256:95060eda0d8ef9b30439212a41756c15066733defdde81ee7118f955be7361d1
+│    profileHash: sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98
+│
+│  ⚠ Schema verification skipped because --fast was provided. Run `prisma-next db schema-verify` to detect st
+ructural drift.
 >
-
 
 
 

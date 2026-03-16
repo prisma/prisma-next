@@ -30,7 +30,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Introspect shows schema without email column [user table has only id column]
 >
 
 
@@ -62,7 +62,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Introspect shows schema without email column [user table has only id column]
 >
 
 
@@ -94,7 +94,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Introspect shows schema without email column [user table has only id column]
 > prisma-next db introspect
 
 
@@ -126,7 +126,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Introspect shows schema without email column [user table has only id column]
 > prisma-next db introspect
 
 
@@ -158,7 +158,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Introspect shows schema without email column [user table has only id column]
 > prisma-next db introspect
 
 
@@ -190,7 +190,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+> # Introspect shows schema without email column [user table has only id column]
 > prisma-next db introspect
 prisma-next db introspect → Inspect the database schema
 │
@@ -204,11 +204,11 @@ prisma-next db introspect → Inspect the database schema
 │  contract
 │  ├─ table user
 │  │  ├─ columns
-│  │  │  ├─ email: text (not nullable)
 │  │  │  └─ id: int4 (not nullable)
 │  │  └─ primary key: id
 │  └─ plpgsql dependency is installed
 >
+
 
 
 
