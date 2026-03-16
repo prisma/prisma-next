@@ -85,4 +85,4 @@ A type-level-only SQL query builder DSL with no runtime implementation. Validate
 
 ## Priority gaps
 
-The most impactful gaps for a practical query builder: **DISTINCT**, **CTEs**, **set operations** (UNION/INTERSECT/EXCEPT), **window functions**, **IS NULL**, **NOT**, **CASE**, **arithmetic**, and **COALESCE** — those cover the vast majority of real-world queries that the current types can't express.
+The most impactful gaps for a practical query builder: **CTEs**, **set operations** (UNION/INTERSECT/EXCEPT), **window functions**, **IS NULL**, **NOT**, **CASE**, **arithmetic**, and **COALESCE** — those cover the vast majority of real-world queries that the current types can't express.

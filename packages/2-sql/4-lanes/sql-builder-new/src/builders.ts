@@ -35,7 +35,7 @@ export interface LateralBuilder<CodecTypes extends CodecTypesBase, ParentScope e
   ): SelectQuery<CodecTypes, MergeScopes<ParentScope, Other[typeof JoinOuterScope]>, EmptyRow>;
 }
 
-export interface JoinCapable<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
+export interface WithJoin<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
   innerJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, CodecTypes>,
@@ -89,7 +89,7 @@ export interface JoinCapable<CodecTypes extends CodecTypesBase, AvailableScope e
   >;
 }
 
-export interface SelectCapable<
+export interface WithSelect<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField> = EmptyRow,
@@ -116,8 +116,8 @@ export interface SelectCapable<
 }
 
 export interface JoinedTables<CodecTypes extends CodecTypesBase, AvailableScope extends Scope>
-  extends JoinCapable<CodecTypes, AvailableScope>,
-    SelectCapable<CodecTypes, AvailableScope> {}
+  extends WithJoin<CodecTypes, AvailableScope>,
+    WithSelect<CodecTypes, AvailableScope> {}
 
 export interface TableProxy<
   CodecTypes extends CodecTypesBase,
@@ -126,14 +126,14 @@ export interface TableProxy<
   Alias extends string = Name,
   AvailableScope extends Scope = DefaultScope<Name, Table>,
 > extends JoinSource<StorageTableToScopeTable<Table>, Alias>,
-    JoinCapable<CodecTypes, AvailableScope>,
-    SelectCapable<CodecTypes, AvailableScope> {
+    WithJoin<CodecTypes, AvailableScope>,
+    WithSelect<CodecTypes, AvailableScope> {
   as<Alias extends string>(
     newAlias: Alias,
   ): TableProxy<CodecTypes, Name, Table, Alias, AvailableScope>;
 }
 
-export interface Distinctable<
+export interface WithDistinct<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
@@ -150,7 +150,7 @@ export interface Distinctable<
   ): this;
 }
 
-export interface Paginatable<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
+export interface WithPagination<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
   limit(count: number): this;
   limit(
     expr: (
@@ -168,11 +168,11 @@ export interface Paginatable<CodecTypes extends CodecTypesBase, AvailableScope e
   ): this;
 }
 
-export interface Aliasable<RowType extends Record<string, ScopeField>> {
+export interface WithAlias<RowType extends Record<string, ScopeField>> {
   as<Alias extends string>(newAlias: Alias): JoinSource<RowType, Alias>;
 }
 
-export interface Executable<
+export interface WithExecution<
   CodecTypes extends CodecTypesBase,
   RowType extends Record<string, ScopeField>,
 > {
@@ -183,11 +183,11 @@ export interface SelectQuery<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-> extends SelectCapable<CodecTypes, AvailableScope, RowType>,
-    Distinctable<CodecTypes, AvailableScope, RowType>,
-    Paginatable<CodecTypes, AvailableScope>,
-    Aliasable<RowType>,
-    Executable<CodecTypes, RowType>,
+> extends WithSelect<CodecTypes, AvailableScope, RowType>,
+    WithDistinct<CodecTypes, AvailableScope, RowType>,
+    WithPagination<CodecTypes, AvailableScope>,
+    WithAlias<RowType>,
+    WithExecution<CodecTypes, RowType>,
     Subquery<RowType> {
   where(
     expr: ExpressionBuilder<AvailableScope, CodecTypes>,
@@ -222,10 +222,10 @@ export interface GroupedQuery<
   CodecTypes extends CodecTypesBase,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-> extends Distinctable<CodecTypes, AvailableScope, RowType>,
-    Paginatable<CodecTypes, AvailableScope>,
-    Aliasable<RowType>,
-    Executable<CodecTypes, RowType>,
+> extends WithDistinct<CodecTypes, AvailableScope, RowType>,
+    WithPagination<CodecTypes, AvailableScope>,
+    WithAlias<RowType>,
+    WithExecution<CodecTypes, RowType>,
     Subquery<RowType> {
   groupBy(
     ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
