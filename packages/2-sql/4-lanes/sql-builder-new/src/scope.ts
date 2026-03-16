@@ -3,6 +3,7 @@ import type { StorageTable } from '@prisma-next/sql-contract/types';
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 export declare const ExpressionType: unique symbol;
 export declare const JoinOuterScope: unique symbol;
+export declare const SubqueryMarker: unique symbol;
 
 export type Expand<T> = { [K in keyof T]: T[K] } & unknown;
 export type EmptyRow = Record<never, ScopeField>;
@@ -52,6 +53,10 @@ export type NullableScope<S extends Scope> = {
   namespaces: {
     [TableName in keyof S['namespaces']]: NullableScopeTable<S['namespaces'][TableName]>;
   };
+};
+
+export type Subquery<RowType extends Record<string, ScopeField>> = {
+  [SubqueryMarker]: RowType;
 };
 
 export type { CodecTypesBase, StorageTable };

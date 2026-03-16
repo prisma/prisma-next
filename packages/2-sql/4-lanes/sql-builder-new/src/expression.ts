@@ -1,4 +1,4 @@
-import type { Expand, ExpressionType, Scope, ScopeField, ScopeTable } from './scope';
+import type { Expand, ExpressionType, Scope, ScopeField, ScopeTable, Subquery } from './scope';
 
 export type Expression<T extends ScopeField> = {
   [ExpressionType]: T;
@@ -83,6 +83,31 @@ export type Functions<CT extends Record<string, { readonly input: unknown }>> = 
   ) => Expression<BooleanCodecType>;
   and: (...ands: ExpressionOrValue<BooleanCodecType, CT>[]) => Expression<BooleanCodecType>;
   or: (...ors: ExpressionOrValue<BooleanCodecType, CT>[]) => Expression<BooleanCodecType>;
+
+  exists: (subquery: Subquery<Record<string, ScopeField>>) => Expression<BooleanCodecType>;
+  notExists: (subquery: Subquery<Record<string, ScopeField>>) => Expression<BooleanCodecType>;
+
+  in: {
+    <CodecId extends string>(
+      expr: Expression<{ codecId: CodecId; nullable: boolean }>,
+      subquery: Subquery<Record<string, { codecId: CodecId; nullable: boolean }>>,
+    ): Expression<BooleanCodecType>;
+    <CodecId extends string>(
+      expr: Expression<{ codecId: CodecId; nullable: boolean }>,
+      values: Array<ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>>,
+    ): Expression<BooleanCodecType>;
+  };
+
+  notIn: {
+    <CodecId extends string>(
+      expr: Expression<{ codecId: CodecId; nullable: boolean }>,
+      subquery: Subquery<Record<string, { codecId: CodecId; nullable: boolean }>>,
+    ): Expression<BooleanCodecType>;
+    <CodecId extends string>(
+      expr: Expression<{ codecId: CodecId; nullable: boolean }>,
+      values: Array<ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>>,
+    ): Expression<BooleanCodecType>;
+  };
 };
 
 export type CountField = { codecId: 'pg/int8@1'; nullable: false };

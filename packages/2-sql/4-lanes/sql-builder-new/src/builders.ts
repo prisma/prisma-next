@@ -26,6 +26,7 @@ import type {
   ScopeField,
   ScopeTable,
   StorageTableToScopeTable,
+  Subquery,
 } from './scope';
 
 export interface LateralBuilder<CodecTypes extends CodecTypesBase, ParentScope extends Scope> {
@@ -168,7 +169,8 @@ export interface SelectQuery<
 > extends SelectCapable<CodecTypes, AvailableScope, RowType>,
     Paginatable<CodecTypes, AvailableScope>,
     Aliasable<RowType>,
-    Executable<CodecTypes, RowType> {
+    Executable<CodecTypes, RowType>,
+    Subquery<RowType> {
   where(
     expr: ExpressionBuilder<AvailableScope, CodecTypes>,
   ): SelectQuery<CodecTypes, AvailableScope, RowType>;
@@ -204,7 +206,8 @@ export interface GroupedQuery<
   RowType extends Record<string, ScopeField>,
 > extends Paginatable<CodecTypes, AvailableScope>,
     Aliasable<RowType>,
-    Executable<CodecTypes, RowType> {
+    Executable<CodecTypes, RowType>,
+    Subquery<RowType> {
   groupBy(
     ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
   ): GroupedQuery<CodecTypes, AvailableScope, RowType>;
