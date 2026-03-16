@@ -184,7 +184,7 @@ export class Collection<
         : isWhereDirectInput(input)
           ? input
           : shorthandToWhereExpr(this.ctx.contract, this.modelName, input);
-    const filter = normalizeWhereArg(whereArg);
+    const filter = normalizeWhereArg(whereArg, { contract: this.ctx.contract });
 
     if (!filter) {
       return this as Collection<TContract, ModelName, Row, WithWhereState<State>>;

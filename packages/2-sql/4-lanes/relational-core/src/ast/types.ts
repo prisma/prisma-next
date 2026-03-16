@@ -37,6 +37,14 @@ export interface AstRewriter extends ExpressionRewriter {
   eqColJoinOn?(on: EqColJoinOn): EqColJoinOn | WhereExpr;
 }
 
+export interface WhereExprVisitor<R> {
+  binary(expr: BinaryExpr): R;
+  and(expr: AndExpr): R;
+  or(expr: OrExpr): R;
+  exists(expr: ExistsExpr): R;
+  nullCheck(expr: NullCheckExpr): R;
+}
+
 export interface ExpressionFolder<T> {
   empty: T;
   combine(a: T, b: T): T;
@@ -228,6 +236,7 @@ export abstract class Expression extends AstNode implements ExpressionSource {
 }
 
 export abstract class WhereExpr extends AstNode {
+  abstract accept<R>(visitor: WhereExprVisitor<R>): R;
   abstract rewrite(rewriter: ExpressionRewriter): WhereExpr;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
   abstract not(): WhereExpr;
@@ -724,6 +733,10 @@ export class BinaryExpr extends WhereExpr {
     return new BinaryExpr('notIn', left, right);
   }
 
+  override accept<R>(visitor: WhereExprVisitor<R>): R {
+    return visitor.binary(this);
+  }
+
   override rewrite(rewriter: ExpressionRewriter): WhereExpr {
     return new BinaryExpr(
       this.op,
@@ -789,6 +802,10 @@ export class AndExpr extends WhereExpr {
     return new AndExpr([]);
   }
 
+  override accept<R>(visitor: WhereExprVisitor<R>): R {
+    return visitor.and(this);
+  }
+
   override rewrite(rewriter: ExpressionRewriter): WhereExpr {
     return new AndExpr(this.exprs.map((expr) => expr.rewrite(rewriter)));
   }
@@ -820,6 +837,10 @@ export class OrExpr extends WhereExpr {
 
   static false(): OrExpr {
     return new OrExpr([]);
+  }
+
+  override accept<R>(visitor: WhereExprVisitor<R>): R {
+    return visitor.or(this);
   }
 
   override rewrite(rewriter: ExpressionRewriter): WhereExpr {
@@ -857,6 +878,10 @@ export class ExistsExpr extends WhereExpr {
     return new ExistsExpr(subquery, true);
   }
 
+  override accept<R>(visitor: WhereExprVisitor<R>): R {
+    return visitor.exists(this);
+  }
+
   override rewrite(rewriter: ExpressionRewriter): WhereExpr {
     return new ExistsExpr(this.subquery.rewrite(rewriter), this.notExists);
   }
@@ -887,6 +912,10 @@ export class NullCheckExpr extends WhereExpr {
 
   static isNotNull(expr: Expression): NullCheckExpr {
     return new NullCheckExpr(expr, false);
+  }
+
+  override accept<R>(visitor: WhereExprVisitor<R>): R {
+    return visitor.nullCheck(this);
   }
 
   override rewrite(rewriter: ExpressionRewriter): WhereExpr {
