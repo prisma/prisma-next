@@ -218,8 +218,8 @@ function buildIncludeOrderArtifacts(
 function buildChildProjectionItems(include: IncludeState): ProjectionItem[] {
   return include.childProjection.aliases.map((alias, idx) => {
     const column = include.childProjection.columns[idx];
-    if (!column || !alias) {
-      errorMissingColumnForAlias(alias ?? 'unknown', idx);
+    if (!column) {
+      errorMissingColumnForAlias(alias, idx);
     }
     return ProjectionItem.of(alias, column.toExpr());
   });
