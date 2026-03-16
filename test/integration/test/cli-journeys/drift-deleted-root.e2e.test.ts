@@ -10,9 +10,9 @@
 
 import { readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -22,27 +22,20 @@ import {
   runMigrationStatus,
   setupJourney,
   swapContract,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
   describe('Journey P4: Deleted Root Migration', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'deleting root migration is detected as broken graph, not silently ignored',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Build a 2-migration chain: base → additive
         const emit0 = await runContractEmit(ctx);

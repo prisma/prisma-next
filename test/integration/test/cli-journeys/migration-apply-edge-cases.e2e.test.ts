@@ -8,9 +8,9 @@
  * - Multiple migrations including destructive in DAG order
  */
 
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -22,6 +22,7 @@ import {
   setupJourney,
   sql,
   swapContract,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -29,23 +30,15 @@ withTempDir(({ createTempDir }) => {
   // No planned migration path
   // ---------------------------------------------------------------------------
   describe('Migration Apply: no planned migration path', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'fails when contract changed without planning a new migration',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Setup: emit → plan → apply initial migration
         const emit0 = await runContractEmit(ctx);
@@ -76,23 +69,15 @@ withTempDir(({ createTempDir }) => {
   // Resume after partial failure
   // ---------------------------------------------------------------------------
   describe('Migration Apply: resume after partial failure', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'resumes from last successful migration after NOT NULL violation',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Plan and apply initial migration (creates user table)
         const emit0 = await runContractEmit(ctx);
@@ -109,7 +94,7 @@ withTempDir(({ createTempDir }) => {
 
         // Insert data so a NOT NULL column addition will fail
         await sql(
-          connectionString,
+          db.connectionString,
           `INSERT INTO "user" (id, email) VALUES (1, 'user@example.com')`,
         );
 
@@ -126,7 +111,7 @@ withTempDir(({ createTempDir }) => {
 
         // Marker stays at the first migration's target hash
         const marker = await sql(
-          connectionString,
+          db.connectionString,
           'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
           [1],
         );
@@ -135,7 +120,7 @@ withTempDir(({ createTempDir }) => {
         );
 
         // Fix: remove conflicting data, then resume
-        await sql(connectionString, 'DELETE FROM "user"');
+        await sql(db.connectionString, 'DELETE FROM "user"');
 
         const applyResume = await runMigrationApply(ctx, ['--json']);
         expect(applyResume.exitCode, 'resume succeeds').toBe(0);
@@ -154,23 +139,15 @@ withTempDir(({ createTempDir }) => {
   // Destructive apply (single drop-column)
   // ---------------------------------------------------------------------------
   describe('Migration Apply: destructive (drop column)', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'applies a migration that drops a column and verifies schema',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Plan and apply initial migration
         const emit0 = await runContractEmit(ctx);
@@ -182,7 +159,7 @@ withTempDir(({ createTempDir }) => {
 
         // Verify email column exists before drop
         const colsBefore = await sql(
-          connectionString,
+          db.connectionString,
           `SELECT column_name FROM information_schema.columns
            WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'email'`,
         );
@@ -209,7 +186,7 @@ withTempDir(({ createTempDir }) => {
 
         // Verify email column no longer exists
         const colsAfter = await sql(
-          connectionString,
+          db.connectionString,
           `SELECT column_name FROM information_schema.columns
            WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'email'`,
         );
@@ -217,7 +194,7 @@ withTempDir(({ createTempDir }) => {
 
         // Verify marker updated
         const marker = await sql(
-          connectionString,
+          db.connectionString,
           'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
           [1],
         );
@@ -235,23 +212,15 @@ withTempDir(({ createTempDir }) => {
   // Multiple migrations including destructive (batch apply)
   // ---------------------------------------------------------------------------
   describe('Migration Apply: multi-step with destructive', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'applies three migrations (create → add column → drop column) in one batch',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Migration 1: create user table (id + email)
         const emit0 = await runContractEmit(ctx);
@@ -288,7 +257,7 @@ withTempDir(({ createTempDir }) => {
 
         // Verify final schema: user table has id only (email dropped, name was never in destructive)
         const cols = await sql(
-          connectionString,
+          db.connectionString,
           `SELECT column_name FROM information_schema.columns
            WHERE table_schema = 'public' AND table_name = 'user'
            ORDER BY ordinal_position`,

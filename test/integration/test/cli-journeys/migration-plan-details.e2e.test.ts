@@ -15,8 +15,8 @@ import { join } from 'node:path';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { verifyMigration } from '@prisma-next/migration-tools/attestation';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { timeouts } from '@prisma-next/test-utils';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -25,6 +25,7 @@ import {
   runMigrationPlan,
   setupJourney,
   swapContract,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -32,23 +33,15 @@ withTempDir(({ createTempDir }) => {
   // Journey H: Plan JSON Envelope and Attestation
   // -------------------------------------------------------------------------
   describe('Journey H: Plan JSON Envelope and Attestation', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'emit → plan --json (verify envelope) → verify attestation → check chain linkage',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // H.01: contract emit
         const emit = await runContractEmit(ctx);
@@ -100,23 +93,15 @@ withTempDir(({ createTempDir }) => {
   // Journey I: Destructive Planning (Drop Column)
   // -------------------------------------------------------------------------
   describe('Journey I: Destructive Planning', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'emit → plan initial → swap destructive → plan drop-column → verify destructive ops',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // I.01: emit base contract and plan initial migration
         const emit0 = await runContractEmit(ctx);

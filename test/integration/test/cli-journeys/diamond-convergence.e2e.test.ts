@@ -17,8 +17,8 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { timeouts } from '@prisma-next/test-utils';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -30,6 +30,7 @@ import {
   runMigrationStatus,
   setupJourney,
   swapContract,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 function createSecondDbContext(baseCtx: JourneyContext, connectionString: string): JourneyContext {
@@ -43,34 +44,17 @@ function createSecondDbContext(baseCtx: JourneyContext, connectionString: string
 
 withTempDir(({ createTempDir }) => {
   describe('Journey D: Diamond Convergence', () => {
-    let stagingConnectionString: string;
-    let prodConnectionString: string;
-    let closeStagingDb: () => Promise<void> = async () => {};
-    let closeProdDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const stagingDb = await createDevDatabase();
-      stagingConnectionString = stagingDb.connectionString;
-      closeStagingDb = stagingDb.close;
-
-      const prodDb = await createDevDatabase();
-      prodConnectionString = prodDb.connectionString;
-      closeProdDb = prodDb.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeStagingDb();
-      await closeProdDb();
-    });
+    const stagingDb = useDevDatabase();
+    const prodDb = useDevDatabase();
 
     it(
       'two environments diverge from C1, converge to C5 via distinct paths',
       async () => {
         const staging: JourneyContext = setupJourney({
-          connectionString: stagingConnectionString,
+          connectionString: stagingDb.connectionString,
           createTempDir,
         });
-        const production = createSecondDbContext(staging, prodConnectionString);
+        const production = createSecondDbContext(staging, prodDb.connectionString);
 
         // D.01: emit base (C1) → plan init (∅→C1)
         const emit0 = await runContractEmit(staging);
