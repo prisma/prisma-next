@@ -1014,10 +1014,12 @@ function columnHasNoDefaultCheck(opts: { schema: string; table: string; column: 
 /**
  * Returns a type-appropriate zero-value SQL literal for the given PostgreSQL native type.
  * Used as a temporary DEFAULT when adding a NOT NULL column without an explicit default
- * to a potentially non-empty table.
+ * to a potentially non-empty table. Existing rows permanently receive this zero value.
  *
  * Returns null for unrecognized types (e.g. enums, arrays, extensions), which causes
  * the planner to fall back to the empty-table precheck.
+ *
+ * @internal Exported for testing only.
  */
 export function getTypeZeroDefault(nativeType: string): string | null {
   switch (nativeType.toLowerCase()) {
@@ -1063,7 +1065,8 @@ export function getTypeZeroDefault(nativeType: string): string | null {
     case 'jsonb':
       return "'{}'::jsonb";
 
-    // Timestamp types
+    // Date and timestamp types
+    case 'date':
     case 'timestamp':
     case 'timestamptz':
     case 'timestamp with time zone':
