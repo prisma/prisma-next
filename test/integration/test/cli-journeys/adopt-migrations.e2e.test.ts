@@ -71,6 +71,7 @@ withTempDir(({ createTempDir }) => {
           markerHash: string;
         }>(applyBaseline);
         expect(applyBaselineResult.ok, 'O.04: ok').toBe(true);
+        expect(applyBaselineResult.migrationsApplied, 'O.04: baseline is no-op').toBe(0);
         expect(applyBaselineResult.markerHash, 'O.04: marker still at C2').toBe(c2Hash);
 
         // O.05: swap to contract-phone-bio (C3) → emit → plan incremental C2→C3

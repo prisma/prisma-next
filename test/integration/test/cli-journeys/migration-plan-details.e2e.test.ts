@@ -146,6 +146,7 @@ withTempDir(({ createTempDir }) => {
           (op) => op.id.includes('email') || op.label.toLowerCase().includes('email'),
         );
         expect(dropOp, 'I.03: has email-related operation').toBeDefined();
+        expect(dropOp!.operationClass, 'I.03: email op is destructive').toBe('destructive');
 
         // I.04: verify destructive operation class on disk
         const migrationsDir = join(ctx.testDir, 'migrations');

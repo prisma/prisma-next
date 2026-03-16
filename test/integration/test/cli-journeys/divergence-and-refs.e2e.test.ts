@@ -79,7 +79,7 @@ withTempDir(({ createTempDir }) => {
         // L.04: status without --ref fails with AMBIGUOUS_LEAF
         const statusFail = await runMigrationStatus(ctx, ['--json']);
         expect(statusFail.exitCode, 'L.04: status fails').toBe(1);
-        const failOutput = stripAnsi(statusFail.stdout + statusFail.stderr);
+        const failOutput = stripAnsi(statusFail.stdout);
         expect(failOutput, 'L.04: mentions ambiguous leaf').toMatch(
           /ambiguous|AMBIGUOUS_LEAF|multiple.*leaf/i,
         );
@@ -97,6 +97,8 @@ withTempDir(({ createTempDir }) => {
           markerHash: string;
         }>(applyRef);
         expect(applyResult.ok, 'L.06: ok').toBe(true);
+        expect(applyResult.migrationsApplied, 'L.06: applied 1').toBe(1);
+        expect(applyResult.markerHash, 'L.06: marker at C3').toBe(c3Hash);
 
         // L.07: status with --ref production
         const statusRef = await runMigrationStatus(ctx, ['--ref', 'production', '--json']);

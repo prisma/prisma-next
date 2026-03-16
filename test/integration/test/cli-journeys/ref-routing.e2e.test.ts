@@ -112,13 +112,10 @@ withTempDir(({ createTempDir }) => {
 
         // N.02: status --ref production reports ahead-of-ref condition
         const statusProdAfter = await runMigrationStatus(ctx, ['--ref', 'production', '--json']);
-        const prodAfterOutput = stripAnsi(statusProdAfter.stdout + statusProdAfter.stderr);
-        // The status should indicate the DB is ahead of the ref target,
-        // or that no migration path exists from C2 to C1
-        expect(
-          statusProdAfter.exitCode === 1 || prodAfterOutput.match(/ahead|no.*path|mismatch/i),
-          'N.02: production status indicates ahead-of-ref or error',
-        ).toBeTruthy();
+        const prodAfterOutput = stripAnsi(statusProdAfter.stdout);
+        expect(prodAfterOutput, 'N.02: production status indicates ahead-of-ref condition').toMatch(
+          /ahead|no.*path|mismatch/i,
+        );
       },
       timeouts.spinUpPpgDev,
     );

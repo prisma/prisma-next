@@ -63,7 +63,7 @@ withTempDir(({ createTempDir }) => {
         // Apply with no planned edge for the new contract → failure
         const apply1 = await runMigrationApply(ctx, ['--json']);
         expect(apply1.exitCode, 'apply fails').toBe(1);
-        const output = stripAnsi(apply1.stdout + apply1.stderr);
+        const output = stripAnsi(apply1.stdout);
         expect(output, 'error mentions no path').toMatch(
           /no.*path|no.*migration|not.*found|cannot.*resolve/i,
         );
@@ -294,8 +294,7 @@ withTempDir(({ createTempDir }) => {
            ORDER BY ordinal_position`,
         );
         const columnNames = cols.rows.map((r) => r['column_name']);
-        expect(columnNames, 'has id').toContain('id');
-        expect(columnNames, 'no email').not.toContain('email');
+        expect(columnNames, 'final schema is id-only').toEqual(['id']);
       },
       timeouts.spinUpPpgDev,
     );

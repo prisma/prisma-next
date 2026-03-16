@@ -79,7 +79,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit3.exitCode, 'J.04: emit C3 (bio)').toBe(0);
         const planFail = await runMigrationPlan(ctx, ['--name', 'add-bio']);
         expect(planFail.exitCode, 'J.04: plan without --from fails').toBe(1);
-        const failOutput = stripAnsi(planFail.stdout + planFail.stderr);
+        const failOutput = stripAnsi(planFail.stdout);
         expect(failOutput, 'J.04: error mentions no resolvable leaf').toMatch(
           /no.*resolvable.*leaf|cycle|NO_RESOLVABLE_LEAF/i,
         );
