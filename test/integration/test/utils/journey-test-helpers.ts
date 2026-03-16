@@ -144,27 +144,6 @@ export function setupJourney(options: JourneySetupOptions): JourneyContext {
   return { testDir, configPath, outputDir };
 }
 
-/**
- * Sets up a journey test directory without a database connection (for help/config-error tests).
- * Uses the no-driver config.
- */
-export function setupJourneyNoDb(createTempDir: () => string): JourneyContext {
-  const testDir = createTempDir();
-  const outputDir = join(testDir, 'output');
-  mkdirSync(outputDir, { recursive: true });
-  mkdirSync(join(testDir, 'migrations'), { recursive: true });
-
-  // Copy base contract
-  copyFileSync(join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'), join(testDir, 'contract.ts'));
-
-  // Copy no-db config (no driver, no connection)
-  const configContent = readFileSync(join(JOURNEY_FIXTURES_DIR, 'prisma-next.config.ts'), 'utf-8');
-  const configPath = join(testDir, 'prisma-next.config.ts');
-  writeFileSync(configPath, configContent, 'utf-8');
-
-  return { testDir, configPath, outputDir };
-}
-
 // ---------------------------------------------------------------------------
 // Contract fixtures
 // ---------------------------------------------------------------------------

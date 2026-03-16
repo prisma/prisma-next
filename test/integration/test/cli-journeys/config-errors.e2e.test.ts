@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
-import { runContractEmitWithConfig, setupJourneyNoDb } from '../utils/journey-test-helpers';
+import { runContractEmitWithConfig, setupJourney } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
   describe('Journey T: Config Errors', () => {
@@ -20,7 +20,7 @@ withTempDir(({ createTempDir }) => {
     it(
       'T.01: fails when config file does not exist',
       async () => {
-        const ctx = setupJourneyNoDb(createTempDir);
+        const ctx = setupJourney({ createTempDir });
 
         // Remove the config file to simulate missing config
         const result = await runContractEmitWithConfig(
@@ -36,7 +36,7 @@ withTempDir(({ createTempDir }) => {
     it(
       'T.02: fails when explicit config path does not exist',
       async () => {
-        const ctx = setupJourneyNoDb(createTempDir);
+        const ctx = setupJourney({ createTempDir });
 
         const result = await runContractEmitWithConfig(ctx.testDir, './this-does-not-exist.ts');
         expect(result.exitCode, 'T.02: explicit missing config').not.toBe(0);
@@ -48,7 +48,7 @@ withTempDir(({ createTempDir }) => {
     it(
       'T.03: fails when config has invalid TypeScript',
       async () => {
-        const ctx = setupJourneyNoDb(createTempDir);
+        const ctx = setupJourney({ createTempDir });
 
         // Overwrite config with invalid TS
         const invalidConfigPath = join(ctx.testDir, 'prisma-next.config.ts');
@@ -64,7 +64,7 @@ withTempDir(({ createTempDir }) => {
     it(
       'T.04: fails when config is missing contract configuration',
       async () => {
-        const ctx = setupJourneyNoDb(createTempDir);
+        const ctx = setupJourney({ createTempDir });
 
         // Overwrite config with valid TS but missing contract field
         const emptyConfigPath = join(ctx.testDir, 'prisma-next.config.ts');
