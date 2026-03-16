@@ -1,4 +1,3 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type BoundWhereExpr,
@@ -12,6 +11,7 @@ import {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { createColumnParamDescriptor } from './param-descriptors';
 import { buildOrmQueryPlan, resolveTableColumns } from './query-plan-meta';
 import { combineWhereFilters, offsetBoundWhereExpr } from './where-utils';
 
@@ -26,28 +26,6 @@ function buildReturningColumns(
       : resolveTableColumns(contract, tableName);
 
   return columns.map((column) => ColumnRef.of(tableName, column));
-}
-
-function createColumnParamDescriptor(
-  contract: SqlContract<SqlStorage>,
-  tableName: string,
-  columnName: string,
-  index: number,
-): ParamDescriptor {
-  const columnMeta = contract.storage.tables[tableName]?.columns[columnName];
-  return {
-    index,
-    name: columnName,
-    source: 'dsl',
-    ...(columnMeta
-      ? {
-          codecId: columnMeta.codecId,
-          nativeType: columnMeta.nativeType,
-          nullable: columnMeta.nullable,
-          refs: { table: tableName, column: columnName },
-        }
-      : {}),
-  };
 }
 
 function toParamAssignments(

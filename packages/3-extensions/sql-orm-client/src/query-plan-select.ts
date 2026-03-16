@@ -24,7 +24,8 @@ import {
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr, OrderExpr } from './types';
-import { combineWhereFilters, createBoundWhereExpr, offsetBoundWhereExpr } from './where-utils';
+import { bindWhereExpr } from './where-binding';
+import { combineWhereFilters, offsetBoundWhereExpr } from './where-utils';
 
 type CursorOrderEntry = OrderExpr & {
   readonly value: unknown;
@@ -144,14 +145,16 @@ function createTableRefRemapper(fromTable: string, toTable: string): AstRewriter
 }
 
 function buildStateWhere(
+  contract: SqlContract<SqlStorage>,
   tableName: string,
   state: CollectionState,
   options?: {
     readonly filterTableName?: string;
   },
 ): BoundWhereExpr | undefined {
-  const cursorWhere = buildCursorWhere(tableName, state.orderBy, state.cursor);
   const filterTableName = options?.filterTableName;
+  const cursorTableName = filterTableName ?? tableName;
+  const cursorWhere = buildCursorWhere(cursorTableName, state.orderBy, state.cursor);
   const remappedFilters =
     filterTableName && filterTableName !== tableName
       ? state.filters.map((filter) => ({
@@ -159,9 +162,15 @@ function buildStateWhere(
           expr: filter.expr.rewrite(createTableRefRemapper(filterTableName, tableName)),
         }))
       : state.filters;
-  const filters = cursorWhere
-    ? [...remappedFilters, createBoundWhereExpr(cursorWhere)]
-    : remappedFilters;
+  const boundCursorWhere = cursorWhere ? bindWhereExpr(contract, cursorWhere) : undefined;
+  const remappedCursorWhere =
+    boundCursorWhere && filterTableName && filterTableName !== tableName
+      ? {
+          ...boundCursorWhere,
+          expr: boundCursorWhere.expr.rewrite(createTableRefRemapper(filterTableName, tableName)),
+        }
+      : boundCursorWhere;
+  const filters = remappedCursorWhere ? [...remappedFilters, remappedCursorWhere] : remappedFilters;
   return combineWhereFilters(filters);
 }
 
@@ -232,7 +241,7 @@ function buildIncludeChildRowsSelect(
     rowsAlias,
     childState.orderBy,
   );
-  const childWhere = buildStateWhere(childTableRef, childState, {
+  const childWhere = buildStateWhere(contract, childTableRef, childState, {
     filterTableName: include.relatedTableName,
   });
   const joinExpr = BinaryExpr.eq(
@@ -361,7 +370,7 @@ function buildSelectAst(
 } {
   const scalarProjection = buildProjection(contract, tableName, state.selectedFields);
   const projection = [...scalarProjection, ...(options.includeProjection ?? [])];
-  const where = options.where ?? buildStateWhere(tableName, state);
+  const where = options.where ?? buildStateWhere(contract, tableName, state);
   const orderBy = toOrderBy(tableName, state.orderBy);
 
   let ast = SelectAst.from(TableSource.named(tableName)).withProject(projection);
@@ -429,7 +438,7 @@ export function compileRelationSelect(
     includes: [],
     limit: undefined,
     offset: undefined,
-    filters: [createBoundWhereExpr(inFilter), ...nestedState.filters],
+    filters: [bindWhereExpr(contract, inFilter), ...nestedState.filters],
   });
 }
 
@@ -449,7 +458,7 @@ export function compileSelectWithIncludeStrategy(
 
   const includeJoins: JoinAst[] = [];
   const includeProjection: ProjectionItem[] = [];
-  const topLevelWhere = buildStateWhere(tableName, state);
+  const topLevelWhere = buildStateWhere(contract, tableName, state);
   const includeParams: unknown[] = [];
   const includeParamDescriptors: Array<BoundWhereExpr['paramDescriptors'][number]> = [];
   let nextParamOffset = topLevelWhere?.params.length ?? 0;

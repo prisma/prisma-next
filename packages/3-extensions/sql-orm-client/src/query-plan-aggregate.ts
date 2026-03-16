@@ -5,7 +5,6 @@ import {
   BinaryExpr,
   type BoundWhereExpr,
   ColumnRef,
-  ExistsExpr,
   type Expression,
   ListLiteralExpr,
   LiteralExpr,
@@ -64,31 +63,27 @@ function validateGroupedMetricExpr(expr: Expression): AggregateExpr {
 }
 
 function validateGroupedHavingExpr(expr: WhereExpr): WhereExpr {
-  if (expr instanceof AndExpr) {
-    return AndExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
-  }
-
-  if (expr instanceof OrExpr) {
-    return OrExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
-  }
-
-  if (expr instanceof ExistsExpr) {
-    throw new Error(`Unsupported grouped having expression kind "${expr.constructor.name}"`);
-  }
-
-  if (expr instanceof NullCheckExpr) {
-    return new NullCheckExpr(validateGroupedMetricExpr(expr.expr), expr.isNull);
-  }
-
-  if (expr instanceof BinaryExpr) {
-    return new BinaryExpr(
-      expr.op,
-      validateGroupedMetricExpr(expr.left),
-      validateGroupedComparable(expr.right),
-    );
-  }
-
-  throw new Error(`Unsupported grouped having expression node "${expr.constructor.name}"`);
+  return expr.accept<WhereExpr>({
+    and(expr) {
+      return AndExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
+    },
+    or(expr) {
+      return OrExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
+    },
+    exists(expr) {
+      throw new Error(`Unsupported grouped having expression kind "${expr.constructor.name}"`);
+    },
+    nullCheck(expr) {
+      return new NullCheckExpr(validateGroupedMetricExpr(expr.expr), expr.isNull);
+    },
+    binary(expr) {
+      return new BinaryExpr(
+        expr.op,
+        validateGroupedMetricExpr(expr.left),
+        validateGroupedComparable(expr.right),
+      );
+    },
+  });
 }
 
 export function compileAggregate(
