@@ -15,9 +15,9 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
+import { withClient } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -25,6 +25,8 @@ import {
   runDbInit,
   runDbVerify,
   setupJourney,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -55,23 +57,15 @@ withTempDir(({ createTempDir }) => {
   // Journey W: No Contract Emitted Yet
   // -------------------------------------------------------------------------
   describe('Journey W: No Contract Yet', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'db init and db verify fail when contract not emitted',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Don't emit contract — go straight to db commands
 
@@ -91,23 +85,15 @@ withTempDir(({ createTempDir }) => {
   // Journey U: Target Mismatch
   // -------------------------------------------------------------------------
   describe('Journey U: Target Mismatch', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'db verify fails when contract target differs from config target',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Init normally with Postgres contract
         const emit = await runContractEmit(ctx);
@@ -137,32 +123,25 @@ withTempDir(({ createTempDir }) => {
   // Journey V: db init on Non-Empty Unmanaged Database
   // -------------------------------------------------------------------------
   describe('Journey V: Unmanaged DB Init', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-      // Create pre-existing tables matching the contract
-      await withClient(connectionString, async (client) => {
-        await client.query(`
-          CREATE TABLE "user" (
-            id int4 PRIMARY KEY,
-            email text NOT NULL
-          );
-        `);
-      });
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
+    const db = useDevDatabase({
+      onReady: (cs) =>
+        withClient(cs, (client) =>
+          client.query(`
+            CREATE TABLE "user" (
+              id int4 PRIMARY KEY,
+              email text NOT NULL
+            );
+          `),
+        ),
     });
 
     it(
       'db init on database with matching pre-existing tables',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Emit contract
         const emit = await runContractEmit(ctx);

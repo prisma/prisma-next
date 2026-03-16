@@ -13,9 +13,8 @@
  *     db update.
  */
 
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -26,6 +25,8 @@ import {
   runDbVerify,
   setupJourney,
   swapContract,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -33,23 +34,15 @@ withTempDir(({ createTempDir }) => {
   // Journey D: Direct Update (No Migrations)
   // -------------------------------------------------------------------------
   describe('Journey D: Direct Update', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'emit → init → swap → update dry-run → update → update noop → verify',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition
         const emit0 = await runContractEmit(ctx);
@@ -87,23 +80,15 @@ withTempDir(({ createTempDir }) => {
   // Journey E: Destructive Update with Confirmation
   // -------------------------------------------------------------------------
   describe('Journey E: Destructive Update', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'emit → init → destructive update scenarios',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition
         const emit0 = await runContractEmit(ctx);
@@ -144,23 +129,15 @@ withTempDir(({ createTempDir }) => {
   // Journey O: db init on Already-Initialized DB (Different Contract)
   // -------------------------------------------------------------------------
   describe('Journey O: Re-init Conflict', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → swap → init fails → db update recovers',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: init with base contract
         const emit0 = await runContractEmit(ctx);

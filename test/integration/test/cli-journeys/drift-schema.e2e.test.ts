@@ -12,9 +12,9 @@
  *     by expanding the contract to include a new column, then db update.
  */
 
-import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
+import { withClient } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -26,6 +26,8 @@ import {
   runDbVerify,
   setupJourney,
   swapContract,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -33,23 +35,15 @@ withTempDir(({ createTempDir }) => {
   // Journey M: Phantom Drift (Marker OK, Schema Diverged)
   // -------------------------------------------------------------------------
   describe('Journey M: Phantom Drift', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → manual DDL drop → verify passes (false positive) → schema-verify catches drift',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: init with base contract
         const emit = await runContractEmit(ctx);
@@ -58,7 +52,7 @@ withTempDir(({ createTempDir }) => {
         expect(init.exitCode, 'M.pre: init').toBe(0);
 
         // Manual DDL: drop email column
-        await withClient(connectionString, async (client) => {
+        await withClient(db.connectionString, async (client) => {
           await client.query('ALTER TABLE "user" DROP COLUMN email');
         });
 
@@ -91,23 +85,15 @@ withTempDir(({ createTempDir }) => {
   // Journey N: Manual DDL Added Extra Column
   // -------------------------------------------------------------------------
   describe('Journey N: Extra Column Drift', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → manual DDL add → verify/tolerant pass → strict fails → expand contract → update → verify',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: init with base contract
         const emit = await runContractEmit(ctx);
@@ -116,7 +102,7 @@ withTempDir(({ createTempDir }) => {
         expect(init.exitCode, 'N.pre: init').toBe(0);
 
         // Manual DDL: add age column
-        await withClient(connectionString, async (client) => {
+        await withClient(db.connectionString, async (client) => {
           await client.query('ALTER TABLE "user" ADD COLUMN age int4');
         });
 
