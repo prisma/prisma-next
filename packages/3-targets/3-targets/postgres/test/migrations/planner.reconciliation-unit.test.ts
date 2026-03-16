@@ -342,6 +342,28 @@ describe('buildReconciliationPlan', () => {
       expect(result.operations[0]!.meta).toMatchObject({ warning: 'TABLE_REWRITE' });
     });
 
+    it('postcheck verifies column type, not just existence', () => {
+      const result = plan(
+        [
+          issue({
+            kind: 'type_mismatch',
+            table: 'post',
+            column: 'title',
+            expected: 'int4',
+            actual: 'text',
+            message: 'type mismatch',
+          }),
+        ],
+        { contract: contractWithColumn('post', 'title', 'int4') },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('regtype');
+      expect(postcheckSql).toContain('int4');
+      expect(postcheckSql).not.toBe(result.operations[0]!.precheck[0]!.sql);
+    });
+
     it('returns conflict for type_mismatch when contract column not found', () => {
       const result = plan([
         issue({

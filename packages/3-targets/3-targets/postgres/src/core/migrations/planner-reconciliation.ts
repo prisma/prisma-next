@@ -514,8 +514,13 @@ USING ${quoteIdentifier(columnName)}::${expectedType}`,
     ],
     postcheck: [
       {
-        description: `verify column "${columnName}" exists after type change`,
-        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+        description: `verify column "${columnName}" has type ${expectedType}`,
+        sql: columnTypeCheck({
+          schema: schemaName,
+          table: tableName,
+          column: columnName,
+          expectedType,
+        }),
       },
     ],
   };
@@ -595,6 +600,30 @@ function buildAlterDefaultOperation(
       },
     ],
   };
+}
+
+function columnTypeCheck({
+  schema,
+  table,
+  column,
+  expectedType,
+}: {
+  schema: string;
+  table: string;
+  column: string;
+  expectedType: string;
+}): string {
+  return `SELECT EXISTS (
+  SELECT 1
+  FROM pg_attribute a
+  JOIN pg_class c ON c.oid = a.attrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = '${escapeLiteral(schema)}'
+    AND c.relname = '${escapeLiteral(table)}'
+    AND a.attname = '${escapeLiteral(column)}'
+    AND a.atttypid = '${escapeLiteral(expectedType)}'::regtype
+    AND NOT a.attisdropped
+)`;
 }
 
 function columnDefaultCheck({
