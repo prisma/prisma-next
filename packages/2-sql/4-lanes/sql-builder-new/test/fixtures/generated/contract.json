@@ -3,7 +3,7 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:09fd32ad8b0c75e83d46508cfaeca1ff1a9813e4615e7ed23ffc742cfa190710",
-  "profileHash": "sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89",
+  "profileHash": "sha256:eb014c98c4ba6a3e1ddd72bb170d48c49a4e8d5d411e473b80b9c16b57d0469b",
   "models": {
     "Comment": {
       "fields": {
@@ -272,7 +272,27 @@
       }
     }
   },
-  "capabilities": {},
+  "capabilities": {
+    "pgvector": {
+      "hnsw": true,
+      "ivfflat": true,
+      "vector": true
+    },
+    "postgres": {
+      "deferrableConstraints": true,
+      "distinctOn": true,
+      "partialIndex": true,
+      "savepoints": true,
+      "transactionalDDL": true
+    },
+    "sql": {
+      "enums": true,
+      "foreignKeys": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "returning": true
+    }
+  },
   "extensionPacks": {
     "pgvector": {}
   },
