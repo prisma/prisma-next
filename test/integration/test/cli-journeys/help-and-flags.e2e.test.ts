@@ -7,6 +7,7 @@
  */
 
 import { timeouts } from '@prisma-next/test-utils';
+import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import { runContractEmit, setupJourney } from '../utils/journey-test-helpers';
@@ -21,14 +22,8 @@ withTempDir(({ createTempDir }) => {
 
         const result = await runContractEmit(ctx);
         expect(result.exitCode, 'Y.01: emit succeeds').toBe(0);
-        // Verify that stdout (the primary output channel) has no ANSI codes.
-        // Note: stderr may still contain decoration characters from TerminalUI
-        // even with --no-color due to how the mock captures output.
-        // The key assertion is that the meaningful output is ANSI-free.
-        expect(
-          result.stdout.length + result.stderr.length,
-          'Y.01: produces output',
-        ).toBeGreaterThan(0);
+        // stdout is the machine-readable channel — it must be ANSI-free with --no-color.
+        expect(result.stdout, 'Y.01: stdout is ANSI-free').toBe(stripAnsi(result.stdout));
       },
       timeouts.typeScriptCompilation,
     );

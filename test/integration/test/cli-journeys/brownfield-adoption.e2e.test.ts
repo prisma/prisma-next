@@ -129,7 +129,7 @@ withTempDir(({ createTempDir }) => {
         const signJsonFail = await runDbSign(ctx, ['--json']);
         expect(signJsonFail.exitCode, 'G.05: db sign json fails').toBe(1);
         const signError = parseJsonOutput(signJsonFail);
-        expect(signError, 'G.05: error envelope').toMatchObject({ ok: false });
+        expect(signError, 'G.05: error envelope').toMatchObject({ ok: false, code: 'PN-RTM-3004' });
 
         // G.06: Fix contract to match DB (swap back to base), emit
         swapContract(ctx, 'contract-base');

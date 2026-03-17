@@ -120,6 +120,10 @@ withTempDir(({ createTempDir }) => {
         expect(jsonAccept.exitCode, 'E.07: json accept').toBe(0);
         const jsonSuccess = parseJsonOutput(jsonAccept);
         expect(jsonSuccess, 'E.07: success envelope').toMatchObject({ ok: true });
+
+        // E.08: db verify confirms the destructive change was applied
+        const verify = await runDbVerify(ctx);
+        expect(verify.exitCode, 'E.08: db verify after destructive update').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );
