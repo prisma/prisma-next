@@ -13,9 +13,8 @@
  *     db update.
  */
 
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -26,6 +25,8 @@ import {
   runDbVerify,
   setupJourney,
   swapContract,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -33,23 +34,15 @@ withTempDir(({ createTempDir }) => {
   // Journey D: Direct Update (No Migrations)
   // -------------------------------------------------------------------------
   describe('Journey D: Direct Update', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'emit → init → swap → update dry-run → update → update noop → verify',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition
         const emit0 = await runContractEmit(ctx);
@@ -87,23 +80,15 @@ withTempDir(({ createTempDir }) => {
   // Journey E: Destructive Update with Confirmation
   // -------------------------------------------------------------------------
   describe('Journey E: Destructive Update', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'emit → init → destructive update scenarios',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition
         const emit0 = await runContractEmit(ctx);
@@ -120,21 +105,21 @@ withTempDir(({ createTempDir }) => {
         const dryRun = await runDbUpdate(ctx, ['--dry-run']);
         expect(dryRun.exitCode, 'E.02: db update dry-run').toBe(0);
 
-        // E.05: db update --no-interactive (without -y) — fails with destructive changes
+        // E.03: db update --no-interactive (without -y) — fails with destructive changes
         const noInteractive = await runDbUpdate(ctx, ['--no-interactive']);
-        expect(noInteractive.exitCode, 'E.05: non-interactive destructive fails').toBe(1);
+        expect(noInteractive.exitCode, 'E.03: non-interactive destructive fails').toBe(1);
 
-        // E.06: db update --json — destructive changes, no prompt, returns error
+        // E.04: db update --json — destructive changes, no prompt, returns error
         const jsonDestructive = await runDbUpdate(ctx, ['--json']);
-        expect(jsonDestructive.exitCode, 'E.06: json destructive error').toBe(1);
+        expect(jsonDestructive.exitCode, 'E.04: json destructive error').toBe(1);
         const jsonError = parseJsonOutput(jsonDestructive);
-        expect(jsonError, 'E.06: error envelope').toMatchObject({ ok: false });
+        expect(jsonError, 'E.04: error envelope').toMatchObject({ ok: false });
 
-        // E.07: db update --json -y — auto-accept, returns success
+        // E.05: db update --json -y — auto-accept, returns success
         const jsonAccept = await runDbUpdate(ctx, ['--json', '-y']);
-        expect(jsonAccept.exitCode, 'E.07: json accept').toBe(0);
+        expect(jsonAccept.exitCode, 'E.05: json accept').toBe(0);
         const jsonSuccess = parseJsonOutput(jsonAccept);
-        expect(jsonSuccess, 'E.07: success envelope').toMatchObject({ ok: true });
+        expect(jsonSuccess, 'E.05: success envelope').toMatchObject({ ok: true });
       },
       timeouts.spinUpPpgDev,
     );
@@ -144,23 +129,15 @@ withTempDir(({ createTempDir }) => {
   // Journey O: db init on Already-Initialized DB (Different Contract)
   // -------------------------------------------------------------------------
   describe('Journey O: Re-init Conflict', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → swap → init fails → db update recovers',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: init with base contract
         const emit0 = await runContractEmit(ctx);

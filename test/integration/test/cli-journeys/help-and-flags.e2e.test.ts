@@ -9,7 +9,7 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
-import { runContractEmit, setupJourneyNoDb } from '../utils/journey-test-helpers';
+import { runContractEmit, setupJourney } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
   describe('Journey Y: Global Flags', () => {
@@ -17,7 +17,7 @@ withTempDir(({ createTempDir }) => {
     it(
       'Y.01: --no-color suppresses ANSI codes in stdout',
       async () => {
-        const ctx = setupJourneyNoDb(createTempDir);
+        const ctx = setupJourney({ createTempDir });
 
         const result = await runContractEmit(ctx);
         expect(result.exitCode, 'Y.01: emit succeeds').toBe(0);
@@ -37,7 +37,7 @@ withTempDir(({ createTempDir }) => {
     it(
       'Y.02: quiet mode reduces output',
       async () => {
-        const ctx = setupJourneyNoDb(createTempDir);
+        const ctx = setupJourney({ createTempDir });
 
         const normal = await runContractEmit(ctx);
         expect(normal.exitCode, 'Y.02: normal emit').toBe(0);
@@ -57,7 +57,7 @@ withTempDir(({ createTempDir }) => {
     it(
       'Y.03: verbose mode increases output',
       async () => {
-        const ctx = setupJourneyNoDb(createTempDir);
+        const ctx = setupJourney({ createTempDir });
 
         const normal = await runContractEmit(ctx);
         expect(normal.exitCode, 'Y.03: normal emit').toBe(0);
