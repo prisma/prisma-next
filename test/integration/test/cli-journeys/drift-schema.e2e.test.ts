@@ -13,9 +13,9 @@
  *     by expanding the contract to include a new column, then db update.
  */
 
-import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
+import { withClient } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -27,6 +27,8 @@ import {
   runDbVerify,
   setupJourney,
   swapContract,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -34,23 +36,15 @@ withTempDir(({ createTempDir }) => {
   // Journey M: Phantom Drift (Marker OK, Schema Diverged)
   // -------------------------------------------------------------------------
   describe('Journey M: Phantom Drift', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → manual DDL drop → verify fails → verify --fast passes → schema-verify fails',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: init with base contract
         const emit = await runContractEmit(ctx);
@@ -59,7 +53,7 @@ withTempDir(({ createTempDir }) => {
         expect(init.exitCode, 'M.pre: init').toBe(0);
 
         // Manual DDL: drop email column
-        await withClient(connectionString, async (client) => {
+        await withClient(db.connectionString, async (client) => {
           await client.query('ALTER TABLE "user" DROP COLUMN email');
         });
 
@@ -96,23 +90,15 @@ withTempDir(({ createTempDir }) => {
   // Journey N: Manual DDL Added Extra Column
   // -------------------------------------------------------------------------
   describe('Journey N: Extra Column Drift', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → manual DDL add → verify/tolerant pass → strict fails → expand contract → update → verify',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: init with base contract
         const emit = await runContractEmit(ctx);
@@ -121,7 +107,7 @@ withTempDir(({ createTempDir }) => {
         expect(init.exitCode, 'N.pre: init').toBe(0);
 
         // Manual DDL: add age column
-        await withClient(connectionString, async (client) => {
+        await withClient(db.connectionString, async (client) => {
           await client.query('ALTER TABLE "user" ADD COLUMN age int4');
         });
 
@@ -147,19 +133,18 @@ withTempDir(({ createTempDir }) => {
         const emitExpanded = await runContractEmit(ctx);
         expect(emitExpanded.exitCode, 'N.05: contract emit expanded').toBe(0);
 
-        // N.06: db update (adds 'name' column; 'age' stays as extra — not resolved by this update)
-        // Use --no-interactive to avoid hanging on potential confirmation prompts
+        // N.06: db update --no-interactive rejects (drift from unmanaged 'age' column
+        // makes the planner classify this as destructive)
         const update = await runDbUpdate(ctx, ['--no-interactive']);
-        // db update may fail if the planner classifies adding NOT NULL column as destructive
-        // In that case, retry with -y to auto-accept
-        if (update.exitCode !== 0) {
-          const updateY = await runDbUpdate(ctx, ['-y']);
-          expect(updateY.exitCode, 'N.06: db update with -y').toBe(0);
-        }
+        expect(update.exitCode, 'N.06: --no-interactive rejects destructive').toBe(1);
 
-        // N.07: db schema-verify tolerant (passes — all contract columns present; 'age' tolerated as extra)
+        // N.07: db update -y explicitly accepts the destructive plan
+        const updateY = await runDbUpdate(ctx, ['-y']);
+        expect(updateY.exitCode, 'N.07: db update -y accepts').toBe(0);
+
+        // N.08: db schema-verify tolerant (passes — all contract columns present; 'age' tolerated as extra)
         const tolerantAfter = await runDbSchemaVerify(ctx);
-        expect(tolerantAfter.exitCode, 'N.07: tolerant passes after update').toBe(0);
+        expect(tolerantAfter.exitCode, 'N.08: tolerant passes after update').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );

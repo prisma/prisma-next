@@ -16,8 +16,8 @@
  *      Recovery via db sign.
  */
 
-import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { withClient } from '@prisma-next/test-utils';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -30,6 +30,8 @@ import {
   runDbVerify,
   setupJourney,
   swapContract,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -37,23 +39,15 @@ withTempDir(({ createTempDir }) => {
   // Journey K: Missing Marker (Never Initialized)
   // -------------------------------------------------------------------------
   describe('Journey K: Missing Marker', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'verify fails → schema-verify fails → introspect empty → init recovers → verify passes',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Emit contract but don't init
         const emit = await runContractEmit(ctx);
@@ -87,23 +81,15 @@ withTempDir(({ createTempDir }) => {
   // Journey L: Stale Marker (Contract Changed, DB Not Updated)
   // -------------------------------------------------------------------------
   describe('Journey L: Stale Marker', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → swap contract → verify fails → schema-verify fails → db update recovers',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: init with base
         const emit0 = await runContractEmit(ctx);
@@ -140,23 +126,15 @@ withTempDir(({ createTempDir }) => {
   // Journey P: Mixed Mode (db update through multiple versions)
   // -------------------------------------------------------------------------
   describe('Journey P: Mixed Mode', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → db update to v2 → db update to v3 → verify ok',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: init with base
         const emit0 = await runContractEmit(ctx);
@@ -196,23 +174,15 @@ withTempDir(({ createTempDir }) => {
   // Journey P2: Corrupt Marker
   // -------------------------------------------------------------------------
   describe('Journey P2: Corrupt Marker', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'init → corrupt marker → verify fails → schema-verify passes → sign recovers → verify passes',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: init with base
         const emit = await runContractEmit(ctx);
@@ -221,7 +191,7 @@ withTempDir(({ createTempDir }) => {
         expect(init.exitCode, 'P2.pre: init').toBe(0);
 
         // Corrupt the marker
-        await withClient(connectionString, async (client) => {
+        await withClient(db.connectionString, async (client) => {
           await client.query(
             `UPDATE prisma_contract.marker SET core_hash = 'sha256:corrupted-garbage' WHERE id = 1`,
           );
