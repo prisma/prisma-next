@@ -27,6 +27,7 @@
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
+    "@prisma-next/psl-printer": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0",
     "c12": "^3.3.2",

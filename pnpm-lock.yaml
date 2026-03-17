@@ -638,6 +638,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:*
         version: link:../migration
+      '@prisma-next/psl-printer':
+        specifier: workspace:*
+        version: link:../../2-authoring/psl-printer
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../1-core/shared/utils
