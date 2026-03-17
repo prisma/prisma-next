@@ -1,3 +1,4 @@
+import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -302,7 +303,7 @@ function planAddColumn(
     nativeType: string;
     codecId: string;
     nullable: boolean;
-    default?: { kind: 'literal'; value: unknown };
+    default?: { kind: 'literal'; value: ColumnDefaultLiteralInputValue };
   },
 ) {
   const planner = createPostgresMigrationPlanner();
