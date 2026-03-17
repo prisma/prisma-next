@@ -32,6 +32,7 @@
     "typecheck:all": "pnpm typecheck && pnpm typecheck:examples",
     "typecheck:packages": "turbo run typecheck --filter='!./examples/**'",
     "typecheck:examples": "turbo run typecheck --filter='./examples/**'",
+    "record": "turbo run record --filter=@prisma-next/cli --",
     "clean": "turbo run clean",
     "prepare": "husky"
   },
