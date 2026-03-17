@@ -233,6 +233,16 @@ function buildReconciliationOperationFromIssue(options: {
       });
     }
 
+    case 'extra_default': {
+      if (!issue.table || !issue.column) {
+        return null;
+      }
+      if (!mode.allowDestructive) {
+        return null;
+      }
+      return buildDropDefaultOperation(schemaName, issue.table, issue.column);
+    }
+
     // Remaining issue kinds (primary_key_mismatch, unique_constraint_mismatch,
     // index_mismatch, foreign_key_mismatch) do not yet have reconciliation operation
     // builders. They fall through to the caller, which converts them to conflicts via
@@ -626,6 +636,47 @@ function buildAlterDefaultOperation(
   };
 }
 
+function buildDropDefaultOperation(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  const qualified = qualifyTableName(schemaName, tableName);
+  return {
+    id: `dropDefault.${tableName}.${columnName}`,
+    label: `Drop default for ${columnName} on ${tableName}`,
+    summary: `Drops default on column ${columnName} of table ${tableName}`,
+    operationClass: 'destructive',
+    target: {
+      id: 'postgres',
+      details: buildTargetDetails('column', columnName, schemaName, tableName),
+    },
+    precheck: [
+      {
+        description: `ensure column "${columnName}" exists`,
+        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+      },
+    ],
+    execute: [
+      {
+        description: `drop default on "${columnName}"`,
+        sql: `ALTER TABLE ${qualified}\nALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
+      },
+    ],
+    postcheck: [
+      {
+        description: `verify column "${columnName}" has no default`,
+        sql: columnDefaultCheck({
+          schema: schemaName,
+          table: tableName,
+          column: columnName,
+          exists: false,
+        }),
+      },
+    ],
+  };
+}
+
 // ============================================================================
 // Conflict Conversion
 // ============================================================================
@@ -638,6 +689,7 @@ function convertIssueToConflict(issue: SchemaIssue): SqlPlannerConflict | null {
       return buildConflict('nullabilityConflict', issue);
     case 'default_missing':
     case 'default_mismatch':
+    case 'extra_default':
     case 'extra_table':
     case 'extra_column':
     case 'extra_primary_key':

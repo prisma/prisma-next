@@ -1004,18 +1004,21 @@ export function columnDefaultCheck({
   schema,
   table,
   column,
+  exists = true,
 }: {
   schema: string;
   table: string;
   column: string;
+  exists?: boolean;
 }): string {
+  const nullCheck = exists ? 'IS NOT NULL' : 'IS NULL';
   return `SELECT EXISTS (
   SELECT 1
   FROM information_schema.columns
   WHERE table_schema = '${escapeLiteral(schema)}'
     AND table_name = '${escapeLiteral(table)}'
     AND column_name = '${escapeLiteral(column)}'
-    AND column_default IS NOT NULL
+    AND column_default ${nullCheck}
 )`;
 }
 
