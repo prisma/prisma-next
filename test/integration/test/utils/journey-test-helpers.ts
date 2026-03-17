@@ -156,7 +156,6 @@ export const contractFixtures = {
   'contract-base': join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'),
   'contract-additive': join(JOURNEY_FIXTURES_DIR, 'contract-additive.ts'),
   'contract-destructive': join(JOURNEY_FIXTURES_DIR, 'contract-destructive.ts'),
-  'contract-add-table': join(JOURNEY_FIXTURES_DIR, 'contract-add-table.ts'),
   'contract-v3': join(JOURNEY_FIXTURES_DIR, 'contract-v3.ts'),
 } as const;
 

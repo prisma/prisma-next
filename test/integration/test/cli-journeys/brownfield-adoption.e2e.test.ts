@@ -82,11 +82,11 @@ withTempDir(({ createTempDir }) => {
         const update = await runDbUpdate(ctx);
         expect(update.exitCode, 'F.07: db update').toBe(0);
 
-        // F.09: db sign --json
+        // F.08: db sign --json
         const signJson = await runDbSign(ctx, ['--json']);
-        expect(signJson.exitCode, 'F.09: db sign json').toBe(0);
+        expect(signJson.exitCode, 'F.08: db sign json').toBe(0);
         const signData = parseJsonOutput(signJson);
-        expect(signData, 'F.09: json ok').toMatchObject({ ok: true });
+        expect(signData, 'F.08: json ok').toMatchObject({ ok: true });
       },
       timeouts.spinUpPpgDev,
     );

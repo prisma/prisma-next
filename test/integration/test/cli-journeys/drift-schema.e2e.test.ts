@@ -128,14 +128,18 @@ withTempDir(({ createTempDir }) => {
         const emitExpanded = await runContractEmit(ctx);
         expect(emitExpanded.exitCode, 'N.05: contract emit expanded').toBe(0);
 
-        // N.06: db update (adds nullable 'name' column; 'age' stays as extra)
-        // Adding a nullable column is non-destructive, so --no-interactive succeeds.
+        // N.06: db update --no-interactive rejects (drift from unmanaged 'age' column
+        // makes the planner classify this as destructive)
         const update = await runDbUpdate(ctx, ['--no-interactive']);
-        expect(update.exitCode, 'N.06: db update non-destructive').toBe(0);
+        expect(update.exitCode, 'N.06: --no-interactive rejects destructive').toBe(1);
 
-        // N.07: db schema-verify tolerant (passes — all contract columns present; 'age' tolerated as extra)
+        // N.07: db update -y explicitly accepts the destructive plan
+        const updateY = await runDbUpdate(ctx, ['-y']);
+        expect(updateY.exitCode, 'N.07: db update -y accepts').toBe(0);
+
+        // N.08: db schema-verify tolerant (passes — all contract columns present; 'age' tolerated as extra)
         const tolerantAfter = await runDbSchemaVerify(ctx);
-        expect(tolerantAfter.exitCode, 'N.07: tolerant passes after update').toBe(0);
+        expect(tolerantAfter.exitCode, 'N.08: tolerant passes after update').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );

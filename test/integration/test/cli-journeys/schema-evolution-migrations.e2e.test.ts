@@ -84,24 +84,24 @@ withTempDir(({ createTempDir }) => {
         expect(statusPreApply.exitCode, 'B.05: migration status pre-apply').toBe(0);
         expect(stripAnsi(statusPreApply.stdout), 'B.05: shows pending').toContain('Pending');
 
-        // B.07: migration apply
+        // B.06: migration apply
         const apply = await runMigrationApply(ctx);
-        expect(apply.exitCode, 'B.07: migration apply').toBe(0);
+        expect(apply.exitCode, 'B.06: migration apply').toBe(0);
 
-        // B.08: migration status (all applied)
+        // B.07: migration status (all applied)
         const statusApplied = await runMigrationStatus(ctx);
-        expect(statusApplied.exitCode, 'B.08: migration status applied').toBe(0);
-        expect(stripAnsi(statusApplied.stdout), 'B.08: shows applied').toContain('Applied');
+        expect(statusApplied.exitCode, 'B.07: migration status applied').toBe(0);
+        expect(stripAnsi(statusApplied.stdout), 'B.07: shows applied').toContain('Applied');
 
-        // B.09: db verify
+        // B.08: db verify
         const dbVerify = await runDbVerify(ctx);
-        expect(dbVerify.exitCode, 'B.09: db verify').toBe(0);
+        expect(dbVerify.exitCode, 'B.08: db verify').toBe(0);
 
-        // B.10: migration status --json
+        // B.09: migration status --json
         const statusJson = await runMigrationStatus(ctx, ['--json']);
-        expect(statusJson.exitCode, 'B.10: migration status json').toBe(0);
+        expect(statusJson.exitCode, 'B.09: migration status json').toBe(0);
         const statusData = parseJsonOutput(statusJson);
-        expect(statusData, 'B.10: json structure').toMatchObject({
+        expect(statusData, 'B.09: json structure').toMatchObject({
           mode: 'online',
           migrations: expect.any(Array),
         });
@@ -131,18 +131,18 @@ withTempDir(({ createTempDir }) => {
         const showLatest = await runMigrationShow(ctx);
         expect(showLatest.exitCode, 'X.01: show latest').toBe(0);
 
-        // X.03: migration show by path (first migration dir)
+        // X.02: migration show by path (first migration dir)
         const migrationsDir = join(ctx.testDir, 'migrations');
         const migrationDirs = readdirSync(migrationsDir).sort();
         if (migrationDirs.length > 0) {
           const firstDir = migrationDirs[0]!;
           const showByPath = await runMigrationShow(ctx, [join('migrations', firstDir)]);
-          expect(showByPath.exitCode, 'X.03: show by path').toBe(0);
+          expect(showByPath.exitCode, 'X.02: show by path').toBe(0);
         }
 
-        // X.05: migration show with non-existent prefix
+        // X.03: migration show with non-existent prefix
         const showNotFound = await runMigrationShow(ctx, ['sha256:nonexistent123']);
-        expect(showNotFound.exitCode, 'X.05: show not found').toBe(1);
+        expect(showNotFound.exitCode, 'X.03: show not found').toBe(1);
       },
       timeouts.spinUpPpgDev,
     );

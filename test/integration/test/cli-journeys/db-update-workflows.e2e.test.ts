@@ -105,21 +105,21 @@ withTempDir(({ createTempDir }) => {
         const dryRun = await runDbUpdate(ctx, ['--dry-run']);
         expect(dryRun.exitCode, 'E.02: db update dry-run').toBe(0);
 
-        // E.05: db update --no-interactive (without -y) — fails with destructive changes
+        // E.03: db update --no-interactive (without -y) — fails with destructive changes
         const noInteractive = await runDbUpdate(ctx, ['--no-interactive']);
-        expect(noInteractive.exitCode, 'E.05: non-interactive destructive fails').toBe(1);
+        expect(noInteractive.exitCode, 'E.03: non-interactive destructive fails').toBe(1);
 
-        // E.06: db update --json — destructive changes, no prompt, returns error
+        // E.04: db update --json — destructive changes, no prompt, returns error
         const jsonDestructive = await runDbUpdate(ctx, ['--json']);
-        expect(jsonDestructive.exitCode, 'E.06: json destructive error').toBe(1);
+        expect(jsonDestructive.exitCode, 'E.04: json destructive error').toBe(1);
         const jsonError = parseJsonOutput(jsonDestructive);
-        expect(jsonError, 'E.06: error envelope').toMatchObject({ ok: false });
+        expect(jsonError, 'E.04: error envelope').toMatchObject({ ok: false });
 
-        // E.07: db update --json -y — auto-accept, returns success
+        // E.05: db update --json -y — auto-accept, returns success
         const jsonAccept = await runDbUpdate(ctx, ['--json', '-y']);
-        expect(jsonAccept.exitCode, 'E.07: json accept').toBe(0);
+        expect(jsonAccept.exitCode, 'E.05: json accept').toBe(0);
         const jsonSuccess = parseJsonOutput(jsonAccept);
-        expect(jsonSuccess, 'E.07: success envelope').toMatchObject({ ok: true });
+        expect(jsonSuccess, 'E.05: success envelope').toMatchObject({ ok: true });
       },
       timeouts.spinUpPpgDev,
     );
