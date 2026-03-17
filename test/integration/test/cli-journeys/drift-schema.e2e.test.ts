@@ -128,15 +128,10 @@ withTempDir(({ createTempDir }) => {
         const emitExpanded = await runContractEmit(ctx);
         expect(emitExpanded.exitCode, 'N.05: contract emit expanded').toBe(0);
 
-        // N.06: db update (adds 'name' column; 'age' stays as extra — not resolved by this update)
-        // Use --no-interactive to avoid hanging on potential confirmation prompts
+        // N.06: db update (adds nullable 'name' column; 'age' stays as extra)
+        // Adding a nullable column is non-destructive, so --no-interactive succeeds.
         const update = await runDbUpdate(ctx, ['--no-interactive']);
-        // db update may fail if the planner classifies adding NOT NULL column as destructive
-        // In that case, retry with -y to auto-accept
-        if (update.exitCode !== 0) {
-          const updateY = await runDbUpdate(ctx, ['-y']);
-          expect(updateY.exitCode, 'N.06: db update with -y').toBe(0);
-        }
+        expect(update.exitCode, 'N.06: db update non-destructive').toBe(0);
 
         // N.07: db schema-verify tolerant (passes — all contract columns present; 'age' tolerated as extra)
         const tolerantAfter = await runDbSchemaVerify(ctx);
