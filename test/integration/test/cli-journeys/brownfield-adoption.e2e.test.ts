@@ -9,9 +9,9 @@
  *     contract to match, and successfully sign.
  */
 
-import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
+import { withClient } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -24,6 +24,8 @@ import {
   runDbVerify,
   setupJourney,
   swapContract,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 const CREATE_USER_TABLE = `
@@ -38,27 +40,17 @@ withTempDir(({ createTempDir }) => {
   // Journey F: Brownfield Adoption
   // -------------------------------------------------------------------------
   describe('Journey F: Brownfield Adoption', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-      // Create pre-existing table via raw SQL
-      await withClient(connectionString, async (client) => {
-        await client.query(CREATE_USER_TABLE);
-      });
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
+    const db = useDevDatabase({
+      onReady: (cs) => withClient(cs, (client) => client.query(CREATE_USER_TABLE)),
     });
 
     it(
       'introspect → emit → schema-verify → sign → verify → evolve → db update',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // F.01: db introspect
         const introspect = await runDbIntrospect(ctx);
@@ -90,11 +82,11 @@ withTempDir(({ createTempDir }) => {
         const update = await runDbUpdate(ctx);
         expect(update.exitCode, 'F.07: db update').toBe(0);
 
-        // F.09: db sign --json
+        // F.08: db sign --json
         const signJson = await runDbSign(ctx, ['--json']);
-        expect(signJson.exitCode, 'F.09: db sign json').toBe(0);
+        expect(signJson.exitCode, 'F.08: db sign json').toBe(0);
         const signData = parseJsonOutput(signJson);
-        expect(signData, 'F.09: json ok').toMatchObject({ ok: true });
+        expect(signData, 'F.08: json ok').toMatchObject({ ok: true });
       },
       timeouts.spinUpPpgDev,
     );
@@ -104,26 +96,17 @@ withTempDir(({ createTempDir }) => {
   // Journey G: Brownfield with Schema Mismatch
   // -------------------------------------------------------------------------
   describe('Journey G: Brownfield Mismatch', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-      await withClient(connectionString, async (client) => {
-        await client.query(CREATE_USER_TABLE);
-      });
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
+    const db = useDevDatabase({
+      onReady: (cs) => withClient(cs, (client) => client.query(CREATE_USER_TABLE)),
     });
 
     it(
       'introspect → emit mismatch → schema-verify fails → sign fails → fix → pass',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // G.01: db introspect
         const introspect = await runDbIntrospect(ctx);

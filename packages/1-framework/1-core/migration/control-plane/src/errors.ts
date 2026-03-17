@@ -1,4 +1,5 @@
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { SchemaIssue, VerifyDatabaseSchemaResult } from './types';
 
 /**
  * CLI error envelope for output formatting.
@@ -433,8 +434,8 @@ export function errorMarkerRequired(options?: {
  */
 export function errorSchemaVerificationFailed(options: {
   readonly summary: string;
-  readonly verificationResult: Record<string, unknown>;
-  readonly issues?: readonly { kind?: string; message?: string }[];
+  readonly verificationResult: VerifyDatabaseSchemaResult;
+  readonly issues?: readonly SchemaIssue[];
 }): CliStructuredError {
   return new CliStructuredError('3004', options.summary, {
     domain: 'RTM',

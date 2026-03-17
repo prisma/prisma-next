@@ -9,8 +9,7 @@
 
 import { readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -20,6 +19,8 @@ import {
   runMigrationStatus,
   setupJourney,
   swapContract,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
@@ -27,23 +28,15 @@ withTempDir(({ createTempDir }) => {
   // Journey P3: Migration Chain Breakage
   // -------------------------------------------------------------------------
   describe('Journey P3: Chain Breakage', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'plan → apply → plan v2 → delete dir → apply fails → re-plan → apply',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // Precondition: emit base, plan+apply initial, then plan and apply first migration
         const emit0 = await runContractEmit(ctx);

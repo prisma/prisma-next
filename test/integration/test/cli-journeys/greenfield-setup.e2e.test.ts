@@ -8,9 +8,8 @@
  * with introspection and JSON output variants of verify/schema-verify.
  */
 
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
@@ -22,27 +21,21 @@ import {
   runDbVerify,
   setupJourney,
   sql,
+  timeouts,
+  useDevDatabase,
 } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
   describe('Journey A: Greenfield Setup', () => {
-    let connectionString: string;
-    let closeDb: () => Promise<void> = async () => {};
-
-    beforeAll(async () => {
-      const db = await createDevDatabase();
-      connectionString = db.connectionString;
-      closeDb = db.close;
-    }, timeouts.spinUpPpgDev);
-
-    afterAll(async () => {
-      await closeDb();
-    });
+    const db = useDevDatabase();
 
     it(
       'emit → init → verify → introspect (full greenfield workflow)',
       async () => {
-        const ctx: JourneyContext = setupJourney({ connectionString, createTempDir });
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
 
         // A.01: contract emit
         const emit = await runContractEmit(ctx);
@@ -55,7 +48,7 @@ withTempDir(({ createTempDir }) => {
         expect(stripAnsi(dryRun.stdout), 'A.02: mentions dry run').toContain('dry run');
         // Verify database not modified
         const tablesAfterDryRun = await sql(
-          connectionString,
+          db.connectionString,
           `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user'`,
         );
         expect(tablesAfterDryRun.rows.length, 'A.02: no tables created').toBe(0);
@@ -66,13 +59,13 @@ withTempDir(({ createTempDir }) => {
         expect(stripAnsi(init.stdout), 'A.03: reports applied').toContain('Applied');
         // Verify table created
         const tablesAfterInit = await sql(
-          connectionString,
+          db.connectionString,
           `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user'`,
         );
         expect(tablesAfterInit.rows.length, 'A.03: user table created').toBe(1);
         // Verify marker created
         const marker = await sql(
-          connectionString,
+          db.connectionString,
           'SELECT core_hash, profile_hash FROM prisma_contract.marker WHERE id = 1',
         );
         expect(marker.rows.length, 'A.03: marker created').toBe(1);

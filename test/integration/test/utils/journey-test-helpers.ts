@@ -7,7 +7,6 @@
  */
 
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
 import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
@@ -20,7 +19,10 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createMigrationVerifyCommand } from '@prisma-next/cli/commands/migration-verify';
+import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Command } from 'commander';
+import { join } from 'pathe';
+import { afterAll, beforeAll } from 'vitest';
 import { executeCommand, getExitCode, setupCommandMocks } from './cli-test-helpers';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +49,57 @@ export interface JourneyContext {
   testDir: string;
   configPath: string;
   outputDir: string;
+}
+
+// Re-export timeouts so journey tests can import from a single module.
+export { timeouts };
+
+// ---------------------------------------------------------------------------
+// Database lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Registers `beforeAll` / `afterAll` hooks that create and tear down a dev database.
+ * Returns a getter for the connection string (available after `beforeAll` runs).
+ *
+ * Optionally accepts an `onReady` callback that runs inside `beforeAll` with the
+ * connection string — useful for seeding the database with tables / data.
+ *
+ * @example
+ * ```ts
+ * const db = useDevDatabase();
+ * it('works', async () => {
+ *   const ctx = setupJourney({ connectionString: db.connectionString, createTempDir });
+ * });
+ * ```
+ *
+ * @example
+ * ```ts
+ * const db = useDevDatabase({ onReady: (cs) => withClient(cs, c => c.query(SQL)) });
+ * ```
+ */
+export function useDevDatabase(options?: {
+  onReady?: (connectionString: string) => Promise<unknown>;
+}): { readonly connectionString: string } {
+  let connectionString = '';
+  let close: () => Promise<void> = async () => {};
+
+  beforeAll(async () => {
+    const db = await createDevDatabase();
+    connectionString = db.connectionString;
+    close = db.close;
+    await options?.onReady?.(connectionString);
+  }, timeouts.spinUpPpgDev);
+
+  afterAll(async () => {
+    await close();
+  });
+
+  return {
+    get connectionString() {
+      return connectionString;
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -91,44 +144,29 @@ export function setupJourney(options: JourneySetupOptions): JourneyContext {
   return { testDir, configPath, outputDir };
 }
 
+// ---------------------------------------------------------------------------
+// Contract fixtures
+// ---------------------------------------------------------------------------
+
 /**
- * Sets up a journey test directory without a database connection (for help/config-error tests).
- * Uses the no-driver config.
+ * All available contract fixture files, keyed by variant name.
+ * Add new fixtures here — `ContractVariant` and `swapContract` derive from this automatically.
  */
-export function setupJourneyNoDb(createTempDir: () => string): JourneyContext {
-  const testDir = createTempDir();
-  const outputDir = join(testDir, 'output');
-  mkdirSync(outputDir, { recursive: true });
-  mkdirSync(join(testDir, 'migrations'), { recursive: true });
+export const contractFixtures = {
+  'contract-base': join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'),
+  'contract-additive': join(JOURNEY_FIXTURES_DIR, 'contract-additive.ts'),
+  'contract-destructive': join(JOURNEY_FIXTURES_DIR, 'contract-destructive.ts'),
+  'contract-v3': join(JOURNEY_FIXTURES_DIR, 'contract-v3.ts'),
+} as const;
 
-  // Copy base contract
-  copyFileSync(join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'), join(testDir, 'contract.ts'));
-
-  // Copy no-db config (no driver, no connection)
-  const configContent = readFileSync(join(JOURNEY_FIXTURES_DIR, 'prisma-next.config.ts'), 'utf-8');
-  const configPath = join(testDir, 'prisma-next.config.ts');
-  writeFileSync(configPath, configContent, 'utf-8');
-
-  return { testDir, configPath, outputDir };
-}
-
-// ---------------------------------------------------------------------------
-// Contract swapping
-// ---------------------------------------------------------------------------
-
-type ContractVariant =
-  | 'contract-base'
-  | 'contract-additive'
-  | 'contract-destructive'
-  | 'contract-add-table'
-  | 'contract-v3';
+export type ContractVariant = keyof typeof contractFixtures;
 
 /**
  * Swaps the active contract in the test directory to a different variant.
  * Copies the variant file over `contract.ts` so the config picks it up on next emit.
  */
 export function swapContract(ctx: JourneyContext, variant: ContractVariant): void {
-  const src = join(JOURNEY_FIXTURES_DIR, `${variant}.ts`);
+  const src = contractFixtures[variant];
   const dest = join(ctx.testDir, 'contract.ts');
   copyFileSync(src, dest);
 }
@@ -138,47 +176,14 @@ export function swapContract(ctx: JourneyContext, variant: ContractVariant): voi
 // ---------------------------------------------------------------------------
 
 /**
- * Runs a CLI command in the journey's test directory.
- * Returns a CommandResult with exit code, stdout, and stderr.
+ * Core execution helper — all run* functions delegate to this.
+ * Creates fresh mocks for each invocation so steps don't interfere.
  *
- * This is the core execution helper — all run* functions delegate to it.
- * It creates fresh mocks for each invocation so steps don't interfere.
+ * NOTE: Uses `process.chdir()`, which is process-global. This is safe because
+ * `vitest.journeys.config.ts` uses `pool: 'forks'` (each file runs in its own
+ * process) and tests within a file run sequentially. Do NOT switch to `pool: 'threads'`.
  */
-async function runCommand(
-  command: Command,
-  ctx: JourneyContext,
-  args: readonly string[],
-): Promise<CommandResult> {
-  const mocks = setupCommandMocks();
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(ctx.testDir);
-    try {
-      await executeCommand(command, ['--config', ctx.configPath, '--no-color', ...args]);
-      return {
-        exitCode: 0,
-        stdout: mocks.consoleOutput.join('\n'),
-        stderr: mocks.consoleErrors.join('\n'),
-      };
-    } catch (error) {
-      const exitCode = getExitCode();
-      if (exitCode == null) throw error; // unexpected error, not a CLI exit
-      return {
-        exitCode,
-        stdout: mocks.consoleOutput.join('\n'),
-        stderr: mocks.consoleErrors.join('\n'),
-      };
-    }
-  } finally {
-    process.chdir(originalCwd);
-    mocks.cleanup();
-  }
-}
-
-/**
- * Runs a CLI command without --config (for commands that don't need it, or error tests).
- */
-async function runCommandRaw(
+async function runCommandCore(
   command: Command,
   testDir: string,
   args: readonly string[],
@@ -207,6 +212,24 @@ async function runCommandRaw(
     process.chdir(originalCwd);
     mocks.cleanup();
   }
+}
+
+/** Runs a CLI command with --config in the journey's test directory. */
+async function runCommand(
+  command: Command,
+  ctx: JourneyContext,
+  args: readonly string[],
+): Promise<CommandResult> {
+  return runCommandCore(command, ctx.testDir, ['--config', ctx.configPath, ...args]);
+}
+
+/** Runs a CLI command without --config (for commands that don't need it, or error tests). */
+async function runCommandRaw(
+  command: Command,
+  testDir: string,
+  args: readonly string[],
+): Promise<CommandResult> {
+  return runCommandCore(command, testDir, args);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,17 +336,6 @@ export async function runContractEmitWithConfig(
   ]);
 }
 
-/**
- * Runs a command with explicit --db flag (for connection error tests).
- */
-export async function runDbVerifyWithDb(
-  ctx: JourneyContext,
-  dbUrl: string,
-  extraArgs: readonly string[] = [],
-): Promise<CommandResult> {
-  return runCommand(createDbVerifyCommand(), ctx, ['--db', dbUrl, ...extraArgs]);
-}
-
 // ---------------------------------------------------------------------------
 // JSON parsing helper
 // ---------------------------------------------------------------------------
@@ -359,13 +371,9 @@ export function parseJsonOutput<T = Record<string, unknown>>(result: CommandResu
  */
 export function getMigrationDirs(ctx: JourneyContext): string[] {
   const migrationsDir = join(ctx.testDir, 'migrations');
-  try {
-    return readdirSync(migrationsDir)
-      .filter((d) => !d.startsWith('.'))
-      .sort();
-  } catch {
-    return [];
-  }
+  return readdirSync(migrationsDir)
+    .filter((d) => !d.startsWith('.'))
+    .sort();
 }
 
 /**
@@ -389,7 +397,6 @@ export async function sql(
   query: string,
   params?: unknown[],
 ): Promise<{ rows: Record<string, unknown>[] }> {
-  const { withClient } = await import('@prisma-next/test-utils');
   return withClient(connectionString, async (client) => {
     const result = await client.query(query, params);
     return { rows: result.rows as Record<string, unknown>[] };
