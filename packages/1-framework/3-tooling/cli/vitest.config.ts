@@ -12,6 +12,7 @@ export default defineConfig({
     isolate: false,
     testTimeout: timeouts.default,
     hookTimeout: timeouts.default,
+    setupFiles: ['./test/setup.ts'],
     env: {
       CI: 'true',
     },

@@ -67,7 +67,7 @@ export async function executeCommand(command: Command, args: string[]): Promise<
  * can check `consoleErrors`. Tests that need only JSON should use `--json` flag
  * (JSON goes to stdout, decoration goes to stderr — they don't mix).
  */
-export function setupCommandMocks(): {
+export function setupCommandMocks(options?: { isTTY?: boolean | undefined }): {
   consoleOutput: string[];
   consoleErrors: string[];
   cleanup: () => void;
@@ -85,8 +85,8 @@ export function setupCommandMocks(): {
   // Reset exit code tracking
   resetExitCode();
 
-  // Force interactive mode so TerminalUI enables decoration
-  process.stdout.isTTY = true;
+  // Default to interactive (TTY) mode; pass { isTTY: false } to simulate piped stdout
+  process.stdout.isTTY = options?.isTTY ?? true;
 
   // Mock console.log (legacy path)
   console.log = vi.fn((...args: unknown[]) => {
