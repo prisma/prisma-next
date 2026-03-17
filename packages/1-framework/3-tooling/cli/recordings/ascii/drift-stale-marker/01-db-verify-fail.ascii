@@ -192,10 +192,11 @@
 ────────────────────────────────────────────────────────────────────────────────
 > # Verify fails — marker hash does not match new contract [initialized with base, contract swapped to v2]
 > prisma-next db verify
-prisma-next db verify → Check whether the database has been signed with your contract
+prisma-next db verify → Check whether the database signature and live schema match your contract
 │
 │ config:               prisma-next.config.ts
 │ contract:             contract.json
+│ mode:                 full (marker + schema)
 │
 │ Read more             https://pris.ly/db-verify
 └
@@ -205,7 +206,6 @@ prisma-next db verify → Check whether the database has been signed with your c
 │    Why: Contract hash does not match database marker
 │    Fix: Migrate database or re-sign if intentional
 >
-
 
 
 
