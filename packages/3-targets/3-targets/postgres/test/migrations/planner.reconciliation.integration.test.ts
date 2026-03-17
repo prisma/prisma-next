@@ -798,4 +798,454 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       expect(defaultRow.rows[0]?.column_default).not.toContain('draft');
     },
   );
+
+  // ==========================================================================
+  // Compound scenarios — multiple reconciliation operations in a single plan
+  // ==========================================================================
+
+  it('changes column type and default together', { timeout: testTimeout }, async () => {
+    const baselineContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          status: {
+            nativeType: 'text',
+            codecId: 'pg/text@1',
+            nullable: false,
+            default: { kind: 'literal', value: 'active' },
+          },
+        }),
+      },
+      'compound-type-default-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
+
+    const updatedContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          status: {
+            nativeType: 'int4',
+            codecId: 'pg/int4@1',
+            nullable: false,
+            default: { kind: 'literal', value: 1 },
+          },
+        }),
+      },
+      'compound-type-default-updated',
+    );
+
+    const schema = await introspectSchema(driver!);
+    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planResult = planner.plan({
+      contract: updatedContract,
+      schema,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (planResult.kind !== 'success') {
+      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
+    }
+
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const executeResult = await runner.execute({
+      plan: planResult.plan,
+      driver: driver!,
+      destinationContract: updatedContract,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (!executeResult.ok) {
+      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+    }
+
+    const typeRow = await driver!.query<{ matches: boolean }>(
+      `SELECT EXISTS (
+          SELECT 1 FROM pg_attribute a
+          JOIN pg_class c ON c.oid = a.attrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public'
+            AND c.relname = 'config'
+            AND a.attname = 'status'
+            AND a.atttypid = 'int4'::regtype
+            AND NOT a.attisdropped
+        ) AS matches`,
+    );
+    expect(typeRow.rows[0]?.matches).toBe(true);
+
+    const defaultRow = await driver!.query<{ column_default: string | null }>(
+      `SELECT column_default
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'config'
+           AND column_name = 'status'`,
+    );
+    expect(defaultRow.rows[0]?.column_default).not.toBeNull();
+    expect(defaultRow.rows[0]?.column_default).toContain('1');
+  });
+
+  it('tightens nullability and adds a default together', { timeout: testTimeout }, async () => {
+    const baselineContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          label: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+        }),
+      },
+      'compound-null-default-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
+
+    const updatedContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          label: {
+            nativeType: 'text',
+            codecId: 'pg/text@1',
+            nullable: false,
+            default: { kind: 'literal', value: 'unknown' },
+          },
+        }),
+      },
+      'compound-null-default-updated',
+    );
+
+    const schema = await introspectSchema(driver!);
+    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planResult = planner.plan({
+      contract: updatedContract,
+      schema,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (planResult.kind !== 'success') {
+      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
+    }
+
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const executeResult = await runner.execute({
+      plan: planResult.plan,
+      driver: driver!,
+      destinationContract: updatedContract,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (!executeResult.ok) {
+      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+    }
+
+    const colInfo = await driver!.query<{ is_nullable: string; column_default: string | null }>(
+      `SELECT is_nullable, column_default
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'config'
+           AND column_name = 'label'`,
+    );
+    expect(colInfo.rows[0]?.is_nullable).toBe('NO');
+    expect(colInfo.rows[0]?.column_default).not.toBeNull();
+    expect(colInfo.rows[0]?.column_default).toContain('unknown');
+  });
+
+  it('drops a foreign key and its parent table', { timeout: testTimeout }, async () => {
+    const baselineContract = makeContract(
+      {
+        parent: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        }),
+        child: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [{ columns: ['parent_id'], name: 'child_parent_id_idx' }],
+          foreignKeys: [
+            {
+              columns: ['parent_id'],
+              references: { table: 'parent', columns: ['id'] },
+              name: 'child_parent_id_fkey',
+              constraint: true,
+              index: true,
+            },
+          ],
+        },
+      },
+      'compound-fk-table-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
+
+    // Updated contract: keep child table but remove FK, and remove parent table entirely
+    const updatedContract = makeContract(
+      {
+        child: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        }),
+      },
+      'compound-fk-table-updated',
+    );
+
+    const schema = await introspectSchema(driver!);
+    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planResult = planner.plan({
+      contract: updatedContract,
+      schema,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (planResult.kind !== 'success') {
+      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
+    }
+
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const executeResult = await runner.execute({
+      plan: planResult.plan,
+      driver: driver!,
+      destinationContract: updatedContract,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (!executeResult.ok) {
+      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+    }
+
+    const fkExists = await driver!.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'child_parent_id_fkey'
+            AND connamespace = 'public'::regnamespace
+        ) AS exists`,
+    );
+    expect(fkExists.rows[0]?.exists).toBe(false);
+
+    const parentExists = await driver!.query<{ exists: boolean }>(
+      `SELECT to_regclass('public.parent') IS NOT NULL AS exists`,
+    );
+    expect(parentExists.rows[0]?.exists).toBe(false);
+  });
+
+  it('drops a column and its index together', { timeout: testTimeout }, async () => {
+    const baselineContract = makeContract(
+      {
+        item: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+            extra: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [{ columns: ['extra'], name: 'item_extra_idx' }],
+          foreignKeys: [],
+        },
+      },
+      'compound-col-index-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
+
+    // Updated contract: remove the column (and its index)
+    const updatedContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+        }),
+      },
+      'compound-col-index-updated',
+    );
+
+    const schema = await introspectSchema(driver!);
+    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planResult = planner.plan({
+      contract: updatedContract,
+      schema,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (planResult.kind !== 'success') {
+      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
+    }
+
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const executeResult = await runner.execute({
+      plan: planResult.plan,
+      driver: driver!,
+      destinationContract: updatedContract,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (!executeResult.ok) {
+      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+    }
+
+    const colExists = await driver!.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'item'
+            AND column_name = 'extra'
+        ) AS exists`,
+    );
+    expect(colExists.rows[0]?.exists).toBe(false);
+
+    const indexExists = await driver!.query<{ exists: boolean }>(
+      `SELECT to_regclass('public.item_extra_idx') IS NOT NULL AS exists`,
+    );
+    expect(indexExists.rows[0]?.exists).toBe(false);
+  });
+
+  it(
+    'widens and tightens nullability on different columns of the same table',
+    { timeout: testTimeout },
+    async () => {
+      const baselineContract = makeContract(
+        {
+          item: makeTable({
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            col_a: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            col_b: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+          }),
+        },
+        'compound-mixed-null-baseline',
+      );
+      await applyBaseline(driver!, baselineContract);
+
+      // Flip both: col_a becomes nullable (widening), col_b becomes NOT NULL (destructive)
+      const updatedContract = makeContract(
+        {
+          item: makeTable({
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            col_a: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+            col_b: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          }),
+        },
+        'compound-mixed-null-updated',
+      );
+
+      const schema = await introspectSchema(driver!);
+      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const planResult = planner.plan({
+        contract: updatedContract,
+        schema,
+        policy: RECONCILIATION_POLICY,
+        frameworkComponents,
+      });
+      if (planResult.kind !== 'success') {
+        throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
+      }
+
+      const runner = postgresTargetDescriptor.createRunner(familyInstance);
+      const executeResult = await runner.execute({
+        plan: planResult.plan,
+        driver: driver!,
+        destinationContract: updatedContract,
+        policy: RECONCILIATION_POLICY,
+        frameworkComponents,
+      });
+      if (!executeResult.ok) {
+        throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+      }
+
+      const colA = await driver!.query<{ is_nullable: string }>(
+        `SELECT is_nullable
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'item'
+           AND column_name = 'col_a'`,
+      );
+      expect(colA.rows[0]?.is_nullable).toBe('YES');
+
+      const colB = await driver!.query<{ is_nullable: string }>(
+        `SELECT is_nullable
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'item'
+           AND column_name = 'col_b'`,
+      );
+      expect(colB.rows[0]?.is_nullable).toBe('NO');
+    },
+  );
+
+  it('changes column type when column has an index', { timeout: testTimeout }, async () => {
+    const baselineContract = makeContract(
+      {
+        item: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            value: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [{ columns: ['value'], name: 'item_value_idx' }],
+          foreignKeys: [],
+        },
+      },
+      'compound-type-with-index-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
+
+    // Change column type but keep the index
+    const updatedContract = makeContract(
+      {
+        item: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            value: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: true },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [{ columns: ['value'], name: 'item_value_idx' }],
+          foreignKeys: [],
+        },
+      },
+      'compound-type-with-index-updated',
+    );
+
+    const schema = await introspectSchema(driver!);
+    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planResult = planner.plan({
+      contract: updatedContract,
+      schema,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (planResult.kind !== 'success') {
+      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
+    }
+
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const executeResult = await runner.execute({
+      plan: planResult.plan,
+      driver: driver!,
+      destinationContract: updatedContract,
+      policy: RECONCILIATION_POLICY,
+      frameworkComponents,
+    });
+    if (!executeResult.ok) {
+      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+    }
+
+    // Verify type changed
+    const typeRow = await driver!.query<{ matches: boolean }>(
+      `SELECT EXISTS (
+          SELECT 1 FROM pg_attribute a
+          JOIN pg_class c ON c.oid = a.attrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public'
+            AND c.relname = 'item'
+            AND a.attname = 'value'
+            AND a.atttypid = 'int4'::regtype
+            AND NOT a.attisdropped
+        ) AS matches`,
+    );
+    expect(typeRow.rows[0]?.matches).toBe(true);
+
+    // Verify index still exists
+    const indexExists = await driver!.query<{ exists: boolean }>(
+      `SELECT to_regclass('public.item_value_idx') IS NOT NULL AS exists`,
+    );
+    expect(indexExists.rows[0]?.exists).toBe(true);
+  });
 });
