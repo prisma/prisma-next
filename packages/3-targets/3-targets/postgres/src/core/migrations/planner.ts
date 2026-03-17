@@ -976,6 +976,70 @@ export function columnNullabilityCheck({
 )`;
 }
 
+export function columnTypeCheck({
+  schema,
+  table,
+  column,
+  expectedType,
+}: {
+  schema: string;
+  table: string;
+  column: string;
+  expectedType: string;
+}): string {
+  return `SELECT EXISTS (
+  SELECT 1
+  FROM pg_attribute a
+  JOIN pg_class c ON c.oid = a.attrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = '${escapeLiteral(schema)}'
+    AND c.relname = '${escapeLiteral(table)}'
+    AND a.attname = '${escapeLiteral(column)}'
+    AND a.atttypid = '${escapeLiteral(expectedType)}'::regtype
+    AND NOT a.attisdropped
+)`;
+}
+
+export function columnDefaultCheck({
+  schema,
+  table,
+  column,
+}: {
+  schema: string;
+  table: string;
+  column: string;
+}): string {
+  return `SELECT EXISTS (
+  SELECT 1
+  FROM information_schema.columns
+  WHERE table_schema = '${escapeLiteral(schema)}'
+    AND table_name = '${escapeLiteral(table)}'
+    AND column_name = '${escapeLiteral(column)}'
+    AND column_default IS NOT NULL
+)`;
+}
+
+export function columnDefaultValueCheck({
+  schema,
+  table,
+  column,
+  expectedFragment,
+}: {
+  schema: string;
+  table: string;
+  column: string;
+  expectedFragment: string;
+}): string {
+  return `SELECT EXISTS (
+  SELECT 1
+  FROM information_schema.columns
+  WHERE table_schema = '${escapeLiteral(schema)}'
+    AND table_name = '${escapeLiteral(table)}'
+    AND column_name = '${escapeLiteral(column)}'
+    AND column_default LIKE '%${escapeLiteral(expectedFragment)}%'
+)`;
+}
+
 function tableIsEmptyCheck(qualifiedTableName: string): string {
   return `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedTableName} LIMIT 1)`;
 }

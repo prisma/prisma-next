@@ -703,6 +703,31 @@ describe('buildReconciliationPlan', () => {
       expect(postcheckSql).toContain('column_default');
       expect(postcheckSql).toContain('IS NOT NULL');
     });
+
+    it('default_mismatch postcheck verifies actual default value, not just existence', () => {
+      const contract = contractWithColumnDefault('user', 'status', 'text', {
+        kind: 'literal',
+        value: 'active',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_mismatch',
+            table: 'user',
+            column: 'status',
+            expected: 'literal(active)',
+            actual: "'draft'::text",
+            message: 'default mismatch',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('active');
+      expect(postcheckSql).not.toContain('IS NOT NULL');
+    });
   });
 
   // =========================================================================

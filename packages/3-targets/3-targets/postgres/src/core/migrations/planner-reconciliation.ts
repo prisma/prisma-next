@@ -13,10 +13,14 @@ import {
   buildColumnDefaultSql,
   buildColumnTypeSql,
   buildTargetDetails,
+  columnDefaultCheck,
+  columnDefaultValueCheck,
   columnExistsCheck,
   columnNullabilityCheck,
+  columnTypeCheck,
   constraintExistsCheck,
   qualifyTableName,
+  renderDefaultLiteral,
   toRegclassLiteral,
 } from './planner';
 
@@ -572,6 +576,10 @@ function buildAlterDefaultOperation(
 ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
   const qualified = qualifyTableName(schemaName, tableName);
   const defaultClause = buildColumnDefaultSql(column.default, column);
+  const expectedFragment =
+    column.default!.kind === 'literal'
+      ? renderDefaultLiteral(column.default!.value, column)
+      : column.default!.expression;
   return {
     id: `setDefault.${tableName}.${columnName}`,
     label: `Change default for ${columnName} on ${tableName}`,
@@ -595,54 +603,16 @@ function buildAlterDefaultOperation(
     ],
     postcheck: [
       {
-        description: `verify column "${columnName}" has a default`,
-        sql: columnDefaultCheck({ schema: schemaName, table: tableName, column: columnName }),
+        description: `verify column "${columnName}" default matches expected value`,
+        sql: columnDefaultValueCheck({
+          schema: schemaName,
+          table: tableName,
+          column: columnName,
+          expectedFragment,
+        }),
       },
     ],
   };
-}
-
-function columnTypeCheck({
-  schema,
-  table,
-  column,
-  expectedType,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  expectedType: string;
-}): string {
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM pg_attribute a
-  JOIN pg_class c ON c.oid = a.attrelid
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = '${escapeLiteral(schema)}'
-    AND c.relname = '${escapeLiteral(table)}'
-    AND a.attname = '${escapeLiteral(column)}'
-    AND a.atttypid = '${escapeLiteral(expectedType)}'::regtype
-    AND NOT a.attisdropped
-)`;
-}
-
-function columnDefaultCheck({
-  schema,
-  table,
-  column,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-}): string {
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-    AND column_default IS NOT NULL
-)`;
 }
 
 // ============================================================================

@@ -418,9 +418,11 @@ function verifyTableChildren(options: {
     });
   }
 
-  // Verify FK constraints only for FKs with constraint: true
+  // Verify FK constraints only for FKs with constraint: true.
+  // Always call when strict mode is on so extra-FK detection runs even if
+  // the contract has no FKs for this table.
   const constraintFks = contractTable.foreignKeys.filter((fk) => fk.constraint === true);
-  if (constraintFks.length > 0) {
+  if (constraintFks.length > 0 || strict) {
     const fkStatuses = verifyForeignKeys(
       constraintFks,
       schemaTable.foreignKeys,
