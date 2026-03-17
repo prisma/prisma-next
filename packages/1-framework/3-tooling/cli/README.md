@@ -181,15 +181,15 @@ export default defineConfig({
 **Output Format (TTY):**
 
 Success:
-```
+```text
 ✔ Database signature and schema match contract
   verification: marker + schema
   storageHash: sha256:abc123...
   profileHash: sha256:def456...
 ```
 
-Fast-mode success:
-```
+Shallow-mode success:
+```text
 ✔ Database marker matches contract
   verification: marker only (--shallow)
   storageHash: sha256:abc123...
@@ -199,7 +199,7 @@ Fast-mode success:
 ```
 
 Marker failure:
-```
+```text
 ✖ Marker missing (PN-RTM-3001)
   Why: Contract marker not found in database
   Fix: Run `prisma-next db sign --db <url>` to create marker

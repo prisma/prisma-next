@@ -308,7 +308,9 @@ export function createDbVerifyCommand(): Command {
       if (flags.json) {
         ui.output(formatSchemaVerifyJson(result.failure));
       } else {
-        const output = formatSchemaVerifyOutput(result.failure, flags);
+        // Always show schema-drift failures, even in quiet mode — exiting 1 without
+        // diagnostics is unhelpful.
+        const output = formatSchemaVerifyOutput(result.failure, { ...flags, quiet: false });
         if (output) {
           ui.log(output);
         }
