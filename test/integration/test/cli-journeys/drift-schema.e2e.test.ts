@@ -2,10 +2,11 @@
  * Schema Drift Scenarios (Journeys M + N)
  *
  * M — Phantom drift: after initialization, a DBA drops a column via manual DDL.
- *     db verify still passes (marker hash unchanged — false positive), but
- *     db schema-verify catches the missing column. Recovery via db update fails
- *     because re-adding a NOT NULL column to an existing table is unrecoverable
- *     without manual intervention.
+ *     db verify now catches the missing column by default via structural schema
+ *     verification. db verify --shallow still performs marker-only verification and
+ *     therefore passes if the marker row is unchanged. Recovery via db update
+ *     fails because re-adding a NOT NULL column to an existing table is
+ *     unrecoverable without manual intervention.
  *
  * N — Extra column drift: a DBA adds a column via manual DDL. Tolerant
  *     schema-verify passes (extras OK), strict schema-verify fails. Recovery
@@ -38,7 +39,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'init → manual DDL drop → verify passes (false positive) → schema-verify catches drift',
+      'init → manual DDL drop → verify fails → verify --shallow passes → schema-verify fails',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -56,26 +57,30 @@ withTempDir(({ createTempDir }) => {
           await client.query('ALTER TABLE "user" DROP COLUMN email');
         });
 
-        // M.01: db verify (passes — marker hash still matches, false positive)
+        // M.01: db verify (fails — structural schema verification detects drift)
         const verify = await runDbVerify(ctx);
-        expect(verify.exitCode, 'M.01: db verify false positive').toBe(0);
+        expect(verify.exitCode, 'M.01: db verify detects drift').toBe(1);
 
-        // M.02: db schema-verify (fails — missing email column)
+        // M.02: db verify --shallow (passes — marker hash still matches)
+        const shallowVerify = await runDbVerify(ctx, ['--shallow']);
+        expect(shallowVerify.exitCode, 'M.02: db verify --shallow marker-only').toBe(0);
+
+        // M.03: db schema-verify (fails — missing email column)
         const schemaVerify = await runDbSchemaVerify(ctx);
-        expect(schemaVerify.exitCode, 'M.02: db schema-verify fails').toBe(1);
+        expect(schemaVerify.exitCode, 'M.03: db schema-verify fails').toBe(1);
 
-        // M.03: db introspect (shows schema without email)
+        // M.04: db introspect (shows schema without email)
         const introspect = await runDbIntrospect(ctx);
-        expect(introspect.exitCode, 'M.03: db introspect').toBe(0);
+        expect(introspect.exitCode, 'M.04: db introspect').toBe(0);
 
-        // M.04: db update recovery
+        // M.05: db update recovery
         // The planner cannot re-add a dropped NOT NULL column to an existing table
         // because Postgres requires a DEFAULT for NOT NULL columns on non-empty tables
         // (even if the table is technically empty, the planner validates post-update schema).
         // db update correctly detects the drift but the runner fails (PN-RTM-3020).
         // Recovery in this scenario requires manual DDL or db init with a fresh database.
         const update = await runDbUpdate(ctx, ['-y']);
-        expect(update.exitCode, 'M.04: db update detects unrecoverable drift').toBe(1);
+        expect(update.exitCode, 'M.05: db update detects unrecoverable drift').toBe(1);
       },
       timeouts.spinUpPpgDev,
     );
@@ -106,7 +111,7 @@ withTempDir(({ createTempDir }) => {
           await client.query('ALTER TABLE "user" ADD COLUMN age int4');
         });
 
-        // N.01: db verify (passes — marker matches)
+        // N.01: db verify (passes — marker matches and tolerant schema verification allows extras)
         const verify = await runDbVerify(ctx);
         expect(verify.exitCode, 'N.01: db verify passes').toBe(0);
 

@@ -1,5 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
+import type {
+  VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -27,7 +30,13 @@ import {
   setCommandExamples,
 } from '../utils/command-helpers';
 import { formatStyledHeader } from '../utils/formatters/styled';
-import { formatVerifyJson, formatVerifyOutput } from '../utils/formatters/verify';
+import {
+  type DbVerifyCommandSuccessResult,
+  formatSchemaVerifyJson,
+  formatSchemaVerifyOutput,
+  formatVerifyJson,
+  formatVerifyOutput,
+} from '../utils/formatters/verify';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
@@ -37,6 +46,7 @@ import { TerminalUI } from '../utils/terminal-ui';
 interface DbVerifyOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
+  readonly shallow?: boolean;
 }
 
 /**
@@ -64,6 +74,8 @@ function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredErro
   return errorRuntime(verifyResult.summary);
 }
 
+type DbVerifyFailure = CliStructuredError | VerifyDatabaseSchemaResult;
+
 /**
  * Executes the db verify command and returns a structured Result.
  */
@@ -71,7 +83,9 @@ async function executeDbVerifyCommand(
   options: DbVerifyOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
-): Promise<Result<VerifyDatabaseResult, CliStructuredError>> {
+): Promise<Result<DbVerifyCommandSuccessResult, DbVerifyFailure>> {
+  const startTime = Date.now();
+
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -85,13 +99,17 @@ async function executeDbVerifyCommand(
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
+      {
+        label: 'mode',
+        value: options.shallow ? 'shallow (marker only)' : 'full (marker + schema)',
+      },
     ];
     if (options.db) {
       details.push({ label: 'database', value: maskConnectionUrl(options.db) });
     }
     const header = formatStyledHeader({
       command: 'db verify',
-      description: 'Check whether the database has been signed with your contract',
+      description: 'Check whether the database signature and live schema match your contract',
       url: 'https://pris.ly/db-verify',
       details,
       flags,
@@ -171,7 +189,56 @@ async function executeDbVerifyCommand(
       return notOk(mapVerifyFailure(verifyResult));
     }
 
-    return ok(verifyResult);
+    if (options.shallow) {
+      return ok({
+        ok: true,
+        mode: 'shallow',
+        summary: 'Database marker matches contract',
+        contract: verifyResult.contract,
+        marker: verifyResult.marker,
+        target: verifyResult.target,
+        ...ifDefined('missingCodecs', verifyResult.missingCodecs),
+        ...ifDefined('codecCoverageSkipped', verifyResult.codecCoverageSkipped),
+        warning:
+          'Schema verification skipped because --shallow was provided. Run `prisma-next db schema-verify` to detect structural drift.',
+        meta: {
+          ...(verifyResult.meta ?? {}),
+          schemaVerification: 'skipped',
+        },
+        timings: { total: Date.now() - startTime },
+      });
+    }
+
+    const schemaVerifyResult = await client.schemaVerify({
+      contractIR: contractJson,
+      strict: false,
+      onProgress,
+    });
+
+    if (!schemaVerifyResult.ok) {
+      return notOk(schemaVerifyResult);
+    }
+
+    return ok({
+      ok: true,
+      mode: 'full',
+      summary: 'Database signature and schema match contract',
+      contract: verifyResult.contract,
+      marker: verifyResult.marker,
+      target: verifyResult.target,
+      ...ifDefined('missingCodecs', verifyResult.missingCodecs),
+      ...ifDefined('codecCoverageSkipped', verifyResult.codecCoverageSkipped),
+      schema: {
+        summary: schemaVerifyResult.summary,
+        counts: schemaVerifyResult.schema.counts,
+        strict: schemaVerifyResult.meta?.strict ?? false,
+      },
+      meta: {
+        ...(verifyResult.meta ?? {}),
+        schemaVerification: 'performed',
+      },
+      timings: { total: Date.now() - startTime },
+    });
   } catch (error) {
     // Driver already throws CliStructuredError for connection failures
     if (error instanceof CliStructuredError) {
@@ -201,34 +268,54 @@ export function createDbVerifyCommand(): Command {
   const command = new Command('verify');
   setCommandDescriptions(
     command,
-    'Check whether the database has been signed with your contract',
-    'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
-      'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
+    'Check whether the database signature and live schema match your contract',
+    'Verifies the database marker first, then runs tolerant structural schema verification to\n' +
+      'catch drift such as manual DDL changes. Use `--shallow` to skip the schema check and accept\n' +
+      'marker-only verification.',
   );
   setCommandExamples(command, [
     'prisma-next db verify --db $DATABASE_URL',
+    'prisma-next db verify --db $DATABASE_URL --shallow',
     'prisma-next db verify --db $DATABASE_URL --json',
   ]);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
+    .option('--shallow', 'Skip structural schema verification and only check the database marker')
     .action(async (options: DbVerifyOptions) => {
       const flags = parseGlobalFlags(options);
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
       const result = await executeDbVerifyCommand(options, flags, ui);
 
-      const exitCode = handleResult(result, flags, ui, (verifyResult) => {
+      if (result.ok) {
         if (flags.json) {
-          ui.output(formatVerifyJson(verifyResult));
+          ui.output(formatVerifyJson(result.value));
         } else {
-          const output = formatVerifyOutput(verifyResult, flags);
+          const output = formatVerifyOutput(result.value, flags);
           if (output) {
             ui.log(output);
           }
         }
-      });
-      process.exit(exitCode);
+        process.exit(0);
+      }
+
+      if (CliStructuredError.is(result.failure)) {
+        const exitCode = handleResult(result as Result<never, CliStructuredError>, flags, ui);
+        process.exit(exitCode);
+      }
+
+      if (flags.json) {
+        ui.output(formatSchemaVerifyJson(result.failure));
+      } else {
+        // Always show schema-drift failures, even in quiet mode — exiting 1 without
+        // diagnostics is unhelpful.
+        const output = formatSchemaVerifyOutput(result.failure, { ...flags, quiet: false });
+        if (output) {
+          ui.log(output);
+        }
+      }
+      process.exit(1);
     });
 
   return command;
