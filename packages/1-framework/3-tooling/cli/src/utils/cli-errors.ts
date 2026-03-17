@@ -22,6 +22,7 @@ export {
   errorQueryRunnerFactoryRequired,
   errorRunnerFailed,
   errorRuntime,
+  errorSchemaVerificationFailed,
   errorTargetMigrationNotSupported,
   errorTargetMismatch,
   errorUnexpected,

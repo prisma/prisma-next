@@ -1,3 +1,6 @@
+import { ifDefined } from '@prisma-next/utils/defined';
+import type { SchemaIssue, VerifyDatabaseSchemaResult } from './types';
+
 /**
  * CLI error envelope for output formatting.
  * This is the serialized form of a CliStructuredError.
@@ -422,6 +425,26 @@ export function errorMarkerRequired(options?: {
     domain: 'RTM',
     why: options?.why ?? 'No database signature (marker) found',
     fix: options?.fix ?? 'Run `prisma-next db init` first to sign the database',
+  });
+}
+
+/**
+ * Schema verification found mismatches between the database and the contract.
+ * The full verification tree is preserved in `meta.verificationResult`.
+ */
+export function errorSchemaVerificationFailed(options: {
+  readonly summary: string;
+  readonly verificationResult: VerifyDatabaseSchemaResult;
+  readonly issues?: readonly SchemaIssue[];
+}): CliStructuredError {
+  return new CliStructuredError('3004', options.summary, {
+    domain: 'RTM',
+    why: 'Database schema does not satisfy the contract',
+    fix: 'Run `prisma-next db update` to reconcile, or adjust your contract to match the database',
+    meta: {
+      verificationResult: options.verificationResult,
+      ...ifDefined('issues', options.issues),
+    },
   });
 }
 
