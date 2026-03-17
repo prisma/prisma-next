@@ -35,7 +35,7 @@ export type StorageHash =
   StorageHashBase<'sha256:09fd32ad8b0c75e83d46508cfaeca1ff1a9813e4615e7ed23ffc742cfa190710'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89'>;
+  ProfileHashBase<'sha256:eb014c98c4ba6a3e1ddd72bb170d48c49a4e8d5d411e473b80b9c16b57d0469b'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -304,7 +304,24 @@ type ContractBase = SqlContract<
   ProfileHash
 > & {
   readonly target: 'postgres';
-  readonly capabilities: {};
+  readonly capabilities: {
+    readonly sql: {
+      readonly lateral: true;
+      readonly returning: true;
+      readonly jsonAgg: true;
+      readonly enums: true;
+      readonly foreignKeys: true;
+      readonly autoIndexesForeignKeys: false;
+    };
+    readonly postgres: {
+      readonly partialIndex: true;
+      readonly deferrableConstraints: true;
+      readonly savepoints: true;
+      readonly transactionalDDL: true;
+      readonly distinctOn: true;
+    };
+    readonly pgvector: { readonly ivfflat: true; readonly hnsw: true; readonly vector: true };
+  };
   readonly extensionPacks: { readonly pgvector: {} };
 };
 

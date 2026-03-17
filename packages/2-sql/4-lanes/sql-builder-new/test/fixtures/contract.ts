@@ -11,6 +11,28 @@ type CodecTypes = PgCodecTypes & PgVectorCodecTypes;
 export const contract = defineContract<CodecTypes>()
   .target(postgresPack)
   .extensionPacks({ pgvector })
+  .capabilities({
+    sql: {
+      lateral: true,
+      returning: true,
+      jsonAgg: true,
+      enums: true,
+      foreignKeys: true,
+      autoIndexesForeignKeys: false,
+    },
+    postgres: {
+      partialIndex: true,
+      deferrableConstraints: true,
+      savepoints: true,
+      transactionalDDL: true,
+      distinctOn: true,
+    },
+    pgvector: {
+      ivfflat: true,
+      hnsw: true,
+      vector: true,
+    },
+  })
   .table('users', (table) =>
     table
       .column('id', { type: int4Column, nullable: false })
