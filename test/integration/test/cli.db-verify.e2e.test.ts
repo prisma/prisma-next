@@ -310,7 +310,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'outputs JSON in fast mode when --fast flag is provided',
+      'outputs JSON in shallow mode when --shallow flag is provided',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           // Set up test directory from fixtures with db config
@@ -347,7 +347,7 @@ withTempDir(({ createTempDir }) => {
           const verifyCwd2 = process.cwd();
           try {
             process.chdir(testDir);
-            await executeCommand(command, ['--config', configPath, '--json', '--fast']);
+            await executeCommand(command, ['--config', configPath, '--json', '--shallow']);
           } finally {
             process.chdir(verifyCwd2);
           }
@@ -364,7 +364,7 @@ withTempDir(({ createTempDir }) => {
           >;
           expect(parsed).toMatchObject({
             ok: true,
-            mode: 'fast',
+            mode: 'shallow',
             summary: expect.any(String),
             contract: {
               storageHash: expect.any(String),

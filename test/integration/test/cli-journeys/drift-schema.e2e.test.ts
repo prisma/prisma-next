@@ -3,7 +3,7 @@
  *
  * M — Phantom drift: after initialization, a DBA drops a column via manual DDL.
  *     db verify now catches the missing column by default via structural schema
- *     verification. db verify --fast still performs marker-only verification and
+ *     verification. db verify --shallow still performs marker-only verification and
  *     therefore passes if the marker row is unchanged. Recovery via db update
  *     fails because re-adding a NOT NULL column to an existing table is
  *     unrecoverable without manual intervention.
@@ -39,7 +39,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'init → manual DDL drop → verify fails → verify --fast passes → schema-verify fails',
+      'init → manual DDL drop → verify fails → verify --shallow passes → schema-verify fails',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -61,9 +61,9 @@ withTempDir(({ createTempDir }) => {
         const verify = await runDbVerify(ctx);
         expect(verify.exitCode, 'M.01: db verify detects drift').toBe(1);
 
-        // M.02: db verify --fast (passes — marker hash still matches)
-        const fastVerify = await runDbVerify(ctx, ['--fast']);
-        expect(fastVerify.exitCode, 'M.02: db verify --fast marker-only').toBe(0);
+        // M.02: db verify --shallow (passes — marker hash still matches)
+        const shallowVerify = await runDbVerify(ctx, ['--shallow']);
+        expect(shallowVerify.exitCode, 'M.02: db verify --shallow marker-only').toBe(0);
 
         // M.03: db schema-verify (fails — missing email column)
         const schemaVerify = await runDbSchemaVerify(ctx);

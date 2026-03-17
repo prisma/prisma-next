@@ -46,7 +46,7 @@ import { TerminalUI } from '../utils/terminal-ui';
 interface DbVerifyOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly fast?: boolean;
+  readonly shallow?: boolean;
 }
 
 /**
@@ -99,7 +99,10 @@ async function executeDbVerifyCommand(
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
-      { label: 'mode', value: options.fast ? 'fast (marker only)' : 'full (marker + schema)' },
+      {
+        label: 'mode',
+        value: options.shallow ? 'shallow (marker only)' : 'full (marker + schema)',
+      },
     ];
     if (options.db) {
       details.push({ label: 'database', value: maskConnectionUrl(options.db) });
@@ -186,10 +189,10 @@ async function executeDbVerifyCommand(
       return notOk(mapVerifyFailure(verifyResult));
     }
 
-    if (options.fast) {
+    if (options.shallow) {
       return ok({
         ok: true,
-        mode: 'fast',
+        mode: 'shallow',
         summary: 'Database marker matches contract',
         contract: verifyResult.contract,
         marker: verifyResult.marker,
@@ -197,7 +200,7 @@ async function executeDbVerifyCommand(
         ...ifDefined('missingCodecs', verifyResult.missingCodecs),
         ...ifDefined('codecCoverageSkipped', verifyResult.codecCoverageSkipped),
         warning:
-          'Schema verification skipped because --fast was provided. Run `prisma-next db schema-verify` to detect structural drift.',
+          'Schema verification skipped because --shallow was provided. Run `prisma-next db schema-verify` to detect structural drift.',
         meta: {
           ...(verifyResult.meta ?? {}),
           schemaVerification: 'skipped',
@@ -267,18 +270,18 @@ export function createDbVerifyCommand(): Command {
     command,
     'Check whether the database signature and live schema match your contract',
     'Verifies the database marker first, then runs tolerant structural schema verification to\n' +
-      'catch drift such as manual DDL changes. Use `--fast` to skip the schema check and accept\n' +
+      'catch drift such as manual DDL changes. Use `--shallow` to skip the schema check and accept\n' +
       'marker-only verification.',
   );
   setCommandExamples(command, [
     'prisma-next db verify --db $DATABASE_URL',
-    'prisma-next db verify --db $DATABASE_URL --fast',
+    'prisma-next db verify --db $DATABASE_URL --shallow',
     'prisma-next db verify --db $DATABASE_URL --json',
   ]);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--fast', 'Skip structural schema verification and only check the database marker')
+    .option('--shallow', 'Skip structural schema verification and only check the database marker')
     .action(async (options: DbVerifyOptions) => {
       const flags = parseGlobalFlags(options);
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
