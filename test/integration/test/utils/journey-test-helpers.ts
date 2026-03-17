@@ -337,17 +337,6 @@ export async function runContractEmitWithConfig(
   ]);
 }
 
-/**
- * Runs a command with explicit --db flag (for connection error tests).
- */
-export async function runDbVerifyWithDb(
-  ctx: JourneyContext,
-  dbUrl: string,
-  extraArgs: readonly string[] = [],
-): Promise<CommandResult> {
-  return runCommand(createDbVerifyCommand(), ctx, ['--db', dbUrl, ...extraArgs]);
-}
-
 // ---------------------------------------------------------------------------
 // JSON parsing helper
 // ---------------------------------------------------------------------------

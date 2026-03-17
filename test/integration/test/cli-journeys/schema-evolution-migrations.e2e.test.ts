@@ -181,21 +181,14 @@ withTempDir(({ createTempDir }) => {
         const plan = await runMigrationPlan(ctx, ['--name', 'initial-evolution']);
         expect(plan.exitCode, 'Z.02: migration plan').toBe(0);
 
-        // Z.03: Since db init marker doesn't match migration chain, we need
-        // to use db update instead, or accept that this particular transition
-        // requires signing the database first.
-        // The migration was planned from ∅→additive, but marker is at base.
-        // Let's test the realistic flow: migration apply will fail, then
-        // we recover by using db update.
+        // Z.03: migration apply fails because the db init marker doesn't match
+        // the migration chain root (planned from ∅→additive, but marker is at base).
+        // Then db update recovers by applying the schema directly.
         const apply = await runMigrationApply(ctx);
-        if (apply.exitCode !== 0) {
-          // Expected: marker doesn't match chain. Use db update as recovery.
-          const update = await runDbUpdate(ctx);
-          expect(update.exitCode, 'Z.03: db update recovery').toBe(0);
-        } else {
-          // If apply succeeded, that's fine too
-          expect(apply.exitCode, 'Z.03: migration apply').toBe(0);
-        }
+        expect(apply.exitCode, 'Z.03: migration apply rejects marker mismatch').toBe(1);
+
+        const update = await runDbUpdate(ctx);
+        expect(update.exitCode, 'Z.03: db update recovery').toBe(0);
 
         // Z.04: db verify
         const dbVerify = await runDbVerify(ctx);
