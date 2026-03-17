@@ -133,6 +133,16 @@ export const config: RecordingsConfig = {
       },
     ],
 
+    ergonomics: [
+      {
+        name: 'did-you-mean',
+        description: 'Typo triggers "Did you mean?" suggestion',
+        command: 'prisma-next db verifu',
+        height: 'dynamic',
+        sleepAfterEnter: '3s',
+      },
+    ],
+
     'db-update': [
       {
         name: 'help',

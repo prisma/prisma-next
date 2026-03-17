@@ -36,6 +36,18 @@
     --ctp-peach: #ef9f76;
     --ctp-mauve: #ca9ee6;
     --ctp-pink: #f4b8e4;
+
+    /* ── Type scale (consolidated) ── */
+    --type-caption: 0.55em;
+    --type-small: 0.6em;
+    --type-body-sm: 0.65em;
+    --type-body: 0.72em;
+    --type-label: 0.48em;
+
+    /* ── Animation tokens ── */
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --duration-fast: 0.15s;
+    --duration-normal: 0.25s;
   }
 
   /* ── reveal.js overrides ── */
@@ -59,7 +71,7 @@
 
   /* Recording slides: top-align for max SVG space */
   .reveal .slides section.recording-slide {
-    padding: 20px 60px 10px;
+    padding: 16px 60px 10px;
     display: flex !important;
     flex-direction: column;
     justify-content: flex-start;
@@ -82,7 +94,7 @@
     margin-bottom: 0.6em;
   }
 
-  .reveal h1 { font-size: 2.4em; font-weight: 700; }
+  .reveal h1 { font-size: 2.4em; font-weight: 700; letter-spacing: -0.04em; }
   .reveal h2 { font-size: 1.5em; }
   .reveal h3 { font-size: 1.1em; color: var(--ctp-subtext0); font-weight: 500; }
 
@@ -133,10 +145,11 @@
 
   /* ── Section labels ── */
   .section-label {
-    display: inline-block;
+    display: block;
+    width: fit-content;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.42em;
-    font-weight: 500;
+    font-size: var(--type-label);
+    font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--ctp-teal);
@@ -158,6 +171,7 @@
 
   .title-slide h1 {
     margin-bottom: 0.15em;
+    text-shadow: 0 0 60px rgba(129, 200, 190, 0.15);
   }
 
   .title-slide .subtitle {
@@ -175,9 +189,9 @@
   }
 
   .title-divider {
-    width: 80px;
+    width: 120px;
     height: 2px;
-    background: var(--ctp-teal);
+    background: linear-gradient(90deg, transparent, var(--ctp-teal), transparent);
     margin: 1.2em auto;
     border: none;
   }
@@ -207,7 +221,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 1em;
     margin: 0.8em 0;
-    font-size: 0.62em;
+    font-size: var(--type-body-sm);
     max-width: 100%;
     overflow: hidden;
   }
@@ -273,11 +287,11 @@
   /* ── Bug fix highlight ── */
   .fix-block {
     background: var(--ctp-mantle);
-    border-left: 3px solid var(--ctp-peach);
+    border-left: 4px solid var(--ctp-peach);
     border-radius: 0 6px 6px 0;
     padding: 0.8em 1.2em;
     margin: 0.6em 0;
-    font-size: 0.65em;
+    font-size: var(--type-body-sm);
   }
 
   .fix-block .fix-label {
@@ -372,21 +386,34 @@
     grid-template-columns: 1fr 1fr;
     gap: 0.8em;
     margin: 0.5em 0;
-    font-size: 0.62em;
+    font-size: var(--type-body-sm);
   }
 
   .scenario-card {
     padding: 0.8em 1em;
     border-radius: 6px;
     border: 1px solid var(--ctp-surface0);
+    border-top: 2px solid var(--ctp-surface1);
     background: var(--ctp-mantle);
+    transition: border-color var(--duration-normal) var(--ease-out-quart),
+                transform var(--duration-normal) var(--ease-out-quart);
   }
+
+  .scenario-card:hover {
+    border-color: var(--ctp-surface1);
+    transform: translateY(-1px);
+  }
+
+  .scenario-card--green  { border-top-color: var(--ctp-green); }
+  .scenario-card--peach  { border-top-color: var(--ctp-peach); }
+  .scenario-card--red    { border-top-color: var(--ctp-red); }
+  .scenario-card--blue   { border-top-color: var(--ctp-blue); }
 
   .scenario-card h4 {
     font-size: 0.85em;
     color: var(--ctp-text);
     margin: 0 0 0.3em;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .scenario-card p {
@@ -409,16 +436,19 @@
 
   .stat .num {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 1.8em;
+    font-size: 2.2em;
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
     color: var(--ctp-teal);
     line-height: 1;
   }
 
   .stat .label {
-    font-size: 0.5em;
+    font-size: 0.45em;
+    font-weight: 500;
+    letter-spacing: 0.04em;
     color: var(--ctp-overlay0);
-    margin-top: 0.3em;
+    margin-top: 0.4em;
   }
 
   /* ── Wrap-up takeaway ── */
@@ -440,7 +470,7 @@
     display: flex !important;
     gap: 1.5em;
     align-items: stretch;
-    padding: 24px 60px 16px;
+    padding: 16px 60px 16px;
   }
 
   .split-text {
@@ -453,7 +483,7 @@
   .split-text .section-label { margin-bottom: 0.4em; }
   .split-text h2 { font-size: 1.3em; margin-bottom: 0.5em; }
   .split-text ul { margin: 0; }
-  .split-text li { font-size: 0.58em; margin-bottom: 0.35em; line-height: 1.45; }
+  .split-text li { font-size: var(--type-small); margin-bottom: 0.35em; line-height: 1.45; }
   .split-text code { white-space: nowrap; }
 
   .split-recording {
@@ -491,19 +521,23 @@
 
   .recording-tabs button {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.42em;
+    font-size: 0.45em;
     padding: 0.35em 0.8em;
     border: 1px solid var(--ctp-surface1);
     border-radius: 100px;
     background: transparent;
     color: var(--ctp-overlay0);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: color var(--duration-fast) var(--ease-out-quart),
+                background var(--duration-fast) var(--ease-out-quart),
+                border-color var(--duration-fast) var(--ease-out-quart),
+                transform var(--duration-fast) var(--ease-out-quart);
   }
 
   .recording-tabs button:hover {
     border-color: var(--ctp-surface2);
     color: var(--ctp-subtext0);
+    transform: translateY(-1px);
   }
 
   .recording-tabs button.active {
@@ -511,6 +545,10 @@
     border-color: var(--ctp-teal);
     color: var(--ctp-crust);
     font-weight: 600;
+  }
+
+  .recording-tabs button:active {
+    transform: translateY(0);
   }
 
   /* ── Slide transitions ── */
@@ -598,14 +636,45 @@
     outline-offset: 2px;
   }
 
+  /* ═══ DELIGHT ═══ */
+
+  /* ── Recording crossfade on tab switch ── */
+  .recording-container object {
+    transition: opacity var(--duration-normal) var(--ease-out-quart);
+  }
+
+  .recording-container object.swapping {
+    opacity: 0;
+  }
+
+  /* ── Journey flow step hover ── */
+  .journey-flow .step {
+    transition: background var(--duration-fast) var(--ease-out-quart);
+  }
+
+  .journey-flow .step:not(.highlight):not(.error):not(.recovery):hover {
+    background: var(--ctp-surface1);
+  }
+
   /* ── Reduced motion ── */
   @media (prefers-reduced-motion: reduce) {
     .reveal .slides section {
       transition: none !important;
     }
 
-    .recording-tabs button {
-      transition: none;
+    .recording-tabs button,
+    .scenario-card,
+    .recording-container object,
+    .journey-flow .step {
+      transition: none !important;
+    }
+
+    .scenario-card:hover {
+      transform: none;
+    }
+
+    .recording-tabs button:hover {
+      transform: none;
     }
   }
 
@@ -644,6 +713,36 @@
     .journey-flow .step {
       border: 1px solid ButtonText;
     }
+
+    .journey-flow .step.highlight,
+    .journey-flow .step.error,
+    .journey-flow .step.recovery {
+      border: 2px solid Highlight;
+    }
+
+    .scenario-card {
+      border: 1px solid ButtonText;
+    }
+
+    .fix-block {
+      border: 1px solid ButtonText;
+    }
+  }
+
+  /* ── Print styles ── */
+  @media print {
+    .reveal-viewport { background: white; }
+    .reveal { color: #1a1a1a; font-size: 14pt; }
+    .reveal h1, .reveal h2, .reveal h3, .reveal h4 { color: #1a1a1a; }
+    .reveal p, .reveal li { color: #333; }
+    .recording-wrapper,
+    .recording-tabs,
+    .recording-container { display: none; }
+    .reveal .progress,
+    .reveal .slide-number { display: none; }
+    .scenario-card { border: 1px solid #ccc; background: #f9f9f9; }
+    .fix-block { border-left: 3px solid #666; background: #f5f5f5; }
+    .section-label { border-color: #999; color: #555; }
   }
 </style>
 </head>
@@ -658,8 +757,8 @@
 <section class="title-slide">
   <h1>Prisma Next <span class="accent-teal">CLI</span></h1>
   <hr class="title-divider">
-  <p class="subtitle">Alberto Schiabel</p>
-  <p class="date">Week of March 13, 2026</p>
+  <p class="subtitle">Alberto Schiabel // @jkomyno</p>
+  <p class="date">March 17, 2026</p>
 </section>
 
 <!-- ═══════════════════════════════════════════════════
@@ -671,8 +770,9 @@
     <h2>Architecture &amp; UX</h2>
 
     <ul>
-      <li>Modular output system &mdash; dedicated formatters per command domain</li>
+      <li>JSON-first pipe-friendly output, ideal for agents</li>
       <li>Centralized terminal layer &mdash; spinners, stdout/stderr routing, interactive mode</li>
+      <li>Modular output system &mdash; dedicated formatters per command domain</li>
       <li><span class="accent">"Did you mean?"</span> suggestions &amp; graceful SIGINT/SIGTERM shutdown</li>
       <li>Copy-pastable examples in every <code>--help</code>, interactive confirmation for destructive ops</li>
     </ul>
@@ -683,10 +783,11 @@
       <button class="active" role="tab" aria-selected="true" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/11-db-verify-jq.svg">db verify | jq</button>
       <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/db-init/help.svg">db init --help</button>
       <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/db-update/help.svg">db update --help</button>
+      <button role="tab" aria-selected="false" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/ergonomics/did-you-mean.svg">did you mean?</button>
     </div>
 
     <div class="recording-wrapper">
-      <div class="recording-container" data-group="revamp">
+      <div class="recording-container" data-group="revamp" role="tabpanel" aria-label="Recording viewer">
         <object data="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/11-db-verify-jq.svg"
                 type="image/svg+xml"
                 aria-label="Terminal recording: db verify piped to jq">Recording unavailable</object>
@@ -702,77 +803,45 @@
   <div class="section-label">CLI Revamp</div>
   <h2>Unified Surface</h2>
 
-  <div style="margin-bottom: 0.6em;">
-    <h3 style="margin-bottom: 0.4em;">Flag Renames</h3>
-    <div class="arrow-item">
-      <span class="old">--plan</span>
-      <span class="arrow">&rarr;</span>
-      <span class="new">--dry-run</span>
-    </div>
-    <div class="arrow-item">
-      <span class="old">--accept-data-loss</span>
-      <span class="arrow">&rarr;</span>
-      <span class="new">-y / --yes</span>
-    </div>
-  </div>
+  <div style="display: flex; gap: 2.5em; align-items: flex-start;">
+    <!-- Left column: Flag Renames + db verify -->
+    <div style="flex: 1; min-width: 0;">
+      <h3 style="margin-bottom: 0.4em;">Flag Renames</h3>
+      <div class="arrow-item">
+        <span class="old">--plan</span>
+        <span class="arrow">&rarr;</span>
+        <span class="new">--dry-run</span>
+      </div>
+      <div class="arrow-item">
+        <span class="old">--accept-data-loss</span>
+        <span class="arrow">&rarr;</span>
+        <span class="new">-y / --yes</span>
+      </div>
 
-  <h3 style="margin-bottom: 0.3em;">Global Flags</h3>
-  <div class="flags-grid">
-    <span class="flag">--json</span>          <span class="desc">Single JSON object to stdout</span>
-    <span class="flag">-q</span>              <span class="desc">Quiet &mdash; errors only</span>
-    <span class="flag">-v / -vv</span>        <span class="desc">Verbose / Trace with timings</span>
-    <span class="flag">--color / --no-color</span> <span class="desc">ANSI color control</span>
-    <span class="flag">-y / --yes</span>      <span class="desc">Auto-accept destructive changes</span>
-    <span class="flag">--trace</span>         <span class="desc">Deep internals + stack traces</span>
-  </div>
+      <div style="margin-top: 1.2em;">
+        <h3 style="margin-bottom: 0.3em;"><code>db verify</code> &mdash; Upgraded</h3>
+        <ul>
+          <li>Now checks <span class="accent">marker + structural schema</span> by default</li>
+          <li><code>--shallow</code> for marker-only (old behavior)</li>
+        </ul>
+      </div>
+    </div>
 
-  <div style="margin-top: 0.5em;">
-    <h3 style="margin-bottom: 0.3em;"><code>db verify</code> &mdash; Upgraded</h3>
-    <ul>
-      <li>Now checks <span class="accent">marker + structural schema</span> by default</li>
-      <li><code>--fast</code> for marker-only (old behavior)</li>
-    </ul>
+    <!-- Right column: Global Flags -->
+    <div style="flex: 1; min-width: 0;">
+      <h3 style="margin-bottom: 0.3em;">Global Flags</h3>
+      <div class="flags-grid">
+        <span class="flag">--json</span>          <span class="desc">Single JSON object to stdout</span>
+        <span class="flag">-q</span>              <span class="desc">Quiet &mdash; errors only</span>
+        <span class="flag">-v / -vv</span>        <span class="desc">Verbose / Trace with timings</span>
+        <span class="flag">--color / --no-color</span> <span class="desc">ANSI color control</span>
+        <span class="flag">-y / --yes</span>      <span class="desc">Auto-accept destructive changes</span>
+        <span class="flag">--trace</span>         <span class="desc">Deep internals + stack traces</span>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════
-     SLIDE 4 — Bug Fixes: Default Normalizer
-     ═══════════════════════════════════════════════════ -->
-<section>
-  <div class="section-label">Bug Fixes</div>
-  <h2>Postgres Default Normalizer</h2>
-
-  <div class="fix-block">
-    <div class="fix-label" style="color: var(--ctp-peach);">Problem</div>
-    <p style="margin: 0; font-size: 1em; color: var(--ctp-subtext1);">
-      Schema verification failed on valid defaults &mdash;
-      cast-wrapped timestamps (<code>now()::timestamp</code>),
-      <code>NULL</code> defaults, and numeric overflow were not
-      normalized to their canonical forms.
-    </p>
-  </div>
-
-  <div class="fix-block" style="border-left-color: var(--ctp-green);">
-    <div class="fix-label" style="color: var(--ctp-green);">Fix</div>
-    <p style="margin: 0; font-size: 1em; color: var(--ctp-subtext1);">
-      Canonical form normalization in <code>default-normalizer.ts</code>
-      &mdash; each default expression is reduced to a single representative
-      form before comparison.
-    </p>
-  </div>
-
-  <div class="fix-block" style="border-left-color: var(--ctp-blue);">
-    <div class="fix-label" style="color: var(--ctp-blue);">Precision</div>
-    <p style="margin: 0; font-size: 1em; color: var(--ctp-subtext1);">
-      <code>clock_timestamp()</code> is now kept distinct from <code>now()</code>
-      &mdash; volatile vs. stable semantics preserved.
-    </p>
-  </div>
-
-  <p class="small dim" style="margin-top: 1em;">
-    Schema verification now correctly matches semantically equivalent defaults.
-  </p>
-</section>
 
 <!-- ═══════════════════════════════════════════════════
      SLIDE 5 — Testing Philosophy
@@ -802,19 +871,19 @@
   </div>
 
   <div class="scenario-grid" style="margin-top: 0.6em;">
-    <div class="scenario-card">
+    <div class="scenario-card scenario-card--green">
       <h4 class="accent">Happy Paths</h4>
       <p>Greenfield setup, direct update, schema evolution, brownfield adoption</p>
     </div>
-    <div class="scenario-card">
+    <div class="scenario-card scenario-card--peach">
       <h4 class="accent-peach">Drift Detection</h4>
       <p>Phantom drift, missing marker, stale marker, DAG breakage</p>
     </div>
-    <div class="scenario-card">
+    <div class="scenario-card scenario-card--red">
       <h4 class="accent-red">Error Scenarios</h4>
       <p>Config errors, connection failures, contract mismatches</p>
     </div>
-    <div class="scenario-card">
+    <div class="scenario-card scenario-card--blue">
       <h4 class="accent-blue">Ergonomics</h4>
       <p>Help output, global flags, quiet/verbose modes, JSON output</p>
     </div>
@@ -833,7 +902,7 @@
   <div class="section-label">Happy Paths</div>
   <h2>Greenfield Setup</h2>
 
-  <p class="dim" style="margin: 0.2em 0 0.4em; font-size: 0.55em;">Full setup from scratch: emit the contract, initialize the database, and verify the result.</p>
+  <p class="dim" style="margin: 0.2em 0 0.4em; font-size: var(--type-caption);">Full setup from scratch: emit the contract, initialize the database, and verify the result.</p>
 
   <div class="recording-tabs" data-group="happy" role="tablist" aria-label="Greenfield setup recordings">
     <button class="active" role="tab" aria-selected="true" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/01-contract-emit.svg">contract emit</button>
@@ -842,7 +911,7 @@
   </div>
 
   <div class="recording-wrapper">
-    <div class="recording-container" data-group="happy">
+    <div class="recording-container" data-group="happy" role="tabpanel" aria-label="Recording viewer">
       <object data="../../packages/1-framework/3-tooling/cli/recordings/svgs/greenfield-setup/01-contract-emit.svg"
               type="image/svg+xml"
               aria-label="Terminal recording: contract emit">Recording unavailable</object>
@@ -857,7 +926,7 @@
   <div class="section-label">Happy Paths</div>
   <h2>Direct Update</h2>
 
-  <p class="dim" style="margin: 0.2em 0 0.4em; font-size: 0.55em;">Apply a schema change: emit the updated contract, preview with dry-run, apply, and verify.</p>
+  <p class="dim" style="margin: 0.2em 0 0.4em; font-size: var(--type-caption);">Apply a schema change: emit the updated contract, preview with dry-run, apply, and verify.</p>
 
   <div class="recording-tabs" data-group="update" role="tablist" aria-label="Direct update recordings">
     <button class="active" role="tab" aria-selected="true" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/direct-update/02-db-update-dry-run.svg">update --dry-run</button>
@@ -866,7 +935,7 @@
   </div>
 
   <div class="recording-wrapper">
-    <div class="recording-container" data-group="update">
+    <div class="recording-container" data-group="update" role="tabpanel" aria-label="Recording viewer">
       <object data="../../packages/1-framework/3-tooling/cli/recordings/svgs/direct-update/02-db-update-dry-run.svg"
               type="image/svg+xml"
               aria-label="Terminal recording: db update dry-run">Recording unavailable</object>
@@ -881,7 +950,7 @@
   <div class="section-label">Drift Detection</div>
   <h2>Phantom Drift Detection</h2>
 
-  <p class="dim" style="margin: 0.2em 0 0.4em; font-size: 0.55em;">After a manual DDL drops a column, <code>db verify</code> now catches it via structural schema check.</p>
+  <p class="dim" style="margin: 0.2em 0 0.4em; font-size: var(--type-caption);">After a manual DDL drops a column, <code>db verify</code> now catches it via structural schema check.</p>
 
   <div class="recording-tabs" data-group="drift" role="tablist" aria-label="Drift detection recordings">
     <button class="active" role="tab" aria-selected="true" data-src="../../packages/1-framework/3-tooling/cli/recordings/svgs/drift-phantom/01-db-verify-fail.svg">verify (catches drift)</button>
@@ -890,7 +959,7 @@
   </div>
 
   <div class="recording-wrapper">
-    <div class="recording-container" data-group="drift">
+    <div class="recording-container" data-group="drift" role="tabpanel" aria-label="Recording viewer">
       <object data="../../packages/1-framework/3-tooling/cli/recordings/svgs/drift-phantom/01-db-verify-fail.svg"
               type="image/svg+xml"
               aria-label="Terminal recording: db verify catches phantom drift">Recording unavailable</object>
@@ -967,23 +1036,60 @@ document.querySelectorAll('.recording-tabs').forEach(tabGroup => {
   if (!container) return;
 
   const obj = container.querySelector('object');
+  const tabs = Array.from(tabGroup.querySelectorAll('button'));
 
-  tabGroup.querySelectorAll('button').forEach(tab => {
-    tab.addEventListener('click', () => {
-      // Update active tab + aria
-      tabGroup.querySelectorAll('button').forEach(t => {
-        t.classList.remove('active');
-        t.setAttribute('aria-selected', 'false');
-      });
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-
-      // Swap SVG source
-      const src = tab.dataset.src;
-      if (src && obj) {
-        obj.data = src;
-      }
+  function activateTab(tab) {
+    // Update active tab + aria
+    tabs.forEach(t => {
+      t.classList.remove('active');
+      t.setAttribute('aria-selected', 'false');
+      t.setAttribute('tabindex', '-1');
     });
+    tab.classList.add('active');
+    tab.setAttribute('aria-selected', 'true');
+    tab.setAttribute('tabindex', '0');
+    tab.focus();
+
+    // Crossfade SVG source
+    const src = tab.dataset.src;
+    if (src && obj) {
+      obj.classList.add('swapping');
+      setTimeout(() => {
+        obj.data = src;
+        obj.classList.remove('swapping');
+      }, 150);
+    }
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => activateTab(tab));
+  });
+
+  // Keyboard arrow navigation (harden)
+  tabGroup.addEventListener('keydown', e => {
+    const current = tabs.indexOf(document.activeElement);
+    if (current === -1) return;
+
+    let next;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      next = (current + 1) % tabs.length;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      next = (current - 1 + tabs.length) % tabs.length;
+    } else if (e.key === 'Home') {
+      next = 0;
+    } else if (e.key === 'End') {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+
+    e.preventDefault();
+    activateTab(tabs[next]);
+  });
+
+  // Set initial tabindex state
+  tabs.forEach((tab, i) => {
+    tab.setAttribute('tabindex', i === 0 ? '0' : '-1');
   });
 });
 
