@@ -2,7 +2,7 @@ import type { StorageTable } from '@prisma-next/sql-contract/types';
 
 export type CapabilityGated<Capabilities, Required, TrueBranch> = Capabilities extends Required
   ? TrueBranch
-  : {};
+  : Record<string, never>;
 
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 export declare const ExpressionType: unique symbol;
