@@ -1,13 +1,13 @@
 import { expectTypeOf } from 'vitest';
-import { posts, users } from './preamble';
+import { db } from './preamble';
 
 // distinct() on a basic select
-const distinctUsers = await users.select('name', 'email').distinct().first();
+const distinctUsers = await db.users.select('name', 'email').distinct().first();
 
 expectTypeOf(distinctUsers).toEqualTypeOf<{ name: string; email: string }>();
 
 // distinctOn with a single column name
-const distinctOnName = await users
+const distinctOnName = await db.users
   .select('name', 'email')
   .distinctOn('name')
   .orderBy('name')
@@ -16,7 +16,7 @@ const distinctOnName = await users
 expectTypeOf(distinctOnName).toEqualTypeOf<{ name: string; email: string }>();
 
 // distinctOn with multiple column names
-const distinctOnMulti = await users
+const distinctOnMulti = await db.users
   .select('name', 'email')
   .distinctOn('name', 'email')
   .orderBy('name')
@@ -25,7 +25,7 @@ const distinctOnMulti = await users
 expectTypeOf(distinctOnMulti).toEqualTypeOf<{ name: string; email: string }>();
 
 // distinctOn with expression callback
-const distinctOnExpr = await users
+const distinctOnExpr = await db.users
   .select('name', 'email')
   .distinctOn((f) => f.name)
   .orderBy('name')
@@ -34,8 +34,8 @@ const distinctOnExpr = await users
 expectTypeOf(distinctOnExpr).toEqualTypeOf<{ name: string; email: string }>();
 
 // distinctOn with joined tables — namespace access in expression
-const distinctOnJoin = await users
-  .innerJoin(posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+const distinctOnJoin = await db.users
+  .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
   .select('name', 'title')
   .distinctOn((f) => f.users.name)
   .orderBy((f) => f.users.name)
@@ -44,7 +44,7 @@ const distinctOnJoin = await users
 expectTypeOf(distinctOnJoin).toEqualTypeOf<{ name: string; title: string }>();
 
 // distinct() on a grouped query
-const distinctGrouped = await users
+const distinctGrouped = await db.users
   .select('name')
   .select('cnt', (_f, fns) => fns.count())
   .groupBy('name')
@@ -54,8 +54,8 @@ const distinctGrouped = await users
 expectTypeOf(distinctGrouped).toEqualTypeOf<{ name: string; cnt: number }>();
 
 // distinctOn on a grouped query
-const distinctOnGrouped = await users
-  .innerJoin(posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+const distinctOnGrouped = await db.users
+  .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
   .select('name')
   .select('postCount', (_f, fns) => fns.count())
   .groupBy('name')
@@ -66,6 +66,6 @@ const distinctOnGrouped = await users
 expectTypeOf(distinctOnGrouped).toEqualTypeOf<{ name: string; postCount: number }>();
 
 // distinctOn referencing scope field not in select
-const distinctOnScope = await users.select('name').distinctOn('id').orderBy('id').first();
+const distinctOnScope = await db.users.select('name').distinctOn('id').orderBy('id').first();
 
 expectTypeOf(distinctOnScope).toEqualTypeOf<{ name: string }>();

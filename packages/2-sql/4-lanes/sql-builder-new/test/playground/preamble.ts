@@ -1,7 +1,6 @@
-import type { TableProxy } from '../../src';
+import type { Db } from '../../src';
 import type { Contract } from '../fixtures/generated/contract';
 
-declare const users: TableProxy<Contract, 'users'>;
-declare const posts: TableProxy<Contract, 'posts'>;
+declare const db: Db<Contract>;
 
-export { users, posts };
+export { db };
