@@ -1,5 +1,4 @@
 export {
-  expressionFromSource,
   getColumnInfo,
   getColumnMeta,
   isColumnBuilder,
@@ -7,5 +6,4 @@ export {
   isExpressionSource,
   isParamPlaceholder,
   isValueSource,
-  toExpression,
 } from '../utils/guards';

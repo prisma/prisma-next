@@ -6,7 +6,6 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import {
-  expressionFromSource,
   getColumnInfo,
   getColumnMeta,
   isColumnBuilder,
@@ -14,7 +13,6 @@ import {
   isExpressionSource,
   isParamPlaceholder,
   isValueSource,
-  toExpression,
 } from '@prisma-next/sql-relational-core/utils/guards';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../fixtures/contract.d';
@@ -75,9 +73,7 @@ describe('guards', () => {
 
   it('converts sources to rich expressions', () => {
     const builder = tables.user.columns.id;
-
-    expect(toExpression(builder)).toEqual(ColumnRef.of('user', 'id'));
-    expect(expressionFromSource(builder)).toEqual(ColumnRef.of('user', 'id'));
+    expect(builder.toExpr()).toEqual(ColumnRef.of('user', 'id'));
   });
 
   it('extracts column metadata', () => {

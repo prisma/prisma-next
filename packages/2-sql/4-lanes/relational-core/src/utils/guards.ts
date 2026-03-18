@@ -1,5 +1,5 @@
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
-import { type Expression, type ExpressionSource, OperationExpr } from '../ast/types';
+import { type ExpressionSource, OperationExpr } from '../ast/types';
 import type {
   AnyColumnBuilder,
   AnyExpressionSource,
@@ -91,28 +91,6 @@ export function isExpressionSource(value: unknown): value is ExpressionSource {
     'toExpr' in value &&
     typeof (value as ExpressionSource).toExpr === 'function'
   );
-}
-
-/**
- * Converts any ExpressionSource to an Expression.
- * This is the canonical way to get an AST Expression from a builder.
- *
- * @param source - A ColumnBuilder or ExpressionBuilder
- * @returns The corresponding Expression (ColumnRef or OperationExpr)
- */
-export function toExpression(source: ExpressionSource): Expression {
-  return source.toExpr();
-}
-
-/**
- * Converts an AnyExpressionSource to an Expression.
- * Handles both ColumnBuilder and ExpressionBuilder.
- *
- * @param source - A ColumnBuilder or ExpressionBuilder
- * @returns The corresponding Expression (ColumnRef or OperationExpr)
- */
-export function expressionFromSource(source: AnyExpressionSource): Expression {
-  return source.toExpr();
 }
 
 /**

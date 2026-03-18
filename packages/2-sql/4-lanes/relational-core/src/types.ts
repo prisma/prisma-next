@@ -225,6 +225,7 @@ export type AnyColumnBuilder =
  * Union type for any builder that can produce an Expression.
  * Used in DSL method signatures where either a column or operation result can be passed.
  */
+// TODO: do we still need this? can we just replace it with ExpressionSource
 export type AnyExpressionSource = AnyColumnBuilder | ExpressionBuilder;
 
 export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {

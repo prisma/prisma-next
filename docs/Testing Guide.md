@@ -490,10 +490,6 @@ const literalExpr: LiteralExpr = { kind: 'literal', value: 'test' };
 
 **Why?** The rich AST helpers ensure consistency, type safety, and make refactoring easier. Manual object creation duplicates AST structure definitions and is error-prone.
 
-**Exception:** `OperationExpr` objects still need structured construction, typically via `OperationExpr.function(...)` in tests.
-
-See `.cursor/rules/use-ast-factories.mdc` for the current AST construction guidance.
-
 ### ContractIR Factory Functions
 
 When creating `ContractIR` objects in tests, use factory functions instead of manual object creation:
@@ -709,6 +705,56 @@ it('returns error when processing fails', () => {
 ```
 
 **Impact:** Conditional expectations make tests unpredictable, harder to debug, and reduce test coverage accuracy. Each test should verify one specific behavior with all expectations executing unconditionally.
+
+### Anti-Pattern 6: Manual try/catch for Error Assertions
+
+**Symptom:** A try/catch block captures an error into a variable, then assertions run against it. Sometimes the throwing function is even called twice — once inside `expect().toThrow()` and again inside a try/catch.
+
+**Example:**
+
+```typescript
+// ANTI-PATTERN: manual try/catch
+let caughtError: unknown;
+try {
+  buildPlan(contract, node);
+} catch (error) {
+  caughtError = error;
+}
+expect(caughtError).toBeInstanceOf(MyError);
+expect(caughtError).toMatchObject({
+  code: 'INVALID_REF',
+  message: 'Unknown column "user.emali"',
+});
+```
+
+```typescript
+// ANTI-PATTERN: calling the function twice
+expect(() => buildPlan(contract, node)).toThrow(MyError);
+
+let caughtError: unknown;
+try {
+  buildPlan(contract, node);
+} catch (error) {
+  caughtError = error;
+}
+expect((caughtError as MyError).code).toBe('INVALID_REF');
+```
+
+**Solution:** Use `expect(() => ...).toThrow(...)` with `expect.objectContaining` for structured error properties
+
+**✅ CORRECT: Single `toThrow` with structured matching**
+
+```typescript
+expect(() => buildPlan(contract, node)).toThrow(
+  expect.objectContaining({
+    code: 'INVALID_REF',
+    message: 'Unknown column "user.emali"',
+    details: expect.objectContaining({ table: 'user', column: 'emali' }),
+  }),
+);
+```
+
+**Impact:** Manual try/catch is verbose, requires a type cast to access error properties, and silently passes if the function doesn't throw (unless you add `expect.assertions(n)` bookkeeping). Calling the function twice is wasteful and can mask non-deterministic failures. `toThrow` runs the function exactly once and fails automatically if no error is thrown.
 
 ---
 
@@ -1016,4 +1062,6 @@ pnpm --filter @prisma-next/sql-runtime typecheck
 - **Test Descriptions:** `.cursor/rules/omit-should-in-tests.mdc`
 - **Type Testing:** `.cursor/rules/vitest-expect-typeof.mdc`
 - **TypeScript Patterns:** `.cursor/rules/typescript-patterns.mdc` (DRY Test Patterns section)
+- **Error Assertions:** `.cursor/rules/prefer-to-throw.mdc`
+- **Object Matchers:** `.cursor/rules/prefer-object-matcher.mdc`
 - **Agent Reference:** `AGENTS.md`

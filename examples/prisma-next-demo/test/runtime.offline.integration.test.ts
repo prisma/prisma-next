@@ -1,4 +1,9 @@
-import { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import {
+  ColumnRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/prisma/db';
 
@@ -13,11 +18,9 @@ describe('static context (no runtime)', () => {
 
     expect(plan.ast).toBeInstanceOf(SelectAst);
     expect(plan).toMatchObject({
-      ast: {
-        from: { name: 'user' },
-        limit: 1,
-        project: [{ alias: 'id', expr: { table: 'user', column: 'id' } }],
-      },
+      ast: SelectAst.from(TableSource.named('user'))
+        .withLimit(1)
+        .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]),
       meta: { lane: 'dsl' },
     });
   });
