@@ -27,11 +27,6 @@ export { BinaryExpr, ColumnRef, OperationExpr, ParamRef } from '@prisma-next/sql
 export function errorModelNotFound(modelName: string): never {
   throw planInvalid(`Model ${modelName} not found in mappings`);
 }
-
-// utils/guards.ts - Builder helpers around the rich AST
-export function expressionFromSource(source: AnyExpressionSource): Expression {
-  return source.toExpr();
-}
 ```
 
 **Why?**

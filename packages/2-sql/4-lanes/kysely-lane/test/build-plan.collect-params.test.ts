@@ -1,13 +1,17 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
-  type BinaryExpr,
+  BinaryExpr,
   ColumnRef,
   DefaultValueExpr,
   DoNothingConflictAction,
   DoUpdateSetConflictAction,
-  type InsertAst,
+  InsertAst,
+  InsertOnConflict,
+  ListLiteralExpr,
   ParamRef,
-  type SelectAst,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExpressionBuilder, InsertQueryNode } from 'kysely';
 import {
@@ -67,6 +71,12 @@ const db = new Kysely<Record<string, Record<string, unknown>>>({
   },
 });
 
+/** Columns of the `user` test table, sorted alphabetically, as ProjectionItems. */
+const userSelectAllProjection = [
+  ProjectionItem.of('email', ColumnRef.of('user', 'email')),
+  ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+];
+
 describe('buildKyselyPlan', () => {
   it('builds a rich select AST and collects params deterministically', () => {
     const contract = createTestContract();
@@ -78,20 +88,55 @@ describe('buildKyselyPlan', () => {
       .toOperationNode();
 
     const plan = buildKyselyPlan(contract, opNode);
-    const ast = plan.ast as SelectAst;
 
-    expect(plan.meta.lane).toBe('kysely');
-    expect((ast.where as BinaryExpr).left).toEqual(ColumnRef.of('user', 'id'));
-    expect((ast.where as BinaryExpr).right).toEqual(ParamRef.of(1));
-    expect(ast.limit).toBe(2);
+    expect(plan.ast).toEqual(
+      new SelectAst({
+        from: new TableSource('user'),
+        joins: undefined,
+        project: userSelectAllProjection,
+        where: BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1)),
+        orderBy: undefined,
+        distinct: undefined,
+        distinctOn: undefined,
+        groupBy: undefined,
+        having: undefined,
+        limit: 2,
+        offset: undefined,
+        selectAllIntent: { table: 'user' },
+      }),
+    );
     expect(plan.params).toEqual(['user_123']);
-    expect(plan.meta.paramDescriptors).toHaveLength(1);
-    expect(plan.meta.paramDescriptors[0]).toMatchObject({
-      index: 1,
-      source: 'lane',
-      refs: { table: 'user', column: 'id' },
+    expect(plan.meta).toEqual({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      profileHash: 'sha256:test-profile',
+      lane: 'kysely',
+      paramDescriptors: [
+        {
+          index: 1,
+          source: 'lane',
+          refs: { table: 'user', column: 'id' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+      ],
+      refs: {
+        tables: ['user'],
+        columns: [
+          { table: 'user', column: 'email' },
+          { table: 'user', column: 'id' },
+        ],
+      },
+      projection: { email: 'email', id: 'id' },
+      projectionTypes: { email: 'pg/text@1', id: 'pg/text@1' },
+      annotations: {
+        codecs: { email: 'pg/text@1', id: 'pg/text@1' },
+        selectAllIntent: { table: 'user' },
+        limit: 2,
+      },
     });
-    expect(plan.meta.annotations).toMatchObject({ limit: 2, selectAllIntent: { table: 'user' } });
   });
 
   it('collects list params for IN predicates', () => {
@@ -104,13 +149,72 @@ describe('buildKyselyPlan', () => {
 
     const plan = buildKyselyPlan(contract, opNode);
 
+    expect(plan.ast).toEqual(
+      new SelectAst({
+        from: new TableSource('user'),
+        joins: undefined,
+        project: userSelectAllProjection,
+        where: BinaryExpr.in(
+          ColumnRef.of('user', 'id'),
+          ListLiteralExpr.of([ParamRef.of(1), ParamRef.of(2), ParamRef.of(3)]),
+        ),
+        orderBy: undefined,
+        distinct: undefined,
+        distinctOn: undefined,
+        groupBy: undefined,
+        having: undefined,
+        limit: undefined,
+        offset: undefined,
+        selectAllIntent: { table: 'user' },
+      }),
+    );
     expect(plan.params).toEqual(['a', 'b', 'c']);
-    expect(plan.meta.paramDescriptors).toHaveLength(3);
-    expect(plan.meta.paramDescriptors).toMatchObject([
-      { index: 1, refs: { table: 'user', column: 'id' } },
-      { index: 2, refs: { table: 'user', column: 'id' } },
-      { index: 3, refs: { table: 'user', column: 'id' } },
-    ]);
+    expect(plan.meta).toEqual({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      profileHash: 'sha256:test-profile',
+      lane: 'kysely',
+      paramDescriptors: [
+        {
+          index: 1,
+          source: 'lane',
+          refs: { table: 'user', column: 'id' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+        {
+          index: 2,
+          source: 'lane',
+          refs: { table: 'user', column: 'id' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+        {
+          index: 3,
+          source: 'lane',
+          refs: { table: 'user', column: 'id' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+      ],
+      refs: {
+        tables: ['user'],
+        columns: [
+          { table: 'user', column: 'email' },
+          { table: 'user', column: 'id' },
+        ],
+      },
+      projection: { email: 'email', id: 'id' },
+      projectionTypes: { email: 'pg/text@1', id: 'pg/text@1' },
+      annotations: {
+        codecs: { email: 'pg/text@1', id: 'pg/text@1' },
+        selectAllIntent: { table: 'user' },
+      },
+    });
   });
 
   it('transforms multi-row INSERT values into rich insert rows with DEFAULTs', () => {
@@ -121,19 +225,57 @@ describe('buildKyselyPlan', () => {
       .toOperationNode();
 
     const plan = buildKyselyPlan(contract, opNode);
-    const ast = plan.ast as InsertAst;
 
-    expect(ast.rows).toEqual([
-      {
-        id: ParamRef.of(1),
-        email: ParamRef.of(2),
-      },
-      {
-        id: ParamRef.of(3),
-        email: new DefaultValueExpr(),
-      },
-    ]);
+    expect(plan.ast).toEqual(
+      new InsertAst(new TableSource('user'), [
+        {
+          id: ParamRef.of(1),
+          email: ParamRef.of(2),
+        },
+        {
+          id: ParamRef.of(3),
+          email: new DefaultValueExpr(),
+        },
+      ]),
+    );
     expect(plan.params).toEqual(['u1', 'alice@example.com', 'u2']);
+    expect(plan.meta).toEqual({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      profileHash: 'sha256:test-profile',
+      lane: 'kysely',
+      paramDescriptors: [
+        {
+          index: 1,
+          source: 'lane',
+          refs: { table: 'user', column: 'id' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+        {
+          index: 2,
+          source: 'lane',
+          refs: { table: 'user', column: 'email' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+        {
+          index: 3,
+          source: 'lane',
+          refs: { table: 'user', column: 'id' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+      ],
+      refs: {
+        tables: ['user'],
+        columns: [],
+      },
+    });
   });
 
   it('preserves ON CONFLICT for default-values inserts', () => {
@@ -145,15 +287,26 @@ describe('buildKyselyPlan', () => {
       .toOperationNode();
 
     const plan = buildKyselyPlan(contract, opNode);
-    const ast = plan.ast as InsertAst;
 
-    expect(ast.rows).toEqual([{}]);
-    expect(ast.onConflict?.columns).toEqual([ColumnRef.of('user', 'id')]);
-    expect(ast.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+    expect(plan.ast).toEqual(
+      new InsertAst(
+        new TableSource('user'),
+        [{}],
+        new InsertOnConflict([ColumnRef.of('user', 'id')], new DoNothingConflictAction()),
+      ),
+    );
     expect(plan.params).toEqual([]);
-    expect(plan.meta.refs).toEqual({
-      tables: ['user'],
-      columns: [{ table: 'user', column: 'id' }],
+    expect(plan.meta).toEqual({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      profileHash: 'sha256:test-profile',
+      lane: 'kysely',
+      paramDescriptors: [],
+      refs: {
+        tables: ['user'],
+        columns: [{ table: 'user', column: 'id' }],
+      },
     });
   });
 
@@ -171,17 +324,51 @@ describe('buildKyselyPlan', () => {
       .toOperationNode();
 
     const plan = buildKyselyPlan(contract, opNode);
-    const ast = plan.ast as InsertAst;
 
-    expect(ast.onConflict?.columns).toEqual([ColumnRef.of('user', 'id')]);
-    expect(ast.onConflict?.action).toBeInstanceOf(DoUpdateSetConflictAction);
-    expect((ast.onConflict?.action as DoUpdateSetConflictAction).set).toEqual({
-      email: ColumnRef.of('excluded', 'email'),
-    });
+    expect(plan.ast).toEqual(
+      new InsertAst(
+        new TableSource('user'),
+        [
+          {
+            id: ParamRef.of(1),
+            email: ParamRef.of(2),
+          },
+        ],
+        new InsertOnConflict(
+          [ColumnRef.of('user', 'id')],
+          new DoUpdateSetConflictAction({ email: ColumnRef.of('excluded', 'email') }),
+        ),
+      ),
+    );
     expect(plan.params).toEqual(['u1', 'alice@example.com']);
-    expect(plan.meta.refs).toEqual({
-      tables: ['user'],
-      columns: [{ table: 'user', column: 'id' }],
+    expect(plan.meta).toEqual({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      profileHash: 'sha256:test-profile',
+      lane: 'kysely',
+      paramDescriptors: [
+        {
+          index: 1,
+          source: 'lane',
+          refs: { table: 'user', column: 'id' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+        {
+          index: 2,
+          source: 'lane',
+          refs: { table: 'user', column: 'email' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+      ],
+      refs: {
+        tables: ['user'],
+        columns: [{ table: 'user', column: 'id' }],
+      },
     });
   });
 
@@ -194,19 +381,13 @@ describe('buildKyselyPlan', () => {
       values: ValuesNode.create([PrimitiveValueListNode.create(['u1'])]),
     };
 
-    let caughtError: unknown;
-    try {
-      buildKyselyPlan(contract, opNode);
-    } catch (error) {
-      caughtError = error;
-    }
-
-    expect(caughtError).toBeInstanceOf(KyselyTransformError);
-    expect(caughtError).toMatchObject({
-      code: KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
-      message: 'Unknown column "user.emali"',
-      details: { table: 'user', column: 'emali' },
-    });
+    expect(() => buildKyselyPlan(contract, opNode)).toThrow(
+      expect.objectContaining({
+        code: KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
+        message: 'Unknown column "user.emali"',
+        details: expect.objectContaining({ table: 'user', column: 'emali' }),
+      }),
+    );
   });
 
   it('keeps DEFAULT insert cells using default expressions after column validation', () => {
@@ -221,15 +402,37 @@ describe('buildKyselyPlan', () => {
     };
 
     const plan = buildKyselyPlan(contract, opNode);
-    const ast = plan.ast as InsertAst;
 
-    expect(ast.rows).toEqual([
-      {
-        id: ParamRef.of(1),
-        email: new DefaultValueExpr(),
-      },
-    ]);
+    expect(plan.ast).toEqual(
+      new InsertAst(new TableSource('user'), [
+        {
+          id: ParamRef.of(1),
+          email: new DefaultValueExpr(),
+        },
+      ]),
+    );
     expect(plan.params).toEqual(['u1']);
+    expect(plan.meta).toEqual({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      profileHash: 'sha256:test-profile',
+      lane: 'kysely',
+      paramDescriptors: [
+        {
+          index: 1,
+          source: 'lane',
+          refs: { table: 'user', column: 'id' },
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+          nullable: false,
+        },
+      ],
+      refs: {
+        tables: ['user'],
+        columns: [],
+      },
+    });
   });
 
   it('runs guardrails on compile-free build path', () => {
@@ -241,17 +444,11 @@ describe('buildKyselyPlan', () => {
       .where('id', '=', 'u_1')
       .toOperationNode();
 
-    expect(() => buildKyselyPlan(contract, opNode)).toThrow(KyselyTransformError);
-
-    let caughtError: unknown;
-    try {
-      buildKyselyPlan(contract, opNode);
-    } catch (error) {
-      caughtError = error;
-    }
-    expect(KyselyTransformError.is(caughtError)).toBe(true);
-    expect((caughtError as KyselyTransformError).code).toBe(
-      KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+    expect(() => buildKyselyPlan(contract, opNode)).toThrow(
+      expect.objectContaining({
+        name: KyselyTransformError.ERROR_NAME,
+        code: KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+      }),
     );
   });
 });

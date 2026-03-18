@@ -2,13 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { ColumnRef, OperationExpr, TableSource } from '../src/exports/ast';
 import type { ExpressionBuilder, ParamPlaceholder } from '../src/types';
 import {
-  expressionFromSource,
   getColumnInfo,
   isExpressionBuilder,
   isExpressionSource,
   isParamPlaceholder,
   isValueSource,
-  toExpression,
 } from '../src/utils/guards';
 
 const placeholder: ParamPlaceholder = { kind: 'param-placeholder', name: 'id' };
@@ -81,8 +79,7 @@ describe('utils/guards', () => {
     });
     const builder = expressionBuilder(expr);
 
-    expect(toExpression(builder)).toBe(expr);
-    expect(expressionFromSource(builder)).toBe(expr);
+    expect(builder.toExpr()).toBe(expr);
     expect(getColumnInfo(expr)).toEqual({ table: 'user', column: 'email' });
     expect(getColumnInfo(builder)).toEqual({ table: 'user', column: 'email' });
     expect(TableSource.named('user').collectRefs()).toEqual({ tables: ['user'], columns: [] });

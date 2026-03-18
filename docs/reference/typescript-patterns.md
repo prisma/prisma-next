@@ -499,12 +499,6 @@ if (isColumnBuilder(where.left)) {
   const { table, column } = getColumnInfo(where.left);
   // TypeScript knows where.left is ColumnBuilder here
 }
-
-// ✅ CORRECT: Narrow to the explicit builder shape
-if (isExpressionBuilder(where.left)) {
-  const operationExpr = where.left.expr;
-  // TypeScript knows operationExpr is OperationExpr here
-}
 ```
 
 ### Why Blind Casts Are Forbidden
@@ -583,22 +577,7 @@ export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
     (value as { kind: unknown }).kind === 'column'
   );
 }
-
-/**
- * Type predicate to check if a value is an ExpressionBuilder.
- */
-export function isExpressionBuilder(value: unknown): value is ExpressionBuilder {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'kind' in value &&
-    (value as { kind: unknown }).kind === 'expression'
-  );
-}
 ```
-
-**Note**: Prefer explicit builder shapes such as `ExpressionBuilder` over hidden implementation properties.
-That keeps narrowing local, removes dependency on `_operationExpr`, and lets TypeScript follow the real API surface.
 
 ### Related Patterns
 
