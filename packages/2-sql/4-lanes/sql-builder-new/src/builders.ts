@@ -36,6 +36,10 @@ import type {
 
 export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
+export type Db<C extends TableProxyContract> = {
+  [Name in string & keyof C['storage']['tables']]: TableProxy<C, Name>;
+};
+
 type ContractToQC<C extends TableProxyContract> = {
   readonly codecTypes: ExtractCodecTypes<C>;
   readonly capabilities: C['capabilities'];

@@ -1,9 +1,9 @@
 import { expectTypeOf } from 'vitest';
-import { posts, users } from './preamble';
+import { db } from './preamble';
 
 // Basic groupBy with count
-const postsPerUser = await users
-  .innerJoin(posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+const postsPerUser = await db.users
+  .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
   .select('name')
   .select('postCount', (_f, fns) => fns.count())
   .groupBy('name')
@@ -12,7 +12,7 @@ const postsPerUser = await users
 expectTypeOf(postsPerUser).toEqualTypeOf<{ name: string; postCount: number }>();
 
 // groupBy with select alias
-const byAlias = await users
+const byAlias = await db.users
   .select('author', (f) => f.name)
   .select('total', (_f, fns) => fns.count())
   .groupBy('author')
@@ -21,8 +21,8 @@ const byAlias = await users
 expectTypeOf(byAlias).toEqualTypeOf<{ author: string; total: number }>();
 
 // HAVING with aggregate expression
-const activeAuthors = await users
-  .innerJoin(posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+const activeAuthors = await db.users
+  .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
   .select('name')
   .select('postCount', (f, fns) => fns.count(f.posts.id))
   .groupBy('name')
@@ -32,8 +32,8 @@ const activeAuthors = await users
 expectTypeOf(activeAuthors).toEqualTypeOf<{ name: string; postCount: number }>();
 
 // HAVING referencing a select alias
-const havingAlias = await users
-  .innerJoin(posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+const havingAlias = await db.users
+  .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
   .select('name')
   .select('postCount', (_f, fns) => fns.count())
   .groupBy('name')
@@ -43,8 +43,8 @@ const havingAlias = await users
 expectTypeOf(havingAlias).toEqualTypeOf<{ name: string; postCount: number }>();
 
 // Chained groupBy
-const multiGroup = await users
-  .innerJoin(posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+const multiGroup = await db.users
+  .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
   .select('name', 'title')
   .select('cnt', (_f, fns) => fns.count())
   .groupBy('name')
@@ -54,7 +54,7 @@ const multiGroup = await users
 expectTypeOf(multiGroup).toEqualTypeOf<{ name: string; title: string; cnt: number }>();
 
 // groupBy with expression
-const byExpr = await users
+const byExpr = await db.users
   .select('email')
   .select('userCount', (_f, fns) => fns.count())
   .groupBy((f) => f.email)
@@ -63,8 +63,8 @@ const byExpr = await users
 expectTypeOf(byExpr).toEqualTypeOf<{ email: string; userCount: number }>();
 
 // ORDER BY aggregate on grouped query
-const orderedGroup = await users
-  .innerJoin(posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+const orderedGroup = await db.users
+  .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
   .select('name')
   .select('postCount', (_f, fns) => fns.count())
   .groupBy('name')
@@ -75,9 +75,9 @@ const orderedGroup = await users
 expectTypeOf(orderedGroup).toEqualTypeOf<{ name: string; postCount: number }>();
 
 // Grouped subquery as join source
-const withCounts = await users
+const withCounts = await db.users
   .innerJoin(
-    posts
+    db.posts
       .select('user_id')
       .select('postCount', (_f, fns) => fns.count())
       .groupBy('user_id')
@@ -90,7 +90,7 @@ const withCounts = await users
 expectTypeOf(withCounts).toEqualTypeOf<{ name: string; postCount: number }>();
 
 // sum/avg/min/max aggregate functions
-const aggregates = await posts
+const aggregates = await db.posts
   .select('totalViews', (f, fns) => fns.sum(f.views))
   .select('avgViews', (f, fns) => fns.avg(f.views))
   .select('minViews', (f, fns) => fns.min(f.views))
@@ -106,7 +106,7 @@ expectTypeOf(aggregates).toEqualTypeOf<{
 }>();
 
 // Aggregates in select are allowed (fns.count available)
-const selectAgg = await users
+const selectAgg = await db.users
   .select('name')
   .select('cnt', (_f, fns) => fns.count())
   .first();
@@ -114,14 +114,14 @@ const selectAgg = await users
 expectTypeOf(selectAgg).toEqualTypeOf<{ name: string; cnt: number }>();
 
 // ❌ Aggregates in WHERE — type error
-await users
+await db.users
   .select('name')
   // @ts-expect-error count is not available in where (Functions, not AggregateFunctions)
   .where((_f, fns) => fns.gt(fns.count(), 5))
   .first();
 
 // ❌ HAVING without GROUP BY — type error
-await users
+await db.users
   .select('name')
   // @ts-expect-error having only exists on GroupedQuery, not SelectQuery
   .having((_f, fns) => fns.gt(fns.count(), 5))
