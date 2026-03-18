@@ -17,6 +17,11 @@ export interface EmitOptions {
    * These are added to contract.d.ts alongside codec and operation type imports.
    */
   readonly parameterizedTypeImports?: ReadonlyArray<TypesImportSpec>;
+  /**
+   * Query operation type imports for sql-builder-new.
+   * Flat operation signatures keyed by operation name.
+   */
+  readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;
 }
 
 export interface EmitResult {

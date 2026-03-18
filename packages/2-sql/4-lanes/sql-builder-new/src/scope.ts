@@ -63,4 +63,18 @@ export type Subquery<RowType extends Record<string, ScopeField>> = {
   [SubqueryMarker]: RowType;
 };
 
+export type OperationTypesBase = Record<
+  string,
+  {
+    readonly args: readonly ScopeField[];
+    readonly returns: ScopeField;
+  }
+>;
+
+export type QueryContext = {
+  readonly codecTypes: CodecTypesBase;
+  readonly capabilities: Record<string, Record<string, boolean>>;
+  readonly queryOperationTypes: OperationTypesBase;
+};
+
 export type { CodecTypesBase, StorageTable };

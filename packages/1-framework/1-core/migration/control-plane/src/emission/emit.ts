@@ -84,6 +84,7 @@ export async function emit(
     extensionIds,
     parameterizedRenderers,
     parameterizedTypeImports,
+    queryOperationTypeImports,
   } = options;
 
   validateCoreStructure(ir);
@@ -143,10 +144,11 @@ export async function emit(
   const contractJsonString = JSON.stringify(contractJsonWithMeta, null, 2);
 
   const generateOptions =
-    parameterizedRenderers || parameterizedTypeImports
+    parameterizedRenderers || parameterizedTypeImports || queryOperationTypeImports
       ? {
           ...ifDefined('parameterizedRenderers', parameterizedRenderers),
           ...ifDefined('parameterizedTypeImports', parameterizedTypeImports),
+          ...ifDefined('queryOperationTypeImports', queryOperationTypeImports),
         }
       : undefined;
 

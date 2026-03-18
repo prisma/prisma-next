@@ -92,7 +92,9 @@ describe('sql-target-family-hook', () => {
         },
       });
       const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-      expect(types).toContain('export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>');
+      expect(types).toContain(
+        'export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>',
+      );
     });
 
     it('TypeMaps delegates to TypeMapsType with CodecTypes and OperationTypes', () => {
@@ -101,7 +103,7 @@ describe('sql-target-family-hook', () => {
         storage: { tables: {} },
       });
       const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-      expect(types).toContain('TypeMapsType<CodecTypes, OperationTypes>');
+      expect(types).toContain('TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>');
     });
 
     it('Contract does not include phantom codecTypes or operationTypes keys', () => {
