@@ -612,24 +612,23 @@ describe('buildReconciliationPlan', () => {
       expect(result.conflicts[0]).toMatchObject({ kind: 'missingButNonAdditive' });
     });
 
-    it('returns conflict for default_mismatch when contract column has no default', () => {
+    it('throws when default_mismatch issue references a contract column with no default', () => {
       const contract = contractWithColumn('user', 'status', 'text');
-      const result = plan(
-        [
-          issue({
-            kind: 'default_mismatch',
-            table: 'user',
-            column: 'status',
-            expected: 'active',
-            actual: 'pending',
-            message: 'default mismatch',
-          }),
-        ],
-        { contract },
-      );
-
-      expect(result.operations).toHaveLength(0);
-      expect(result.conflicts).toHaveLength(1);
+      expect(() =>
+        plan(
+          [
+            issue({
+              kind: 'default_mismatch',
+              table: 'user',
+              column: 'status',
+              expected: 'active',
+              actual: 'pending',
+              message: 'default mismatch',
+            }),
+          ],
+          { contract },
+        ),
+      ).toThrow('default_mismatch issue for "user"."status" but contract column has no default');
     });
 
     it('converts default_missing to conflict when policy forbids additive', () => {
@@ -725,8 +724,11 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations).toHaveLength(1);
       const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
-      expect(postcheckSql).toContain('active');
+      // SQL-escaped: 'active'::text becomes ''active''::text inside the SQL string literal
+      expect(postcheckSql).toContain("''active''::text");
+      expect(postcheckSql).toContain('column_default =');
       expect(postcheckSql).not.toContain('IS NOT NULL');
+      expect(postcheckSql).not.toContain('LIKE');
     });
   });
 

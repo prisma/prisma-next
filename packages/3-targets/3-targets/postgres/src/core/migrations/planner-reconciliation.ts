@@ -1,4 +1,4 @@
-import { escapeLiteral, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
+import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
@@ -7,6 +7,7 @@ import type {
   SqlPlannerConflict,
 } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import { invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PlanningMode, PostgresPlanTargetDetails } from './planner';
 import {
@@ -20,7 +21,7 @@ import {
   columnTypeCheck,
   constraintExistsCheck,
   qualifyTableName,
-  renderDefaultLiteral,
+  renderExpectedPgDefault,
   toRegclassLiteral,
 } from './planner';
 
@@ -198,11 +199,16 @@ function buildReconciliationOperationFromIssue(options: {
       if (!issue.table || !issue.column) {
         return null;
       }
-      const contractCol = getContractColumn(contract, issue.table, issue.column);
-      if (!contractCol?.default) {
+      const contractColMissing = getContractColumn(contract, issue.table, issue.column);
+      if (!contractColMissing) {
         return null;
       }
-      return buildSetDefaultOperation(schemaName, issue.table, issue.column, contractCol);
+      // NOTE: Being in the `default_missing` case means the verifier found the contract expects a default, so it should exist here. We must still narrow.
+      invariant(
+        contractColMissing.default !== undefined,
+        `default_missing issue for "${issue.table}"."${issue.column}" but contract column has no default`,
+      );
+      return buildSetDefaultOperation(schemaName, issue.table, issue.column, contractColMissing);
     }
 
     case 'default_mismatch': {
@@ -212,11 +218,19 @@ function buildReconciliationOperationFromIssue(options: {
       if (!mode.allowWidening) {
         return null;
       }
-      const contractCol = getContractColumn(contract, issue.table, issue.column);
-      if (!contractCol?.default) {
+      const contractColMismatch = getContractColumn(contract, issue.table, issue.column);
+      if (!contractColMismatch) {
         return null;
       }
-      return buildAlterDefaultOperation(schemaName, issue.table, issue.column, contractCol);
+      // NOTE: Being in the `default_mismatch` case means the verifier found the contract expects a different default, so it should exist here. We must still narrow.
+      invariant(
+        contractColMismatch.default !== undefined,
+        `default_mismatch issue for "${issue.table}"."${issue.column}" but contract column has no default`,
+      );
+      return buildAlterDefaultOperation(schemaName, issue.table, issue.column, {
+        ...contractColMismatch,
+        default: contractColMismatch.default,
+      });
     }
 
     // Remaining issue kinds (primary_key_mismatch, unique_constraint_mismatch,
@@ -572,14 +586,11 @@ function buildAlterDefaultOperation(
   schemaName: string,
   tableName: string,
   columnName: string,
-  column: StorageColumn,
+  column: StorageColumn & { readonly default: NonNullable<StorageColumn['default']> },
 ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
   const qualified = qualifyTableName(schemaName, tableName);
   const defaultClause = buildColumnDefaultSql(column.default, column);
-  const expectedFragment =
-    column.default!.kind === 'literal'
-      ? renderDefaultLiteral(column.default!.value, column)
-      : column.default!.expression;
+  const expectedDefault = renderExpectedPgDefault(column.default, column);
   return {
     id: `setDefault.${tableName}.${columnName}`,
     label: `Change default for ${columnName} on ${tableName}`,
@@ -608,7 +619,7 @@ function buildAlterDefaultOperation(
           schema: schemaName,
           table: tableName,
           column: columnName,
-          expectedFragment,
+          expectedDefault,
         }),
       },
     ],

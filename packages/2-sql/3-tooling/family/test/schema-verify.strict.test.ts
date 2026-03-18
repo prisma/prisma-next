@@ -115,4 +115,56 @@ describe('verifySqlSchema - result structure', () => {
       totalNodes: expect.any(Number),
     });
   });
+
+  it('detects extra foreign keys when contract has no FKs for the table', () => {
+    const contract = createTestContract({
+      parent: createContractTable({
+        id: { nativeType: 'int4', nullable: false },
+      }),
+      child: createContractTable({
+        id: { nativeType: 'int4', nullable: false },
+        parent_id: { nativeType: 'int4', nullable: false },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      parent: createSchemaTable('parent', {
+        id: { nativeType: 'int4', nullable: false },
+      }),
+      child: createSchemaTable(
+        'child',
+        {
+          id: { nativeType: 'int4', nullable: false },
+          parent_id: { nativeType: 'int4', nullable: false },
+        },
+        {
+          foreignKeys: [
+            {
+              columns: ['parent_id'],
+              referencedTable: 'parent',
+              referencedColumns: ['id'],
+              name: 'child_parent_id_fkey',
+            },
+          ],
+        },
+      ),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: true,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.schema.issues).toContainEqual(
+      expect.objectContaining({
+        kind: 'extra_foreign_key',
+        table: 'child',
+        indexOrConstraint: 'child_parent_id_fkey',
+      }),
+    );
+  });
 });

@@ -1023,12 +1023,12 @@ export function columnDefaultValueCheck({
   schema,
   table,
   column,
-  expectedFragment,
+  expectedDefault,
 }: {
   schema: string;
   table: string;
   column: string;
-  expectedFragment: string;
+  expectedDefault: string;
 }): string {
   return `SELECT EXISTS (
   SELECT 1
@@ -1036,8 +1036,41 @@ export function columnDefaultValueCheck({
   WHERE table_schema = '${escapeLiteral(schema)}'
     AND table_name = '${escapeLiteral(table)}'
     AND column_name = '${escapeLiteral(column)}'
-    AND column_default LIKE '%${escapeLiteral(expectedFragment)}%'
+    AND column_default = '${escapeLiteral(expectedDefault)}'
 )`;
+}
+
+/**
+ * Predicts the normalized default expression that Postgres will store in
+ * `information_schema.columns.column_default` after executing SET DEFAULT.
+ *
+ * PG appends a `::type` cast to string-like literals. Numbers and booleans
+ * are stored as-is. JSON literals already include the cast from
+ * `renderDefaultLiteral`.
+ */
+export function renderExpectedPgDefault(
+  columnDefault: NonNullable<StorageColumn['default']>,
+  column: StorageColumn,
+): string {
+  switch (columnDefault.kind) {
+    case 'literal': {
+      const rendered = renderDefaultLiteral(columnDefault.value, column);
+
+      // JSON columns: renderDefaultLiteral already appends ::jsonb/::json
+      if (column.nativeType === 'json' || column.nativeType === 'jsonb') {
+        return rendered;
+      }
+      // String and Date literals: PG appends ::nativeType
+      if (typeof columnDefault.value === 'string' || columnDefault.value instanceof Date) {
+        return `${rendered}::${column.nativeType}`;
+      }
+      // Numbers, booleans: stored as-is
+      return rendered;
+    }
+    case 'function': {
+      return columnDefault.expression;
+    }
+  }
 }
 
 function tableIsEmptyCheck(qualifiedTableName: string): string {

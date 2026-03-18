@@ -83,6 +83,34 @@ async function introspectSchema(driver: PostgresControlDriver): Promise<SqlSchem
   return familyInstance.introspect({ driver });
 }
 
+async function planAndExecute(
+  driver: PostgresControlDriver,
+  contract: SqlContract<SqlStorage>,
+): Promise<void> {
+  const schema = await introspectSchema(driver);
+  const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+  const planResult = planner.plan({
+    contract,
+    schema,
+    policy: RECONCILIATION_POLICY,
+    frameworkComponents,
+  });
+  if (planResult.kind !== 'success') {
+    throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
+  }
+  const runner = postgresTargetDescriptor.createRunner(familyInstance);
+  const executeResult = await runner.execute({
+    plan: planResult.plan,
+    driver,
+    destinationContract: contract,
+    policy: RECONCILIATION_POLICY,
+    frameworkComponents,
+  });
+  if (!executeResult.ok) {
+    throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+  }
+}
+
 describe.sequential('PostgresMigrationPlanner - reconciliation integration', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;
   let driver: PostgresControlDriver | undefined;
@@ -131,29 +159,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'alter-type-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const typeRow = await driver!.query<{ matches: boolean }>(
       `SELECT EXISTS (
@@ -200,29 +206,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         'set-default-updated',
       );
 
-      const schema = await introspectSchema(driver!);
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-      const planResult = planner.plan({
-        contract: updatedContract,
-        schema,
-        policy: RECONCILIATION_POLICY,
-        frameworkComponents,
-      });
-      if (planResult.kind !== 'success') {
-        throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-      }
-
-      const runner = postgresTargetDescriptor.createRunner(familyInstance);
-      const executeResult = await runner.execute({
-        plan: planResult.plan,
-        driver: driver!,
-        destinationContract: updatedContract,
-        policy: RECONCILIATION_POLICY,
-        frameworkComponents,
-      });
-      if (!executeResult.ok) {
-        throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-      }
+      await planAndExecute(driver!, updatedContract);
 
       const defaultRow = await driver!.query<{ column_default: string | null }>(
         `SELECT column_default
@@ -261,29 +245,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'drop-table-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const tableExists = await driver!.query<{ exists: boolean }>(
       `SELECT to_regclass('public.extra') IS NOT NULL AS exists`,
@@ -314,29 +276,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'drop-column-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const colExists = await driver!.query<{ exists: boolean }>(
       `SELECT EXISTS (
@@ -377,29 +317,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'drop-index-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const indexExists = await driver!.query<{ exists: boolean }>(
       `SELECT to_regclass('public.item_name_idx') IS NOT NULL AS exists`,
@@ -435,29 +353,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'drop-unique-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const constraintExists = await driver!.query<{ exists: boolean }>(
       `SELECT EXISTS (
@@ -511,29 +407,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'drop-fk-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const fkExists = await driver!.query<{ exists: boolean }>(
       `SELECT EXISTS (
@@ -580,29 +454,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'drop-pk-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const pkExists = await driver!.query<{ exists: boolean }>(
       `SELECT EXISTS (
@@ -637,29 +489,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'drop-notnull-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const nullable = await driver!.query<{ is_nullable: string }>(
       `SELECT is_nullable
@@ -693,29 +523,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'set-notnull-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const nullable = await driver!.query<{ is_nullable: string }>(
       `SELECT is_nullable
@@ -762,29 +570,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         'alter-default-updated',
       );
 
-      const schema = await introspectSchema(driver!);
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-      const planResult = planner.plan({
-        contract: updatedContract,
-        schema,
-        policy: RECONCILIATION_POLICY,
-        frameworkComponents,
-      });
-      if (planResult.kind !== 'success') {
-        throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-      }
-
-      const runner = postgresTargetDescriptor.createRunner(familyInstance);
-      const executeResult = await runner.execute({
-        plan: planResult.plan,
-        driver: driver!,
-        destinationContract: updatedContract,
-        policy: RECONCILIATION_POLICY,
-        frameworkComponents,
-      });
-      if (!executeResult.ok) {
-        throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-      }
+      await planAndExecute(driver!, updatedContract);
 
       const defaultRow = await driver!.query<{ column_default: string | null }>(
         `SELECT column_default
@@ -835,29 +621,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'compound-type-default-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const typeRow = await driver!.query<{ matches: boolean }>(
       `SELECT EXISTS (
@@ -911,29 +675,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'compound-null-default-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const colInfo = await driver!.query<{ is_nullable: string; column_default: string | null }>(
       `SELECT is_nullable, column_default
@@ -987,29 +729,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'compound-fk-table-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const fkExists = await driver!.query<{ exists: boolean }>(
       `SELECT EXISTS (
@@ -1056,29 +776,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'compound-col-index-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     const colExists = await driver!.query<{ exists: boolean }>(
       `SELECT EXISTS (
@@ -1124,29 +822,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         'compound-mixed-null-updated',
       );
 
-      const schema = await introspectSchema(driver!);
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-      const planResult = planner.plan({
-        contract: updatedContract,
-        schema,
-        policy: RECONCILIATION_POLICY,
-        frameworkComponents,
-      });
-      if (planResult.kind !== 'success') {
-        throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-      }
-
-      const runner = postgresTargetDescriptor.createRunner(familyInstance);
-      const executeResult = await runner.execute({
-        plan: planResult.plan,
-        driver: driver!,
-        destinationContract: updatedContract,
-        policy: RECONCILIATION_POLICY,
-        frameworkComponents,
-      });
-      if (!executeResult.ok) {
-        throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-      }
+      await planAndExecute(driver!, updatedContract);
 
       const colA = await driver!.query<{ is_nullable: string }>(
         `SELECT is_nullable
@@ -1203,29 +879,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       'compound-type-with-index-updated',
     );
 
-    const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-    const planResult = planner.plan({
-      contract: updatedContract,
-      schema,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (planResult.kind !== 'success') {
-      throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
-    }
-
-    const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const executeResult = await runner.execute({
-      plan: planResult.plan,
-      driver: driver!,
-      destinationContract: updatedContract,
-      policy: RECONCILIATION_POLICY,
-      frameworkComponents,
-    });
-    if (!executeResult.ok) {
-      throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
-    }
+    await planAndExecute(driver!, updatedContract);
 
     // Verify type changed
     const typeRow = await driver!.query<{ matches: boolean }>(
@@ -1247,5 +901,50 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       `SELECT to_regclass('public.item_value_idx') IS NOT NULL AS exists`,
     );
     expect(indexExists.rows[0]?.exists).toBe(true);
+  });
+
+  it('changes a literal default to a function default', { timeout: testTimeout }, async () => {
+    const baselineContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          uid: {
+            nativeType: 'uuid',
+            codecId: 'pg/uuid@1',
+            nullable: false,
+            default: { kind: 'literal', value: '00000000-0000-0000-0000-000000000000' },
+          },
+        }),
+      },
+      'fn-default-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
+
+    const updatedContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          uid: {
+            nativeType: 'uuid',
+            codecId: 'pg/uuid@1',
+            nullable: false,
+            default: { kind: 'function', expression: 'gen_random_uuid()' },
+          },
+        }),
+      },
+      'fn-default-updated',
+    );
+
+    await planAndExecute(driver!, updatedContract);
+
+    const defaultRow = await driver!.query<{ column_default: string | null }>(
+      `SELECT column_default
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'item'
+           AND column_name = 'uid'`,
+    );
+    expect(defaultRow.rows[0]?.column_default).not.toBeNull();
+    expect(defaultRow.rows[0]?.column_default).toContain('gen_random_uuid');
   });
 });
