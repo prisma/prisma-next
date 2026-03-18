@@ -1,4 +1,13 @@
-import type { Expand, ExpressionType, Scope, ScopeField, ScopeTable, Subquery } from './scope';
+import type {
+  Expand,
+  ExpressionType,
+  OperationTypesBase,
+  QueryContext,
+  Scope,
+  ScopeField,
+  ScopeTable,
+  Subquery,
+} from './scope';
 
 export type Expression<T extends ScopeField> = {
   [ExpressionType]: T;
@@ -35,10 +44,10 @@ export type ExpressionOrValue<
 
 export type BooleanCodecType = { codecId: 'pg/bool@1'; nullable: boolean };
 
-export type ExpressionBuilder<
-  AvailableScope extends Scope,
-  CT extends Record<string, { readonly input: unknown }>,
-> = (fields: FieldProxy<AvailableScope>, fns: Functions<CT>) => Expression<BooleanCodecType>;
+export type ExpressionBuilder<AvailableScope extends Scope, QC extends QueryContext> = (
+  fields: FieldProxy<AvailableScope>,
+  fns: Functions<QC>,
+) => Expression<BooleanCodecType>;
 
 export type OrderByDirection = 'asc' | 'desc';
 export type OrderByNulls = 'first' | 'last';
@@ -56,7 +65,21 @@ export type OrderByScope<
   namespaces: AvailableScope['namespaces'];
 };
 
-export type Functions<CT extends Record<string, { readonly input: unknown }>> = {
+type ExtensionFunctionArgs<
+  Args extends readonly ScopeField[],
+  CT extends Record<string, { readonly input: unknown }>,
+> = { [I in keyof Args]: ExpressionOrValue<Args[I], CT> };
+
+type DeriveExtFunctions<
+  OT extends OperationTypesBase,
+  CT extends Record<string, { readonly input: unknown }>,
+> = {
+  [K in keyof OT]: (
+    ...args: ExtensionFunctionArgs<OT[K]['args'], CT>
+  ) => Expression<OT[K]['returns']>;
+};
+
+type BuiltinFunctions<CT extends Record<string, { readonly input: unknown }>> = {
   eq: <CodecId extends string>(
     a: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>,
     b: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>,
@@ -110,21 +133,23 @@ export type Functions<CT extends Record<string, { readonly input: unknown }>> = 
   };
 };
 
+export type Functions<QC extends QueryContext> = BuiltinFunctions<QC['codecTypes']> &
+  DeriveExtFunctions<QC['queryOperationTypes'], QC['codecTypes']>;
+
 export type CountField = { codecId: 'pg/int8@1'; nullable: false };
 
-export type AggregateFunctions<CT extends Record<string, { readonly input: unknown }>> =
-  Functions<CT> & {
-    count: (expr?: Expression<ScopeField>) => Expression<CountField>;
-    sum: <T extends ScopeField>(
-      expr: Expression<T>,
-    ) => Expression<{ codecId: T['codecId']; nullable: true }>;
-    avg: <T extends ScopeField>(
-      expr: Expression<T>,
-    ) => Expression<{ codecId: T['codecId']; nullable: true }>;
-    min: <T extends ScopeField>(
-      expr: Expression<T>,
-    ) => Expression<{ codecId: T['codecId']; nullable: true }>;
-    max: <T extends ScopeField>(
-      expr: Expression<T>,
-    ) => Expression<{ codecId: T['codecId']; nullable: true }>;
-  };
+export type AggregateFunctions<QC extends QueryContext> = Functions<QC> & {
+  count: (expr?: Expression<ScopeField>) => Expression<CountField>;
+  sum: <T extends ScopeField>(
+    expr: Expression<T>,
+  ) => Expression<{ codecId: T['codecId']; nullable: true }>;
+  avg: <T extends ScopeField>(
+    expr: Expression<T>,
+  ) => Expression<{ codecId: T['codecId']; nullable: true }>;
+  min: <T extends ScopeField>(
+    expr: Expression<T>,
+  ) => Expression<{ codecId: T['codecId']; nullable: true }>;
+  max: <T extends ScopeField>(
+    expr: Expression<T>,
+  ) => Expression<{ codecId: T['codecId']; nullable: true }>;
+};

@@ -156,9 +156,11 @@ export function applyFkDefaults(
 export type TypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   TOperationTypes extends Record<string, unknown> = Record<string, never>,
+  TQueryOperationTypes extends Record<string, unknown> = Record<string, never>,
 > = {
   readonly codecTypes: TCodecTypes;
   readonly operationTypes: TOperationTypes;
+  readonly queryOperationTypes: TQueryOperationTypes;
 };
 
 export type CodecTypesOf<T> = [T] extends [never]
@@ -174,6 +176,14 @@ export type OperationTypesOf<T> = [T] extends [never]
   : T extends { readonly operationTypes: infer O }
     ? O extends Record<string, unknown>
       ? O
+      : Record<string, never>
+    : Record<string, never>;
+
+export type QueryOperationTypesOf<T> = [T] extends [never]
+  ? Record<string, never>
+  : T extends { readonly queryOperationTypes: infer Q }
+    ? Q extends Record<string, unknown>
+      ? Q
       : Record<string, never>
     : Record<string, never>;
 
@@ -206,6 +216,7 @@ export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T
 
 export type ExtractCodecTypes<T> = CodecTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractOperationTypes<T> = OperationTypesOf<ExtractTypeMapsFromContract<T>>;
+export type ExtractQueryOperationTypes<T> = QueryOperationTypesOf<ExtractTypeMapsFromContract<T>>;
 
 export type ResolveCodecTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
   ? ExtractCodecTypes<TContract>

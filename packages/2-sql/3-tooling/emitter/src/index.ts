@@ -248,6 +248,11 @@ export const sqlTargetFamilyHook = {
       allImports.push(...parameterizedTypeImports);
     }
 
+    const queryOperationTypeImports = options?.queryOperationTypeImports ?? [];
+    if (queryOperationTypeImports.length > 0) {
+      allImports.push(...queryOperationTypeImports);
+    }
+
     // Deduplicate imports by package+named to avoid duplicate import statements.
     // Strategy: When the same package::named appears multiple times, keep the first
     // occurrence (and its alias); later duplicates with different aliases are silently ignored.
@@ -281,6 +286,10 @@ export const sqlTargetFamilyHook = {
       .join(' & ');
     const operationTypes = operationTypeImports
       .filter((imp) => imp.named === 'OperationTypes')
+      .map((imp) => imp.alias)
+      .join(' & ');
+    const queryOperationTypes = queryOperationTypeImports
+      .filter((imp) => imp.named === 'QueryOperationTypes')
       .map((imp) => imp.alias)
       .join(' & ');
 
@@ -319,6 +328,7 @@ export const sqlTargetFamilyHook = {
   export type CodecTypes = ${codecTypes || 'Record<string, never>'};
   export type LaneCodecTypes = CodecTypes;
   export type OperationTypes = ${operationTypes || 'Record<string, never>'};
+  export type QueryOperationTypes = ${queryOperationTypes || 'Record<string, never>'};
   type DefaultLiteralValue<CodecId extends string, Encoded> =
     CodecId extends keyof CodecTypes
       ? CodecTypes[CodecId] extends { readonly output: infer O }
@@ -326,7 +336,7 @@ export const sqlTargetFamilyHook = {
         : Encoded
       : Encoded;
 
-  export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
+  export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
   type ContractBase = SqlContract<
   ${storageType},

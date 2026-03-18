@@ -1,4 +1,8 @@
-import type { StorageTable } from '@prisma-next/sql-contract/types';
+import type {
+  ExtractCodecTypes,
+  ExtractQueryOperationTypes,
+  StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type {
   AggregateFunctions,
   BooleanCodecType,
@@ -15,7 +19,6 @@ import type {
 import type { ResolveRow } from './resolve';
 import type {
   CapabilityGated,
-  CodecTypesBase,
   DefaultScope,
   EmptyRow,
   Expand,
@@ -23,6 +26,7 @@ import type {
   JoinSource,
   MergeScopes,
   NullableScope,
+  QueryContext,
   Scope,
   ScopeField,
   ScopeTable,
@@ -32,172 +36,125 @@ import type {
 
 export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
-export interface LateralBuilder<
-  CodecTypes extends CodecTypesBase,
-  ParentScope extends Scope,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> {
+type ContractToQC<C extends TableProxyContract> = {
+  readonly codecTypes: ExtractCodecTypes<C>;
+  readonly capabilities: C['capabilities'];
+  readonly queryOperationTypes: ExtractQueryOperationTypes<C>;
+};
+
+export interface LateralBuilder<QC extends QueryContext, ParentScope extends Scope> {
   from<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
-  ): SelectQuery<
-    CodecTypes,
-    MergeScopes<ParentScope, Other[typeof JoinOuterScope]>,
-    EmptyRow,
-    Capabilities
-  >;
+  ): SelectQuery<QC, MergeScopes<ParentScope, Other[typeof JoinOuterScope]>, EmptyRow>;
 }
 
-export interface WithJoin<
-  CodecTypes extends CodecTypesBase,
-  AvailableScope extends Scope,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> {
+export interface WithJoin<QC extends QueryContext, AvailableScope extends Scope> {
   innerJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
-    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, CodecTypes>,
-  ): JoinedTables<
-    CodecTypes,
-    MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>,
-    Capabilities
-  >;
+    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
+  ): JoinedTables<QC, MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>>;
 
   outerLeftJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
-    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, CodecTypes>,
-  ): JoinedTables<
-    CodecTypes,
-    MergeScopes<AvailableScope, NullableScope<Other[typeof JoinOuterScope]>>,
-    Capabilities
-  >;
+    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
+  ): JoinedTables<QC, MergeScopes<AvailableScope, NullableScope<Other[typeof JoinOuterScope]>>>;
 
   outerRightJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
-    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, CodecTypes>,
-  ): JoinedTables<
-    CodecTypes,
-    MergeScopes<NullableScope<AvailableScope>, Other[typeof JoinOuterScope]>,
-    Capabilities
-  >;
+    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
+  ): JoinedTables<QC, MergeScopes<NullableScope<AvailableScope>, Other[typeof JoinOuterScope]>>;
 
   outerFullJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
-    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, CodecTypes>,
+    on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
   ): JoinedTables<
-    CodecTypes,
-    MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>,
-    Capabilities
+    QC,
+    MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>
   >;
 }
 
-export interface WithLateralJoin<
-  CodecTypes extends CodecTypesBase,
-  AvailableScope extends Scope,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> {
+export interface WithLateralJoin<QC extends QueryContext, AvailableScope extends Scope> {
   lateralJoin<Alias extends string, LateralRow extends Record<string, ScopeField>>(
     alias: Alias,
-    builder: (
-      lateral: LateralBuilder<CodecTypes, AvailableScope, Capabilities>,
-    ) => Subquery<LateralRow>,
+    builder: (lateral: LateralBuilder<QC, AvailableScope>) => Subquery<LateralRow>,
   ): JoinedTables<
-    CodecTypes,
-    MergeScopes<AvailableScope, { topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>,
-    Capabilities
+    QC,
+    MergeScopes<AvailableScope, { topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>
   >;
 
   outerLateralJoin<Alias extends string, LateralRow extends Record<string, ScopeField>>(
     alias: Alias,
-    builder: (
-      lateral: LateralBuilder<CodecTypes, AvailableScope, Capabilities>,
-    ) => Subquery<LateralRow>,
+    builder: (lateral: LateralBuilder<QC, AvailableScope>) => Subquery<LateralRow>,
   ): JoinedTables<
-    CodecTypes,
+    QC,
     MergeScopes<
       AvailableScope,
       NullableScope<{ topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>
-    >,
-    Capabilities
+    >
   >;
 }
 
 export interface WithSelect<
-  CodecTypes extends CodecTypesBase,
+  QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField> = EmptyRow,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
 > {
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
     ...columns: Columns
-  ): SelectQuery<
-    CodecTypes,
-    AvailableScope,
-    WithFields<RowType, AvailableScope['topLevel'], Columns>,
-    Capabilities
-  >;
+  ): SelectQuery<QC, AvailableScope, WithFields<RowType, AvailableScope['topLevel'], Columns>>;
 
   select<Alias extends string, Field extends ScopeField>(
     alias: Alias,
-    expr: (
-      fields: FieldProxy<AvailableScope>,
-      fns: AggregateFunctions<CodecTypes>,
-    ) => Expression<Field>,
-  ): SelectQuery<CodecTypes, AvailableScope, WithField<RowType, Field, Alias>, Capabilities>;
+    expr: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Expression<Field>,
+  ): SelectQuery<QC, AvailableScope, WithField<RowType, Field, Alias>>;
 
   select<Result extends Record<string, Expression<ScopeField>>>(
-    callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<CodecTypes>) => Result,
-  ): SelectQuery<
-    CodecTypes,
-    AvailableScope,
-    Expand<RowType & ExtractScopeFields<Result>>,
-    Capabilities
-  >;
+    callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Result,
+  ): SelectQuery<QC, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>>;
 }
 
-interface JoinedTablesBaseline<
-  CodecTypes extends CodecTypesBase,
-  AvailableScope extends Scope,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> extends WithJoin<CodecTypes, AvailableScope, Capabilities>,
-    WithSelect<CodecTypes, AvailableScope, EmptyRow, Capabilities> {}
+interface JoinedTablesBaseline<QC extends QueryContext, AvailableScope extends Scope>
+  extends WithJoin<QC, AvailableScope>,
+    WithSelect<QC, AvailableScope, EmptyRow> {}
 
 export type JoinedTables<
-  CodecTypes extends CodecTypesBase,
+  QC extends QueryContext,
   AvailableScope extends Scope,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> = JoinedTablesBaseline<CodecTypes, AvailableScope, Capabilities> &
+> = JoinedTablesBaseline<QC, AvailableScope> &
   CapabilityGated<
-    Capabilities,
+    QC['capabilities'],
     { sql: { lateral: true } },
-    WithLateralJoin<CodecTypes, AvailableScope, Capabilities>
+    WithLateralJoin<QC, AvailableScope>
   >;
 
+type TableProxyContract = {
+  readonly storage: { readonly tables: Record<string, StorageTable> };
+  readonly capabilities: CapabilitiesBase;
+};
+
 interface TableProxyBaseline<
-  CodecTypes extends CodecTypesBase,
-  Name extends string,
-  Table extends StorageTable,
+  C extends TableProxyContract,
+  Name extends string & keyof C['storage']['tables'],
   Alias extends string = Name,
-  AvailableScope extends Scope = DefaultScope<Name, Table>,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> extends JoinSource<StorageTableToScopeTable<Table>, Alias>,
-    WithJoin<CodecTypes, AvailableScope, Capabilities>,
-    WithSelect<CodecTypes, AvailableScope, EmptyRow, Capabilities> {
-  as<NewAlias extends string>(
-    newAlias: NewAlias,
-  ): TableProxy<CodecTypes, Name, Table, NewAlias, AvailableScope, Capabilities>;
+  AvailableScope extends Scope = DefaultScope<Name, C['storage']['tables'][Name]>,
+  QC extends QueryContext = ContractToQC<C>,
+> extends JoinSource<StorageTableToScopeTable<C['storage']['tables'][Name]>, Alias>,
+    WithJoin<QC, AvailableScope>,
+    WithSelect<QC, AvailableScope, EmptyRow> {
+  as<NewAlias extends string>(newAlias: NewAlias): TableProxy<C, Name, NewAlias, AvailableScope>;
 }
 
 export type TableProxy<
-  CodecTypes extends CodecTypesBase,
-  Name extends string,
-  Table extends StorageTable,
+  C extends TableProxyContract,
+  Name extends string & keyof C['storage']['tables'],
   Alias extends string = Name,
-  AvailableScope extends Scope = DefaultScope<Name, Table>,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> = TableProxyBaseline<CodecTypes, Name, Table, Alias, AvailableScope, Capabilities> &
+  AvailableScope extends Scope = DefaultScope<Name, C['storage']['tables'][Name]>,
+  QC extends QueryContext = ContractToQC<C>,
+> = TableProxyBaseline<C, Name, Alias, AvailableScope, QC> &
   CapabilityGated<
-    Capabilities,
+    C['capabilities'],
     { sql: { lateral: true } },
-    WithLateralJoin<CodecTypes, AvailableScope, Capabilities>
+    WithLateralJoin<QC, AvailableScope>
   >;
 
 export interface WithDistinct {
@@ -205,7 +162,7 @@ export interface WithDistinct {
 }
 
 export interface WithDistinctOn<
-  CodecTypes extends CodecTypesBase,
+  QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
 > {
@@ -214,26 +171,20 @@ export interface WithDistinctOn<
   distinctOn(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
-      fns: Functions<CodecTypes>,
+      fns: Functions<QC>,
     ) => Expression<ScopeField>,
   ): this;
 }
 
-export interface WithPagination<CodecTypes extends CodecTypesBase, AvailableScope extends Scope> {
+export interface WithPagination<QC extends QueryContext, AvailableScope extends Scope> {
   limit(count: number): this;
   limit(
-    expr: (
-      fields: FieldProxy<AvailableScope>,
-      fns: Functions<CodecTypes>,
-    ) => Expression<ScopeField>,
+    expr: (fields: FieldProxy<AvailableScope>, fns: Functions<QC>) => Expression<ScopeField>,
   ): this;
 
   offset(count: number): this;
   offset(
-    expr: (
-      fields: FieldProxy<AvailableScope>,
-      fns: Functions<CodecTypes>,
-    ) => Expression<ScopeField>,
+    expr: (fields: FieldProxy<AvailableScope>, fns: Functions<QC>) => Expression<ScopeField>,
   ): this;
 }
 
@@ -242,114 +193,108 @@ export interface WithAlias<RowType extends Record<string, ScopeField>> {
 }
 
 export interface WithExecution<
-  CodecTypes extends CodecTypesBase,
+  QC extends QueryContext,
   RowType extends Record<string, ScopeField>,
 > {
-  first(): Promise<ResolveRow<RowType, CodecTypes>>;
+  first(): Promise<ResolveRow<RowType, QC['codecTypes']>>;
 }
 
 interface SelectQueryBaseline<
-  CodecTypes extends CodecTypesBase,
+  QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> extends WithSelect<CodecTypes, AvailableScope, RowType, Capabilities>,
+> extends WithSelect<QC, AvailableScope, RowType>,
     WithDistinct,
-    WithPagination<CodecTypes, AvailableScope>,
+    WithPagination<QC, AvailableScope>,
     WithAlias<RowType>,
-    WithExecution<CodecTypes, RowType>,
+    WithExecution<QC, RowType>,
     Subquery<RowType> {
-  where(
-    expr: ExpressionBuilder<AvailableScope, CodecTypes>,
-  ): SelectQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  where(expr: ExpressionBuilder<AvailableScope, QC>): SelectQuery<QC, AvailableScope, RowType>;
 
   orderBy(
     field: (keyof RowType | keyof AvailableScope['topLevel']) & string,
     options?: OrderByOptions,
-  ): SelectQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  ): SelectQuery<QC, AvailableScope, RowType>;
 
   orderBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
-      fns: Functions<CodecTypes>,
+      fns: Functions<QC>,
     ) => Expression<ScopeField>,
     options?: OrderByOptions,
-  ): SelectQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  ): SelectQuery<QC, AvailableScope, RowType>;
 
   groupBy(
     ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
-  ): GroupedQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  ): GroupedQuery<QC, AvailableScope, RowType>;
 
   groupBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
-      fns: Functions<CodecTypes>,
+      fns: Functions<QC>,
     ) => Expression<ScopeField>,
-  ): GroupedQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  ): GroupedQuery<QC, AvailableScope, RowType>;
 }
 
 export type SelectQuery<
-  CodecTypes extends CodecTypesBase,
+  QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> = SelectQueryBaseline<CodecTypes, AvailableScope, RowType, Capabilities> &
+> = SelectQueryBaseline<QC, AvailableScope, RowType> &
   CapabilityGated<
-    Capabilities,
+    QC['capabilities'],
     { postgres: { distinctOn: true } },
-    WithDistinctOn<CodecTypes, AvailableScope, RowType>
+    WithDistinctOn<QC, AvailableScope, RowType>
   >;
 
 interface GroupedQueryBaseline<
-  CodecTypes extends CodecTypesBase,
+  QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
 > extends WithDistinct,
-    WithPagination<CodecTypes, AvailableScope>,
+    WithPagination<QC, AvailableScope>,
     WithAlias<RowType>,
-    WithExecution<CodecTypes, RowType>,
+    WithExecution<QC, RowType>,
     Subquery<RowType> {
   groupBy(
     ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
-  ): GroupedQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  ): GroupedQuery<QC, AvailableScope, RowType>;
 
   groupBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
-      fns: Functions<CodecTypes>,
+      fns: Functions<QC>,
     ) => Expression<ScopeField>,
-  ): GroupedQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  ): GroupedQuery<QC, AvailableScope, RowType>;
 
   having(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
-      fns: AggregateFunctions<CodecTypes>,
+      fns: AggregateFunctions<QC>,
     ) => Expression<BooleanCodecType>,
-  ): GroupedQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  ): GroupedQuery<QC, AvailableScope, RowType>;
 
   orderBy(
     field: (keyof RowType | keyof AvailableScope['topLevel']) & string,
     options?: OrderByOptions,
-  ): GroupedQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  ): GroupedQuery<QC, AvailableScope, RowType>;
 
   orderBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
-      fns: AggregateFunctions<CodecTypes>,
+      fns: AggregateFunctions<QC>,
     ) => Expression<ScopeField>,
     options?: OrderByOptions,
-  ): GroupedQuery<CodecTypes, AvailableScope, RowType, Capabilities>;
+  ): GroupedQuery<QC, AvailableScope, RowType>;
 }
 
 export type GroupedQuery<
-  CodecTypes extends CodecTypesBase,
+  QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
-  Capabilities extends CapabilitiesBase = CapabilitiesBase,
-> = GroupedQueryBaseline<CodecTypes, AvailableScope, RowType, Capabilities> &
+> = GroupedQueryBaseline<QC, AvailableScope, RowType> &
   CapabilityGated<
-    Capabilities,
+    QC['capabilities'],
     { postgres: { distinctOn: true } },
-    WithDistinctOn<CodecTypes, AvailableScope, RowType>
+    WithDistinctOn<QC, AvailableScope, RowType>
   >;

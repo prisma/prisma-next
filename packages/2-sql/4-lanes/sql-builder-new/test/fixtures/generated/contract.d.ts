@@ -16,6 +16,7 @@ import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
+import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
 import type {
   ExecutionHashBase,
@@ -40,6 +41,7 @@ export type ProfileHash =
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
+export type QueryOperationTypes = PgVectorQueryOperationTypes;
 type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId] extends { readonly output: infer O }
     ? O extends Date | bigint
@@ -48,7 +50,7 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
     : Encoded
   : Encoded;
 
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
 type ContractBase = SqlContract<
   {
