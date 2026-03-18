@@ -30,7 +30,7 @@ export type OperationTypes = {
   };
 };
 
-/** Flat operation signatures for sql-builder-new query builder. */
+/** Flat operation signatures for the query builder. */
 export type QueryOperationTypes = {
   readonly cosineDistance: {
     readonly args: readonly [

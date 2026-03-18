@@ -200,7 +200,9 @@ export interface WithExecution<
   QC extends QueryContext,
   RowType extends Record<string, ScopeField>,
 > {
-  first(): Promise<ResolveRow<RowType, QC['codecTypes']>>;
+  first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null>;
+  firstOrThrow(): Promise<ResolveRow<RowType, QC['codecTypes']>>;
+  all(): AsyncIterable<ResolveRow<RowType, QC['codecTypes']>>;
 }
 
 interface SelectQueryBaseline<

@@ -18,7 +18,7 @@ export interface EmitOptions {
    */
   readonly parameterizedTypeImports?: ReadonlyArray<TypesImportSpec>;
   /**
-   * Query operation type imports for sql-builder-new.
+   * Query operation type imports for the query builder.
    * Flat operation signatures keyed by operation name.
    */
   readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;
