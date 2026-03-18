@@ -855,6 +855,35 @@ describe('sql-target-family-hook', () => {
     expect(types).not.toContain('export type OperationTypes = TestOps & Other');
   });
 
+  it('generates contract types with query operation type imports', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const queryOperationTypeImports = [
+      { package: '@test/query-ops', named: 'QueryOperationTypes', alias: 'TestQueryOps' },
+      { package: '@test/other', named: 'OtherTypes', alias: 'Other' },
+    ];
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
+      queryOperationTypeImports,
+    });
+    expect(types).toContain('export type QueryOperationTypes = TestQueryOps');
+    expect(types).not.toContain('export type QueryOperationTypes = TestQueryOps & Other');
+  });
+
   it('generates contract types with extension-owned index config in storage', () => {
     const ir = createContractIR({
       targetFamily: 'sql',
