@@ -512,7 +512,7 @@ async function executeMigrationStatusCommand(
     diagnostics,
     ...ifDefined('markerHash', markerHash),
     ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
-    ...(pathDecision ? { pathDecision } : {}),
+    ...ifDefined('pathDecision', pathDecision),
   };
   return ok(result);
 }

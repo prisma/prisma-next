@@ -78,7 +78,7 @@ function convertColumn(
 function convertUnique(unique: UniqueConstraint): SqlUniqueIR {
   return {
     columns: unique.columns,
-    ...(unique.name != null ? { name: unique.name } : {}),
+    ...ifDefined('name', unique.name),
   };
 }
 
@@ -86,7 +86,7 @@ function convertIndex(index: Index): SqlIndexIR {
   return {
     columns: index.columns,
     unique: false,
-    ...(index.name != null ? { name: index.name } : {}),
+    ...ifDefined('name', index.name),
   };
 }
 
@@ -95,7 +95,7 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
     columns: fk.columns,
     referencedTable: fk.references.table,
     referencedColumns: fk.references.columns,
-    ...(fk.name != null ? { name: fk.name } : {}),
+    ...ifDefined('name', fk.name),
   };
 }
 
@@ -131,7 +131,7 @@ function convertTable(
   return {
     name,
     columns,
-    ...(table.primaryKey != null ? { primaryKey: table.primaryKey } : {}),
+    ...ifDefined('primaryKey', table.primaryKey),
     foreignKeys: table.foreignKeys.map(convertForeignKey),
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
