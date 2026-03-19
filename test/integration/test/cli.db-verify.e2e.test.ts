@@ -1,6 +1,5 @@
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -12,6 +11,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   executeCommand,
@@ -471,6 +471,74 @@ withTempDir(({ createTempDir }) => {
           expect(parsed).toMatchObject({
             ok: true,
             summary: expect.stringContaining('satisfies contract'),
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'passes schema-only strict verification when schema matches exactly',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'output/contract.json');
+          mkdirSync(resolve(testSetup.testDir, 'output'), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const outputStartIndex = consoleOutput.length;
+          const command = createDbVerifyCommand();
+          const verifyCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, [
+              '--config',
+              configPath,
+              '--schema-only',
+              '--strict',
+              '--json',
+              '--no-color',
+            ]);
+          } finally {
+            process.chdir(verifyCwd);
+          }
+
+          expect(getExitCode()).toBe(0);
+
+          const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+            string,
+            unknown
+          >;
+          expect(parsed).toMatchObject({
+            ok: true,
+            summary: expect.stringContaining('satisfies contract'),
+            schema: expect.anything(),
+            meta: {
+              strict: true,
+            },
           });
         });
       },
