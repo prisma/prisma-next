@@ -11,7 +11,7 @@
  * at compile time (to derive CodecTypes).
  */
 
-import type { Codec, CodecMeta } from '@prisma-next/sql-relational-core/ast';
+import type { Codec, CodecMeta, CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import { codec, defineCodecs, sqlCodecDefinitions } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type as arktype } from 'arktype';
@@ -55,18 +55,19 @@ const precisionParamsSchema = arktype({
 
 function aliasCodec<
   Id extends string,
+  TTraits extends readonly CodecTrait[],
   TWire,
   TJs,
-  TParams = Record<string, unknown>,
-  THelper = unknown,
+  TParams,
+  THelper,
 >(
-  base: Codec<string, TWire, TJs, TParams, THelper>,
+  base: Codec<string, TTraits, TWire, TJs, TParams, THelper>,
   options: {
     readonly typeId: Id;
     readonly targetTypes: readonly string[];
     readonly meta?: CodecMeta;
   },
-): Codec<Id, TWire, TJs, TParams, THelper> {
+): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
   return {
     id: options.typeId,
     targetTypes: options.targetTypes,
@@ -74,8 +75,9 @@ function aliasCodec<
     ...ifDefined('paramsSchema', base.paramsSchema),
     ...ifDefined('init', base.init),
     ...ifDefined('encode', base.encode),
+    ...ifDefined('traits', base.traits),
     decode: base.decode,
-  };
+  } as Codec<Id, TTraits, TWire, TJs, TParams, THelper>;
 }
 
 const sqlCharCodec = sqlCodecDefinitions.char.codec;
@@ -95,6 +97,7 @@ export type JsonValue =
 const pgTextCodec = codec({
   typeId: PG_TEXT_CODEC_ID,
   targetTypes: ['text'],
+  traits: ['equality', 'order', 'textual'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   meta: {
@@ -164,11 +167,12 @@ const pgFloatCodec = aliasCodec(sqlFloatCodec, {
   },
 });
 
-const pgInt4Codec = codec<typeof PG_INT4_CODEC_ID, number, number>({
+const pgInt4Codec = codec({
   typeId: PG_INT4_CODEC_ID,
   targetTypes: ['int4'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
   meta: {
     db: {
       sql: {
@@ -180,9 +184,15 @@ const pgInt4Codec = codec<typeof PG_INT4_CODEC_ID, number, number>({
   },
 });
 
-const pgNumericCodec = codec<typeof PG_NUMERIC_CODEC_ID, string, string>({
+const pgNumericCodec = codec<
+  typeof PG_NUMERIC_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  string,
+  string
+>({
   typeId: PG_NUMERIC_CODEC_ID,
   targetTypes: ['numeric', 'decimal'],
+  traits: ['equality', 'order', 'numeric'],
   encode: (value: string): string => value,
   decode: (wire: string | number): string => {
     if (typeof wire === 'number') return String(wire);
@@ -200,11 +210,12 @@ const pgNumericCodec = codec<typeof PG_NUMERIC_CODEC_ID, string, string>({
   },
 });
 
-const pgInt2Codec = codec<typeof PG_INT2_CODEC_ID, number, number>({
+const pgInt2Codec = codec({
   typeId: PG_INT2_CODEC_ID,
   targetTypes: ['int2'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
   meta: {
     db: {
       sql: {
@@ -216,11 +227,12 @@ const pgInt2Codec = codec<typeof PG_INT2_CODEC_ID, number, number>({
   },
 });
 
-const pgInt8Codec = codec<typeof PG_INT8_CODEC_ID, number, number>({
+const pgInt8Codec = codec({
   typeId: PG_INT8_CODEC_ID,
   targetTypes: ['int8'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
   meta: {
     db: {
       sql: {
@@ -232,11 +244,12 @@ const pgInt8Codec = codec<typeof PG_INT8_CODEC_ID, number, number>({
   },
 });
 
-const pgFloat4Codec = codec<typeof PG_FLOAT4_CODEC_ID, number, number>({
+const pgFloat4Codec = codec({
   typeId: PG_FLOAT4_CODEC_ID,
   targetTypes: ['float4'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
   meta: {
     db: {
       sql: {
@@ -248,11 +261,12 @@ const pgFloat4Codec = codec<typeof PG_FLOAT4_CODEC_ID, number, number>({
   },
 });
 
-const pgFloat8Codec = codec<typeof PG_FLOAT8_CODEC_ID, number, number>({
+const pgFloat8Codec = codec({
   typeId: PG_FLOAT8_CODEC_ID,
   targetTypes: ['float8'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
   meta: {
     db: {
       sql: {
@@ -264,9 +278,15 @@ const pgFloat8Codec = codec<typeof PG_FLOAT8_CODEC_ID, number, number>({
   },
 });
 
-const pgTimestampCodec = codec<typeof PG_TIMESTAMP_CODEC_ID, string | Date, string>({
+const pgTimestampCodec = codec<
+  typeof PG_TIMESTAMP_CODEC_ID,
+  readonly ['equality', 'order'],
+  string | Date,
+  string
+>({
   typeId: PG_TIMESTAMP_CODEC_ID,
   targetTypes: ['timestamp'],
+  traits: ['equality', 'order'],
   encode: (value: string | Date): string => {
     if (value instanceof Date) return value.toISOString();
     if (typeof value === 'string') return value;
@@ -288,9 +308,15 @@ const pgTimestampCodec = codec<typeof PG_TIMESTAMP_CODEC_ID, string | Date, stri
   },
 });
 
-const pgTimestamptzCodec = codec<typeof PG_TIMESTAMPTZ_CODEC_ID, string | Date, string>({
+const pgTimestamptzCodec = codec<
+  typeof PG_TIMESTAMPTZ_CODEC_ID,
+  readonly ['equality', 'order'],
+  string | Date,
+  string
+>({
   typeId: PG_TIMESTAMPTZ_CODEC_ID,
   targetTypes: ['timestamptz'],
+  traits: ['equality', 'order'],
   encode: (value: string | Date): string => {
     if (value instanceof Date) return value.toISOString();
     if (typeof value === 'string') return value;
@@ -312,9 +338,10 @@ const pgTimestamptzCodec = codec<typeof PG_TIMESTAMPTZ_CODEC_ID, string | Date, 
   },
 });
 
-const pgTimeCodec = codec<typeof PG_TIME_CODEC_ID, string, string>({
+const pgTimeCodec = codec<typeof PG_TIME_CODEC_ID, readonly ['equality', 'order'], string, string>({
   typeId: PG_TIME_CODEC_ID,
   targetTypes: ['time'],
+  traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: precisionParamsSchema,
@@ -329,9 +356,15 @@ const pgTimeCodec = codec<typeof PG_TIME_CODEC_ID, string, string>({
   },
 });
 
-const pgTimetzCodec = codec<typeof PG_TIMETZ_CODEC_ID, string, string>({
+const pgTimetzCodec = codec<
+  typeof PG_TIMETZ_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string
+>({
   typeId: PG_TIMETZ_CODEC_ID,
   targetTypes: ['timetz'],
+  traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: precisionParamsSchema,
@@ -346,11 +379,12 @@ const pgTimetzCodec = codec<typeof PG_TIMETZ_CODEC_ID, string, string>({
   },
 });
 
-const pgBoolCodec = codec<typeof PG_BOOL_CODEC_ID, boolean, boolean>({
+const pgBoolCodec = codec({
   typeId: PG_BOOL_CODEC_ID,
   targetTypes: ['bool'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'boolean'],
+  encode: (value: boolean): boolean => value,
+  decode: (wire: boolean): boolean => wire,
   meta: {
     db: {
       sql: {
@@ -362,9 +396,10 @@ const pgBoolCodec = codec<typeof PG_BOOL_CODEC_ID, boolean, boolean>({
   },
 });
 
-const pgBitCodec = codec<typeof PG_BIT_CODEC_ID, string, string>({
+const pgBitCodec = codec<typeof PG_BIT_CODEC_ID, readonly ['equality', 'order'], string, string>({
   typeId: PG_BIT_CODEC_ID,
   targetTypes: ['bit'],
+  traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: lengthParamsSchema,
@@ -379,9 +414,15 @@ const pgBitCodec = codec<typeof PG_BIT_CODEC_ID, string, string>({
   },
 });
 
-const pgVarbitCodec = codec<typeof PG_VARBIT_CODEC_ID, string, string>({
+const pgVarbitCodec = codec<
+  typeof PG_VARBIT_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string
+>({
   typeId: PG_VARBIT_CODEC_ID,
   targetTypes: ['bit varying'],
+  traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: lengthParamsSchema,
@@ -396,20 +437,23 @@ const pgVarbitCodec = codec<typeof PG_VARBIT_CODEC_ID, string, string>({
   },
 });
 
-const pgEnumCodec = codec<typeof PG_ENUM_CODEC_ID, string, string>({
+const pgEnumCodec = codec({
   typeId: PG_ENUM_CODEC_ID,
   targetTypes: ['enum'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
 });
 
 const pgIntervalCodec = codec<
   typeof PG_INTERVAL_CODEC_ID,
+  readonly ['equality', 'order'],
   string | Record<string, unknown>,
   string
 >({
   typeId: PG_INTERVAL_CODEC_ID,
   targetTypes: ['interval'],
+  traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string | Record<string, unknown>): string => {
     if (typeof wire === 'string') return wire;
@@ -427,11 +471,13 @@ const pgIntervalCodec = codec<
   },
 });
 
-const pgJsonCodec = codec<typeof PG_JSON_CODEC_ID, string | JsonValue, JsonValue>({
+const pgJsonCodec = codec({
   typeId: PG_JSON_CODEC_ID,
   targetTypes: ['json'],
-  encode: (value) => JSON.stringify(value),
-  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  traits: [],
+  encode: (value: string | JsonValue): string => JSON.stringify(value),
+  decode: (wire: string | JsonValue): JsonValue =>
+    typeof wire === 'string' ? JSON.parse(wire) : wire,
   meta: {
     db: {
       sql: {
@@ -443,11 +489,13 @@ const pgJsonCodec = codec<typeof PG_JSON_CODEC_ID, string | JsonValue, JsonValue
   },
 });
 
-const pgJsonbCodec = codec<typeof PG_JSONB_CODEC_ID, string | JsonValue, JsonValue>({
+const pgJsonbCodec = codec({
   typeId: PG_JSONB_CODEC_ID,
   targetTypes: ['jsonb'],
-  encode: (value) => JSON.stringify(value),
-  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  traits: ['equality'],
+  encode: (value: string | JsonValue): string => JSON.stringify(value),
+  decode: (wire: string | JsonValue): JsonValue =>
+    typeof wire === 'string' ? JSON.parse(wire) : wire,
   meta: {
     db: {
       sql: {
@@ -492,5 +540,4 @@ const codecs = defineCodecs()
 export const codecDefinitions = codecs.codecDefinitions;
 export const dataTypes = codecs.dataTypes;
 
-// Export types derived from codecs builder
 export type CodecTypes = typeof codecs.CodecTypes;
