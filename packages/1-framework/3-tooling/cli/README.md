@@ -116,6 +116,7 @@ Options:
 - `--shallow`: Skip structural schema verification and only check the database marker
 - `--schema-only`: Skip marker verification and only check whether the live schema satisfies the contract
 - `--strict`: When schema verification runs, fail on unmanaged extra schema elements
+- `--shallow` cannot be combined with `--schema-only` or `--strict` (exit code 2, `PN-CLI-4012`). `--schema-only --strict` is valid.
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)

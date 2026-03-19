@@ -139,6 +139,7 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
   - `--shallow` performs marker-only verification.
   - `--schema-only` skips marker checks and verifies only that the live schema satisfies the contract.
   - `--strict` makes schema verification fail on unmanaged extra schema elements.
+  - `--shallow` cannot be combined with `--schema-only` or `--strict` (exit code 2, `PN-CLI-4012`). `--schema-only --strict` is valid.
   - Non‑interactive; single JSON with `--json`.
 - `db sign` (canonical):
   - Runs the same verify phase first, then writes/updates the marker row.
