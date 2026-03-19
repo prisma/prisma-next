@@ -6,7 +6,7 @@ Clean up the CLI migration commands (`migration-apply`, `migration-plan`, `migra
 
 **Spec:** TODOs in `migration-apply.ts`, `migration-plan.ts`, `migration-status.ts` + `wip/cleanup-notes.md`
 
-## Status: Not started
+## Status: M1 complete, M3 complete
 
 ## Collaborators
 
@@ -24,8 +24,8 @@ Extract duplicated patterns into shared utilities and tighten types that are unn
 
 - [x] **Create `readContractEnvelope` utility**: Added to `command-helpers.ts`. Reads contract.json, validates framework-level envelope fields (`storageHash`, `schemaVersion`, `target`, `targetFamily`). Uses `ContractEnvelope` interface with index signature for family-specific fields. Replaces raw `JSON.parse` + `as Record<string, unknown>` casts in `migration-apply.ts` and `migration-status.ts`. Note: `validateContract` from `sql-contract` is off-limits due to layering (framework cannot import from SQL domain per ADR 140).
 - [x] **Create `resolveMigrationPaths` utility**: Added to `command-helpers.ts`. Extracts the repeated `configPath` + `migrationsDir` + `migrationsRelative` computation. Used in `migration-apply.ts`, `migration-plan.ts`, and `migration-status.ts`.
-- [ ] **Create shared `loadMigrationBundles` utility**: Extract the repeated `readMigrationsDir → filter attested → reconstructGraph` pattern from both commands into a single function returning `{ bundles: AttestedMigrationBundle[], graph: MigrationGraph }`.
-- [x] **Split `MigrationManifest` into Draft/Attested types**: `MigrationManifest` is now a union of `DraftMigrationManifest` (`migrationId: null`) and `AttestedMigrationManifest` (`migrationId: string`). Added `AttestedMigrationBundle` interface, `isAttested()` type guard. `MigrationChainEntry.migrationId` is now `string` (non-nullable) since only attested migrations appear in the graph. `reconstructGraph` now accepts `AttestedMigrationBundle[]`. **WIP**: ~35 type errors remain in CLI test files — they construct `MigrationBundle` fixtures and pass to `reconstructGraph` without filtering. Need to update test helpers to use `createAttestedBundle` or filter with `isAttested`.
+- [x] **Create shared `loadMigrationBundles` utility**: Added to `command-helpers.ts`. Reads migrations dir, filters to attested, builds graph. Returns `{ bundles: AttestedMigrationBundle[], graph: MigrationGraph }`. Used by `migration-apply`, `migration-plan`, and `migration-status`. Also fixed `MigrationApplyStep.operations` to use `MigrationPlanOperation[]` directly (removed inline type + cast round-trip), replaced stale `MigrationPackage` references with `MigrationBundle`, and changed `targetSupportsMigrations` from type guard to boolean + added `getTargetMigrations` using the migration-control-plane's `ControlTargetDescriptor` (which has the optional `migrations?` property the config-level type omits).
+- [x] **Split `MigrationManifest` into Draft/Attested types**: `MigrationManifest` is now a union of `DraftMigrationManifest` (`migrationId: null`) and `AttestedMigrationManifest` (`migrationId: string`). Added `AttestedMigrationBundle` interface, `isAttested()` type guard. `MigrationChainEntry.migrationId` is now `string` (non-nullable) since only attested migrations appear in the graph. `reconstructGraph` now accepts `AttestedMigrationBundle[]`. All 37 type errors in CLI test and source files resolved — tests use `isAttested` filter, source files use `loadMigrationBundles`.
 - [x] **Reuse `PathDecision` type**: Added `PathDecisionResult` interface and `toPathDecisionResult()` helper to `command-helpers.ts`. Replaces inline PathDecision construction in both `migration-apply.ts` and `migration-status.ts`.
 - [x] **Replace target cast with type guard**: Added `targetSupportsMigrations()` type guard to `command-helpers.ts`. Replaces `as typeof config.target & { migrations?: unknown }` casts in `migration-apply.ts` and `migration-plan.ts`. The config-level `ControlTargetDescriptor` doesn't include `migrations` (it's on the migration control-plane version), so runtime check is needed.
 - [x] **Rename `packages` → `bundles`**: Renamed local variables in `migration-apply.ts` and `migration-status.ts` (`packages` → `bundles`, `allPackages` → `allBundles`, `packageByDir` → `bundleByDir`). `MigrationBundle` type already existed; added `MigrationBundle as MigrationPackage` re-export for backward compat.
@@ -98,9 +98,7 @@ The code currently does `markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH
 
 ## Immediate next steps
 
-1. **Fix ~35 type errors in CLI test files**: Tests construct `MigrationBundle` and pass to `reconstructGraph` which now wants `AttestedMigrationBundle[]`. Each test file's bundle construction needs to use `createAttestedBundle` from fixtures, or filter with `isAttested`. This is mechanical but widespread across `migration-apply.test.ts`, `migration-status.test.ts`, `migration-plan.test.ts`, `migration-ref.test.ts`, `migration-e2e.test.ts`, and `migration-show.ts`.
-2. **Fix remaining source errors**: `migration-plan.ts` has type errors from `targetSupportsMigrations` narrowing not propagating to `migrations` usage. `migration-show.ts` also needs `isAttested` filter. A few stale `MigrationPackage` references remain.
-3. **Extract `loadMigrationBundles` utility**: The last uncompleted M1 task.
+M1 and M3 are complete. Next up is M2 (fix incorrect error messages).
 
 ## Open Items
 
