@@ -24,36 +24,50 @@ function createLengthTypeHelper(
   });
 }
 
-const sqlCharCodec = codec<typeof SQL_CHAR_CODEC_ID, string, string>({
+const sqlCharCodec = codec<
+  typeof SQL_CHAR_CODEC_ID,
+  readonly ['equality', 'order', 'textual'],
+  string,
+  string
+>({
   typeId: SQL_CHAR_CODEC_ID,
   targetTypes: ['char'],
+  traits: ['equality', 'order', 'textual'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire.trimEnd(),
   paramsSchema: lengthParamsSchema,
   init: createLengthTypeHelper('fixed'),
 });
 
-const sqlVarcharCodec = codec<typeof SQL_VARCHAR_CODEC_ID, string, string>({
+const sqlVarcharCodec = codec<
+  typeof SQL_VARCHAR_CODEC_ID,
+  readonly ['equality', 'order', 'textual'],
+  string,
+  string
+>({
   typeId: SQL_VARCHAR_CODEC_ID,
   targetTypes: ['varchar'],
+  traits: ['equality', 'order', 'textual'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: lengthParamsSchema,
   init: createLengthTypeHelper('variable'),
 });
 
-const sqlIntCodec = codec<typeof SQL_INT_CODEC_ID, number, number>({
+const sqlIntCodec = codec({
   typeId: SQL_INT_CODEC_ID,
   targetTypes: ['int'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
 });
 
-const sqlFloatCodec = codec<typeof SQL_FLOAT_CODEC_ID, number, number>({
+const sqlFloatCodec = codec({
   typeId: SQL_FLOAT_CODEC_ID,
   targetTypes: ['float'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
 });
 
 const codecs = defineCodecs()

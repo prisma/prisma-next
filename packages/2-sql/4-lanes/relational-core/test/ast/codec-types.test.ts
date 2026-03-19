@@ -448,3 +448,132 @@ describe('CodecDefBuilder', () => {
     expect('test/type1@1' in builder.CodecTypes).toBe(true);
   });
 });
+
+describe('codec traits', () => {
+  it('codec() factory produces codec with traits', () => {
+    const testCodec = codec({
+      typeId: 'test/numeric@1',
+      targetTypes: ['int4'],
+      traits: ['equality', 'order', 'numeric'],
+      encode: (value: number) => value,
+      decode: (wire: number) => wire,
+    });
+
+    expect(testCodec.traits).toEqual(['equality', 'order', 'numeric']);
+  });
+
+  it('codec() factory omits traits when not provided', () => {
+    const testCodec = codec({
+      typeId: 'test/bare@1',
+      targetTypes: ['text'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+    });
+
+    expect(testCodec.traits).toBeUndefined();
+  });
+
+  it('hasTrait returns true for declared trait', () => {
+    const registry = createCodecRegistry();
+    registry.register(
+      codec({
+        typeId: 'test/num@1',
+        targetTypes: ['int'],
+        traits: ['equality', 'order', 'numeric'],
+        encode: (v: number) => v,
+        decode: (w: number) => w,
+      }),
+    );
+
+    expect(registry.hasTrait('test/num@1', 'numeric')).toBe(true);
+    expect(registry.hasTrait('test/num@1', 'equality')).toBe(true);
+    expect(registry.hasTrait('test/num@1', 'order')).toBe(true);
+  });
+
+  it('hasTrait returns false for undeclared trait', () => {
+    const registry = createCodecRegistry();
+    registry.register(
+      codec({
+        typeId: 'test/bool@1',
+        targetTypes: ['bool'],
+        traits: ['equality', 'boolean'],
+        encode: (v: boolean) => v,
+        decode: (w: boolean) => w,
+      }),
+    );
+
+    expect(registry.hasTrait('test/bool@1', 'numeric')).toBe(false);
+    expect(registry.hasTrait('test/bool@1', 'order')).toBe(false);
+    expect(registry.hasTrait('test/bool@1', 'textual')).toBe(false);
+  });
+
+  it('hasTrait returns false for unknown codec', () => {
+    const registry = createCodecRegistry();
+    expect(registry.hasTrait('unknown/id@1', 'equality')).toBe(false);
+  });
+
+  it('hasTrait returns false for codec without traits', () => {
+    const registry = createCodecRegistry();
+    registry.register(
+      codec({
+        typeId: 'test/bare@1',
+        targetTypes: ['text'],
+        encode: (v: string) => v,
+        decode: (w: string) => w,
+      }),
+    );
+
+    expect(registry.hasTrait('test/bare@1', 'equality')).toBe(false);
+  });
+
+  it('traitsOf returns declared traits', () => {
+    const registry = createCodecRegistry();
+    registry.register(
+      codec({
+        typeId: 'test/text@1',
+        targetTypes: ['text'],
+        traits: ['equality', 'order', 'textual'],
+        encode: (v: string) => v,
+        decode: (w: string) => w,
+      }),
+    );
+
+    expect(registry.traitsOf('test/text@1')).toEqual(['equality', 'order', 'textual']);
+  });
+
+  it('traitsOf returns empty array for unknown codec', () => {
+    const registry = createCodecRegistry();
+    expect(registry.traitsOf('unknown/id@1')).toEqual([]);
+  });
+
+  it('traitsOf returns empty array for codec without traits', () => {
+    const registry = createCodecRegistry();
+    registry.register(
+      codec({
+        typeId: 'test/bare@1',
+        targetTypes: ['text'],
+        encode: (v: string) => v,
+        decode: (w: string) => w,
+      }),
+    );
+
+    expect(registry.traitsOf('test/bare@1')).toEqual([]);
+  });
+});
+
+describe('SqlCodecTypes with traits', () => {
+  it('SqlCodecTypes carries narrow traits for codecs without init', async () => {
+    type SqlCTypes = import('../../src/ast/sql-codecs').SqlCodecTypes;
+
+    // Int (no init/paramsSchema): TTraits inferred as literal tuple
+    true satisfies 'numeric' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
+    true satisfies 'equality' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
+    true satisfies 'order' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
+    false satisfies 'textual' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
+    false satisfies 'boolean' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
+
+    // Float (no init/paramsSchema): same narrow traits
+    true satisfies 'numeric' extends SqlCTypes['sql/float@1']['traits'] ? true : false;
+    false satisfies 'textual' extends SqlCTypes['sql/float@1']['traits'] ? true : false;
+  });
+});
