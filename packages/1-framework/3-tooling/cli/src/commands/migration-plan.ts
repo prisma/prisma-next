@@ -9,10 +9,14 @@ import {
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
-import { type MigrationManifest, MigrationToolsError } from '@prisma-next/migration-tools/types';
+import {
+  isAttested,
+  type MigrationManifest,
+  MigrationToolsError,
+} from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { join, relative, resolve } from 'pathe';
+import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import {
@@ -27,11 +31,11 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  getTargetMigrations,
   resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
-  targetSupportsMigrations,
 } from '../utils/command-helpers';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
@@ -164,6 +168,7 @@ async function executeMigrationPlanCommand(
 
   try {
     const migrationBundles = await readMigrationsDir(migrationsDir);
+    const attested = migrationBundles.filter(isAttested);
 
     if (options.from) {
       fromHash = options.from;
@@ -178,7 +183,7 @@ async function executeMigrationPlanCommand(
       }
       fromContract = sourceBundle.manifest.toContract;
     } else {
-      const graph = reconstructGraph(migrationBundles);
+      const graph = reconstructGraph(attested);
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
         fromHash = latestMigration.to;
@@ -212,16 +217,14 @@ async function executeMigrationPlanCommand(
   }
 
   // Check target supports migrations
-  if (!targetSupportsMigrations(config.target)) {
+  const migrations = getTargetMigrations(config.target);
+  if (!migrations) {
     return notOk(
       errorTargetMigrationNotSupported({
         why: `Target "${config.target.id}" does not support migrations`,
       }),
     );
   }
-
-  // Plan migration using the same planner as db init
-  const { migrations } = config.target;
   const stack = createControlPlaneStack({
     target: config.target,
     adapter: config.adapter,

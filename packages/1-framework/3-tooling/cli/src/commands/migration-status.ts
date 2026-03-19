@@ -9,7 +9,6 @@ import {
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
-  AttestedMigrationBundle,
   MigrationBundle,
   MigrationChainEntry,
   MigrationGraph,
@@ -114,7 +113,7 @@ function summarizeOps(ops: readonly MigrationPlanOperation[]): {
 
 export function buildMigrationEntries(
   chain: readonly MigrationChainEntry[],
-  packages: readonly MigrationPackage[],
+  packages: readonly MigrationBundle[],
   markerHash: string | undefined,
 ): MigrationStatusEntry[] {
   const pkgByDirName = new Map(packages.map((p) => [p.dirName, p]));
