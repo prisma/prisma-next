@@ -426,14 +426,34 @@ async function executeMigrationStatusCommand(
   if (mode === 'online') {
     const pendingCount = entries.filter((e) => e.status === 'pending').length;
     if (!markerInChain) {
+      // Tailor guidance based on where the contract sits relative to the graph:
+      // - marker == contract: DB was managed with db update, just need to plan a migration.
+      // - contract is in the graph: migrations exist for the contract, DB drifted.
+      //   Suggest db sign if they want to force-align, or db verify to inspect.
+      // - neither: both DB and contract are outside the graph, needs investigation.
+      const hints: string[] = [];
+      if (markerHash === contractHash) {
+        hints.push(
+          'The contract matches the database marker but no migration exists for this contract',
+          "Run 'prisma-next migration plan' to generate a migration for the current contract",
+        );
+      } else if (graph.nodes.has(contractHash)) {
+        hints.push(
+          'The database marker is not in the migration graph, but migrations exist for the current contract',
+          "Run 'prisma-next db sign' to overwrite the marker if the database already matches the contract",
+          "Run 'prisma-next db verify' to inspect the database state",
+        );
+      } else {
+        hints.push(
+          'Neither the database marker nor the contract appear in the migration graph',
+          "Run 'prisma-next db verify' to inspect the database state",
+        );
+      }
       diagnostics.push({
         code: 'MIGRATION.MARKER_DIVERGED',
         severity: 'warn',
         message: 'Database marker does not match any migration in the chain',
-        hints: [
-          "The database may have been managed with 'db update' instead of migrations",
-          "Run 'prisma-next db verify' to inspect the database state",
-        ],
+        hints,
       });
     } else if (pendingCount > 0) {
       diagnostics.push({
