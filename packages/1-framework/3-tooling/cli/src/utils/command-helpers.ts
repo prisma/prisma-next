@@ -1,6 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import type { ControlTargetDescriptor } from '@prisma-next/core-control-plane/types';
 import type { PathDecision } from '@prisma-next/migration-tools/dag';
+import { reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import type { AttestedMigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
+import { isAttested } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -148,6 +152,21 @@ export function targetSupportsMigrations(target: ControlTargetDescriptor<string,
  */
 export function getTargetMigrations(target: ControlTargetDescriptor<string, string>) {
   return target.migrations;
+}
+
+/**
+ * Reads the migrations directory, filters to attested bundles, and builds
+ * the migration graph. Throws on I/O or graph errors — callers handle
+ * error mapping.
+ */
+export async function loadMigrationBundles(migrationsDir: string): Promise<{
+  bundles: readonly AttestedMigrationBundle[];
+  graph: MigrationGraph;
+}> {
+  const allBundles = await readMigrationsDir(migrationsDir);
+  const bundles = allBundles.filter(isAttested);
+  const graph = reconstructGraph(bundles);
+  return { bundles, graph };
 }
 
 /**

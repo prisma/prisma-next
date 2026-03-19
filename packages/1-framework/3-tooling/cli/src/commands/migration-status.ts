@@ -1,19 +1,14 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
-import {
-  findLeaf,
-  findPath,
-  findPathWithDecision,
-  reconstructGraph,
-} from '@prisma-next/migration-tools/dag';
-import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import { findLeaf, findPath, findPathWithDecision } from '@prisma-next/migration-tools/dag';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
+  AttestedMigrationBundle,
   MigrationBundle,
   MigrationChainEntry,
   MigrationGraph,
 } from '@prisma-next/migration-tools/types';
-import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -23,6 +18,7 @@ import { createControlClient } from '../control-api/client';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  loadMigrationBundles,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -299,9 +295,10 @@ async function executeMigrationStatusCommand(
     });
   }
 
-  let allBundles: readonly MigrationBundle[];
+  let attested: readonly AttestedMigrationBundle[];
+  let graph: MigrationGraph;
   try {
-    allBundles = await readMigrationsDir(migrationsDir);
+    ({ bundles: attested, graph } = await loadMigrationBundles(migrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -314,8 +311,6 @@ async function executeMigrationStatusCommand(
       }),
     );
   }
-
-  const attested = allBundles.filter(isAttested);
 
   // TODO: lots of nesting and stuff - can we flatten this
   if (attested.length === 0) {
@@ -340,10 +335,8 @@ async function executeMigrationStatusCommand(
     });
   }
 
-  let graph: MigrationGraph;
   let targetHash: string;
   try {
-    graph = reconstructGraph(attested);
     // TODO: if we don't find a ref then we default to findLeaf - does that make sense? We should probably error if the ref is invalid
     targetHash = activeRefHash ?? findLeaf(graph);
   } catch (error) {

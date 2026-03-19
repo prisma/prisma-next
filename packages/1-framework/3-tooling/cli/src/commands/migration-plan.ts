@@ -3,17 +3,9 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
-import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
-import {
-  formatMigrationDirName,
-  readMigrationsDir,
-  writeMigrationPackage,
-} from '@prisma-next/migration-tools/io';
-import {
-  isAttested,
-  type MigrationManifest,
-  MigrationToolsError,
-} from '@prisma-next/migration-tools/types';
+import { findLatestMigration } from '@prisma-next/migration-tools/dag';
+import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
+import { type MigrationManifest, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
@@ -32,6 +24,7 @@ import {
 import {
   addGlobalOptions,
   getTargetMigrations,
+  loadMigrationBundles,
   resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
@@ -167,12 +160,11 @@ async function executeMigrationPlanCommand(
   let fromHash: string = EMPTY_CONTRACT_HASH;
 
   try {
-    const migrationBundles = await readMigrationsDir(migrationsDir);
-    const attested = migrationBundles.filter(isAttested);
+    const { bundles, graph } = await loadMigrationBundles(migrationsDir);
 
     if (options.from) {
       fromHash = options.from;
-      const sourceBundle = migrationBundles.find((p) => p.manifest.to === fromHash);
+      const sourceBundle = bundles.find((p) => p.manifest.to === fromHash);
       if (!sourceBundle) {
         return notOk(
           errorRuntime('Starting contract not found', {
@@ -183,13 +175,10 @@ async function executeMigrationPlanCommand(
       }
       fromContract = sourceBundle.manifest.toContract;
     } else {
-      const graph = reconstructGraph(attested);
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
         fromHash = latestMigration.to;
-        const leafPkg = migrationBundles.find(
-          (p) => p.manifest.migrationId === latestMigration.migrationId,
-        );
+        const leafPkg = bundles.find((p) => p.manifest.migrationId === latestMigration.migrationId);
         if (leafPkg) {
           fromContract = leafPkg.manifest.toContract;
         }

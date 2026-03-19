@@ -1,9 +1,8 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { findPathWithDecision, reconstructGraph } from '@prisma-next/migration-tools/dag';
-import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type { AttestedMigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
-import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { resolve } from 'pathe';
@@ -21,6 +20,7 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  loadMigrationBundles,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -189,9 +189,9 @@ async function executeMigrationApplyCommand(
 
   // Read migrations and build migration chain model (offline — no DB needed)
   let bundles: readonly AttestedMigrationBundle[];
+  let graph: MigrationGraph;
   try {
-    const allBundles = await readMigrationsDir(migrationsDir);
-    bundles = allBundles.filter(isAttested);
+    ({ bundles, graph } = await loadMigrationBundles(migrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -255,16 +255,6 @@ async function executeMigrationApplyCommand(
       summary: 'No attested migrations found',
       timings: { total: Date.now() - startTime },
     });
-  }
-
-  let graph: MigrationGraph;
-  try {
-    graph = reconstructGraph(bundles);
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      return notOk(mapMigrationToolsError(error));
-    }
-    throw error;
   }
 
   // Create control client for all DB operations
