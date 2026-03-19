@@ -114,7 +114,7 @@ exports[`help text snapshots > formats db update help 1`] = `
 `;
 
 exports[`help text snapshots > formats db verify help 1`] = `
-"prisma-next verify → Check whether the database has been signed with your contract
+"prisma-next verify → Check whether the database signature and live schema match your contract
 │
 │ --json                Output as JSON
 │ -q, --quiet           Quiet mode: errors only
@@ -127,15 +127,19 @@ exports[`help text snapshots > formats db verify help 1`] = `
 │ -y, --yes             Auto-accept prompts
 │ --db <url>            Database connection string
 │ --config <path>       Path to prisma-next.config.ts
+│ --shallow             Skip structural schema verification and only check the
+│                       database marker
 │
 │ Examples:
 │   $ prisma-next db verify --db $DATABASE_URL
+│   $ prisma-next db verify --db $DATABASE_URL --shallow
 │   $ prisma-next db verify --db $DATABASE_URL --json
 │
-│ Verifies that your database schema matches the emitted contract. Checks table
-│ structures,
-│ column types, constraints, and codec coverage. Reports any mismatches or
-│ missing codecs.
+│ Verifies the database marker first, then runs tolerant structural schema
+│ verification to
+│ catch drift such as manual DDL changes. Use \`--shallow\` to skip the schema
+│ check and accept
+│ marker-only verification.
 └
 "
 `;
@@ -146,7 +150,7 @@ exports[`help text snapshots > formats root help 1`] = `
 │ ├─ contract         
 │ │  └─ emit            Emit your contract artifacts
 │ └─ db               
-│    └─ verify          Check whether the database has been signed with your contract
+│    └─ verify          Check whether the database signature and live schema match your contract
 │
 │ Use Prisma Next to define your data layer as a contract. Sign your database
 │ and application with the same contract to guarantee compatibility. Plan and
@@ -161,7 +165,7 @@ exports[`help text snapshots > formats root help with no color 1`] = `
 │ ├─ contract         
 │ │  └─ emit            Emit your contract artifacts
 │ └─ db               
-│    └─ verify          Check whether the database has been signed with your contract
+│    └─ verify          Check whether the database signature and live schema match your contract
 │
 │ Use Prisma Next to define your data layer as a contract. Sign your database
 │ and application with the same contract to guarantee compatibility. Plan and

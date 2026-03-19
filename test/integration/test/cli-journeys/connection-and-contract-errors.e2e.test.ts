@@ -34,20 +34,19 @@ withTempDir(({ createTempDir }) => {
   // Journey S: Connection Failures
   // -------------------------------------------------------------------------
   describe('Journey S: Connection Errors', () => {
-    // S.04 is the most deterministically testable (no DB needed)
     it(
-      'S.04: db verify without --db and no config connection fails',
+      'S.01: db verify without --db and no config connection fails',
       async () => {
         // Setup journey without db connection in config
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
         // Emit contract first (no DB needed for emit)
         const emit = await runContractEmit(ctx);
-        expect(emit.exitCode, 'S.04.pre: emit').toBe(0);
+        expect(emit.exitCode, 'S.01.pre: emit').toBe(0);
 
         // db verify without connection should fail
         const verify = await runDbVerify(ctx);
-        expect(verify.exitCode, 'S.04: missing connection').not.toBe(0);
+        expect(verify.exitCode, 'S.01: missing connection').not.toBe(0);
       },
       timeouts.spinUpPpgDev,
     );

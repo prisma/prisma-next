@@ -9,7 +9,7 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
-import { runContractEmit, setupJourney } from '../utils/journey-test-helpers';
+import { parseJsonOutput, runContractEmit, setupJourney } from '../utils/journey-test-helpers';
 
 withTempDir(({ createTempDir }) => {
   describe('Journey Y: Global Flags', () => {
@@ -69,6 +69,40 @@ withTempDir(({ createTempDir }) => {
         const normalLen = normal.stdout.length + normal.stderr.length;
         const verboseLen = verbose.stdout.length + verbose.stderr.length;
         expect(verboseLen, 'Y.03: verbose output is longer').toBeGreaterThanOrEqual(normalLen);
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    // Y.04: auto-JSON when stdout is piped (not a TTY)
+    it(
+      'Y.04: auto-enables JSON output when stdout is piped',
+      async () => {
+        const ctx = setupJourney({ createTempDir });
+
+        // Simulate piped stdout (isTTY=false) — no explicit --json flag
+        const result = await runContractEmit(ctx, [], { isTTY: false });
+        expect(result.exitCode, 'Y.04: emit succeeds').toBe(0);
+
+        // When piped, output should be valid JSON on stdout
+        const json = parseJsonOutput(result);
+        expect(json, 'Y.04: outputs valid JSON object').toBeDefined();
+        expect(typeof json, 'Y.04: JSON is an object').toBe('object');
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    // Y.05: explicit --json flag still works in interactive mode
+    it(
+      'Y.05: explicit --json flag produces JSON in interactive mode',
+      async () => {
+        const ctx = setupJourney({ createTempDir });
+
+        const result = await runContractEmit(ctx, ['--json']);
+        expect(result.exitCode, 'Y.05: emit succeeds').toBe(0);
+
+        const json = parseJsonOutput(result);
+        expect(json, 'Y.05: outputs valid JSON object').toBeDefined();
+        expect(typeof json, 'Y.05: JSON is an object').toBe('object');
       },
       timeouts.typeScriptCompilation,
     );

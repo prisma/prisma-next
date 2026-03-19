@@ -2,10 +2,11 @@
  * Schema Drift Scenarios (Journeys M + N)
  *
  * M — Phantom drift: after initialization, a DBA drops a column via manual DDL.
- *     db verify still passes (marker hash unchanged — false positive), but
- *     db schema-verify catches the missing column. Recovery via db update
+ *     db verify now catches the missing column by default via structural schema
+ *     verification. db verify --shallow still performs marker-only verification and
+ *     therefore passes if the marker row is unchanged. Recovery via db update
  *     succeeds because the planner uses a temporary default to re-add
- *     NOT NULL columns to non-empty tables.
+ *     NOT NULL columns to potentially non-empty tables.
  *
  * N — Extra column drift: a DBA adds a column via manual DDL. Tolerant
  *     schema-verify passes (extras OK), strict schema-verify fails. Recovery
@@ -38,7 +39,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'init → manual DDL drop → verify passes (false positive) → schema-verify catches drift',
+      'init → manual DDL drop → verify fails → verify --shallow passes → schema-verify fails → update recovers',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -56,27 +57,32 @@ withTempDir(({ createTempDir }) => {
           await client.query('ALTER TABLE "user" DROP COLUMN email');
         });
 
-        // M.01: db verify (passes — marker hash still matches, false positive)
+        // M.01: db verify (fails — structural schema verification detects drift)
         const verify = await runDbVerify(ctx);
-        expect(verify.exitCode, 'M.01: db verify false positive').toBe(0);
+        expect(verify.exitCode, 'M.01: db verify detects drift').toBe(1);
 
-        // M.02: db schema-verify (fails — missing email column)
+        // M.02: db verify --shallow (passes — marker hash still matches)
+        const shallowVerify = await runDbVerify(ctx, ['--shallow']);
+        expect(shallowVerify.exitCode, 'M.02: db verify --shallow marker-only').toBe(0);
+
+        // M.03: db schema-verify (fails — missing email column)
         const schemaVerify = await runDbSchemaVerify(ctx);
-        expect(schemaVerify.exitCode, 'M.02: db schema-verify fails').toBe(1);
+        expect(schemaVerify.exitCode, 'M.03: db schema-verify fails').toBe(1);
 
-        // M.03: db introspect (shows schema without email)
+        // M.04: db introspect (shows schema without email)
         const introspect = await runDbIntrospect(ctx);
-        expect(introspect.exitCode, 'M.03: db introspect').toBe(0);
+        expect(introspect.exitCode, 'M.04: db introspect').toBe(0);
 
-        // M.04: db update recovery
+        // M.05: db update recovery
         // The planner re-adds the dropped NOT NULL column using a temporary default
-        // so the DDL is executable even on non-empty tables.
+        // so PostgreSQL can apply the DDL even when the table may already contain rows.
+        // The temporary default is removed immediately after the column is added.
         const update = await runDbUpdate(ctx, ['-y']);
-        expect(update.exitCode, 'M.04: db update recovers from drift').toBe(0);
+        expect(update.exitCode, 'M.05: db update recovers from drift').toBe(0);
 
-        // M.05: db schema-verify passes after recovery
+        // M.06: db schema-verify passes after recovery
         const schemaVerifyAfter = await runDbSchemaVerify(ctx);
-        expect(schemaVerifyAfter.exitCode, 'M.05: schema-verify passes after update').toBe(0);
+        expect(schemaVerifyAfter.exitCode, 'M.06: schema-verify passes after update').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );
@@ -107,7 +113,7 @@ withTempDir(({ createTempDir }) => {
           await client.query('ALTER TABLE "user" ADD COLUMN age int4');
         });
 
-        // N.01: db verify (passes — marker matches)
+        // N.01: db verify (passes — marker matches and tolerant schema verification allows extras)
         const verify = await runDbVerify(ctx);
         expect(verify.exitCode, 'N.01: db verify passes').toBe(0);
 
@@ -129,19 +135,18 @@ withTempDir(({ createTempDir }) => {
         const emitExpanded = await runContractEmit(ctx);
         expect(emitExpanded.exitCode, 'N.05: contract emit expanded').toBe(0);
 
-        // N.06: db update (adds 'name' column; 'age' stays as extra — not resolved by this update)
-        // Use --no-interactive to avoid hanging on potential confirmation prompts
+        // N.06: db update --no-interactive rejects (drift from unmanaged 'age' column
+        // makes the planner classify this as destructive)
         const update = await runDbUpdate(ctx, ['--no-interactive']);
-        // db update may fail if the planner classifies adding NOT NULL column as destructive
-        // In that case, retry with -y to auto-accept
-        if (update.exitCode !== 0) {
-          const updateY = await runDbUpdate(ctx, ['-y']);
-          expect(updateY.exitCode, 'N.06: db update with -y').toBe(0);
-        }
+        expect(update.exitCode, 'N.06: --no-interactive rejects destructive').toBe(1);
 
-        // N.07: db schema-verify tolerant (passes — all contract columns present; 'age' tolerated as extra)
+        // N.07: db update -y explicitly accepts the destructive plan
+        const updateY = await runDbUpdate(ctx, ['-y']);
+        expect(updateY.exitCode, 'N.07: db update -y accepts').toBe(0);
+
+        // N.08: db schema-verify tolerant (passes — all contract columns present; 'age' tolerated as extra)
         const tolerantAfter = await runDbSchemaVerify(ctx);
-        expect(tolerantAfter.exitCode, 'N.07: tolerant passes after update').toBe(0);
+        expect(tolerantAfter.exitCode, 'N.08: tolerant passes after update').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );

@@ -1,0 +1,224 @@
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> # Inspect the live database schema tree [initialized with user(id, email)]
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> # Inspect the live database schema tree [initialized with user(id, email)]
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> # Inspect the live database schema tree [initialized with user(id, email)]
+> prisma-next db introspect
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> # Inspect the live database schema tree [initialized with user(id, email)]
+> prisma-next db introspect
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> # Inspect the live database schema tree [initialized with user(id, email)]
+> prisma-next db introspect
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> # Inspect the live database schema tree [initialized with user(id, email)]
+> prisma-next db introspect
+prisma-next db introspect → Inspect the database schema
+│
+│ config:               prisma-next.config.ts
+│ database:             postgres://****:****@127.0.0.1:5433/prisma_rec_0
+│
+│ Read more             https://pris.ly/db-introspect
+└
+
+│
+│  contract
+│  ├─ table user
+│  │  ├─ columns
+│  │  │  ├─ email: text (not nullable)
+│  │  │  └─ id: int4 (not nullable)
+│  │  └─ primary key: id
+│  └─ plpgsql dependency is installed
+>
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────

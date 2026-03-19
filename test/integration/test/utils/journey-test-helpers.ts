@@ -176,6 +176,12 @@ export function swapContract(ctx: JourneyContext, variant: ContractVariant): voi
 // Command execution
 // ---------------------------------------------------------------------------
 
+/** Options for controlling the test environment when running a CLI command. */
+export interface RunCommandOptions {
+  /** Simulate piped stdout (isTTY=false) to test auto-JSON forwarding. Default: true (interactive). */
+  readonly isTTY?: boolean;
+}
+
 /**
  * Core execution helper — all run* functions delegate to this.
  * Creates fresh mocks for each invocation so steps don't interfere.
@@ -188,8 +194,9 @@ async function runCommandCore(
   command: Command,
   testDir: string,
   args: readonly string[],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
-  const mocks = setupCommandMocks();
+  const mocks = setupCommandMocks({ isTTY: options?.isTTY });
   const originalCwd = process.cwd();
   try {
     process.chdir(testDir);
@@ -220,8 +227,9 @@ async function runCommand(
   command: Command,
   ctx: JourneyContext,
   args: readonly string[],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
-  return runCommandCore(command, ctx.testDir, ['--config', ctx.configPath, ...args]);
+  return runCommandCore(command, ctx.testDir, ['--config', ctx.configPath, ...args], options);
 }
 
 /** Runs a CLI command without --config (for commands that don't need it, or error tests). */
@@ -229,8 +237,9 @@ async function runCommandRaw(
   command: Command,
   testDir: string,
   args: readonly string[],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
-  return runCommandCore(command, testDir, args);
+  return runCommandCore(command, testDir, args, options);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,8 +249,9 @@ async function runCommandRaw(
 export async function runContractEmit(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
-  return runCommand(createContractEmitCommand(), ctx, extraArgs);
+  return runCommand(createContractEmitCommand(), ctx, extraArgs, options);
 }
 
 export async function runDbInit(
