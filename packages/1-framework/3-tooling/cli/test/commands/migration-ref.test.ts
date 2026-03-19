@@ -13,7 +13,7 @@ import {
 } from '@prisma-next/migration-tools/io';
 import { readRefs, resolveRef, writeRefs } from '@prisma-next/migration-tools/refs';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -176,7 +176,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     expect(productionHash).toBe(HASH_B);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.migrationId !== null);
+    const attested = packages.filter(isAttested);
     const graph = reconstructGraph(attested);
 
     const pathToStaging = findPath(graph, EMPTY_CONTRACT_HASH, stagingHash);
@@ -271,7 +271,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const refHash = resolveRef(refs, 'production');
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.migrationId !== null);
+    const attested = packages.filter(isAttested);
     const graph = reconstructGraph(attested);
 
     const markerHash = HASH_B;
@@ -360,7 +360,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.migrationId !== null);
+    const attested = packages.filter(isAttested);
     const graph = reconstructGraph(attested);
 
     const refsPath = join(migrationsDir, 'refs.json');
@@ -439,7 +439,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     const refs = await readRefs(refsPath);
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter((p) => p.manifest.migrationId !== null);
+    const attested = packages.filter(isAttested);
     const graph = reconstructGraph(attested);
 
     const stagingPath = findPath(graph, EMPTY_CONTRACT_HASH, resolveRef(refs, 'staging'));

@@ -13,7 +13,7 @@ import {
 } from '@prisma-next/migration-tools/io';
 import { readRefs } from '@prisma-next/migration-tools/refs';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
@@ -149,7 +149,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
@@ -169,7 +169,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
@@ -188,7 +188,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
@@ -207,7 +207,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
@@ -226,7 +226,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
@@ -245,7 +245,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
@@ -681,7 +681,7 @@ describe('resolveDisplayChain', { timeout: timeouts.databaseOperation }, () => {
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
 
     const chain = resolveDisplayChain(graph, 'sha256:hash-b', 'sha256:hash-c');
 
@@ -703,7 +703,7 @@ describe('resolveDisplayChain', { timeout: timeouts.databaseOperation }, () => {
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
 
     const chain = resolveDisplayChain(graph, 'sha256:hash-c', 'sha256:hash-a');
 
@@ -724,7 +724,7 @@ describe('resolveDisplayChain', { timeout: timeouts.databaseOperation }, () => {
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
 
     const chain = resolveDisplayChain(graph, 'sha256:hash-b', 'sha256:hash-b');
 

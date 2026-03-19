@@ -12,6 +12,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { isAttested } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -116,7 +117,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -177,7 +178,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -240,7 +241,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
 
       const pathToContractA = findPath(graph, EMPTY_CONTRACT_HASH, 'sha256:hash-a');
@@ -264,7 +265,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -288,7 +289,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -328,7 +329,7 @@ describe(
       const allPackages = await readMigrationsDir(migrationsDir);
       expect(allPackages).toHaveLength(2);
 
-      const attested = allPackages.filter((p) => p.manifest.migrationId !== null);
+      const attested = allPackages.filter(isAttested);
       expect(attested).toHaveLength(1);
 
       const graph = reconstructGraph(attested);
@@ -387,7 +388,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => typeof p.manifest.migrationId === 'string');
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -425,7 +426,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
       const path = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;

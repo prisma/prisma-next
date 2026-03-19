@@ -13,6 +13,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { isAttested } from '@prisma-next/migration-tools/types';
 import { describe, expect, it } from 'vitest';
 
 function createContract(
@@ -176,7 +177,7 @@ describe('migration plan → verify end-to-end', () => {
     const packages = await readMigrationsDir(migrationsDir);
     expect(packages).toHaveLength(2);
 
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     expect(leaf).toBe('sha256:hash-b');
 
@@ -226,7 +227,7 @@ describe('migration plan → verify end-to-end', () => {
 
     // Read migrations and check leaf
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
 
     // Same hash → no-op
