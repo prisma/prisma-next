@@ -9,11 +9,12 @@ import {
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
+  AttestedMigrationBundle,
+  MigrationBundle,
   MigrationChainEntry,
   MigrationGraph,
-  MigrationPackage,
 } from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -299,10 +300,9 @@ async function executeMigrationStatusCommand(
     });
   }
 
-  // TODO: packages -> migration bundles
-  let allPackages: readonly MigrationPackage[];
+  let allBundles: readonly MigrationBundle[];
   try {
-    allPackages = await readMigrationsDir(migrationsDir);
+    allBundles = await readMigrationsDir(migrationsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -316,8 +316,7 @@ async function executeMigrationStatusCommand(
     );
   }
 
-  // TODO: should be unncessary if migrationid can't be null
-  const attested = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
+  const attested = allBundles.filter(isAttested);
 
   // TODO: lots of nesting and stuff - can we flatten this
   if (attested.length === 0) {

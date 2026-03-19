@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { computeMigrationId } from '../src/attestation';
 import { findLeaf, findPath, findReachableLeaves, reconstructGraph } from '../src/dag';
 import { MigrationToolsError } from '../src/errors';
-import type { MigrationBundle } from '../src/types';
-import { createTestManifest, createTestOps } from './fixtures';
+import type { AttestedMigrationBundle } from '../src/types';
+import { createAttestedManifest, createTestOps } from './fixtures';
 
 const E = EMPTY_CONTRACT_HASH;
 
@@ -14,8 +14,8 @@ const C3 = `sha256:${'3'.repeat(64)}`;
 
 let migrationCounter = 0;
 
-function edge(from: string, to: string, dirName: string): MigrationBundle {
-  const manifest = createTestManifest({ from, to });
+function edge(from: string, to: string, dirName: string): AttestedMigrationBundle {
+  const manifest = createAttestedManifest({ from, to });
   const ops = createTestOps();
   const migrationId = computeMigrationId(
     { ...manifest, createdAt: `${manifest.createdAt}-${migrationCounter++}` },

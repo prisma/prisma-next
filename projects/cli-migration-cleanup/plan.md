@@ -22,14 +22,13 @@ Extract duplicated patterns into shared utilities and tighten types that are unn
 
 **Tasks:**
 
-- [ ] **Create shared `loadContractHash` utility**: Extract the repeated `JSON.parse(readFile(...)) as Record → storageHash` pattern from `migration-apply.ts:165-170` and `migration-status.ts:298-303` into a shared CLI utility that reads and validates the contract, returning at minimum the storage hash. Decide whether to use `validateContract` (full validation) or a lightweight hash-only reader. If we only need the hash, a lightweight reader that validates just `storageHash` is appropriate; if the command later needs the full contract, use `validateContract`.
-  - User comments: Just load the whole contract. don't add a utility.
-  
-- [ ] **Create shared `resolveMigrationsDir` utility**: Extract the repeated config → migrations dir resolution pattern from `migration-status.ts:213-224` and `migration-apply.ts` (similar pattern). Should return `{ migrationsDir: string, migrationsRelative: string }`.
-- [ ] **Create shared `loadMigrationBundles` utility**: Extract the repeated `readMigrationsDir → filter attested → reconstructGraph` pattern from both commands into a single function returning `{ bundles: MigrationBundle[], graph: MigrationGraph }`.
-- [ ] **Tighten `migrationId` type to `string` (non-nullable)**: Verify there is no legitimate scenario where `migrationId` is `null` on an attested migration. Remove `| null` from `MigrationChainEntry.migrationId` and `MigrationManifest.migrationId`. Update the IO validation schema (`io.ts:31`). Remove the redundant `typeof p.manifest.migrationId === 'string'` filter in both `migration-apply.ts:218` and `migration-status.ts:349`. Fix any type errors and tests that relied on `null`.
-- [ ] **Reuse `PathDecision` type in migration-status**: Replace the inline type at `migration-status.ts:502-503` with the exported `PathDecision` from `@prisma-next/migration/dag`. Factor out the pathDecision construction into a shared utility (used in both `migration-apply.ts:360-372` and `migration-status.ts:507+`).
-- [ ] **Investigate and fix target cast**: Both `migration-apply.ts:136-137` and `migration-plan.ts:219-220` cast `config.target` to check for `.migrations`. Determine whether the target type should include `migrations` natively, or if a type guard is the right pattern.
+- [x] **Create `readContractEnvelope` utility**: Added to `command-helpers.ts`. Reads contract.json, validates framework-level envelope fields (`storageHash`, `schemaVersion`, `target`, `targetFamily`). Uses `ContractEnvelope` interface with index signature for family-specific fields. Replaces raw `JSON.parse` + `as Record<string, unknown>` casts in `migration-apply.ts` and `migration-status.ts`. Note: `validateContract` from `sql-contract` is off-limits due to layering (framework cannot import from SQL domain per ADR 140).
+- [x] **Create `resolveMigrationPaths` utility**: Added to `command-helpers.ts`. Extracts the repeated `configPath` + `migrationsDir` + `migrationsRelative` computation. Used in `migration-apply.ts`, `migration-plan.ts`, and `migration-status.ts`.
+- [ ] **Create shared `loadMigrationBundles` utility**: Extract the repeated `readMigrationsDir → filter attested → reconstructGraph` pattern from both commands into a single function returning `{ bundles: AttestedMigrationBundle[], graph: MigrationGraph }`.
+- [x] **Split `MigrationManifest` into Draft/Attested types**: `MigrationManifest` is now a union of `DraftMigrationManifest` (`migrationId: null`) and `AttestedMigrationManifest` (`migrationId: string`). Added `AttestedMigrationBundle` interface, `isAttested()` type guard. `MigrationChainEntry.migrationId` is now `string` (non-nullable) since only attested migrations appear in the graph. `reconstructGraph` now accepts `AttestedMigrationBundle[]`. **WIP**: ~35 type errors remain in CLI test files — they construct `MigrationBundle` fixtures and pass to `reconstructGraph` without filtering. Need to update test helpers to use `createAttestedBundle` or filter with `isAttested`.
+- [x] **Reuse `PathDecision` type**: Added `PathDecisionResult` interface and `toPathDecisionResult()` helper to `command-helpers.ts`. Replaces inline PathDecision construction in both `migration-apply.ts` and `migration-status.ts`.
+- [x] **Replace target cast with type guard**: Added `targetSupportsMigrations()` type guard to `command-helpers.ts`. Replaces `as typeof config.target & { migrations?: unknown }` casts in `migration-apply.ts` and `migration-plan.ts`. The config-level `ControlTargetDescriptor` doesn't include `migrations` (it's on the migration control-plane version), so runtime check is needed.
+- [x] **Rename `packages` → `bundles`**: Renamed local variables in `migration-apply.ts` and `migration-status.ts` (`packages` → `bundles`, `allPackages` → `allBundles`, `packageByDir` → `bundleByDir`). `MigrationBundle` type already existed; added `MigrationBundle as MigrationPackage` re-export for backward compat.
 
 ### Milestone 2: Fix incorrect error messages and semantic issues
 
@@ -45,15 +44,9 @@ Review every error message and "fix" suggestion in the migration commands. Sever
 - [ ] **Review ref fallback to `findLeaf`**: At `migration-status.ts:378`, when a ref is provided but not found, the code falls back to `findLeaf`. The TODO suggests this should be an error. Determine: if the user passes `--ref foo` and `foo` doesn't exist, should that be a hard error?
 - [ ] **Clarify ref update ordering**: Document in the migration apply command (or a shared doc) whether `migration apply` should update the ref after successful application, or if that's the user's responsibility.
 
-### Milestone 3: Rename "packages" to "MigrationBundle"
+### Milestone 3: Rename "packages" to "MigrationBundle" ✅
 
-Rename the `packages` variable name and `MigrationPackage` type references to use `MigrationBundle` consistently. The type already exists as `MigrationBundle` — this is about making local variable names and comments match.
-
-**Tasks:**
-
-- [ ] **Add JSDoc to `MigrationBundle`**: Add a comment explaining what a MigrationBundle is (an on-disk migration directory containing `migration.json` manifest + `ops.json` operations).
-- [ ] **Rename `packages` variables**: In `migration-apply.ts` and `migration-status.ts`, rename local `packages`/`allPackages` variables to `bundles`/`allBundles`. Rename `packageByDir` to `bundleByDir`.
-- [ ] **Check for `MigrationPackage` type**: If there's still a `MigrationPackage` type alias somewhere, remove it or redirect to `MigrationBundle`.
+Completed as part of M1. `MigrationBundle` has JSDoc, local variables renamed, `MigrationPackage` kept as re-export alias for backward compat.
 
 ### Milestone 4: Flatten and simplify control flow
 
@@ -102,6 +95,12 @@ Traced the code: `db init` → `client.dbInit()` → `executeDbInit()`. It intro
 ### Marker semantics: `undefined` means "no marker", not `EMPTY_CONTRACT_HASH`
 
 The code currently does `markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH`, then later checks `if (markerHash !== EMPTY_CONTRACT_HASH)` — effectively conflating "no marker row" with "empty database". These are different states: no marker means the database has never been initialized by prisma-next. The fix: keep `markerHash` as `string | undefined`, handle `undefined` explicitly, remove `EMPTY_CONTRACT_HASH` fallback.
+
+## Immediate next steps
+
+1. **Fix ~35 type errors in CLI test files**: Tests construct `MigrationBundle` and pass to `reconstructGraph` which now wants `AttestedMigrationBundle[]`. Each test file's bundle construction needs to use `createAttestedBundle` from fixtures, or filter with `isAttested`. This is mechanical but widespread across `migration-apply.test.ts`, `migration-status.test.ts`, `migration-plan.test.ts`, `migration-ref.test.ts`, `migration-e2e.test.ts`, and `migration-show.ts`.
+2. **Fix remaining source errors**: `migration-plan.ts` has type errors from `targetSupportsMigrations` narrowing not propagating to `migrations` usage. `migration-show.ts` also needs `isAttested` filter. A few stale `MigrationPackage` references remain.
+3. **Extract `loadMigrationBundles` utility**: The last uncompleted M1 task.
 
 ## Open Items
 

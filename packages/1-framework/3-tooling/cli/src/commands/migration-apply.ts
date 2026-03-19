@@ -2,8 +2,8 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { findPathWithDecision, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
-import type { MigrationGraph, MigrationPackage } from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import type { AttestedMigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
+import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { resolve } from 'pathe';
@@ -187,13 +187,11 @@ async function executeMigrationApplyCommand(
     ui.stderr(header);
   }
 
-  // TODO: can we reuse the loading code etc
-  // TODO: rename packages to bundle and remove the redundant typeof check
   // Read migrations and build migration chain model (offline — no DB needed)
-  let packages: readonly MigrationBundle[];
+  let bundles: readonly AttestedMigrationBundle[];
   try {
-    const allPackages = await readMigrationsDir(migrationsDir);
-    packages = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
+    const allBundles = await readMigrationsDir(migrationsDir);
+    bundles = allBundles.filter(isAttested);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -204,7 +202,7 @@ async function executeMigrationApplyCommand(
   // TODO: can't we do early returns or something and flatten this mess, way too nested
   // TODO: can we somehow factor this out in a useful manner so we don't have two heavily nested sections of code
   // that are doing a control client thing - or reuse control client?
-  if (packages.length === 0) {
+  if (bundles.length === 0) {
     const client = createControlClient({
       family: config.family,
       target: config.target,
@@ -261,7 +259,7 @@ async function executeMigrationApplyCommand(
 
   let graph: MigrationGraph;
   try {
-    graph = reconstructGraph(packages);
+    graph = reconstructGraph(bundles);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -350,11 +348,10 @@ async function executeMigrationApplyCommand(
     }
 
     // Resolve graph edges to full apply-ready edges
-    // TODO:packages -> bundles again
-    const packageByDir = new Map(packages.map((pkg) => [pkg.dirName, pkg]));
+    const bundleByDir = new Map(bundles.map((b) => [b.dirName, b]));
     const pendingMigrations: MigrationApplyStep[] = [];
     for (const migration of pendingPath) {
-      const pkg = packageByDir.get(migration.dirName);
+      const pkg = bundleByDir.get(migration.dirName);
       if (!pkg) {
         return notOk(
           errorRuntime(`Migration package not found: ${migration.dirName}`, {

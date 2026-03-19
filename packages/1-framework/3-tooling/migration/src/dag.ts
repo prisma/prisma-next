@@ -7,9 +7,9 @@ import {
   errorNoRoot,
   errorSelfLoop,
 } from './errors';
-import type { MigrationBundle, MigrationChainEntry, MigrationGraph } from './types';
+import type { AttestedMigrationBundle, MigrationChainEntry, MigrationGraph } from './types';
 
-export function reconstructGraph(packages: readonly MigrationBundle[]): MigrationGraph {
+export function reconstructGraph(packages: readonly AttestedMigrationBundle[]): MigrationGraph {
   const nodes = new Set<string>();
   const forwardChain = new Map<string, MigrationChainEntry[]>();
   const reverseChain = new Map<string, MigrationChainEntry[]>();
