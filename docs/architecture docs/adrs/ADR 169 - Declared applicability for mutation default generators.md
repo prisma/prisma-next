@@ -46,7 +46,7 @@ We treat generator/column compatibility as **declared applicability** supplied b
 
 Contributors provide applicability metadata sufficient to validate “this generator id is valid for this column descriptor”.
 
-For this slice, applicability is keyed by `codecId` only.
+In this initial implementation, applicability is keyed by `codecId` only.
 
 ### 2) Introduce a component-composed generator registry (execution-time)
 
@@ -57,20 +57,34 @@ Runtime resolves generator ids through a registry assembled from the composed ru
 
 Missing generator ids referenced by a contract are a stable, targeted runtime error.
 
-### 3) Introduce a component-composed lowering vocabulary registry (emit-time)
+### 3) Mutation default descriptors are surface-agnostic; argument resolution is surface-specific
 
-Emit-time lowering for default functions uses a composed registry of handlers that:
+The shared registry describes **what mutation defaults are available** and **how to produce generator specs from validated parameters**. Each authoring surface adds its own argument parsing or method presentation on top.
 
-- define supported vocabulary (names + argument rules), and
-- lower to either:
-  - storage defaults (`storage.tables.*.columns.*.default`), or
-  - execution mutation defaults (`execution.mutations.defaults` with `{ kind: "generator", id, params? }`).
+A mutation default descriptor declares:
+
+- identity: the generator id (e.g. `uuidv7`)
+- applicability: which `codecId`s the default applies to
+- parameter schema: what parameters the default accepts and their constraints
+- spec production: given validated parameters, produce a storage default or execution generator spec
+- type compatibility resolution: given the generator spec, resolve what column type the generator expects (used for validation in PSL and for column type derivation in TS authoring helpers)
+
+This is the shared layer. It lives in SQL core, not in any authoring surface package.
+
+Note: mutation default descriptors configure **defaults only** — they don't set the column type themselves. In PSL, the column type is declared separately (e.g. `id String @default(uuid())`). The TS authoring surface's `t.generated('id', uuidv4())` helper bundles type + default together as a convenience, but the underlying descriptor still describes a default, not a column type. For the broader concept of helpers that configure column type + default + constraints in one declaration, see ADR 170 (type constructors and field presets).
+
+Each authoring surface projects the registry differently:
+
+- **PSL** parses `@default(uuid(7))` as a text function call, resolves the name against the registry, parses raw string arguments into validated parameters, and delegates to the descriptor's spec production.
+- **TS authoring (future)** would expose composed builder methods (e.g. `col.uuid({ version: 7 })` or `.default((d) => d.uuid(7))`) where the available methods are derived from the registry's descriptors. Arguments are already typed — no text parsing needed.
+
+Both surfaces produce the same contract output: `{ kind: 'generator', id: 'uuidv7' }`.
+
+The key implication: shared types (descriptor, result, registry) must not use surface-specific terminology. Terms like "default function" or "lowering handler" encode PSL's function-call syntax into what should be a surface-neutral abstraction. The shared vocabulary uses terms like "mutation default descriptor", "mutation default resolution", and "mutation default registry".
 
 Applicability is declared on generator descriptors and checked during authoring via `codecId`.
 
-Duplicate default-function names and duplicate generator ids are hard errors during assembly.
-
-This registry is the primary mechanism for vocabulary-driven authoring surfaces to validate defaults deterministically.
+Duplicate descriptor names and duplicate generator ids are hard errors during assembly.
 
 PSL authoring packages consume this registry as an input; assembly ownership lives in composition layers (for example SQL family/control orchestration), not in PSL provider/interpreter packages.
 
@@ -99,7 +113,7 @@ Runtime generator implementations remain contributor-owned and are resolved only
 - **Deterministic validation** without brittle type inference.
 - **Composable extensibility**: packs can add generators and default vocabulary through the same composition seams as other runtime behavior.
 - **Reusable metadata**: future tooling can answer “what defaults are available for this column?” using the registry’s declared applicability.
-- **Authoring-surface neutrality**: PSL is a consumer, not the driver; the data structures are system-wide.
+- **Authoring-surface neutrality**: the shared descriptor registry is consumed by PSL, TS authoring, and future surfaces equally. No surface owns the vocabulary — each surface projects it into its own syntax (parsed function calls, typed builder methods, etc.).
 
 ### Costs
 
@@ -121,4 +135,5 @@ Runtime generator implementations remain contributor-owned and are resolved only
 - ADR 150 — Family-Agnostic CLI and Pack Entry Points
 - ADR 155 — Driver Codec Boundary and Lowering Responsibilities
 - ADR 113 — Extension function & operator registry (adjacent pattern: registry as extension seam)
+- ADR 170 — Pack-provided type constructors and field presets (broader column helper pattern that subsumes mutation defaults)
 

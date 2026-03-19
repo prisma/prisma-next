@@ -1,8 +1,4 @@
----
-status: accepted
----
-
-# ADR 170 - Parameterized native types in contracts
+# ADR 171 — Parameterized native types in contracts
 
 ## Context
 

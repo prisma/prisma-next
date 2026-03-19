@@ -166,5 +166,6 @@ This is the main reason to do this as a shared architecture decision instead of 
 - ADR 104 — PSL extension namespacing & syntax
 - ADR 112 — Target Extension Packs
 - ADR 158 — Execution mutation defaults
-- ADR 169 — Declared applicability for mutation default generators
+- ADR 169 — Declared applicability for mutation default generators (mutation defaults are one output that presets can configure; ADR 169 owns the default-specific registry and applicability model)
+- ADR 171 — Parameterized native types in contracts (how contracts represent parameterized storage types)
 
