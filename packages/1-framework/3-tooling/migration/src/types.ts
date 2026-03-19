@@ -11,7 +11,7 @@ export interface MigrationHints {
 export interface MigrationManifest {
   readonly from: string;
   readonly to: string;
-  readonly migrationId: string | null;
+  readonly migrationId: string;
   readonly kind: 'regular' | 'baseline';
   readonly fromContract: ContractIR | null;
   readonly toContract: ContractIR;
@@ -24,7 +24,7 @@ export interface MigrationManifest {
 
 export type MigrationOps = readonly MigrationPlanOperation[];
 
-export interface MigrationPackage {
+export interface MigrationBundle {
   readonly dirName: string;
   readonly dirPath: string;
   readonly manifest: MigrationManifest;

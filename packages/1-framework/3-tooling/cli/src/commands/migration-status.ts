@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import {
@@ -25,7 +24,7 @@ import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils
 import {
   addGlobalOptions,
   maskConnectionUrl,
-  resolveContractPath,
+  readContractEnvelope,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
@@ -182,6 +181,7 @@ export function resolveDisplayChain(
   }
 
   const toMarker = findPath(graph, EMPTY_CONTRACT_HASH, markerHash);
+  // TODO: does this ever really make sense to do? isn't this output wrong if we have a marker and couldn't find a path to it?
   if (!toMarker) return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
 
   if (markerHash === targetHash) return toMarker;
@@ -199,6 +199,7 @@ export function resolveDisplayChain(
   if (targetToMarker) return [...toTarget, ...targetToMarker];
 
   // Genuinely disconnected — fall back to EMPTY→target
+  // TODO: same thing as above - is this really what we want to return?
   return toTarget;
 }
 
@@ -208,6 +209,8 @@ async function executeMigrationStatusCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
+  // TODO: all of this below - aren't we repeating this a lot?
+  // BEGIN
   const configPath = options.config
     ? relative(process.cwd(), resolve(options.config))
     : 'prisma-next.config.ts';
@@ -217,6 +220,7 @@ async function executeMigrationStatusCommand(
     config.migrations?.dir ?? 'migrations',
   );
   const migrationsRelative = relative(process.cwd(), migrationsDir);
+  // END
 
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
@@ -225,6 +229,7 @@ async function executeMigrationStatusCommand(
   let activeRefHash: string | undefined;
   let allRefs: Record<string, string> = {};
 
+  // TODO: don't we have a utility for this
   const refsPath = resolve(migrationsDir, 'refs.json');
   try {
     allRefs = await readRefs(refsPath);
@@ -259,6 +264,7 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  // todo: can't we derive this without modifying the StatusRef obj
   const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, hash]) => ({
     name,
     hash,
@@ -288,38 +294,18 @@ async function executeMigrationStatusCommand(
   const diagnostics: StatusDiagnostic[] = [];
   let contractHash: string = EMPTY_CONTRACT_HASH;
   try {
-    const contractPathAbsolute = resolveContractPath(config);
-    const contractContent = await readFile(contractPathAbsolute, 'utf-8');
-    try {
-      const contractRaw = JSON.parse(contractContent) as Record<string, unknown>;
-      const hash = contractRaw['storageHash'];
-      if (typeof hash === 'string') {
-        contractHash = hash;
-      } else {
-        diagnostics.push({
-          code: 'CONTRACT.MISSING_HASH',
-          severity: 'warn',
-          message: 'Contract file exists but has no storageHash field',
-          hints: ["Run 'prisma-next contract emit' to regenerate the contract"],
-        });
-      }
-    } catch {
-      diagnostics.push({
-        code: 'CONTRACT.INVALID_JSON',
-        severity: 'warn',
-        message: 'Contract file contains invalid JSON',
-        hints: ["Run 'prisma-next contract emit' to regenerate the contract"],
-      });
-    }
-  } catch {
+    const envelope = await readContractEnvelope(config);
+    contractHash = envelope.storageHash;
+  } catch (error) {
     diagnostics.push({
       code: 'CONTRACT.UNREADABLE',
       severity: 'warn',
-      message: 'Could not read contract file — contract state unknown',
-      hints: ["Run 'prisma-next contract emit' to generate a contract"],
+      message: `Could not read contract: ${error instanceof Error ? error.message : 'unknown error'}`,
+      hints: ["Run 'prisma-next contract emit' to generate a valid contract"],
     });
   }
 
+  // TODO: packages -> migration bundles
   let allPackages: readonly MigrationPackage[];
   try {
     allPackages = await readMigrationsDir(migrationsDir);
@@ -336,8 +322,10 @@ async function executeMigrationStatusCommand(
     );
   }
 
+  // TODO: should be unncessary if migrationid can't be null
   const attested = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
 
+  // TODO: lots of nesting and stuff - can we flatten this
   if (attested.length === 0) {
     if (contractHash !== EMPTY_CONTRACT_HASH) {
       diagnostics.push({
@@ -364,6 +352,7 @@ async function executeMigrationStatusCommand(
   let targetHash: string;
   try {
     graph = reconstructGraph(attested);
+    // TODO: if we don't find a ref then we default to findLeaf - does that make sense? We should probably error if the ref is invalid
     targetHash = activeRefHash ?? findLeaf(graph);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
@@ -389,6 +378,7 @@ async function executeMigrationStatusCommand(
       try {
         await client.connect(dbConnection);
         const marker = await client.readMarker();
+        // TODO: marker hash surely shouldn't be empty hash if we didn't find it?
         markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH;
         mode = 'online';
       } finally {
@@ -401,6 +391,8 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  // TODO: is the online/offline not unnecessary then? if we read markerhash then we have marker in db and are online
+  // but if we didn't read marker in DB, we probably just want to leave it undefined and maybe emit a diagnostic about that specifically
   const chain = resolveDisplayChain(graph, targetHash, mode === 'online' ? markerHash : undefined);
 
   if (!chain) {
@@ -418,12 +410,14 @@ async function executeMigrationStatusCommand(
     mode === 'online' ? markerHash : undefined,
   );
 
+  // TODO: the marker not being in the chain and us not having a marker are probably not the same scenario
   const markerInChain =
     markerHash === undefined ||
     markerHash === EMPTY_CONTRACT_HASH ||
     chain.some((e) => e.to === markerHash);
 
   let summary: string;
+  // TODO: flatten and simplify all of the below
   if (mode === 'online') {
     if (!markerInChain) {
       summary = `Database marker does not match any migration — was the database managed with 'db update'?`;
@@ -482,6 +476,7 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  // TODO: Reuse PathDecision type or some such
   let pathDecision: MigrationStatusResult['pathDecision'];
   if (mode === 'online' && markerHash !== undefined) {
     const decision = findPathWithDecision(graph, markerHash, targetHash, activeRefName);

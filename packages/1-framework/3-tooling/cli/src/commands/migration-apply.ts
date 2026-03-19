@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { findPathWithDecision, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
@@ -24,7 +23,7 @@ import {
 import {
   addGlobalOptions,
   maskConnectionUrl,
-  resolveContractPath,
+  readContractEnvelope,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
@@ -133,6 +132,7 @@ async function executeMigrationApplyCommand(
     return notOk(errorDriverRequired({ why: 'Config.driver is required for migration apply' }));
   }
 
+  // TODO: investigate cast
   const targetWithMigrations = config.target as typeof config.target & {
     readonly migrations?: unknown;
   };
@@ -161,25 +161,12 @@ async function executeMigrationApplyCommand(
     }
   } else {
     try {
-      const contractPathAbsolute = resolveContractPath(config);
-      const contractRaw = JSON.parse(await readFile(contractPathAbsolute, 'utf-8')) as Record<
-        string,
-        unknown
-      >;
-      const contractHash = contractRaw['storageHash'];
-      if (typeof contractHash !== 'string') {
-        return notOk(
-          errorRuntime('Current contract is missing storage hash', {
-            why: `The contract at ${relative(process.cwd(), contractPathAbsolute)} does not contain a valid storageHash`,
-            fix: 'Run `prisma-next contract emit` and re-run `prisma-next migration apply`.',
-          }),
-        );
-      }
-      destinationHash = contractHash;
+      const envelope = await readContractEnvelope(config);
+      destinationHash = envelope.storageHash;
     } catch (error) {
       return notOk(
         errorRuntime('Current contract is unavailable', {
-          why: `Failed to read contract hash before apply: ${error instanceof Error ? error.message : String(error)}`,
+          why: `Failed to read contract: ${error instanceof Error ? error.message : String(error)}`,
           fix: 'Run `prisma-next contract emit` to generate a valid contract.json, then retry apply.',
         }),
       );
@@ -207,8 +194,10 @@ async function executeMigrationApplyCommand(
     ui.stderr(header);
   }
 
+  // TODO: can we reuse the loading code etc
+  // TODO: rename packages to bundle and remove the redundant typeof check
   // Read migrations and build migration chain model (offline — no DB needed)
-  let packages: readonly MigrationPackage[];
+  let packages: readonly MigrationBundle[];
   try {
     const allPackages = await readMigrationsDir(migrationsDir);
     packages = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
@@ -219,6 +208,9 @@ async function executeMigrationApplyCommand(
     throw error;
   }
 
+  // TODO: can't we do early returns or something and flatten this mess, way too nested
+  // TODO: can we somehow factor this out in a useful manner so we don't have two heavily nested sections of code
+  // that are doing a control client thing - or reuse control client?
   if (packages.length === 0) {
     const client = createControlClient({
       family: config.family,
@@ -235,11 +227,13 @@ async function executeMigrationApplyCommand(
         return notOk(
           errorRuntime('Database has state but no migrations exist', {
             why: `The database marker hash "${markerHash}" exists but no attested migrations were found in ${migrationsRelative}`,
+            // TODO: does it really reset the database? i don't think so - also is that really what we want to do here?
             fix: 'Ensure the migrations directory is correct, or reset the database with `prisma-next db init`.',
             meta: { markerHash, migrationsDir: migrationsRelative },
           }),
         );
       }
+      // TODO: will the destination ever be empty? surely this check is completely redundant
       if (destinationHash !== EMPTY_CONTRACT_HASH) {
         return notOk(
           errorRuntime('Current contract has no planned migrations', {
@@ -304,18 +298,21 @@ async function executeMigrationApplyCommand(
       return notOk(
         errorRuntime('Database marker contains the empty sentinel hash', {
           why: `The marker row exists but contains the empty sentinel value "${EMPTY_CONTRACT_HASH}". This should never happen — the marker should contain the hash of the last applied contract.`,
+          // TODO: same as before re. reset (db sign?)
           fix: 'The marker is corrupted. Reset the database with `prisma-next db init`, or manually update the marker to the correct contract hash.',
           meta: { markerHash: EMPTY_CONTRACT_HASH },
         }),
       );
     }
 
+    // TODO: can't we just check if it's undefined first
     const markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH;
 
     if (markerHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(markerHash)) {
       return notOk(
         errorRuntime('Database marker does not match any known migration', {
           why: `The database marker hash "${markerHash}" is not found in the migration history at ${migrationsRelative}`,
+          // TODO: again reset
           fix: 'Ensure the migrations directory matches this database, or reset the database with `prisma-next db init`.',
           meta: { markerHash, knownNodes: [...graph.nodes] },
         }),
@@ -344,6 +341,7 @@ async function executeMigrationApplyCommand(
     }
 
     const pendingPath = decision.selectedPath;
+    // TODO: constructor utility? we are doing this in at least two places
     const pathDecision = {
       fromHash: decision.fromHash,
       toHash: decision.toHash,
@@ -372,6 +370,7 @@ async function executeMigrationApplyCommand(
     }
 
     // Resolve graph edges to full apply-ready edges
+    // TODO:packages -> bundles again
     const packageByDir = new Map(packages.map((pkg) => [pkg.dirName, pkg]));
     const pendingMigrations: MigrationApplyStep[] = [];
     for (const migration of pendingPath) {

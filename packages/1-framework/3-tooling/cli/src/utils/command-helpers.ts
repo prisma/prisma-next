@@ -1,5 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import type { Command } from 'commander';
-import { resolve } from 'pathe';
+import { relative, resolve } from 'pathe';
 import { formatCommandHelp } from './formatters/help';
 import type { CommonCommandOptions } from './global-flags';
 import { parseGlobalFlags } from './global-flags';
@@ -64,6 +65,67 @@ export function resolveContractPath(config: { contract?: { output?: string } }):
   return config.contract?.output
     ? resolve(config.contract.output)
     : resolve('src/prisma/contract.json');
+}
+
+/**
+ * The subset of the emitted contract.json that the framework layer can
+ * safely type. The emitter adds these fields on top of the family-specific
+ * storage/models/relations. Other fields exist in the JSON but are opaque
+ * at this layer — the index signature preserves them for downstream
+ * consumers that operate at the family level (e.g., the control client).
+ */
+export interface ContractEnvelope {
+  readonly storageHash: string;
+  readonly schemaVersion: string;
+  readonly target: string;
+  readonly targetFamily: string;
+  readonly profileHash?: string;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * Reads and parses contract.json, validating the framework-level envelope
+ * fields (storageHash, schemaVersion, target, targetFamily).
+ *
+ * Family-specific validation (storage structure, codec mappings, etc.)
+ * happens downstream in the control client via the family instance.
+ */
+export async function readContractEnvelope(config: {
+  contract?: { output?: string };
+}): Promise<ContractEnvelope> {
+  const contractPath = resolveContractPath(config);
+  const content = await readFile(contractPath, 'utf-8');
+  const json = JSON.parse(content) as Record<string, unknown>;
+
+  const { storageHash, schemaVersion, target, targetFamily, profileHash } = json;
+
+  if (typeof storageHash !== 'string') {
+    throw new Error(
+      `Contract at ${relative(process.cwd(), contractPath)} is missing a valid storageHash. Run \`prisma-next contract emit\` to regenerate.`,
+    );
+  }
+  if (typeof schemaVersion !== 'string') {
+    throw new Error(
+      `Contract at ${relative(process.cwd(), contractPath)} is missing schemaVersion.`,
+    );
+  }
+  if (typeof target !== 'string') {
+    throw new Error(`Contract at ${relative(process.cwd(), contractPath)} is missing target.`);
+  }
+  if (typeof targetFamily !== 'string') {
+    throw new Error(
+      `Contract at ${relative(process.cwd(), contractPath)} is missing targetFamily.`,
+    );
+  }
+
+  return {
+    ...json,
+    storageHash,
+    schemaVersion,
+    target,
+    targetFamily,
+    ...(typeof profileHash === 'string' ? { profileHash } : {}),
+  };
 }
 
 /**

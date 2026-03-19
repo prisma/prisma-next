@@ -2,10 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
-import type {
-  ControlTargetDescriptor,
-  MigrationPlanOperation,
-} from '@prisma-next/core-control-plane/types';
+import type { ControlTargetDescriptor } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -170,13 +167,12 @@ async function executeMigrationPlanCommand(
   let fromHash: string = EMPTY_CONTRACT_HASH;
 
   try {
-    const allPackages = await readMigrationsDir(migrationsDir);
-    const packages = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
+    const migrationBundles = await readMigrationsDir(migrationsDir);
 
     if (options.from) {
       fromHash = options.from;
-      const sourcePkg = packages.find((p) => p.manifest.to === fromHash);
-      if (!sourcePkg) {
+      const sourceBundle = migrationBundles.find((p) => p.manifest.to === fromHash);
+      if (!sourceBundle) {
         return notOk(
           errorRuntime('Starting contract not found', {
             why: `No migration with to="${fromHash}" exists in ${migrationsRelative}`,
@@ -184,13 +180,13 @@ async function executeMigrationPlanCommand(
           }),
         );
       }
-      fromContract = sourcePkg.manifest.toContract;
+      fromContract = sourceBundle.manifest.toContract;
     } else {
-      const graph = reconstructGraph(packages);
+      const graph = reconstructGraph(migrationBundles);
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
         fromHash = latestMigration.to;
-        const leafPkg = packages.find(
+        const leafPkg = migrationBundles.find(
           (p) => p.manifest.migrationId === latestMigration.migrationId,
         );
         if (leafPkg) {
@@ -220,6 +216,7 @@ async function executeMigrationPlanCommand(
   }
 
   // Check target supports migrations
+  // TODO: investigate cast
   const targetWithMigrations = config.target as ControlTargetDescriptor<string, string>;
   if (!targetWithMigrations.migrations) {
     return notOk(
@@ -259,9 +256,7 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  const ops: readonly MigrationPlanOperation[] = plannerResult.plan.operations;
-
-  if (ops.length === 0) {
+  if (plannerResult.plan.operations.length === 0) {
     return notOk(
       errorMigrationPlanningFailed({
         conflicts: [
@@ -300,10 +295,10 @@ async function executeMigrationPlanCommand(
   };
 
   try {
-    await writeMigrationPackage(packageDir, manifest, ops);
+    await writeMigrationPackage(packageDir, manifest, plannerResult.plan.operations);
     const migrationId = await attestMigration(packageDir);
 
-    const sql = extractSqlDdl(ops);
+    const sql = extractSqlDdl(plannerResult.plan.operations);
     const result: MigrationPlanResult = {
       ok: true,
       noOp: false,
@@ -311,13 +306,13 @@ async function executeMigrationPlanCommand(
       to: toStorageHash,
       migrationId,
       dir: relative(process.cwd(), packageDir),
-      operations: ops.map((op) => ({
+      operations: plannerResult.plan.operations.map((op) => ({
         id: op.id,
         label: op.label,
         operationClass: op.operationClass,
       })),
       sql,
-      summary: `Planned ${ops.length} operation(s)`,
+      summary: `Planned ${plannerResult.plan.operations.length} operation(s)`,
       timings: { total: Date.now() - startTime },
     };
     return ok(result);
