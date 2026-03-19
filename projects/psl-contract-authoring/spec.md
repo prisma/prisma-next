@@ -190,6 +190,19 @@ Requirements for the follow-up:
 - Keep scalar lists strictly unsupported.
 - Populate `contract.relations` consistently so both sides of a relation (N:1 and 1:N) are represented in a stable, deterministic way.
 
+## Planned follow-up requirement: pack-provided type constructors and field presets
+
+As a follow-up slice, we plan to introduce **type constructors** and **field presets** — pack-provided, surface-agnostic descriptors that bundle multiple column concerns into a single declaration.
+
+- **Type constructors** (e.g. `Uuid(7)`, `Vector(1536)`) configure the column's storage type, mutation default, and type parameters from a single parameterized name. In PSL this replaces `id String @default(uuid(7))` with `id Uuid(7)`.
+- **Field presets** (e.g. `CreatedAt`, `UpdatedAt`) are fully configured field templates that set type + default + constraints in one name, targeting common patterns.
+
+Both are composed from pack registries (the same composition seam as mutation defaults, codecs, etc.) and are projected differently by each authoring surface:
+- **PSL**: type constructors appear as field types (e.g. `id Uuid(7) @id`); presets appear as unparameterized field types (e.g. `createdAt CreatedAt`).
+- **TS**: type constructors appear as builder methods (e.g. `col.uuid({ version: 7 })`); presets appear as helper methods (e.g. `col.createdAt()`).
+
+See ADR 170 (Pack-provided type constructors and field presets) for the full design.
+
 ## Planned follow-up requirement: thin core, fat interfaces for composed behaviors
 
 The contract authoring system is built on the “thin core, fat interfaces/targets” rule:

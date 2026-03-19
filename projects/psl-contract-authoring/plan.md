@@ -121,6 +121,22 @@ Remove “built-in” ID generator implementations and privileged vocabularies f
 - [ ] Ensure TS authoring convenience helpers (if retained) do not require shipping concrete implementations in low layers.
 - [ ] Update fixtures/tests to prove generator ids exist only when the corresponding component is composed.
 
+### Milestone 6.2: Follow-up — Pack-provided type constructors and field presets
+
+Introduce composed registries of **type constructors** (parameterized types like `Uuid(7)` or `Vector(1536)` that bundle column type + mutation default + constraints) and **field presets** (fully configured field templates like `CreatedAt` or `UpdatedAt`). These registries are pack-provided and surface-agnostic: PSL and TS authoring both project them into their own syntax.
+
+**ADR:** `docs/architecture docs/adrs/ADR 170 - Pack-provided type constructors and field presets.md`
+
+**Tasks:**
+
+- [ ] Define shared type constructor and field preset descriptor interfaces in `sql-core/contract`.
+- [ ] Define registry assembly rules (duplicate detection, precedence, dot-namespacing for extension packs).
+- [ ] Implement type constructor interpretation in PSL (e.g. `id Uuid(7) @id` → column type + mutation default).
+- [ ] Implement field preset interpretation in PSL (e.g. `createdAt CreatedAt` → typed column + `now()` default).
+- [ ] Expose type constructors and field presets in TS authoring surface (e.g. `col.uuid({ version: 7 })` or `.default((d) => d.uuid(7))`).
+- [ ] Add parity fixtures: PSL and TS authoring produce the same contract output for type constructors and presets.
+- [ ] Add diagnostics for unknown type constructors and invalid parameters.
+
 ### Milestone 7: PSL sql template literal syntax (follow-up)
 
 Introduce PSL grammar support for inline SQL literals via backticks (`sql\`...\``), designed for tooling highlighting and future SQL embedding surfaces.
