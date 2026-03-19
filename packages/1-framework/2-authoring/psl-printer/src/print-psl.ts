@@ -3,6 +3,7 @@ import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { mapDefault } from './default-mapping';
 import { toEnumName, toFieldName, toModelName, toNamedTypeName } from './name-transforms';
 import { extractEnumDefinitions, extractEnumTypeNames } from './postgres-type-map';
+import { parseRawDefault } from './raw-default-parser';
 import { inferRelations } from './relation-inference';
 import type {
   PrinterField,
@@ -298,12 +299,15 @@ function processTable(
 }
 
 /**
- * Parses a raw default string into a ColumnDefault if it's still a raw string.
- * Accepts both raw strings (from SqlSchemaIR.default) and pre-parsed ColumnDefault.
+ * Parses a default value into a ColumnDefault.
+ * Handles both pre-normalized ColumnDefault objects and raw string expressions.
  */
 function parseDefaultIfNeeded(value: unknown): ColumnDefault | undefined {
   if (typeof value === 'object' && value !== null && 'kind' in value) {
     return value as ColumnDefault;
+  }
+  if (typeof value === 'string') {
+    return parseRawDefault(value);
   }
   return undefined;
 }
