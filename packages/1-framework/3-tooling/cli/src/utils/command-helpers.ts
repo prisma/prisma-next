@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import type { PathDecision } from '@prisma-next/migration-tools/dag';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
 import { formatCommandHelp } from './formatters/help';
@@ -65,6 +67,77 @@ export function resolveContractPath(config: { contract?: { output?: string } }):
   return config.contract?.output
     ? resolve(config.contract.output)
     : resolve('src/prisma/contract.json');
+}
+
+/**
+ * Resolves the migrations directory and config path from CLI options.
+ * Shared by migration-apply, migration-plan, and migration-status.
+ */
+export function resolveMigrationPaths(
+  configOption: string | undefined,
+  config: { migrations?: { dir?: string } },
+): {
+  configPath: string;
+  migrationsDir: string;
+  migrationsRelative: string;
+} {
+  const configPath = configOption
+    ? relative(process.cwd(), resolve(configOption))
+    : 'prisma-next.config.ts';
+  const migrationsDir = resolve(
+    configOption ? resolve(configOption, '..') : process.cwd(),
+    config.migrations?.dir ?? 'migrations',
+  );
+  const migrationsRelative = relative(process.cwd(), migrationsDir);
+  return { configPath, migrationsDir, migrationsRelative };
+}
+
+/**
+ * Slim representation of a PathDecision for CLI JSON output.
+ * Strips internal fields (createdAt, labels) from chain entries.
+ */
+export interface PathDecisionResult {
+  readonly fromHash: string;
+  readonly toHash: string;
+  readonly alternativeCount: number;
+  readonly tieBreakReasons: readonly string[];
+  readonly refName?: string;
+  readonly selectedPath: readonly {
+    readonly dirName: string;
+    readonly migrationId: string;
+    readonly from: string;
+    readonly to: string;
+  }[];
+}
+
+/**
+ * Maps a PathDecision to the slim CLI output representation.
+ */
+export function toPathDecisionResult(decision: PathDecision): PathDecisionResult {
+  return {
+    fromHash: decision.fromHash,
+    toHash: decision.toHash,
+    alternativeCount: decision.alternativeCount,
+    tieBreakReasons: decision.tieBreakReasons,
+    ...ifDefined('refName', decision.refName),
+    selectedPath: decision.selectedPath.map((entry) => ({
+      dirName: entry.dirName,
+      migrationId: entry.migrationId,
+      from: entry.from,
+      to: entry.to,
+    })),
+  };
+}
+
+/**
+ * Type guard that checks whether a target descriptor supports migrations.
+ * The config-level ControlTargetDescriptor doesn't include `migrations`
+ * (it's on the migration control-plane version), so we check at runtime.
+ */
+export function targetSupportsMigrations(target: {
+  readonly id: string;
+}): target is { readonly id: string; readonly migrations: unknown } {
+  return 'migrations' in target && !!(target as Record<string, unknown>)['migrations'];
 }
 
 /**

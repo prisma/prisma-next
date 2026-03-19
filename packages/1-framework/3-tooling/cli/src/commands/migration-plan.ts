@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
-import type { ControlTargetDescriptor } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -29,8 +28,10 @@ import {
 import {
   addGlobalOptions,
   resolveContractPath,
+  resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
+  targetSupportsMigrations,
 } from '../utils/command-helpers';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
@@ -84,15 +85,10 @@ async function executeMigrationPlanCommand(
   startTime: number,
 ): Promise<Result<MigrationPlanResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const configPath = options.config
-    ? relative(process.cwd(), resolve(options.config))
-    : 'prisma-next.config.ts';
-
-  const migrationsDir = resolve(
-    options.config ? resolve(options.config, '..') : process.cwd(),
-    config.migrations?.dir ?? 'migrations',
+  const { configPath, migrationsDir, migrationsRelative } = resolveMigrationPaths(
+    options.config,
+    config,
   );
-  const migrationsRelative = relative(process.cwd(), migrationsDir);
 
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
@@ -216,9 +212,7 @@ async function executeMigrationPlanCommand(
   }
 
   // Check target supports migrations
-  // TODO: investigate cast
-  const targetWithMigrations = config.target as ControlTargetDescriptor<string, string>;
-  if (!targetWithMigrations.migrations) {
+  if (!targetSupportsMigrations(config.target)) {
     return notOk(
       errorTargetMigrationNotSupported({
         why: `Target "${config.target.id}" does not support migrations`,
@@ -227,7 +221,7 @@ async function executeMigrationPlanCommand(
   }
 
   // Plan migration using the same planner as db init
-  const { migrations } = targetWithMigrations;
+  const { migrations } = config.target;
   const stack = createControlPlaneStack({
     target: config.target,
     adapter: config.adapter,

@@ -17,7 +17,7 @@ import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { relative, resolve } from 'pathe';
+import { resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
@@ -25,8 +25,10 @@ import {
   addGlobalOptions,
   maskConnectionUrl,
   readContractEnvelope,
+  resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
+  toPathDecisionResult,
 } from '../utils/command-helpers';
 import { formatMigrationStatusOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -209,18 +211,10 @@ async function executeMigrationStatusCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  // TODO: all of this below - aren't we repeating this a lot?
-  // BEGIN
-  const configPath = options.config
-    ? relative(process.cwd(), resolve(options.config))
-    : 'prisma-next.config.ts';
-
-  const migrationsDir = resolve(
-    options.config ? resolve(options.config, '..') : process.cwd(),
-    config.migrations?.dir ?? 'migrations',
+  const { configPath, migrationsDir, migrationsRelative } = resolveMigrationPaths(
+    options.config,
+    config,
   );
-  const migrationsRelative = relative(process.cwd(), migrationsDir);
-  // END
 
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
@@ -476,24 +470,11 @@ async function executeMigrationStatusCommand(
     }
   }
 
-  // TODO: Reuse PathDecision type or some such
   let pathDecision: MigrationStatusResult['pathDecision'];
   if (mode === 'online' && markerHash !== undefined) {
     const decision = findPathWithDecision(graph, markerHash, targetHash, activeRefName);
     if (decision) {
-      pathDecision = {
-        fromHash: decision.fromHash,
-        toHash: decision.toHash,
-        alternativeCount: decision.alternativeCount,
-        tieBreakReasons: decision.tieBreakReasons,
-        ...ifDefined('refName', decision.refName),
-        selectedPath: decision.selectedPath.map((entry) => ({
-          dirName: entry.dirName,
-          migrationId: entry.migrationId,
-          from: entry.from,
-          to: entry.to,
-        })),
-      };
+      pathDecision = toPathDecisionResult(decision);
     }
   }
 

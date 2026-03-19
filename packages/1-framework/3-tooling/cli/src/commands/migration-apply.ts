@@ -4,10 +4,9 @@ import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type { MigrationGraph, MigrationPackage } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { relative, resolve } from 'pathe';
+import { resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type { MigrationApplyFailure, MigrationApplyStep } from '../control-api/types';
@@ -24,8 +23,11 @@ import {
   addGlobalOptions,
   maskConnectionUrl,
   readContractEnvelope,
+  resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
+  targetSupportsMigrations,
+  toPathDecisionResult,
 } from '../utils/command-helpers';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -108,15 +110,10 @@ async function executeMigrationApplyCommand(
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
-  const configPath = options.config
-    ? relative(process.cwd(), resolve(options.config))
-    : 'prisma-next.config.ts';
-
-  const migrationsDir = resolve(
-    options.config ? resolve(options.config, '..') : process.cwd(),
-    config.migrations?.dir ?? 'migrations',
+  const { configPath, migrationsDir, migrationsRelative } = resolveMigrationPaths(
+    options.config,
+    config,
   );
-  const migrationsRelative = relative(process.cwd(), migrationsDir);
 
   const dbConnection = options.db ?? config.db?.connection;
   if (!dbConnection) {
@@ -132,11 +129,7 @@ async function executeMigrationApplyCommand(
     return notOk(errorDriverRequired({ why: 'Config.driver is required for migration apply' }));
   }
 
-  // TODO: investigate cast
-  const targetWithMigrations = config.target as typeof config.target & {
-    readonly migrations?: unknown;
-  };
-  if (!targetWithMigrations.migrations) {
+  if (!targetSupportsMigrations(config.target)) {
     return notOk(
       errorTargetMigrationNotSupported({
         why: `Target "${config.target.id}" does not support migrations`,
@@ -341,20 +334,7 @@ async function executeMigrationApplyCommand(
     }
 
     const pendingPath = decision.selectedPath;
-    // TODO: constructor utility? we are doing this in at least two places
-    const pathDecision = {
-      fromHash: decision.fromHash,
-      toHash: decision.toHash,
-      alternativeCount: decision.alternativeCount,
-      tieBreakReasons: decision.tieBreakReasons,
-      ...ifDefined('refName', decision.refName),
-      selectedPath: decision.selectedPath.map((entry) => ({
-        dirName: entry.dirName,
-        migrationId: entry.migrationId,
-        from: entry.from,
-        to: entry.to,
-      })),
-    };
+    const pathDecision = toPathDecisionResult(decision);
 
     if (pendingPath.length === 0) {
       return ok({
