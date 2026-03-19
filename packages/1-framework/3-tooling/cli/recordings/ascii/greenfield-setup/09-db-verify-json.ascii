@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify marker (JSON output for CI/agents) [initialized, marker matches contract]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,7 +30,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify marker (JSON output for CI/agents) [initialized, marker matches contract]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema (JSON output for CI/agents) [initialized, marker matches contract]
 >
 
 
@@ -92,43 +61,10 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify marker (JSON output for CI/agents) [initialized, marker matches contract]
-> prisma-next db verify --json
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify marker (JSON output for CI/agents) [initialized, marker matches contract]
-> prisma-next db verify --json
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema (JSON output for CI/agents) [initialized, marker matches contract]
+>
 
 
 
@@ -158,9 +94,9 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify marker (JSON output for CI/agents) [initialized, marker matches contract]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema (JSON output for CI/agents) [initialized, marker matches contract]
 > prisma-next db verify --json
-
 
 
 
@@ -190,8 +126,74 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify marker (JSON output for CI/agents) [initialized, marker matches contract]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema (JSON output for CI/agents) [initialized, marker matches contract]
 > prisma-next db verify --json
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema (JSON output for CI/agents) [initialized, marker matches contract]
+> prisma-next db verify --json
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema (JSON output for CI/agents) [initialized, marker matches contract]
+> prisma-next db verify --json
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 {
   "ok": true,
   "summary": "Database signature and schema match contract",
@@ -219,6 +221,4 @@
     "strict": false
   },
   "meta": {
-    "contractPath": "",
-    "schemaVerification": "performed"
 ────────────────────────────────────────────────────────────────────────────────

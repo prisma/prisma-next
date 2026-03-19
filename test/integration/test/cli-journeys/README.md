@@ -17,18 +17,18 @@ pnpm test:journeys
 
 | File | What it covers |
 |---|---|
-| `greenfield-setup.e2e.test.ts` | New project with empty database: emit a contract, dry-run init to preview operations, apply init, confirm idempotency on re-run, verify marker and schema (tolerant + strict), introspect, and JSON output variants of verify/schema-verify |
+| `greenfield-setup.e2e.test.ts` | New project with empty database: emit a contract, dry-run init to preview operations, apply init, confirm idempotency on re-run, verify marker and schema (`db verify`, `db verify --schema-only`, `db verify --strict`), introspect, and JSON output variants of full and schema-only verify |
 | `schema-evolution-migrations.e2e.test.ts` | **Migration lifecycle**: plan a migration, show its details, verify the planned directory, check status (offline + online), apply, confirm all applied, db verify. Also covers edge cases: apply when already up-to-date (noop), plan when contract is unchanged (noop), show by path and not-found. **Init-to-migrations transition**: initialize with `db init`, then switch to the migration workflow |
 | `multi-step-migration.e2e.test.ts` | Planning two migrations (base → additive → v3) without applying either, then batch-applying both at once. Verifies pending/applied status reporting |
 | `db-update-workflows.e2e.test.ts` | **Direct update**: `db update` without migrations (additive-only, dry-run, noop). **Destructive update**: drops a column, tests `--no-interactive` rejection, `--json` error envelope, and `--json -y` auto-accept. **Re-init conflict**: `db init` on an already-initialized DB with a different contract fails; recovery via `db update` |
-| `brownfield-adoption.e2e.test.ts` | **Adopt Prisma on existing DB**: introspect → emit matching contract → schema-verify → sign → verify → evolve via db update. **Schema mismatch**: emit a contract that doesn't match the DB, observe sign/schema-verify failures, fix contract, retry |
+| `brownfield-adoption.e2e.test.ts` | **Adopt Prisma on existing DB**: introspect → emit matching contract → `db verify --schema-only` → sign → verify → evolve via db update. **Schema mismatch**: emit a contract that doesn't match the DB, observe sign / schema-only verify failures, fix contract, retry |
 
 ### Drift detection and recovery
 
 | File | What it covers |
 |---|---|
-| `drift-schema.e2e.test.ts` | **Phantom drift**: marker OK but schema diverged via manual DDL (dropped column); `db verify` now fails by default because it runs structural verification, while `db verify --shallow` reproduces marker-only verification. **Extra column drift**: DBA adds a column via manual DDL; tolerant `db verify` / `db schema-verify` pass, strict schema-verify fails; recover by expanding the contract and running `db update` |
-| `drift-marker.e2e.test.ts` | **Missing marker**: contract emitted but `db init` never run — verify/schema-verify fail, init recovers. **Stale marker**: contract changed without updating DB — verify fails, `db update` recovers. **Mixed-mode evolution**: iterate through multiple contract versions using `db update` (no migration files). **Corrupt marker**: marker row overwritten with garbage — verify fails, schema-verify passes (schema intact), `db sign` recovers |
+| `drift-schema.e2e.test.ts` | **Phantom drift**: marker OK but schema diverged via manual DDL (dropped column); `db verify` now fails by default because it runs structural verification, while `db verify --shallow` reproduces marker-only verification. **Extra column drift**: DBA adds a column via manual DDL; tolerant `db verify` / `db verify --schema-only` pass, strict `db verify` fails; recover by expanding the contract and running `db update` |
+| `drift-marker.e2e.test.ts` | **Missing marker**: contract emitted but `db init` never run — `db verify` fails, `db verify --schema-only` reports the structural mismatch, init recovers. **Stale marker**: contract changed without updating DB — verify fails, schema-only verify shows the missing column, `db update` recovers. **Mixed-mode evolution**: iterate through multiple contract versions using `db update` (no migration files). **Corrupt marker**: marker row overwritten with garbage — verify fails, `db verify --schema-only` passes (schema intact), `db sign` recovers |
 | `drift-migration-dag.e2e.test.ts` | **Chain breakage**: after building a migration chain, a migration directory is deleted from disk. `migration apply` fails (no path to destination), recovery by re-planning the missing edge |
 
 ### Error scenarios (no database needed)

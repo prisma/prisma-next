@@ -10,7 +10,6 @@ import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } fro
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
 import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
-import { createDbSchemaVerifyCommand } from '@prisma-next/cli/commands/db-schema-verify';
 import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
@@ -273,13 +272,6 @@ export async function runDbVerify(
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
   return runCommand(createDbVerifyCommand(), ctx, extraArgs);
-}
-
-export async function runDbSchemaVerify(
-  ctx: JourneyContext,
-  extraArgs: readonly string[] = [],
-): Promise<CommandResult> {
-  return runCommand(createDbSchemaVerifyCommand(), ctx, extraArgs);
 }
 
 export async function runDbSign(

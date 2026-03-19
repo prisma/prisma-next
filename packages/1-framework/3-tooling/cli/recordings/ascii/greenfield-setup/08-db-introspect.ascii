@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Inspect the live database schema tree [initialized with user(id, email)]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,6 +30,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Inspect the live database schema tree [initialized with user(id, email)]
 >
 
@@ -92,8 +61,40 @@
 
 
 
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Inspect the live database schema tree [initialized with user(id, email)]
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Inspect the live database schema tree [initialized with user(id, email)]
 > prisma-next db introspect
 
@@ -124,8 +125,8 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Inspect the live database schema tree [initialized with user(id, email)]
 > prisma-next db introspect
 
@@ -156,8 +157,8 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Inspect the live database schema tree [initialized with user(id, email)]
 > prisma-next db introspect
 
@@ -188,14 +189,15 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Inspect the live database schema tree [initialized with user(id, email)]
 > prisma-next db introspect
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 prisma-next db introspect → Inspect the database schema
 │
 │ config:               prisma-next.config.ts
-│ database:             postgres://****:****@127.0.0.1:5433/prisma_rec_0
+│ database:             postgres://****:****@127.0.0.1:5432/prisma_rec_0
 │
 │ Read more             https://pris.ly/db-introspect
 └
@@ -209,8 +211,6 @@ prisma-next db introspect → Inspect the database schema
 │  │  └─ primary key: id
 │  └─ plpgsql dependency is installed
 >
-
-
 
 
 

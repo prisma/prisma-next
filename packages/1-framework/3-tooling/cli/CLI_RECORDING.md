@@ -71,7 +71,7 @@ Journeys:
 | `direct-update` | Additive schema change via `db update` |
 | `drift-missing-marker` | No marker in database, recovery via `db init` |
 | `drift-stale-marker` | Marker hash mismatch after contract change, recovery via `db update` |
-| `drift-phantom` | Manual DDL drift undetected by marker, caught by `db schema-verify` |
+| `drift-phantom` | Manual DDL drift detected by `db verify`; `db verify --shallow` shows the marker-only escape hatch |
 
 ### Database setup per recording
 

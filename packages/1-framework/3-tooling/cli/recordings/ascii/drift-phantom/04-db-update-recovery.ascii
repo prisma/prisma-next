@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Recovery — re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,7 +30,9 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Recovery — re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> Recovery # re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: Recovery: command not found
 >
 
 
@@ -91,13 +61,11 @@
 
 
 
-
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Recovery — re-add missing column, re-sign marker [email column missing, contract expects it]
-> prisma-next db update
-
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> Recovery # re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: Recovery: command not found
+>
 
 
 
@@ -126,10 +94,10 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Recovery — re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> Recovery # re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: Recovery: command not found
 > prisma-next db update
-
-
 
 
 
@@ -158,10 +126,10 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Recovery — re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> Recovery # re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: Recovery: command not found
 > prisma-next db update
-
-
 
 
 
@@ -190,8 +158,43 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Recovery — re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> Recovery # re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: Recovery: command not found
 > prisma-next db update
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> Recovery # re-add missing column, re-sign marker [email column missing, contract expects it]
+bash: Recovery: command not found
+> prisma-next db update
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 prisma-next db update → Update your database schema to match your contract
 │
 │ config:               prisma-next.config.ts
@@ -207,9 +210,6 @@ prisma-next db update → Update your database schema to match your contract
 │    Issues (showing 1 of 1):
 │      - [missing_column] Column "user"."email" is missing from database
 >
-
-
-
 
 
 

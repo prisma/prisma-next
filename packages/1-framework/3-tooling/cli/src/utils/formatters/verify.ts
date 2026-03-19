@@ -59,11 +59,13 @@ export function formatVerifyOutput(
   const formatGreen = createColorFormatter(useColor, green);
   const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
+  const verificationMode =
+    result.mode === 'full'
+      ? `marker + schema${result.schema?.strict ? ' (strict)' : ' (tolerant)'}`
+      : 'marker only (--shallow)';
 
   lines.push(`${formatGreen('✔')} ${result.summary}`);
-  lines.push(
-    `${formatDimText(`  verification: ${result.mode === 'full' ? 'marker + schema' : 'marker only (--shallow)'}`)}`,
-  );
+  lines.push(`${formatDimText(`  verification: ${verificationMode}`)}`);
   lines.push(`${formatDimText(`  storageHash: ${result.contract.storageHash}`)}`);
   if (result.contract.profileHash) {
     lines.push(`${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);

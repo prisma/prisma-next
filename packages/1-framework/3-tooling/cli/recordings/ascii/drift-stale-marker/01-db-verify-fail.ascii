@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — marker hash does not match new contract [initialized with base, contract swapped to v2]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,7 +30,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — marker hash does not match new contract [initialized with base, contract swapped to v2]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify marker hash does not match new contract [initialized with base, contract swapped to v2]
 >
 
 
@@ -92,43 +61,10 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — marker hash does not match new contract [initialized with base, contract swapped to v2]
-> prisma-next db verify
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — marker hash does not match new contract [initialized with base, contract swapped to v2]
-> prisma-next db verify
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify marker hash does not match new contract [initialized with base, contract swapped to v2]
+>
 
 
 
@@ -158,9 +94,9 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — marker hash does not match new contract [initialized with base, contract swapped to v2]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify marker hash does not match new contract [initialized with base, contract swapped to v2]
 > prisma-next db verify
-
 
 
 
@@ -190,13 +126,79 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — marker hash does not match new contract [initialized with base, contract swapped to v2]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify marker hash does not match new contract [initialized with base, contract swapped to v2]
 > prisma-next db verify
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify marker hash does not match new contract [initialized with base, contract swapped to v2]
+> prisma-next db verify
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify marker hash does not match new contract [initialized with base, contract swapped to v2]
+> prisma-next db verify
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 prisma-next db verify → Check whether the database signature and live schema match your contract
 │
 │ config:               prisma-next.config.ts
 │ contract:             contract.json
-│ mode:                 full (marker + schema)
+│ mode:                 full (marker + schema, tolerant)
 │
 │ Read more             https://pris.ly/db-verify
 └
@@ -206,8 +208,6 @@ prisma-next db verify → Check whether the database signature and live schema m
 │    Why: Contract hash does not match database marker
 │    Fix: Migrate database or re-sign if intentional
 >
-
-
 
 
 

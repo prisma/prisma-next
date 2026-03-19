@@ -135,12 +135,11 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 ## Database Commands
 - `db verify` (canonical):
   - Loads config + contract, connects via `--db` or `config.db.connection`.
-  - Checks marker presence, `storageHash`/`profileHash` equality, target match.
+  - Default mode checks marker presence, `storageHash`/`profileHash` equality, target match, then runs structural schema verification.
+  - `--shallow` performs marker-only verification.
+  - `--schema-only` skips marker checks and verifies only that the live schema satisfies the contract.
+  - `--strict` makes schema verification fail on unmanaged extra schema elements.
   - Non‑interactive; single JSON with `--json`.
-- `db schema-verify` (canonical):
-  - Loads config + contract, connects via `config.db.connection` (or `--db` when supported).
-  - Verifies that the live database schema satisfies the contract (catalog-based checks).
-  - Non‑interactive; single JSON object with `--json`.
 - `db sign` (canonical):
   - Runs the same verify phase first, then writes/updates the marker row.
   - Missing marker → insert; same hash → no‑op; different hash → never overwrite unless `--force`.

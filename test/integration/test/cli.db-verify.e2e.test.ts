@@ -1,6 +1,6 @@
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -24,6 +24,44 @@ import {
 
 // Fixture subdirectory for db-verify tests
 const fixtureSubdir = 'db-verify';
+
+function createTestContract(
+  tables: Record<
+    string,
+    {
+      columns: Record<string, { codecId: string; nativeType: string; nullable: boolean }>;
+      uniques?: Array<{ columns: string[] }>;
+    }
+  >,
+) {
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    storageHash: 'sha256:test',
+    storage: {
+      tables: Object.fromEntries(
+        Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
+          name,
+          {
+            columns,
+            primaryKey: { columns: ['id'] },
+            uniques,
+            indexes: [],
+            foreignKeys: [],
+          },
+        ]),
+      ),
+    },
+    models: {},
+    relations: {},
+    mappings: {},
+    extensionPacks: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+  };
+}
 
 /**
  * Extracts JSON from mixed output that may contain Clack decoration lines.
@@ -310,6 +348,258 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
+      'runs schema-only verification with matching schema via driver',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'output/contract.json');
+          mkdirSync(resolve(testSetup.testDir, 'output'), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const outputStartIndex = consoleOutput.length;
+          const command = createDbVerifyCommand();
+          const verifyCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, [
+              '--config',
+              configPath,
+              '--schema-only',
+              '--json',
+              '--no-color',
+            ]);
+          } finally {
+            process.chdir(verifyCwd);
+          }
+
+          expect(getExitCode()).toBe(0);
+
+          const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+            string,
+            unknown
+          >;
+          expect(parsed).toMatchObject({
+            ok: true,
+            summary: expect.stringContaining('satisfies contract'),
+            schema: expect.anything(),
+            meta: {
+              strict: false,
+            },
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'runs schema-only verification when marker is missing',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL
+              )
+            `);
+          });
+
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'output/contract.json');
+          mkdirSync(resolve(testSetup.testDir, 'output'), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const outputStartIndex = consoleOutput.length;
+          const command = createDbVerifyCommand();
+          const verifyCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(command, [
+              '--config',
+              configPath,
+              '--schema-only',
+              '--json',
+              '--no-color',
+            ]);
+          } finally {
+            process.chdir(verifyCwd);
+          }
+
+          expect(getExitCode()).toBe(0);
+
+          const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+            string,
+            unknown
+          >;
+          expect(parsed).toMatchObject({
+            ok: true,
+            summary: expect.stringContaining('satisfies contract'),
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'preserves schema-only retry hint when database connection is missing',
+      async () => {
+        const testSetup = setupTestDirectoryFromFixtures(
+          createTempDir,
+          fixtureSubdir,
+          'prisma-next.config.ts',
+        );
+        const testDir = testSetup.testDir;
+        const configPath = testSetup.configPath;
+
+        const emitCommand = createContractEmitCommand();
+        const emitCwd = process.cwd();
+        try {
+          process.chdir(testDir);
+          await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+        } finally {
+          process.chdir(emitCwd);
+        }
+
+        const outputStartIndex = consoleOutput.length;
+        const command = createDbVerifyCommand();
+        const verifyCwd = process.cwd();
+        try {
+          process.chdir(testDir);
+          await expect(
+            executeCommand(command, [
+              '--config',
+              configPath,
+              '--schema-only',
+              '--strict',
+              '--json',
+            ]),
+          ).rejects.toThrow('process.exit called');
+        } finally {
+          process.chdir(verifyCwd);
+        }
+
+        expect(getExitCode()).not.toBe(0);
+
+        const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+          string,
+          unknown
+        >;
+        expect(parsed).toMatchObject({
+          code: 'PN-CLI-4005',
+          summary: 'Database connection is required',
+        });
+        expect(parsed['fix']).toContain(
+          'Run `prisma-next db verify --schema-only --strict --db <url>`',
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'fails in strict mode when extra columns exist',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const testDir = testSetup.testDir;
+          const configPath = testSetup.configPath;
+
+          const emitCommand = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testDir);
+            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          const contractJsonPath = join(testDir, 'output', 'contract.json');
+          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+
+          await withClient(connectionString, async (client) => {
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS "user" (
+                id integer NOT NULL,
+                email text NOT NULL,
+                age integer,
+                PRIMARY KEY ("id")
+              )
+            `);
+          });
+          await writeMatchingMarker(connectionString, contract);
+
+          const outputStartIndex = consoleOutput.length;
+          const command = createDbVerifyCommand();
+          const verifyCwd = process.cwd();
+          try {
+            process.chdir(testDir);
+            await expect(
+              executeCommand(command, ['--config', configPath, '--json', '--strict']),
+            ).rejects.toThrow('process.exit called');
+          } finally {
+            process.chdir(verifyCwd);
+          }
+
+          expect(getExitCode()).toBe(1);
+
+          const parsed = extractJson(consoleOutput.slice(outputStartIndex)) as Record<
+            string,
+            unknown
+          >;
+          expect(parsed).toMatchObject({
+            ok: false,
+            summary: expect.stringContaining('does not satisfy contract'),
+            meta: {
+              strict: true,
+            },
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
       'outputs JSON in shallow mode when --shallow flag is provided',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
@@ -383,6 +673,82 @@ withTempDir(({ createTempDir }) => {
               total: expect.any(Number),
             },
             warning: expect.stringContaining('Schema verification skipped'),
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects mutually exclusive verify modes',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          const command = createDbVerifyCommand();
+          const verifyCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await expect(
+              executeCommand(command, [
+                '--config',
+                configPath,
+                '--json',
+                '--shallow',
+                '--schema-only',
+              ]),
+            ).rejects.toThrow('process.exit called');
+          } finally {
+            process.chdir(verifyCwd);
+          }
+
+          expect(getExitCode()).toBe(2);
+
+          const parsed = extractJson(consoleOutput) as Record<string, unknown>;
+          expect(parsed).toMatchObject({
+            code: 'PN-CLI-4012',
+            summary: 'Invalid verify mode',
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects strict mode when schema verification is skipped',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+
+          const command = createDbVerifyCommand();
+          const verifyCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await expect(
+              executeCommand(command, ['--config', configPath, '--json', '--shallow', '--strict']),
+            ).rejects.toThrow('process.exit called');
+          } finally {
+            process.chdir(verifyCwd);
+          }
+
+          expect(getExitCode()).toBe(2);
+
+          const parsed = extractJson(consoleOutput) as Record<string, unknown>;
+          expect(parsed).toMatchObject({
+            code: 'PN-CLI-4012',
+            summary: 'Invalid verify mode',
           });
         });
       },

@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — missing name column [base schema, v2 contract expects name column]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,7 +30,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — missing name column [base schema, v2 contract expects name column]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Schema-only fails verify missing name column [base schema, v2 contract expects name column]
 >
 
 
@@ -92,43 +61,10 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — missing name column [base schema, v2 contract expects name column]
-> prisma-next db schema-verify
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — missing name column [base schema, v2 contract expects name column]
-> prisma-next db schema-verify
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Schema-only fails verify missing name column [base schema, v2 contract expects name column]
+>
 
 
 
@@ -158,9 +94,9 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — missing name column [base schema, v2 contract expects name column]
-> prisma-next db schema-verify
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Schema-only fails verify missing name column [base schema, v2 contract expects name column]
+> prisma-next db verify --schema-only
 
 
 
@@ -190,14 +126,81 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — missing name column [base schema, v2 contract expects name column]
-> prisma-next db schema-verify
-prisma-next db schema-verify → Check whether the database schema satisfies your contract
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Schema-only fails verify missing name column [base schema, v2 contract expects name column]
+> prisma-next db verify --schema-only
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Schema-only fails verify missing name column [base schema, v2 contract expects name column]
+> prisma-next db verify --schema-only
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Schema-only fails verify missing name column [base schema, v2 contract expects name column]
+> prisma-next db verify --schema-only
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+prisma-next db verify → Check whether the live database schema matches your contract
 │
 │ config:               prisma-next.config.ts
 │ contract:             contract.json
+│ mode:                 schema only (tolerant)
 │
-│ Read more             https://pris.ly/db-schema-verify
+│ Read more             https://pris.ly/db-verify
 └
 
 │
@@ -211,9 +214,6 @@ prisma-next db schema-verify → Check whether the database schema satisfies you
 │
 │  ✖ Database schema does not satisfy contract (4 failures) (PN-SCHEMA-0001)
 >
-
-
-
 
 
 

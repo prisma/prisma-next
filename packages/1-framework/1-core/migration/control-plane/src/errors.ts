@@ -198,10 +198,13 @@ export function errorFileNotFound(
 export function errorDatabaseConnectionRequired(options?: {
   readonly why?: string;
   readonly commandName?: string;
+  readonly retryCommand?: string;
 }): CliStructuredError {
-  const runHint = options?.commandName
-    ? `Run \`prisma-next ${options.commandName} --db <url>\``
-    : 'Provide `--db <url>`';
+  const runHint = options?.retryCommand
+    ? `Run \`${options.retryCommand}\``
+    : options?.commandName
+      ? `Run \`prisma-next ${options.commandName} --db <url>\``
+      : 'Provide `--db <url>`';
   return new CliStructuredError('4005', 'Database connection is required', {
     domain: 'CLI',
     why: options?.why ?? 'Database connection is required for this command',
@@ -310,7 +313,7 @@ export function errorMigrationPlanningFailed(options: {
   const computedFix =
     conflictFixes.length > 0
       ? conflictFixes.join('\n')
-      : 'Use `db schema-verify` to inspect conflicts, or ensure the database is empty';
+      : 'Use `db verify --schema-only` to inspect conflicts, or ensure the database is empty';
 
   return new CliStructuredError('4020', 'Migration planning failed', {
     domain: 'CLI',
