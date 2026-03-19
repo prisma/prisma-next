@@ -93,13 +93,13 @@ function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType
   });
 }
 
-function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
+function packageToStep(pkg: AttestedMigrationBundle): MigrationApplyStep {
   return {
     dirName: pkg.dirName,
     from: pkg.manifest.from,
     to: pkg.manifest.to,
     toContract: pkg.manifest.toContract,
-    operations: pkg.ops as MigrationApplyStep['operations'],
+    operations: pkg.ops,
   };
 }
 
