@@ -107,20 +107,23 @@ function summarizeOps(ops: readonly MigrationPlanOperation[]): {
   return { summary: `${count} ${noun} (${parts.join(', ')})`, hasDestructive };
 }
 
+/**
+ * @param mode    — 'online' if we connected to the database, 'offline' otherwise
+ * @param markerHash — the marker hash from the database, or undefined if no marker row / offline
+ */
 export function buildMigrationEntries(
   chain: readonly MigrationChainEntry[],
   packages: readonly MigrationBundle[],
+  mode: 'online' | 'offline',
   markerHash: string | undefined,
 ): MigrationStatusEntry[] {
   const pkgByDirName = new Map(packages.map((p) => [p.dirName, p]));
 
-  const markerInChain =
-    markerHash === undefined ||
-    markerHash === EMPTY_CONTRACT_HASH ||
-    chain.some((e) => e.to === markerHash);
+  const markerInChain = markerHash === undefined || chain.some((e) => e.to === markerHash);
 
   const entries: MigrationStatusEntry[] = [];
-  let reachedMarker = markerHash === undefined || markerHash === EMPTY_CONTRACT_HASH;
+  // Online with no marker = fresh database, all migrations are pending.
+  let reachedMarker = mode === 'online' && markerHash === undefined;
 
   for (const migration of chain) {
     const pkg = pkgByDirName.get(migration.dirName);
@@ -128,7 +131,7 @@ export function buildMigrationEntries(
     const { summary, hasDestructive } = summarizeOps(ops);
 
     let status: 'applied' | 'pending' | 'unknown';
-    if (markerHash === undefined || !markerInChain) {
+    if (mode === 'offline' || !markerInChain) {
       status = 'unknown';
     } else if (reachedMarker) {
       status = 'pending';
@@ -174,12 +177,13 @@ export function resolveDisplayChain(
   targetHash: string,
   markerHash: string | undefined,
 ): readonly MigrationChainEntry[] | null {
-  if (markerHash === undefined || markerHash === EMPTY_CONTRACT_HASH) {
+  if (markerHash === undefined) {
     return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
   }
 
   const toMarker = findPath(graph, EMPTY_CONTRACT_HASH, markerHash);
-  // TODO: does this ever really make sense to do? isn't this output wrong if we have a marker and couldn't find a path to it?
+  // Marker unreachable from EMPTY — show the target chain anyway.
+  // The caller detects this via markerInChain and emits a divergence diagnostic.
   if (!toMarker) return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
 
   if (markerHash === targetHash) return toMarker;
@@ -196,8 +200,7 @@ export function resolveDisplayChain(
   const targetToMarker = findPath(graph, targetHash, markerHash);
   if (targetToMarker) return [...toTarget, ...targetToMarker];
 
-  // Genuinely disconnected — fall back to EMPTY→target
-  // TODO: same thing as above - is this really what we want to return?
+  // Genuinely disconnected — show EMPTY→target; caller handles divergence diagnostic.
   return toTarget;
 }
 
@@ -337,7 +340,6 @@ async function executeMigrationStatusCommand(
 
   let targetHash: string;
   try {
-    // TODO: if we don't find a ref then we default to findLeaf - does that make sense? We should probably error if the ref is invalid
     targetHash = activeRefHash ?? findLeaf(graph);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
@@ -363,8 +365,7 @@ async function executeMigrationStatusCommand(
       try {
         await client.connect(dbConnection);
         const marker = await client.readMarker();
-        // TODO: marker hash surely shouldn't be empty hash if we didn't find it?
-        markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH;
+        markerHash = marker?.storageHash;
         mode = 'online';
       } finally {
         await client.close();
@@ -376,9 +377,7 @@ async function executeMigrationStatusCommand(
     }
   }
 
-  // TODO: is the online/offline not unnecessary then? if we read markerhash then we have marker in db and are online
-  // but if we didn't read marker in DB, we probably just want to leave it undefined and maybe emit a diagnostic about that specifically
-  const chain = resolveDisplayChain(graph, targetHash, mode === 'online' ? markerHash : undefined);
+  const chain = resolveDisplayChain(graph, targetHash, markerHash);
 
   if (!chain) {
     return notOk(
@@ -389,17 +388,9 @@ async function executeMigrationStatusCommand(
     );
   }
 
-  const entries = buildMigrationEntries(
-    chain,
-    attested,
-    mode === 'online' ? markerHash : undefined,
-  );
+  const entries = buildMigrationEntries(chain, attested, mode, markerHash);
 
-  // TODO: the marker not being in the chain and us not having a marker are probably not the same scenario
-  const markerInChain =
-    markerHash === undefined ||
-    markerHash === EMPTY_CONTRACT_HASH ||
-    chain.some((e) => e.to === markerHash);
+  const markerInChain = markerHash === undefined || chain.some((e) => e.to === markerHash);
 
   let summary: string;
   // TODO: flatten and simplify all of the below
@@ -413,7 +404,7 @@ async function executeMigrationStatusCommand(
       const appliedCount = entries.filter((e) => e.status === 'applied').length;
       if (pendingCount === 0) {
         summary = `Database is up to date (${appliedCount} migration${appliedCount !== 1 ? 's' : ''} applied)`;
-      } else if (markerHash === EMPTY_CONTRACT_HASH) {
+      } else if (markerHash === undefined) {
         summary = `${pendingCount} pending migration(s) — database has no marker`;
       } else {
         summary = `${pendingCount} pending migration(s) — run 'prisma-next migration apply' to apply`;

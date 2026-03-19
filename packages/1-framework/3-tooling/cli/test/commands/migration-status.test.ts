@@ -153,7 +153,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, undefined);
+    const entries = buildMigrationEntries(chain, packages, 'offline', undefined);
 
     expect(entries).toHaveLength(3);
     expect(entries[0]!.status).toBe('unknown');
@@ -173,7 +173,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, 'sha256:hash-a');
+    const entries = buildMigrationEntries(chain, packages, 'online', 'sha256:hash-a');
 
     expect(entries[0]!.status).toBe('applied');
     expect(entries[1]!.status).toBe('pending');
@@ -192,7 +192,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, 'sha256:hash-c');
+    const entries = buildMigrationEntries(chain, packages, 'online', 'sha256:hash-c');
 
     expect(entries[0]!.status).toBe('applied');
     expect(entries[1]!.status).toBe('applied');
@@ -211,7 +211,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, EMPTY_CONTRACT_HASH);
+    const entries = buildMigrationEntries(chain, packages, 'online', undefined);
 
     expect(entries[0]!.status).toBe('pending');
     expect(entries[1]!.status).toBe('pending');
@@ -230,7 +230,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, 'sha256:totally-unknown');
+    const entries = buildMigrationEntries(chain, packages, 'online', 'sha256:totally-unknown');
 
     expect(entries[0]!.status).toBe('unknown');
     expect(entries[1]!.status).toBe('unknown');
@@ -249,7 +249,7 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, undefined);
+    const entries = buildMigrationEntries(chain, packages, 'offline', undefined);
 
     expect(entries[0]!.operationSummary).toBe('1 op (all additive)');
     expect(entries[0]!.hasDestructive).toBe(false);
@@ -689,7 +689,7 @@ describe('resolveDisplayChain', { timeout: timeouts.databaseOperation }, () => {
     expect(chain!.length).toBe(3);
     expect(chain!.some((e) => e.to === 'sha256:hash-c')).toBe(true);
 
-    const entries = buildMigrationEntries(chain!, packages, 'sha256:hash-c');
+    const entries = buildMigrationEntries(chain!, packages, 'online', 'sha256:hash-c');
     expect(entries[0]!.status).toBe('applied');
     expect(entries[1]!.status).toBe('applied');
     expect(entries[2]!.status).toBe('applied');
@@ -710,7 +710,7 @@ describe('resolveDisplayChain', { timeout: timeouts.databaseOperation }, () => {
     expect(chain).not.toBeNull();
     expect(chain!.length).toBe(3);
 
-    const entries = buildMigrationEntries(chain!, packages, 'sha256:hash-a');
+    const entries = buildMigrationEntries(chain!, packages, 'online', 'sha256:hash-a');
     expect(entries[0]!.status).toBe('applied');
     expect(entries[1]!.status).toBe('pending');
     expect(entries[2]!.status).toBe('pending');

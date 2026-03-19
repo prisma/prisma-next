@@ -126,7 +126,11 @@ async function executeMigrationApplyCommand(
   }
 
   if (!config.driver) {
-    return notOk(errorDriverRequired({ why: 'Config.driver is required for migration apply' }));
+    return notOk(
+      errorDriverRequired({
+        why: 'Config.driver is required for migration apply',
+      }),
+    );
   }
 
   if (!targetSupportsMigrations(config.target)) {
@@ -172,7 +176,10 @@ async function executeMigrationApplyCommand(
       { label: 'migrations', value: migrationsRelative },
     ];
     if (typeof dbConnection === 'string') {
-      details.push({ label: 'database', value: maskConnectionUrl(dbConnection) });
+      details.push({
+        label: 'database',
+        value: maskConnectionUrl(dbConnection),
+      });
     }
     if (refName) {
       details.push({ label: 'ref', value: refName });
@@ -213,18 +220,19 @@ async function executeMigrationApplyCommand(
     try {
       await client.connect(dbConnection);
       const marker = await client.readMarker();
-      const markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH;
-      if (markerHash !== EMPTY_CONTRACT_HASH) {
+      if (marker?.storageHash) {
         return notOk(
           errorRuntime('Database has state but no migrations exist', {
-            why: `The database marker hash "${markerHash}" exists but no attested migrations were found in ${migrationsRelative}`,
-            // TODO: does it really reset the database? i don't think so - also is that really what we want to do here?
-            fix: 'Ensure the migrations directory is correct, or reset the database with `prisma-next db init`.',
-            meta: { markerHash, migrationsDir: migrationsRelative },
+            why: `The database marker hash "${marker.storageHash}" exists but no attested migrations were found in ${migrationsRelative}`,
+            fix: 'Ensure the migrations directory is correct. If the database was managed with `db init` or `db update`, run `prisma-next db sign` to update the marker.',
+            meta: {
+              markerHash: marker.storageHash,
+              migrationsDir: migrationsRelative,
+            },
           }),
         );
       }
-      // TODO: will the destination ever be empty? surely this check is completely redundant
+      // Non-empty contract + no migrations = user needs to plan first.
       if (destinationHash !== EMPTY_CONTRACT_HASH) {
         return notOk(
           errorRuntime('Current contract has no planned migrations', {
@@ -234,6 +242,7 @@ async function executeMigrationApplyCommand(
           }),
         );
       }
+      // Else: Empty contract + no migrations = nothing to do (falls through to ok result).
     } catch (error) {
       if (CliStructuredError.is(error)) {
         return notOk(error);
@@ -279,22 +288,19 @@ async function executeMigrationApplyCommand(
       return notOk(
         errorRuntime('Database marker contains the empty sentinel hash', {
           why: `The marker row exists but contains the empty sentinel value "${EMPTY_CONTRACT_HASH}". This should never happen — the marker should contain the hash of the last applied contract.`,
-          // TODO: same as before re. reset (db sign?)
-          fix: 'The marker is corrupted. Reset the database with `prisma-next db init`, or manually update the marker to the correct contract hash.',
+          fix: 'The marker is corrupted. Run `prisma-next db sign` to overwrite it with the correct contract hash, or drop and recreate the database.',
           meta: { markerHash: EMPTY_CONTRACT_HASH },
         }),
       );
     }
 
-    // TODO: can't we just check if it's undefined first
-    const markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH;
+    const markerHash = marker?.storageHash;
 
-    if (markerHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(markerHash)) {
+    if (markerHash !== undefined && !graph.nodes.has(markerHash)) {
       return notOk(
         errorRuntime('Database marker does not match any known migration', {
           why: `The database marker hash "${markerHash}" is not found in the migration history at ${migrationsRelative}`,
-          // TODO: again reset
-          fix: 'Ensure the migrations directory matches this database, or reset the database with `prisma-next db init`.',
+          fix: 'Ensure the migrations directory matches this database. If the database was managed with `db init` or `db update`, run `prisma-next db sign` to update the marker.',
           meta: { markerHash, knownNodes: [...graph.nodes] },
         }),
       );
@@ -310,13 +316,16 @@ async function executeMigrationApplyCommand(
       );
     }
 
-    const decision = findPathWithDecision(graph, markerHash, destinationHash, refName);
+    // "No marker" means the database is fresh — start from the empty contract hash.
+    const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
+
+    const decision = findPathWithDecision(graph, originHash, destinationHash, refName);
     if (!decision) {
       return notOk(
         errorRuntime('No migration path from current state to target', {
-          why: `Cannot find a path from marker hash "${markerHash}" to target "${destinationHash}"`,
+          why: `Cannot find a path from "${originHash}" to target "${destinationHash}"`,
           fix: 'Check the migration history for gaps or inconsistencies.',
-          meta: { markerHash, destinationHash },
+          meta: { markerHash: originHash, destinationHash },
         }),
       );
     }
@@ -329,7 +338,7 @@ async function executeMigrationApplyCommand(
         ok: true,
         migrationsApplied: 0,
         migrationsTotal: 0,
-        markerHash,
+        markerHash: originHash,
         applied: [],
         summary: 'Already up to date',
         pathDecision,
@@ -360,7 +369,7 @@ async function executeMigrationApplyCommand(
     }
 
     const applyResult = await client.migrationApply({
-      originHash: markerHash,
+      originHash,
       destinationHash,
       pendingMigrations,
     });
@@ -414,7 +423,10 @@ export function createMigrationApplyCommand(): Command {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const ui = new TerminalUI({
+        color: flags.color,
+        interactive: flags.interactive,
+      });
 
       const result = await executeMigrationApplyCommand(options, flags, ui, startTime);
 
