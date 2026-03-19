@@ -30,6 +30,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 163 | Provider-invoked source interpretation packages | Keeps parsing/interpretation logic in provider-invoked authoring packages so CLI/control plane stay source-agnostic and IO-free | [ADR 163 - Provider-invoked source interpretation packages.md](adrs/ADR%20163%20-%20Provider-invoked%20source%20interpretation%20packages.md) |
 | 167 | Typed default literal pipeline and extensibility | Documents typed literal default flow across authoring/emission/verification/rendering and records deferred codec-keyed SPI follow-up | [ADR 167 - Typed default literal pipeline and extensibility.md](adrs/ADR%20167%20-%20Typed%20default%20literal%20pipeline%20and%20extensibility.md) |
 | 170 | Pack-provided type constructors and field presets | Composed registries for parameterized types and presets across PSL + TS; dot namespacing; hard-error duplicates; presets may imply constraints | [ADR 170 - Pack-provided type constructors and field presets.md](adrs/ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md) |
+| 171 | Parameterized native types in contracts | Contracts represent parameterized storage types as base `nativeType` + structured `typeParams`; expansion to SQL strings is hook-driven per component | [ADR 171 - Parameterized native types in contracts.md](adrs/ADR%20171%20-%20Parameterized%20native%20types%20in%20contracts.md) |
 
 ## Query System
 
