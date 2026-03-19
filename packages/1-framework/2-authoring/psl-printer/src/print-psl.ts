@@ -454,7 +454,7 @@ function serializeModel(model: PrinterModel): string {
       }
 
       const attrStr = field.attributes.length > 0 ? ` ${field.attributes.join(' ')}` : '';
-      lines.push(`  ${paddedName} ${paddedType}${attrStr}`);
+      lines.push(`  ${paddedName} ${paddedType}${attrStr}`.trimEnd());
     }
   }
 

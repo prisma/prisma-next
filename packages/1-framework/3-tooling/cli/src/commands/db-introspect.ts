@@ -147,9 +147,12 @@ async function executeDbIntrospectCommand(
     if (!options.dryRun) {
       const outputPath = resolveOutputPath(options, config.contract?.output);
 
-      // Generate PSL
-      // schemaIR is typed as `unknown` from the control client; cast for the printer
-      const typedSchemaIR = schemaIR as Parameters<typeof printPsl>[0];
+      // schemaIR is typed as `unknown` from the control client; validate shape before casting
+      const ir = schemaIR as Record<string, unknown>;
+      if (!ir || typeof ir !== 'object' || !('tables' in ir)) {
+        throw errorUnexpected('Introspection returned an unexpected schema shape');
+      }
+      const typedSchemaIR = ir as Parameters<typeof printPsl>[0];
       const enumTypeNames = extractEnumTypeNames(typedSchemaIR.annotations);
       const typeMap = createPostgresTypeMap(enumTypeNames);
       const pslContent = printPsl(typedSchemaIR, { typeMap });

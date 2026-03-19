@@ -269,7 +269,7 @@ describe('printPsl', () => {
 
       model Employee {
         id        Int        @id
-        name      String    
+        name      String
         managerId Int?       @map("manager_id")
         manager   Employee   @relation(fields: [managerId], references: [id])
         employees Employee[]
@@ -480,7 +480,7 @@ describe('printPsl', () => {
       model GeoData {
         id       Int                      @id
         location Unsupported("geometry")?
-        metadata Unsupported("hstore")   
+        metadata Unsupported("hstore")
 
         @@map("geo_data")
       }
@@ -515,7 +515,7 @@ describe('printPsl', () => {
 
       // WARNING: This table has no primary key in the database
       model AuditLog {
-        event     String  
+        event     String
         timestamp DateTime
 
         @@map("audit_log")
