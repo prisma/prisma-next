@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — no tables exist [empty database]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,7 +30,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — no tables exist [empty database]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
 >
 
 
@@ -92,43 +61,10 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — no tables exist [empty database]
-> prisma-next db schema-verify
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — no tables exist [empty database]
-> prisma-next db schema-verify
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
+>
 
 
 
@@ -158,9 +94,9 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — no tables exist [empty database]
-> prisma-next db schema-verify
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
+> prisma-next db verify --schema-only
 
 
 
@@ -190,29 +126,93 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Schema verify fails — no tables exist [empty database]
-> prisma-next db schema-verify
-prisma-next db schema-verify → Check whether the database schema satisfies your contract
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
+> prisma-next db verify --schema-only
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
+> prisma-next db verify --schema-only
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
+> prisma-next db verify --schema-only
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+prisma-next db verify → Check whether the live database schema matches your contract
 │
 │ config:               prisma-next.config.ts
 │ contract:             contract.json
+│ mode:                 schema only (tolerant)
 │
-│ Read more             https://pris.ly/db-schema-verify
+│ Read more             https://pris.ly/db-verify
 └
 
 │
-│  ✖ contract
-│  └─ ✖ table user (Table "user" is missing)
+│  ✔ contract
+│  └─ ✔ table user
+│     ├─ ✔ columns
+│     │  ├─ ✔ email: text (pg/text@1) (not nullable)
+│     │  └─ ✔ id: int4 (pg/int4@1) (not nullable)
+│     └─ ✔ primary key: id
 │
-│  ✖ Database schema does not satisfy contract (2 failures) (PN-SCHEMA-0001)
+│  ✔ Database schema satisfies contract
 >
-
-
-
-
-
-
-
 
 
 

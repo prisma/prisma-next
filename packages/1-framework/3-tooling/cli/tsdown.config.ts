@@ -8,7 +8,6 @@ export default defineConfig({
     'src/commands/db-init.ts',
     'src/commands/db-update.ts',
     'src/commands/db-introspect.ts',
-    'src/commands/db-schema-verify.ts',
     'src/commands/db-sign.ts',
     'src/commands/db-verify.ts',
     'src/commands/contract-emit.ts',

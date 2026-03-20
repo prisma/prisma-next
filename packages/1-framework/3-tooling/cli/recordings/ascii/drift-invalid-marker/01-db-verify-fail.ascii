@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify schema satisfies contract (strict, no extras) [initialized, schema matches contract exactly]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,7 +30,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify schema satisfies contract (strict, no extras) [initialized, schema matches contract exactly]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
 >
 
 
@@ -92,43 +61,10 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify schema satisfies contract (strict, no extras) [initialized, schema matches contract exactly]
-> prisma-next db schema-verify --strict
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify schema satisfies contract (strict, no extras) [initialized, schema matches contract exactly]
-> prisma-next db schema-verify --strict
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
+>
 
 
 
@@ -158,9 +94,9 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify schema satisfies contract (strict, no extras) [initialized, schema matches contract exactly]
-> prisma-next db schema-verify --strict
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
+> prisma-next db verify
 
 
 
@@ -190,29 +126,93 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify schema satisfies contract (strict, no extras) [initialized, schema matches contract exactly]
-> prisma-next db schema-verify --strict
-prisma-next db schema-verify → Check whether the database schema satisfies your contract
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
+> prisma-next db verify
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
+> prisma-next db verify
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
+> prisma-next db verify
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+prisma-next db verify → Check whether the database marker and live schema match your contract
 │
 │ config:               prisma-next.config.ts
 │ contract:             contract.json
+│ mode:                 full (marker + schema, tolerant)
 │
-│ Read more             https://pris.ly/db-schema-verify
+│ Read more             https://pris.ly/db-verify
 └
 
 │
-│  ✔ contract
-│  └─ ✔ table user
-│     ├─ ✔ columns
-│     │  ├─ ✔ email: text (pg/text@1) (not nullable)
+│  ✖ contract
+│  └─ ✖ table user
+│     ├─ ✖ columns
+│     │  ├─ ✖ email: missing (Column "email" is missing)
 │     │  └─ ✔ id: int4 (pg/int4@1) (not nullable)
 │     └─ ✔ primary key: id
 │
-│  ✔ Database schema satisfies contract
+│  ✖ Database schema does not satisfy contract (4 failures) (PN-SCHEMA-0001)
 >
-
-
-
 
 
 

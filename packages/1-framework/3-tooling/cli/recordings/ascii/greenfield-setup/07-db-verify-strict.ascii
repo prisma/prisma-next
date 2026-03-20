@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify passes — marker is stale but hash still matches! [manual DDL dropped email column, marker untouched]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,7 +30,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify passes — marker is stale but hash still matches! [manual DDL dropped email column, marker untouched]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema in strict mode (no extras) [initialized, schema matches contract exactly]
 >
 
 
@@ -92,43 +61,10 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify passes — marker is stale but hash still matches! [manual DDL dropped email column, marker untouched]
-> prisma-next db verify
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify passes — marker is stale but hash still matches! [manual DDL dropped email column, marker untouched]
-> prisma-next db verify
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema in strict mode (no extras) [initialized, schema matches contract exactly]
+>
 
 
 
@@ -158,9 +94,9 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify passes — marker is stale but hash still matches! [manual DDL dropped email column, marker untouched]
-> prisma-next db verify
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema in strict mode (no extras) [initialized, schema matches contract exactly]
+> prisma-next db verify --strict
 
 
 
@@ -190,27 +126,91 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify passes — marker is stale but hash still matches! [manual DDL dropped email column, marker untouched]
-> prisma-next db verify
-prisma-next db verify → Check whether the database signature and live schema match your contract
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema in strict mode (no extras) [initialized, schema matches contract exactly]
+> prisma-next db verify --strict
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema in strict mode (no extras) [initialized, schema matches contract exactly]
+> prisma-next db verify --strict
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Verify marker + schema in strict mode (no extras) [initialized, schema matches contract exactly]
+> prisma-next db verify --strict
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+prisma-next db verify → Check whether the database marker and live schema match your contract
 │
 │ config:               prisma-next.config.ts
 │ contract:             contract.json
-│ mode:                 full (marker + schema)
+│ mode:                 full (marker + schema, strict)
 │
 │ Read more             https://pris.ly/db-verify
 └
 
 │
-│  ✖ contract
-│  └─ ✖ table user
-│     ├─ ✖ columns
-│     │  ├─ ✖ email: missing (Column "email" is missing)
-│     │  └─ ✔ id: int4 (pg/int4@1) (not nullable)
-│     └─ ✔ primary key: id
-│
-│  ✖ Database schema does not satisfy contract (4 failures) (PN-SCHEMA-0001)
+│  ✔ Database marker and schema match contract
+│    verification: marker + schema (strict)
+│    storageHash: sha256:95060eda0d8ef9b30439212a41756c15066733defdde81ee7118f955be7361d1
+│    profileHash: sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98
 >
+
+
 
 
 

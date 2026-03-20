@@ -7,7 +7,6 @@ installShutdownHandlers();
 
 import { createDbInitCommand } from './commands/db-init';
 import { createDbIntrospectCommand } from './commands/db-introspect';
-import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
 import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
@@ -195,10 +194,6 @@ dbCommand.addCommand(dbUpdateCommand);
 // Add introspect subcommand to db
 const dbIntrospectCommand = createDbIntrospectCommand();
 dbCommand.addCommand(dbIntrospectCommand);
-
-// Add schema-verify subcommand to db
-const dbSchemaVerifyCommand = createDbSchemaVerifyCommand();
-dbCommand.addCommand(dbSchemaVerifyCommand);
 
 // Add sign subcommand to db
 const dbSignCommand = createDbSignCommand();

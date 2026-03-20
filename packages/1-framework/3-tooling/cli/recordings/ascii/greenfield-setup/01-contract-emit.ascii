@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Emit contract.json + contract.d.ts [empty database, no contract yet]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,6 +30,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Emit contract.json + contract.d.ts [empty database, no contract yet]
 >
 
@@ -92,8 +61,40 @@
 
 
 
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Emit contract.json + contract.d.ts [empty database, no contract yet]
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Emit contract.json + contract.d.ts [empty database, no contract yet]
 > prisma-next contract emit
 
@@ -124,8 +125,8 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Emit contract.json + contract.d.ts [empty database, no contract yet]
 > prisma-next contract emit
 
@@ -156,8 +157,8 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Emit contract.json + contract.d.ts [empty database, no contract yet]
 > prisma-next contract emit
 
@@ -188,10 +189,11 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Emit contract.json + contract.d.ts [empty database, no contract yet]
 > prisma-next contract emit
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 prisma-next contract emit → Emit your contract artifacts
 │
 │ config:               prisma-next.config.ts
@@ -209,8 +211,6 @@ prisma-next contract emit → Emit your contract artifacts
 │
 ◆  ✔ Success
 >
-
-
 
 
 
