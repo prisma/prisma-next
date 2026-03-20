@@ -103,20 +103,20 @@ prisma-next contract emit -v
 
 ### `prisma-next db verify`
 
-Verify that a database instance matches the emitted contract by checking the marker first and, by default, the live schema structure second.
+Verify that a database instance matches the emitted contract by checking the marker first and, by default, the live schema second.
 
 **Command:**
 ```bash
-prisma-next db verify [--db <url>] [--config <path>] [--shallow | --schema-only] [--strict] [--json] [-v] [-q] [--color/--no-color]
+prisma-next db verify [--db <url>] [--config <path>] [--marker-only | --schema-only] [--strict] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 Options:
 - `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
-- `--shallow`: Skip schema verification and only check the database marker
+- `--marker-only`: Skip schema verification and only check the database marker
 - `--schema-only`: Skip marker verification and only check whether the live schema satisfies the contract
 - `--strict`: When schema verification runs, schema elements not present in the contract are considered an error
-- `--shallow` cannot be combined with `--schema-only` or `--strict` (exit code 2, `PN-CLI-4012`). `--schema-only --strict` is valid.
+- `--marker-only` cannot be combined with `--schema-only` or `--strict` (exit code 2, `PN-CLI-4012`). `--schema-only --strict` is valid.
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
@@ -132,7 +132,7 @@ prisma-next db verify
 prisma-next db verify --db postgresql://user:pass@localhost/db
 
 # Marker-only verification when callers accept the trade-off
-prisma-next db verify --db postgresql://user:pass@localhost/db --shallow
+prisma-next db verify --db postgresql://user:pass@localhost/db --marker-only
 
 # Schema-only verification without relying on marker state
 prisma-next db verify --db postgresql://user:pass@localhost/db --schema-only
@@ -185,7 +185,7 @@ export default defineConfig({
    - Compares storage hash: Returns `PN-RTM-3002` if `storageHash` doesn't match
    - Compares profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
    - Checks codec coverage (optional): Compares contract column types against supported codec types and reports missing codecs
-5. **Verify Schema (default)**: Unless `--shallow` is provided, calls `familyInstance.schemaVerify()` to catch schema mismatches such as missing tables or columns after manual DDL. By default this runs in tolerant mode; `--strict` treats schema elements not present in the contract as an error.
+5. **Verify Schema (default)**: Unless `--marker-only` is provided, calls `familyInstance.schemaVerify()` to catch schema mismatches such as missing tables or columns after manual DDL. By default this runs in tolerant mode; `--strict` treats schema elements not present in the contract as an error.
 6. **Schema-only mode**: `--schema-only` skips marker verification entirely and runs only `schemaVerify()`. This is useful for brownfield adoption and corrupt-marker diagnosis.
 
 **Output Format (TTY):**
@@ -198,14 +198,14 @@ Success:
   profileHash: sha256:def456...
 ```
 
-Shallow-mode success:
+Marker-only success:
 ```text
 ✔ Database marker matches contract
-  verification: marker only (--shallow)
+  verification: marker only (--marker-only)
   storageHash: sha256:abc123...
   profileHash: sha256:def456...
 
-⚠ Schema verification skipped because --shallow was provided
+⚠ Schema verification skipped because --marker-only was provided
 ```
 
 Marker failure:
@@ -297,7 +297,7 @@ interface ControlFamilyInstance {
 
 Use `createControlPlaneStack()` from `@prisma-next/core-control-plane/stack` to create the stack with sensible defaults (`driver` defaults to `undefined`, `extensionPacks` defaults to `[]`).
 
-The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles marker checks, full `db verify` follows it with `schemaVerify()`, `--shallow` skips that schema step, and `--schema-only` runs `schemaVerify()` without marker checks.
+The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles marker checks, full `db verify` follows it with `schemaVerify()`, `--marker-only` skips that schema step, and `--schema-only` runs `schemaVerify()` without marker checks.
 
 ### `prisma-next db introspect`
 
@@ -622,7 +622,7 @@ For updated markers:
 - Exit code 1: Schema verification failed — database schema does not match contract (marker is not written)
 
 **Relationship to Other Commands:**
-- **`db verify`**: `db verify` checks that the marker exists and matches the contract, then runs schema verification by default. `db sign` writes the marker that `db verify` checks. Use `db verify --shallow` for marker-only verification and `db verify --schema-only` to inspect only the live schema.
+- **`db verify`**: `db verify` checks that the marker exists and matches the contract, then runs schema verification by default. `db sign` writes the marker that `db verify` checks. Use `db verify --marker-only` for marker-only verification and `db verify --schema-only` to inspect only the live schema.
 
 **Idempotency:**
 The `db sign` command is idempotent and safe to run multiple times:

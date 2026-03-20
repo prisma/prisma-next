@@ -46,12 +46,12 @@ import { TerminalUI } from '../utils/terminal-ui';
 interface DbVerifyOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly shallow?: boolean;
+  readonly markerOnly?: boolean;
   readonly schemaOnly?: boolean;
   readonly strict?: boolean;
 }
 
-type DbVerifyMode = 'full' | 'shallow' | 'schema-only';
+type DbVerifyMode = 'full' | 'marker-only' | 'schema-only';
 
 /**
  * Maps a VerifyDatabaseResult failure to a CliStructuredError.
@@ -93,19 +93,19 @@ function errorInvalidVerifyMode(options: {
 }
 
 function resolveDbVerifyMode(options: DbVerifyOptions): Result<DbVerifyMode, CliStructuredError> {
-  if (options.shallow && options.schemaOnly) {
+  if (options.markerOnly && options.schemaOnly) {
     return notOk(
       errorInvalidVerifyMode({
-        why: '`--shallow` and `--schema-only` cannot be used together',
-        fix: 'Choose one mode: omit both to check the marker and schema, use `--shallow` to check only the marker, or use `--schema-only` to check only the live schema.',
+        why: '`--marker-only` and `--schema-only` cannot be used together',
+        fix: 'Choose one mode: omit both to check the marker and schema, use `--marker-only` to check only the marker, or use `--schema-only` to check only the live schema.',
       }),
     );
   }
 
-  if (options.shallow && options.strict) {
+  if (options.markerOnly && options.strict) {
     return notOk(
       errorInvalidVerifyMode({
-        why: '`--strict` requires schema verification, but `--shallow` skips it',
+        why: '`--strict` requires schema verification, but `--marker-only` skips it',
         fix: 'Remove `--strict`, or use `db verify` / `db verify --schema-only` when you want to check the live schema in strict mode.',
       }),
     );
@@ -115,16 +115,16 @@ function resolveDbVerifyMode(options: DbVerifyOptions): Result<DbVerifyMode, Cli
     return ok('schema-only');
   }
 
-  if (options.shallow) {
-    return ok('shallow');
+  if (options.markerOnly) {
+    return ok('marker-only');
   }
 
   return ok('full');
 }
 
 function formatDbVerifyModeLabel(mode: DbVerifyMode, strict: boolean): string {
-  if (mode === 'shallow') {
-    return 'shallow (marker only)';
+  if (mode === 'marker-only') {
+    return 'marker only';
   }
 
   if (mode === 'schema-only') {
@@ -137,8 +137,8 @@ function formatDbVerifyModeLabel(mode: DbVerifyMode, strict: boolean): string {
 function formatDbVerifyInvocation(mode: DbVerifyMode, strict: boolean): string {
   const args = ['db verify'];
 
-  if (mode === 'shallow') {
-    args.push('--shallow');
+  if (mode === 'marker-only') {
+    args.push('--marker-only');
   }
 
   if (mode === 'schema-only') {
@@ -176,7 +176,9 @@ function renderVerifyHeader(
   const description =
     mode === 'schema-only'
       ? 'Check whether the live database schema matches your contract'
-      : 'Check whether the database marker and live schema match your contract';
+      : mode === 'marker-only'
+        ? 'Check whether the database marker matches your contract'
+        : 'Check whether the database marker and live schema match your contract';
 
   const details: Array<{ label: string; value: string }> = [
     { label: 'config', value: paths.configPath },
@@ -314,7 +316,7 @@ async function executeDbVerifyCommand(
   options: DbVerifyOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
-  mode: Extract<DbVerifyMode, 'full' | 'shallow'>,
+  mode: Extract<DbVerifyMode, 'full' | 'marker-only'>,
 ): Promise<Result<DbVerifyCommandSuccessResult, DbVerifyFailure>> {
   const startTime = Date.now();
   const paths = await resolveVerifyPaths(options);
@@ -339,17 +341,17 @@ async function executeDbVerifyCommand(
       return notOk(mapVerifyFailure(verifyResult));
     }
 
-    if (mode === 'shallow') {
+    if (mode === 'marker-only') {
       return ok({
         ok: true,
-        mode: 'shallow',
+        mode: 'marker-only',
         summary: 'Database marker matches contract',
         contract: verifyResult.contract,
         marker: verifyResult.marker,
         target: verifyResult.target,
         ...ifDefined('missingCodecs', verifyResult.missingCodecs),
         ...ifDefined('codecCoverageSkipped', verifyResult.codecCoverageSkipped),
-        warning: 'Schema verification skipped because --shallow was provided',
+        warning: 'Schema verification skipped because --marker-only was provided',
         meta: {
           ...(verifyResult.meta ?? {}),
           schemaVerification: 'skipped',
@@ -432,7 +434,7 @@ export function createDbVerifyCommand(): Command {
     command,
     'Check whether the database marker and live schema match your contract',
     'Verifies the database marker first, then checks the database schema matches your contract.\n' +
-      'Use `--shallow` for marker-only verification, `--schema-only` to skip marker checks and\n' +
+      'Use `--marker-only` for marker-only verification, `--schema-only` to skip marker checks and\n' +
       'inspect only the live schema, and `--strict` to fail if the database includes elements\n' +
       'not present in the contract.',
   );
@@ -441,13 +443,13 @@ export function createDbVerifyCommand(): Command {
     'prisma-next db verify --db $DATABASE_URL --strict',
     'prisma-next db verify --db $DATABASE_URL --schema-only',
     'prisma-next db verify --db $DATABASE_URL --schema-only --strict',
-    'prisma-next db verify --db $DATABASE_URL --shallow',
+    'prisma-next db verify --db $DATABASE_URL --marker-only',
     'prisma-next db verify --db $DATABASE_URL --json',
   ]);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--shallow', 'Skip schema verification and only check the database marker')
+    .option('--marker-only', 'Skip schema verification and only check the database marker')
     .option(
       '--schema-only',
       'Skip marker verification and only check whether the live schema satisfies the contract',

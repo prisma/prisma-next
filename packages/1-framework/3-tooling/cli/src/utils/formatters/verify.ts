@@ -17,7 +17,7 @@ import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
 export interface DbVerifyCommandSuccessResult {
   readonly ok: true;
-  readonly mode: 'full' | 'shallow';
+  readonly mode: 'full' | 'marker-only';
   readonly summary: string;
   readonly contract: VerifyDatabaseResult['contract'];
   readonly marker?: VerifyDatabaseResult['marker'];
@@ -62,7 +62,7 @@ export function formatVerifyOutput(
   const verificationMode =
     result.mode === 'full'
       ? `marker + schema${result.schema?.strict ? ' (strict)' : ' (tolerant)'}`
-      : 'marker only (--shallow)';
+      : 'marker only (--marker-only)';
 
   lines.push(`${formatGreen('✔')} ${result.summary}`);
   lines.push(`${formatDimText(`  verification: ${verificationMode}`)}`);

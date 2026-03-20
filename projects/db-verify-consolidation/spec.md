@@ -1,17 +1,17 @@
 # Summary
 
-Consolidate database verification onto `prisma-next db verify` and remove the parallel `prisma-next db schema-verify` command. `db verify` remains correctness-first by default (marker check + tolerant schema verification), keeps `--shallow` as an explicit marker-only escape hatch, and absorbs schema-only / strict structural checks under flags so there is one verb for all verification workflows.
+Consolidate database verification onto `prisma-next db verify` and remove the parallel `prisma-next db schema-verify` command. `db verify` remains correctness-first by default (marker check + tolerant schema verification), keeps `--marker-only` as an explicit marker-only escape hatch, and absorbs schema-only / strict schema checks under flags so there is one verb for all verification workflows.
 
 # Description
 
-`db verify` already does the right thing by default in the current codebase: it checks the marker, then runs tolerant schema verification, and only `--shallow` opts back into the old fast-but-incomplete behavior. The remaining problem is surface area: `db schema-verify` still exists as a second command, is still documented as canonical in several places, is still exported as its own CLI entrypoint, and is still referenced by journey tests, error messages, and recordings.
+`db verify` already does the right thing by default in the current codebase: it checks the marker, then runs tolerant schema verification, and only `--marker-only` opts back into the old fast-but-incomplete behavior. The remaining problem is surface area: `db schema-verify` still exists as a second command, is still documented as canonical in several places, is still exported as its own CLI entrypoint, and is still referenced by journey tests, error messages, and recordings.
 
 That split is now actively misleading. It suggests there are two top-level verification commands when the product decision is that there should be one correctness-first default. It also forces users to understand subtle reliability differences before they can pick a command.
 
 This project completes the consolidation:
 
 - `db verify` is the single canonical verification command
-- the fast marker-only path remains available only as an explicit opt-in (`--shallow`)
+- the fast marker-only path remains available only as an explicit opt-in (`--marker-only`)
 - marker-independent structural validation remains available as a mode on `db verify`, so brownfield adoption and corrupt-marker triage do not lose a read-only workflow
 - `db schema-verify` is deleted entirely from the CLI surface, docs, tests, exports, and recordings
 
@@ -26,14 +26,14 @@ This project completes the consolidation:
 The CLI exposes one verification command:
 
 ```bash
-prisma-next db verify [--db <url>] [--config <path>] [--shallow | --schema-only] [--strict] [--json] [-v] [-q] [--color/--no-color]
+prisma-next db verify [--db <url>] [--config <path>] [--marker-only | --schema-only] [--strict] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 Mode semantics:
 
 - default (no mode flags): verify marker, then run tolerant schema verification
-- `--shallow`: verify marker only; skip structural schema verification
-- `--schema-only`: skip marker checks; run structural schema verification only
+- `--marker-only`: verify marker only; skip schema verification
+- `--schema-only`: skip marker checks; run schema verification only
 - `--strict`: when schema verification runs, extra schema elements cause failure
 
 Examples:
@@ -42,26 +42,26 @@ Examples:
 - `prisma-next db verify --db $DATABASE_URL --strict`
 - `prisma-next db verify --db $DATABASE_URL --schema-only`
 - `prisma-next db verify --db $DATABASE_URL --schema-only --strict`
-- `prisma-next db verify --db $DATABASE_URL --shallow`
+- `prisma-next db verify --db $DATABASE_URL --marker-only`
 
 Database connection resolution stays unchanged: `--db` overrides `config.db.connection`. No new env vars or config keys are added.
 
 ### FR-2: Correctness-first default for `db verify`
 
-`prisma-next db verify` without `--shallow` must always run structural schema verification after marker verification. This remains the default, first-line command shown in help, docs, examples, journey tests, and error recovery guidance.
+`prisma-next db verify` without `--marker-only` must always run schema verification after marker verification. This remains the default, first-line command shown in help, docs, examples, journey tests, and error recovery guidance.
 
 Human output and JSON output must clearly state whether schema verification ran, and whether it ran in tolerant or strict mode.
 
 ### FR-3: Marker-independent structural verification under `db verify`
 
-Full `db verify` remains marker-first. If marker verification fails, the command exits with the marker failure instead of continuing into structural verification. Engineers who need structural diagnostics without trusting marker state must use `--schema-only`.
+Full `db verify` remains marker-first. If marker verification fails, the command exits with the marker failure instead of continuing into schema verification. Engineers who need schema diagnostics without trusting marker state must use `--schema-only`.
 
 The current CLI use cases that rely on `db schema-verify` without a valid marker must remain possible under `db verify`:
 
 - brownfield adoption before `db sign`
 - missing-marker diagnosis
 - corrupt-marker diagnosis
-- stale-marker diagnosis where the engineer wants a read-only structural comparison before running `db update` or `db sign`
+- stale-marker diagnosis where the engineer wants a read-only schema comparison before running `db update` or `db sign`
 
 `prisma-next db verify --schema-only` is the replacement path. It is read-only and does not inspect, require, or mutate the marker row. It may be combined with `--strict`.
 
@@ -71,8 +71,8 @@ TTY and JSON formatting for `--schema-only` should reuse the current schema veri
 
 Flag combinations are validated before any database work begins:
 
-- `--shallow` and `--schema-only` are mutually exclusive
-- `--shallow` and `--strict` are mutually exclusive
+- `--marker-only` and `--schema-only` are mutually exclusive
+- `--marker-only` and `--strict` are mutually exclusive
 - `--schema-only --strict` is valid
 - default mode with `--strict` is valid
 
@@ -96,7 +96,7 @@ Delete `prisma-next db schema-verify` completely:
 
 Do not keep an alias, deprecation path, or compatibility shim. Update repo call sites directly.
 
-### FR-6: Move strict structural checking onto `db verify`
+### FR-6: Move strict schema checking onto `db verify`
 
 Anything that currently requires `prisma-next db schema-verify --strict` must use `prisma-next db verify --strict` or `prisma-next db verify --schema-only --strict`, depending on whether marker verification is desired.
 
@@ -110,10 +110,10 @@ Strict mode behavior must remain unchanged:
 
 All repo-owned guidance must use the consolidated command surface:
 
-- default structural drift detection: `db verify`
-- marker-only fast path: `db verify --shallow`
-- read-only structural comparison without marker state: `db verify --schema-only`
-- strict structural comparison: `db verify --strict` or `db verify --schema-only --strict`
+- default schema mismatch detection: `db verify`
+- marker-only fast path: `db verify --marker-only`
+- read-only schema comparison without marker state: `db verify --schema-only`
+- strict schema comparison: `db verify --strict` or `db verify --schema-only --strict`
 
 This includes:
 
@@ -153,7 +153,7 @@ Because the repo has no external consumers, the implementation should directly r
 The underlying verification semantics that already exist in the repo should stay intact:
 
 - full `db verify` remains marker + tolerant schema
-- `--shallow` remains the explicit fast-but-incomplete path
+- `--marker-only` remains the explicit fast-but-incomplete path
 - `db sign` still uses schema verification before writing the marker
 
 The work is surface consolidation, not a rewrite of control-plane verification.
@@ -165,7 +165,7 @@ The work is surface consolidation, not a rewrite of control-plane verification.
 ## Non-goals
 
 - Removing or redesigning `client.schemaVerify()` or family-level `schemaVerify()`
-- Renaming `--shallow` in the same project
+- Introducing another alias for marker-only verification
 - Unifying every `db verify` JSON success / failure payload into a brand-new single envelope
 - Changing `db sign`, `db update`, or `db introspect` semantics beyond updated guidance text
 - Adding a deprecation alias or migration path for `db schema-verify`
@@ -174,12 +174,12 @@ The work is surface consolidation, not a rewrite of control-plane verification.
 
 - [ ] `prisma-next db verify` help and docs present it as the single canonical verification command
 - [ ] `prisma-next db verify` without mode flags performs marker verification followed by tolerant schema verification
-- [ ] `prisma-next db verify --shallow` performs only marker verification and no longer tells users to run `db schema-verify`
+- [ ] `prisma-next db verify --marker-only` performs only marker verification and no longer tells users to run `db schema-verify`
 - [ ] `prisma-next db verify --schema-only` performs read-only structural verification without requiring a valid marker
 - [ ] `prisma-next db verify --strict` fails on extra schema elements that tolerant `db verify` accepts
 - [ ] `prisma-next db verify --schema-only --strict` reproduces the current strict structural verification behavior without marker checks
-- [ ] `prisma-next db verify --shallow --strict` exits with code `2` and an actionable usage error
-- [ ] `prisma-next db verify --shallow --schema-only` exits with code `2` and an actionable usage error
+- [ ] `prisma-next db verify --marker-only --strict` exits with code `2` and an actionable usage error
+- [ ] `prisma-next db verify --marker-only --schema-only` exits with code `2` and an actionable usage error
 - [ ] `prisma-next db schema-verify` is absent from the `db` command tree and CLI help output
 - [ ] The repo no longer builds or tests a `db-schema-verify` command entrypoint or package subpath export
 - [ ] Brownfield-adoption coverage uses `db verify --schema-only` before `db sign`
@@ -206,7 +206,7 @@ Verbose and JSON modes should keep exposing enough information to distinguish:
 - marker failure
 - tolerant schema drift
 - strict-only extra-element failure
-- explicit marker-only execution via `--shallow`
+- explicit marker-only execution via `--marker-only`
 - explicit schema-only execution via `--schema-only`
 
 If command metrics or telemetry are added later, they should record the selected verification mode and strictness without logging connection secrets.

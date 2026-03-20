@@ -668,7 +668,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'outputs JSON in shallow mode when --shallow flag is provided',
+      'outputs JSON in marker-only mode when --marker-only flag is provided',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           // Set up test directory from fixtures with db config
@@ -705,7 +705,7 @@ withTempDir(({ createTempDir }) => {
           const verifyCwd2 = process.cwd();
           try {
             process.chdir(testDir);
-            await executeCommand(command, ['--config', configPath, '--json', '--shallow']);
+            await executeCommand(command, ['--config', configPath, '--json', '--marker-only']);
           } finally {
             process.chdir(verifyCwd2);
           }
@@ -722,7 +722,7 @@ withTempDir(({ createTempDir }) => {
           >;
           expect(parsed).toMatchObject({
             ok: true,
-            mode: 'shallow',
+            mode: 'marker-only',
             summary: expect.any(String),
             contract: {
               storageHash: expect.any(String),
@@ -768,7 +768,7 @@ withTempDir(({ createTempDir }) => {
                 '--config',
                 configPath,
                 '--json',
-                '--shallow',
+                '--marker-only',
                 '--schema-only',
               ]),
             ).rejects.toThrow('process.exit called');
@@ -805,7 +805,13 @@ withTempDir(({ createTempDir }) => {
           try {
             process.chdir(testSetup.testDir);
             await expect(
-              executeCommand(command, ['--config', configPath, '--json', '--shallow', '--strict']),
+              executeCommand(command, [
+                '--config',
+                configPath,
+                '--json',
+                '--marker-only',
+                '--strict',
+              ]),
             ).rejects.toThrow('process.exit called');
           } finally {
             process.chdir(verifyCwd);

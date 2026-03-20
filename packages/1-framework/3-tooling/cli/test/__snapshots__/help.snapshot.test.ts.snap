@@ -126,7 +126,7 @@ exports[`help text snapshots > formats db verify help 1`] = `
 │ -y, --yes             Auto-accept prompts
 │ --db <url>            Database connection string
 │ --config <path>       Path to prisma-next.config.ts
-│ --shallow             Skip schema verification and only check the database
+│ --marker-only         Skip schema verification and only check the database
 │                       marker
 │ --schema-only         Skip marker verification and only check whether the live
 │                       schema satisfies the contract
@@ -139,13 +139,13 @@ exports[`help text snapshots > formats db verify help 1`] = `
 │   $ prisma-next db verify --db $DATABASE_URL --strict
 │   $ prisma-next db verify --db $DATABASE_URL --schema-only
 │   $ prisma-next db verify --db $DATABASE_URL --schema-only --strict
-│   $ prisma-next db verify --db $DATABASE_URL --shallow
+│   $ prisma-next db verify --db $DATABASE_URL --marker-only
 │   $ prisma-next db verify --db $DATABASE_URL --json
 │
 │ Verifies the database marker first, then checks the database schema matches
 │ your contract.
-│ Use \`--shallow\` for marker-only verification, \`--schema-only\` to skip marker
-│ checks and
+│ Use \`--marker-only\` for marker-only verification, \`--schema-only\` to skip
+│ marker checks and
 │ inspect only the live schema, and \`--strict\` to fail if the database includes
 │ elements
 │ not present in the contract.
