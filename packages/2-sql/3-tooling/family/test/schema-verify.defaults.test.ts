@@ -18,9 +18,26 @@ import {
 const testNormalizer: DefaultNormalizer = (rawDefault: string): ColumnDefault | undefined => {
   const trimmed = rawDefault.trim();
 
-  // now() / CURRENT_TIMESTAMP
-  if (/^(now\s*\(\s*\)|CURRENT_TIMESTAMP)$/i.test(trimmed)) {
-    return { kind: 'function', expression: 'now()' };
+  // Timestamp defaults: now()/CURRENT_TIMESTAMP → 'now()', clock_timestamp() → 'clock_timestamp()'
+  const nowPattern = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP)$/i;
+  const clockPattern = /^clock_timestamp\s*\(\s*\)$/i;
+  const timestampCastSuffix = /::timestamp(?:tz|\s+(?:with|without)\s+time\s+zone)?$/i;
+  if (nowPattern.test(trimmed)) return { kind: 'function', expression: 'now()' };
+  if (clockPattern.test(trimmed)) return { kind: 'function', expression: 'clock_timestamp()' };
+  if (timestampCastSuffix.test(trimmed)) {
+    let inner = trimmed.replace(timestampCastSuffix, '').trim();
+    if (inner.startsWith('(') && inner.endsWith(')')) {
+      inner = inner.slice(1, -1).trim();
+    }
+    if (nowPattern.test(inner)) return { kind: 'function', expression: 'now()' };
+    if (clockPattern.test(inner)) return { kind: 'function', expression: 'clock_timestamp()' };
+    inner = inner.replace(/::text$/i, '').trim();
+    if (/^'now'$/i.test(inner)) return { kind: 'function', expression: 'now()' };
+  }
+
+  // NULL or NULL::type
+  if (/^NULL(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+(?:,\d+)?\))?)?$/i.test(trimmed)) {
+    return { kind: 'literal', value: null };
   }
 
   // Boolean literals
@@ -359,6 +376,112 @@ describe('verifySqlSchema - defaults', () => {
   });
 });
 
+describe('verifySqlSchema - timestamp default normalization', () => {
+  it('treats now() contract default as equal to CURRENT_TIMESTAMP in schema', () => {
+    const contract = createTestContract({
+      event: createContractTable({
+        created_at: {
+          nativeType: 'timestamptz',
+          nullable: false,
+          default: { kind: 'function', expression: 'now()' },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      event: createSchemaTable('event', {
+        created_at: {
+          nativeType: 'timestamptz',
+          nullable: false,
+          default: 'CURRENT_TIMESTAMP',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('treats now() contract default as equal to cast-wrapped timestamp in schema', () => {
+    const contract = createTestContract({
+      event: createContractTable({
+        created_at: {
+          nativeType: 'timestamptz',
+          nullable: false,
+          default: { kind: 'function', expression: 'now()' },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      event: createSchemaTable('event', {
+        created_at: {
+          nativeType: 'timestamptz',
+          nullable: false,
+          default: "('now'::text)::timestamp without time zone",
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+});
+
+describe('verifySqlSchema - null default normalization', () => {
+  it('treats NULL schema default as matching null literal contract default', () => {
+    const contract = createTestContract({
+      config: createContractTable({
+        value: {
+          nativeType: 'text',
+          nullable: true,
+          default: { kind: 'literal', value: null },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      config: createSchemaTable('config', {
+        value: {
+          nativeType: 'text',
+          nullable: true,
+          default: 'NULL',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+});
+
 describe('verifySqlSchema - string literal defaults with type casts', () => {
   it('matches contract literal without cast to DB literal with ::text cast', () => {
     const contract = createTestContract({
@@ -604,75 +727,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
     expect(result.schema.issues).toHaveLength(0);
   });
 
-  it('matches when contract includes enum cast and DB also returns enum cast', () => {
-    const contract = createTestContract({
-      Organization: createContractTable({
-        billingState: {
-          nativeType: 'BillingState',
-          nullable: false,
-          default: { kind: 'literal', value: 'atRisk' },
-        },
-      }),
-    });
-
-    const schema = createTestSchemaIR({
-      Organization: createSchemaTable('Organization', {
-        billingState: {
-          nativeType: 'BillingState',
-          nullable: false,
-          default: '\'atRisk\'::"BillingState"',
-        },
-      }),
-    });
-
-    const result = verifySqlSchema({
-      contract,
-      schema,
-      strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
-      frameworkComponents: [],
-      normalizeDefault: testNormalizer,
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
-  });
-
-  it('matches when contract has cast-free literal but DB returns enum cast', () => {
-    const contract = createTestContract({
-      Organization: createContractTable({
-        billingState: {
-          nativeType: 'BillingState',
-          nullable: false,
-          default: { kind: 'literal', value: 'atRisk' },
-        },
-      }),
-    });
-
-    const schema = createTestSchemaIR({
-      Organization: createSchemaTable('Organization', {
-        billingState: {
-          nativeType: 'BillingState',
-          nullable: false,
-          default: '\'atRisk\'::"BillingState"',
-        },
-      }),
-    });
-
-    const result = verifySqlSchema({
-      contract,
-      schema,
-      strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
-      frameworkComponents: [],
-      normalizeDefault: testNormalizer,
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
-  });
-
-  it('matches when contract has enum cast but DB returns cast-free literal', () => {
+  it('matches when DB returns cast-free enum literal', () => {
     const contract = createTestContract({
       Organization: createContractTable({
         billingState: {
