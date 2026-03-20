@@ -23,15 +23,20 @@ import { isSelectAst } from './helpers';
 
 const descriptor = (index: number) => ({ source: 'lane' as const, index });
 const dslDescriptor = (table: string, column: string, index: number) => {
-  const columnMeta = baseContract.storage.tables[table]?.columns[column];
+  const columnMeta = (
+    baseContract.storage.tables as Record<
+      string,
+      { columns: Record<string, { codecId: string; nativeType: string; nullable: boolean }> }
+    >
+  )[table]!.columns[column]!;
   return {
     index,
     name: column,
     source: 'dsl' as const,
     refs: { table, column },
-    codecId: columnMeta?.codecId,
-    nativeType: columnMeta?.nativeType,
-    nullable: columnMeta?.nullable,
+    codecId: columnMeta.codecId,
+    nativeType: columnMeta.nativeType,
+    nullable: columnMeta.nullable,
   };
 };
 const bound = (

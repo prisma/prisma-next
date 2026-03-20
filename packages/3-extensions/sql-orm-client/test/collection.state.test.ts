@@ -36,15 +36,20 @@ function dslBound(
     expr,
     params,
     paramDescriptors: refs.map((ref, index) => {
-      const columnMeta = baseContract.storage.tables[ref.table]?.columns[ref.column];
+      const columnMeta = (
+        baseContract.storage.tables as Record<
+          string,
+          { columns: Record<string, { codecId: string; nativeType: string; nullable: boolean }> }
+        >
+      )[ref.table]!.columns[ref.column]!;
       return {
         index: index + 1,
         name: ref.column,
         source: 'dsl' as const,
         refs: ref,
-        codecId: columnMeta?.codecId,
-        nativeType: columnMeta?.nativeType,
-        nullable: columnMeta?.nullable,
+        codecId: columnMeta.codecId,
+        nativeType: columnMeta.nativeType,
+        nullable: columnMeta.nullable,
       };
     }),
   };
