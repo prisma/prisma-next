@@ -68,35 +68,32 @@ function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
   const findings: LintFinding[] = [];
 
   if (ast instanceof DeleteAst) {
-    const deleteAst = ast;
-    if (deleteAst.where === undefined) {
+    if (ast.where === undefined) {
       findings.push({
         code: 'LINT.DELETE_WITHOUT_WHERE',
         severity: 'error',
         message:
           'DELETE without WHERE clause blocks execution to prevent accidental full-table deletion',
-        details: { table: deleteAst.table.name },
+        details: { table: ast.table.name },
       });
     }
   }
 
   if (ast instanceof UpdateAst) {
-    const updateAst = ast;
-    if (updateAst.where === undefined) {
+    if (ast.where === undefined) {
       findings.push({
         code: 'LINT.UPDATE_WITHOUT_WHERE',
         severity: 'error',
         message:
           'UPDATE without WHERE clause blocks execution to prevent accidental full-table update',
-        details: { table: updateAst.table.name },
+        details: { table: ast.table.name },
       });
     }
   }
 
   if (ast instanceof SelectAst) {
-    const selectAst = ast;
-    if (selectAst.limit === undefined) {
-      const table = getFromSourceTableDetail(selectAst.from);
+    if (ast.limit === undefined) {
+      const table = getFromSourceTableDetail(ast.from);
       findings.push({
         code: 'LINT.NO_LIMIT',
         severity: 'warn',
@@ -104,13 +101,11 @@ function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
         ...ifDefined('details', table !== undefined ? { table } : undefined),
       });
     }
-    const hasSelectAllIntent =
-      selectAst.selectAllIntent !== undefined ||
-      (meta.annotations as { selectAllIntent?: unknown })?.selectAllIntent !== undefined;
-    if (hasSelectAllIntent) {
-      const table =
-        selectAst.selectAllIntent?.table ??
-        (meta.annotations as { selectAllIntent?: { table?: string } })?.selectAllIntent?.table;
+    const annotationIntent = meta.annotations?.['selectAllIntent'] as
+      | { table?: string }
+      | undefined;
+    if (ast.selectAllIntent !== undefined || annotationIntent !== undefined) {
+      const table = ast.selectAllIntent?.table ?? annotationIntent?.table;
       findings.push({
         code: 'LINT.SELECT_STAR',
         severity: 'warn',
