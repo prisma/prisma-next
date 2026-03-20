@@ -33,6 +33,9 @@ function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>
   return new AggregateExpr(selector.fn, ColumnRef.of(tableName, selector.column));
 }
 
+// ORM HAVING filters use literal binding (values inlined at plan-build time),
+// not parameterized binding. ParamRef is rejected because the ORM's grouped
+// collection API always produces literal comparisons for having() predicates.
 function validateGroupedComparable(
   value: Expression | ParamRef | LiteralExpr | ListLiteralExpr,
 ): Expression | LiteralExpr | ListLiteralExpr {
