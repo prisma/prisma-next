@@ -1,3 +1,4 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { Command } from 'commander';
 import { describe, expect, it } from 'vitest';
 import { createContractEmitCommand } from '../src/commands/contract-emit';
@@ -8,24 +9,28 @@ import { formatCommandHelp, formatRootHelp } from '../src/utils/formatters/help'
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('help text snapshots', () => {
-  it('formats root help', () => {
-    const program = new Command();
-    program.name('prisma-next').description('Prisma Next CLI');
-    const contract = new Command('contract').description('Contract management commands');
-    const contractEmit = createContractEmitCommand();
-    contract.addCommand(contractEmit);
-    const db = new Command('db').description('Database operations');
-    const dbVerify = createDbVerifyCommand();
-    db.addCommand(dbVerify);
-    program.addCommand(contract);
-    program.addCommand(db);
+  it(
+    'formats root help',
+    () => {
+      const program = new Command();
+      program.name('prisma-next').description('Prisma Next CLI');
+      const contract = new Command('contract').description('Contract management commands');
+      const contractEmit = createContractEmitCommand();
+      contract.addCommand(contractEmit);
+      const db = new Command('db').description('Database operations');
+      const dbVerify = createDbVerifyCommand();
+      db.addCommand(dbVerify);
+      program.addCommand(contract);
+      program.addCommand(db);
 
-    // Explicitly disable colors for consistent snapshots
-    const flags = parseGlobalFlags({ 'no-color': true });
-    const helpText = formatRootHelp({ program, flags });
+      // Explicitly disable colors for consistent snapshots
+      const flags = parseGlobalFlags({ 'no-color': true });
+      const helpText = formatRootHelp({ program, flags });
 
-    expect(helpText).toMatchSnapshot();
-  }, 1000);
+      expect(helpText).toMatchSnapshot();
+    },
+    timeouts.default,
+  );
 
   it('formats contract emit help', () => {
     const command = createContractEmitCommand();

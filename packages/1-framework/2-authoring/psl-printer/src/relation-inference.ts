@@ -1,5 +1,5 @@
 import type { SqlForeignKeyIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
-import { deriveBackRelationFieldName, deriveRelationFieldName } from './name-transforms';
+import { deriveBackRelationFieldName, deriveRelationFieldName, pluralize } from './name-transforms';
 import type { RelationField } from './types';
 
 /**
@@ -67,13 +67,11 @@ export function inferRelations(
       const childModelName = modelNameMap.get(childTableName) ?? childTableName;
       const parentModelName = modelNameMap.get(parentTableName) ?? parentTableName;
       const pairKey = `${childTableName}→${parentTableName}`;
-      const needsRelationName = (fkCountByPair.get(pairKey) as number) > 1;
+      const isSelfRelation = childTableName === parentTableName;
+      const needsRelationName = (fkCountByPair.get(pairKey) as number) > 1 || isSelfRelation;
 
       // Determine cardinality
       const isOneToOne = detectOneToOne(fk, table);
-
-      // Derive relation name for disambiguation
-      const relationName = needsRelationName ? deriveRelationName(fk) : undefined;
 
       // Child table: relation field (e.g., author User @relation(...))
       const childRelFieldName = resolveUniqueFieldName(
@@ -81,11 +79,18 @@ export function inferRelations(
         childUsed,
         parentModelName,
       );
+      const relationName = needsRelationName
+        ? deriveRelationName(fk, childRelFieldName, parentModelName, isSelfRelation)
+        : undefined;
+      const childOptional = fk.columns.some(
+        (columnName) => table.columns[columnName]?.nullable ?? false,
+      );
 
       const childRelField = buildChildRelationField(
         childRelFieldName,
         parentModelName,
         fk,
+        childOptional,
         relationName,
       );
 
@@ -149,11 +154,19 @@ function detectOneToOne(fk: SqlForeignKeyIR, table: SqlTableIR): boolean {
 
 /**
  * Derives a relation name for disambiguation.
- * Uses the FK constraint name if available, otherwise generates from column names.
+ * Uses the FK constraint name if available, otherwise generates one from the relation shape.
  */
-function deriveRelationName(fk: SqlForeignKeyIR): string {
+function deriveRelationName(
+  fk: SqlForeignKeyIR,
+  childRelationFieldName: string,
+  parentModelName: string,
+  isSelfRelation: boolean,
+): string {
   if (fk.name) {
     return fk.name;
+  }
+  if (isSelfRelation) {
+    return `${childRelationFieldName.charAt(0).toUpperCase() + childRelationFieldName.slice(1)}${pluralize(parentModelName)}`;
   }
   return fk.columns.join('_');
 }
@@ -165,6 +178,7 @@ function buildChildRelationField(
   fieldName: string,
   parentModelName: string,
   fk: SqlForeignKeyIR,
+  optional: boolean,
   relationName?: string,
 ): RelationField {
   const onDelete = fk.onDelete && fk.onDelete !== DEFAULT_ON_DELETE ? fk.onDelete : undefined;
@@ -174,7 +188,7 @@ function buildChildRelationField(
     fieldName,
     typeName: parentModelName,
     referencedTableName: fk.referencedTable,
-    optional: false,
+    optional,
     list: false,
     relationName,
     fields: fk.columns,

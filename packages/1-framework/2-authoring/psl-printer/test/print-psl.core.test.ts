@@ -1,6 +1,6 @@
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { printPsl } from '../src/exports/index';
+import { printPsl } from '../src/print-psl';
 import { makeOptions } from './print-psl-test-helpers';
 
 describe('printPsl', () => {
@@ -112,7 +112,7 @@ describe('printPsl', () => {
             },
             quantity: { name: 'quantity', nativeType: 'int4', nullable: false, default: undefined },
           },
-          primaryKey: { columns: ['order_id', 'product_id'] },
+          primaryKey: { columns: ['order_id', 'product_id'], name: 'order_item_pkey' },
           foreignKeys: [],
           uniques: [],
           indexes: [],
@@ -129,7 +129,7 @@ describe('printPsl', () => {
         productId Int @map("product_id")
         quantity  Int
 
-        @@id([orderId, productId])
+        @@id([orderId, productId], map: "order_item_pkey")
         @@map("order_item")
       }
       "

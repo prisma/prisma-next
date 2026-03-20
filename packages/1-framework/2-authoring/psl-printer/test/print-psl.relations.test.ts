@@ -1,6 +1,6 @@
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { printPsl } from '../src/exports/index';
+import { printPsl } from '../src/print-psl';
 import { makeOptions } from './print-psl-test-helpers';
 
 describe('printPsl', () => {
@@ -158,8 +158,8 @@ describe('printPsl', () => {
         id        Int        @id
         name      String
         managerId Int?       @map("manager_id")
-        manager   Employee   @relation(fields: [managerId], references: [id])
-        employees Employee[]
+        manager   Employee?  @relation(name: "ManagerEmployees", fields: [managerId], references: [id])
+        employees Employee[] @relation(name: "ManagerEmployees")
 
         @@map("employee")
       }

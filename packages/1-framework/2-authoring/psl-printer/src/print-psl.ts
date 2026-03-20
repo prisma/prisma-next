@@ -164,13 +164,17 @@ function processTable(
 
   const pkColumns = new Set(table.primaryKey?.columns ?? []);
   const isSinglePk = pkColumns.size === 1;
+  const singlePkConstraintName = isSinglePk ? table.primaryKey?.name : undefined;
 
-  // Build set of unique single-column constraints
-  const uniqueColumns = new Set<string>();
+  // Build lookup for unique single-column constraints.
+  const uniqueColumns = new Map<string, string | undefined>();
   for (const unique of table.uniques) {
     if (unique.columns.length === 1) {
       const [columnName = ''] = unique.columns;
-      uniqueColumns.add(columnName);
+      const existingConstraintName = uniqueColumns.get(columnName);
+      if (!uniqueColumns.has(columnName) || (existingConstraintName === undefined && unique.name)) {
+        uniqueColumns.set(columnName, unique.name);
+      }
     }
   }
 
@@ -218,7 +222,7 @@ function processTable(
     const attributes: string[] = [];
     const isId = isSinglePk && pkColumns.has(column.name);
     if (isId) {
-      attributes.push('@id');
+      attributes.push(formatFieldConstraintAttribute('@id', singlePkConstraintName));
     }
 
     // Default value
@@ -236,8 +240,11 @@ function processTable(
     }
 
     // Unique
-    if (uniqueColumns.has(column.name) && !isId) {
-      attributes.push('@unique');
+    const uniqueConstraintName = uniqueColumns.get(column.name);
+    if (uniqueConstraintName !== undefined || uniqueColumns.has(column.name)) {
+      if (!isId) {
+        attributes.push(formatFieldConstraintAttribute('@unique', uniqueConstraintName));
+      }
     }
 
     // Map
@@ -314,7 +321,9 @@ function processTable(
     const pkFieldNames = table.primaryKey.columns.map((columnName) =>
       resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
     );
-    modelAttributes.push(`@@id([${pkFieldNames.join(', ')}])`);
+    modelAttributes.push(
+      formatModelConstraintAttribute('@@id', pkFieldNames, table.primaryKey.name),
+    );
   }
 
   // Composite unique constraints
@@ -323,7 +332,7 @@ function processTable(
       const fieldNames = unique.columns.map((columnName) =>
         resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
       );
-      modelAttributes.push(`@@unique([${fieldNames.join(', ')}])`);
+      modelAttributes.push(formatModelConstraintAttribute('@@unique', fieldNames, unique.name));
     }
   }
 
@@ -360,14 +369,49 @@ function processTable(
  * Parses a default value into a ColumnDefault.
  * Handles both pre-normalized ColumnDefault objects and raw string expressions.
  */
+function isColumnDefault(value: unknown): value is ColumnDefault {
+  if (typeof value !== 'object' || value === null || !Object.hasOwn(value, 'kind')) {
+    return false;
+  }
+
+  const kind = Reflect.get(value, 'kind');
+  if (kind === 'literal') {
+    return Object.hasOwn(value, 'value');
+  }
+  if (kind === 'function') {
+    return typeof Reflect.get(value, 'expression') === 'string';
+  }
+
+  return false;
+}
+
 function parseDefaultIfNeeded(value: unknown): ColumnDefault | undefined {
-  if (typeof value === 'object' && value !== null && 'kind' in value) {
-    return value as ColumnDefault;
+  if (isColumnDefault(value)) {
+    return value;
   }
   if (typeof value === 'string') {
     return parseRawDefault(value);
   }
   return undefined;
+}
+
+function formatFieldConstraintAttribute(
+  attribute: '@id' | '@unique',
+  constraintName?: string,
+): string {
+  return constraintName ? `${attribute}(map: "${constraintName}")` : attribute;
+}
+
+function formatModelConstraintAttribute(
+  attribute: '@@id' | '@@unique',
+  fields: readonly string[],
+  constraintName?: string,
+): string {
+  const parts = [`[${fields.join(', ')}]`];
+  if (constraintName) {
+    parts.push(`map: "${constraintName}"`);
+  }
+  return `${attribute}(${parts.join(', ')})`;
 }
 
 function buildFieldNamesByTable(

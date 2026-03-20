@@ -1,6 +1,6 @@
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { printPsl } from '../src/exports/index';
+import { printPsl } from '../src/print-psl';
 import { makeOptions } from './print-psl-test-helpers';
 
 describe('printPsl', () => {
@@ -167,6 +167,45 @@ describe('printPsl', () => {
 
         @@unique([_type, code])
         @@index([category, _type])
+        @@map("record")
+      }
+      "
+    `);
+  });
+
+  it('preserves named primary keys and unique constraints', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        record: {
+          name: 'record',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            email: { name: 'email', nativeType: 'text', nullable: false, default: undefined },
+            category: { name: 'category', nativeType: 'text', nullable: false, default: undefined },
+            code: { name: 'code', nativeType: 'text', nullable: false, default: undefined },
+          },
+          primaryKey: { columns: ['id'], name: 'record_pkey' },
+          foreignKeys: [],
+          uniques: [
+            { columns: ['email'], name: 'record_email_key' },
+            { columns: ['category', 'code'], name: 'record_category_code_key' },
+          ],
+          indexes: [],
+        },
+      },
+      dependencies: [],
+    };
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toMatchInlineSnapshot(`
+      "// This file was introspected from the database. Do not edit manually.
+
+      model Record {
+        id       Int    @id(map: "record_pkey")
+        email    String @unique(map: "record_email_key")
+        category String
+        code     String
+
+        @@unique([category, code], map: "record_category_code_key")
         @@map("record")
       }
       "

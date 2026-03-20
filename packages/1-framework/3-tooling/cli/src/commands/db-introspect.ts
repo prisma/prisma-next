@@ -3,6 +3,7 @@ import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view
 import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
 import { createPostgresTypeMap, extractEnumTypeNames, printPsl } from '@prisma-next/psl-printer';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { type as arktype } from 'arktype';
 import { Command } from 'commander';
 import { dirname, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
@@ -42,136 +43,120 @@ interface DbIntrospectCommandResult {
 }
 
 type PrintableSqlSchemaIR = Parameters<typeof printPsl>[0];
+type PrintableSqlAnnotations = Readonly<Record<string, unknown>>;
+type PrintablePrimaryKey = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+};
+type PrintableSqlColumn = {
+  readonly name: string;
+  readonly nativeType: string;
+  readonly nullable: boolean;
+  readonly default?: string;
+  readonly annotations?: PrintableSqlAnnotations;
+};
+type PrintableSqlForeignKey = {
+  readonly columns: readonly string[];
+  readonly referencedTable: string;
+  readonly referencedColumns: readonly string[];
+  readonly name?: string;
+  readonly onDelete?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+  readonly onUpdate?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+  readonly annotations?: PrintableSqlAnnotations;
+};
+type PrintableSqlUnique = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+  readonly annotations?: PrintableSqlAnnotations;
+};
+type PrintableSqlIndex = {
+  readonly columns: readonly string[];
+  readonly name?: string;
+  readonly unique: boolean;
+  readonly annotations?: PrintableSqlAnnotations;
+};
+type PrintableSqlTable = {
+  readonly name: string;
+  readonly columns: Record<string, PrintableSqlColumn>;
+  readonly primaryKey?: PrintablePrimaryKey;
+  readonly foreignKeys: readonly PrintableSqlForeignKey[];
+  readonly uniques: readonly PrintableSqlUnique[];
+  readonly indexes: readonly PrintableSqlIndex[];
+  readonly annotations?: PrintableSqlAnnotations;
+};
+type PrintableDependency = {
+  readonly id: string;
+};
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+const SqlAnnotationsSchema = arktype({
+  '[string]': 'unknown',
+});
 
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
-}
+const PrimaryKeySchema = arktype.declare<PrintablePrimaryKey>().type({
+  columns: arktype.string.array().readonly(),
+  'name?': 'string',
+});
 
-function hasOptionalAnnotations(value: Record<string, unknown>): boolean {
-  const annotations = value['annotations'];
-  return annotations === undefined || isRecord(annotations);
-}
+const SqlColumnSchema = arktype.declare<PrintableSqlColumn>().type({
+  name: 'string',
+  nativeType: 'string',
+  nullable: 'boolean',
+  'default?': 'string',
+  'annotations?': SqlAnnotationsSchema,
+});
 
-function isPrimaryKeyLike(value: unknown): boolean {
-  if (!isRecord(value)) {
-    return false;
+const SqlForeignKeySchema = arktype.declare<PrintableSqlForeignKey>().type({
+  columns: arktype.string.array().readonly(),
+  referencedTable: 'string',
+  referencedColumns: arktype.string.array().readonly(),
+  'name?': 'string',
+  'onDelete?': "'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'",
+  'onUpdate?': "'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'",
+  'annotations?': SqlAnnotationsSchema,
+});
+
+const SqlUniqueSchema = arktype.declare<PrintableSqlUnique>().type({
+  columns: arktype.string.array().readonly(),
+  'name?': 'string',
+  'annotations?': SqlAnnotationsSchema,
+});
+
+const SqlIndexSchema = arktype.declare<PrintableSqlIndex>().type({
+  columns: arktype.string.array().readonly(),
+  unique: 'boolean',
+  'name?': 'string',
+  'annotations?': SqlAnnotationsSchema,
+});
+
+const SqlTableSchema = arktype.declare<PrintableSqlTable>().type({
+  name: 'string',
+  columns: arktype({ '[string]': SqlColumnSchema }),
+  'primaryKey?': PrimaryKeySchema,
+  foreignKeys: SqlForeignKeySchema.array().readonly(),
+  uniques: SqlUniqueSchema.array().readonly(),
+  indexes: SqlIndexSchema.array().readonly(),
+  'annotations?': SqlAnnotationsSchema,
+});
+
+const DependencySchema = arktype.declare<PrintableDependency>().type({
+  id: 'string',
+});
+
+const PrintableSqlSchemaIRSchema = arktype.declare<PrintableSqlSchemaIR>().type({
+  tables: arktype({ '[string]': SqlTableSchema }),
+  'annotations?': SqlAnnotationsSchema,
+  dependencies: DependencySchema.array().readonly(),
+});
+
+function validatePrintableSqlSchemaIR(value: unknown): PrintableSqlSchemaIR {
+  const result = PrintableSqlSchemaIRSchema(value);
+  if (result instanceof arktype.errors) {
+    const messages = result.map((problem: { message: string }) => problem.message).join('; ');
+    throw errorUnexpected('Introspection returned an unexpected schema shape', {
+      why: `Introspection returned an unexpected schema shape: ${messages}`,
+    });
   }
-  const columns = value['columns'];
-  const name = value['name'];
-  return isStringArray(columns) && (name === undefined || typeof name === 'string');
-}
-
-function isSqlColumnLike(value: unknown): boolean {
-  if (!isRecord(value)) {
-    return false;
-  }
-  const name = value['name'];
-  const nativeType = value['nativeType'];
-  const nullable = value['nullable'];
-  return (
-    typeof name === 'string' &&
-    typeof nativeType === 'string' &&
-    typeof nullable === 'boolean' &&
-    hasOptionalAnnotations(value)
-  );
-}
-
-function isSqlForeignKeyLike(value: unknown): boolean {
-  if (!isRecord(value)) {
-    return false;
-  }
-  const columns = value['columns'];
-  const referencedTable = value['referencedTable'];
-  const referencedColumns = value['referencedColumns'];
-  const name = value['name'];
-  const onDelete = value['onDelete'];
-  const onUpdate = value['onUpdate'];
-  return (
-    isStringArray(columns) &&
-    typeof referencedTable === 'string' &&
-    isStringArray(referencedColumns) &&
-    (name === undefined || typeof name === 'string') &&
-    (onDelete === undefined || typeof onDelete === 'string') &&
-    (onUpdate === undefined || typeof onUpdate === 'string') &&
-    hasOptionalAnnotations(value)
-  );
-}
-
-function isSqlUniqueLike(value: unknown): boolean {
-  if (!isRecord(value)) {
-    return false;
-  }
-  const columns = value['columns'];
-  const name = value['name'];
-  return (
-    isStringArray(columns) &&
-    (name === undefined || typeof name === 'string') &&
-    hasOptionalAnnotations(value)
-  );
-}
-
-function isSqlIndexLike(value: unknown): boolean {
-  if (!isRecord(value)) {
-    return false;
-  }
-  const columns = value['columns'];
-  const unique = value['unique'];
-  const name = value['name'];
-  return (
-    isStringArray(columns) &&
-    typeof unique === 'boolean' &&
-    (name === undefined || typeof name === 'string') &&
-    hasOptionalAnnotations(value)
-  );
-}
-
-function isSqlTableLike(value: unknown): boolean {
-  if (!isRecord(value)) {
-    return false;
-  }
-  const name = value['name'];
-  const columns = value['columns'];
-  const primaryKey = value['primaryKey'];
-  const foreignKeys = value['foreignKeys'];
-  const uniques = value['uniques'];
-  const indexes = value['indexes'];
-  return (
-    typeof name === 'string' &&
-    isRecord(columns) &&
-    Object.values(columns).every(isSqlColumnLike) &&
-    (primaryKey === undefined || isPrimaryKeyLike(primaryKey)) &&
-    Array.isArray(foreignKeys) &&
-    foreignKeys.every(isSqlForeignKeyLike) &&
-    Array.isArray(uniques) &&
-    uniques.every(isSqlUniqueLike) &&
-    Array.isArray(indexes) &&
-    indexes.every(isSqlIndexLike) &&
-    hasOptionalAnnotations(value)
-  );
-}
-
-function isDependencyLike(value: unknown): boolean {
-  return isRecord(value) && typeof value['id'] === 'string';
-}
-
-function isPrintableSqlSchemaIR(value: unknown): value is PrintableSqlSchemaIR {
-  if (!isRecord(value)) {
-    return false;
-  }
-  const tables = value['tables'];
-  const dependencies = value['dependencies'];
-  const annotations = value['annotations'];
-  return (
-    isRecord(tables) &&
-    Object.values(tables).every(isSqlTableLike) &&
-    Array.isArray(dependencies) &&
-    dependencies.every(isDependencyLike) &&
-    (annotations === undefined || isRecord(annotations))
-  );
+  return result;
 }
 
 /**
@@ -243,9 +228,10 @@ async function executeDbIntrospectCommand(
       connection: dbConnection,
       onProgress,
     });
+    const printableSchemaIR = validatePrintableSqlSchemaIR(schemaIR);
 
     // Call toSchemaView to convert schema IR to CoreSchemaView for tree rendering
-    const schemaView = client.toSchemaView(schemaIR);
+    const schemaView = client.toSchemaView(printableSchemaIR);
 
     const totalTime = Date.now() - startTime;
 
@@ -258,14 +244,9 @@ async function executeDbIntrospectCommand(
 
     if (!options.dryRun) {
       const outputPath = resolveDbIntrospectOutputPath(options, config.contract?.output);
-
-      // schemaIR is typed as `unknown` from the control client; validate shape before printing PSL.
-      if (!isPrintableSqlSchemaIR(schemaIR)) {
-        throw errorUnexpected('Introspection returned an unexpected schema shape');
-      }
-      const enumTypeNames = extractEnumTypeNames(schemaIR.annotations);
+      const enumTypeNames = extractEnumTypeNames(printableSchemaIR.annotations);
       const typeMap = createPostgresTypeMap(enumTypeNames);
-      const pslContent = printPsl(schemaIR, { typeMap });
+      const pslContent = printPsl(printableSchemaIR, { typeMap });
 
       // Warn if file exists
       if (existsSync(outputPath) && !flags.quiet) {
@@ -292,7 +273,7 @@ async function executeDbIntrospectCommand(
         familyId: config.family.familyId,
         id: config.target.targetId,
       },
-      schema: schemaIR,
+      schema: printableSchemaIR,
       meta: {
         ...(configPath ? { configPath } : {}),
         ...(connectionForMeta ? { dbUrl: connectionForMeta } : {}),

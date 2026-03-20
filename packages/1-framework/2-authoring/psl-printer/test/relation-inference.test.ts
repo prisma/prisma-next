@@ -235,12 +235,15 @@ describe('inferRelations', () => {
     expect(childRel).toMatchObject({
       fieldName: 'parent',
       typeName: 'Category',
+      optional: true,
+      relationName: 'ParentCategories',
     });
     // Back-relation field
     const backRel = relations!.find((r) => !r.fields);
     expect(backRel).toMatchObject({
       typeName: 'Category',
       list: true,
+      relationName: 'ParentCategories',
     });
   });
 

@@ -35,6 +35,11 @@ describe('toModelName', () => {
   it('no map when name is already PascalCase', () => {
     expect(toModelName('User')).toEqual({ name: 'User' });
   });
+
+  it('sanitizes punctuated identifiers', () => {
+    expect(toModelName('user.profile')).toEqual({ name: 'UserProfile', map: 'user.profile' });
+    expect(toModelName('foo$bar')).toEqual({ name: 'FooBar', map: 'foo$bar' });
+  });
 });
 
 describe('toFieldName', () => {
@@ -66,6 +71,11 @@ describe('toFieldName', () => {
   it('keeps separator-only names stable', () => {
     expect(toFieldName('___')).toEqual({ name: '___' });
   });
+
+  it('sanitizes punctuated identifiers', () => {
+    expect(toFieldName('user.profile')).toEqual({ name: 'userProfile', map: 'user.profile' });
+    expect(toFieldName('foo$bar')).toEqual({ name: 'fooBar', map: 'foo$bar' });
+  });
 });
 
 describe('toEnumName', () => {
@@ -79,6 +89,10 @@ describe('toEnumName', () => {
 
   it('escapes reserved enum names', () => {
     expect(toEnumName('enum')).toEqual({ name: '_Enum', map: 'enum' });
+  });
+
+  it('sanitizes punctuated identifiers', () => {
+    expect(toEnumName('user.role')).toEqual({ name: 'UserRole', map: 'user.role' });
   });
 });
 
@@ -146,5 +160,11 @@ describe('toNamedTypeName', () => {
   it('converts column name to PascalCase', () => {
     expect(toNamedTypeName('email')).toBe('Email');
     expect(toNamedTypeName('phone_number')).toBe('PhoneNumber');
+  });
+
+  it('sanitizes and escapes identifiers', () => {
+    expect(toNamedTypeName('foo$bar')).toBe('FooBar');
+    expect(toNamedTypeName('type')).toBe('_Type');
+    expect(toNamedTypeName('123value')).toBe('_123value');
   });
 });

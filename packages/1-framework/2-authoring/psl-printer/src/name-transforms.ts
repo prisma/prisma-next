@@ -3,41 +3,53 @@
  */
 const PSL_RESERVED_WORDS = new Set(['model', 'enum', 'types', 'type', 'generator', 'datasource']);
 
+const IDENTIFIER_PART_PATTERN = /[A-Za-z0-9]+/g;
+
 type NameResult = {
   readonly name: string;
   readonly map?: string;
 };
 
 /**
- * Checks if the string contains snake_case separators (underscores, hyphens, spaces).
+ * Checks whether normalization needs to split or sanitize the identifier.
  */
 function hasSeparators(input: string): boolean {
-  return /[_\s-]/.test(input);
+  return /[^A-Za-z0-9]/.test(input);
+}
+
+function extractIdentifierParts(input: string): string[] {
+  return input.match(IDENTIFIER_PART_PATTERN) ?? [];
+}
+
+function sanitizeIdentifierCharacters(input: string): string {
+  return input.replace(/[^\w]/g, '');
+}
+
+function capitalize(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 /**
- * Converts a snake_case string to PascalCase.
- * Only splits on separators — preserves existing casing within words.
+ * Converts a normalized identifier to PascalCase.
  */
 function snakeToPascalCase(input: string): string {
-  return input
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join('');
+  const parts = extractIdentifierParts(input);
+  if (parts.length === 0) {
+    return sanitizeIdentifierCharacters(input);
+  }
+  return parts.map(capitalize).join('');
 }
 
 /**
- * Converts a snake_case string to camelCase.
- * Only splits on separators — preserves existing casing within words.
+ * Converts a normalized identifier to camelCase.
  */
 function snakeToCamelCase(input: string): string {
-  const [firstPart = input, ...rest] = input.split(/[_\s-]+/).filter(Boolean);
-  return (
-    firstPart.charAt(0).toLowerCase() +
-    firstPart.slice(1) +
-    rest.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join('')
-  );
+  const parts = extractIdentifierParts(input);
+  if (parts.length === 0) {
+    return sanitizeIdentifierCharacters(input);
+  }
+  const [firstPart = input, ...rest] = parts;
+  return firstPart.charAt(0).toLowerCase() + firstPart.slice(1) + rest.map(capitalize).join('');
 }
 
 /**
@@ -198,8 +210,13 @@ export function deriveBackRelationFieldName(childModelName: string, isOneToOne: 
  * E.g., column "email" with type "character varying(255)" → "Email"
  */
 export function toNamedTypeName(columnName: string): string {
+  let name: string;
+
   if (hasSeparators(columnName)) {
-    return snakeToPascalCase(columnName);
+    name = snakeToPascalCase(columnName);
+  } else {
+    name = columnName.charAt(0).toUpperCase() + columnName.slice(1);
   }
-  return columnName.charAt(0).toUpperCase() + columnName.slice(1);
+
+  return escapeIfNeeded(name);
 }
