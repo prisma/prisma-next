@@ -106,8 +106,8 @@ These affect the migration graph and reachability.
 - **Implications:** Cannot migrate to target; must write new migration or add edge
 - **Recovery:** Create new migration from current state to target
 
-**dag/chain-breakage**
-- **Description:** Marker references migration that no longer exists in DAG
+**dag/path-breakage**
+- **Description:** Marker references a state that no longer exists in the migration graph
 - **Detection:** On migration apply; edge file deleted or lost
 - **Cause:** Migration file deleted; repository history rewritten; incomplete sync
 - **Recoverability:** Depends on whether edge can be reconstructed
