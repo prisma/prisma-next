@@ -17,6 +17,7 @@ import {
   ParamRef,
   ProjectionItem,
   SelectAst,
+  SubqueryExpr,
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -134,6 +135,23 @@ describe('Postgres rich AST lowering', () => {
 
     expect(lowered.body.sql).toContain('"user"."vector" <=> $1::vector');
     expect(lowered.body.sql).toContain('COUNT(*) AS "count"');
+  });
+
+  it('lowers scalar subquery expressions in projections', () => {
+    const subquery = SelectAst.from(TableSource.named('post'))
+      .withProject([ProjectionItem.of('cnt', AggregateExpr.count())])
+      .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'user_id'), ColumnRef.of('user', 'id')));
+
+    const ast = SelectAst.from(TableSource.named('user')).withProject([
+      ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+      ProjectionItem.of('post_count', SubqueryExpr.of(subquery)),
+    ]);
+
+    const lowered = adapter.lower(ast, { contract, params: [] });
+
+    expect(lowered.body.sql).toContain(
+      '(SELECT COUNT(*) AS "cnt" FROM "post" WHERE "post"."user_id" = "user"."id") AS "post_count"',
+    );
   });
 
   it('lowers insert, update, and delete statements built from rich nodes', () => {
