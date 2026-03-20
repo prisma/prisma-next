@@ -1,0 +1,224 @@
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Preview planned CREATE TABLE operations [empty database, contract emitted]
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Preview planned CREATE TABLE operations [empty database, contract emitted]
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Preview planned CREATE TABLE operations [empty database, contract emitted]
+> prisma-next db init --dry-run
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Preview planned CREATE TABLE operations [empty database, contract emitted]
+> prisma-next db init --dry-run
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Preview planned CREATE TABLE operations [empty database, contract emitted]
+> prisma-next db init --dry-run
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Preview planned CREATE TABLE operations [empty database, contract emitted]
+> prisma-next db init --dry-run
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+prisma-next db init → Bootstrap a database to match the current contract
+│
+│ config:               prisma-next.config.ts
+│ contract:             contract.json
+│ mode:                 dry run
+│
+│ Read more             https://pris.ly/db-init
+└
+
+│
+│  ✔ Planned 1 operation(s)
+│  │
+│  └─ Create table user [additive]
+│
+│  Destination hash: sha256:95060eda0d8ef9b30439212a41756c15066733defdde81ee7118f955be7361d1
+│
+│  This is a dry run. No changes were applied.
+│  Run without --dry-run to apply changes.
+>
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────

@@ -308,7 +308,8 @@ export function createDbIntrospectCommand(): Command {
     'Inspect the database schema and generate PSL',
     'Reads the live database schema and writes a .prisma schema file.\n' +
       'By default, writes to the resolved output path. Use --dry-run to\n' +
-      'preview the schema as a tree view without writing any file.',
+      'preview the schema as a tree view without writing any file. Use\n' +
+      '`db verify` to compare the live schema against your contract.',
   );
   setCommandExamples(command, [
     'prisma-next db introspect --db $DATABASE_URL',

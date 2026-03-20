@@ -132,7 +132,6 @@ function getCommandDocsUrl(commandPath: string): string | undefined {
     'db verify': 'https://pris.ly/db-verify',
     'db update': 'https://pris.ly/db-update',
     'db introspect': 'https://pris.ly/db-introspect',
-    'db schema-verify': 'https://pris.ly/db-schema-verify',
     'migration plan': 'https://pris.ly/migration-plan',
     'migration apply': 'https://pris.ly/migration-apply',
     'migration show': 'https://pris.ly/migration-show',

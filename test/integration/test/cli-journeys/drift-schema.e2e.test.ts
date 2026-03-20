@@ -1,15 +1,15 @@
 /**
  * Schema Drift Scenarios (Journeys M + N)
  *
- * M — Phantom drift: after initialization, a DBA drops a column via manual DDL.
- *     db verify now catches the missing column by default via structural schema
- *     verification. db verify --shallow still performs marker-only verification and
- *     therefore passes if the marker row is unchanged. Recovery via db update
- *     fails because re-adding a NOT NULL column to an existing table is
- *     unrecoverable without manual intervention.
+ * M — Manual DDL with unchanged marker: after initialization, a DBA drops a
+ *     column via manual DDL. db verify catches that the live schema no longer
+ *     matches the contract. db verify --marker-only still performs marker-only
+ *     verification and therefore passes if the marker row is unchanged.
+ *     Recovery via db update fails because re-adding a NOT NULL column to an
+ *     existing table is unrecoverable without manual intervention.
  *
  * N — Extra column drift: a DBA adds a column via manual DDL. Tolerant
- *     schema-verify passes (extras OK), strict schema-verify fails. Recovery
+ *     db verify passes (extras OK), strict db verify fails. Recovery
  *     by expanding the contract to include a new column, then db update.
  */
 
@@ -22,7 +22,6 @@ import {
   runContractEmit,
   runDbInit,
   runDbIntrospect,
-  runDbSchemaVerify,
   runDbUpdate,
   runDbVerify,
   setupJourney,
@@ -33,13 +32,13 @@ import {
 
 withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
-  // Journey M: Phantom Drift (Marker OK, Schema Diverged)
+  // Journey M: Manual DDL With Unchanged Marker
   // -------------------------------------------------------------------------
-  describe('Journey M: Phantom Drift', () => {
+  describe('Journey M: Manual DDL With Unchanged Marker', () => {
     const db = useDevDatabase();
 
     it(
-      'init → manual DDL drop → verify fails → verify --shallow passes → schema-verify fails',
+      'init → manual DDL drop → verify fails → verify --marker-only passes → verify --schema-only fails',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -57,17 +56,17 @@ withTempDir(({ createTempDir }) => {
           await client.query('ALTER TABLE "user" DROP COLUMN email');
         });
 
-        // M.01: db verify (fails — structural schema verification detects drift)
+        // M.01: db verify (fails — schema verification detects the missing column)
         const verify = await runDbVerify(ctx);
         expect(verify.exitCode, 'M.01: db verify detects drift').toBe(1);
 
-        // M.02: db verify --shallow (passes — marker hash still matches)
-        const shallowVerify = await runDbVerify(ctx, ['--shallow']);
-        expect(shallowVerify.exitCode, 'M.02: db verify --shallow marker-only').toBe(0);
+        // M.02: db verify --marker-only (passes — marker hash still matches)
+        const markerOnlyVerify = await runDbVerify(ctx, ['--marker-only']);
+        expect(markerOnlyVerify.exitCode, 'M.02: db verify --marker-only').toBe(0);
 
-        // M.03: db schema-verify (fails — missing email column)
-        const schemaVerify = await runDbSchemaVerify(ctx);
-        expect(schemaVerify.exitCode, 'M.03: db schema-verify fails').toBe(1);
+        // M.03: db verify --schema-only (fails — missing email column)
+        const schemaVerify = await runDbVerify(ctx, ['--schema-only']);
+        expect(schemaVerify.exitCode, 'M.03: db verify --schema-only fails').toBe(1);
 
         // M.04: db introspect (shows schema without email)
         const introspect = await runDbIntrospect(ctx);
@@ -115,13 +114,13 @@ withTempDir(({ createTempDir }) => {
         const verify = await runDbVerify(ctx);
         expect(verify.exitCode, 'N.01: db verify passes').toBe(0);
 
-        // N.02: db schema-verify (passes — tolerant, extras OK)
-        const tolerant = await runDbSchemaVerify(ctx);
-        expect(tolerant.exitCode, 'N.02: schema-verify tolerant passes').toBe(0);
+        // N.02: db verify --schema-only (passes — tolerant, extras OK)
+        const tolerant = await runDbVerify(ctx, ['--schema-only']);
+        expect(tolerant.exitCode, 'N.02: db verify --schema-only tolerant passes').toBe(0);
 
-        // N.03: db schema-verify --strict (fails — extra age column)
-        const strict = await runDbSchemaVerify(ctx, ['--strict']);
-        expect(strict.exitCode, 'N.03: schema-verify strict fails').toBe(1);
+        // N.03: db verify --strict (fails — extra age column)
+        const strict = await runDbVerify(ctx, ['--strict']);
+        expect(strict.exitCode, 'N.03: db verify strict fails').toBe(1);
 
         // N.04: db introspect --dry-run
         const introspect = await runDbIntrospect(ctx, ['--dry-run']);
@@ -142,9 +141,9 @@ withTempDir(({ createTempDir }) => {
         const updateY = await runDbUpdate(ctx, ['-y']);
         expect(updateY.exitCode, 'N.07: db update -y accepts').toBe(0);
 
-        // N.08: db schema-verify tolerant (passes — all contract columns present; 'age' tolerated as extra)
-        const tolerantAfter = await runDbSchemaVerify(ctx);
-        expect(tolerantAfter.exitCode, 'N.08: tolerant passes after update').toBe(0);
+        // N.08: db verify --schema-only tolerant (passes — all contract columns present; 'age' tolerated as extra)
+        const tolerantAfter = await runDbVerify(ctx, ['--schema-only']);
+        expect(tolerantAfter.exitCode, 'N.08: schema-only tolerant passes after update').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );

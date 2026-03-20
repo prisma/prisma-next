@@ -5,7 +5,7 @@
  * the full initialization lifecycle: emit a contract, dry-run the init to
  * preview planned operations, apply it for real, confirm idempotency on
  * re-run, then verify the marker and schema (tolerant and strict). Finishes
- * with introspection and JSON output variants of verify/schema-verify.
+ * with introspection and JSON output variants of full and schema-only verify.
  */
 
 import stripAnsi from 'strip-ansi';
@@ -17,7 +17,6 @@ import {
   runContractEmit,
   runDbInit,
   runDbIntrospect,
-  runDbSchemaVerify,
   runDbVerify,
   setupJourney,
   sql,
@@ -80,13 +79,13 @@ withTempDir(({ createTempDir }) => {
         const verify = await runDbVerify(ctx);
         expect(verify.exitCode, 'A.05: db verify').toBe(0);
 
-        // A.06: db schema-verify
-        const schemaVerify = await runDbSchemaVerify(ctx);
-        expect(schemaVerify.exitCode, 'A.06: db schema-verify').toBe(0);
+        // A.06: db verify --schema-only
+        const schemaVerify = await runDbVerify(ctx, ['--schema-only']);
+        expect(schemaVerify.exitCode, 'A.06: db verify --schema-only').toBe(0);
 
-        // A.07: db schema-verify --strict
-        const schemaVerifyStrict = await runDbSchemaVerify(ctx, ['--strict']);
-        expect(schemaVerifyStrict.exitCode, 'A.07: db schema-verify strict').toBe(0);
+        // A.07: db verify --strict
+        const schemaVerifyStrict = await runDbVerify(ctx, ['--strict']);
+        expect(schemaVerifyStrict.exitCode, 'A.07: db verify strict').toBe(0);
 
         // A.08: db introspect --dry-run
         const introspect = await runDbIntrospect(ctx, ['--dry-run']);
@@ -103,9 +102,9 @@ withTempDir(({ createTempDir }) => {
           marker: { storageHash: expect.any(String) },
         });
 
-        // A.10: db schema-verify --json
-        const schemaVerifyJson = await runDbSchemaVerify(ctx, ['--json']);
-        expect(schemaVerifyJson.exitCode, 'A.10: db schema-verify json').toBe(0);
+        // A.10: db verify --schema-only --json
+        const schemaVerifyJson = await runDbVerify(ctx, ['--schema-only', '--json']);
+        expect(schemaVerifyJson.exitCode, 'A.10: db verify schema-only json').toBe(0);
         const svData = parseJsonOutput(schemaVerifyJson);
         expect(svData, 'A.10: json ok').toMatchObject({ ok: true });
       },

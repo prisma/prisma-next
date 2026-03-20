@@ -10,7 +10,6 @@ import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } fro
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
 import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
-import { createDbSchemaVerifyCommand } from '@prisma-next/cli/commands/db-schema-verify';
 import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
@@ -156,6 +155,7 @@ export const contractFixtures = {
   'contract-base': join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'),
   'contract-additive': join(JOURNEY_FIXTURES_DIR, 'contract-additive.ts'),
   'contract-destructive': join(JOURNEY_FIXTURES_DIR, 'contract-destructive.ts'),
+  'contract-add-table': join(JOURNEY_FIXTURES_DIR, 'contract-add-table.ts'),
   'contract-v3': join(JOURNEY_FIXTURES_DIR, 'contract-v3.ts'),
 } as const;
 
@@ -175,6 +175,12 @@ export function swapContract(ctx: JourneyContext, variant: ContractVariant): voi
 // Command execution
 // ---------------------------------------------------------------------------
 
+/** Options for controlling the test environment when running a CLI command. */
+export interface RunCommandOptions {
+  /** Simulate piped stdout (isTTY=false) to test auto-JSON forwarding. Default: true (interactive). */
+  readonly isTTY?: boolean;
+}
+
 /**
  * Core execution helper — all run* functions delegate to this.
  * Creates fresh mocks for each invocation so steps don't interfere.
@@ -187,8 +193,9 @@ async function runCommandCore(
   command: Command,
   testDir: string,
   args: readonly string[],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
-  const mocks = setupCommandMocks();
+  const mocks = setupCommandMocks({ isTTY: options?.isTTY });
   const originalCwd = process.cwd();
   try {
     process.chdir(testDir);
@@ -219,8 +226,9 @@ async function runCommand(
   command: Command,
   ctx: JourneyContext,
   args: readonly string[],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
-  return runCommandCore(command, ctx.testDir, ['--config', ctx.configPath, ...args]);
+  return runCommandCore(command, ctx.testDir, ['--config', ctx.configPath, ...args], options);
 }
 
 /** Runs a CLI command without --config (for commands that don't need it, or error tests). */
@@ -228,8 +236,9 @@ async function runCommandRaw(
   command: Command,
   testDir: string,
   args: readonly string[],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
-  return runCommandCore(command, testDir, args);
+  return runCommandCore(command, testDir, args, options);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,8 +248,9 @@ async function runCommandRaw(
 export async function runContractEmit(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
-  return runCommand(createContractEmitCommand(), ctx, extraArgs);
+  return runCommand(createContractEmitCommand(), ctx, extraArgs, options);
 }
 
 export async function runDbInit(
@@ -262,13 +272,6 @@ export async function runDbVerify(
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
   return runCommand(createDbVerifyCommand(), ctx, extraArgs);
-}
-
-export async function runDbSchemaVerify(
-  ctx: JourneyContext,
-  extraArgs: readonly string[] = [],
-): Promise<CommandResult> {
-  return runCommand(createDbSchemaVerifyCommand(), ctx, extraArgs);
 }
 
 export async function runDbSign(
@@ -334,6 +337,17 @@ export async function runContractEmitWithConfig(
     configPath,
     ...extraArgs,
   ]);
+}
+
+/**
+ * Runs a command with explicit --db flag (for connection error tests).
+ */
+export async function runDbVerifyWithDb(
+  ctx: JourneyContext,
+  dbUrl: string,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createDbVerifyCommand(), ctx, ['--db', dbUrl, ...extraArgs]);
 }
 
 // ---------------------------------------------------------------------------

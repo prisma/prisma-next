@@ -240,6 +240,13 @@ describe('Config Errors', () => {
     expect(error.fix).toContain('Run `prisma-next db init --db <url>`');
   });
 
+  it('errorDatabaseConnectionRequired with retryCommand preserves command flags', () => {
+    const error = errorDatabaseConnectionRequired({
+      retryCommand: 'prisma-next db verify --schema-only --strict --db <url>',
+    });
+    expect(error.fix).toContain('Run `prisma-next db verify --schema-only --strict --db <url>`');
+  });
+
   it('errorQueryRunnerFactoryRequired creates correct error', () => {
     const error = errorQueryRunnerFactoryRequired();
     expect(error.code).toBe('4006');
@@ -300,7 +307,7 @@ describe('Config Errors', () => {
   it('errorMigrationPlanningFailed with no conflict fixes', () => {
     const conflicts = [{ kind: 'conflict-1', summary: 'Summary 1' }];
     const error = errorMigrationPlanningFailed({ conflicts });
-    expect(error.fix).toContain('db schema-verify');
+    expect(error.fix).toContain('db verify --schema-only');
   });
 
   it('errorTargetMigrationNotSupported creates correct error', () => {

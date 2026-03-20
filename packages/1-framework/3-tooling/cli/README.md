@@ -103,17 +103,20 @@ prisma-next contract emit -v
 
 ### `prisma-next db verify`
 
-Verify that a database instance matches the emitted contract by checking the marker first and, by default, the live schema structure second.
+Verify that a database instance matches the emitted contract by checking the marker first and, by default, the live schema second.
 
 **Command:**
 ```bash
-prisma-next db verify [--db <url>] [--config <path>] [--shallow] [--json] [-v] [-q] [--color/--no-color]
+prisma-next db verify [--db <url>] [--config <path>] [--marker-only | --schema-only] [--strict] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 Options:
 - `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
-- `--shallow`: Skip structural schema verification and only check the database marker
+- `--marker-only`: Skip schema verification and only check the database marker
+- `--schema-only`: Skip marker verification and only check whether the live schema satisfies the contract
+- `--strict`: When schema verification runs, schema elements not present in the contract are considered an error
+- `--marker-only` cannot be combined with `--schema-only` or `--strict` (exit code 2, `PN-CLI-4012`). `--schema-only --strict` is valid.
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
@@ -129,7 +132,13 @@ prisma-next db verify
 prisma-next db verify --db postgresql://user:pass@localhost/db
 
 # Marker-only verification when callers accept the trade-off
-prisma-next db verify --db postgresql://user:pass@localhost/db --shallow
+prisma-next db verify --db postgresql://user:pass@localhost/db --marker-only
+
+# Schema-only verification without relying on marker state
+prisma-next db verify --db postgresql://user:pass@localhost/db --schema-only
+
+# Strict schema verification (extras fail)
+prisma-next db verify --db postgresql://user:pass@localhost/db --strict
 
 # JSON output
 prisma-next db verify --json
@@ -176,26 +185,27 @@ export default defineConfig({
    - Compares storage hash: Returns `PN-RTM-3002` if `storageHash` doesn't match
    - Compares profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
    - Checks codec coverage (optional): Compares contract column types against supported codec types and reports missing codecs
-5. **Verify Schema (default)**: Unless `--shallow` is provided, calls `familyInstance.schemaVerify()` in tolerant mode to catch structural drift such as missing tables or columns created by manual DDL.
+5. **Verify Schema (default)**: Unless `--marker-only` is provided, calls `familyInstance.schemaVerify()` to catch schema mismatches such as missing tables or columns after manual DDL. By default this runs in tolerant mode; `--strict` treats schema elements not present in the contract as an error.
+6. **Schema-only mode**: `--schema-only` skips marker verification entirely and runs only `schemaVerify()`. This is useful for brownfield adoption and corrupt-marker diagnosis.
 
 **Output Format (TTY):**
 
 Success:
 ```text
-✔ Database signature and schema match contract
+✔ Database marker and schema match contract
   verification: marker + schema
   storageHash: sha256:abc123...
   profileHash: sha256:def456...
 ```
 
-Shallow-mode success:
+Marker-only success:
 ```text
 ✔ Database marker matches contract
-  verification: marker only (--shallow)
+  verification: marker only (--marker-only)
   storageHash: sha256:abc123...
   profileHash: sha256:def456...
 
-⚠ Schema verification skipped because --shallow was provided. Run `prisma-next db schema-verify` to detect structural drift.
+⚠ Schema verification skipped because --marker-only was provided
 ```
 
 Marker failure:
@@ -206,14 +216,14 @@ Marker failure:
 ```
 
 Schema drift failure:
-`db verify` prints the same schema verification tree and JSON payload as `db schema-verify`, then exits with code 1.
+`db verify` prints the schema verification tree / JSON payload and exits with code 1.
 
 **Output Format (JSON):**
 
 ```json
 {
   "ok": true,
-  "summary": "Database signature and schema match contract",
+  "summary": "Database marker and schema match contract",
   "mode": "full",
   "contract": {
     "storageHash": "sha256:abc123...",
@@ -254,7 +264,7 @@ Schema drift failure:
 - `PN-RTM-3001`: Marker missing - Contract marker not found in database
 - `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
 - `PN-RTM-3003`: Target mismatch - Contract target does not match config target
-- Exit code 1 with schema verification payload: Structural drift detected after marker verification passed
+- Exit code 1 with schema verification payload: Schema does not match the contract (default mode or `--schema-only`)
 
 **Family Requirements:**
 
@@ -287,7 +297,7 @@ interface ControlFamilyInstance {
 
 Use `createControlPlaneStack()` from `@prisma-next/core-control-plane/stack` to create the stack with sensible defaults (`driver` defaults to `undefined`, `extensionPacks` defaults to `[]`).
 
-The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles marker checks, and `db verify` follows it with `schemaVerify()` unless `--shallow` is provided.
+The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles marker checks, full `db verify` follows it with `schemaVerify()`, `--marker-only` skips that schema step, and `--schema-only` runs `schemaVerify()` without marker checks.
 
 ### `prisma-next db introspect`
 
@@ -612,8 +622,7 @@ For updated markers:
 - Exit code 1: Schema verification failed — database schema does not match contract (marker is not written)
 
 **Relationship to Other Commands:**
-- **`db schema-verify`**: `db sign` calls `schemaVerify` as a precondition before writing the marker. If schema verification fails, `db sign` exits without writing the marker.
-- **`db verify`**: `db verify` checks that the marker exists and matches the contract, then runs tolerant schema verification by default. `db sign` writes the marker that `db verify` checks. Use `db verify --shallow` for marker-only verification.
+- **`db verify`**: `db verify` checks that the marker exists and matches the contract, then runs schema verification by default. `db sign` writes the marker that `db verify` checks. Use `db verify --marker-only` for marker-only verification and `db verify --schema-only` to inspect only the live schema.
 
 **Idempotency:**
 The `db sign` command is idempotent and safe to run multiple times:
@@ -1111,7 +1120,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
       - `types.storage`: Storage type bindings (`typeId`, `nativeType`, etc.) used in authoring/emission.
     - **`operations`**: Operation signatures the component contributes (extensions), used for type generation and (optionally) validation/lowering.
     - **Component-specific metadata**:
-      - Extensions may also include control-plane-only metadata like `databaseDependencies` (used by verify/schema-verify and not required at runtime).
+      - Extensions may also include control-plane-only metadata like `databaseDependencies` (used by verify and schema verification flows and not required at runtime).
 
 Unlike the older **manifest-based IR** approach (separate JSON manifests + a parsing/validation step to build an IR), descriptors are imported directly from packages (e.g., `@prisma-next/*/control`). This removes a file-format boundary and keeps the data and its types co-located.
 - Benefits: fewer moving parts (no JSON parsing), easier refactors (TypeScript catches drift), and clearer ownership (the package exports the canonical descriptor object).
@@ -1320,7 +1329,6 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/commands/db-init`**: Exports `createDbInitCommand`
 - **`@prisma-next/cli/commands/db-update`**: Exports `createDbUpdateCommand`
 - **`@prisma-next/cli/commands/db-introspect`**: Exports `createDbIntrospectCommand`
-- **`@prisma-next/cli/commands/db-schema-verify`**: Exports `createDbSchemaVerifyCommand`
 - **`@prisma-next/cli/commands/db-sign`**: Exports `createDbSignCommand`
 - **`@prisma-next/cli/commands/db-verify`**: Exports `createDbVerifyCommand`
 - **`@prisma-next/cli/commands/contract-emit`**: Exports `createContractEmitCommand`

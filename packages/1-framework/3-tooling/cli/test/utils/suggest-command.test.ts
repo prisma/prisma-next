@@ -3,7 +3,7 @@ import { suggestCommands } from '../../src/utils/suggest-command';
 
 describe('suggestCommands', () => {
   const topLevel = ['contract', 'db', 'migration', 'help'];
-  const dbSubs = ['verify', 'init', 'update', 'introspect', 'schema-verify', 'sign'];
+  const dbSubs = ['verify', 'init', 'update', 'introspect', 'sign'];
 
   it('returns empty array when no candidates', () => {
     expect(suggestCommands('foo', [])).toEqual([]);

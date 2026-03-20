@@ -15,6 +15,7 @@
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
+    "record": "tsx scripts/record.ts",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "bin": {
@@ -74,10 +75,6 @@
     "./commands/db-introspect": {
       "types": "./dist/commands/db-introspect.d.mts",
       "import": "./dist/commands/db-introspect.mjs"
-    },
-    "./commands/db-schema-verify": {
-      "types": "./dist/commands/db-schema-verify.d.mts",
-      "import": "./dist/commands/db-schema-verify.mjs"
     },
     "./commands/db-sign": {
       "types": "./dist/commands/db-sign.d.mts",

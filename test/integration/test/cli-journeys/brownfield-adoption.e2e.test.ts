@@ -2,10 +2,10 @@
  * Brownfield Adoption (Journeys F + G)
  *
  * F — Adopt Prisma on an existing database: introspect the live schema, emit a
- *     matching contract, schema-verify, sign the marker, then evolve via db update.
+ *     matching contract, verify --schema-only, sign the marker, then evolve via db update.
  *
  * G — Brownfield with schema mismatch: emit a contract that doesn't match the
- *     database (extra column), observe schema-verify and sign failures, fix the
+ *     database (extra column), observe verify --schema-only and sign failures, fix the
  *     contract to match, and successfully sign.
  */
 
@@ -18,7 +18,6 @@ import {
   parseJsonOutput,
   runContractEmit,
   runDbIntrospect,
-  runDbSchemaVerify,
   runDbSign,
   runDbUpdate,
   runDbVerify,
@@ -45,7 +44,7 @@ withTempDir(({ createTempDir }) => {
     });
 
     it(
-      'introspect → emit → schema-verify → sign → verify → evolve → db update',
+      'introspect → emit → verify --schema-only → sign → verify → evolve → db update',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -63,9 +62,9 @@ withTempDir(({ createTempDir }) => {
         const emit = await runContractEmit(ctx);
         expect(emit.exitCode, 'F.02: contract emit').toBe(0);
 
-        // F.03: db schema-verify
-        const schemaVerify = await runDbSchemaVerify(ctx);
-        expect(schemaVerify.exitCode, 'F.03: db schema-verify').toBe(0);
+        // F.03: db verify --schema-only
+        const schemaVerify = await runDbVerify(ctx, ['--schema-only']);
+        expect(schemaVerify.exitCode, 'F.03: db verify --schema-only').toBe(0);
 
         // F.04: db sign
         const sign = await runDbSign(ctx);
@@ -103,7 +102,7 @@ withTempDir(({ createTempDir }) => {
     });
 
     it(
-      'introspect → emit mismatch → schema-verify fails → sign fails → fix → pass',
+      'introspect → emit mismatch → verify --schema-only fails → sign fails → fix → pass',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -119,9 +118,9 @@ withTempDir(({ createTempDir }) => {
         const emit = await runContractEmit(ctx);
         expect(emit.exitCode, 'G.02: contract emit mismatch').toBe(0);
 
-        // G.03: db schema-verify (fails — missing column)
-        const schemaVerifyFail = await runDbSchemaVerify(ctx);
-        expect(schemaVerifyFail.exitCode, 'G.03: db schema-verify fails').toBe(1);
+        // G.03: db verify --schema-only (fails — missing column)
+        const schemaVerifyFail = await runDbVerify(ctx, ['--schema-only']);
+        expect(schemaVerifyFail.exitCode, 'G.03: db verify --schema-only fails').toBe(1);
 
         // G.04: db sign (fails — schema verification fails first)
         const signFail = await runDbSign(ctx);
@@ -138,9 +137,9 @@ withTempDir(({ createTempDir }) => {
         const emitFixed = await runContractEmit(ctx);
         expect(emitFixed.exitCode, 'G.06: contract emit fixed').toBe(0);
 
-        // G.07: db schema-verify (passes)
-        const schemaVerifyPass = await runDbSchemaVerify(ctx);
-        expect(schemaVerifyPass.exitCode, 'G.07: db schema-verify passes').toBe(0);
+        // G.07: db verify --schema-only (passes)
+        const schemaVerifyPass = await runDbVerify(ctx, ['--schema-only']);
+        expect(schemaVerifyPass.exitCode, 'G.07: db verify --schema-only passes').toBe(0);
 
         // G.08: db sign (succeeds)
         const sign = await runDbSign(ctx);

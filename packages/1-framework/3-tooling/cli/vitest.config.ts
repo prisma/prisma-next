@@ -12,6 +12,7 @@ export default defineConfig({
     isolate: false,
     testTimeout: timeouts.default,
     hookTimeout: timeouts.default,
+    setupFiles: ['./test/setup.ts'],
     env: {
       CI: 'true',
     },
@@ -44,7 +45,6 @@ export default defineConfig({
         'src/commands/contract-emit.ts',
         'src/commands/db-init.ts',
         'src/commands/db-introspect.ts',
-        'src/commands/db-schema-verify.ts',
         'src/commands/db-sign.ts',
         'src/commands/db-update.ts',
         'src/commands/db-verify.ts',

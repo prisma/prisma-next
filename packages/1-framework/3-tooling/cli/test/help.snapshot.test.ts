@@ -8,7 +8,7 @@ import { createDbVerifyCommand } from '../src/commands/db-verify';
 import { formatCommandHelp, formatRootHelp } from '../src/utils/formatters/help';
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
-describe('help text snapshots', () => {
+describe('help text snapshots', { timeout: timeouts.default }, () => {
   it(
     'formats root help',
     () => {
