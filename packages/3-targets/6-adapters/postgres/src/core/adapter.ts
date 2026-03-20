@@ -38,7 +38,7 @@ import {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
 import { codecDefinitions } from './codecs';
-import { escapeLiteral } from './sql-utils';
+import { escapeLiteral, quoteIdentifier } from './sql-utils';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
 const VECTOR_CODEC_ID = 'pg/vector@1' as const;
@@ -502,10 +502,6 @@ function renderJoinOn(on: JoinOnExpr, contract?: PostgresContract): string {
     return `${left} = ${right}`;
   }
   return renderWhere(on, contract);
-}
-
-function quoteIdentifier(identifier: string): string {
-  return `"${identifier.replace(/"/g, '""')}"`;
 }
 
 function getInsertColumnOrder(
