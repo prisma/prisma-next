@@ -2,7 +2,9 @@
 
 ## Context
 
-Migrations are modeled as directed edges from `fromHash` to `toHash`. At apply time, the runner must compute a path from the database's current contract hash to the desired hash using the set of on-disk edges. The graph must remain acyclic and well-formed so path computation is deterministic, fast, and safe.
+Migrations are modeled as directed edges from `fromHash` to `toHash`. At apply time, the runner must compute a path from the database's current contract hash to the desired hash using the set of on-disk edges. The graph must be well-formed so path computation is deterministic, fast, and safe.
+
+**Update (ADR 169):** The graph now tolerates cycles (e.g., rollback migrations C1→C2→C1). BFS pathfinding uses visited-node tracking to handle cycles safely. `parentMigrationId` has been removed — ordering is determined entirely by graph topology. Named refs (`migrations/refs.json`) provide multi-environment targeting.
 
 ## Problem
 
@@ -70,7 +72,7 @@ Not a conflict with reconstruction:
 ### Integrity checks on load
 
 - **Self-loop check**: reject `from == to` with `ERR_MIG_GRAPH_SELF_LOOP`
-- **Cycle detection**: DFS with color marking, error `ERR_MIG_GRAPH_CYCLE` and report the cycle
+- **Cycle detection**: DFS with color marking, reported as `WARN_MIG_GRAPH_CYCLE` for diagnostics. Cycles are tolerated at runtime — BFS pathfinding uses visited-node tracking to avoid infinite loops. See ADR 169 §3.
 - **Parallel edge policy**: two edges with same `(from, to)` but different `opsHash` require label `parallel-ok`, else `ERR_MIG_GRAPH_PARALLEL_EDGE`
 - **Orphan edge detection**: edges unreachable from any genesis or that lead to no declared target are flagged as `WARN_MIG_ORPHAN_EDGE` (excludes edges marked `archived: true`)
 - **Dangling target detection**: `to` with no inbound edges and not a genesis is `ERR_MIG_GRAPH_DANGLING_TARGET`
