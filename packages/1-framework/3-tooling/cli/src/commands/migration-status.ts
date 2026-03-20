@@ -222,7 +222,6 @@ async function executeMigrationStatusCommand(
   let activeRefHash: string | undefined;
   let allRefs: Record<string, string> = {};
 
-  // TODO: don't we have a utility for this
   const refsPath = resolve(migrationsDir, 'refs.json');
   try {
     allRefs = await readRefs(refsPath);
@@ -315,7 +314,6 @@ async function executeMigrationStatusCommand(
     );
   }
 
-  // TODO: lots of nesting and stuff - can we flatten this
   if (attested.length === 0) {
     if (contractHash !== EMPTY_CONTRACT_HASH) {
       diagnostics.push({
@@ -354,26 +352,23 @@ async function executeMigrationStatusCommand(
   let mode: 'online' | 'offline' = 'offline';
 
   if (dbConnection && hasDriver) {
+    const client = createControlClient({
+      family: config.family,
+      target: config.target,
+      adapter: config.adapter,
+      driver: config.driver,
+      extensionPacks: config.extensionPacks ?? [],
+    });
     try {
-      const client = createControlClient({
-        family: config.family,
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
-      try {
-        await client.connect(dbConnection);
-        const marker = await client.readMarker();
-        markerHash = marker?.storageHash;
-        mode = 'online';
-      } finally {
-        await client.close();
-      }
+      await client.connect(dbConnection);
+      markerHash = (await client.readMarker())?.storageHash;
+      mode = 'online';
     } catch {
       if (!flags.json && !flags.quiet) {
         ui.warn('Could not connect to database — showing offline status');
       }
+    } finally {
+      await client.close();
     }
   }
 
@@ -393,7 +388,6 @@ async function executeMigrationStatusCommand(
   const markerInChain = markerHash === undefined || chain.some((e) => e.to === markerHash);
 
   let summary: string;
-  // TODO: flatten and simplify all of the below
   if (mode === 'online') {
     if (!markerInChain) {
       summary = `Database marker does not match any migration — was the database managed with 'db update'?`;
