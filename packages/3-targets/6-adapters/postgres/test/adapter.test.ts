@@ -11,6 +11,7 @@ import {
   createTableRef,
   createUpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '../src/core/adapter';
@@ -1035,55 +1036,59 @@ describe('createPostgresAdapter', () => {
         expect(lowered.body.sql).toContain('AS "normalized"');
       });
 
-      it('lowers SELECT with operation expression in include ORDER BY', () => {
-        const adapter = createPostgresAdapter();
+      it(
+        'lowers SELECT with operation expression in include ORDER BY',
+        { timeout: timeouts.databaseOperation },
+        () => {
+          const adapter = createPostgresAdapter();
 
-        const operationExpr = {
-          kind: 'operation' as const,
-          method: 'normalize',
-          forTypeId: 'pg/vector@1',
-          self: { kind: 'col' as const, table: 'post', column: 'vector' },
-          args: [],
-          returns: { kind: 'typeId' as const, type: 'pg/vector@1' },
-          lowering: {
-            targetFamily: 'sql' as const,
-            strategy: 'function' as const,
-            // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-            template: 'normalize(${self})',
-          },
-        };
-
-        const ast: SelectAst = {
-          kind: 'select',
-          from: { kind: 'table', name: 'user' },
-          includes: [
-            {
-              kind: 'includeMany',
-              alias: 'posts',
-              child: {
-                table: { kind: 'table', name: 'post' },
-                on: {
-                  kind: 'eqCol',
-                  left: { kind: 'col', table: 'user', column: 'id' },
-                  right: { kind: 'col', table: 'post', column: 'userId' },
-                },
-                project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
-                orderBy: [{ expr: operationExpr, dir: 'asc' }],
-              },
+          const operationExpr = {
+            kind: 'operation' as const,
+            method: 'normalize',
+            forTypeId: 'pg/vector@1',
+            self: { kind: 'col' as const, table: 'post', column: 'vector' },
+            args: [],
+            returns: { kind: 'typeId' as const, type: 'pg/vector@1' },
+            lowering: {
+              targetFamily: 'sql' as const,
+              strategy: 'function' as const,
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+              template: 'normalize(${self})',
             },
-          ],
-          project: [
-            { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-            { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
-          ],
-        };
+          };
 
-        const lowered = adapter.lower(ast, { contract, params: [] });
+          const ast: SelectAst = {
+            kind: 'select',
+            from: { kind: 'table', name: 'user' },
+            includes: [
+              {
+                kind: 'includeMany',
+                alias: 'posts',
+                child: {
+                  table: { kind: 'table', name: 'post' },
+                  on: {
+                    kind: 'eqCol',
+                    left: { kind: 'col', table: 'user', column: 'id' },
+                    right: { kind: 'col', table: 'post', column: 'userId' },
+                  },
+                  project: [{ alias: 'id', expr: { kind: 'col', table: 'post', column: 'id' } }],
+                  orderBy: [{ expr: operationExpr, dir: 'asc' }],
+                },
+              },
+            ],
+            project: [
+              { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+              { alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } },
+            ],
+          };
 
-        expect(lowered.body.sql).toContain('ORDER BY');
-        expect(lowered.body.sql).toContain('normalize("post"."vector")');
-        expect(lowered.body.sql).toContain('ASC');
-      });
+          const lowered = adapter.lower(ast, { contract, params: [] });
+
+          expect(lowered.body.sql).toContain('ORDER BY');
+          expect(lowered.body.sql).toContain('normalize("post"."vector")');
+          expect(lowered.body.sql).toContain('ASC');
+        },
+      );
     });
   });
 

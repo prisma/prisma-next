@@ -38,6 +38,6 @@ The TS authoring surface can express a broader set of default functions/expressi
 # References
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
-- Project plan: `projects/psl-contract-authoring/plans/plan.md`
+- Project plan: `projects/psl-contract-authoring/plan.md`
 - Gap inventory: `projects/psl-contract-authoring/references/authoring-surface-gap-inventory.md`
 

@@ -1,11 +1,11 @@
 import type { PslSpan } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
-  createBuiltinDefaultFunctionRegistry,
-  type DefaultFunctionLoweringHandler,
+  type DefaultFunctionRegistryEntry,
   lowerDefaultFunctionWithRegistry,
   parseDefaultFunctionCall,
 } from '../src/default-function-registry';
+import { createBuiltinLikeControlMutationDefaults } from './fixtures';
 
 function createSpan(overrides?: Partial<PslSpan['start']>): PslSpan {
   return {
@@ -29,6 +29,8 @@ const loweringContext = {
 } as const;
 
 describe('default function registry', () => {
+  const builtinRegistry = createBuiltinLikeControlMutationDefaults().defaultFunctionRegistry;
+
   it('returns undefined for invalid function-call shapes', () => {
     expect(parseDefaultFunctionCall('uuid', createSpan())).toBeUndefined();
     expect(parseDefaultFunctionCall('uuid(4', createSpan())).toBeUndefined();
@@ -89,7 +91,7 @@ describe('default function registry', () => {
   });
 
   it('lowers cuid(2) and rejects cuid() with actionable guidance', () => {
-    const registry = createBuiltinDefaultFunctionRegistry();
+    const registry = builtinRegistry;
     const cuid2Call = parseDefaultFunctionCall('cuid(2)', createSpan());
     const cuidCall = parseDefaultFunctionCall('cuid()', createSpan({ line: 7 }));
 
@@ -123,19 +125,21 @@ describe('default function registry', () => {
   });
 
   it('derives unknown-function supported list from registry keys', () => {
-    const customRegistry = new Map<string, DefaultFunctionLoweringHandler>([
+    const customRegistry = new Map<string, DefaultFunctionRegistryEntry>([
       [
         'custom',
-        () => ({
-          ok: true,
-          value: {
-            kind: 'storage',
-            defaultValue: {
-              kind: 'function',
-              expression: 'custom()',
+        {
+          lower: () => ({
+            ok: true,
+            value: {
+              kind: 'storage',
+              defaultValue: {
+                kind: 'function',
+                expression: 'custom()',
+              },
             },
-          },
-        }),
+          }),
+        },
       ],
     ]);
     const unknownCall = parseDefaultFunctionCall('mystery()', createSpan());
@@ -156,9 +160,44 @@ describe('default function registry', () => {
     expect(loweredUnknown.diagnostic.message).not.toContain('autoincrement()');
   });
 
-  it('includes additive suggestion for known mistyped generator ids', () => {
+  it('uses contributed usage signatures when provided', () => {
+    const customRegistry = new Map<string, DefaultFunctionRegistryEntry>([
+      [
+        'custom',
+        {
+          lower: () => ({
+            ok: true,
+            value: {
+              kind: 'storage',
+              defaultValue: {
+                kind: 'function',
+                expression: 'custom()',
+              },
+            },
+          }),
+          usageSignatures: ['custom(size)'],
+        },
+      ],
+    ]);
+    const unknownCall = parseDefaultFunctionCall('mystery()', createSpan());
+    expect(unknownCall).toBeDefined();
+    if (!unknownCall) return;
+
+    const loweredUnknown = lowerDefaultFunctionWithRegistry({
+      call: unknownCall,
+      registry: customRegistry,
+      context: loweringContext,
+    });
+
+    expect(loweredUnknown.ok).toBe(false);
+    if (loweredUnknown.ok) return;
+    expect(loweredUnknown.diagnostic.message).toContain('custom(size)');
+    expect(loweredUnknown.diagnostic.message).not.toContain('custom().');
+  });
+
+  it('lists supported signatures for unknown generator-like function names', () => {
     const unknownCall = parseDefaultFunctionCall('uuidv7()', createSpan());
-    const registry = createBuiltinDefaultFunctionRegistry();
+    const registry = builtinRegistry;
 
     expect(unknownCall).toBeDefined();
     if (!unknownCall) return;
@@ -171,11 +210,11 @@ describe('default function registry', () => {
     expect(loweredUnknown.ok).toBe(false);
     if (loweredUnknown.ok) return;
 
-    expect(loweredUnknown.diagnostic.message).toContain('Use `uuid(7)`.');
+    expect(loweredUnknown.diagnostic.message).toContain('uuid(7)');
   });
 
   it('preserves escaped dbgenerated string content', () => {
-    const registry = createBuiltinDefaultFunctionRegistry();
+    const registry = builtinRegistry;
     const call = parseDefaultFunctionCall(
       String.raw`dbgenerated("nextval(\"public\".\"user_id_seq\")")`,
       createSpan(),
@@ -202,7 +241,7 @@ describe('default function registry', () => {
   });
 
   it('returns diagnostics for nanoid and dbgenerated invalid argument shapes', () => {
-    const registry = createBuiltinDefaultFunctionRegistry();
+    const registry = builtinRegistry;
     const badNanoidCall = parseDefaultFunctionCall('nanoid(16, 32)', createSpan());
     const missingDbgeneratedArgCall = parseDefaultFunctionCall('dbgenerated()', createSpan());
     const nonStringDbgeneratedArgCall = parseDefaultFunctionCall('dbgenerated(123)', createSpan());
