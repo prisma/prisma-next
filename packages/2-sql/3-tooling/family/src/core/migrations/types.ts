@@ -1,4 +1,5 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverInstance,
@@ -55,10 +56,27 @@ type ControlMutationDefaultLoweringContext = {
   readonly columnCodecId?: string;
 };
 
+export type ControlMutationDefaultFunctionResult =
+  | {
+      readonly ok: true;
+      readonly value:
+        | { readonly kind: 'storage'; readonly defaultValue: ColumnDefault }
+        | { readonly kind: 'execution'; readonly generated: ExecutionMutationDefaultValue };
+    }
+  | {
+      readonly ok: false;
+      readonly diagnostic: {
+        readonly code: string;
+        readonly message: string;
+        readonly sourceId?: string;
+        readonly span?: ControlMutationDefaultSpan;
+      };
+    };
+
 export type ControlMutationDefaultFunctionHandler = (input: {
   readonly call: ControlMutationDefaultFunctionCall;
   readonly context: ControlMutationDefaultLoweringContext;
-}) => unknown;
+}) => ControlMutationDefaultFunctionResult;
 
 export interface ControlMutationDefaultFunctionEntry {
   readonly lower: ControlMutationDefaultFunctionHandler;

@@ -21,11 +21,11 @@ export interface DefaultFunctionLoweringContext {
   readonly columnCodecId?: string;
 }
 
-type LoweredDefaultValue =
+export type LoweredDefaultValue =
   | { readonly kind: 'storage'; readonly defaultValue: ColumnDefault }
   | { readonly kind: 'execution'; readonly generated: ExecutionMutationDefaultValue };
 
-type LoweredDefaultResult =
+export type LoweredDefaultResult =
   | { readonly ok: true; readonly value: LoweredDefaultValue }
   | { readonly ok: false; readonly diagnostic: ContractSourceDiagnostic };
 
@@ -60,7 +60,7 @@ export interface ControlMutationDefaultEntry {
   readonly lower: (input: {
     readonly call: ParsedDefaultFunctionCall;
     readonly context: DefaultFunctionLoweringContext;
-  }) => unknown;
+  }) => LoweredDefaultResult;
   readonly usageSignatures?: readonly string[];
 }
 
@@ -246,7 +246,7 @@ export function lowerDefaultFunctionWithRegistry(input: {
 }): LoweredDefaultResult {
   const entry = input.registry.get(input.call.name);
   if (entry) {
-    return entry.lower({ call: input.call, context: input.context }) as LoweredDefaultResult;
+    return entry.lower({ call: input.call, context: input.context });
   }
   const supportedFunctionList = formatSupportedFunctionList(input.registry);
 
