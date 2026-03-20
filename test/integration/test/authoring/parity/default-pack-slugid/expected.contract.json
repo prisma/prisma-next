@@ -4,7 +4,7 @@
   "target": "postgres",
   "storageHash": "sha256:9e27b90da3eb44a199ce86ba13e2082b0d2cdc502803c95138a32b3afb88c0ec",
   "executionHash": "sha256:c3b03395de492379b9ba6d6f890debc53739629234ba98a8dbf7dc8c4301a910",
-  "profileHash": "sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89",
+  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
   "models": {
     "User": {
       "fields": {
@@ -53,8 +53,27 @@
       ]
     }
   },
-  "capabilities": {},
-  "extensionPacks": {},
+  "capabilities": {
+    "postgres": {
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "enums": true
+    }
+  },
+  "extensionPacks": {
+    "slugid-defaults": {
+      "familyId": "sql",
+      "id": "slugid-defaults",
+      "kind": "extension",
+      "targetId": "postgres",
+      "version": "0.0.1"
+    }
+  },
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
