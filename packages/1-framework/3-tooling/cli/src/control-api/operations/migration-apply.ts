@@ -4,7 +4,6 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
-  MigrationPlanOperation,
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
@@ -113,7 +112,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       label: `Applying ${migration.dirName}`,
     });
 
-    const operations = migration.operations as readonly MigrationPlanOperation[];
+    const { operations } = migration;
 
     // Allow all operation classes. The policy gate belongs at plan time, not
     // apply time — the planner already decided what to emit. Restricting here

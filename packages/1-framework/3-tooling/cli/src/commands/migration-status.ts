@@ -1,37 +1,43 @@
-import { readFile } from 'node:fs/promises';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
-import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
-import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import { findLeaf, findPath, findPathWithDecision } from '@prisma-next/migration-tools/dag';
+import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
+  AttestedMigrationBundle,
+  MigrationBundle,
   MigrationChainEntry,
   MigrationGraph,
-  MigrationPackage,
 } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { relative, resolve } from 'pathe';
+
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  loadMigrationBundles,
   maskConnectionUrl,
-  resolveContractPath,
+  readContractEnvelope,
+  resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
+  toPathDecisionResult,
 } from '../utils/command-helpers';
 import { formatMigrationStatusOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import type { StatusDiagnostic, StatusRef } from '../utils/migration-types';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationStatusOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
+  readonly ref?: string;
 }
 
 export interface MigrationStatusEntry {
@@ -45,20 +51,29 @@ export interface MigrationStatusEntry {
   readonly status: 'applied' | 'pending' | 'unknown';
 }
 
-export interface StatusDiagnostic {
-  readonly code: string;
-  readonly severity: 'warn' | 'info';
-  readonly message: string;
-  readonly hints: readonly string[];
-}
+export type { StatusDiagnostic, StatusRef } from '../utils/migration-types';
 
 export interface MigrationStatusResult {
   readonly ok: true;
   readonly mode: 'online' | 'offline';
   readonly migrations: readonly MigrationStatusEntry[];
   readonly markerHash?: string;
-  readonly leafHash: string;
+  readonly targetHash: string;
   readonly contractHash: string;
+  readonly refs?: readonly StatusRef[];
+  readonly pathDecision?: {
+    readonly fromHash: string;
+    readonly toHash: string;
+    readonly alternativeCount: number;
+    readonly tieBreakReasons: readonly string[];
+    readonly refName?: string;
+    readonly selectedPath: readonly {
+      readonly dirName: string;
+      readonly migrationId: string | null;
+      readonly from: string;
+      readonly to: string;
+    }[];
+  };
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
 }
@@ -92,20 +107,23 @@ function summarizeOps(ops: readonly MigrationPlanOperation[]): {
   return { summary: `${count} ${noun} (${parts.join(', ')})`, hasDestructive };
 }
 
+/**
+ * @param mode    — 'online' if we connected to the database, 'offline' otherwise
+ * @param markerHash — the marker hash from the database, or undefined if no marker row / offline
+ */
 export function buildMigrationEntries(
   chain: readonly MigrationChainEntry[],
-  packages: readonly MigrationPackage[],
+  packages: readonly MigrationBundle[],
+  mode: 'online' | 'offline',
   markerHash: string | undefined,
 ): MigrationStatusEntry[] {
   const pkgByDirName = new Map(packages.map((p) => [p.dirName, p]));
 
-  const markerInChain =
-    markerHash === undefined ||
-    markerHash === EMPTY_CONTRACT_HASH ||
-    chain.some((e) => e.to === markerHash);
+  const markerInChain = markerHash === undefined || chain.some((e) => e.to === markerHash);
 
   const entries: MigrationStatusEntry[] = [];
-  let reachedMarker = markerHash === undefined || markerHash === EMPTY_CONTRACT_HASH;
+  // Online with no marker = fresh database, all migrations are pending.
+  let reachedMarker = mode === 'online' && markerHash === undefined;
 
   for (const migration of chain) {
     const pkg = pkgByDirName.get(migration.dirName);
@@ -113,7 +131,7 @@ export function buildMigrationEntries(
     const { summary, hasDestructive } = summarizeOps(ops);
 
     let status: 'applied' | 'pending' | 'unknown';
-    if (markerHash === undefined || !markerInChain) {
+    if (mode === 'offline' || !markerInChain) {
       status = 'unknown';
     } else if (reachedMarker) {
       status = 'pending';
@@ -140,24 +158,108 @@ export function buildMigrationEntries(
   return entries;
 }
 
+/**
+ * Resolve the migration chain to display in status output.
+ *
+ * When offline or the marker is at EMPTY, the chain is simply the shortest
+ * path from EMPTY to the target — all structural paths are equivalent per
+ * the spec, so the deterministic shortest path is the canonical display.
+ *
+ * When online with a non-empty marker, the chain routes *through* the marker:
+ * EMPTY→marker (applied history) + marker→target (pending edges). This ensures
+ * the displayed chain includes the marker node so applied/pending status is
+ * correct. Without this, BFS from EMPTY to target could pick a shortest path
+ * that bypasses the marker entirely (e.g. in a diamond graph), causing the
+ * marker to appear "diverged" when it isn't.
+ */
+export function resolveDisplayChain(
+  graph: MigrationGraph,
+  targetHash: string,
+  markerHash: string | undefined,
+): readonly MigrationChainEntry[] | null {
+  if (markerHash === undefined) {
+    return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+  }
+
+  const toMarker = findPath(graph, EMPTY_CONTRACT_HASH, markerHash);
+  // Marker unreachable from EMPTY — show the target chain anyway.
+  // The caller detects this via markerInChain and emits a divergence diagnostic.
+  if (!toMarker) return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+
+  if (markerHash === targetHash) return toMarker;
+
+  const fromMarker = findPath(graph, markerHash, targetHash);
+  if (fromMarker) return [...toMarker, ...fromMarker];
+
+  // Marker is ahead of target (or on a disconnected branch).
+  // Try the inverse: target→marker. If it succeeds, the marker is ahead —
+  // show the full chain from EMPTY through the target and on to the marker.
+  const toTarget = findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+  if (!toTarget) return null;
+
+  const targetToMarker = findPath(graph, targetHash, markerHash);
+  if (targetToMarker) return [...toTarget, ...targetToMarker];
+
+  // Genuinely disconnected — show EMPTY→target; caller handles divergence diagnostic.
+  return toTarget;
+}
+
 async function executeMigrationStatusCommand(
   options: MigrationStatusOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const configPath = options.config
-    ? relative(process.cwd(), resolve(options.config))
-    : 'prisma-next.config.ts';
-
-  const migrationsDir = resolve(
-    options.config ? resolve(options.config, '..') : process.cwd(),
-    config.migrations?.dir ?? 'migrations',
+  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
+    options.config,
+    config,
   );
-  const migrationsRelative = relative(process.cwd(), migrationsDir);
 
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
+
+  let activeRefName: string | undefined;
+  let activeRefHash: string | undefined;
+  let allRefs: Record<string, string> = {};
+  try {
+    allRefs = await readRefs(refsPath);
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      return notOk(
+        errorRuntime(error.message, {
+          why: error.why,
+          fix: error.fix,
+          meta: { code: error.code },
+        }),
+      );
+    }
+    throw error;
+  }
+
+  if (options.ref) {
+    activeRefName = options.ref;
+    try {
+      activeRefHash = resolveRef(allRefs, activeRefName);
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(
+          errorRuntime(error.message, {
+            why: error.why,
+            fix: error.fix,
+            meta: { code: error.code },
+          }),
+        );
+      }
+      throw error;
+    }
+  }
+
+  // todo: can't we derive this without modifying the StatusRef obj
+  const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, hash]) => ({
+    name,
+    hash,
+    active: name === activeRefName,
+  }));
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
@@ -166,6 +268,9 @@ async function executeMigrationStatusCommand(
     ];
     if (dbConnection && hasDriver) {
       details.push({ label: 'database', value: maskConnectionUrl(String(dbConnection)) });
+    }
+    if (activeRefName) {
+      details.push({ label: 'ref', value: activeRefName });
     }
     const header = formatStyledHeader({
       command: 'migration status',
@@ -179,41 +284,21 @@ async function executeMigrationStatusCommand(
   const diagnostics: StatusDiagnostic[] = [];
   let contractHash: string = EMPTY_CONTRACT_HASH;
   try {
-    const contractPathAbsolute = resolveContractPath(config);
-    const contractContent = await readFile(contractPathAbsolute, 'utf-8');
-    try {
-      const contractRaw = JSON.parse(contractContent) as Record<string, unknown>;
-      const hash = contractRaw['storageHash'];
-      if (typeof hash === 'string') {
-        contractHash = hash;
-      } else {
-        diagnostics.push({
-          code: 'CONTRACT.MISSING_HASH',
-          severity: 'warn',
-          message: 'Contract file exists but has no storageHash field',
-          hints: ["Run 'prisma-next contract emit' to regenerate the contract"],
-        });
-      }
-    } catch {
-      diagnostics.push({
-        code: 'CONTRACT.INVALID_JSON',
-        severity: 'warn',
-        message: 'Contract file contains invalid JSON',
-        hints: ["Run 'prisma-next contract emit' to regenerate the contract"],
-      });
-    }
-  } catch {
+    const envelope = await readContractEnvelope(config);
+    contractHash = envelope.storageHash;
+  } catch (error) {
     diagnostics.push({
       code: 'CONTRACT.UNREADABLE',
       severity: 'warn',
-      message: 'Could not read contract file — contract state unknown',
-      hints: ["Run 'prisma-next contract emit' to generate a contract"],
+      message: `Could not read contract: ${error instanceof Error ? error.message : 'unknown error'}`,
+      hints: ["Run 'prisma-next contract emit' to generate a valid contract"],
     });
   }
 
-  let allPackages: readonly MigrationPackage[];
+  let attested: readonly AttestedMigrationBundle[];
+  let graph: MigrationGraph;
   try {
-    allPackages = await readMigrationsDir(migrationsDir);
+    ({ bundles: attested, graph } = await loadMigrationBundles(migrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -226,8 +311,6 @@ async function executeMigrationStatusCommand(
       }),
     );
   }
-
-  const attested = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
 
   if (attested.length === 0) {
     if (contractHash !== EMPTY_CONTRACT_HASH) {
@@ -244,18 +327,16 @@ async function executeMigrationStatusCommand(
       ok: true,
       mode: dbConnection && hasDriver ? 'online' : 'offline',
       migrations: [],
-      leafHash: EMPTY_CONTRACT_HASH,
+      targetHash: EMPTY_CONTRACT_HASH,
       contractHash,
       summary: 'No migrations found',
       diagnostics,
     });
   }
 
-  let graph: MigrationGraph;
-  let leafHash: string;
+  let targetHash: string;
   try {
-    graph = reconstructGraph(attested);
-    leafHash = findLeaf(graph);
+    targetHash = activeRefHash ?? findLeaf(graph);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -265,64 +346,57 @@ async function executeMigrationStatusCommand(
     throw error;
   }
 
-  const chain = findPath(graph, EMPTY_CONTRACT_HASH, leafHash);
+  let markerHash: string | undefined;
+  let mode: 'online' | 'offline' = 'offline';
+
+  if (dbConnection && hasDriver) {
+    const client = createControlClient({
+      family: config.family,
+      target: config.target,
+      adapter: config.adapter,
+      driver: config.driver,
+      extensionPacks: config.extensionPacks ?? [],
+    });
+    try {
+      await client.connect(dbConnection);
+      markerHash = (await client.readMarker())?.storageHash;
+      mode = 'online';
+    } catch {
+      if (!flags.json && !flags.quiet) {
+        ui.warn('Could not connect to database — showing offline status');
+      }
+    } finally {
+      await client.close();
+    }
+  }
+
+  const chain = resolveDisplayChain(graph, targetHash, markerHash);
+
   if (!chain) {
     return notOk(
       errorRuntime('Cannot reconstruct migration chain', {
-        why: `No path from ${EMPTY_CONTRACT_HASH} to leaf ${leafHash}`,
+        why: `No path from ${EMPTY_CONTRACT_HASH} to target ${targetHash}`,
         fix: 'The migration history may have gaps. Check the migrations directory for missing or corrupted packages.',
       }),
     );
   }
 
-  let markerHash: string | undefined;
-  let mode: 'online' | 'offline' = 'offline';
+  const entries = buildMigrationEntries(chain, attested, mode, markerHash);
 
-  if (dbConnection && hasDriver) {
-    try {
-      const client = createControlClient({
-        family: config.family,
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
-      try {
-        await client.connect(dbConnection);
-        const marker = await client.readMarker();
-        markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH;
-        mode = 'online';
-      } finally {
-        await client.close();
-      }
-    } catch {
-      if (!flags.json && !flags.quiet) {
-        ui.warn('Could not connect to database — showing offline status');
-      }
-    }
-  }
-
-  const entries = buildMigrationEntries(
-    chain,
-    attested,
-    mode === 'online' ? markerHash : undefined,
-  );
-
-  const markerInChain =
-    markerHash === undefined ||
-    markerHash === EMPTY_CONTRACT_HASH ||
-    chain.some((e) => e.to === markerHash);
+  const markerInChain = markerHash === undefined || chain.some((e) => e.to === markerHash);
 
   let summary: string;
   if (mode === 'online') {
     if (!markerInChain) {
       summary = `Database marker does not match any migration — was the database managed with 'db update'?`;
+    } else if (activeRefHash && markerHash !== undefined) {
+      summary = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
     } else {
       const pendingCount = entries.filter((e) => e.status === 'pending').length;
       const appliedCount = entries.filter((e) => e.status === 'applied').length;
       if (pendingCount === 0) {
         summary = `Database is up to date (${appliedCount} migration${appliedCount !== 1 ? 's' : ''} applied)`;
-      } else if (markerHash === EMPTY_CONTRACT_HASH) {
+      } else if (markerHash === undefined) {
         summary = `${pendingCount} pending migration(s) — database has no marker`;
       } else {
         summary = `${pendingCount} pending migration(s) — run 'prisma-next migration apply' to apply`;
@@ -332,7 +406,7 @@ async function executeMigrationStatusCommand(
     summary = `${entries.length} migration(s) on disk`;
   }
 
-  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== leafHash) {
+  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== targetHash && !activeRefHash) {
     diagnostics.push({
       code: 'CONTRACT.AHEAD',
       severity: 'warn',
@@ -344,14 +418,34 @@ async function executeMigrationStatusCommand(
   if (mode === 'online') {
     const pendingCount = entries.filter((e) => e.status === 'pending').length;
     if (!markerInChain) {
+      // Tailor guidance based on where the contract sits relative to the graph:
+      // - marker == contract: DB was managed with db update, just need to plan a migration.
+      // - contract is in the graph: migrations exist for the contract, DB drifted.
+      //   Suggest db sign if they want to force-align, or db verify to inspect.
+      // - neither: both DB and contract are outside the graph, needs investigation.
+      const hints: string[] = [];
+      if (markerHash === contractHash) {
+        hints.push(
+          'The contract matches the database marker but no migration exists for this contract',
+          "Run 'prisma-next migration plan' to generate a migration for the current contract",
+        );
+      } else if (graph.nodes.has(contractHash)) {
+        hints.push(
+          'The database marker is not in the migration graph, but migrations exist for the current contract',
+          "Run 'prisma-next db sign' to overwrite the marker if the database already matches the contract",
+          "Run 'prisma-next db verify' to inspect the database state",
+        );
+      } else {
+        hints.push(
+          'Neither the database marker nor the contract appear in the migration graph',
+          "Run 'prisma-next db verify' to inspect the database state",
+        );
+      }
       diagnostics.push({
         code: 'MIGRATION.MARKER_DIVERGED',
         severity: 'warn',
         message: 'Database marker does not match any migration in the chain',
-        hints: [
-          "The database may have been managed with 'db update' instead of migrations",
-          "Run 'prisma-next db verify' to inspect the database state",
-        ],
+        hints,
       });
     } else if (pendingCount > 0) {
       diagnostics.push({
@@ -370,15 +464,25 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  let pathDecision: MigrationStatusResult['pathDecision'];
+  if (mode === 'online' && markerHash !== undefined) {
+    const decision = findPathWithDecision(graph, markerHash, targetHash, activeRefName);
+    if (decision) {
+      pathDecision = toPathDecisionResult(decision);
+    }
+  }
+
   const result: MigrationStatusResult = {
     ok: true,
     mode,
     migrations: entries,
-    leafHash,
+    targetHash,
     contractHash,
     summary,
     diagnostics,
-    ...(markerHash !== undefined ? { markerHash } : {}),
+    ...ifDefined('markerHash', markerHash),
+    ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
+    ...ifDefined('pathDecision', pathDecision),
   };
   return ok(result);
 }
@@ -399,6 +503,7 @@ export function createMigrationStatusCommand(): Command {
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
+    .option('--ref <name>', 'Target ref name from migrations/refs.json')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
 
@@ -418,4 +523,21 @@ export function createMigrationStatusCommand(): Command {
     });
 
   return command;
+}
+
+function summarizeRefDistance(
+  graph: MigrationGraph,
+  markerHash: string,
+  refHash: string,
+  refName: string,
+): string {
+  if (markerHash === refHash) return `At ref "${refName}" target`;
+
+  const pathToRef = findPath(graph, markerHash, refHash);
+  if (pathToRef) return `${pathToRef.length} edge(s) behind ref "${refName}"`;
+
+  const pathFromRef = findPath(graph, refHash, markerHash);
+  if (pathFromRef) return `${pathFromRef.length} edge(s) ahead of ref "${refName}"`;
+
+  return `No path between marker and ref "${refName}" target`;
 }

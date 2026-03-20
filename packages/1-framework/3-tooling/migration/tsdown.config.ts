@@ -6,6 +6,7 @@ export default defineConfig({
     'exports/io': 'src/exports/io.ts',
     'exports/attestation': 'src/exports/attestation.ts',
     'exports/dag': 'src/exports/dag.ts',
+    'exports/refs': 'src/exports/refs.ts',
   },
   exports: { enabled: false },
 });

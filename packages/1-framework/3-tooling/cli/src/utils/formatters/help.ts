@@ -172,12 +172,16 @@ export function formatCommandHelp(options: {
   const shortDescription = command.description() || '';
   const longDescription = getLongDescription(command);
 
-  // Header: "prisma-next <full-command-path> <short-description>"
+  // Include positional arguments in the header line
+  const argsSuffix = command.registeredArguments
+    .map((arg) => (arg.required ? `<${arg.name()}>` : `[${arg.name()}]`))
+    .join(' ');
   const brand = createPrismaNextBadge(useColor);
-  const operation = useColor ? bold(commandPath) : commandPath;
+  const commandWithArgs = argsSuffix ? `${commandPath} ${argsSuffix}` : commandPath;
+  const operation = useColor ? bold(commandWithArgs) : commandWithArgs;
   const intent = formatDimText(shortDescription);
   lines.push(formatHeaderLine({ brand, operation, intent }));
-  lines.push(formatDimText('│')); // Vertical line separator between command and params
+  lines.push(formatDimText('│'));
 
   // Extract options and format them
   const optionsList = command.options.map((opt) => {

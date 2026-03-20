@@ -12,6 +12,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { isAttested } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -53,7 +54,6 @@ async function writeAttestedMigration(
   opts: {
     from: string;
     to: string;
-    parentMigrationId?: string | null;
     fromContract: ContractIR | null;
     toContract: ContractIR;
     ops: MigrationPlanOperation[];
@@ -67,7 +67,6 @@ async function writeAttestedMigration(
     from: opts.from,
     to: opts.to,
     migrationId: null,
-    parentMigrationId: opts.parentMigrationId ?? null,
     kind: 'regular',
     fromContract: opts.fromContract,
     toContract: opts.toContract,
@@ -118,7 +117,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -158,7 +157,7 @@ describe(
         },
       });
 
-      const m1 = await writeAttestedMigration(migrationsDir, {
+      await writeAttestedMigration(migrationsDir, {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         fromContract: null,
@@ -171,7 +170,6 @@ describe(
       await writeAttestedMigration(migrationsDir, {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        parentMigrationId: m1.migrationId,
         fromContract: contractA,
         toContract: contractB,
         ops: [createTableOp('post')],
@@ -180,7 +178,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -222,7 +220,7 @@ describe(
         },
       });
 
-      const m1 = await writeAttestedMigration(migrationsDir, {
+      await writeAttestedMigration(migrationsDir, {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         fromContract: null,
@@ -235,7 +233,6 @@ describe(
       await writeAttestedMigration(migrationsDir, {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        parentMigrationId: m1.migrationId,
         fromContract: contractA,
         toContract: contractB,
         ops: [createTableOp('post')],
@@ -244,7 +241,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
 
       const pathToContractA = findPath(graph, EMPTY_CONTRACT_HASH, 'sha256:hash-a');
@@ -268,7 +265,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -292,7 +289,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -319,7 +316,6 @@ describe(
         from: 'sha256:hash-a',
         to: EMPTY_CONTRACT_HASH,
         migrationId: null,
-        parentMigrationId: null,
         kind: 'regular',
         fromContract: createTestContract(),
         toContract: createTestContract(),
@@ -333,7 +329,7 @@ describe(
       const allPackages = await readMigrationsDir(migrationsDir);
       expect(allPackages).toHaveLength(2);
 
-      const attested = allPackages.filter((p) => p.manifest.migrationId !== null);
+      const attested = allPackages.filter(isAttested);
       expect(attested).toHaveLength(1);
 
       const graph = reconstructGraph(attested);
@@ -371,7 +367,7 @@ describe(
         },
       });
 
-      const m1 = await writeAttestedMigration(migrationsDir, {
+      await writeAttestedMigration(migrationsDir, {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         fromContract: null,
@@ -384,7 +380,6 @@ describe(
       await writeAttestedMigration(migrationsDir, {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        parentMigrationId: m1.migrationId,
         fromContract: contractA,
         toContract: contractB,
         ops: [createTableOp('post')],
@@ -393,7 +388,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => typeof p.manifest.migrationId === 'string');
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -423,7 +418,6 @@ describe(
       const m2 = await writeAttestedMigration(migrationsDir, {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
-        parentMigrationId: m1.migrationId,
         fromContract: contractA,
         toContract: contractB,
         ops: [createTableOp('post')],
@@ -432,7 +426,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter((p) => p.manifest.migrationId !== null);
+      const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
       const path = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;

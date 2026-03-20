@@ -1,8 +1,8 @@
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
-import type { MigrationPackage } from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
+import type { MigrationBundle } from '@prisma-next/migration-tools/types';
+import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -48,9 +48,9 @@ function looksLikePath(target: string): boolean {
 }
 
 export function resolveByHashPrefix(
-  packages: readonly MigrationPackage[],
+  packages: readonly MigrationBundle[],
   prefix: string,
-): Result<MigrationPackage, CliStructuredError> {
+): Result<MigrationBundle, CliStructuredError> {
   const normalizedPrefix = prefix.startsWith('sha256:') ? prefix : `sha256:${prefix}`;
   const attested = packages.filter((p) => typeof p.manifest.migrationId === 'string');
   const matches = attested.filter((p) => p.manifest.migrationId!.startsWith(normalizedPrefix));
@@ -111,7 +111,7 @@ async function executeMigrationShowCommand(
     ui.stderr(header);
   }
 
-  let pkg: MigrationPackage;
+  let pkg: MigrationBundle;
 
   try {
     if (target && looksLikePath(target)) {
@@ -132,7 +132,7 @@ async function executeMigrationShowCommand(
         if (!resolved.ok) return resolved;
         pkg = resolved.value;
       } else {
-        const attested = allPackages.filter((p) => typeof p.manifest.migrationId === 'string');
+        const attested = allPackages.filter(isAttested);
         if (attested.length === 0) {
           return notOk(
             errorRuntime('No attested migrations found', {

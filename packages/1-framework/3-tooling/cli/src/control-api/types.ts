@@ -11,6 +11,7 @@ import type {
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
   MigrationPlannerConflict,
+  MigrationPlanOperation,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -434,12 +435,7 @@ export interface MigrationApplyStep {
   readonly from: string;
   readonly to: string;
   readonly toContract: unknown;
-  readonly operations: ReadonlyArray<{
-    readonly id: string;
-    readonly label: string;
-    readonly operationClass: string;
-    readonly [key: string]: unknown;
-  }>;
+  readonly operations: readonly MigrationPlanOperation[];
 }
 
 /**

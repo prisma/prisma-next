@@ -15,6 +15,7 @@ import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
+import { createMigrationRefCommand } from '@prisma-next/cli/commands/migration-ref';
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createMigrationVerifyCommand } from '@prisma-next/cli/commands/migration-verify';
@@ -154,9 +155,15 @@ export function setupJourney(options: JourneySetupOptions): JourneyContext {
 export const contractFixtures = {
   'contract-base': join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'),
   'contract-additive': join(JOURNEY_FIXTURES_DIR, 'contract-additive.ts'),
+  'contract-additive-required': join(JOURNEY_FIXTURES_DIR, 'contract-additive-required.ts'),
   'contract-destructive': join(JOURNEY_FIXTURES_DIR, 'contract-destructive.ts'),
   'contract-add-table': join(JOURNEY_FIXTURES_DIR, 'contract-add-table.ts'),
   'contract-v3': join(JOURNEY_FIXTURES_DIR, 'contract-v3.ts'),
+  'contract-phone': join(JOURNEY_FIXTURES_DIR, 'contract-phone.ts'),
+  'contract-bio': join(JOURNEY_FIXTURES_DIR, 'contract-bio.ts'),
+  'contract-phone-bio': join(JOURNEY_FIXTURES_DIR, 'contract-phone-bio.ts'),
+  'contract-avatar': join(JOURNEY_FIXTURES_DIR, 'contract-avatar.ts'),
+  'contract-all': join(JOURNEY_FIXTURES_DIR, 'contract-all.ts'),
 } as const;
 
 export type ContractVariant = keyof typeof contractFixtures;
@@ -322,6 +329,20 @@ export async function runMigrationVerify(
 ): Promise<CommandResult> {
   // migration verify doesn't support --config, use runCommandRaw
   return runCommandRaw(createMigrationVerifyCommand(), ctx.testDir, extraArgs);
+}
+
+export async function runMigrationRef(
+  ctx: JourneyContext,
+  subcommandArgs: readonly string[],
+): Promise<CommandResult> {
+  const [subcommand, ...rest] = subcommandArgs;
+  return runCommandRaw(createMigrationRefCommand(), ctx.testDir, [
+    subcommand!,
+    '--config',
+    ctx.configPath,
+    '--no-color',
+    ...rest,
+  ]);
 }
 
 /**
