@@ -5,13 +5,53 @@ import type { ColumnDefault } from '@prisma-next/contract/types';
  * These are compiled once at module load time rather than on each function call.
  */
 const NEXTVAL_PATTERN = /^nextval\s*\(/i;
-const TIMESTAMP_PATTERN = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP|clock_timestamp\s*\(\s*\))$/i;
+const NOW_FUNCTION_PATTERN = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP)$/i;
+const CLOCK_TIMESTAMP_PATTERN = /^clock_timestamp\s*\(\s*\)$/i;
+const TIMESTAMP_CAST_SUFFIX = /::timestamp(?:tz|\s+(?:with|without)\s+time\s+zone)?$/i;
+const TEXT_CAST_SUFFIX = /::text$/i;
+const NOW_LITERAL_PATTERN = /^'now'$/i;
 const UUID_PATTERN = /^gen_random_uuid\s*\(\s*\)$/i;
 const UUID_OSSP_PATTERN = /^uuid_generate_v4\s*\(\s*\)$/i;
+const NULL_PATTERN = /^NULL(?:::.+)?$/i;
 const TRUE_PATTERN = /^true$/i;
 const FALSE_PATTERN = /^false$/i;
 const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
 const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/;
+
+/**
+ * Returns the canonical expression for a timestamp default function, or undefined
+ * if the expression is not a recognized timestamp default.
+ *
+ * Keeps now()/CURRENT_TIMESTAMP and clock_timestamp() distinct:
+ * - now(), CURRENT_TIMESTAMP, ('now'::text)::timestamp... → 'now()'
+ * - clock_timestamp(), clock_timestamp()::timestamptz → 'clock_timestamp()'
+ *
+ * These are semantically different in Postgres: now() returns the transaction
+ * start time (constant within a transaction), while clock_timestamp() returns
+ * the actual wall-clock time (can differ across rows in a single INSERT).
+ */
+function canonicalizeTimestampDefault(expr: string): string | undefined {
+  if (NOW_FUNCTION_PATTERN.test(expr)) return 'now()';
+  if (CLOCK_TIMESTAMP_PATTERN.test(expr)) return 'clock_timestamp()';
+
+  if (!TIMESTAMP_CAST_SUFFIX.test(expr)) return undefined;
+
+  let inner = expr.replace(TIMESTAMP_CAST_SUFFIX, '').trim();
+
+  // Strip outer parentheses
+  if (inner.startsWith('(') && inner.endsWith(')')) {
+    inner = inner.slice(1, -1).trim();
+  }
+
+  if (NOW_FUNCTION_PATTERN.test(inner)) return 'now()';
+  if (CLOCK_TIMESTAMP_PATTERN.test(inner)) return 'clock_timestamp()';
+
+  // Handle 'now'::text form (Postgres casts the string literal 'now' through ::text)
+  inner = inner.replace(TEXT_CAST_SUFFIX, '').trim();
+  if (NOW_LITERAL_PATTERN.test(inner)) return 'now()';
+
+  return undefined;
+}
 
 /**
  * Parses a raw Postgres column default expression into a normalized ColumnDefault.
@@ -21,15 +61,15 @@ const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d
  * keeping the introspection layer focused on faithful data capture.
  *
  * @param rawDefault - Raw default expression from information_schema.columns.column_default
- * @param _nativeType - Native column type (currently unused, reserved for future type-aware parsing)
+ * @param nativeType - Native column type, used for type-aware parsing (bigint tagging, JSON detection)
  * @returns Normalized ColumnDefault or undefined if the expression cannot be parsed
  */
 export function parsePostgresDefault(
   rawDefault: string,
-  _nativeType?: string,
+  nativeType?: string,
 ): ColumnDefault | undefined {
   const trimmed = rawDefault.trim();
-  const normalizedType = _nativeType?.toLowerCase();
+  const normalizedType = nativeType?.toLowerCase();
   const isBigInt = normalizedType === 'bigint' || normalizedType === 'int8';
 
   // Autoincrement: nextval('tablename_column_seq'::regclass)
@@ -37,9 +77,10 @@ export function parsePostgresDefault(
     return { kind: 'function', expression: 'autoincrement()' };
   }
 
-  // now() / CURRENT_TIMESTAMP / clock_timestamp()
-  if (TIMESTAMP_PATTERN.test(trimmed)) {
-    return { kind: 'function', expression: 'now()' };
+  // Timestamp defaults: now()/CURRENT_TIMESTAMP → 'now()', clock_timestamp() → 'clock_timestamp()'
+  const canonicalTimestamp = canonicalizeTimestampDefault(trimmed);
+  if (canonicalTimestamp) {
+    return { kind: 'function', expression: canonicalTimestamp };
   }
 
   // gen_random_uuid()
@@ -50,6 +91,11 @@ export function parsePostgresDefault(
   // uuid_generate_v4() from uuid-ossp extension
   if (UUID_OSSP_PATTERN.test(trimmed)) {
     return { kind: 'function', expression: 'gen_random_uuid()' };
+  }
+
+  // NULL or NULL::type — explicit null default
+  if (NULL_PATTERN.test(trimmed)) {
+    return { kind: 'literal', value: null };
   }
 
   // Boolean literals
@@ -65,7 +111,9 @@ export function parsePostgresDefault(
     if (isBigInt) {
       return { kind: 'literal', value: { $type: 'bigint', value: trimmed } };
     }
-    return { kind: 'literal', value: Number(trimmed) };
+    const num = Number(trimmed);
+    if (!Number.isFinite(num)) return undefined;
+    return { kind: 'literal', value: num };
   }
 
   // String literals: 'value'::type or just 'value'
