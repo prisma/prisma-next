@@ -5,8 +5,8 @@
  *     db verify now catches the missing column by default via structural schema
  *     verification. db verify --shallow still performs marker-only verification and
  *     therefore passes if the marker row is unchanged. Recovery via db update
- *     fails because re-adding a NOT NULL column to an existing table is
- *     unrecoverable without manual intervention.
+ *     succeeds because the planner uses a temporary default to re-add
+ *     NOT NULL columns to potentially non-empty tables.
  *
  * N — Extra column drift: a DBA adds a column via manual DDL. Tolerant
  *     schema-verify passes (extras OK), strict schema-verify fails. Recovery
@@ -39,7 +39,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'init → manual DDL drop → verify fails → verify --shallow passes → schema-verify fails',
+      'init → manual DDL drop → verify fails → verify --shallow passes → schema-verify fails → update recovers',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -74,13 +74,15 @@ withTempDir(({ createTempDir }) => {
         expect(introspect.exitCode, 'M.04: db introspect').toBe(0);
 
         // M.05: db update recovery
-        // The planner cannot re-add a dropped NOT NULL column to an existing table
-        // because Postgres requires a DEFAULT for NOT NULL columns on non-empty tables
-        // (even if the table is technically empty, the planner validates post-update schema).
-        // db update correctly detects the drift but the runner fails (PN-RTM-3020).
-        // Recovery in this scenario requires manual DDL or db init with a fresh database.
+        // The planner re-adds the dropped NOT NULL column using a temporary default
+        // so PostgreSQL can apply the DDL even when the table may already contain rows.
+        // The temporary default is removed immediately after the column is added.
         const update = await runDbUpdate(ctx, ['-y']);
-        expect(update.exitCode, 'M.05: db update detects unrecoverable drift').toBe(1);
+        expect(update.exitCode, 'M.05: db update recovers from drift').toBe(0);
+
+        // M.06: db schema-verify passes after recovery
+        const schemaVerifyAfter = await runDbSchemaVerify(ctx);
+        expect(schemaVerifyAfter.exitCode, 'M.06: schema-verify passes after update').toBe(0);
       },
       timeouts.spinUpPpgDev,
     );
