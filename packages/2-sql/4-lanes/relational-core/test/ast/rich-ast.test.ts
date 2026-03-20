@@ -103,13 +103,14 @@ describe('rich SQL AST', () => {
       .withOffset(20)
       .withSelectAllIntent({ table: 'user' });
 
-    expect(base.project).toEqual([]);
-    expect(base.where).toBeUndefined();
+    expect(base).toMatchObject({ project: [], where: undefined });
+    expect(next).toMatchObject({
+      where,
+      limit: 10,
+      offset: 20,
+      selectAllIntent: { table: 'user' },
+    });
     expect(next.project.map((item) => item.alias)).toEqual(['id', 'email']);
-    expect(next.where).toBe(where);
-    expect(next.limit).toBe(10);
-    expect(next.offset).toBe(20);
-    expect(next.selectAllIntent).toEqual({ table: 'user' });
     expect(Object.isFrozen(next.project)).toBe(true);
   });
 

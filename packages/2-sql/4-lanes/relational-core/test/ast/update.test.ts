@@ -12,10 +12,12 @@ describe('ast/update', () => {
       })
       .withWhere(where);
 
-    expect(updateAst.table).toEqual(table('user'));
-    expect(updateAst.set).toEqual({ email: param(0, 'email') });
-    expect(updateAst.where).toEqual(where);
-    expect(updateAst.returning).toBeUndefined();
+    expect(updateAst).toMatchObject({
+      table: table('user'),
+      set: { email: param(0, 'email') },
+      where,
+      returning: undefined,
+    });
   });
 
   it('creates update ASTs with returning clauses and multiple set values', () => {

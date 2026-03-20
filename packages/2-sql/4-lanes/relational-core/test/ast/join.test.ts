@@ -106,9 +106,7 @@ describe('ast/join', () => {
 
     const join = JoinAst.inner(derived, on, true);
 
-    expect(join.source).toEqual(derived);
-    expect(join.lateral).toBe(true);
-    expect(join.on).toEqual(on);
+    expect(join).toMatchObject({ source: derived, lateral: true, on });
   });
 
   it('rewrites join predicates through the AST rewriter', () => {
@@ -139,9 +137,11 @@ describe('ast/join', () => {
       tables.post.columns.userId,
     );
 
-    expect(predicate.kind).toBe('join-on');
-    expect(predicate.left).toBe(tables.user.columns.id);
-    expect(predicate.right).toBe(tables.post.columns.userId);
+    expect(predicate).toMatchObject({
+      kind: 'join-on',
+      left: tables.user.columns.id,
+      right: tables.post.columns.userId,
+    });
   });
 
   it('rejects invalid join-on operands and self-joins', () => {

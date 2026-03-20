@@ -16,16 +16,18 @@ describe('ast/select', () => {
       .addProject('id', col('user', 'id'))
       .addProject('email', col('user', 'email'));
 
-    expect(selectAst.from).toEqual(table('user'));
-    expect(selectAst.project).toEqual([
-      { alias: 'id', expr: col('user', 'id') },
-      { alias: 'email', expr: col('user', 'email') },
-    ]);
-    expect(selectAst.joins).toBeUndefined();
-    expect(selectAst.where).toBeUndefined();
-    expect(selectAst.orderBy).toBeUndefined();
-    expect(selectAst.limit).toBeUndefined();
-    expect(selectAst.selectAllIntent).toBeUndefined();
+    expect(selectAst).toMatchObject({
+      from: table('user'),
+      project: [
+        { alias: 'id', expr: col('user', 'id') },
+        { alias: 'email', expr: col('user', 'email') },
+      ],
+      joins: undefined,
+      where: undefined,
+      orderBy: undefined,
+      limit: undefined,
+      selectAllIntent: undefined,
+    });
   });
 
   it('supports fluent optional clauses immutably', () => {
@@ -45,18 +47,19 @@ describe('ast/select', () => {
       .withOffset(3)
       .withSelectAllIntent({ table: 'user' });
 
-    expect(base.joins).toBeUndefined();
-    expect(base.where).toBeUndefined();
+    expect(base).toMatchObject({ joins: undefined, where: undefined });
+    expect(selectAst).toMatchObject({
+      where,
+      orderBy: [OrderByItem.asc(col('user', 'id'))],
+      limit: 10,
+      distinct: true,
+      distinctOn: [col('user', 'email')],
+      groupBy: [col('user', 'id')],
+      having: BinaryExpr.gt(col('user', 'id'), param(1, 'minId')),
+      offset: 3,
+      selectAllIntent: { table: 'user' },
+    });
     expect(selectAst.joins).toHaveLength(1);
-    expect(selectAst.where).toEqual(where);
-    expect(selectAst.orderBy).toEqual([OrderByItem.asc(col('user', 'id'))]);
-    expect(selectAst.limit).toBe(10);
-    expect(selectAst.distinct).toBe(true);
-    expect(selectAst.distinctOn).toEqual([col('user', 'email')]);
-    expect(selectAst.groupBy).toEqual([col('user', 'id')]);
-    expect(selectAst.having).toEqual(BinaryExpr.gt(col('user', 'id'), param(1, 'minId')));
-    expect(selectAst.offset).toBe(3);
-    expect(selectAst.selectAllIntent).toEqual({ table: 'user' });
   });
 
   it('stores operation and exists expressions inside project and where clauses', () => {
@@ -101,9 +104,11 @@ describe('ast/select', () => {
       .withDistinctOn([])
       .withGroupBy([]);
 
-    expect(selectAst.joins).toBeUndefined();
-    expect(selectAst.orderBy).toBeUndefined();
-    expect(selectAst.distinctOn).toBeUndefined();
-    expect(selectAst.groupBy).toBeUndefined();
+    expect(selectAst).toMatchObject({
+      joins: undefined,
+      orderBy: undefined,
+      distinctOn: undefined,
+      groupBy: undefined,
+    });
   });
 });
