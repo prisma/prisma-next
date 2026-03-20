@@ -191,6 +191,7 @@ function buildChildRelationField(
     optional,
     list: false,
     relationName,
+    fkName: fk.name,
     fields: fk.columns,
     references: fk.referencedColumns,
     onDelete: onDelete ? REFERENTIAL_ACTION_PSL[onDelete] : undefined,

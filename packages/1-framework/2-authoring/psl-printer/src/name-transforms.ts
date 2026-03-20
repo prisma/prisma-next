@@ -21,8 +21,20 @@ function extractIdentifierParts(input: string): string[] {
   return input.match(IDENTIFIER_PART_PATTERN) ?? [];
 }
 
+function createSyntheticIdentifier(input: string): string {
+  let hash = 2166136261;
+
+  for (const char of input) {
+    hash ^= char.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `x${(hash >>> 0).toString(16)}`;
+}
+
 function sanitizeIdentifierCharacters(input: string): string {
-  return input.replace(/[^\w]/g, '');
+  const sanitized = input.replace(/[^\w]/g, '');
+  return sanitized.length > 0 ? sanitized : createSyntheticIdentifier(input);
 }
 
 function capitalize(word: string): string {
@@ -35,7 +47,7 @@ function capitalize(word: string): string {
 function snakeToPascalCase(input: string): string {
   const parts = extractIdentifierParts(input);
   if (parts.length === 0) {
-    return sanitizeIdentifierCharacters(input);
+    return capitalize(sanitizeIdentifierCharacters(input));
   }
   return parts.map(capitalize).join('');
 }

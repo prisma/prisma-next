@@ -90,6 +90,7 @@ export type RelationField = {
   readonly optional: boolean;
   readonly list: boolean;
   readonly relationName?: string | undefined;
+  readonly fkName?: string | undefined;
   readonly fields?: readonly string[] | undefined;
   readonly references?: readonly string[] | undefined;
   readonly onDelete?: string | undefined;

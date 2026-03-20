@@ -234,8 +234,8 @@ describe('printPsl', () => {
         id          Int  @id
         senderId    Int  @map("sender_id")
         recipientId Int  @map("recipient_id")
-        sender      User @relation(name: "message_sender_fk", fields: [senderId], references: [id])
-        recipient   User @relation(name: "message_recipient_fk", fields: [recipientId], references: [id])
+        sender      User @relation(name: "message_sender_fk", fields: [senderId], references: [id], map: "message_sender_fk")
+        recipient   User @relation(name: "message_recipient_fk", fields: [recipientId], references: [id], map: "message_recipient_fk")
 
         @@map("message")
       }
@@ -385,6 +385,63 @@ describe('printPsl', () => {
     `);
   });
 
+  it('preserves foreign key constraint names with relation map arguments', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        team: {
+          name: 'team',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        member: {
+          name: 'member',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            team_id: { name: 'team_id', nativeType: 'int4', nullable: false, default: undefined },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            {
+              name: 'member_team_id_fkey',
+              columns: ['team_id'],
+              referencedTable: 'team',
+              referencedColumns: ['id'],
+            },
+          ],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      dependencies: [],
+    };
+
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toMatchInlineSnapshot(`
+      "// This file was introspected from the database. Do not edit manually.
+
+      model Team {
+        id      Int      @id
+        members Member[]
+
+        @@map("team")
+      }
+
+      model Member {
+        id     Int  @id
+        teamId Int  @map("team_id")
+        team   Team @relation(fields: [teamId], references: [id], map: "member_team_id_fkey")
+
+        @@map("member")
+      }
+      "
+    `);
+  });
+
   it('orders cyclic table dependencies deterministically', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
@@ -424,6 +481,11 @@ describe('printPsl', () => {
     };
 
     const result = printPsl(schemaIR, makeOptions(schemaIR));
-    expect(result.indexOf('model Beta')).toBeLessThan(result.indexOf('model Alpha'));
+    const betaIndex = result.indexOf('model Beta');
+    const alphaIndex = result.indexOf('model Alpha');
+
+    expect(betaIndex).toBeGreaterThanOrEqual(0);
+    expect(alphaIndex).toBeGreaterThanOrEqual(0);
+    expect(betaIndex).toBeLessThan(alphaIndex);
   });
 });

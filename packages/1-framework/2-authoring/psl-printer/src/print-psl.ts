@@ -295,6 +295,9 @@ function processTable(
       if (rel.onUpdate) {
         parts.push(`onUpdate: ${rel.onUpdate}`);
       }
+      if (rel.fkName) {
+        parts.push(`map: "${rel.fkName}"`);
+      }
       relAttributes.push(`@relation(${parts.join(', ')})`);
     } else if (rel.relationName) {
       relAttributes.push(`@relation(name: "${rel.relationName}")`);

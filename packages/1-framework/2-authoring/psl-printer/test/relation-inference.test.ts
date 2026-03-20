@@ -166,8 +166,11 @@ describe('inferRelations', () => {
 
     const messageRelations = relationsByTable.get('message');
     expect(messageRelations).toHaveLength(2);
-    expect(messageRelations![0]).toMatchObject({ relationName: 'fk_sender' });
-    expect(messageRelations![1]).toMatchObject({ relationName: 'fk_receiver' });
+    expect(messageRelations![0]).toMatchObject({ relationName: 'fk_sender', fkName: 'fk_sender' });
+    expect(messageRelations![1]).toMatchObject({
+      relationName: 'fk_receiver',
+      fkName: 'fk_receiver',
+    });
   });
 
   it('falls back to generated relation names for unnamed duplicate FKs', () => {

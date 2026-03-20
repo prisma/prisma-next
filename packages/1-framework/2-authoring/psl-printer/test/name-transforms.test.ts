@@ -40,6 +40,14 @@ describe('toModelName', () => {
     expect(toModelName('user.profile')).toEqual({ name: 'UserProfile', map: 'user.profile' });
     expect(toModelName('foo$bar')).toEqual({ name: 'FooBar', map: 'foo$bar' });
   });
+
+  it('synthesizes a deterministic identifier when no ASCII identifier characters remain', () => {
+    expect(toModelName('$$$')).toMatchObject({
+      name: expect.stringMatching(/^X[0-9a-f]+$/),
+      map: '$$$',
+    });
+    expect(toModelName('東京')).toEqual(toModelName('東京'));
+  });
 });
 
 describe('toFieldName', () => {
@@ -76,6 +84,14 @@ describe('toFieldName', () => {
     expect(toFieldName('user.profile')).toEqual({ name: 'userProfile', map: 'user.profile' });
     expect(toFieldName('foo$bar')).toEqual({ name: 'fooBar', map: 'foo$bar' });
   });
+
+  it('synthesizes a deterministic identifier when no ASCII identifier characters remain', () => {
+    expect(toFieldName('$$$')).toMatchObject({
+      name: expect.stringMatching(/^x[0-9a-f]+$/),
+      map: '$$$',
+    });
+    expect(toFieldName('東京')).toEqual(toFieldName('東京'));
+  });
 });
 
 describe('toEnumName', () => {
@@ -93,6 +109,13 @@ describe('toEnumName', () => {
 
   it('sanitizes punctuated identifiers', () => {
     expect(toEnumName('user.role')).toEqual({ name: 'UserRole', map: 'user.role' });
+  });
+
+  it('synthesizes a deterministic identifier when no ASCII identifier characters remain', () => {
+    expect(toEnumName('$$$')).toMatchObject({
+      name: expect.stringMatching(/^X[0-9a-f]+$/),
+      map: '$$$',
+    });
   });
 });
 
@@ -166,5 +189,10 @@ describe('toNamedTypeName', () => {
     expect(toNamedTypeName('foo$bar')).toBe('FooBar');
     expect(toNamedTypeName('type')).toBe('_Type');
     expect(toNamedTypeName('123value')).toBe('_123value');
+  });
+
+  it('synthesizes a deterministic identifier when no ASCII identifier characters remain', () => {
+    expect(toNamedTypeName('$$$')).toMatch(/^X[0-9a-f]+$/);
+    expect(toNamedTypeName('東京')).toBe(toNamedTypeName('東京'));
   });
 });
