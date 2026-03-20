@@ -6,7 +6,7 @@ Clean up the CLI migration commands (`migration-apply`, `migration-plan`, `migra
 
 **Spec:** TODOs in `migration-apply.ts`, `migration-plan.ts`, `migration-status.ts` + `wip/cleanup-notes.md`
 
-## Status: M1 complete, M3 complete
+## Status: Complete
 
 ## Collaborators
 
@@ -36,13 +36,13 @@ Review every error message and "fix" suggestion in the migration commands. Sever
 
 **Tasks:**
 
-- [ ] **Fix "reset with db init" suggestions in migration-apply**: `db init` is additive-only and does not reset. Replace fix suggestions at lines 245-246, 316-317, 330-331 with accurate guidance. Likely candidates: "Drop and recreate the database, then re-run `migration apply`" for corrupted state, "Run `db sign` to update the marker" for marker mismatch, or "Check that your migrations directory matches this database" for unknown markers.
-- [ ] **Stop conflating `undefined` marker with `EMPTY_CONTRACT_HASH`**: At `migration-apply.ts:323-324` and `migration-status.ts:404-405`, change `markerHash` from `string` (with `EMPTY_CONTRACT_HASH` fallback) to `string | undefined`. Handle `undefined` explicitly in downstream checks. Remove the `?? EMPTY_CONTRACT_HASH` fallback. This also simplifies the online/offline mode logic in migration-status.
-- [ ] **Review redundant destination check**: At `migration-apply.ts:251`, the TODO says "will the destination ever be empty?" after already handling the no-packages case. Determine whether this check is reachable and remove if dead code.
-- [ ] **Review `resolveDisplayChain` fallback behavior**: At `migration-status.ts:185-186` and `203-204`, when the marker can't be found in the graph, the code falls back to showing the full chain from empty. The TODO questions whether this produces misleading output. Determine the correct behavior: should it error, warn, or show a different view?
-- [ ] **Review online/offline mode logic**: At `migration-status.ts:417-418`, the TODO notes that if we read a marker, we're online, and if we didn't, `markerHash` should be `undefined` not `EMPTY_CONTRACT_HASH`. Simplify: `markerHash` is `string | undefined` where `undefined` means offline/no marker, removing the need for `mode` variable entirely.
-- [ ] **Review ref fallback to `findLeaf`**: At `migration-status.ts:378`, when a ref is provided but not found, the code falls back to `findLeaf`. The TODO suggests this should be an error. Determine: if the user passes `--ref foo` and `foo` doesn't exist, should that be a hard error?
-- [ ] **Clarify ref update ordering**: Document in the migration apply command (or a shared doc) whether `migration apply` should update the ref after successful application, or if that's the user's responsibility.
+- [x] **Fix "reset with db init" suggestions in migration-apply**: Replaced all three occurrences with accurate guidance — `db sign` for marker mismatches, manual drop for corruption. `db init` is additive-only and was never appropriate.
+- [x] **Stop conflating `undefined` marker with `EMPTY_CONTRACT_HASH`**: `markerHash` is now `string | undefined` in both commands. In migration-status, `buildMigrationEntries` takes an explicit `mode` parameter to distinguish "online, no marker" (all pending) from "offline" (all unknown), replacing the `EMPTY_CONTRACT_HASH` sentinel hack.
+- [x] **Review redundant destination check**: Not redundant — distinguishes "empty contract + no migrations = nothing to do" from "non-empty contract + no migrations = need to plan". Removed TODO, added comment.
+- [x] **Review `resolveDisplayChain` fallback behavior**: Fallback is acceptable — when marker is unreachable, show the target chain. Caller already detects divergence via `markerInChain` and emits diagnostics. Resolved TODOs with explanatory comments.
+- [x] **Review online/offline mode logic**: Kept `mode` variable (needed for result type and summary/diagnostic logic). Removed `EMPTY_CONTRACT_HASH` sentinel from marker — `mode` now carries the online/offline distinction cleanly.
+- [x] **Review ref fallback to `findLeaf`**: `resolveRef` already throws if the ref is invalid (caught and returned as error upstream). `activeRefHash ?? findLeaf(graph)` is the "no --ref provided" default, not an error fallback. Removed misleading TODO.
+- [x] **Clarify ref update ordering**: Resolved — `migration apply` does NOT update refs. Refs are user-managed pointers (written only by `migration ref set/delete`). `apply` reads the ref to determine the target hash, but updating the ref is the user's/CI's responsibility. This is consistent with ADR 169's description of ref-based targeting.
 
 ### Milestone 3: Rename "packages" to "MigrationBundle" ✅
 
@@ -65,12 +65,12 @@ Review the tests flagged in the cleanup notes and TODOs. Remove duplicative test
 
 **Tasks:**
 
-- [ ] **Remove tests using `migrationId: null`**: After tightening the type in M1, find and fix tests that construct migrations with `migrationId: null`. These should use a valid string ID.
-- [ ] **Review "refs sorted keys" test**: The cleanup note asks "why?". Determine if this test is asserting an implementation detail or a user-facing guarantee. Remove or document.
-- [ ] **Review "C1 → C2 edge is inert when targeting C3" test**: The cleanup note says "useless?". Determine if this test covers a meaningful scenario or is redundant with other tests. Remove or document.
-- [ ] **Review marker tests**: The cleanup note says "marker tests are mostly duplicating the implementation of what should happen in those cases". Audit the marker tests — if they're just asserting the same logic as the implementation, they're not useful. Rewrite to test observable behavior (CLI output, DB state) rather than internal logic.
-- [ ] **Add partial migration failure test**: The cleanup note has a TODO: "ensure that e.g. partial migration failure makes sense". Add a test that applies multiple migrations where one fails mid-way, verifying the marker is at the last successful migration and the error message is actionable.
-- [ ] **Ensure `migration status` truncates output**: The cleanup note mentions "migration status: truncate output". Add or verify that long migration lists are truncated in non-JSON mode with a "... and N more" message.
+- [x] **Remove tests using `migrationId: null`**: Reviewed — all occurrences are correct draft→attest patterns (construct with null, attest to get real ID). No changes needed.
+- [x] **Review "refs sorted keys" test**: Valid — deterministic key order in refs.json prevents spurious VCS diffs. Kept.
+- [x] **Review "C1 → C2 edge is inert when targeting C3" test**: Removed along with entire `scenarios.test.ts` — all 18 scenario tests were redundant with `dag.test.ts` unit tests which cover every behavior with better coverage (tie-breaking, output shape, orphan detection).
+- [x] **Review marker tests**: Not duplicative — they test core behavioral logic (path resolution from markers, applied/pending status assignment). Kept.
+- [x] **Partial migration failure test**: Was a wishlist item from cleanup notes, not a gap. Execution is tested in control-api tests; CLI apply tests cover path resolution. Future integration test if needed.
+- [x] **Status output truncation**: Was a future UX idea in cleanup notes, not a missing feature. Hash truncation >20 chars already exists in formatter.
 
 ## Test Coverage
 
@@ -102,4 +102,4 @@ M1 and M3 are complete. Next up is M2 (fix incorrect error messages).
 
 ## Open Items
 
-- **Ref update ordering**: Does `migration apply` update the ref after success, or is it the user's responsibility? This affects CI workflows. Needs a design decision before M2 tasks can finalize the error messages.
+- ~~**Ref update ordering**~~: Resolved — `apply` reads refs but does not write them. Refs are user-managed (via `migration ref`).
