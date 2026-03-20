@@ -52,88 +52,125 @@ function isStringArray(value: unknown): value is readonly string[] {
 }
 
 function hasOptionalAnnotations(value: Record<string, unknown>): boolean {
-  return value.annotations === undefined || isRecord(value.annotations);
+  const annotations = value['annotations'];
+  return annotations === undefined || isRecord(annotations);
 }
 
 function isPrimaryKeyLike(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    isStringArray(value.columns) &&
-    (value.name === undefined || typeof value.name === 'string')
-  );
+  if (!isRecord(value)) {
+    return false;
+  }
+  const columns = value['columns'];
+  const name = value['name'];
+  return isStringArray(columns) && (name === undefined || typeof name === 'string');
 }
 
 function isSqlColumnLike(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const name = value['name'];
+  const nativeType = value['nativeType'];
+  const nullable = value['nullable'];
   return (
-    isRecord(value) &&
-    typeof value.name === 'string' &&
-    typeof value.nativeType === 'string' &&
-    typeof value.nullable === 'boolean' &&
+    typeof name === 'string' &&
+    typeof nativeType === 'string' &&
+    typeof nullable === 'boolean' &&
     hasOptionalAnnotations(value)
   );
 }
 
 function isSqlForeignKeyLike(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const columns = value['columns'];
+  const referencedTable = value['referencedTable'];
+  const referencedColumns = value['referencedColumns'];
+  const name = value['name'];
+  const onDelete = value['onDelete'];
+  const onUpdate = value['onUpdate'];
   return (
-    isRecord(value) &&
-    isStringArray(value.columns) &&
-    typeof value.referencedTable === 'string' &&
-    isStringArray(value.referencedColumns) &&
-    (value.name === undefined || typeof value.name === 'string') &&
-    (value.onDelete === undefined || typeof value.onDelete === 'string') &&
-    (value.onUpdate === undefined || typeof value.onUpdate === 'string') &&
+    isStringArray(columns) &&
+    typeof referencedTable === 'string' &&
+    isStringArray(referencedColumns) &&
+    (name === undefined || typeof name === 'string') &&
+    (onDelete === undefined || typeof onDelete === 'string') &&
+    (onUpdate === undefined || typeof onUpdate === 'string') &&
     hasOptionalAnnotations(value)
   );
 }
 
 function isSqlUniqueLike(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const columns = value['columns'];
+  const name = value['name'];
   return (
-    isRecord(value) &&
-    isStringArray(value.columns) &&
-    (value.name === undefined || typeof value.name === 'string') &&
+    isStringArray(columns) &&
+    (name === undefined || typeof name === 'string') &&
     hasOptionalAnnotations(value)
   );
 }
 
 function isSqlIndexLike(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const columns = value['columns'];
+  const unique = value['unique'];
+  const name = value['name'];
   return (
-    isRecord(value) &&
-    isStringArray(value.columns) &&
-    typeof value.unique === 'boolean' &&
-    (value.name === undefined || typeof value.name === 'string') &&
+    isStringArray(columns) &&
+    typeof unique === 'boolean' &&
+    (name === undefined || typeof name === 'string') &&
     hasOptionalAnnotations(value)
   );
 }
 
 function isSqlTableLike(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const name = value['name'];
+  const columns = value['columns'];
+  const primaryKey = value['primaryKey'];
+  const foreignKeys = value['foreignKeys'];
+  const uniques = value['uniques'];
+  const indexes = value['indexes'];
   return (
-    isRecord(value) &&
-    typeof value.name === 'string' &&
-    isRecord(value.columns) &&
-    Object.values(value.columns).every(isSqlColumnLike) &&
-    (value.primaryKey === undefined || isPrimaryKeyLike(value.primaryKey)) &&
-    Array.isArray(value.foreignKeys) &&
-    value.foreignKeys.every(isSqlForeignKeyLike) &&
-    Array.isArray(value.uniques) &&
-    value.uniques.every(isSqlUniqueLike) &&
-    Array.isArray(value.indexes) &&
-    value.indexes.every(isSqlIndexLike) &&
+    typeof name === 'string' &&
+    isRecord(columns) &&
+    Object.values(columns).every(isSqlColumnLike) &&
+    (primaryKey === undefined || isPrimaryKeyLike(primaryKey)) &&
+    Array.isArray(foreignKeys) &&
+    foreignKeys.every(isSqlForeignKeyLike) &&
+    Array.isArray(uniques) &&
+    uniques.every(isSqlUniqueLike) &&
+    Array.isArray(indexes) &&
+    indexes.every(isSqlIndexLike) &&
     hasOptionalAnnotations(value)
   );
 }
 
 function isDependencyLike(value: unknown): boolean {
-  return isRecord(value) && typeof value.id === 'string';
+  return isRecord(value) && typeof value['id'] === 'string';
 }
 
 function isPrintableSqlSchemaIR(value: unknown): value is PrintableSqlSchemaIR {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const tables = value['tables'];
+  const dependencies = value['dependencies'];
+  const annotations = value['annotations'];
   return (
-    isRecord(value) &&
-    isRecord(value.tables) &&
-    Object.values(value.tables).every(isSqlTableLike) &&
-    Array.isArray(value.dependencies) &&
-    value.dependencies.every(isDependencyLike) &&
-    (value.annotations === undefined || isRecord(value.annotations))
+    isRecord(tables) &&
+    Object.values(tables).every(isSqlTableLike) &&
+    Array.isArray(dependencies) &&
+    dependencies.every(isDependencyLike) &&
+    (annotations === undefined || isRecord(annotations))
   );
 }
 

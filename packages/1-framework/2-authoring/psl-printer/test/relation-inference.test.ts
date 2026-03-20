@@ -170,6 +170,45 @@ describe('inferRelations', () => {
     expect(messageRelations![1]).toMatchObject({ relationName: 'fk_receiver' });
   });
 
+  it('falls back to generated relation names for unnamed duplicate FKs', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: {
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
+      message: {
+        name: 'message',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          sender_id: { name: 'sender_id', nativeType: 'int4', nullable: false },
+          recipient_id: { name: 'recipient_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [
+          { columns: ['sender_id'], referencedTable: 'user', referencedColumns: ['id'] },
+          { columns: ['recipient_id'], referencedTable: 'user', referencedColumns: ['id'] },
+        ],
+        uniques: [],
+        indexes: [],
+      },
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['message', 'Message'],
+    ]);
+
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+    const messageRelations = relationsByTable.get('message');
+
+    expect(messageRelations).toHaveLength(2);
+    expect(messageRelations![0]).toMatchObject({ relationName: 'sender_id' });
+    expect(messageRelations![1]).toMatchObject({ relationName: 'recipient_id' });
+  });
+
   it('handles self-referencing FKs', () => {
     const tables: Record<string, SqlTableIR> = {
       category: {
@@ -245,6 +284,78 @@ describe('inferRelations', () => {
     expect(childRelations![0]).toMatchObject({
       onDelete: 'Cascade',
       onUpdate: 'SetNull',
+    });
+  });
+
+  it('falls back to table names and creates parent relation state when the model map is incomplete', () => {
+    const tables: Record<string, SqlTableIR> = {
+      audit: {
+        name: 'audit',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          owner_id: { name: 'owner_id', nativeType: 'int4', nullable: false },
+          marker: { name: 'marker', nativeType: 'text', nullable: false },
+        },
+        foreignKeys: [
+          { columns: ['owner_id'], referencedTable: 'user', referencedColumns: ['id'] },
+        ],
+        uniques: [{ columns: ['marker'] }],
+        indexes: [],
+      },
+    };
+
+    const { relationsByTable } = inferRelations(tables, new Map());
+
+    expect(relationsByTable.get('audit')![0]).toMatchObject({
+      fieldName: 'owner',
+      typeName: 'user',
+      relationName: undefined,
+      optional: false,
+      list: false,
+    });
+    expect(relationsByTable.get('user')![0]).toMatchObject({
+      fieldName: 'audits',
+      typeName: 'audit',
+      relationName: undefined,
+      optional: false,
+      list: true,
+    });
+  });
+
+  it('falls back to a numeric suffix when relation names still collide after appending the model name', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: {
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
+      audit: {
+        name: 'audit',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+          user: { name: 'user', nativeType: 'text', nullable: false },
+          userUser: { name: 'userUser', nativeType: 'text', nullable: false },
+          user2: { name: 'user2', nativeType: 'text', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [],
+      },
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['audit', 'Audit'],
+    ]);
+
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+    expect(relationsByTable.get('audit')![0]).toMatchObject({
+      fieldName: 'user3',
+      typeName: 'User',
     });
   });
 });

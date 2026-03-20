@@ -25,7 +25,7 @@ describe('help text snapshots', () => {
     const helpText = formatRootHelp({ program, flags });
 
     expect(helpText).toMatchSnapshot();
-  });
+  }, 1000);
 
   it('formats contract emit help', () => {
     const command = createContractEmitCommand();

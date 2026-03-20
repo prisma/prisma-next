@@ -53,6 +53,14 @@ describe('createPostgresTypeMap', () => {
     });
   });
 
+  it('marks bare varchar as a named-type candidate', () => {
+    expect(typeMap.resolve('varchar')).toEqual({
+      pslType: 'String',
+      nativeType: 'varchar',
+      typeParams: { baseType: 'varchar' },
+    });
+  });
+
   it('returns unsupported for unknown types', () => {
     expect(typeMap.resolve('geometry')).toEqual({ unsupported: true, nativeType: 'geometry' });
     expect(typeMap.resolve('hstore')).toEqual({ unsupported: true, nativeType: 'hstore' });
@@ -108,6 +116,35 @@ describe('extractEnumTypeNames', () => {
   it('returns empty set for no annotations', () => {
     expect(extractEnumTypeNames(undefined)).toEqual(new Set());
     expect(extractEnumTypeNames({})).toEqual(new Set());
+  });
+
+  it('ignores non-enum storage types while keeping enum codec entries', () => {
+    const annotations = {
+      pg: {
+        storageTypes: {
+          user_role: {
+            codecId: 'pg/enum@1',
+            nativeType: 'user_role',
+            typeParams: { values: ['USER', 'ADMIN'] },
+          },
+          status: {
+            codecId: 'pg/enum@1',
+            nativeType: 'status',
+            typeParams: { values: 'ACTIVE' },
+          },
+          metadata: {
+            codecId: 'pg/json@1',
+            nativeType: 'jsonb',
+            typeParams: {},
+          },
+        },
+      },
+    };
+
+    expect(extractEnumTypeNames(annotations)).toEqual(new Set(['user_role', 'status']));
+    expect(extractEnumDefinitions(annotations)).toEqual(
+      new Map([['user_role', ['USER', 'ADMIN']]]),
+    );
   });
 });
 

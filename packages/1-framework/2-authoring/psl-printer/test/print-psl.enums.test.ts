@@ -113,4 +113,49 @@ describe('printPsl', () => {
       "
     `);
   });
+
+  it('normalizes symbol-only enum labels and omits @@map when the enum name is already PSL-safe', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        User: {
+          name: 'User',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            role: { name: 'role', nativeType: 'Role', nullable: false, default: undefined },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      annotations: {
+        pg: {
+          storageTypes: {
+            Role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'Role',
+              typeParams: { values: ['!!!'] },
+            },
+          },
+        },
+      },
+      dependencies: [],
+    };
+
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toMatchInlineSnapshot(`
+      "// This file was introspected from the database. Do not edit manually.
+
+      enum Role {
+        value
+      }
+
+      model User {
+        id   Int  @id
+        role Role
+      }
+      "
+    `);
+  });
 });

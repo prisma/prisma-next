@@ -63,14 +63,11 @@ export function inferRelations(
     for (const fk of table.foreignKeys) {
       const childTableName = table.name;
       const parentTableName = fk.referencedTable;
-      const childUsed = usedFieldNames.get(childTableName);
-      if (!childUsed) {
-        continue;
-      }
+      const childUsed = usedFieldNames.get(childTableName) as Set<string>;
       const childModelName = modelNameMap.get(childTableName) ?? childTableName;
       const parentModelName = modelNameMap.get(parentTableName) ?? parentTableName;
       const pairKey = `${childTableName}→${parentTableName}`;
-      const needsRelationName = (fkCountByPair.get(pairKey) ?? 0) > 1;
+      const needsRelationName = (fkCountByPair.get(pairKey) as number) > 1;
 
       // Determine cardinality
       const isOneToOne = detectOneToOne(fk, table);
@@ -97,9 +94,7 @@ export function inferRelations(
 
       // Parent table: back-relation field (e.g., posts Post[])
       const parentUsed = usedFieldNames.get(parentTableName) ?? new Set();
-      if (!usedFieldNames.has(parentTableName)) {
-        usedFieldNames.set(parentTableName, parentUsed);
-      }
+      usedFieldNames.set(parentTableName, parentUsed);
 
       const backRelFieldName = resolveUniqueFieldName(
         deriveBackRelationFieldName(childModelName, isOneToOne),
@@ -141,10 +136,7 @@ function detectOneToOne(fk: SqlForeignKeyIR, table: SqlTableIR): boolean {
 
   // Single FK column with a unique constraint → 1:1
   if (fk.columns.length === 1) {
-    const [fkCol] = fk.columns;
-    if (!fkCol) {
-      return false;
-    }
+    const [fkCol = ''] = fk.columns;
     for (const unique of table.uniques) {
       if (unique.columns.length === 1 && unique.columns[0] === fkCol) {
         return true;

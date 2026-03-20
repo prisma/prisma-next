@@ -79,18 +79,16 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
       // Check for parameterized types (e.g., "character varying(255)")
       const paramMatch = nativeType.match(PARAMETERIZED_TYPE_PATTERN);
       if (paramMatch) {
-        const [, baseType, params] = paramMatch;
-        if (baseType && params) {
-          const pslBase =
-            getOwnMappingValue(PARAMETERIZED_TYPES, baseType) ??
-            getOwnMappingValue(POSTGRES_TO_PSL, baseType);
-          if (pslBase) {
-            return {
-              pslType: pslBase,
-              nativeType,
-              typeParams: { baseType, params },
-            };
-          }
+        const [, baseType = nativeType, params = ''] = paramMatch;
+        const pslBase =
+          getOwnMappingValue(PARAMETERIZED_TYPES, baseType) ??
+          getOwnMappingValue(POSTGRES_TO_PSL, baseType);
+        if (pslBase) {
+          return {
+            pslType: pslBase,
+            nativeType,
+            typeParams: { baseType, params },
+          };
         }
       }
 

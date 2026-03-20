@@ -384,4 +384,46 @@ describe('printPsl', () => {
       "
     `);
   });
+
+  it('orders cyclic table dependencies deterministically', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        alpha: {
+          name: 'alpha',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            beta_id: { name: 'beta_id', nativeType: 'int4', nullable: false, default: undefined },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            { columns: ['beta_id'], referencedTable: 'beta', referencedColumns: ['id'] },
+          ],
+          uniques: [],
+          indexes: [],
+        },
+        beta: {
+          name: 'beta',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            alpha_id: {
+              name: 'alpha_id',
+              nativeType: 'int4',
+              nullable: false,
+              default: undefined,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            { columns: ['alpha_id'], referencedTable: 'alpha', referencedColumns: ['id'] },
+          ],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      dependencies: [],
+    };
+
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result.indexOf('model Beta')).toBeLessThan(result.indexOf('model Alpha'));
+  });
 });

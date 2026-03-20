@@ -178,6 +178,70 @@ describe('printPsl', () => {
     `);
   });
 
+  it('reuses named types when the same alias resolves to the same storage type', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        account: {
+          name: 'account',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            email: {
+              name: 'email',
+              nativeType: 'character varying(255)',
+              nullable: false,
+              default: undefined,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        profile: {
+          name: 'profile',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            email: {
+              name: 'email',
+              nativeType: 'character varying(255)',
+              nullable: false,
+              default: undefined,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      dependencies: [],
+    };
+
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toMatchInlineSnapshot(`
+      "// This file was introspected from the database. Do not edit manually.
+
+      types {
+        Email = String
+      }
+
+      model Account {
+        id    Int   @id
+        email Email
+
+        @@map("account")
+      }
+
+      model Profile {
+        id    Int   @id
+        email Email
+
+        @@map("profile")
+      }
+      "
+    `);
+  });
+
   it('unsupported (unmappable) types', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
@@ -290,6 +354,35 @@ describe('printPsl', () => {
       }
       "
     `);
+  });
+
+  it('ignores unsupported default shapes that are neither strings nor normalized defaults', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        settings: {
+          name: 'settings',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            flags: {
+              name: 'flags',
+              nativeType: 'text',
+              nullable: false,
+              default: { unsupported: true } as unknown as string,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      dependencies: [],
+    };
+
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toContain('flags String');
+    expect(result).not.toContain('@default(');
+    expect(result).not.toContain('// Raw default:');
   });
 
   it('preserves raw bigint defaults without precision loss', () => {

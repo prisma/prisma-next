@@ -111,7 +111,7 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
   // Process enums
   const enums: Array<{ name: string; mapName: string | undefined; values: readonly string[] }> = [];
   for (const [pgTypeName, values] of enumDefinitions) {
-    const enumName = enumNames.get(pgTypeName) ?? toEnumName(pgTypeName);
+    const enumName = enumNames.get(pgTypeName) as TopLevelNameResult;
     enums.push({ name: enumName.name, mapName: enumName.map, values });
   }
 
@@ -169,10 +169,8 @@ function processTable(
   const uniqueColumns = new Set<string>();
   for (const unique of table.uniques) {
     if (unique.columns.length === 1) {
-      const [columnName] = unique.columns;
-      if (columnName) {
-        uniqueColumns.add(columnName);
-      }
+      const [columnName = ''] = unique.columns;
+      uniqueColumns.add(columnName);
     }
   }
 
@@ -548,16 +546,6 @@ function createNormalizedEnumMemberBaseName(value: string): string {
     normalized = `_${normalized}`;
   }
 
-  if (!PSL_IDENTIFIER_PATTERN.test(normalized)) {
-    normalized = normalized.replace(/[^\w]/g, '');
-    if (normalized.length === 0) {
-      normalized = 'value';
-    }
-    if (isNormalizedEnumMemberReservedWord(normalized) || /^\d/.test(normalized)) {
-      normalized = `_${normalized}`;
-    }
-  }
-
   return normalized;
 }
 
@@ -580,20 +568,17 @@ function topologicalSort(
   const deps = new Map<string, Set<string>>();
   const tableToModel = new Map<string, string>();
   for (const tableName of Object.keys(tables)) {
-    const modelName = modelNameMap.get(tableName) ?? toModelName(tableName).name;
+    const modelName = modelNameMap.get(tableName) as string;
     tableToModel.set(tableName, modelName);
     deps.set(modelName, new Set());
   }
 
   for (const [tableName, table] of Object.entries(tables)) {
-    const modelName = tableToModel.get(tableName);
-    if (!modelName) {
-      continue;
-    }
+    const modelName = tableToModel.get(tableName) as string;
     for (const fk of table.foreignKeys) {
       const refModelName = tableToModel.get(fk.referencedTable);
       if (refModelName && refModelName !== modelName) {
-        deps.get(modelName)?.add(refModelName);
+        (deps.get(modelName) as Set<string>).add(refModelName);
       }
     }
   }
@@ -612,20 +597,14 @@ function topologicalSort(
     visiting.add(name);
 
     // Visit dependencies first (parent tables before child tables)
-    const depSet = deps.get(name);
-    if (depSet) {
-      const sortedDeps = [...depSet].sort();
-      for (const dep of sortedDeps) {
-        visit(dep);
-      }
+    const sortedDeps = [...(deps.get(name) as Set<string>)].sort();
+    for (const dep of sortedDeps) {
+      visit(dep);
     }
 
     visiting.delete(name);
     visited.add(name);
-    const model = modelByName.get(name);
-    if (model) {
-      result.push(model);
-    }
+    result.push(modelByName.get(name) as PrinterModel);
   }
 
   for (const name of sortedNames) {

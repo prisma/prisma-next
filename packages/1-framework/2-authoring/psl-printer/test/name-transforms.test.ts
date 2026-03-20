@@ -62,6 +62,10 @@ describe('toFieldName', () => {
   it('lowercases first char of PascalCase column name', () => {
     expect(toFieldName('Name')).toEqual({ name: 'name', map: 'Name' });
   });
+
+  it('keeps separator-only names stable', () => {
+    expect(toFieldName('___')).toEqual({ name: '___' });
+  });
 });
 
 describe('toEnumName', () => {
@@ -71,6 +75,10 @@ describe('toEnumName', () => {
 
   it('no map when already PascalCase', () => {
     expect(toEnumName('Role')).toEqual({ name: 'Role' });
+  });
+
+  it('escapes reserved enum names', () => {
+    expect(toEnumName('enum')).toEqual({ name: '_Enum', map: 'enum' });
   });
 });
 

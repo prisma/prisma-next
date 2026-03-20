@@ -32,12 +32,7 @@ function snakeToPascalCase(input: string): string {
  * Only splits on separators — preserves existing casing within words.
  */
 function snakeToCamelCase(input: string): string {
-  const parts = input.split(/[_\s-]+/).filter(Boolean);
-  if (parts.length === 0) return input;
-  const [firstPart, ...rest] = parts;
-  if (!firstPart) {
-    return input;
-  }
+  const [firstPart = input, ...rest] = input.split(/[_\s-]+/).filter(Boolean);
   return (
     firstPart.charAt(0).toLowerCase() +
     firstPart.slice(1) +
@@ -173,10 +168,7 @@ export function deriveRelationFieldName(
   referencedTableName: string,
 ): string {
   if (fkColumns.length === 1) {
-    const [col] = fkColumns;
-    if (!col) {
-      return escapeIfNeeded(snakeToCamelCase(referencedTableName));
-    }
+    const [col = referencedTableName] = fkColumns;
     // Strip common FK suffixes
     const stripped = col.replace(/_id$/i, '').replace(/Id$/, '');
 

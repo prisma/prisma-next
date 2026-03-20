@@ -38,6 +38,12 @@ describe('mapDefault', () => {
     });
   });
 
+  it('maps bigint', () => {
+    expect(mapDefault({ kind: 'literal', value: 42n })).toEqual({
+      attribute: '@default(42)',
+    });
+  });
+
   it('maps string', () => {
     expect(mapDefault({ kind: 'literal', value: 'hello' })).toEqual({
       attribute: '@default("hello")',
@@ -73,6 +79,12 @@ describe('mapDefault', () => {
       mapDefault({ kind: 'literal', value: { $type: 'bigint', value: '9007199254740993' } }),
     ).toEqual({
       attribute: '@default(9007199254740993)',
+    });
+  });
+
+  it('stringifies unsupported literal defaults', () => {
+    expect(mapDefault({ kind: 'literal', value: { nested: ['value'] } })).toEqual({
+      attribute: '@default("{\\"nested\\":[\\"value\\"]}")',
     });
   });
 });
