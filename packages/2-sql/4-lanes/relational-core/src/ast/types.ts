@@ -194,6 +194,10 @@ function mergeRefsInto(
   }
 }
 
+// Node dispatch relies solely on instanceof. If multiple copies of this package
+// end up in node_modules (hoisting issues, misaligned workspace versions), instanceof
+// checks fail silently. Consider adding a structural brand (kind tag / Symbol.hasInstance)
+// if this becomes a problem. See: NB-F02 in PR #234 review.
 export abstract class AstNode {
   protected freeze(): void {
     Object.freeze(this);
@@ -297,6 +301,9 @@ export class DerivedTableSource extends FromSource {
     return new DerivedTableSource(alias, query);
   }
 
+  // Intentionally does not call rewriter.tableSource — derived tables are rewritten
+  // via their inner query, not intercepted at the FromSource level. A future
+  // fromSource?(source: FromSource) callback would be needed for that.
   override rewrite(rewriter: AstRewriter): FromSource {
     return new DerivedTableSource(this.alias, this.query.rewrite(rewriter));
   }
@@ -335,6 +342,8 @@ export class ColumnRef extends Expression {
 }
 
 export class ParamRef extends AstNode {
+  // 1-based index matching PostgreSQL's $1, $2, ... convention.
+  // The corresponding value lives at params[index - 1] in the bound params array.
   readonly index: number;
   readonly name: string | undefined;
 
