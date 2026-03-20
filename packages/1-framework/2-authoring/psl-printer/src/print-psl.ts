@@ -342,7 +342,7 @@ function processTable(
       const fieldNames = index.columns.map((columnName) =>
         resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
       );
-      modelAttributes.push(`@@index([${fieldNames.join(', ')}])`);
+      modelAttributes.push(formatModelConstraintAttribute('@@index', fieldNames, index.name));
     }
   }
 
@@ -403,7 +403,7 @@ function formatFieldConstraintAttribute(
 }
 
 function formatModelConstraintAttribute(
-  attribute: '@@id' | '@@unique',
+  attribute: '@@id' | '@@unique' | '@@index',
   fields: readonly string[],
   constraintName?: string,
 ): string {

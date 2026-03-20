@@ -59,6 +59,7 @@ The proposed solution changes `db introspect` so that its **default behavior** i
 ### PSL printer — types and defaults
 
 - Enum types from `annotations.pg.storageTypes` emit `enum` blocks.
+- Enum member mapping is intentionally out of scope for v1. The printer normalizes enum member names to valid PSL identifiers, but it does not preserve original database enum labels via enum member `@map` attributes. For enums with labels that are not already PSL-safe identifiers, introspection is therefore lossy.
 - Parameterized Postgres types (e.g., `character varying(255)`) generate `types` block entries.
 - Default values emit `@default(autoincrement())`, `@default(now())`, `@default(uuid())`, `@default(true/false)`, `@default(42)`, `@default("str")`.
 - Unrecognized default expressions are emitted as PSL comments (`// Raw default: <expr>`).
@@ -82,6 +83,7 @@ The proposed solution changes `db introspect` so that its **default behavior** i
 
 - TypeScript contract materialization from the introspect command (remains a separate `contract emit` step).
 - Merge mode for existing PSL files (v1 is overwrite-only; merge is a future enhancement).
+- Preserving original database enum labels via enum member `@map` attributes.
 - Multi-target support beyond PostgreSQL (MySQL, SQLite type maps are future work).
 - Introspecting non-`public` Postgres schemas (`--schema` flag is future).
 - Excluding specific tables (`--exclude` flag is future).
@@ -193,6 +195,7 @@ Decisions already made:
 - **Pluralization**: Simple English rules (`s`, `y→ies`, `s→ses`) for back-relation field naming (e.g., `User` has `posts Post[]`). No library needed for v1.
 - **Column alignment**: Match Prisma ORM's formatter — field types and attributes aligned into columns.
 - **Default command behavior**: PSL file write is the default. The current tree-view output moves behind `--dry-run`. This eliminates the implicit-side-effect problem — introspect *is* a write operation, and `--dry-run` is the preview.
+- **Enum member mapping**: Out of scope for this PR. The printer emits enum blocks and normalizes enum member identifiers to valid PSL names, but it does not preserve original database enum labels via enum member `@map`.
 - **Back-relation `Type[]` fields**: The printer emits them for readability, even though the PSL interpreter does not yet support relation navigation lists. A comment in the generated PSL notes this. Full round-trip through the interpreter is gated on the `psl-contract-authoring` follow-up shipping `Type[]` support.
 
 Remaining questions:
