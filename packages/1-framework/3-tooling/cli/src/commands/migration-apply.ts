@@ -5,7 +5,7 @@ import type { AttestedMigrationBundle, MigrationGraph } from '@prisma-next/migra
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { resolve } from 'pathe';
+
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type { MigrationApplyFailure, MigrationApplyStep } from '../control-api/types';
@@ -110,7 +110,7 @@ async function executeMigrationApplyCommand(
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative } = resolveMigrationPaths(
+  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -146,7 +146,6 @@ async function executeMigrationApplyCommand(
 
   if (options.ref) {
     refName = options.ref;
-    const refsPath = resolve(migrationsDir, 'refs.json');
     try {
       const refs = await readRefs(refsPath);
       destinationHash = resolveRef(refs, refName);

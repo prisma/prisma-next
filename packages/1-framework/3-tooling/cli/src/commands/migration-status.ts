@@ -12,7 +12,7 @@ import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { resolve } from 'pathe';
+
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
@@ -210,7 +210,7 @@ async function executeMigrationStatusCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative } = resolveMigrationPaths(
+  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -221,8 +221,6 @@ async function executeMigrationStatusCommand(
   let activeRefName: string | undefined;
   let activeRefHash: string | undefined;
   let allRefs: Record<string, string> = {};
-
-  const refsPath = resolve(migrationsDir, 'refs.json');
   try {
     allRefs = await readRefs(refsPath);
   } catch (error) {
