@@ -62,7 +62,7 @@ export class GroupedCollection<
   having(
     predicate: (having: HavingBuilder<TContract, ModelName>) => WhereExpr,
   ): GroupedCollection<TContract, ModelName, GroupFields> {
-    const havingExpr = predicate(createHavingBuilder(this.ctx.contract, this.modelName));
+    const havingExpr = predicate(createHavingBuilder(this.ctx.context.contract, this.modelName));
     return new GroupedCollection(this.ctx, this.modelName, {
       tableName: this.tableName,
       baseFilters: this.baseFilters,
@@ -77,7 +77,7 @@ export class GroupedCollection<
   ): Promise<
     Array<Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>>
   > {
-    const aggregateSpec = fn(createAggregateBuilder(this.ctx.contract, this.modelName));
+    const aggregateSpec = fn(createAggregateBuilder(this.ctx.context.contract, this.modelName));
     const aggregateEntries = Object.entries(aggregateSpec);
     if (aggregateEntries.length === 0) {
       throw new Error('groupBy().aggregate() requires at least one aggregation selector');
@@ -98,13 +98,13 @@ export class GroupedCollection<
     );
     const rows = await executeCompiledQuery<Record<string, unknown>>(
       this.ctx.runtime,
-      this.ctx.contract,
+      this.ctx.context.contract,
       compiled,
       { lane: 'orm-client' },
     ).toArray();
 
     return rows.map((row) => {
-      const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, row);
+      const mapped = mapStorageRowToModelFields(this.ctx.context.contract, this.tableName, row);
       for (const [alias, selector] of aggregateEntries) {
         mapped[alias] = coerceAggregateValue(selector.fn, row[alias]);
       }

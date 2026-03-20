@@ -238,7 +238,6 @@ export default function postgres<
     return runtimeInstance;
   };
   const orm: OrmClient<TContract> = ormBuilder({
-    contract,
     runtime: {
       execute(plan) {
         return getRuntime().execute(plan);
@@ -247,6 +246,7 @@ export default function postgres<
         return getRuntime().connection();
       },
     },
+    context,
   });
 
   return {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { compileSelectWithIncludeStrategy } from '../../src/kysely-compiler';
 import { baseContract, createCollection, createCollectionFor } from '../collection-fixtures';
-import { createMockRuntime, type TestContract } from '../helpers';
+import { createMockRuntime, getTestContext, type TestContract } from '../helpers';
 import { normalizeSql, serializePlans } from './helpers';
 
 function withIncludeCapabilities(
@@ -307,7 +307,7 @@ describe('sql-compilation/include', () => {
     };
 
     const collection = new Collection(
-      { contract: baseContract, runtime: runtimeWithConnection },
+      { runtime: runtimeWithConnection, context: getTestContext() },
       'User',
     );
     runtimeWithConnection.setNextResults?.([

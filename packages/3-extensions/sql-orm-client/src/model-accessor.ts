@@ -1,27 +1,18 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
-  BinaryExpr,
   ColumnRef,
   ExistsExpr,
-  LiteralExpr,
   SelectAst,
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { and, not } from './filters';
-import type { ComparisonMethods, ModelAccessor, RelationFilterAccessor } from './types';
-
-const COMPARISON_OPS: ReadonlyArray<BinaryExpr['op']> = [
-  'eq',
-  'neq',
-  'gt',
-  'lt',
-  'gte',
-  'lte',
-  'like',
-  'ilike',
-  'in',
-  'notIn',
-];
+import {
+  COMPARISON_METHODS_META,
+  type ComparisonMethodFns,
+  type ModelAccessor,
+  type RelationFilterAccessor,
+} from './types';
 
 interface RelationMeta {
   readonly to?: string;
@@ -39,14 +30,15 @@ type RelationPredicateInput<TContract extends SqlContract<SqlStorage>, ModelName
 /**
  * Creates a Proxy-based model accessor for use inside `where()` callbacks.
  *
- * Accessing a field returns scalar comparison methods, and accessing a relation
- * returns quantifier methods (`some`, `every`, `none`) that compile to EXISTS
- * subqueries.
+ * Accessing a field returns scalar comparison methods (gated by codec traits),
+ * and accessing a relation returns quantifier methods (`some`, `every`, `none`)
+ * that compile to EXISTS subqueries.
  */
 export function createModelAccessor<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
->(contract: TContract, modelName: ModelName): ModelAccessor<TContract, ModelName> {
+>(context: ExecutionContext<TContract>, modelName: ModelName): ModelAccessor<TContract, ModelName> {
+  const contract = context.contract;
   const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
   const tableName = resolveModelTableName(contract, modelName);
   const tableRelations = (contract.relations?.[tableName] ?? {}) as Record<string, RelationMeta>;
@@ -59,83 +51,53 @@ export function createModelAccessor<
 
       const relation = tableRelations[prop];
       if (relation) {
-        return createRelationFilterAccessor(contract, modelName, tableName, relation);
+        return createRelationFilterAccessor(context, modelName, tableName, relation);
       }
 
       const columnName = fieldToColumn[prop] ?? prop;
-      return createScalarFieldAccessor(tableName, columnName);
+      const traits = resolveFieldTraits(contract, tableName, columnName, context);
+      return createScalarFieldAccessor(tableName, columnName, traits);
     },
   });
+}
+
+function resolveFieldTraits(
+  contract: SqlContract<SqlStorage>,
+  tableName: string,
+  columnName: string,
+  context: ExecutionContext,
+): readonly string[] | undefined {
+  const tables = contract.storage?.tables as
+    | Record<string, { columns?: Record<string, { codecId?: string }> }>
+    | undefined;
+  const codecId = tables?.[tableName]?.columns?.[columnName]?.codecId;
+  if (!codecId) return undefined; // Column not in storage — can't resolve traits
+  return context.codecs.traitsOf(codecId);
 }
 
 function createScalarFieldAccessor(
   tableName: string,
   columnName: string,
-): ComparisonMethods<unknown> {
-  const left: ColumnRef = {
-    kind: 'col',
-    table: tableName,
-    column: columnName,
-  };
+  traits: readonly string[] | undefined,
+): Partial<ComparisonMethodFns<unknown>> {
+  const column: ColumnRef = { kind: 'col', table: tableName, column: columnName };
+  const methods: Record<string, unknown> = {};
 
-  const methods: Partial<ComparisonMethods<unknown>> = {};
-  for (const op of COMPARISON_OPS) {
-    if (op === 'in' || op === 'notIn') {
-      methods[op] = ((values: readonly unknown[]): BinaryExpr => ({
-        kind: 'bin',
-        op,
-        left,
-        right: {
-          kind: 'listLiteral',
-          values: values.map(
-            (value): LiteralExpr => ({
-              kind: 'literal',
-              value,
-            }),
-          ),
-        },
-      })) as ComparisonMethods<unknown>[typeof op];
+  for (const [name, meta] of Object.entries(COMPARISON_METHODS_META)) {
+    if (traits && meta.traits.length > 0 && !meta.traits.every((t) => traits.includes(t))) {
       continue;
     }
-
-    methods[op] = ((value: unknown): BinaryExpr => ({
-      kind: 'bin',
-      op,
-      left,
-      right: {
-        kind: 'literal',
-        value,
-      },
-    })) as ComparisonMethods<unknown>[typeof op];
+    methods[name] = meta.create(column);
   }
 
-  methods.isNull = () => ({
-    kind: 'nullCheck',
-    expr: left,
-    isNull: true,
-  });
-  methods.isNotNull = () => ({
-    kind: 'nullCheck',
-    expr: left,
-    isNull: false,
-  });
-  methods.asc = () => ({
-    column: columnName,
-    direction: 'asc',
-  });
-  methods.desc = () => ({
-    column: columnName,
-    direction: 'desc',
-  });
-
-  return methods as ComparisonMethods<unknown>;
+  return methods as Partial<ComparisonMethodFns<unknown>>;
 }
 
 function createRelationFilterAccessor<
   TContract extends SqlContract<SqlStorage>,
   ParentModelName extends string,
 >(
-  contract: TContract,
+  context: ExecutionContext<TContract>,
   parentModelName: ParentModelName,
   parentTableName: string,
   relation: RelationMeta,
@@ -146,21 +108,21 @@ function createRelationFilterAccessor<
       `Relation metadata for model "${parentModelName}" is missing the "to" model reference`,
     );
   }
-  const relatedTableName = resolveModelTableName(contract, relatedModelName);
+  const relatedTableName = resolveModelTableName(context.contract, relatedModelName);
 
   const relationAccessor: RelationFilterAccessor<TContract, string> = {
     some: (predicate) =>
-      createExistsExpr(contract, parentTableName, relatedModelName, relatedTableName, relation, {
+      createExistsExpr(context, parentTableName, relatedModelName, relatedTableName, relation, {
         mode: 'some',
         predicate,
       }),
     every: (predicate) =>
-      createExistsExpr(contract, parentTableName, relatedModelName, relatedTableName, relation, {
+      createExistsExpr(context, parentTableName, relatedModelName, relatedTableName, relation, {
         mode: 'every',
         predicate,
       }),
     none: (predicate) =>
-      createExistsExpr(contract, parentTableName, relatedModelName, relatedTableName, relation, {
+      createExistsExpr(context, parentTableName, relatedModelName, relatedTableName, relation, {
         mode: 'none',
         predicate,
       }),
@@ -170,7 +132,7 @@ function createRelationFilterAccessor<
 }
 
 function createExistsExpr<TContract extends SqlContract<SqlStorage>>(
-  contract: TContract,
+  context: ExecutionContext<TContract>,
   parentTableName: string,
   relatedModelName: string,
   relatedTableName: string,
@@ -181,7 +143,7 @@ function createExistsExpr<TContract extends SqlContract<SqlStorage>>(
   },
 ): ExistsExpr {
   const joinWhere = buildJoinWhere(parentTableName, relatedTableName, relation);
-  const childWhere = toRelationWhereExpr(contract, relatedModelName, options.predicate);
+  const childWhere = toRelationWhereExpr(context, relatedModelName, options.predicate);
 
   let subqueryWhere = joinWhere;
   let existsNot = false;
@@ -228,7 +190,7 @@ function createExistsExpr<TContract extends SqlContract<SqlStorage>>(
 }
 
 function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
-  contract: TContract,
+  context: ExecutionContext<TContract>,
   relatedModelName: string,
   predicate: RelationPredicateInput<TContract, string> | undefined,
 ): WhereExpr | undefined {
@@ -236,28 +198,39 @@ function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
     return undefined;
   }
 
-  const accessor = createModelAccessor(contract, relatedModelName);
+  // Both callback and shorthand paths use the trait-gated accessor
+  const accessor = createModelAccessor(context, relatedModelName);
 
   if (typeof predicate === 'function') {
     return predicate(accessor);
   }
 
+  // Shorthand object — skip fields without eq
   const exprs: WhereExpr[] = [];
   for (const [fieldName, value] of Object.entries(predicate)) {
     if (value === undefined) {
       continue;
     }
 
-    const fieldAccessor = (accessor as Record<string, ComparisonMethods<unknown>>)[fieldName];
+    const fieldAccessor = (accessor as Record<string, Partial<ComparisonMethodFns<unknown>>>)[
+      fieldName
+    ];
     if (!fieldAccessor) {
       continue;
     }
 
     if (value === null) {
-      exprs.push(fieldAccessor.isNull());
+      if (fieldAccessor.isNull) {
+        exprs.push(fieldAccessor.isNull());
+      }
       continue;
     }
 
+    if (!fieldAccessor.eq) {
+      throw new Error(
+        `Shorthand filter on "${relatedModelName}.${fieldName}": field does not support equality comparisons`,
+      );
+    }
     exprs.push(fieldAccessor.eq(value));
   }
 

@@ -1,9 +1,10 @@
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import { orm } from '../src/orm';
 import type { TestContract } from './helpers';
-import { createMockRuntime, getTestContract } from './helpers';
+import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 
 class UserCollection extends Collection<TestContract, 'User'> {
   named(name: string) {
@@ -33,12 +34,13 @@ function expectCommentCollection(value: unknown): asserts value is CommentCollec
 
 describe('orm()', () => {
   const contract = getTestContract();
+  const context = getTestContext();
 
   it('returns custom collections by key', () => {
     const runtime = createMockRuntime();
     const db = orm({
-      contract,
       runtime,
+      context,
       collections: { Post: PostCollection },
     });
     expect(db.Post).toBeInstanceOf(PostCollection);
@@ -46,7 +48,7 @@ describe('orm()', () => {
 
   it('creates default collections for model names', async () => {
     const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
+    const db = orm({ runtime, context });
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
     const results = await db.User.all();
     expect(results).toHaveLength(1);
@@ -54,13 +56,13 @@ describe('orm()', () => {
 
   it('returns undefined for symbol-based property lookups on the proxy', () => {
     const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
+    const db = orm({ runtime, context });
     expect((db as Record<PropertyKey, unknown>)[Symbol.toStringTag]).toBeUndefined();
   });
 
   it('caches lazily created collections', () => {
     const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
+    const db = orm({ runtime, context });
     const first = db.User;
     const second = db.User;
     expect(first).toBe(second);
@@ -68,7 +70,7 @@ describe('orm()', () => {
 
   it('throws for unknown model name', () => {
     const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
+    const db = orm({ runtime, context });
     expect(() => (db as Record<string, unknown>)['unknown']).toThrow(
       /No model found for 'unknown'/,
     );
@@ -84,15 +86,19 @@ describe('orm()', () => {
       },
     } as unknown as TestContract;
 
-    const db = orm({ contract: withoutModelToTable, runtime });
+    const customContext = {
+      ...context,
+      contract: withoutModelToTable,
+    } as ExecutionContext<TestContract>;
+    const db = orm({ runtime, context: customContext });
     expect(db.User.modelName).toBe('User');
   });
 
   it('custom collection overrides default for same key', () => {
     const runtime = createMockRuntime();
     const db = orm({
-      contract,
       runtime,
+      context,
       collections: { Post: PostCollection },
     });
 
@@ -102,8 +108,8 @@ describe('orm()', () => {
   it('resolves User to custom collection instance', () => {
     const runtime = createMockRuntime();
     const db = orm({
-      contract,
       runtime,
+      context,
       collections: { User: UserCollection },
     });
 
@@ -118,8 +124,8 @@ describe('orm()', () => {
     }
 
     const db = orm({
-      contract,
       runtime,
+      context,
       collections: { Post: LazyPostCollection },
     });
 
@@ -136,8 +142,8 @@ describe('orm()', () => {
   it('ignores undefined custom collection entries and falls back to default collection', () => {
     const runtime = createMockRuntime();
     const db = orm({
-      contract,
       runtime,
+      context,
       collections: { Post: undefined as unknown as typeof PostCollection },
     });
 
@@ -150,8 +156,8 @@ describe('orm()', () => {
 
     expect(() =>
       orm({
-        contract,
         runtime,
+        context,
         collections: { unknownCollection: PostCollection },
       }),
     ).toThrow(/No model found for custom collection 'unknownCollection'/);
@@ -159,12 +165,12 @@ describe('orm()', () => {
 
   it('throws when custom collection values are instances instead of classes', () => {
     const runtime = createMockRuntime();
-    const postCollectionInstance = new PostCollection({ contract, runtime }, 'Post');
+    const postCollectionInstance = new PostCollection({ runtime, context }, 'Post');
 
     expect(() =>
       orm({
-        contract,
         runtime,
+        context,
         collections: {
           Post: postCollectionInstance as unknown as typeof PostCollection,
         },
@@ -182,8 +188,8 @@ describe('orm()', () => {
 
     expect(() =>
       orm({
-        contract,
         runtime,
+        context,
         collections: {
           Post: NotACollection as unknown as typeof PostCollection,
         },
@@ -196,8 +202,8 @@ describe('orm()', () => {
 
     expect(() =>
       orm({
-        contract,
         runtime,
+        context,
         collections: {
           Post: (() => ({ ok: true })) as unknown as typeof PostCollection,
         },
@@ -207,7 +213,7 @@ describe('orm()', () => {
 
   it('does not type unknown keys on the client', () => {
     const runtime = createMockRuntime();
-    const db = orm({ contract, runtime });
+    const db = orm({ runtime, context });
     expect(db.User).toBeDefined();
     type DbClient = typeof db;
     // @ts-expect-error unknown collection key should not exist on typed client
@@ -220,8 +226,8 @@ describe('orm()', () => {
     () => {
       const runtime = createMockRuntime();
       const db = orm({
-        contract,
         runtime,
+        context,
         collections: { Post: PostCollection },
       });
 
@@ -238,8 +244,8 @@ describe('orm()', () => {
   it('propagates registered collection classes through nested include refinements', () => {
     const runtime = createMockRuntime();
     const db = orm({
-      contract,
       runtime,
+      context,
       collections: {
         Post: PostCollection,
         Comment: CommentCollection,
@@ -309,6 +315,7 @@ describe('orm()', () => {
       },
     } as unknown as TestContract;
 
-    expect(() => orm({ contract: withEmptyModelName, runtime })).not.toThrow();
+    const customContext = { ...context, contract: withEmptyModelName };
+    expect(() => orm({ runtime, context: customContext })).not.toThrow();
   });
 });

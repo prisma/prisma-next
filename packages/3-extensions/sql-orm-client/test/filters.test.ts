@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or, shorthandToWhereExpr } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
-import { getTestContract } from './helpers';
+import { getTestContext, getTestContract } from './helpers';
 
 describe('filters', () => {
   const contract = getTestContract();
+  const context = getTestContext();
 
   it('and() composes multiple expressions', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
     const expr = and(user['name']!.eq('Alice'), user['email']!.neq('bob@example.com'));
 
     expect(expr).toMatchObject({
@@ -20,7 +21,7 @@ describe('filters', () => {
   });
 
   it('or() composes multiple expressions', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
     const expr = or(user['name']!.eq('Alice'), user['name']!.eq('Bob'));
 
     expect(expr).toMatchObject({
@@ -33,7 +34,7 @@ describe('filters', () => {
   });
 
   it('not() negates binary expressions', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
     const expr = not(user['name']!.eq('Alice'));
 
     expect(expr).toMatchObject({
@@ -45,7 +46,7 @@ describe('filters', () => {
   });
 
   it('not() toggles exists and nullCheck expressions', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
 
     const existsExpr = user['posts']!.some();
     const nullCheckExpr = user['email']!.isNull();
@@ -61,7 +62,7 @@ describe('filters', () => {
   });
 
   it('not() applies De Morgan for and/or expressions', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
     const expr = not(
       and(user['name']!.eq('Alice'), or(user['email']!.eq('a'), user['email']!.eq('b'))),
     );
@@ -89,7 +90,7 @@ describe('filters', () => {
   });
 
   it('negates all supported scalar binary operators', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
 
     expect(not(user['id']!.neq(1))).toMatchObject({ kind: 'bin', op: 'eq' });
     expect(not(user['id']!.lt(1))).toMatchObject({ kind: 'bin', op: 'gte' });
@@ -100,7 +101,7 @@ describe('filters', () => {
   });
 
   it('throws when negating like or ilike operators', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
 
     expect(() => not(user['name']!.like('%a%'))).toThrow(/not negatable/i);
     expect(() => not(user['name']!.ilike('%a%'))).toThrow(/not negatable/i);

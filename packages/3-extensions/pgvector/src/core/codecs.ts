@@ -7,9 +7,10 @@
 
 import { codec, defineCodecs } from '@prisma-next/sql-relational-core/ast';
 
-const pgVectorCodec = codec<'pg/vector@1', string, number[]>({
+const pgVectorCodec = codec({
   typeId: 'pg/vector@1',
   targetTypes: ['vector'],
+  traits: ['equality'],
   encode: (value: number[]): string => {
     // Validate that value is an array of numbers
     if (!Array.isArray(value)) {
