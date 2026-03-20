@@ -13,7 +13,7 @@ test('inner join', () => {
 test('conflicting column names are not available at top level', () => {
   db.users
     .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.user_id))
-    // @ts-expect-error f.id is not available without a namespace
+    // @ts-expect-error conflicting column 'id' evicted from top-level scope; must use namespace
     .select((f) => ({ id: f.id, title: f.posts.title }))
     .firstOrThrow();
 });
