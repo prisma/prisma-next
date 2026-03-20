@@ -26,6 +26,7 @@ import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
+import { resolveDbIntrospectOutputPath } from './db-introspect-paths';
 
 interface DbIntrospectOptions extends CommonCommandOptions {
   readonly db?: string;
@@ -38,28 +39,6 @@ interface DbIntrospectCommandResult {
   readonly introspectResult: IntrospectSchemaResult<unknown>;
   readonly schemaView: CoreSchemaView | undefined;
   readonly pslPath?: string | undefined;
-}
-
-/**
- * Resolves the output path for the PSL file.
- *
- * Priority:
- * 1. --output <path> flag (resolved relative to cwd)
- * 2. Derive from config.contract.output — replace extension with .prisma
- * 3. Canonical default: schema.prisma in cwd
- */
-function resolveOutputPath(
-  options: DbIntrospectOptions,
-  contractOutput: string | undefined,
-): string {
-  if (options.output) {
-    return resolve(process.cwd(), options.output);
-  }
-  if (contractOutput) {
-    const contractPath = resolve(process.cwd(), contractOutput);
-    return contractPath.replace(/\.[^.]+$/, '.prisma');
-  }
-  return resolve(process.cwd(), 'schema.prisma');
 }
 
 /**
@@ -145,7 +124,7 @@ async function executeDbIntrospectCommand(
     let pslPath: string | undefined;
 
     if (!options.dryRun) {
-      const outputPath = resolveOutputPath(options, config.contract?.output);
+      const outputPath = resolveDbIntrospectOutputPath(options, config.contract?.output);
 
       // schemaIR is typed as `unknown` from the control client; validate shape before casting
       const ir = schemaIR as Record<string, unknown>;
