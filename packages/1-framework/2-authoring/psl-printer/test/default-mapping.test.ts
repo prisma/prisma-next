@@ -50,6 +50,12 @@ describe('mapDefault', () => {
     });
   });
 
+  it('escapes control characters in string defaults', () => {
+    expect(mapDefault({ kind: 'literal', value: 'line 1\nline 2\t"quoted"' })).toEqual({
+      attribute: '@default("line 1\\nline 2\\t\\"quoted\\"")',
+    });
+  });
+
   it('unrecognized function becomes comment', () => {
     expect(mapDefault({ kind: 'function', expression: 'custom_func()' })).toEqual({
       comment: '// Raw default: custom_func()',

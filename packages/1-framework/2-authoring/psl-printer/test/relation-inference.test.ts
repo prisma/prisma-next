@@ -34,16 +34,20 @@ describe('inferRelations', () => {
     // Child table (post) should have relation field
     const postRelations = relationsByTable.get('post');
     expect(postRelations).toHaveLength(1);
-    expect(postRelations![0]!.fieldName).toBe('user');
-    expect(postRelations![0]!.typeName).toBe('User');
-    expect(postRelations![0]!.list).toBe(false);
+    expect(postRelations![0]).toMatchObject({
+      fieldName: 'user',
+      typeName: 'User',
+      list: false,
+    });
 
     // Parent table (user) should have back-relation
     const userRelations = relationsByTable.get('user');
     expect(userRelations).toHaveLength(1);
-    expect(userRelations![0]!.fieldName).toBe('posts');
-    expect(userRelations![0]!.typeName).toBe('Post');
-    expect(userRelations![0]!.list).toBe(true);
+    expect(userRelations![0]).toMatchObject({
+      fieldName: 'posts',
+      typeName: 'Post',
+      list: true,
+    });
   });
 
   it('detects 1:1 when FK column has unique constraint', () => {
@@ -77,8 +81,10 @@ describe('inferRelations', () => {
     // Back-relation should be optional (1:1), not a list
     const userRelations = relationsByTable.get('user');
     expect(userRelations).toHaveLength(1);
-    expect(userRelations![0]!.optional).toBe(true);
-    expect(userRelations![0]!.list).toBe(false);
+    expect(userRelations![0]).toMatchObject({
+      optional: true,
+      list: false,
+    });
   });
 
   it('detects 1:1 when FK columns match PK columns', () => {
@@ -110,8 +116,10 @@ describe('inferRelations', () => {
 
     const userRelations = relationsByTable.get('user');
     expect(userRelations).toHaveLength(1);
-    expect(userRelations![0]!.optional).toBe(true);
-    expect(userRelations![0]!.list).toBe(false);
+    expect(userRelations![0]).toMatchObject({
+      optional: true,
+      list: false,
+    });
   });
 
   it('produces named relations for multiple FKs to same parent', () => {
@@ -158,8 +166,8 @@ describe('inferRelations', () => {
 
     const messageRelations = relationsByTable.get('message');
     expect(messageRelations).toHaveLength(2);
-    expect(messageRelations![0]!.relationName).toBe('fk_sender');
-    expect(messageRelations![1]!.relationName).toBe('fk_receiver');
+    expect(messageRelations![0]).toMatchObject({ relationName: 'fk_sender' });
+    expect(messageRelations![1]).toMatchObject({ relationName: 'fk_receiver' });
   });
 
   it('handles self-referencing FKs', () => {
@@ -185,12 +193,16 @@ describe('inferRelations', () => {
     expect(relations).toHaveLength(2); // child + back-relation
     // Child relation field
     const childRel = relations!.find((r) => r.fields);
-    expect(childRel?.fieldName).toBe('parent');
-    expect(childRel?.typeName).toBe('Category');
+    expect(childRel).toMatchObject({
+      fieldName: 'parent',
+      typeName: 'Category',
+    });
     // Back-relation field
     const backRel = relations!.find((r) => !r.fields);
-    expect(backRel?.typeName).toBe('Category');
-    expect(backRel?.list).toBe(true);
+    expect(backRel).toMatchObject({
+      typeName: 'Category',
+      list: true,
+    });
   });
 
   it('includes onDelete/onUpdate when non-default', () => {
@@ -230,7 +242,9 @@ describe('inferRelations', () => {
     const { relationsByTable } = inferRelations(tables, modelNameMap);
 
     const childRelations = relationsByTable.get('child');
-    expect(childRelations![0]!.onDelete).toBe('Cascade');
-    expect(childRelations![0]!.onUpdate).toBe('SetNull');
+    expect(childRelations![0]).toMatchObject({
+      onDelete: 'Cascade',
+      onUpdate: 'SetNull',
+    });
   });
 });

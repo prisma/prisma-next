@@ -63,6 +63,10 @@ export function inferRelations(
     for (const fk of table.foreignKeys) {
       const childTableName = table.name;
       const parentTableName = fk.referencedTable;
+      const childUsed = usedFieldNames.get(childTableName);
+      if (!childUsed) {
+        continue;
+      }
       const childModelName = modelNameMap.get(childTableName) ?? childTableName;
       const parentModelName = modelNameMap.get(parentTableName) ?? parentTableName;
       const pairKey = `${childTableName}→${parentTableName}`;
@@ -77,7 +81,7 @@ export function inferRelations(
       // Child table: relation field (e.g., author User @relation(...))
       const childRelFieldName = resolveUniqueFieldName(
         deriveRelationFieldName(fk.columns, parentTableName),
-        usedFieldNames.get(childTableName)!,
+        childUsed,
         parentModelName,
       );
 
@@ -89,7 +93,7 @@ export function inferRelations(
       );
 
       addRelationField(relationsByTable, childTableName, childRelField);
-      usedFieldNames.get(childTableName)!.add(childRelFieldName);
+      childUsed.add(childRelFieldName);
 
       // Parent table: back-relation field (e.g., posts Post[])
       const parentUsed = usedFieldNames.get(parentTableName) ?? new Set();
@@ -137,7 +141,10 @@ function detectOneToOne(fk: SqlForeignKeyIR, table: SqlTableIR): boolean {
 
   // Single FK column with a unique constraint → 1:1
   if (fk.columns.length === 1) {
-    const fkCol = fk.columns[0]!;
+    const [fkCol] = fk.columns;
+    if (!fkCol) {
+      return false;
+    }
     for (const unique of table.uniques) {
       if (unique.columns.length === 1 && unique.columns[0] === fkCol) {
         return true;

@@ -22,6 +22,27 @@ type ResolvedColumnFieldName = {
 
 type TableColumnFieldNameMap = ReadonlyMap<string, ResolvedColumnFieldName>;
 
+type NamedTypeRegistry = {
+  readonly entriesByKey: Map<string, PrinterNamedType>;
+  readonly usedNames: Set<string>;
+};
+
+type TopLevelNameResult = {
+  readonly name: string;
+  readonly map?: string | undefined;
+};
+
+const PSL_IDENTIFIER_PATTERN = /^[A-Za-z_]\w*$/;
+const ENUM_MEMBER_RESERVED_WORDS = new Set([
+  'datasource',
+  'default',
+  'enum',
+  'generator',
+  'model',
+  'type',
+  'types',
+]);
+
 /**
  * Converts a SqlSchemaIR to a PSL (Prisma Schema Language) string.
  *
@@ -44,18 +65,23 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
   const enumDefinitions = extractEnumDefinitions(schemaIR.annotations);
 
   // Build model name mapping (db table name → PSL model name)
-  const modelNameMap = new Map<string, string>();
-  for (const tableName of Object.keys(schemaIR.tables)) {
-    const { name } = toModelName(tableName);
-    modelNameMap.set(tableName, name);
-  }
+  const modelNames = buildTopLevelNameMap(
+    Object.keys(schemaIR.tables),
+    toModelName,
+    'model',
+    'table',
+  );
 
   // Build enum name mapping (db type name → PSL enum name)
-  const enumNameMap = new Map<string, string>();
-  for (const pgTypeName of enumTypeNames) {
-    const { name } = toEnumName(pgTypeName);
-    enumNameMap.set(pgTypeName, name);
-  }
+  const enumNames = buildTopLevelNameMap(enumTypeNames, toEnumName, 'enum', 'enum type');
+  assertNoCrossKindNameCollisions(modelNames, enumNames);
+
+  const modelNameMap = new Map(
+    [...modelNames].map(([tableName, result]) => [tableName, result.name]),
+  );
+  const enumNameMap = new Map(
+    [...enumNames].map(([pgTypeName, result]) => [pgTypeName, result.name]),
+  );
 
   const fieldNamesByTable = buildFieldNamesByTable(schemaIR.tables);
 
@@ -63,7 +89,10 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
   const { relationsByTable } = inferRelations(schemaIR.tables, modelNameMap);
 
   // Collect named types for the types block
-  const namedTypes = new Map<string, PrinterNamedType>();
+  const namedTypes: NamedTypeRegistry = {
+    entriesByKey: new Map<string, PrinterNamedType>(),
+    usedNames: new Set<string>(),
+  };
 
   // Process tables into models
   const models: PrinterModel[] = [];
@@ -82,15 +111,15 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
   // Process enums
   const enums: Array<{ name: string; mapName: string | undefined; values: readonly string[] }> = [];
   for (const [pgTypeName, values] of enumDefinitions) {
-    const { name, map } = toEnumName(pgTypeName);
-    enums.push({ name, mapName: map, values });
+    const enumName = enumNames.get(pgTypeName) ?? toEnumName(pgTypeName);
+    enums.push({ name: enumName.name, mapName: enumName.map, values });
   }
 
   // Sort enums alphabetically
   enums.sort((a, b) => a.name.localeCompare(b.name));
 
   // Sort models topologically by FK dependencies
-  const sortedModels = topologicalSort(models, schemaIR.tables);
+  const sortedModels = topologicalSort(models, schemaIR.tables, modelNameMap);
 
   // Serialize
   const sections: string[] = [];
@@ -99,7 +128,9 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
   sections.push(headerComment);
 
   // Types block
-  const namedTypeEntries = [...namedTypes.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const namedTypeEntries = [...namedTypes.entriesByKey.values()].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
   if (namedTypeEntries.length > 0) {
     sections.push(serializeTypesBlock(namedTypeEntries));
   }
@@ -114,7 +145,7 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
     sections.push(serializeModel(model));
   }
 
-  return sections.join('\n\n') + '\n';
+  return `${sections.join('\n\n')}\n`;
 }
 
 /**
@@ -125,7 +156,7 @@ function processTable(
   typeMap: PslPrinterOptions['typeMap'],
   enumNameMap: ReadonlyMap<string, string>,
   fieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>,
-  namedTypes: Map<string, PrinterNamedType>,
+  namedTypes: NamedTypeRegistry,
   relationFields: readonly RelationField[],
 ): PrinterModel {
   const { name: modelName, map: mapName } = toModelName(table.name);
@@ -138,7 +169,10 @@ function processTable(
   const uniqueColumns = new Set<string>();
   for (const unique of table.uniques) {
     if (unique.columns.length === 1) {
-      uniqueColumns.add(unique.columns[0]!);
+      const [columnName] = unique.columns;
+      if (columnName) {
+        uniqueColumns.add(columnName);
+      }
     }
   }
 
@@ -179,14 +213,7 @@ function processTable(
 
     // Handle parameterized types → named type in types block
     if (resolution.typeParams && !enumPslName) {
-      const namedTypeName = toNamedTypeName(column.name);
-      if (!namedTypes.has(namedTypeName)) {
-        namedTypes.set(namedTypeName, {
-          name: namedTypeName,
-          baseType: resolution.pslType,
-        });
-      }
-      typeName = namedTypeName;
+      typeName = registerNamedType(namedTypes, column.name, resolution);
     }
 
     // Build attributes
@@ -410,6 +437,130 @@ function createUniqueFieldName(desiredName: string, usedFieldNames: ReadonlySet<
   return `${desiredName}${counter}`;
 }
 
+function buildTopLevelNameMap(
+  sources: Iterable<string>,
+  normalize: (source: string) => TopLevelNameResult,
+  kind: 'model' | 'enum',
+  sourceKind: 'table' | 'enum type',
+): Map<string, TopLevelNameResult> {
+  const results = new Map<string, TopLevelNameResult>();
+  const normalizedToSources = new Map<string, string[]>();
+
+  for (const source of sources) {
+    const normalized = normalize(source);
+    results.set(source, normalized);
+    normalizedToSources.set(normalized.name, [
+      ...(normalizedToSources.get(normalized.name) ?? []),
+      source,
+    ]);
+  }
+
+  const duplicates = [...normalizedToSources.entries()].filter(
+    ([, conflictingSources]) => conflictingSources.length > 1,
+  );
+  if (duplicates.length > 0) {
+    const details = duplicates.map(
+      ([normalizedName, conflictingSources]) =>
+        `- ${kind} "${normalizedName}" from ${sourceKind}s ${conflictingSources
+          .map((source) => `"${source}"`)
+          .join(', ')}`,
+    );
+    throw new Error(`PSL ${kind} name collisions detected:\n${details.join('\n')}`);
+  }
+
+  return results;
+}
+
+function assertNoCrossKindNameCollisions(
+  modelNames: ReadonlyMap<string, TopLevelNameResult>,
+  enumNames: ReadonlyMap<string, TopLevelNameResult>,
+): void {
+  const enumSourceByName = new Map([...enumNames].map(([source, result]) => [result.name, source]));
+
+  const collisions = [...modelNames.entries()]
+    .map(([tableName, result]) => {
+      const enumSource = enumSourceByName.get(result.name);
+      return enumSource
+        ? `- identifier "${result.name}" from table "${tableName}" collides with enum type "${enumSource}"`
+        : undefined;
+    })
+    .filter((detail): detail is string => detail !== undefined);
+
+  if (collisions.length > 0) {
+    throw new Error(`PSL top-level name collisions detected:\n${collisions.join('\n')}`);
+  }
+}
+
+function registerNamedType(
+  registry: NamedTypeRegistry,
+  columnName: string,
+  resolution: {
+    readonly pslType: string;
+    readonly nativeType: string;
+    readonly typeParams?: Record<string, unknown>;
+  },
+): string {
+  const desiredName = toNamedTypeName(columnName);
+  const key = JSON.stringify({
+    desiredName,
+    baseType: resolution.pslType,
+    nativeType: resolution.nativeType,
+    typeParams: resolution.typeParams,
+  });
+
+  const existing = registry.entriesByKey.get(key);
+  if (existing) {
+    return existing.name;
+  }
+
+  const name = createUniqueFieldName(desiredName, registry.usedNames);
+  const entry = {
+    name,
+    baseType: resolution.pslType,
+  } satisfies PrinterNamedType;
+  registry.entriesByKey.set(key, entry);
+  registry.usedNames.add(name);
+  return name;
+}
+
+function isNormalizedEnumMemberReservedWord(value: string): boolean {
+  return ENUM_MEMBER_RESERVED_WORDS.has(value.toLowerCase());
+}
+
+function normalizeEnumMemberName(value: string, usedNames: ReadonlySet<string>): string {
+  const desiredName =
+    PSL_IDENTIFIER_PATTERN.test(value) && !isNormalizedEnumMemberReservedWord(value)
+      ? value
+      : createNormalizedEnumMemberBaseName(value);
+
+  return createUniqueFieldName(desiredName, usedNames);
+}
+
+function createNormalizedEnumMemberBaseName(value: string): string {
+  const tokens = value.match(/[A-Za-z0-9]+/g)?.map((token) => token.toLowerCase()) ?? [];
+  let normalized = tokens[0] ?? 'value';
+
+  for (const token of tokens.slice(1)) {
+    normalized += token.charAt(0).toUpperCase() + token.slice(1);
+  }
+
+  if (isNormalizedEnumMemberReservedWord(normalized) || /^\d/.test(normalized)) {
+    normalized = `_${normalized}`;
+  }
+
+  if (!PSL_IDENTIFIER_PATTERN.test(normalized)) {
+    normalized = normalized.replace(/[^\w]/g, '');
+    if (normalized.length === 0) {
+      normalized = 'value';
+    }
+    if (isNormalizedEnumMemberReservedWord(normalized) || /^\d/.test(normalized)) {
+      normalized = `_${normalized}`;
+    }
+  }
+
+  return normalized;
+}
+
 /**
  * Topologically sorts models by FK dependencies.
  * Parent tables (those referenced by FKs) come before child tables.
@@ -418,6 +569,7 @@ function createUniqueFieldName(desiredName: string, usedFieldNames: ReadonlySet<
 function topologicalSort(
   models: PrinterModel[],
   tables: Record<string, SqlTableIR>,
+  modelNameMap: ReadonlyMap<string, string>,
 ): PrinterModel[] {
   const modelByName = new Map<string, PrinterModel>();
   for (const model of models) {
@@ -428,17 +580,20 @@ function topologicalSort(
   const deps = new Map<string, Set<string>>();
   const tableToModel = new Map<string, string>();
   for (const tableName of Object.keys(tables)) {
-    const modelName = toModelName(tableName).name;
+    const modelName = modelNameMap.get(tableName) ?? toModelName(tableName).name;
     tableToModel.set(tableName, modelName);
     deps.set(modelName, new Set());
   }
 
   for (const [tableName, table] of Object.entries(tables)) {
-    const modelName = tableToModel.get(tableName)!;
+    const modelName = tableToModel.get(tableName);
+    if (!modelName) {
+      continue;
+    }
     for (const fk of table.foreignKeys) {
       const refModelName = tableToModel.get(fk.referencedTable);
       if (refModelName && refModelName !== modelName) {
-        deps.get(modelName)!.add(refModelName);
+        deps.get(modelName)?.add(refModelName);
       }
     }
   }
@@ -505,8 +660,11 @@ function serializeEnum(e: {
   values: readonly string[];
 }): string {
   const lines = [`enum ${e.name} {`];
+  const usedNames = new Set<string>();
   for (const value of e.values) {
-    lines.push(`  ${value}`);
+    const memberName = normalizeEnumMemberName(value, usedNames);
+    lines.push(`  ${memberName}`);
+    usedNames.add(memberName);
   }
   if (e.mapName) {
     lines.push('');

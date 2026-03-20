@@ -59,6 +59,13 @@ describe('parseRawDefault', () => {
     expect(parseRawDefault('3.14')).toEqual({ kind: 'literal', value: 3.14 });
   });
 
+  it('preserves large integer literals as tagged bigint values', () => {
+    expect(parseRawDefault('9223372036854775807')).toEqual({
+      kind: 'literal',
+      value: { $type: 'bigint', value: '9223372036854775807' },
+    });
+  });
+
   it('recognizes string literals', () => {
     expect(parseRawDefault("'hello'")).toEqual({ kind: 'literal', value: 'hello' });
   });

@@ -123,8 +123,8 @@ withTempDir(({ createTempDir }) => {
         const strict = await runDbSchemaVerify(ctx, ['--strict']);
         expect(strict.exitCode, 'N.03: schema-verify strict fails').toBe(1);
 
-        // N.04: db introspect
-        const introspect = await runDbIntrospect(ctx);
+        // N.04: db introspect --dry-run
+        const introspect = await runDbIntrospect(ctx, ['--dry-run']);
         expect(introspect.exitCode, 'N.04: db introspect').toBe(0);
         expect(stripAnsi(introspect.stdout), 'N.04: shows age column').toContain('age');
 

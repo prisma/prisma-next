@@ -69,5 +69,5 @@ function isTaggedBigInt(value: unknown): value is { $type: 'bigint'; value: stri
 }
 
 function escapeString(str: string): string {
-  return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return JSON.stringify(str).slice(1, -1);
 }

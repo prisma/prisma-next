@@ -58,6 +58,17 @@ describe('createPostgresTypeMap', () => {
     expect(typeMap.resolve('hstore')).toEqual({ unsupported: true, nativeType: 'hstore' });
   });
 
+  it('ignores prototype-chain property names', () => {
+    expect(typeMap.resolve('constructor')).toEqual({
+      unsupported: true,
+      nativeType: 'constructor',
+    });
+    expect(typeMap.resolve('constructor(1)')).toEqual({
+      unsupported: true,
+      nativeType: 'constructor(1)',
+    });
+  });
+
   it('detects enum types when provided', () => {
     const enumTypes = new Set(['user_role', 'status']);
     const enumTypeMap = createPostgresTypeMap(enumTypes);

@@ -59,6 +59,10 @@ const PARAMETERIZED_TYPE_PATTERN = /^(.+?)\((.+)\)$/;
  */
 const ENUM_CODEC_ID = 'pg/enum@1';
 
+function getOwnMappingValue(map: Record<string, string>, key: string): string | undefined {
+  return Object.hasOwn(map, key) ? map[key] : undefined;
+}
+
 /**
  * Creates a Postgres-specific type map for the PSL printer.
  *
@@ -75,31 +79,38 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
       // Check for parameterized types (e.g., "character varying(255)")
       const paramMatch = nativeType.match(PARAMETERIZED_TYPE_PATTERN);
       if (paramMatch) {
-        const baseType = paramMatch[1]!;
-        const params = paramMatch[2]!;
-        const pslBase = PARAMETERIZED_TYPES[baseType] ?? POSTGRES_TO_PSL[baseType];
-        if (pslBase) {
-          return {
-            pslType: pslBase,
-            nativeType,
-            typeParams: { baseType, params },
-          };
+        const [, baseType, params] = paramMatch;
+        if (baseType && params) {
+          const pslBase =
+            getOwnMappingValue(PARAMETERIZED_TYPES, baseType) ??
+            getOwnMappingValue(POSTGRES_TO_PSL, baseType);
+          if (pslBase) {
+            return {
+              pslType: pslBase,
+              nativeType,
+              typeParams: { baseType, params },
+            };
+          }
         }
       }
 
       // Check for non-parameterized types that still need types block entries
-      if (nativeType in PARAMETERIZED_TYPES) {
+      const parameterizedScalar = getOwnMappingValue(PARAMETERIZED_TYPES, nativeType);
+      if (parameterizedScalar) {
         return {
-          pslType: PARAMETERIZED_TYPES[nativeType]!,
+          pslType: parameterizedScalar,
           nativeType,
           typeParams: { baseType: nativeType },
         };
       }
 
       // Direct scalar mapping
-      const pslType = POSTGRES_TO_PSL[nativeType];
+      const pslType = getOwnMappingValue(POSTGRES_TO_PSL, nativeType);
       if (pslType) {
-        return { pslType, nativeType };
+        return {
+          pslType,
+          nativeType,
+        };
       }
 
       // Unsupported type

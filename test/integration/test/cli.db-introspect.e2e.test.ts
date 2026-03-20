@@ -69,7 +69,7 @@ withTempDir(({ createTempDir }) => {
     });
 
     it(
-      'default: writes PSL file to schema.prisma',
+      'default: writes PSL file to output/schema.prisma',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           await withClient(connectionString, async (client) => {
@@ -100,7 +100,7 @@ withTempDir(({ createTempDir }) => {
           }
 
           // Verify the PSL file was written
-          const pslPath = join(testSetup.testDir, 'schema.prisma');
+          const pslPath = join(testSetup.testDir, 'output/schema.prisma');
           expect(existsSync(pslPath)).toBe(true);
 
           const pslContent = readFileSync(pslPath, 'utf-8');
@@ -160,7 +160,7 @@ withTempDir(({ createTempDir }) => {
           }
 
           // Verify no PSL file was written
-          const pslPath = join(testSetup.testDir, 'schema.prisma');
+          const pslPath = join(testSetup.testDir, 'output/schema.prisma');
           expect(existsSync(pslPath)).toBe(false);
 
           // Get output and strip ANSI for snapshot
@@ -260,7 +260,7 @@ withTempDir(({ createTempDir }) => {
 
           // Verify psl.path is present in JSON output
           expect(jsonOutput.psl).toBeDefined();
-          expect(jsonOutput.psl.path).toBe('schema.prisma');
+          expect(jsonOutput.psl.path).toBe('output/schema.prisma');
 
           // Normalize non-deterministic values (dbUrl and timing) for snapshot
           const normalized = {
@@ -320,7 +320,7 @@ withTempDir(({ createTempDir }) => {
           }
 
           // Verify no PSL file was written
-          const pslPath = join(testSetup.testDir, 'schema.prisma');
+          const pslPath = join(testSetup.testDir, 'output/schema.prisma');
           expect(existsSync(pslPath)).toBe(false);
 
           // Parse JSON output and verify no psl field
@@ -356,7 +356,7 @@ withTempDir(({ createTempDir }) => {
           }
 
           // Verify PSL file was written
-          const pslPath = join(testSetup.testDir, 'schema.prisma');
+          const pslPath = join(testSetup.testDir, 'output/schema.prisma');
           expect(existsSync(pslPath)).toBe(true);
 
           const pslContent = readFileSync(pslPath, 'utf-8');

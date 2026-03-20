@@ -34,13 +34,14 @@ function snakeToPascalCase(input: string): string {
 function snakeToCamelCase(input: string): string {
   const parts = input.split(/[_\s-]+/).filter(Boolean);
   if (parts.length === 0) return input;
+  const [firstPart, ...rest] = parts;
+  if (!firstPart) {
+    return input;
+  }
   return (
-    parts[0]!.charAt(0).toLowerCase() +
-    parts[0]!.slice(1) +
-    parts
-      .slice(1)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join('')
+    firstPart.charAt(0).toLowerCase() +
+    firstPart.slice(1) +
+    rest.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join('')
   );
 }
 
@@ -172,7 +173,10 @@ export function deriveRelationFieldName(
   referencedTableName: string,
 ): string {
   if (fkColumns.length === 1) {
-    const col = fkColumns[0]!;
+    const [col] = fkColumns;
+    if (!col) {
+      return escapeIfNeeded(snakeToCamelCase(referencedTableName));
+    }
     // Strip common FK suffixes
     const stripped = col.replace(/_id$/i, '').replace(/Id$/, '');
 

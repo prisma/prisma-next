@@ -41,6 +41,102 @@ interface DbIntrospectCommandResult {
   readonly pslPath?: string | undefined;
 }
 
+type PrintableSqlSchemaIR = Parameters<typeof printPsl>[0];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function hasOptionalAnnotations(value: Record<string, unknown>): boolean {
+  return value.annotations === undefined || isRecord(value.annotations);
+}
+
+function isPrimaryKeyLike(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isStringArray(value.columns) &&
+    (value.name === undefined || typeof value.name === 'string')
+  );
+}
+
+function isSqlColumnLike(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.name === 'string' &&
+    typeof value.nativeType === 'string' &&
+    typeof value.nullable === 'boolean' &&
+    hasOptionalAnnotations(value)
+  );
+}
+
+function isSqlForeignKeyLike(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isStringArray(value.columns) &&
+    typeof value.referencedTable === 'string' &&
+    isStringArray(value.referencedColumns) &&
+    (value.name === undefined || typeof value.name === 'string') &&
+    (value.onDelete === undefined || typeof value.onDelete === 'string') &&
+    (value.onUpdate === undefined || typeof value.onUpdate === 'string') &&
+    hasOptionalAnnotations(value)
+  );
+}
+
+function isSqlUniqueLike(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isStringArray(value.columns) &&
+    (value.name === undefined || typeof value.name === 'string') &&
+    hasOptionalAnnotations(value)
+  );
+}
+
+function isSqlIndexLike(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isStringArray(value.columns) &&
+    typeof value.unique === 'boolean' &&
+    (value.name === undefined || typeof value.name === 'string') &&
+    hasOptionalAnnotations(value)
+  );
+}
+
+function isSqlTableLike(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.name === 'string' &&
+    isRecord(value.columns) &&
+    Object.values(value.columns).every(isSqlColumnLike) &&
+    (value.primaryKey === undefined || isPrimaryKeyLike(value.primaryKey)) &&
+    Array.isArray(value.foreignKeys) &&
+    value.foreignKeys.every(isSqlForeignKeyLike) &&
+    Array.isArray(value.uniques) &&
+    value.uniques.every(isSqlUniqueLike) &&
+    Array.isArray(value.indexes) &&
+    value.indexes.every(isSqlIndexLike) &&
+    hasOptionalAnnotations(value)
+  );
+}
+
+function isDependencyLike(value: unknown): boolean {
+  return isRecord(value) && typeof value.id === 'string';
+}
+
+function isPrintableSqlSchemaIR(value: unknown): value is PrintableSqlSchemaIR {
+  return (
+    isRecord(value) &&
+    isRecord(value.tables) &&
+    Object.values(value.tables).every(isSqlTableLike) &&
+    Array.isArray(value.dependencies) &&
+    value.dependencies.every(isDependencyLike) &&
+    (value.annotations === undefined || isRecord(value.annotations))
+  );
+}
+
 /**
  * Executes the db introspect command and returns a structured Result.
  */
@@ -126,15 +222,13 @@ async function executeDbIntrospectCommand(
     if (!options.dryRun) {
       const outputPath = resolveDbIntrospectOutputPath(options, config.contract?.output);
 
-      // schemaIR is typed as `unknown` from the control client; validate shape before casting
-      const ir = schemaIR as Record<string, unknown>;
-      if (!ir || typeof ir !== 'object' || !('tables' in ir)) {
+      // schemaIR is typed as `unknown` from the control client; validate shape before printing PSL.
+      if (!isPrintableSqlSchemaIR(schemaIR)) {
         throw errorUnexpected('Introspection returned an unexpected schema shape');
       }
-      const typedSchemaIR = ir as Parameters<typeof printPsl>[0];
-      const enumTypeNames = extractEnumTypeNames(typedSchemaIR.annotations);
+      const enumTypeNames = extractEnumTypeNames(schemaIR.annotations);
       const typeMap = createPostgresTypeMap(enumTypeNames);
-      const pslContent = printPsl(typedSchemaIR, { typeMap });
+      const pslContent = printPsl(schemaIR, { typeMap });
 
       // Warn if file exists
       if (existsSync(outputPath) && !flags.quiet) {
