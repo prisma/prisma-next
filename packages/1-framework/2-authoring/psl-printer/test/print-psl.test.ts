@@ -797,6 +797,66 @@ describe('printPsl', () => {
     `);
   });
 
+  it('escapes inferred relation field names that would start with a digit', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        account: {
+          name: 'account',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        login: {
+          name: 'login',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            '2fa_id': {
+              name: '2fa_id',
+              nativeType: 'int4',
+              nullable: false,
+              default: undefined,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            {
+              columns: ['2fa_id'],
+              referencedTable: 'account',
+              referencedColumns: ['id'],
+            },
+          ],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      dependencies: [],
+    };
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toMatchInlineSnapshot(`
+      "// This file was introspected from the database. Do not edit manually.
+
+      model Account {
+        id     Int     @id
+        logins Login[]
+
+        @@map("account")
+      }
+
+      model Login {
+        id     Int     @id
+        _2faId Int     @map("2fa_id")
+        _2fa   Account @relation(fields: [_2faId], references: [id])
+
+        @@map("login")
+      }
+      "
+    `);
+  });
+
   it('composite unique constraint and index', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {

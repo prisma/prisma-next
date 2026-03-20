@@ -111,6 +111,10 @@ describe('deriveRelationFieldName', () => {
     expect(deriveRelationFieldName(['parent_category_id'], 'category')).toBe('parentCategory');
   });
 
+  it('escapes digit-prefixed inferred relation names', () => {
+    expect(deriveRelationFieldName(['2fa_id'], 'account')).toBe('_2fa');
+  });
+
   it('uses referenced table name for composite FKs', () => {
     expect(deriveRelationFieldName(['cat_id', 'prod_id'], 'product')).toBe('product');
   });

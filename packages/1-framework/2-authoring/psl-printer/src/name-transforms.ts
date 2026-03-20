@@ -58,6 +58,10 @@ function escapeName(name: string): string {
   return `_${name}`;
 }
 
+function escapeIfNeeded(name: string): string {
+  return needsEscaping(name) ? escapeName(name) : name;
+}
+
 /**
  * Converts a database table name to a PSL model name.
  * snake_case → PascalCase, with @@map("db_name") when the name was transformed.
@@ -173,14 +177,14 @@ export function deriveRelationFieldName(
     const stripped = col.replace(/_id$/i, '').replace(/Id$/, '');
 
     if (stripped.length > 0 && stripped !== col) {
-      return snakeToCamelCase(stripped);
+      return escapeIfNeeded(snakeToCamelCase(stripped));
     }
     // If stripping didn't change anything, use the referenced table name
-    return snakeToCamelCase(referencedTableName);
+    return escapeIfNeeded(snakeToCamelCase(referencedTableName));
   }
 
   // Composite FK: use referenced table name
-  return snakeToCamelCase(referencedTableName);
+  return escapeIfNeeded(snakeToCamelCase(referencedTableName));
 }
 
 /**
