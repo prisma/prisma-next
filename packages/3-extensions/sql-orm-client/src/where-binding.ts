@@ -10,6 +10,7 @@ import {
   ExistsExpr,
   type Expression,
   type ExpressionRewriter,
+  type FromSource,
   JoinAst,
   ListLiteralExpr,
   LiteralExpr,
@@ -167,14 +168,17 @@ function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst, state: BindS
 
 function bindFromSource(
   contract: SqlContract<SqlStorage>,
-  source: TableSource | DerivedTableSource,
+  source: FromSource,
   state: BindState,
-): TableSource | DerivedTableSource {
+): FromSource {
   if (source instanceof TableSource) {
     return source;
   }
+  if (source instanceof DerivedTableSource) {
+    return DerivedTableSource.as(source.alias, bindSelectAst(contract, source.query, state));
+  }
 
-  return DerivedTableSource.as(source.alias, bindSelectAst(contract, source.query, state));
+  return source;
 }
 
 function bindSelectAst(
