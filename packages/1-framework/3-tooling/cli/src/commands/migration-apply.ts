@@ -206,29 +206,26 @@ async function executeMigrationApplyCommand(
     throw error;
   }
 
-  // TODO: can't we do early returns or something and flatten this mess, way too nested
-  // TODO: can we somehow factor this out in a useful manner so we don't have two heavily nested sections of code
-  // that are doing a control client thing - or reuse control client?
-  if (bundles.length === 0) {
-    const client = createControlClient({
-      family: config.family,
-      target: config.target,
-      adapter: config.adapter,
-      driver: config.driver,
-      extensionPacks: config.extensionPacks ?? [],
-    });
-    try {
-      await client.connect(dbConnection);
-      const marker = await client.readMarker();
+  const client = createControlClient({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    driver: config.driver,
+    extensionPacks: config.extensionPacks ?? [],
+  });
+
+  try {
+    await client.connect(dbConnection);
+    const marker = await client.readMarker();
+
+    // --- No attested migrations on disk ---
+    if (bundles.length === 0) {
       if (marker?.storageHash) {
         return notOk(
           errorRuntime('Database has state but no migrations exist', {
             why: `The database marker hash "${marker.storageHash}" exists but no attested migrations were found in ${migrationsRelative}`,
             fix: 'Ensure the migrations directory is correct. If the database was managed with `db init` or `db update`, run `prisma-next db sign` to update the marker.',
-            meta: {
-              markerHash: marker.storageHash,
-              migrationsDir: migrationsRelative,
-            },
+            meta: { markerHash: marker.storageHash, migrationsDir: migrationsRelative },
           }),
         );
       }
@@ -242,48 +239,22 @@ async function executeMigrationApplyCommand(
           }),
         );
       }
-      // Else: Empty contract + no migrations = nothing to do (falls through to ok result).
-    } catch (error) {
-      if (CliStructuredError.is(error)) {
-        return notOk(error);
-      }
-      return notOk(
-        errorUnexpected(error instanceof Error ? error.message : String(error), {
-          why: `Unexpected error during migration apply: ${error instanceof Error ? error.message : String(error)}`,
-        }),
-      );
-    } finally {
-      await client.close();
+      // Empty contract + no migrations = nothing to do.
+      return ok({
+        ok: true,
+        migrationsApplied: 0,
+        migrationsTotal: 0,
+        markerHash: EMPTY_CONTRACT_HASH,
+        applied: [],
+        summary: 'No attested migrations found',
+        timings: { total: Date.now() - startTime },
+      });
     }
-    return ok({
-      ok: true,
-      migrationsApplied: 0,
-      migrationsTotal: 0,
-      markerHash: EMPTY_CONTRACT_HASH,
-      applied: [],
-      summary: 'No attested migrations found',
-      timings: { total: Date.now() - startTime },
-    });
-  }
 
-  // Create control client for all DB operations
-  const client = createControlClient({
-    family: config.family,
-    target: config.target,
-    adapter: config.adapter,
-    driver: config.driver,
-    extensionPacks: config.extensionPacks ?? [],
-  });
+    // --- Validate marker state ---
 
-  try {
-    await client.connect(dbConnection);
-
-    const marker = await client.readMarker();
-
-    // Distinguish "no marker row" (null) from "marker row exists with the
-    // empty sentinel". The sentinel should never appear in a real marker row —
-    // if it does, the marker was corrupted and replaying all migrations would
-    // be dangerous (the DB likely already has tables).
+    // The empty sentinel should never appear in a real marker row — if it does,
+    // the marker was corrupted and replaying all migrations would be dangerous.
     if (marker?.storageHash === EMPTY_CONTRACT_HASH) {
       return notOk(
         errorRuntime('Database marker contains the empty sentinel hash', {
@@ -316,6 +287,8 @@ async function executeMigrationApplyCommand(
       );
     }
 
+    // --- Resolve path and apply ---
+
     // "No marker" means the database is fresh — start from the empty contract hash.
     const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
 
@@ -346,7 +319,6 @@ async function executeMigrationApplyCommand(
       });
     }
 
-    // Resolve graph edges to full apply-ready edges
     const bundleByDir = new Map(bundles.map((b) => [b.dirName, b]));
     const pendingMigrations: MigrationApplyStep[] = [];
     for (const migration of pendingPath) {
