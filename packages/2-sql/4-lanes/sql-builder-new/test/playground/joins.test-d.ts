@@ -70,6 +70,15 @@ test('join on a subquery', () => {
   expectTypeOf(subquery).toEqualTypeOf<Promise<{ userName: string; postTitle: string }>>();
 });
 
+test('as() rebinds scope for direct method access', () => {
+  const aliased = db.users
+    .as('u')
+    .select((f) => ({ id: f.u.id, name: f.u.name }))
+    .firstOrThrow();
+
+  expectTypeOf(aliased).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+});
+
 test('self-join via alias', () => {
   const selfJoin = db.users
     .innerJoin(db.users.as('inviter'), (f, fns) => fns.eq(f.users.invited_by_id, f.inviter.id))

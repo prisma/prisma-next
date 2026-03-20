@@ -27,6 +27,7 @@ import type {
   MergeScopes,
   NullableScope,
   QueryContext,
+  RebindScope,
   Scope,
   ScopeField,
   ScopeTable,
@@ -145,7 +146,9 @@ interface TableProxyBaseline<
 > extends JoinSource<StorageTableToScopeTable<C['storage']['tables'][Name]>, Alias>,
     WithJoin<QC, AvailableScope>,
     WithSelect<QC, AvailableScope, EmptyRow> {
-  as<NewAlias extends string>(newAlias: NewAlias): TableProxy<C, Name, NewAlias, AvailableScope>;
+  as<NewAlias extends string>(
+    newAlias: NewAlias,
+  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>>;
 }
 
 export type TableProxy<

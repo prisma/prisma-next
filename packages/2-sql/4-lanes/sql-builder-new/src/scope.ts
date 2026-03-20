@@ -48,6 +48,11 @@ export type MergeScopes<A extends Scope, B extends Scope> = {
   namespaces: Expand<A['namespaces'] & B['namespaces']>;
 };
 
+export type RebindScope<S extends Scope, OldKey extends string, NewKey extends string> = {
+  topLevel: S['topLevel'];
+  namespaces: Expand<Omit<S['namespaces'], OldKey> & Record<NewKey, S['namespaces'][OldKey]>>;
+};
+
 export type NullableScopeTable<S extends ScopeTable> = {
   [K in keyof S]: { codecId: S[K]['codecId']; nullable: true };
 };
