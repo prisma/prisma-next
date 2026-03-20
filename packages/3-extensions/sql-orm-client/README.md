@@ -8,8 +8,8 @@ This package provides a high-level ORM client surface on top of the runtime that
 
 - Expose typed `Collection` primitives for model-level data access
 - Build filter/order/include state from fluent APIs (`where`, `include`, `orderBy`, `take`, `skip`)
-- Accept lane-agnostic `WhereArg` filter inputs (`WhereExpr` or `ToWhereExpr`) and normalize bound payloads inside ORM (Phase 2: strict payload validation + `ParamRef -> LiteralExpr` normalization)
-- Compile collection state into executable SQL plans using Kysely compilation
+- Accept lane-agnostic `WhereArg` filter inputs (`WhereExpr` or `ToWhereExpr`) and normalize bound payloads inside ORM while preserving bound params/descriptors for runtime encoding and adapter lowering
+- Compile collection state into SQL AST query plans (`SqlQueryPlan`) without rendering SQL in ORM
 - Execute and stitch include trees across multiple plan executions
 - Map storage-column rows back to model-field row shapes
 - Expose an `orm()` client with typed collection keys (for example `db.Post`)
@@ -21,7 +21,7 @@ This package depends on:
 - `@prisma-next/sql-contract` for contract shape and mappings
 - `@prisma-next/contract` for `ExecutionPlan` metadata
 - `@prisma-next/runtime-executor` for `AsyncIterableResult`
-- `kysely` for SQL compilation
+- `@prisma-next/sql-relational-core` for SQL AST and plan types
 
 This package should not depend on target adapters or drivers directly; execution is delegated to the runtime queryable interface.
 
@@ -30,8 +30,8 @@ This package should not depend on target adapters or drivers directly; execution
 ```mermaid
 flowchart LR
   A[Collection API] --> B[CollectionState]
-  B --> C[Kysely compiler]
-  C --> D[ExecutionPlan]
+  B --> C[ORM Query Planner]
+  C --> D[SqlQueryPlan (AST + params + meta)]
   D --> E[RuntimeQueryable.execute]
   E --> F[Rows by storage column]
   F --> G[Row mapping + include stitching]

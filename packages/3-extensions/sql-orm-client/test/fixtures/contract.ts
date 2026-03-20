@@ -11,7 +11,8 @@ export const contract = defineContract<CodecTypes>()
       .column('name', { type: textColumn, nullable: false })
       .column('email', { type: textColumn, nullable: false })
       .column('invited_by_id', { type: int4Column, nullable: true })
-      .primaryKey(['id']),
+      .primaryKey(['id'])
+      .unique(['email']),
   )
   .table('posts', (table) =>
     table

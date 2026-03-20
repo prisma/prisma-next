@@ -9,7 +9,7 @@ This package provides the build-only logic for the Kysely lane: transforming Kys
 
 ## Responsibilities
 
-- **Transform**: Convert Kysely `compiledQuery` AST (SelectQueryNode, InsertQueryNode, UpdateQueryNode, DeleteQueryNode) into PN SQL AST (`QueryAst`)
+- **Transform**: Convert Kysely `compiledQuery` AST (SelectQueryNode, InsertQueryNode, UpdateQueryNode, DeleteQueryNode) into PN SQL AST (`QueryAst`), including row-based batch inserts
 - **Guardrails**: Pre-transform validation for multi-table scope (qualified refs, unambiguous selectAll)
 - **Plan assembly**: Build `SqlQueryPlan` with stable refs/param descriptors and redacted SQL annotation metadata
 - **Lane client surface**: Build-only Kysely lane (`build`, `whereExpr`, `redactedSql`) plus execution backstop dialect plumbing
@@ -57,4 +57,3 @@ The lane package is build-only: it produces AST and plan metadata. SQL lowering 
 
 - [Query Lanes](/docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)
 - [ADR 160 - Kysely lane emits PN SQL AST](/docs/architecture%20docs/adrs/ADR%20160%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md)
-

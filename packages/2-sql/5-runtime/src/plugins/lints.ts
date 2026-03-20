@@ -1,20 +1,19 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
 import type { Plugin, PluginContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
-import type {
+import {
   DeleteAst,
+  DerivedTableSource,
+  type FromSource,
   QueryAst,
   SelectAst,
+  TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 
-const QUERY_AST_KINDS = new Set(['select', 'insert', 'update', 'delete']);
-
 function isSqlQueryAst(ast: unknown): ast is QueryAst {
-  if (ast === null || typeof ast !== 'object' || !('kind' in ast)) return false;
-  const kind = (ast as { kind: string }).kind;
-  return typeof kind === 'string' && QUERY_AST_KINDS.has(kind);
+  return ast instanceof QueryAst;
 }
 
 export interface LintsOptions {
@@ -55,52 +54,58 @@ function lintError(code: string, message: string, details?: Record<string, unkno
   });
 }
 
+function getFromSourceTableDetail(source: FromSource): string | undefined {
+  if (source instanceof TableSource) {
+    return source.name;
+  }
+  if (source instanceof DerivedTableSource) {
+    return source.alias;
+  }
+  return undefined;
+}
+
 function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
   const findings: LintFinding[] = [];
 
-  if (ast.kind === 'delete') {
-    const deleteAst = ast as DeleteAst;
-    if (deleteAst.where === undefined) {
+  if (ast instanceof DeleteAst) {
+    if (ast.where === undefined) {
       findings.push({
         code: 'LINT.DELETE_WITHOUT_WHERE',
         severity: 'error',
         message:
           'DELETE without WHERE clause blocks execution to prevent accidental full-table deletion',
-        details: { table: deleteAst.table.name },
+        details: { table: ast.table.name },
       });
     }
   }
 
-  if (ast.kind === 'update') {
-    const updateAst = ast as UpdateAst;
-    if (updateAst.where === undefined) {
+  if (ast instanceof UpdateAst) {
+    if (ast.where === undefined) {
       findings.push({
         code: 'LINT.UPDATE_WITHOUT_WHERE',
         severity: 'error',
         message:
           'UPDATE without WHERE clause blocks execution to prevent accidental full-table update',
-        details: { table: updateAst.table.name },
+        details: { table: ast.table.name },
       });
     }
   }
 
-  if (ast.kind === 'select') {
-    const selectAst = ast as SelectAst;
-    if (selectAst.limit === undefined) {
+  if (ast instanceof SelectAst) {
+    if (ast.limit === undefined) {
+      const table = getFromSourceTableDetail(ast.from);
       findings.push({
         code: 'LINT.NO_LIMIT',
         severity: 'warn',
         message: 'Unbounded SELECT may return large result sets',
-        details: { table: selectAst.from.name },
+        ...ifDefined('details', table !== undefined ? { table } : undefined),
       });
     }
-    const hasSelectAllIntent =
-      selectAst.selectAllIntent !== undefined ||
-      (meta.annotations as { selectAllIntent?: unknown })?.selectAllIntent !== undefined;
-    if (hasSelectAllIntent) {
-      const table =
-        selectAst.selectAllIntent?.table ??
-        (meta.annotations as { selectAllIntent?: { table?: string } })?.selectAllIntent?.table;
+    const annotationIntent = meta.annotations?.['selectAllIntent'] as
+      | { table?: string }
+      | undefined;
+    if (ast.selectAllIntent !== undefined || annotationIntent !== undefined) {
+      const table = ast.selectAllIntent?.table ?? annotationIntent?.table;
       findings.push({
         code: 'LINT.SELECT_STAR',
         severity: 'warn',

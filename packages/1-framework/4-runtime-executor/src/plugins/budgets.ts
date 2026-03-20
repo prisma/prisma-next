@@ -119,10 +119,6 @@ function estimateRows(
   tableRows: Record<string, number>,
   defaultTableRows: number,
 ): number | null {
-  if (!plan.ast) {
-    return null;
-  }
-
   const table = plan.meta.refs?.tables?.[0];
   if (!table) {
     return null;
@@ -130,34 +126,19 @@ function estimateRows(
 
   const tableEstimate = tableRows[table] ?? defaultTableRows;
 
-  if (
-    plan.ast &&
-    typeof plan.ast === 'object' &&
-    'kind' in plan.ast &&
-    plan.ast.kind === 'select' &&
-    'limit' in plan.ast &&
-    typeof plan.ast.limit === 'number'
-  ) {
-    return Math.min(plan.ast.limit, tableEstimate);
+  // TODO: this is really not great. It should instead walk the AST.
+  // It also doesn't check in any way that this limit correlates with the current table.
+  // Move this plugin to a higher level (close to the linter) and use AST visitors.
+  const limit = plan.meta.annotations?.['limit'];
+  if (typeof limit === 'number') {
+    return Math.min(limit, tableEstimate);
   }
 
   return tableEstimate;
 }
 
 function hasDetectableLimit(plan: ExecutionPlan): boolean {
-  if (
-    plan.ast &&
-    typeof plan.ast === 'object' &&
-    'kind' in plan.ast &&
-    plan.ast.kind === 'select' &&
-    'limit' in plan.ast &&
-    typeof plan.ast.limit === 'number'
-  ) {
-    return true;
-  }
-
-  const annotations = plan.meta.annotations as { limit?: number; LIMIT?: number } | undefined;
-  return typeof annotations?.limit === 'number' || typeof annotations?.LIMIT === 'number';
+  return typeof plan.meta.annotations?.['limit'] === 'number';
 }
 
 export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unknown>(

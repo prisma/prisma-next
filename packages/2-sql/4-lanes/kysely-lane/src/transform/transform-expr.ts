@@ -1,14 +1,15 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type {
-  BinaryOp,
+import type { BinaryOp, JoinOnExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  AndExpr,
+  BinaryExpr,
   ColumnRef,
-  Direction,
-  Expression,
-  JoinOnExpr,
+  EqColJoinOn,
   ListLiteralExpr,
   LiteralExpr,
+  OrderByItem,
+  OrExpr,
   ParamRef,
-  WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   AndNode,
@@ -52,25 +53,25 @@ export function transformValue(
         const index = nextParamIndex(ctx);
         ctx.params.push(node);
         addDescriptorForCurrentParam();
-        return { kind: 'param', index };
+        return ParamRef.of(index);
       }
-      return { kind: 'literal', value: node };
+      return LiteralExpr.of(node);
     }
 
     const index = nextParamIndex(ctx);
     ctx.params.push(node);
     addDescriptorForCurrentParam();
-    return { kind: 'param', index };
+    return ParamRef.of(index);
   }
 
   if (ValueNode.is(node)) {
     if (node.immediate === true) {
-      return { kind: 'literal', value: node.value };
+      return LiteralExpr.of(node.value);
     }
     const index = nextParamIndex(ctx);
     ctx.params.push(node.value);
     addDescriptorForCurrentParam();
-    return { kind: 'param', index };
+    return ParamRef.of(index);
   }
 
   throw new KyselyTransformError(
@@ -144,17 +145,11 @@ function transformRightOperand(
   }
 
   if (PrimitiveValueListNode.is(node)) {
-    return {
-      kind: 'listLiteral',
-      values: node.values.map((value) => transformValue(value, ctx, refs)),
-    };
+    return ListLiteralExpr.of(node.values.map((value) => transformValue(value, ctx, refs)));
   }
 
   if (ValueListNode.is(node)) {
-    return {
-      kind: 'listLiteral',
-      values: node.values.map((value) => transformValue(value, ctx, refs)),
-    };
+    return ListLiteralExpr.of(node.values.map((value) => transformValue(value, ctx, refs)));
   }
 
   return transformValue(node, ctx, refs);
@@ -182,7 +177,7 @@ export function transformWhereExpr(
     flattenLogical(node, 'and', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];
-    return { kind: 'and', exprs };
+    return AndExpr.of(exprs);
   }
 
   if (OrNode.is(node)) {
@@ -190,7 +185,7 @@ export function transformWhereExpr(
     flattenLogical(node, 'or', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];
-    return { kind: 'or', exprs };
+    return OrExpr.of(exprs);
   }
 
   if (!BinaryOperationNode.is(node)) {
@@ -225,26 +220,21 @@ export function transformWhereExpr(
     column: left.column,
   });
 
-  return {
-    kind: 'bin',
-    op: operator,
-    left,
-    right,
-  };
+  return new BinaryExpr(operator, left, right);
 }
 
 export function transformOrderByItem(
   node: unknown,
   ctx: TransformContext,
   defaultTable?: string,
-): { expr: Expression; dir: Direction } | undefined {
+): OrderByItem | undefined {
   if (!isOperationNode(node) || !OrderByItemNode.is(node)) {
     return undefined;
   }
 
   const colRef = resolveColumnRef(node.orderBy, ctx, defaultTable);
   const dir = parseOrderByDirection(node);
-  return { expr: colRef, dir };
+  return new OrderByItem(colRef, dir);
 }
 
 export function transformJoinOn(
@@ -262,16 +252,12 @@ export function transformJoinOn(
   }
 
   if (
-    expr.kind === 'bin' &&
+    expr instanceof BinaryExpr &&
     expr.op === 'eq' &&
-    expr.left.kind === 'col' &&
-    expr.right.kind === 'col'
+    expr.left instanceof ColumnRef &&
+    expr.right instanceof ColumnRef
   ) {
-    return {
-      kind: 'eqCol',
-      left: expr.left,
-      right: expr.right,
-    };
+    return EqColJoinOn.of(expr.left, expr.right);
   }
 
   return expr;

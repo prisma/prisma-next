@@ -1,95 +1,58 @@
-import type { JoinAst, JoinOnExpr, SelectAst } from '@prisma-next/sql-relational-core/ast';
-import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import {
+  ColumnRef,
+  EqColJoinOn,
+  JoinAst,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 
 describe('Join AST types', () => {
-  it('defines JoinOnExpr with eqCol kind', () => {
-    const onExpr: JoinOnExpr = {
-      kind: 'eqCol',
-      left: createColumnRef('user', 'id'),
-      right: createColumnRef('post', 'userId'),
-    };
+  it('defines eq-column join predicates as rich objects', () => {
+    const onExpr = EqColJoinOn.of(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId'));
 
-    expect(onExpr.kind).toBe('eqCol');
-    expect(onExpr.left.table).toBe('user');
-    expect(onExpr.left.column).toBe('id');
-    expect(onExpr.right.table).toBe('post');
-    expect(onExpr.right.column).toBe('userId');
+    expect(onExpr).toBeInstanceOf(EqColJoinOn);
+    expect(onExpr.left).toEqual(ColumnRef.of('user', 'id'));
+    expect(onExpr.right).toEqual(ColumnRef.of('post', 'userId'));
   });
 
-  it('defines JoinAst with join type and table', () => {
-    const joinAst: JoinAst = {
-      kind: 'join',
-      joinType: 'inner',
-      table: { kind: 'table', name: 'post' },
-      on: {
-        kind: 'eqCol',
-        left: createColumnRef('user', 'id'),
-        right: createColumnRef('post', 'userId'),
-      },
-    };
+  it('defines joins with source, join type, and predicate', () => {
+    const joinAst = JoinAst.inner(
+      TableSource.named('post'),
+      EqColJoinOn.of(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId')),
+    );
 
-    expect(joinAst.kind).toBe('join');
+    expect(joinAst).toBeInstanceOf(JoinAst);
     expect(joinAst.joinType).toBe('inner');
-    expect(joinAst.table.name).toBe('post');
-    expect(joinAst.on.kind).toBe('eqCol');
+    expect(joinAst.source).toEqual(TableSource.named('post'));
+    expect(joinAst.on).toBeInstanceOf(EqColJoinOn);
   });
 
-  it('defines SelectAst with optional joins array', () => {
-    const selectAst: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      joins: [
-        {
-          kind: 'join',
-          joinType: 'inner',
-          table: { kind: 'table', name: 'post' },
-          on: {
-            kind: 'eqCol',
-            left: createColumnRef('user', 'id'),
-            right: createColumnRef('post', 'userId'),
-          },
-        },
-      ],
-      project: [{ alias: 'id', expr: createColumnRef('user', 'id') }],
-    };
+  it('allows selects with and without joins', () => {
+    const withJoin = SelectAst.from(TableSource.named('user'))
+      .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withJoins([
+        JoinAst.left(
+          TableSource.named('post'),
+          EqColJoinOn.of(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId')),
+        ),
+      ]);
+    const withoutJoin = SelectAst.from(TableSource.named('user')).withProject([
+      ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+    ]);
 
-    expect(selectAst.joins).toBeDefined();
-    expect(selectAst.joins?.length).toBe(1);
-    expect(selectAst.joins?.[0]?.joinType).toBe('inner');
+    expect(withJoin.joins?.[0]?.joinType).toBe('left');
+    expect(withoutJoin.joins).toBeUndefined();
   });
 
-  it('allows SelectAst without joins', () => {
-    const selectAst: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'id', expr: createColumnRef('user', 'id') }],
-    };
+  it.each(['inner', 'left', 'right', 'full'] as const)('supports %s joins', (joinType) => {
+    const join = new JoinAst(
+      joinType,
+      TableSource.named('post'),
+      EqColJoinOn.of(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId')),
+    );
 
-    expect(selectAst.joins).toBeUndefined();
-  });
-
-  it('supports all join types', () => {
-    const joinTypes: Array<'inner' | 'left' | 'right' | 'full'> = [
-      'inner',
-      'left',
-      'right',
-      'full',
-    ];
-
-    for (const joinType of joinTypes) {
-      const joinAst: JoinAst = {
-        kind: 'join',
-        joinType,
-        table: { kind: 'table', name: 'post' },
-        on: {
-          kind: 'eqCol',
-          left: createColumnRef('user', 'id'),
-          right: createColumnRef('post', 'userId'),
-        },
-      };
-
-      expect(joinAst.joinType).toBe(joinType);
-    }
+    expect(join.joinType).toBe(joinType);
   });
 });

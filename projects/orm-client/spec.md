@@ -1,6 +1,6 @@
 # ORM Client — Phase 2: DX, Integration, and Polish
 
-A consolidation pass over the `@prisma-next/sql-orm-client` package following the initial implementation. This phase focuses on fixing type and autocompletion bugs, integrating the ORM client into the `postgres()` one-liner, ensuring queries flow through the Kysely lane for correct plugin behavior, verifying query correctness, and improving API ergonomics with contextual method autocompletion.
+A consolidation pass over the `@prisma-next/sql-orm-client` package following the initial implementation. This phase focuses on fixing type and autocompletion bugs, integrating the ORM client into the `postgres()` one-liner, ensuring ORM plans carry valid PN ASTs for plugin behavior, verifying query correctness, and improving API ergonomics with contextual method autocompletion.
 
 # Description
 
@@ -9,8 +9,8 @@ The initial ORM client implementation (`@prisma-next/sql-orm-client`) is feature
 This phase transitions the ORM client from "implemented" to "production-ready flagship API." The work spans:
 
 - **DX correctness**: Fix bugs in TypeScript types, autocompletion, result type inference, and relationship traversal.
-- **Example app integration**: Make the ORM client available as `db.orm` from the `postgres()` one-liner, with support for custom collections passed directly to the one-liner. The ORM client builds queries via the Kysely lane (Kysely AST → PN AST transformation).
-- **Plugin correctness**: Ensure plugins (`budgets`, `lints`) operate correctly on queries built via the ORM client and the Kysely lane, by verifying the `ExecutionPlan` contains a valid PN AST.
+- **Example app integration**: Make the ORM client available as `db.orm` from the `postgres()` one-liner, with support for custom collections passed directly to the one-liner. The ORM client plans queries directly from ORM DSL to PN AST, which then flows through runtime plugins and adapter lowering.
+- **Plugin correctness**: Ensure plugins (`budgets`, `lints`) operate correctly on queries built via the ORM client and the Kysely lane, by verifying the `ExecutionPlan` contains a valid PN AST in both paths.
 - **Benchmarks**: Establish baseline performance benchmarks for ORM query compilation and Kysely lane transformation overhead.
 - **Query correctness**: Ensure all query types produce correct results across include strategies, mutations, aggregations, and edge cases.
 - **Contextual autocompletion**: Split column accessor interfaces so filter methods only appear in `where()` and ordering methods only appear in `orderBy()`.
@@ -47,7 +47,7 @@ Fix all bugs and correctness issues in the TypeScript types and autocompletion b
 
 ### FR-2: Example App Integration — `postgres()` One-Liner
 
-Make the ORM client a first-class citizen of the `postgres()` one-liner, so users get a fully pre-instantiated ORM client with no additional setup. The ORM client must build queries via the Kysely lane (not compile Kysely queries itself), so that the Kysely AST is transformed to PN AST and all plugins operate on the transformed AST.
+Make the ORM client a first-class citizen of the `postgres()` one-liner, so users get a fully pre-instantiated ORM client with no additional setup. The ORM client must plan queries directly to PN AST, so that runtime plugins operate on the same canonical AST used by adapter lowering. Kysely remains available separately via `db.kysely`.
 
 - **FR-2.1**: Add a `collections` option to `PostgresOptions` that accepts a map of model name aliases to `Collection` subclasses. The type parameter must flow through so that `db.orm.users` returns the custom collection type.
 - **FR-2.2**: `db.orm` must be fully functional with the same capabilities as an `orm()` factory created manually — including custom collection methods, relationship traversal, and all query patterns.
@@ -58,16 +58,16 @@ Make the ORM client a first-class citizen of the `postgres()` one-liner, so user
 
 Ensure plugins operate correctly on queries built via the ORM client and the Kysely lane.
 
-- **FR-3.1**: ORM client queries must flow through the Kysely lane: ORM DSL → Kysely query builder → Kysely AST → `transformKyselyToPnAst()` → PN AST → plugin pipeline → SQL generation → execution. The `ExecutionPlan` must contain a valid `plan.ast` (PN `QueryAst`).
+- **FR-3.1**: ORM client queries must flow through the direct planning path: ORM DSL → PN AST → plugin pipeline → adapter lowering → execution. The `ExecutionPlan` must contain a valid `plan.ast` (PN `QueryAst`).
 - **FR-3.2**: Verify that the `budgets` plugin correctly estimates row counts and enforces limits on ORM queries.
 - **FR-3.3**: Verify that the `lints` plugin correctly applies lint rules (`DELETE_WITHOUT_WHERE`, `UPDATE_WITHOUT_WHERE`, `NO_LIMIT`, `SELECT_STAR`) to ORM queries.
-- **FR-3.4**: Verify the same plugin correctness for queries built directly via the Kysely lane (`db.kysely`).
+- **FR-3.4**: Verify the same plugin correctness for queries built directly via the Kysely lane (`db.kysely`), where Kysely AST is transformed to PN AST before plugin execution.
 
 ### FR-4: Benchmarks
 
 Establish baseline performance benchmarks for ORM query compilation and Kysely lane transformation.
 
-- **FR-4.1**: Benchmark ORM query compilation (DSL → SQL) for common query patterns: simple select, where + orderBy + take, include, nested include, aggregate, mutation.
+- **FR-4.1**: Benchmark ORM query compilation (ORM DSL → PN AST → lowered SQL) for common query patterns: simple select, where + orderBy + take, include, nested include, aggregate, mutation.
 - **FR-4.2**: Benchmark the Kysely lane transformation overhead (`transformKyselyToPnAst()`) for typical query complexity levels.
 - **FR-4.3**: Compare ORM query compilation performance to direct sql-lane usage.
 
@@ -140,10 +140,11 @@ Split the column accessor interfaces to make autocompletion context-aware, follo
 - [ ] Manual `orm()` factory still works for advanced use cases
 
 ## Plugin Correctness
-- [ ] ORM queries flow through Kysely lane (Kysely AST → PN AST)
+- [ ] ORM queries plan directly to PN AST
 - [ ] `ExecutionPlan` from ORM queries contains valid `plan.ast`
 - [ ] `budgets` plugin works on ORM queries
 - [ ] `lints` plugin works on ORM queries
+- [ ] `db.kysely` queries still flow through the Kysely lane (Kysely AST → PN AST)
 
 ## Benchmarks
 - [ ] Baseline benchmarks exist for ORM query compilation

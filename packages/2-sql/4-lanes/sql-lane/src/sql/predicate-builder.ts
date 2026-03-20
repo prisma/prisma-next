@@ -7,9 +7,11 @@ import type {
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
-  createBinaryExpr,
-  createNullCheckExpr,
-  createParamRef,
+  BinaryExpr,
+  ColumnRef,
+  Expression as ExpressionBase,
+  NullCheckExpr as NullCheckExprNode,
+  ParamRef as ParamRefNode,
 } from '@prisma-next/sql-relational-core/ast';
 import type {
   BinaryBuilder,
@@ -52,7 +54,7 @@ function buildNullCheckExpr(
   const expr = where.expr;
 
   // Validate column exists in contract if it's a ColumnRef
-  if (expr.kind === 'col') {
+  if (expr instanceof ColumnRef) {
     const { table, column } = expr;
     const contractTable = contract.storage.tables[table];
     if (!contractTable) {
@@ -65,7 +67,7 @@ function buildNullCheckExpr(
     }
   }
 
-  return createNullCheckExpr(expr, where.isNull);
+  return where.isNull ? NullCheckExprNode.isNull(expr) : NullCheckExprNode.isNotNull(expr);
 }
 
 export function buildWhereExpr(
@@ -91,12 +93,7 @@ export function buildWhereExpr(
   let paramName: string;
 
   // Validate where.left is a valid Expression (col or operation)
-  const validExpressionKinds = ['col', 'operation'];
-  if (
-    !where.left ||
-    typeof where.left !== 'object' ||
-    !validExpressionKinds.includes((where.left as { kind?: string }).kind ?? '')
-  ) {
+  if (!(where.left instanceof ExpressionBase)) {
     errorFailedToBuildWhereClause();
   }
 
@@ -105,7 +102,7 @@ export function buildWhereExpr(
   leftExpr = where.left;
 
   // If the left expression is a column reference, extract codecId for param descriptors
-  if (leftExpr.kind === 'col') {
+  if (leftExpr instanceof ColumnRef) {
     const { table, column } = leftExpr;
     const contractTable = contract.storage.tables[table];
     if (!contractTable) {
@@ -134,7 +131,7 @@ export function buildWhereExpr(
     const index = values.push(value);
 
     // Construct descriptor directly from validated StorageColumn if left is a column
-    if (leftExpr.kind === 'col') {
+    if (leftExpr instanceof ColumnRef) {
       const { table, column } = leftExpr;
       const contractTable = contract.storage.tables[table];
       const columnMeta = contractTable?.columns[column];
@@ -150,13 +147,13 @@ export function buildWhereExpr(
       }
     }
 
-    rightExpr = createParamRef(index, paramName);
+    rightExpr = ParamRefNode.of(index, paramName);
   } else if (isColumnBuilder(where.right) || isExpressionBuilder(where.right)) {
     // Handle ExpressionSource (ColumnBuilder or ExpressionBuilder) on the right
     rightExpr = where.right.toExpr();
 
     // Validate column exists in contract if it's a ColumnRef
-    if (rightExpr.kind === 'col') {
+    if (rightExpr instanceof ColumnRef) {
       const { table, column } = rightExpr;
       const contractTable = contract.storage.tables[table];
       if (!contractTable) {
@@ -177,7 +174,7 @@ export function buildWhereExpr(
   }
 
   return {
-    expr: createBinaryExpr(where.op, leftExpr, rightExpr),
+    expr: new BinaryExpr(where.op, leftExpr, rightExpr),
     codecId,
     paramName,
   };

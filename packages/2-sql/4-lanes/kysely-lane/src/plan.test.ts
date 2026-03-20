@@ -1,4 +1,10 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  type BinaryExpr,
+  ParamRef,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import type { CompiledQuery } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import { buildKyselyPlan, REDACTED_SQL } from './plan';
@@ -45,54 +51,23 @@ function createSelectCompiledQuery(): CompiledQuery<{ id: string; email: string 
       kind: 'SelectQueryNode',
       from: {
         kind: 'FromNode',
-        froms: [
-          {
-            kind: 'TableNode',
-            table: { kind: 'IdentifierNode', name: 'user' },
-          },
-        ],
+        froms: [{ kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } }],
       },
       selections: [
         {
           kind: 'SelectionNode',
           selection: {
             kind: 'ReferenceNode',
-            table: {
-              kind: 'TableNode',
-              table: { kind: 'IdentifierNode', name: 'user' },
-            },
-            column: {
-              kind: 'ColumnNode',
-              column: { kind: 'IdentifierNode', name: 'id' },
-            },
+            table: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+            column: { kind: 'ColumnNode', column: { kind: 'IdentifierNode', name: 'id' } },
           },
         },
         {
           kind: 'SelectionNode',
           selection: {
             kind: 'ReferenceNode',
-            table: {
-              kind: 'TableNode',
-              table: { kind: 'IdentifierNode', name: 'user' },
-            },
-            column: {
-              kind: 'ColumnNode',
-              column: { kind: 'IdentifierNode', name: 'id' },
-            },
-          },
-        },
-        {
-          kind: 'SelectionNode',
-          selection: {
-            kind: 'ReferenceNode',
-            table: {
-              kind: 'TableNode',
-              table: { kind: 'IdentifierNode', name: 'user' },
-            },
-            column: {
-              kind: 'ColumnNode',
-              column: { kind: 'IdentifierNode', name: 'email' },
-            },
+            table: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+            column: { kind: 'ColumnNode', column: { kind: 'IdentifierNode', name: 'email' } },
           },
         },
       ],
@@ -102,32 +77,36 @@ function createSelectCompiledQuery(): CompiledQuery<{ id: string; email: string 
           kind: 'BinaryOperationNode',
           leftOperand: {
             kind: 'ReferenceNode',
-            table: {
-              kind: 'TableNode',
-              table: { kind: 'IdentifierNode', name: 'user' },
-            },
-            column: {
-              kind: 'ColumnNode',
-              column: { kind: 'IdentifierNode', name: 'id' },
-            },
+            table: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+            column: { kind: 'ColumnNode', column: { kind: 'IdentifierNode', name: 'id' } },
           },
           operator: { kind: 'OperatorNode', operator: '=' },
           rightOperand: { kind: 'ValueNode', value: 'u1' },
         },
       },
+      limit: {
+        kind: 'LimitNode',
+        limit: { kind: 'ValueNode', value: 2 },
+      },
     },
     queryId: {} as never,
-    sql: 'select "id", "id", "email" from "user" where "id" = $1',
+    sql: 'select "id", "email" from "user" where "id" = $1 limit $2',
     parameters: ['u1'],
   } as unknown as CompiledQuery<{ id: string; email: string }>;
 }
 
 describe('buildKyselyPlan', () => {
-  it('assembles plan metadata with stable refs', () => {
+  it('assembles plan metadata with stable refs and limit annotations', () => {
     const plan = buildKyselyPlan(contract, createSelectCompiledQuery());
 
+    expect(plan.ast).toBeInstanceOf(SelectAst);
+    const ast = plan.ast as SelectAst;
+    expect(ast.from).toEqual(TableSource.named('user'));
+    expect((ast.where as BinaryExpr).left).toEqual(ast.project[0]!.expr);
+    expect((ast.where as BinaryExpr).right).toEqual(ParamRef.of(1));
+    expect(ast.limit).toBe(2);
     expect(plan.params).toEqual(['u1']);
-    expect(plan.meta.annotations).toMatchObject({ sql: REDACTED_SQL });
+    expect(plan.meta.annotations).toMatchObject({ sql: REDACTED_SQL, limit: 2 });
     expect(plan.meta.refs).toEqual({
       tables: ['user'],
       columns: [
@@ -137,13 +116,7 @@ describe('buildKyselyPlan', () => {
     });
   });
 
-  it('emits deterministic refs for equivalent query shapes', () => {
-    const first = buildKyselyPlan(contract, createSelectCompiledQuery());
-    const second = buildKyselyPlan(contract, createSelectCompiledQuery());
-    expect(first.meta.refs).toEqual(second.meta.refs);
-  });
-
-  it('canonicalizes refs ordering', () => {
+  it('canonicalizes refs ordering across transformed joins', () => {
     const query = {
       query: {
         kind: 'SelectQueryNode',
@@ -233,6 +206,81 @@ describe('buildKyselyPlan', () => {
         { table: 'user', column: 'id' },
       ],
     });
+  });
+
+  it('emits lateral join metadata in transformed select ASTs', () => {
+    const query = {
+      query: {
+        kind: 'SelectQueryNode',
+        from: {
+          kind: 'FromNode',
+          froms: [{ kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } }],
+        },
+        joins: [
+          {
+            kind: 'JoinNode',
+            joinType: 'LateralLeftJoinNode',
+            table: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'post' } },
+            on: {
+              kind: 'OnNode',
+              on: {
+                kind: 'BinaryOperationNode',
+                leftOperand: {
+                  kind: 'ReferenceNode',
+                  table: {
+                    kind: 'TableNode',
+                    table: { kind: 'IdentifierNode', name: 'user' },
+                  },
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'id' },
+                  },
+                },
+                operator: { kind: 'OperatorNode', operator: '=' },
+                rightOperand: {
+                  kind: 'ReferenceNode',
+                  table: {
+                    kind: 'TableNode',
+                    table: { kind: 'IdentifierNode', name: 'post' },
+                  },
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'userId' },
+                  },
+                },
+              },
+            },
+          },
+        ],
+        selections: [
+          {
+            kind: 'SelectionNode',
+            selection: {
+              kind: 'ReferenceNode',
+              table: {
+                kind: 'TableNode',
+                table: { kind: 'IdentifierNode', name: 'user' },
+              },
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+              },
+            },
+          },
+        ],
+      },
+      queryId: {} as never,
+      sql: 'select "user"."id" from "user" left join lateral "post" on ...',
+      parameters: [],
+    } as unknown as CompiledQuery<unknown>;
+
+    const plan = buildKyselyPlan(contract, query);
+    expect(plan.ast).toBeInstanceOf(SelectAst);
+    const ast = plan.ast as SelectAst;
+    expect(ast.joins).toHaveLength(1);
+    expect(ast.joins?.[0]?.joinType).toBe('left');
+    expect(ast.joins?.[0]?.lateral).toBe(true);
+    expect(ast.joins?.[0]?.source).toEqual(TableSource.named('post'));
   });
 
   it('fails fast on unsupported query kinds', () => {
