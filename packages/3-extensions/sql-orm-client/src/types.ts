@@ -6,7 +6,14 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
-import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type {
+  BinaryExpr,
+  CodecTrait,
+  ColumnRef,
+  LiteralExpr,
+  WhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { RowSelection } from './collection-internal-types';
 
@@ -128,15 +135,15 @@ export interface RuntimeQueryable extends RuntimeScope {
 }
 
 export interface CollectionContext<TContract extends SqlContract<SqlStorage>> {
-  readonly contract: TContract;
   readonly runtime: RuntimeQueryable;
+  readonly context: ExecutionContext<TContract>;
 }
 
 // ---------------------------------------------------------------------------
 // ModelAccessor — type-safe proxy for where() callbacks
 // ---------------------------------------------------------------------------
 
-export type ComparisonMethods<T> = {
+export type ComparisonMethodFns<T> = {
   eq(value: T): WhereExpr;
   neq(value: T): WhereExpr;
   gt(value: T): WhereExpr;
@@ -152,6 +159,108 @@ export type ComparisonMethods<T> = {
   asc(): OrderByDirective;
   desc(): OrderByDirective;
 };
+
+/**
+ * Trait-gated comparison methods. Only methods whose required traits are
+ * all present in `Traits` are included.
+ *
+ * - `traits: []` → always available (isNull, isNotNull)
+ */
+export type ComparisonMethods<T, Traits> = {
+  [K in keyof ComparisonMethodsMeta as [ComparisonMethodsMeta[K]['traits'][number]] extends [Traits]
+    ? K
+    : never]: ComparisonMethodFns<T>[K];
+};
+
+// ---------------------------------------------------------------------------
+// COMPARISON_METHODS_META — single source of truth for traits + factories
+// ---------------------------------------------------------------------------
+
+function literal(value: unknown): LiteralExpr {
+  return { kind: 'literal', value };
+}
+
+function listLiteral(values: readonly unknown[]) {
+  return { kind: 'listLiteral' as const, values: values.map(literal) };
+}
+
+function bin(op: BinaryExpr['op'], column: ColumnRef, right: BinaryExpr['right']): BinaryExpr {
+  return { kind: 'bin', op, left: column, right };
+}
+
+type MethodFactory = (column: ColumnRef) => (...args: never[]) => unknown;
+
+type ComparisonMethodMeta = {
+  readonly traits: readonly CodecTrait[];
+  readonly create: MethodFactory;
+};
+
+/**
+ * Declares trait requirements and runtime factory for each comparison method.
+ *
+ * - `traits: []` means "no trait required" — always available
+ * - Multi-trait: `traits: ['equality', 'order']` means BOTH traits are required
+ */
+export const COMPARISON_METHODS_META = {
+  eq: {
+    traits: ['equality'],
+    create: (column) => (value: unknown) => bin('eq', column, literal(value)),
+  },
+  neq: {
+    traits: ['equality'],
+    create: (column) => (value: unknown) => bin('neq', column, literal(value)),
+  },
+  in: {
+    traits: ['equality'],
+    create: (column) => (values: readonly unknown[]) => bin('in', column, listLiteral(values)),
+  },
+  notIn: {
+    traits: ['equality'],
+    create: (column) => (values: readonly unknown[]) => bin('notIn', column, listLiteral(values)),
+  },
+  gt: {
+    traits: ['order'],
+    create: (column) => (value: unknown) => bin('gt', column, literal(value)),
+  },
+  lt: {
+    traits: ['order'],
+    create: (column) => (value: unknown) => bin('lt', column, literal(value)),
+  },
+  gte: {
+    traits: ['order'],
+    create: (column) => (value: unknown) => bin('gte', column, literal(value)),
+  },
+  lte: {
+    traits: ['order'],
+    create: (column) => (value: unknown) => bin('lte', column, literal(value)),
+  },
+  like: {
+    traits: ['textual'],
+    create: (column) => (pattern: string) => bin('like', column, literal(pattern)),
+  },
+  ilike: {
+    traits: ['textual'],
+    create: (column) => (pattern: string) => bin('ilike', column, literal(pattern)),
+  },
+  asc: {
+    traits: ['order'],
+    create: (column) => () => ({ column: column.column, direction: 'asc' as const }),
+  },
+  desc: {
+    traits: ['order'],
+    create: (column) => () => ({ column: column.column, direction: 'desc' as const }),
+  },
+  isNull: {
+    traits: [],
+    create: (column) => () => ({ kind: 'nullCheck' as const, expr: column, isNull: true }),
+  },
+  isNotNull: {
+    traits: [],
+    create: (column) => () => ({ kind: 'nullCheck' as const, expr: column, isNull: false }),
+  },
+} as const satisfies Record<keyof ComparisonMethodFns<unknown>, ComparisonMethodMeta>;
+
+type ComparisonMethodsMeta = typeof COMPARISON_METHODS_META;
 
 export type RelationPredicate<
   TContract extends SqlContract<SqlStorage>,
@@ -174,7 +283,8 @@ export type RelationFilterAccessor<
 
 type ScalarModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: ComparisonMethods<
-    FieldJsType<TContract, ModelName, K>
+    FieldJsType<TContract, ModelName, K>,
+    FieldTraits<TContract, ModelName, K>
   >;
 };
 
@@ -233,7 +343,7 @@ export interface AggregateBuilder<
 }
 
 export type HavingComparisonMethods<T> = Pick<
-  ComparisonMethods<T>,
+  ComparisonMethods<T, 'equality' | 'order'>,
   'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte'
 >;
 
@@ -412,60 +522,44 @@ type FieldStorageColumn<
     : never
   : never;
 
-type NumericNativeType =
-  | 'smallint'
-  | 'int2'
-  | 'integer'
-  | 'int4'
-  | 'bigint'
-  | 'int8'
-  | 'real'
-  | 'float4'
-  | 'double precision'
-  | 'float8'
-  | 'numeric'
-  | 'decimal'
-  | 'smallserial'
-  | 'serial'
-  | 'bigserial';
+// ---------------------------------------------------------------------------
+// Field trait resolution from contract CodecTypes
+// ---------------------------------------------------------------------------
 
-type IsNumericStorageColumn<Column> = Column extends {
-  readonly nativeType: infer Native extends string;
+type FieldCodecId<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = FieldStorageColumn<TContract, ModelName, FieldName> extends {
+  readonly codecId: infer Id extends string;
 }
-  ? Native extends NumericNativeType
-    ? true
-    : false
-  : false;
+  ? Id
+  : never;
 
-type StrictNumericFieldNames<
+type FieldTraits<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
-> = {
-  [K in keyof DefaultModelRow<TContract, ModelName> & string]: IsNumericStorageColumn<
-    FieldStorageColumn<TContract, ModelName, K>
-  > extends true
-    ? K
-    : never;
-}[keyof DefaultModelRow<TContract, ModelName> & string];
-
-type NumericFieldNamesFromRowType<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-> = {
-  [K in keyof DefaultModelRow<TContract, ModelName> & string]: DefaultModelRow<
-    TContract,
-    ModelName
-  >[K] extends number
-    ? K
-    : never;
-}[keyof DefaultModelRow<TContract, ModelName> & string];
+  FieldName extends string,
+> = FieldCodecId<TContract, ModelName, FieldName> extends infer Id extends string
+  ? Id extends keyof ExtractCodecTypes<TContract>
+    ? ExtractCodecTypes<TContract>[Id] extends { readonly traits: infer T }
+      ? T
+      : never
+    : never
+  : never;
 
 export type NumericFieldNames<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
-> = [StrictNumericFieldNames<TContract, ModelName>] extends [never]
-  ? NumericFieldNamesFromRowType<TContract, ModelName>
-  : StrictNumericFieldNames<TContract, ModelName>;
+> = {
+  [K in keyof DefaultModelRow<TContract, ModelName> & string]: 'numeric' extends FieldTraits<
+    TContract,
+    ModelName,
+    K
+  >
+    ? K
+    : never;
+}[keyof DefaultModelRow<TContract, ModelName> & string];
 
 type ExecutionDefaultEntry<TContract extends SqlContract<SqlStorage>> =
   TContract['execution'] extends {

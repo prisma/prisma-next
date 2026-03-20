@@ -1,6 +1,10 @@
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { RuntimeQueryable } from '../src/types';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
@@ -11,6 +15,19 @@ export type TestContract = Contract;
 
 export function getTestContract(): TestContract {
   return structuredClone(baseTestContract);
+}
+
+const testContext: ExecutionContext<TestContract> = createExecutionContext({
+  contract: baseTestContract,
+  stack: createSqlExecutionStack({
+    target: postgresTarget,
+    adapter: postgresAdapter,
+    extensionPacks: [],
+  }),
+});
+
+export function getTestContext(): ExecutionContext<TestContract> {
+  return testContext;
 }
 
 export interface MockExecution {

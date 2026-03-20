@@ -23,6 +23,9 @@
       "Skill(tsdown-package)",
       "Bash(ls:*)",
       "Bash(pnpm build:*)",
+      "Bash(pnpm test:packages:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm lint:deps:*)",
       "Bash(gh pr view:*)"
     ],
     "deny": [],

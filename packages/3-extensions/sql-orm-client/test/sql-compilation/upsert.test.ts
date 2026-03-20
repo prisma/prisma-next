@@ -5,7 +5,7 @@ import {
   createReturningCollectionFor,
   withReturningCapability,
 } from '../collection-fixtures';
-import { createMockRuntime, getTestContract } from '../helpers';
+import { createMockRuntime, getTestContext, getTestContract } from '../helpers';
 import { normalizeSql, serializePlans } from './helpers';
 
 describe('sql-compilation/upsert', () => {
@@ -133,7 +133,8 @@ describe('sql-compilation/upsert', () => {
     const contractWithoutPrimaryKey = withReturningCapability(getTestContract());
     delete (contractWithoutPrimaryKey.storage.tables.users as { primaryKey?: unknown }).primaryKey;
 
-    const collection = new Collection({ contract: contractWithoutPrimaryKey, runtime }, 'User');
+    const context = { ...getTestContext(), contract: contractWithoutPrimaryKey };
+    const collection = new Collection({ runtime, context }, 'User');
 
     await expect(
       collection.upsert({

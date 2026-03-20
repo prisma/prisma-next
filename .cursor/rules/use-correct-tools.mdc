@@ -5,6 +5,7 @@ alwaysApply: true
 ---
 
 - Use pnpm not npm!
+- Use `pnpm exec`, not `npx`
 - Use the shell's Node.js. Do not run `nvm use`, `fnm use`, or any other version-switching command.
 - The source of truth for the required Node version is the root `package.json` `engines.node` field.
 - If the shell's `node -v` does not satisfy that, or Node/pnpm commands fail due to version, report:
@@ -13,7 +14,7 @@ alwaysApply: true
   default Node in your version manager, or use Volta)."
 - We use turborepo to build, generally. `pnpm build` scripts are available in each package which delegate to turborepo
 - If you change exported types in a workspace package consumed by other packages/examples, run that package's `pnpm build` to refresh `dist/*.d.mts` declarations before validating downstream TypeScript usage.
-- When you want to typecheck, use the local `pnpm typecheck` scripts instead of writing `tsc` commands from scratch
+- When you want to typecheck, use the local `pnpm typecheck` scripts instead of writing `tsc`/`pnpm exec tsc` commands from scratch
 - When you want to test, use the local `pnpm test` scripts. For coverage, use `pnpm test:coverage` (all packages) or `pnpm coverage:packages` (packages only, excludes examples)
 - Use arktype instead of zod
 - Never add file extensions to imports in TypeScript

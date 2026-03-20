@@ -60,7 +60,7 @@ describe('collection-dispatch', () => {
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
-      contract: collection.ctx.contract,
+      contract: collection.ctx.context.contract,
       runtime,
       state: collection.state,
       tableName: collection.tableName,
@@ -237,7 +237,7 @@ describe('collection-dispatch', () => {
     runtime.setNextResults([[]]);
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
-      contract: collection.ctx.contract,
+      contract: collection.ctx.context.contract,
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
