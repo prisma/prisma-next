@@ -113,9 +113,9 @@ prisma-next db verify [--db <url>] [--config <path>] [--shallow | --schema-only]
 Options:
 - `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
-- `--shallow`: Skip structural schema verification and only check the database marker
+- `--shallow`: Skip schema verification and only check the database marker
 - `--schema-only`: Skip marker verification and only check whether the live schema satisfies the contract
-- `--strict`: When schema verification runs, fail on unmanaged extra schema elements
+- `--strict`: When schema verification runs, schema elements not present in the contract are considered an error
 - `--shallow` cannot be combined with `--schema-only` or `--strict` (exit code 2, `PN-CLI-4012`). `--schema-only --strict` is valid.
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -134,10 +134,10 @@ prisma-next db verify --db postgresql://user:pass@localhost/db
 # Marker-only verification when callers accept the trade-off
 prisma-next db verify --db postgresql://user:pass@localhost/db --shallow
 
-# Structural verification without relying on marker state
+# Schema-only verification without relying on marker state
 prisma-next db verify --db postgresql://user:pass@localhost/db --schema-only
 
-# Strict structural verification (extras fail)
+# Strict schema verification (extras fail)
 prisma-next db verify --db postgresql://user:pass@localhost/db --strict
 
 # JSON output
@@ -185,14 +185,14 @@ export default defineConfig({
    - Compares storage hash: Returns `PN-RTM-3002` if `storageHash` doesn't match
    - Compares profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
    - Checks codec coverage (optional): Compares contract column types against supported codec types and reports missing codecs
-5. **Verify Schema (default)**: Unless `--shallow` is provided, calls `familyInstance.schemaVerify()` to catch structural drift such as missing tables or columns created by manual DDL. By default this runs in tolerant mode; `--strict` fails on unmanaged extra schema elements.
+5. **Verify Schema (default)**: Unless `--shallow` is provided, calls `familyInstance.schemaVerify()` to catch schema mismatches such as missing tables or columns after manual DDL. By default this runs in tolerant mode; `--strict` treats schema elements not present in the contract as an error.
 6. **Schema-only mode**: `--schema-only` skips marker verification entirely and runs only `schemaVerify()`. This is useful for brownfield adoption and corrupt-marker diagnosis.
 
 **Output Format (TTY):**
 
 Success:
 ```text
-✔ Database signature and schema match contract
+✔ Database marker and schema match contract
   verification: marker + schema
   storageHash: sha256:abc123...
   profileHash: sha256:def456...
@@ -205,7 +205,7 @@ Shallow-mode success:
   storageHash: sha256:abc123...
   profileHash: sha256:def456...
 
-⚠ Schema verification skipped because --shallow was provided. Run `prisma-next db verify --schema-only` to detect structural drift.
+⚠ Schema verification skipped because --shallow was provided
 ```
 
 Marker failure:
@@ -223,7 +223,7 @@ Schema drift failure:
 ```json
 {
   "ok": true,
-  "summary": "Database signature and schema match contract",
+  "summary": "Database marker and schema match contract",
   "mode": "full",
   "contract": {
     "storageHash": "sha256:abc123...",
@@ -264,7 +264,7 @@ Schema drift failure:
 - `PN-RTM-3001`: Marker missing - Contract marker not found in database
 - `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
 - `PN-RTM-3003`: Target mismatch - Contract target does not match config target
-- Exit code 1 with schema verification payload: Structural drift detected after marker verification passed
+- Exit code 1 with schema verification payload: Schema does not match the contract after marker verification passed
 
 **Family Requirements:**
 
@@ -622,7 +622,7 @@ For updated markers:
 - Exit code 1: Schema verification failed — database schema does not match contract (marker is not written)
 
 **Relationship to Other Commands:**
-- **`db verify`**: `db verify` checks that the marker exists and matches the contract, then runs schema verification by default. `db sign` writes the marker that `db verify` checks. Use `db verify --shallow` for marker-only verification and `db verify --schema-only` for structural verification without marker checks.
+- **`db verify`**: `db verify` checks that the marker exists and matches the contract, then runs schema verification by default. `db sign` writes the marker that `db verify` checks. Use `db verify --shallow` for marker-only verification and `db verify --schema-only` to inspect only the live schema.
 
 **Idempotency:**
 The `db sign` command is idempotent and safe to run multiple times:
