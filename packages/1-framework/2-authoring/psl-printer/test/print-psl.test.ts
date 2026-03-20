@@ -857,6 +857,78 @@ describe('printPsl', () => {
     `);
   });
 
+  it('disambiguates colliding normalized field names and preserves relation references', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        account: {
+          name: 'account',
+          columns: {
+            user_id: {
+              name: 'user_id',
+              nativeType: 'int4',
+              nullable: false,
+              default: undefined,
+            },
+            userId: {
+              name: 'userId',
+              nativeType: 'text',
+              nullable: false,
+              default: undefined,
+            },
+          },
+          primaryKey: { columns: ['user_id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        login: {
+          name: 'login',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            account_id: {
+              name: 'account_id',
+              nativeType: 'int4',
+              nullable: false,
+              default: undefined,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            {
+              columns: ['account_id'],
+              referencedTable: 'account',
+              referencedColumns: ['user_id'],
+            },
+          ],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      dependencies: [],
+    };
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toMatchInlineSnapshot(`
+      "// This file was introspected from the database. Do not edit manually.
+
+      model Account {
+        userId2 Int     @id @map("user_id")
+        userId  String
+        logins  Login[]
+
+        @@map("account")
+      }
+
+      model Login {
+        id        Int     @id
+        accountId Int     @map("account_id")
+        account   Account @relation(fields: [accountId], references: [userId2])
+
+        @@map("login")
+      }
+      "
+    `);
+  });
+
   it('composite unique constraint and index', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {

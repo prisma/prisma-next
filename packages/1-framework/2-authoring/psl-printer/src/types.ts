@@ -86,6 +86,7 @@ export type PrinterNamedType = {
 export type RelationField = {
   readonly fieldName: string;
   readonly typeName: string;
+  readonly referencedTableName?: string | undefined;
   readonly optional: boolean;
   readonly list: boolean;
   readonly relationName?: string | undefined;

@@ -174,6 +174,7 @@ function buildChildRelationField(
   return {
     fieldName,
     typeName: parentModelName,
+    referencedTableName: fk.referencedTable,
     optional: false,
     list: false,
     relationName,

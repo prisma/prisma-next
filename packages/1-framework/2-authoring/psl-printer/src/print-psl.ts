@@ -15,6 +15,13 @@ import type {
 
 const DEFAULT_HEADER = '// This file was introspected from the database. Do not edit manually.';
 
+type ResolvedColumnFieldName = {
+  readonly fieldName: string;
+  readonly fieldMap?: string | undefined;
+};
+
+type TableColumnFieldNameMap = ReadonlyMap<string, ResolvedColumnFieldName>;
+
 /**
  * Converts a SqlSchemaIR to a PSL (Prisma Schema Language) string.
  *
@@ -50,6 +57,8 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
     enumNameMap.set(pgTypeName, name);
   }
 
+  const fieldNamesByTable = buildFieldNamesByTable(schemaIR.tables);
+
   // Infer relations from foreign keys
   const { relationsByTable } = inferRelations(schemaIR.tables, modelNameMap);
 
@@ -63,6 +72,7 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
       table,
       typeMap,
       enumNameMap,
+      fieldNamesByTable,
       namedTypes,
       relationsByTable.get(table.name) ?? [],
     );
@@ -114,10 +124,12 @@ function processTable(
   table: SqlTableIR,
   typeMap: PslPrinterOptions['typeMap'],
   enumNameMap: ReadonlyMap<string, string>,
+  fieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>,
   namedTypes: Map<string, PrinterNamedType>,
   relationFields: readonly RelationField[],
 ): PrinterModel {
   const { name: modelName, map: mapName } = toModelName(table.name);
+  const fieldNameMap = fieldNamesByTable.get(table.name);
 
   const pkColumns = new Set(table.primaryKey?.columns ?? []);
   const isSinglePk = pkColumns.size === 1;
@@ -135,7 +147,9 @@ function processTable(
   const columnEntries = Object.values(table.columns);
 
   for (const column of columnEntries) {
-    const { name: fieldName, map: fieldMap } = toFieldName(column.name);
+    const resolvedField = fieldNameMap?.get(column.name);
+    const fieldName = resolvedField?.fieldName ?? toFieldName(column.name).name;
+    const fieldMap = resolvedField?.fieldMap;
 
     // Resolve type
     const resolution = typeMap.resolve(column.nativeType, table.annotations);
@@ -221,7 +235,9 @@ function processTable(
   }
 
   // Add relation fields
+  const usedFieldNames = new Set(fields.map((field) => field.name));
   for (const rel of relationFields) {
+    const relationFieldName = createUniqueFieldName(rel.fieldName, usedFieldNames);
     const relAttributes: string[] = [];
 
     if (rel.fields && rel.references) {
@@ -229,8 +245,18 @@ function processTable(
       if (rel.relationName) {
         parts.push(`name: "${rel.relationName}"`);
       }
-      parts.push(`fields: [${rel.fields.map((f) => toFieldName(f).name).join(', ')}]`);
-      parts.push(`references: [${rel.references.map((r) => toFieldName(r).name).join(', ')}]`);
+      parts.push(
+        `fields: [${rel.fields
+          .map((fieldName) => resolveColumnFieldName(fieldNamesByTable, table.name, fieldName))
+          .join(', ')}]`,
+      );
+      parts.push(
+        `references: [${rel.references
+          .map((fieldName) =>
+            resolveColumnFieldName(fieldNamesByTable, rel.referencedTableName ?? '', fieldName),
+          )
+          .join(', ')}]`,
+      );
       if (rel.onDelete) {
         parts.push(`onDelete: ${rel.onDelete}`);
       }
@@ -243,7 +269,7 @@ function processTable(
     }
 
     fields.push({
-      name: rel.fieldName,
+      name: relationFieldName,
       typeName: rel.typeName,
       optional: rel.optional,
       list: rel.list,
@@ -252,6 +278,7 @@ function processTable(
       isRelation: true,
       isUnsupported: false,
     });
+    usedFieldNames.add(relationFieldName);
   }
 
   // Model-level attributes
@@ -259,14 +286,18 @@ function processTable(
 
   // Composite PK
   if (table.primaryKey && table.primaryKey.columns.length > 1) {
-    const pkFieldNames = table.primaryKey.columns.map((c) => toFieldName(c).name);
+    const pkFieldNames = table.primaryKey.columns.map((columnName) =>
+      resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
+    );
     modelAttributes.push(`@@id([${pkFieldNames.join(', ')}])`);
   }
 
   // Composite unique constraints
   for (const unique of table.uniques) {
     if (unique.columns.length > 1) {
-      const fieldNames = unique.columns.map((c) => toFieldName(c).name);
+      const fieldNames = unique.columns.map((columnName) =>
+        resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
+      );
       modelAttributes.push(`@@unique([${fieldNames.join(', ')}])`);
     }
   }
@@ -274,7 +305,9 @@ function processTable(
   // Indexes (non-unique only; unique indexes are handled by @@unique)
   for (const index of table.indexes) {
     if (!index.unique) {
-      const fieldNames = index.columns.map((c) => toFieldName(c).name);
+      const fieldNames = index.columns.map((columnName) =>
+        resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
+      );
       modelAttributes.push(`@@index([${fieldNames.join(', ')}])`);
     }
   }
@@ -310,6 +343,71 @@ function parseDefaultIfNeeded(value: unknown): ColumnDefault | undefined {
     return parseRawDefault(value);
   }
   return undefined;
+}
+
+function buildFieldNamesByTable(
+  tables: Record<string, SqlTableIR>,
+): ReadonlyMap<string, TableColumnFieldNameMap> {
+  const fieldNamesByTable = new Map<string, TableColumnFieldNameMap>();
+
+  for (const table of Object.values(tables)) {
+    const columns = Object.values(table.columns).map((column, index) => {
+      const { name, map } = toFieldName(column.name);
+      return {
+        columnName: column.name,
+        desiredFieldName: name,
+        fieldMap: map,
+        index,
+      };
+    });
+
+    const assignmentOrder = [...columns].sort((left, right) => {
+      const mapComparison =
+        Number(left.fieldMap !== undefined) - Number(right.fieldMap !== undefined);
+      if (mapComparison !== 0) {
+        return mapComparison;
+      }
+      return left.index - right.index;
+    });
+
+    const usedFieldNames = new Set<string>();
+    const tableFieldNames = new Map<string, ResolvedColumnFieldName>();
+
+    for (const column of assignmentOrder) {
+      const fieldName = createUniqueFieldName(column.desiredFieldName, usedFieldNames);
+      usedFieldNames.add(fieldName);
+      tableFieldNames.set(column.columnName, {
+        fieldName,
+        fieldMap: column.fieldMap,
+      });
+    }
+
+    fieldNamesByTable.set(table.name, tableFieldNames);
+  }
+
+  return fieldNamesByTable;
+}
+
+function resolveColumnFieldName(
+  fieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>,
+  tableName: string,
+  columnName: string,
+): string {
+  return (
+    fieldNamesByTable.get(tableName)?.get(columnName)?.fieldName ?? toFieldName(columnName).name
+  );
+}
+
+function createUniqueFieldName(desiredName: string, usedFieldNames: ReadonlySet<string>): string {
+  if (!usedFieldNames.has(desiredName)) {
+    return desiredName;
+  }
+
+  let counter = 2;
+  while (usedFieldNames.has(`${desiredName}${counter}`)) {
+    counter++;
+  }
+  return `${desiredName}${counter}`;
 }
 
 /**
