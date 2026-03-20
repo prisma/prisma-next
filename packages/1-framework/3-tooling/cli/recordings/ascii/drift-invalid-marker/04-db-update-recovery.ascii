@@ -31,7 +31,8 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # Marker-only verification still passes when marker hash is unchanged [email column dropped, marker still matches contract]
+> Recovery # re-add missing column, update marker [email column missing, contract expects it]
+bash: Recovery: command not found
 >
 
 
@@ -60,10 +61,10 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # Marker-only verification still passes when marker hash is unchanged [email column dropped, marker still matches contract]
+> Recovery # re-add missing column, update marker [email column missing, contract expects it]
+bash: Recovery: command not found
 >
 
 
@@ -92,44 +93,11 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # Marker-only verification still passes when marker hash is unchanged [email column dropped, marker still matches contract]
-> prisma-next db verify --shallow
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # Marker-only verification still passes when marker hash is unchanged [email column dropped, marker still matches contract]
-> prisma-next db verify --shallow
-
+> Recovery # re-add missing column, update marker [email column missing, contract expects it]
+bash: Recovery: command not found
+> prisma-next db update
 
 
 
@@ -159,9 +127,9 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # Marker-only verification still passes when marker hash is unchanged [email column dropped, marker still matches contract]
-> prisma-next db verify --shallow
-
+> Recovery # re-add missing column, update marker [email column missing, contract expects it]
+bash: Recovery: command not found
+> prisma-next db update
 
 
 
@@ -191,26 +159,58 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # Marker-only verification still passes when marker hash is unchanged [email column dropped, marker still matches contract]
-> prisma-next db verify --shallow
+> Recovery # re-add missing column, update marker [email column missing, contract expects it]
+bash: Recovery: command not found
+> prisma-next db update
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-prisma-next db verify → Check whether the database signature and live schema match your contract
+> Recovery # re-add missing column, update marker [email column missing, contract expects it]
+bash: Recovery: command not found
+> prisma-next db update
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+prisma-next db update → Update your database schema to match your contract
 │
 │ config:               prisma-next.config.ts
 │ contract:             contract.json
-│ mode:                 shallow (marker only)
 │
-│ Read more             https://pris.ly/db-verify
+│ Read more             https://pris.ly/db-update
 └
 
 │
-│  ✔ Database marker matches contract
-│    verification: marker only (--shallow)
-│    storageHash: sha256:95060eda0d8ef9b30439212a41756c15066733defdde81ee7118f955be7361d1
-│    profileHash: sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98
-│
-│  ⚠ Schema verification skipped because --shallow was provided. Run `prisma-next db verify --schema-only` to detect structural drift.
+■  ✖ Database schema does not satisfy contract (4 failures) (PN-RTM-3020)
+│    Why: The resulting database schema does not satisfy the destination contract.
+│    Fix: Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`
+│    Issues (showing 1 of 1):
+│      - [missing_column] Column "user"."email" is missing from database
 >
+
 
 
 

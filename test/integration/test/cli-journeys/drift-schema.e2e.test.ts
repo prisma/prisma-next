@@ -1,12 +1,12 @@
 /**
  * Schema Drift Scenarios (Journeys M + N)
  *
- * M — Phantom drift: after initialization, a DBA drops a column via manual DDL.
- *     db verify now catches the missing column by default via structural schema
- *     verification. db verify --marker-only still performs marker-only verification and
- *     therefore passes if the marker row is unchanged. Recovery via db update
- *     fails because re-adding a NOT NULL column to an existing table is
- *     unrecoverable without manual intervention.
+ * M — Manual DDL with unchanged marker: after initialization, a DBA drops a
+ *     column via manual DDL. db verify catches that the live schema no longer
+ *     matches the contract. db verify --marker-only still performs marker-only
+ *     verification and therefore passes if the marker row is unchanged.
+ *     Recovery via db update fails because re-adding a NOT NULL column to an
+ *     existing table is unrecoverable without manual intervention.
  *
  * N — Extra column drift: a DBA adds a column via manual DDL. Tolerant
  *     db verify passes (extras OK), strict db verify fails. Recovery
@@ -32,9 +32,9 @@ import {
 
 withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
-  // Journey M: Phantom Drift (Marker OK, Schema Diverged)
+  // Journey M: Manual DDL With Unchanged Marker
   // -------------------------------------------------------------------------
-  describe('Journey M: Phantom Drift', () => {
+  describe('Journey M: Manual DDL With Unchanged Marker', () => {
     const db = useDevDatabase();
 
     it(
@@ -56,7 +56,7 @@ withTempDir(({ createTempDir }) => {
           await client.query('ALTER TABLE "user" DROP COLUMN email');
         });
 
-        // M.01: db verify (fails — structural schema verification detects drift)
+        // M.01: db verify (fails — schema verification detects the missing column)
         const verify = await runDbVerify(ctx);
         expect(verify.exitCode, 'M.01: db verify detects drift').toBe(1);
 

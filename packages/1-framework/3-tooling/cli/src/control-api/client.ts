@@ -204,7 +204,7 @@ class ControlClientImpl implements ControlClient {
       action: 'verify',
       kind: 'spanStart',
       spanId: 'verify',
-      label: 'Verifying database signature...',
+      label: 'Verifying database marker...',
     });
 
     try {

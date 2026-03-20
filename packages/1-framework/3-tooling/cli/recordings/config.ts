@@ -392,7 +392,7 @@ export const config: RecordingsConfig = {
       ],
     },
 
-    'drift-phantom': {
+    'drift-invalid-marker': {
       precondition: 'initialized',
       contract: 'contract-base.ts',
       steps: [
@@ -400,16 +400,16 @@ export const config: RecordingsConfig = {
           ordinal: '01',
           slug: 'db-verify-fail',
           command: 'prisma-next db verify',
-          description: 'Verify fails — structural schema drift is detected by default',
-          dbState: 'manual DDL dropped email column, marker untouched',
+          description: 'Verify fails — the live schema no longer matches the contract',
+          dbState: 'manual DDL dropped email column, marker unchanged',
           before: [{ type: 'sql', query: 'ALTER TABLE "user" DROP COLUMN "email"' }],
           sleepAfterEnter: '10s',
         },
         {
           ordinal: '02',
-          slug: 'db-verify-shallow-pass',
-          command: 'prisma-next db verify --shallow',
-          description: 'Marker-only verification still passes when marker hash is unchanged',
+          slug: 'db-verify-marker-only-pass',
+          command: 'prisma-next db verify --marker-only',
+          description: 'Marker-only verification still passes when the marker row is unchanged',
           dbState: 'email column dropped, marker still matches contract',
           sleepAfterEnter: '10s',
         },
@@ -425,7 +425,7 @@ export const config: RecordingsConfig = {
           ordinal: '04',
           slug: 'db-update-recovery',
           command: 'prisma-next db update',
-          description: 'Recovery — re-add missing column, re-sign marker',
+          description: 'Recovery — re-add missing column, update marker',
           dbState: 'email column missing, contract expects it',
           sleepAfterEnter: '12s',
         },

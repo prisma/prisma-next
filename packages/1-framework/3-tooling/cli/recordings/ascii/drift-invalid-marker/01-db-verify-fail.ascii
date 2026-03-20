@@ -31,7 +31,7 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # fails Verify structural schema drift is detected by default [manual DDL dropped email column, marker untouched]
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
 >
 
 
@@ -63,7 +63,7 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # fails Verify structural schema drift is detected by default [manual DDL dropped email column, marker untouched]
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
 >
 
 
@@ -95,7 +95,7 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # fails Verify structural schema drift is detected by default [manual DDL dropped email column, marker untouched]
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
 > prisma-next db verify
 
 
@@ -127,7 +127,7 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # fails Verify structural schema drift is detected by default [manual DDL dropped email column, marker untouched]
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
 > prisma-next db verify
 
 
@@ -159,7 +159,7 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # fails Verify structural schema drift is detected by default [manual DDL dropped email column, marker untouched]
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
 > prisma-next db verify
 
 
@@ -191,10 +191,10 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 ────────────────────────────────────────────────────────────────────────────────
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # fails Verify structural schema drift is detected by default [manual DDL dropped email column, marker untouched]
+> # fails Verify the live schema no longer matches the contract [manual DDL dropped email column, marker unchanged]
 > prisma-next db verify
 bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-prisma-next db verify → Check whether the database signature and live schema match your contract
+prisma-next db verify → Check whether the database marker and live schema match your contract
 │
 │ config:               prisma-next.config.ts
 │ contract:             contract.json
