@@ -26,15 +26,17 @@ describe('ast/builders', () => {
       .withLimit(10)
       .withOffset(5);
 
-    expect(ast.from).toEqual(table('user'));
-    expect(ast.project).toEqual([{ alias: 'id', expr: col('user', 'id') }]);
-    expect(ast.where).toEqual(BinaryExpr.eq(col('user', 'id'), param(1, 'id')));
-    expect(ast.distinct).toBe(true);
-    expect(ast.distinctOn).toEqual([col('user', 'email')]);
-    expect(ast.groupBy).toEqual([col('user', 'id')]);
-    expect(ast.having).toEqual(BinaryExpr.gt(col('user', 'id'), param(2, 'minId')));
-    expect(ast.limit).toBe(10);
-    expect(ast.offset).toBe(5);
+    expect(ast).toMatchObject({
+      from: table('user'),
+      project: [{ alias: 'id', expr: col('user', 'id') }],
+      where: BinaryExpr.eq(col('user', 'id'), param(1, 'id')),
+      distinct: true,
+      distinctOn: [col('user', 'email')],
+      groupBy: [col('user', 'id')],
+      having: BinaryExpr.gt(col('user', 'id'), param(2, 'minId')),
+      limit: 10,
+      offset: 5,
+    });
   });
 
   it('builds insert ASTs with on-conflict update sets', () => {
@@ -94,9 +96,7 @@ describe('ast/builders', () => {
       .withWhere(where)
       .withReturning([col('user', 'id')]);
 
-    expect(updateAst.where).toEqual(where);
-    expect(deleteAst.where).toEqual(where);
-    expect(updateAst.returning).toEqual([col('user', 'id')]);
-    expect(deleteAst.returning).toEqual([col('user', 'id')]);
+    expect(updateAst).toMatchObject({ where, returning: [col('user', 'id')] });
+    expect(deleteAst).toMatchObject({ where, returning: [col('user', 'id')] });
   });
 });
