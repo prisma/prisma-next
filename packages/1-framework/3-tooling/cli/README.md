@@ -264,7 +264,7 @@ Schema drift failure:
 - `PN-RTM-3001`: Marker missing - Contract marker not found in database
 - `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
 - `PN-RTM-3003`: Target mismatch - Contract target does not match config target
-- Exit code 1 with schema verification payload: Schema does not match the contract after marker verification passed
+- Exit code 1 with schema verification payload: Schema does not match the contract (default mode or `--schema-only`)
 
 **Family Requirements:**
 
