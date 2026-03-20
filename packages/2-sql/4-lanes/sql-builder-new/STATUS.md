@@ -9,7 +9,7 @@ A type-level-only SQL query builder DSL with no runtime implementation. Validate
 - **FROM** (table)
 - **SELECT** (column names, aliased expressions, callback returning record)
 - **WHERE**
-- **JOIN** (INNER, LEFT OUTER, RIGHT OUTER, FULL OUTER, LATERAL, LATERAL LEFT)
+- **JOIN** (INNER, LEFT OUTER, RIGHT OUTER, FULL OUTER, LATERAL, LATERAL LEFT — lateral joins are capability-enabled)
 - **ORDER BY** (with direction, nulls first/last)
 - **GROUP BY**
 - **HAVING**
@@ -20,7 +20,7 @@ A type-level-only SQL query builder DSL with no runtime implementation. Validate
 - **Comparison operators**: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`
 - **Logical operators**: `and`, `or`
 - **Subquery predicates**: `exists`, `notExists`, `in` (subquery or array), `notIn` (subquery or array)
-- **DISTINCT** / **DISTINCT ON (expr, ...)**
+- **DISTINCT** / **DISTINCT ON (expr, ...)** (DISTINCT ON is capability-enabled)
 
 ## What's missing
 

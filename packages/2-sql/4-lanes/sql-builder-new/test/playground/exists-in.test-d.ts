@@ -82,7 +82,7 @@ test('NOT IN with literal array', () => {
 test('type-mismatched subquery — title is text, id is int4', () => {
   db.users
     .select('id')
-    // @ts-expect-error
+    // @ts-expect-error type mismatch: title (text) is not compatible with id (int4)
     .where((f, fns) => fns.in(f.users.id, db.posts.select('title')))
     .firstOrThrow();
 });
@@ -90,7 +90,7 @@ test('type-mismatched subquery — title is text, id is int4', () => {
 test('multi-column subquery with different types', () => {
   db.users
     .select('id')
-    // @ts-expect-error
+    // @ts-expect-error multi-column subquery not allowed in scalar IN
     .where((f, fns) => fns.in(f.users.id, db.posts.select('user_id', 'title')))
     .firstOrThrow();
 });
@@ -98,7 +98,7 @@ test('multi-column subquery with different types', () => {
 test('type-mismatched literal array — strings vs int expression', () => {
   db.users
     .select('id')
-    // @ts-expect-error
+    // @ts-expect-error string array not compatible with int4 column
     .where((f, fns) => fns.in(f.users.id, ['hello', 'world']))
     .firstOrThrow();
 });

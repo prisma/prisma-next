@@ -42,6 +42,7 @@
   },
   "exports": {
     ".": "./dist/index.mjs",
+    "./types": "./dist/exports/types.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",
