@@ -204,7 +204,7 @@ prisma-next db verify → Check whether the database marker and live schema matc
 └
 
 │
-■  ✖ Hash mismatch (PN-RTM-3002)
+■  ✖ Hash mismatch (PN-RUN-3002)
 │    Why: Contract hash does not match database marker
 │    Fix: Migrate database or re-sign if intentional
 >

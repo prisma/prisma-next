@@ -204,6 +204,8 @@ prisma-next db init → Bootstrap a database to match the current contract
 └
 
 │
+◇  Connecting to database... (1054ms)
+│
 │  ✔ Planned 1 operation(s)
 │  │
 │  └─ Create table user [additive]
@@ -213,8 +215,6 @@ prisma-next db init → Bootstrap a database to match the current contract
 │  This is a dry run. No changes were applied.
 │  Run without --dry-run to apply changes.
 >
-
-
 
 
 

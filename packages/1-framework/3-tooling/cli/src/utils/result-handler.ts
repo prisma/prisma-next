@@ -37,7 +37,7 @@ export function handleResult<T>(
     ui.error(formatErrorOutput(envelope, flags));
   }
 
-  // Infer exit code from error domain: CLI errors = 2, RTM errors = 1
+  // Infer exit code from error domain: CLI errors = 2, RUN errors = 1
   const exitCode = result.failure.domain === 'CLI' ? 2 : 1;
   return exitCode;
 }

@@ -204,7 +204,7 @@ prisma-next db verify → Check whether the database marker and live schema matc
 └
 
 │
-■  ✖ Database not signed (PN-RTM-3001)
+■  ✖ Database not signed (PN-RUN-3001)
 │    Why: No database signature (marker) found
 │    Fix: Run `prisma-next db sign --db <url>` to sign the database
 >
