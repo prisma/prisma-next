@@ -138,7 +138,7 @@ describe('composed runtime mutation default generators', () => {
     expect(applied).toEqual([]);
   });
 
-  it('includes both owners when duplicate generator ids are composed', () => {
+  it('throws error naming both owners when duplicate generator ids are composed', () => {
     const first: SqlRuntimeExtensionDescriptor<'postgres'> = {
       kind: 'extension',
       id: 'first-pack',
