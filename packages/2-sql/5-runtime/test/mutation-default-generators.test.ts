@@ -92,6 +92,52 @@ describe('composed runtime mutation default generators', () => {
     expect(applied).toEqual([{ column: 'id', value: 'slug-from-pack' }]);
   });
 
+  it('skips generated default when user provides an explicit value', () => {
+    const extension: SqlRuntimeExtensionDescriptor<'postgres'> = {
+      kind: 'extension',
+      id: 'test-mutation-defaults',
+      version: '0.0.1',
+      familyId: 'sql',
+      targetId: 'postgres',
+      codecs: () => createCodecRegistry(),
+      operationSignatures: () => [],
+      parameterizedCodecs: () => [],
+      mutationDefaultGenerators: () => [
+        {
+          id: 'slugid',
+          generate: () => 'slug-from-pack',
+        },
+      ],
+      create() {
+        return { familyId: 'sql', targetId: 'postgres' };
+      },
+    };
+
+    const context = createExecutionContext({
+      contract: {
+        ...testContract,
+        execution: {
+          mutations: {
+            defaults: [
+              {
+                ref: { table: 'user', column: 'id' },
+                onCreate: { kind: 'generator', id: 'slugid' },
+              },
+            ],
+          },
+        },
+      },
+      stack: createStack([extension]),
+    });
+
+    const applied = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      values: { id: 'user-provided-value' },
+    });
+    expect(applied).toEqual([]);
+  });
+
   it('includes both owners when duplicate generator ids are composed', () => {
     const first: SqlRuntimeExtensionDescriptor<'postgres'> = {
       kind: 'extension',
