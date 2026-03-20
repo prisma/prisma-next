@@ -87,8 +87,8 @@ withTempDir(({ createTempDir }) => {
         const schemaVerifyStrict = await runDbVerify(ctx, ['--strict']);
         expect(schemaVerifyStrict.exitCode, 'A.07: db verify strict').toBe(0);
 
-        // A.08: db introspect
-        const introspect = await runDbIntrospect(ctx);
+        // A.08: db introspect --dry-run
+        const introspect = await runDbIntrospect(ctx, ['--dry-run']);
         expect(introspect.exitCode, 'A.08: db introspect').toBe(0);
         expect(stripAnsi(introspect.stdout), 'A.08: shows user table').toContain('user');
 

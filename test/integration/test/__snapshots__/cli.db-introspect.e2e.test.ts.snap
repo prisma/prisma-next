@@ -1,12 +1,39 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`db introspect command (e2e) > outputs JSON envelope with real database 1`] = `
+exports[`db introspect command (e2e) > dry-run > --dry-run: outputs tree structure without writing file 1`] = `
+"prisma-next db introspect → Inspect the database schema and generate PSL
+│ config:               prisma-next.config.ts
+│ database:             postgres://****:****@127.0.0.1:XXXXX/template1?sslmode=disable
+│ Read more             https://pris.ly/db-introspect
+└
+
+│  contract
+│  ├─ table post
+│  │  ├─ columns
+│  │  │  ├─ id: int4 (not nullable)
+│  │  │  ├─ title: text (not nullable)
+│  │  │  └─ userId: int4 (nullable)
+│  │  └─ primary key: id
+│  ├─ table user
+│  │  ├─ columns
+│  │  │  ├─ id: int4 (not nullable)
+│  │  │  ├─ email: text (not nullable)
+│  │  │  └─ name: text (nullable)
+│  │  ├─ primary key: id
+│  │  └─ unique index user_email_unique
+│  └─ plpgsql dependency is installed"
+`;
+
+exports[`db introspect command (e2e) > json > --json includes psl.path when file was written 1`] = `
 {
   "meta": {
     "configPath": "prisma-next.config.ts",
     "dbUrl": "postgres://****:****@127.0.0.1:XXXXX/template1?sslmode=disable",
   },
   "ok": true,
+  "psl": {
+    "path": "output/schema.prisma",
+  },
   "schema": {
     "annotations": {
       "pg": {
@@ -56,28 +83,4 @@ exports[`db introspect command (e2e) > outputs JSON envelope with real database 
     "total": 0,
   },
 }
-`;
-
-exports[`db introspect command (e2e) > outputs tree structure with real database 1`] = `
-"prisma-next db introspect → Inspect the database schema
-│ config:               prisma-next.config.ts
-│ database:             postgres://****:****@127.0.0.1:XXXXX/template1?sslmode=disable
-│ Read more             https://pris.ly/db-introspect
-└
-
-│  contract
-│  ├─ table post
-│  │  ├─ columns
-│  │  │  ├─ id: int4 (not nullable)
-│  │  │  ├─ title: text (not nullable)
-│  │  │  └─ userId: int4 (nullable)
-│  │  └─ primary key: id
-│  ├─ table user
-│  │  ├─ columns
-│  │  │  ├─ id: int4 (not nullable)
-│  │  │  ├─ email: text (not nullable)
-│  │  │  └─ name: text (nullable)
-│  │  ├─ primary key: id
-│  │  └─ unique index user_email_unique
-│  └─ plpgsql dependency is installed"
 `;

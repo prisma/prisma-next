@@ -9,24 +9,28 @@ import { formatCommandHelp, formatRootHelp } from '../src/utils/formatters/help'
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('help text snapshots', { timeout: timeouts.default }, () => {
-  it('formats root help', () => {
-    const program = new Command();
-    program.name('prisma-next').description('Prisma Next CLI');
-    const contract = new Command('contract').description('Contract management commands');
-    const contractEmit = createContractEmitCommand();
-    contract.addCommand(contractEmit);
-    const db = new Command('db').description('Database operations');
-    const dbVerify = createDbVerifyCommand();
-    db.addCommand(dbVerify);
-    program.addCommand(contract);
-    program.addCommand(db);
+  it(
+    'formats root help',
+    () => {
+      const program = new Command();
+      program.name('prisma-next').description('Prisma Next CLI');
+      const contract = new Command('contract').description('Contract management commands');
+      const contractEmit = createContractEmitCommand();
+      contract.addCommand(contractEmit);
+      const db = new Command('db').description('Database operations');
+      const dbVerify = createDbVerifyCommand();
+      db.addCommand(dbVerify);
+      program.addCommand(contract);
+      program.addCommand(db);
 
-    // Explicitly disable colors for consistent snapshots
-    const flags = parseGlobalFlags({ 'no-color': true });
-    const helpText = formatRootHelp({ program, flags });
+      // Explicitly disable colors for consistent snapshots
+      const flags = parseGlobalFlags({ 'no-color': true });
+      const helpText = formatRootHelp({ program, flags });
 
-    expect(helpText).toMatchSnapshot();
-  });
+      expect(helpText).toMatchSnapshot();
+    },
+    timeouts.default,
+  );
 
   it('formats contract emit help', () => {
     const command = createContractEmitCommand();

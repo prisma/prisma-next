@@ -51,10 +51,12 @@ withTempDir(({ createTempDir }) => {
           createTempDir,
         });
 
-        // F.01: db introspect
+        // F.01: db introspect (writes PSL file by default)
         const introspect = await runDbIntrospect(ctx);
         expect(introspect.exitCode, 'F.01: db introspect').toBe(0);
-        expect(stripAnsi(introspect.stdout), 'F.01: shows user table').toContain('user');
+        expect(stripAnsi(introspect.stderr), 'F.01: success message').toContain(
+          'Schema written to',
+        );
 
         // F.02: contract emit (base contract matches existing schema)
         const emit = await runContractEmit(ctx);

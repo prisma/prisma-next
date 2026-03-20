@@ -55,7 +55,7 @@ exports[`help text snapshots > formats contract emit help with no color 1`] = `
 `;
 
 exports[`help text snapshots > formats db introspect help 1`] = `
-"prisma-next introspect → Inspect the database schema
+"prisma-next introspect → Inspect the database schema and generate PSL
 │
 │ --json                Output as JSON
 │ -q, --quiet           Quiet mode: errors only
@@ -68,15 +68,19 @@ exports[`help text snapshots > formats db introspect help 1`] = `
 │ -y, --yes             Auto-accept prompts
 │ --db <url>            Database connection string
 │ --config <path>       Path to prisma-next.config.ts
+│ --output <path>       Write PSL file to the specified path
+│ --dry-run             Preview schema as tree view without writing file
 │
 │ Examples:
 │   $ prisma-next db introspect --db $DATABASE_URL
+│   $ prisma-next db introspect --db $DATABASE_URL --output ./prisma/schema.prisma
+│   $ prisma-next db introspect --db $DATABASE_URL --dry-run
 │   $ prisma-next db introspect --db $DATABASE_URL --json
 │
-│ Reads the live database schema and displays it as a tree structure. This
-│ command
-│ does not check the schema against your contract - it only shows what exists in
-│ the database. Use \`db verify\` to compare against your contract.
+│ Reads the live database schema and writes a .prisma schema file.
+│ By default, writes to the resolved output path. Use --dry-run to
+│ preview the schema as a tree view without writing any file. Use
+│ \`db verify\` to compare the live schema against your contract.
 └
 "
 `;
