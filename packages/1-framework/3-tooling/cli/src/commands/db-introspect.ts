@@ -156,7 +156,7 @@ export function createDbIntrospectCommand(): Command {
     'Inspect the database schema',
     'Reads the live database schema and displays it as a tree structure. This command\n' +
       'does not check the schema against your contract - it only shows what exists in\n' +
-      'the database. Use `db verify` or `db verify --schema-only` to compare against your contract.',
+      'the database. Use `db verify` to compare against your contract.',
   );
   setCommandExamples(command, [
     'prisma-next db introspect --db $DATABASE_URL',

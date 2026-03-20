@@ -76,8 +76,7 @@ exports[`help text snapshots > formats db introspect help 1`] = `
 │ Reads the live database schema and displays it as a tree structure. This
 │ command
 │ does not check the schema against your contract - it only shows what exists in
-│ the database. Use \`db verify\` or \`db verify --schema-only\` to compare against
-│ your contract.
+│ the database. Use \`db verify\` to compare against your contract.
 └
 "
 `;
@@ -114,7 +113,7 @@ exports[`help text snapshots > formats db update help 1`] = `
 `;
 
 exports[`help text snapshots > formats db verify help 1`] = `
-"prisma-next verify → Check whether the database signature and live schema match your contract
+"prisma-next verify → Check whether the database marker and live schema match your contract
 │
 │ --json                Output as JSON
 │ -q, --quiet           Quiet mode: errors only
@@ -127,11 +126,12 @@ exports[`help text snapshots > formats db verify help 1`] = `
 │ -y, --yes             Auto-accept prompts
 │ --db <url>            Database connection string
 │ --config <path>       Path to prisma-next.config.ts
-│ --shallow             Skip structural schema verification and only check the
-│                       database marker
+│ --shallow             Skip schema verification and only check the database
+│                       marker
 │ --schema-only         Skip marker verification and only check whether the live
 │                       schema satisfies the contract
-│ --strict              Strict mode: extra schema elements cause failures
+│ --strict              Strict mode: schema elements not present in the contract
+│                       are considered an error
 │                       default: false
 │
 │ Examples:
@@ -142,13 +142,13 @@ exports[`help text snapshots > formats db verify help 1`] = `
 │   $ prisma-next db verify --db $DATABASE_URL --shallow
 │   $ prisma-next db verify --db $DATABASE_URL --json
 │
-│ Verifies the database marker first, then runs structural schema verification
-│ to catch drift
-│ such as manual DDL changes. Use \`--shallow\` for marker-only verification,
-│ \`--schema-only\`
-│ to skip marker checks and inspect only the live schema, and \`--strict\` to fail
-│ on extra
-│ schema elements when schema verification runs.
+│ Verifies the database marker first, then checks the database schema matches
+│ your contract.
+│ Use \`--shallow\` for marker-only verification, \`--schema-only\` to skip marker
+│ checks and
+│ inspect only the live schema, and \`--strict\` to fail if the database includes
+│ elements
+│ not present in the contract.
 └
 "
 `;
@@ -159,7 +159,7 @@ exports[`help text snapshots > formats root help 1`] = `
 │ ├─ contract         
 │ │  └─ emit            Emit your contract artifacts
 │ └─ db               
-│    └─ verify          Check whether the database signature and live schema match your contract
+│    └─ verify          Check whether the database marker and live schema match your contract
 │
 │ Use Prisma Next to define your data layer as a contract. Sign your database
 │ and application with the same contract to guarantee compatibility. Plan and
@@ -174,7 +174,7 @@ exports[`help text snapshots > formats root help with no color 1`] = `
 │ ├─ contract         
 │ │  └─ emit            Emit your contract artifacts
 │ └─ db               
-│    └─ verify          Check whether the database signature and live schema match your contract
+│    └─ verify          Check whether the database marker and live schema match your contract
 │
 │ Use Prisma Next to define your data layer as a contract. Sign your database
 │ and application with the same contract to guarantee compatibility. Plan and
