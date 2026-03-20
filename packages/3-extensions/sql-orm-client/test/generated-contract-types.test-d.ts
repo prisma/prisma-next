@@ -1,9 +1,32 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ContractWithTypeMaps,
+  SqlContract,
+  SqlStorage,
+  TypeMaps,
+} from '@prisma-next/sql-contract/types';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
 
 import { createMockRuntime } from './helpers';
 
-type GeneratedLikeContract = SqlContract<
+type GeneratedLikeCodecTypes = {
+  'pg/text@1': {
+    output: string;
+    traits: 'equality' | 'order' | 'textual';
+  };
+  'pg/bool@1': {
+    output: boolean;
+    traits: 'equality' | 'boolean';
+  };
+  'pg/jsonb@1': {
+    output: unknown;
+    traits: 'equality';
+  };
+};
+
+type GeneratedLikeTypeMaps = TypeMaps<GeneratedLikeCodecTypes>;
+
+type GeneratedLikeContractBase = SqlContract<
   {
     tables: {
       user: {
@@ -11,6 +34,8 @@ type GeneratedLikeContract = SqlContract<
           id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
           name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
           email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+          active: { nativeType: 'bool'; codecId: 'pg/bool@1'; nullable: false };
+          metadata: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
         };
         primaryKey: { columns: ['id'] };
         uniques: [];
@@ -37,6 +62,8 @@ type GeneratedLikeContract = SqlContract<
         id: string;
         name: string;
         email: string;
+        active: boolean;
+        metadata: unknown;
       };
     };
     Post: {
@@ -75,6 +102,8 @@ type GeneratedLikeContract = SqlContract<
         id: 'id';
         name: 'name';
         email: 'email';
+        active: 'active';
+        metadata: 'metadata';
       };
       Post: {
         id: 'id';
@@ -87,6 +116,8 @@ type GeneratedLikeContract = SqlContract<
         id: 'id';
         name: 'name';
         email: 'email';
+        active: 'active';
+        metadata: 'metadata';
       };
       post: {
         id: 'id';
@@ -95,11 +126,15 @@ type GeneratedLikeContract = SqlContract<
       };
     };
     codecTypes: {
-      'pg/text@1': { output: string };
+      'pg/text@1': { output: string; traits: 'equality' | 'order' | 'textual' };
+      'pg/bool@1': { output: boolean; traits: 'equality' | 'boolean' };
+      'pg/jsonb@1': { output: unknown; traits: 'equality' };
     };
     operationTypes: Record<string, never>;
   }
 >;
+
+type GeneratedLikeContract = ContractWithTypeMaps<GeneratedLikeContractBase, GeneratedLikeTypeMaps>;
 
 class PostCollection extends Collection<GeneratedLikeContract, 'Post'> {
   forUser(userId: string) {
@@ -128,12 +163,12 @@ type StateOf<TCollection> =
     : never;
 
 const runtime = createMockRuntime();
-const contract = {} as GeneratedLikeContract;
-const collection = new PostCollection({ contract, runtime }, 'Post');
+const context = {} as ExecutionContext<GeneratedLikeContract>;
+const collection = new PostCollection({ runtime, context }, 'Post');
 collection.forUser('user_001');
 
-const userCollection = new Collection({ contract, runtime }, 'User');
-const postCollection = new Collection({ contract, runtime }, 'Post');
+const userCollection = new Collection({ runtime, context }, 'User');
+const postCollection = new Collection({ runtime, context }, 'Post');
 
 type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
@@ -179,6 +214,8 @@ userCollection.create({
   id: 'user_001',
   name: 'Alice',
   email: 'alice@example.com',
+  active: true,
+  metadata: {},
   posts: (posts) =>
     posts.create([
       {
@@ -192,16 +229,16 @@ userCollection.create({ id: 'user_only_id' });
 // @ts-expect-error Post has no relation callbacks to satisfy required userId in create()
 postCollection.create({ id: 'post_missing_user', title: 'Missing owner' });
 userCollection.upsert({
-  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com' },
+  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com', active: true, metadata: {} },
   update: { name: 'Alice Updated' },
   conflictOn: { id: 'user_001' },
 });
 userCollection.upsert({
-  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com' },
+  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com', active: true, metadata: {} },
   update: { name: 'Alice Updated' },
 });
 userCollection.upsert({
-  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com' },
+  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com', active: true, metadata: {} },
   update: { name: 'Alice Updated' },
   // @ts-expect-error invalid conflict key for upsert()
   conflictOn: { unknown: 'value' },
@@ -270,3 +307,43 @@ export type GeneratedContractTypeAssertions = [
   Assert<Equal<GroupedUserStatsRow['email'], string>>,
   Assert<Equal<GroupedUserStatsRow['count'], number>>,
 ];
+
+// ---------------------------------------------------------------------------
+// Trait-gating: negative type tests
+// ---------------------------------------------------------------------------
+// text (equality + order + textual): eq, gt, like, asc all work
+userCollection.where((u) => u.name.eq('x'));
+userCollection.where((u) => u.name.gt('a'));
+userCollection.where((u) => u.name.like('%x'));
+userCollection.orderBy((u) => u.name.asc());
+userCollection.where((u) => u.name.isNull());
+
+// bool (equality + boolean): eq works, gt/like/asc do not
+userCollection.where((u) => u.active.eq(true));
+userCollection.where((u) => u.active.neq(false));
+userCollection.where((u) => u.active.isNull());
+// @ts-expect-error bool has no order trait → gt not available
+userCollection.where((u) => u.active.gt(true));
+// @ts-expect-error bool has no order trait → lt not available
+userCollection.where((u) => u.active.lt(false));
+// @ts-expect-error bool has no textual trait → like not available
+userCollection.where((u) => u.active.like('%'));
+// @ts-expect-error bool has no order trait → asc not available
+userCollection.orderBy((u) => u.active.asc());
+// @ts-expect-error bool has no order trait → desc not available
+userCollection.orderBy((u) => u.active.desc());
+
+// jsonb (equality only): eq works, gt/like/asc do not
+userCollection.where((u) => u.metadata.eq({} as unknown));
+userCollection.where((u) => u.metadata.in([{} as unknown]));
+userCollection.where((u) => u.metadata.isNotNull());
+// @ts-expect-error jsonb has no order trait → gt not available
+userCollection.where((u) => u.metadata.gt(1));
+// @ts-expect-error jsonb has no order trait → gte not available
+userCollection.where((u) => u.metadata.gte(1));
+// @ts-expect-error jsonb has no textual trait → like not available
+userCollection.where((u) => u.metadata.like('%'));
+// @ts-expect-error jsonb has no textual trait → ilike not available
+userCollection.where((u) => u.metadata.ilike('%'));
+// @ts-expect-error jsonb has no order trait → asc not available
+userCollection.orderBy((u) => u.metadata.asc());
