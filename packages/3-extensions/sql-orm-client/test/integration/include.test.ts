@@ -586,4 +586,81 @@ describe('integration/include', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'include() supports nested 2-level includes (users -> posts -> comments)',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 1, views: 200 },
+          { id: 12, title: 'Post C', userId: 2, views: 300 },
+        ]);
+        await seedComments(runtime, [
+          { id: 100, body: 'Comment A', postId: 10 },
+          { id: 101, body: 'Comment B', postId: 10 },
+          { id: 102, body: 'Comment C', postId: 11 },
+        ]);
+
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('posts', (posts) =>
+            posts
+              .orderBy((post) => post.id.asc())
+              .include('comments', (comments) => comments.orderBy((c) => c.id.asc())),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            posts: [
+              {
+                id: 10,
+                title: 'Post A',
+                userId: 1,
+                views: 100,
+                comments: [
+                  { id: 100, body: 'Comment A', postId: 10 },
+                  { id: 101, body: 'Comment B', postId: 10 },
+                ],
+              },
+              {
+                id: 11,
+                title: 'Post B',
+                userId: 1,
+                views: 200,
+                comments: [{ id: 102, body: 'Comment C', postId: 11 }],
+              },
+            ],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            posts: [
+              {
+                id: 12,
+                title: 'Post C',
+                userId: 2,
+                views: 300,
+                comments: [],
+              },
+            ],
+          },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
