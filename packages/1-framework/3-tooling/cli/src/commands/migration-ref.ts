@@ -2,6 +2,7 @@ import {
   readRefs,
   resolveRef,
   validateRefName,
+  validateRefValue,
   writeRefs,
 } from '@prisma-next/migration-tools/refs';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
@@ -55,10 +56,17 @@ function mapError(error: unknown): CliStructuredError {
   return errorUnexpected(error instanceof Error ? error.message : String(error));
 }
 
-function errorInvalidRefName(name: string): CliStructuredError {
+function cliErrorInvalidRefName(name: string): CliStructuredError {
   return errorRuntime(`Invalid ref name "${name}"`, {
     why: `Ref name "${name}" does not match the required format`,
     fix: 'Ref names must be lowercase alphanumeric with hyphens or forward slashes, no `.` or `..` segments',
+  });
+}
+
+function cliErrorInvalidRefValue(hash: string): CliStructuredError {
+  return errorRuntime(`Invalid contract hash "${hash}"`, {
+    why: `"${hash}" is not a valid contract hash`,
+    fix: 'Contract hashes must match the format "sha256:<64 hex chars>". Copy the hash from `prisma-next contract emit` or `migration status --json`.',
   });
 }
 
@@ -75,7 +83,10 @@ async function executeRefSetCommand(
   options: { config?: string },
 ): Promise<Result<RefSetResult, CliStructuredError>> {
   if (!validateRefName(name)) {
-    return notOk(errorInvalidRefName(name));
+    return notOk(cliErrorInvalidRefName(name));
+  }
+  if (!validateRefValue(hash)) {
+    return notOk(cliErrorInvalidRefValue(hash));
   }
 
   try {
@@ -269,7 +280,8 @@ export {
   executeRefGetCommand,
   executeRefDeleteCommand,
   executeRefListCommand,
-  errorInvalidRefName,
+  cliErrorInvalidRefName,
+  cliErrorInvalidRefValue,
   errorRefNotFound,
 };
 
