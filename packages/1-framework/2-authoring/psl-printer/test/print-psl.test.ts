@@ -690,7 +690,7 @@ describe('printPsl', () => {
       "// This file was introspected from the database. Do not edit manually.
 
       model Item {
-        id String @id @default(uuid())
+        id String @id @default(dbgenerated("gen_random_uuid()"))
 
         @@map("item")
       }

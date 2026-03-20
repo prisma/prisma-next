@@ -24,7 +24,7 @@ export function mapDefault(columnDefault: ColumnDefault): DefaultMappingResult {
     return { attribute: '@default(now())' };
   }
   if (expr === 'gen_random_uuid()') {
-    return { attribute: '@default(uuid())' };
+    return { attribute: '@default(dbgenerated("gen_random_uuid()"))' };
   }
 
   // Unrecognized function — emit as comment

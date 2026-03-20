@@ -14,9 +14,9 @@ describe('mapDefault', () => {
     });
   });
 
-  it('maps gen_random_uuid() to uuid()', () => {
+  it('maps gen_random_uuid() to dbgenerated storage default', () => {
     expect(mapDefault({ kind: 'function', expression: 'gen_random_uuid()' })).toEqual({
-      attribute: '@default(uuid())',
+      attribute: '@default(dbgenerated("gen_random_uuid()"))',
     });
   });
 
