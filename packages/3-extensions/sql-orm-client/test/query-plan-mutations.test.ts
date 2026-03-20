@@ -3,6 +3,7 @@ import {
   DefaultValueExpr,
   DeleteAst,
   DoNothingConflictAction,
+  DoUpdateSetConflictAction,
   type InsertAst,
   InsertAst as InsertAstClass,
   ParamRef,
@@ -95,6 +96,38 @@ describe('query plan mutations', () => {
         ColumnRef.of('users', column),
       ),
     );
+  });
+
+  it('compileInsertReturning() rejects empty rows array', () => {
+    const contract = withReturningCapability(getTestContract());
+
+    expect(() => compileInsertReturning(contract, 'users', [], undefined)).toThrow(
+      'at least one row',
+    );
+  });
+
+  it('compileInsertCount() rejects empty rows array', () => {
+    const contract = getTestContract();
+
+    expect(() => compileInsertCount(contract, 'users', [])).toThrow('at least one row');
+  });
+
+  it('compileUpsertReturning() produces DoUpdateSetConflictAction with correct params when update is non-empty', () => {
+    const contract = withReturningCapability(getTestContract());
+    const plan = compileUpsertReturning(
+      contract,
+      'users',
+      { id: 10, name: 'Alice', email: 'alice@example.com' },
+      { name: 'Updated Alice' },
+      ['email'],
+      undefined,
+    );
+
+    assertInsertAst(plan.ast);
+    expect(plan.ast.onConflict?.action).toBeInstanceOf(DoUpdateSetConflictAction);
+    const action = plan.ast.onConflict?.action as DoUpdateSetConflictAction;
+    expect(action.set).toEqual({ name: ParamRef.of(4, 'name') });
+    expect(plan.params).toEqual([10, 'Alice', 'alice@example.com', 'Updated Alice']);
   });
 
   it('compileUpdateCount() and compileDeleteCount() omit WHERE when filters are empty', () => {
