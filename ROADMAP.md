@@ -19,7 +19,7 @@ The remaining work is being delivered in three phases.
 
 ---
 
-## Phase 1 — Enable external contributions (April 2025)
+## Phase 1 — Enable external contributions (April 2026)
 
 **Status**: In progress
 
@@ -48,7 +48,7 @@ This is the best time to get involved if you want to shape the final version of 
 
 ---
 
-## Phase 2 — Early access (May 2025)
+## Phase 2 — Early access (May 2026)
 
 **Status**: Not started
 
@@ -67,7 +67,7 @@ This is the time to adopt Prisma Next early and provide feedback that shapes the
 
 ---
 
-## Phase 3 — General availability (June–July 2025)
+## Phase 3 — General availability (June–July 2026)
 
 **Status**: Not started
 
