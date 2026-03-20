@@ -19,7 +19,7 @@ const REFERENTIAL_ACTION_PSL: Record<string, string> = {
   setDefault: 'SetDefault',
 };
 
-type InferredRelations = {
+export type InferredRelations = {
   /** Relation fields keyed by table name → array of fields to add */
   readonly relationsByTable: ReadonlyMap<string, readonly RelationField[]>;
 };

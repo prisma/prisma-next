@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`db introspect command (e2e) > --dry-run: outputs tree structure without writing file 1`] = `
+exports[`db introspect command (e2e) > dry-run > --dry-run: outputs tree structure without writing file 1`] = `
 "prisma-next db introspect → Inspect the database schema and generate PSL
 │ config:               prisma-next.config.ts
 │ database:             postgres://****:****@127.0.0.1:XXXXX/template1?sslmode=disable
@@ -24,7 +24,7 @@ exports[`db introspect command (e2e) > --dry-run: outputs tree structure without
 │  └─ plpgsql dependency is installed"
 `;
 
-exports[`db introspect command (e2e) > --json includes psl.path when file was written 1`] = `
+exports[`db introspect command (e2e) > json > --json includes psl.path when file was written 1`] = `
 {
   "meta": {
     "configPath": "prisma-next.config.ts",
