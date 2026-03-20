@@ -66,6 +66,10 @@ function normalizeInsertRows(
   readonly params: readonly unknown[];
   readonly paramDescriptors: readonly ParamDescriptor[];
 } {
+  if (rows.length === 0) {
+    throw new Error('normalizeInsertRows requires at least one row');
+  }
+
   const orderedColumns: string[] = [];
   const seenColumns = new Set<string>();
 
