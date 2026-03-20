@@ -92,7 +92,9 @@ describe('sql-target-family-hook', () => {
         },
       });
       const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-      expect(types).toContain('export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>');
+      expect(types).toContain(
+        'export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>',
+      );
     });
 
     it('TypeMaps delegates to TypeMapsType with CodecTypes and OperationTypes', () => {
@@ -101,7 +103,7 @@ describe('sql-target-family-hook', () => {
         storage: { tables: {} },
       });
       const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-      expect(types).toContain('TypeMapsType<CodecTypes, OperationTypes>');
+      expect(types).toContain('TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>');
     });
 
     it('Contract does not include phantom codecTypes or operationTypes keys', () => {
@@ -851,6 +853,35 @@ describe('sql-target-family-hook', () => {
     // (OtherTypes will still be imported but not used in the OperationTypes type)
     expect(types).toContain('export type OperationTypes = TestOps');
     expect(types).not.toContain('export type OperationTypes = TestOps & Other');
+  });
+
+  it('generates contract types with query operation type imports', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const queryOperationTypeImports = [
+      { package: '@test/query-ops', named: 'QueryOperationTypes', alias: 'TestQueryOps' },
+      { package: '@test/other', named: 'OtherTypes', alias: 'Other' },
+    ];
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
+      queryOperationTypeImports,
+    });
+    expect(types).toContain('export type QueryOperationTypes = TestQueryOps');
+    expect(types).not.toContain('export type QueryOperationTypes = TestQueryOps & Other');
   });
 
   it('generates contract types with extension-owned index config in storage', () => {

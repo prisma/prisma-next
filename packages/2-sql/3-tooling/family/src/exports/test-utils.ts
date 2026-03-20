@@ -7,4 +7,5 @@ export {
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
+  extractQueryOperationTypeImports,
 } from '../core/assembly';

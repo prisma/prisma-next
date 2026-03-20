@@ -1,0 +1,56 @@
+{
+  "name": "@prisma-next/sql-lane-sql-builder-new",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "SQL builder new lane for Prisma Next",
+  "scripts": {
+    "build": "tsdown",
+    "preemit": "pnpm --filter @prisma-next/cli... build",
+    "emit": "node ../../../1-framework/3-tooling/cli/dist/cli.js contract emit --config test/fixtures/prisma-next.config.ts",
+    "emit:check": "pnpm emit && git diff --exit-code test/fixtures/generated/",
+    "test": "vitest run --passWithNoTests",
+    "~test:coverage": "vitest run --coverage --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "devDependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/extension-pgvector": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./types": "./dist/exports/types.mjs",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/2-sql/4-lanes/sql-builder-new"
+  }
+}

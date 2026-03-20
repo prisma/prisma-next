@@ -69,6 +69,7 @@ interface DescriptorWithTypes {
       readonly typeImports?: ReadonlyArray<TypesImportSpec>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
+    readonly queryOperationTypes?: { readonly import: TypesImportSpec };
   };
 }
 
@@ -101,6 +102,22 @@ export function extractOperationTypeImports(
     const operationTypes = types?.operationTypes;
     if (operationTypes?.import) {
       imports.push(operationTypes.import);
+    }
+  }
+
+  return imports;
+}
+
+export function extractQueryOperationTypeImports(
+  descriptors: ReadonlyArray<DescriptorWithTypes>,
+): ReadonlyArray<TypesImportSpec> {
+  const imports: TypesImportSpec[] = [];
+
+  for (const descriptor of descriptors) {
+    const types = descriptor.types;
+    const queryOperationTypes = types?.queryOperationTypes;
+    if (queryOperationTypes?.import) {
+      imports.push(queryOperationTypes.import);
     }
   }
 

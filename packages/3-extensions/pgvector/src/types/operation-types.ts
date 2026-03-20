@@ -29,3 +29,14 @@ export type OperationTypes = {
     };
   };
 };
+
+/** Flat operation signatures for the query builder. */
+export type QueryOperationTypes = {
+  readonly cosineDistance: {
+    readonly args: readonly [
+      { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
+      { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
+    ];
+    readonly returns: { readonly codecId: 'pg/float8@1'; readonly nullable: false };
+  };
+};

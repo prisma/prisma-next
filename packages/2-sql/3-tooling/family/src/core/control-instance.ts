@@ -34,6 +34,7 @@ import {
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,
+  extractQueryOperationTypeImports,
   type SqlControlDescriptorWithContributions,
 } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
@@ -297,6 +298,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const operationRegistry = assembleOperationRegistry(descriptors);
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
+  const queryOperationTypeImports = extractQueryOperationTypeImports(descriptors);
   const extensionIds = extractExtensionIds(adapter, target, extensions);
   const parameterizedRenderers = extractParameterizedRenderers(descriptors);
   const parameterizedTypeImports = extractParameterizedTypeImports(descriptors);
@@ -739,6 +741,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           operationRegistry,
           codecTypeImports,
           operationTypeImports,
+          queryOperationTypeImports,
           extensionIds,
           parameterizedRenderers,
           parameterizedTypeImports,
