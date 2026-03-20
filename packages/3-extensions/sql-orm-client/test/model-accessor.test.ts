@@ -11,12 +11,14 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
+import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
-import { getTestContract } from './helpers';
+import { getTestContext, getTestContract } from './helpers';
 
 describe('createModelAccessor', () => {
-  const contract = getTestContract();
+  const context = getTestContext();
 
   function expectBinaryLiteral(
     actual: unknown,
@@ -29,8 +31,8 @@ describe('createModelAccessor', () => {
   }
 
   it('creates scalar comparison operators and maps fields to columns', () => {
-    const user = createModelAccessor(contract, 'User');
-    const post = createModelAccessor(contract, 'Post');
+    const user = createModelAccessor(context, 'User');
+    const post = createModelAccessor(context, 'Post');
 
     expectBinaryLiteral(user['name']!.eq('Alice'), 'users', 'name', 'eq', 'Alice');
     expectBinaryLiteral(
@@ -50,7 +52,7 @@ describe('createModelAccessor', () => {
   });
 
   it('creates list literal, null check, and order directive helpers', () => {
-    const accessor = createModelAccessor(contract, 'Post');
+    const accessor = createModelAccessor(context, 'Post');
 
     expect(accessor['id']!.in([1, 2, 3])).toEqual(
       BinaryExpr.in(ColumnRef.of('posts', 'id'), ListExpression.fromValues([1, 2, 3])),
@@ -61,7 +63,7 @@ describe('createModelAccessor', () => {
     expect(accessor['id']!.asc()).toEqual({ column: 'id', direction: 'asc' });
     expect(accessor['id']!.desc()).toEqual({ column: 'id', direction: 'desc' });
 
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
     expect(user['email']!.isNull()).toEqual(NullCheckExpr.isNull(ColumnRef.of('users', 'email')));
     expect(user['email']!.isNotNull()).toEqual(
       NullCheckExpr.isNotNull(ColumnRef.of('users', 'email')),
@@ -69,7 +71,7 @@ describe('createModelAccessor', () => {
   });
 
   it('creates some() relation filters as EXISTS subqueries', () => {
-    const accessor = createModelAccessor(contract, 'User');
+    const accessor = createModelAccessor(context, 'User');
 
     expect(accessor['posts']!.some()).toEqual(
       ExistsExpr.exists(
@@ -81,7 +83,7 @@ describe('createModelAccessor', () => {
   });
 
   it('creates none() and every() relation filters with NOT EXISTS semantics', () => {
-    const accessor = createModelAccessor(contract, 'User');
+    const accessor = createModelAccessor(context, 'User');
 
     const noneExpr = accessor['posts']!.none({ views: 10 }) as ExistsExpr;
     expect(noneExpr.notExists).toBe(true);
@@ -103,7 +105,7 @@ describe('createModelAccessor', () => {
   });
 
   it('treats every({}) as vacuously true and none() as a plain anti-exists join', () => {
-    const accessor = createModelAccessor(contract, 'User');
+    const accessor = createModelAccessor(context, 'User');
 
     expect(accessor['posts']!.every({})).toEqual(AndExpr.true());
 
@@ -115,7 +117,7 @@ describe('createModelAccessor', () => {
   });
 
   it('supports nested relation filters', () => {
-    const accessor = createModelAccessor(contract, 'User');
+    const accessor = createModelAccessor(context, 'User');
     const expr = accessor['posts']!.some((post) =>
       post['comments']!.some((comment) => comment['body']!.like('%urgent%')),
     ) as ExistsExpr;
@@ -126,7 +128,7 @@ describe('createModelAccessor', () => {
   });
 
   it('keeps proxy symbol access undefined and relation shorthand maps null and undefined', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
     expect((user as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
 
     const someUnknown = user['posts']!.some({ unknown: 'value' }) as ExistsExpr;
@@ -142,7 +144,7 @@ describe('createModelAccessor', () => {
       BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
     );
 
-    const post = createModelAccessor(contract, 'Post');
+    const post = createModelAccessor(context, 'Post');
     const nullExpr = post['comments']!.some({ body: null }) as ExistsExpr;
     expect(nullExpr.subquery.where).toEqual(
       AndExpr.of([
@@ -187,18 +189,18 @@ describe('createModelAccessor', () => {
 
     expect(() =>
       (
-        createModelAccessor(missingToContract as never, 'User') as unknown as Record<
-          string,
-          { some: () => unknown }
-        >
+        createModelAccessor(
+          { ...context, contract: missingToContract } as never,
+          'User',
+        ) as unknown as Record<string, { some: () => unknown }>
       )['posts']!.some(),
     ).toThrow(/missing the "to" model reference/);
     expect(() =>
       (
-        createModelAccessor(brokenJoinContract as never, 'User') as unknown as Record<
-          string,
-          { some: () => unknown }
-        >
+        createModelAccessor(
+          { ...context, contract: brokenJoinContract } as never,
+          'User',
+        ) as unknown as Record<string, { some: () => unknown }>
       )['posts']!.some(),
     ).toThrow(/missing join columns/);
   });
@@ -238,10 +240,10 @@ describe('createModelAccessor', () => {
     };
 
     const compositeExpr = (
-      createModelAccessor(compositeContract as never, 'User') as unknown as Record<
-        string,
-        { some: () => unknown }
-      >
+      createModelAccessor(
+        { ...context, contract: compositeContract } as never,
+        'User',
+      ) as unknown as Record<string, { some: () => unknown }>
     )['posts']!.some() as ExistsExpr;
     expect(compositeExpr.subquery.projection).toEqual([
       ProjectionItem.of('_exists', ColumnRef.of('posts', 'user_id')),
@@ -271,10 +273,10 @@ describe('createModelAccessor', () => {
     };
 
     const fallbackExpr = (
-      createModelAccessor(noChildColsContract as never, 'User') as unknown as Record<
-        string,
-        { some: () => unknown }
-      >
+      createModelAccessor(
+        { ...context, contract: noChildColsContract } as never,
+        'User',
+      ) as unknown as Record<string, { some: () => unknown }>
     )['posts']!.some() as ExistsExpr;
     expect(fallbackExpr.subquery.projection).toEqual([
       ProjectionItem.of('_exists', ColumnRef.of('posts', 'id')),
@@ -301,7 +303,10 @@ describe('createModelAccessor', () => {
     };
 
     expect(
-      createModelAccessor(storageFallbackContract as never, 'User')['name']!.eq('Alice'),
+      createModelAccessor(
+        { ...context, contract: storageFallbackContract } as never,
+        'User',
+      )['name']!.eq('Alice'),
     ).toEqual(BinaryExpr.eq(ColumnRef.of('users_storage', 'name'), LiteralExpr.of('Alice')));
 
     const modelNameFallbackContract = {
@@ -322,12 +327,15 @@ describe('createModelAccessor', () => {
     };
 
     expect(
-      createModelAccessor(modelNameFallbackContract as never, 'User')['name']!.eq('Alice'),
+      createModelAccessor(
+        { ...context, contract: modelNameFallbackContract } as never,
+        'User',
+      )['name']!.eq('Alice'),
     ).toEqual(BinaryExpr.eq(ColumnRef.of('User', 'name'), LiteralExpr.of('Alice')));
   });
 
   it('combines relation shorthand fields with and() and rejects missing join arrays', () => {
-    const accessor = createModelAccessor(contract, 'User');
+    const accessor = createModelAccessor(context, 'User');
     const predicate = accessor['posts']!.some({ title: 'A', views: 1 }) as ExistsExpr;
 
     expect(predicate.subquery.where).toEqual(
@@ -356,11 +364,78 @@ describe('createModelAccessor', () => {
 
     expect(() =>
       (
-        createModelAccessor(contractWithoutJoinArrays as never, 'User') as unknown as Record<
-          string,
-          { some: () => unknown }
-        >
+        createModelAccessor(
+          { ...context, contract: contractWithoutJoinArrays } as never,
+          'User',
+        ) as unknown as Record<string, { some: () => unknown }>
       )['posts']!.some(),
     ).toThrow(/missing join columns/);
+  });
+
+  describe('runtime trait-gating', () => {
+    function makeRegistry(entries: Record<string, readonly CodecTrait[]>): CodecRegistry {
+      const registry = createCodecRegistry();
+      for (const [id, traits] of Object.entries(entries)) {
+        registry.register(
+          codec({
+            typeId: id,
+            targetTypes: [],
+            traits,
+            encode: (v: unknown) => v,
+            decode: (v: unknown) => v,
+          }),
+        );
+      }
+      return registry;
+    }
+
+    it('only creates equality methods when codec has equality trait', () => {
+      const codecs = makeRegistry({ 'pg/int4@1': ['equality'] });
+      const accessor = createModelAccessor({ ...context, codecs }, 'Post');
+      const field = accessor['id'] as unknown as Record<string, unknown>;
+
+      expect(typeof field['eq']).toBe('function');
+      expect(typeof field['neq']).toBe('function');
+      expect(typeof field['in']).toBe('function');
+      expect(typeof field['notIn']).toBe('function');
+      expect(typeof field['isNull']).toBe('function');
+      expect(typeof field['isNotNull']).toBe('function');
+
+      expect(field['gt']).toBeUndefined();
+      expect(field['lt']).toBeUndefined();
+      expect(field['gte']).toBeUndefined();
+      expect(field['lte']).toBeUndefined();
+      expect(field['like']).toBeUndefined();
+      expect(field['ilike']).toBeUndefined();
+      expect(field['asc']).toBeUndefined();
+      expect(field['desc']).toBeUndefined();
+    });
+
+    it('creates all methods when codec has all relevant traits', () => {
+      const codecs = makeRegistry({
+        'pg/text@1': ['equality', 'order', 'textual'],
+      });
+      const accessor = createModelAccessor({ ...context, codecs }, 'User');
+      const field = accessor['name'] as unknown as Record<string, unknown>;
+
+      for (const method of [
+        'eq',
+        'neq',
+        'gt',
+        'lt',
+        'gte',
+        'lte',
+        'like',
+        'ilike',
+        'in',
+        'notIn',
+        'isNull',
+        'isNotNull',
+        'asc',
+        'desc',
+      ]) {
+        expect(typeof field[method]).toBe('function');
+      }
+    });
   });
 });

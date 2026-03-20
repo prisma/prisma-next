@@ -11,13 +11,14 @@ import {
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or, shorthandToWhereExpr } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
-import { getTestContract } from './helpers';
+import { getTestContext, getTestContract } from './helpers';
 
 describe('filters', () => {
   const contract = getTestContract();
+  const context = getTestContext();
 
   it('and(), or(), not(), and all() use rich where objects', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
 
     const andExpr = and(user['name']!.eq('Alice'), user['email']!.neq('bob@example.com'));
     expect(andExpr).toEqual(
@@ -59,7 +60,7 @@ describe('filters', () => {
   });
 
   it('wraps scalar binary operators in NotExpr', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
 
     expect(not(user['id']!.neq(1))).toEqual(
       new NotExpr(BinaryExpr.neq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
@@ -82,7 +83,7 @@ describe('filters', () => {
   });
 
   it('wraps like and ilike in NotExpr', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
 
     expect(not(user['name']!.like('%a%'))).toEqual(
       new NotExpr(BinaryExpr.like(ColumnRef.of('users', 'name'), LiteralExpr.of('%a%'))),

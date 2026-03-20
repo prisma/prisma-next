@@ -1,10 +1,17 @@
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContract } from './helpers';
+import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 
 export type TestModelName = Extract<keyof TestContract['models'], string>;
 
 export const baseContract = getTestContract();
+
+function contextForContract(contract: TestContract): ExecutionContext<TestContract> {
+  const base = getTestContext();
+  if (contract === baseContract) return base;
+  return { ...base, contract } as ExecutionContext<TestContract>;
+}
 
 export function createCollectionFor<ModelName extends TestModelName>(
   modelName: ModelName,
@@ -14,7 +21,8 @@ export function createCollectionFor<ModelName extends TestModelName>(
   runtime: MockRuntime;
 } {
   const runtime = createMockRuntime();
-  const collection = new Collection({ contract, runtime }, modelName);
+  const context = contextForContract(contract);
+  const collection = new Collection({ runtime, context }, modelName);
   return {
     collection,
     runtime,
@@ -44,7 +52,8 @@ export function createReturningCollectionFor<ModelName extends TestModelName>(
   runtime: MockRuntime;
 } {
   const runtime = createMockRuntime();
-  const collection = new Collection({ contract: withReturningCapability(), runtime }, modelName);
+  const context = contextForContract(withReturningCapability());
+  const collection = new Collection({ runtime, context }, modelName);
   return {
     collection,
     runtime,
