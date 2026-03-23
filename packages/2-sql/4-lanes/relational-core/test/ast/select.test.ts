@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BinaryExpr } from '../../src/ast/predicate';
 import {
+  BinaryExpr,
   DerivedTableSource,
   EqColJoinOn,
   ExistsExpr,

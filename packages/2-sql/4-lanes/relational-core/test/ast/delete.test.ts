@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DeleteAst } from '../../src/ast/delete';
-import { BinaryExpr } from '../../src/ast/predicate';
+import { BinaryExpr, DeleteAst } from '../../src/ast/types';
 import { col, param, table } from './test-helpers';
 
 describe('ast/delete', () => {

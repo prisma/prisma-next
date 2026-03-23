@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OrderByItem } from '../../src/ast/order';
+import { OrderByItem } from '../../src/ast/types';
 import { col, lowerExpr } from './test-helpers';
 
 describe('ast/order', () => {
