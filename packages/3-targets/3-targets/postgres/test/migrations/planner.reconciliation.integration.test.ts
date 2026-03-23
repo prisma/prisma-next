@@ -1017,6 +1017,57 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
   });
 
   it(
+    'applies ALTER COLUMN TYPE between parameterized type variants',
+    { timeout: testTimeout },
+    async () => {
+      const baselineContract = makeContract(
+        {
+          item: makeTable({
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            name: {
+              nativeType: 'character varying',
+              codecId: 'pg/varchar@1',
+              nullable: true,
+              typeParams: { length: 64 },
+            },
+          }),
+        },
+        'varchar-typmod-baseline',
+      );
+      await applyBaseline(driver!, baselineContract);
+
+      const updatedContract = makeContract(
+        {
+          item: makeTable({
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            name: {
+              nativeType: 'character varying',
+              codecId: 'pg/varchar@1',
+              nullable: true,
+              typeParams: { length: 255 },
+            },
+          }),
+        },
+        'varchar-typmod-updated',
+      );
+
+      await planAndExecute(driver!, updatedContract);
+
+      const typeRow = await driver!.query<{ formatted_type: string }>(
+        `SELECT format_type(a.atttypid, a.atttypmod) AS formatted_type
+           FROM pg_attribute a
+           JOIN pg_class c ON c.oid = a.attrelid
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname = 'public'
+             AND c.relname = 'item'
+             AND a.attname = 'name'
+             AND NOT a.attisdropped`,
+      );
+      expect(typeRow.rows[0]?.formatted_type).toBe('character varying(255)');
+    },
+  );
+
+  it(
     'widens nullability and drops default from a NOT NULL DEFAULT column',
     { timeout: testTimeout },
     async () => {
