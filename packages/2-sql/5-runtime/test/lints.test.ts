@@ -91,10 +91,7 @@ describe('lints plugin', () => {
       const ast = SelectAst.from(userTable)
         .withProject([ProjectionItem.of('id', idCol)])
         .withSelectAllIntent({ table: 'user' });
-      const plan = createPlan({
-        ast,
-        meta: { annotations: { selectAllIntent: { table: 'user' } } },
-      });
+      const plan = createPlan({ ast });
       const plugin = lints();
       const ctx = createPluginContext();
 
