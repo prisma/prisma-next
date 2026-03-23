@@ -180,10 +180,10 @@ export default defineConfig({
 3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Verify Marker**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
-   - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
-   - Compares target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
-   - Compares storage hash: Returns `PN-RTM-3002` if `storageHash` doesn't match
-   - Compares profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
+   - Compares marker presence: Returns `PN-RUN-3001` if marker is missing
+   - Compares target compatibility: Returns `PN-RUN-3003` if contract target doesn't match config target
+   - Compares storage hash: Returns `PN-RUN-3002` if `storageHash` doesn't match
+   - Compares profile hash: Returns `PN-RUN-3002` if `profileHash` doesn't match (when present)
    - Checks codec coverage (optional): Compares contract column types against supported codec types and reports missing codecs
 5. **Verify Schema (default)**: Unless `--marker-only` is provided, calls `familyInstance.schemaVerify()` to catch schema mismatches such as missing tables or columns after manual DDL. By default this runs in tolerant mode; `--strict` treats schema elements not present in the contract as an error.
 6. **Schema-only mode**: `--schema-only` skips marker verification entirely and runs only `schemaVerify()`. This is useful for brownfield adoption and corrupt-marker diagnosis.
@@ -210,7 +210,7 @@ Marker-only success:
 
 Marker failure:
 ```text
-✖ Marker missing (PN-RTM-3001)
+✖ Marker missing (PN-RUN-3001)
   Why: Contract marker not found in database
   Fix: Run `prisma-next db sign --db <url>` to create marker
 ```
@@ -261,9 +261,9 @@ Schema drift failure:
 **Error Codes:**
 
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-RTM-3001`: Marker missing - Contract marker not found in database
-- `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
-- `PN-RTM-3003`: Target mismatch - Contract target does not match config target
+- `PN-RUN-3001`: Marker missing - Contract marker not found in database
+- `PN-RUN-3002`: Hash mismatch - Contract hash does not match database marker
+- `PN-RUN-3003`: Target mismatch - Contract target does not match config target
 - Exit code 1 with schema verification payload: Schema does not match the contract (default mode or `--schema-only`)
 
 **Family Requirements:**
@@ -806,7 +806,7 @@ Applying migration plan and verifying schema...
 - `PN-CLI-4010`: Missing driver in config
 - `PN-CLI-4020`: Migration planning failed (conflicts)
 - `PN-CLI-4021`: Target does not support migrations
-- `PN-RTM-3000`: Runtime error (includes marker mismatch failures)
+- `PN-RUN-3000`: Runtime error (includes marker mismatch failures)
 
 **Behavior Notes:**
 
@@ -1097,7 +1097,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Result Processing**: `handleResult()` processes Results, formats output, and returns exit codes
 - **Exit Codes**:
   - Usage/config errors (PN-CLI-4001-4007) → exit code 2
-  - Runtime errors (PN-RTM-3xxx) → exit code 1
+  - Runtime errors (PN-RUN-3xxx) → exit code 1
   - Success → exit code 0
 - **Fail Fast**: Non-structured errors propagate and are caught by Commander.js's `exitOverride()` with stack traces
 - See `.cursor/rules/cli-error-handling.mdc` for detailed patterns

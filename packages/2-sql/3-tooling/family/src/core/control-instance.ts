@@ -385,7 +385,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RTM-3001',
+          code: 'PN-RUN-3001',
           summary: 'Marker missing',
           contractStorageHash,
           expectedTargetId,
@@ -402,7 +402,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RTM-3003',
+          code: 'PN-RUN-3003',
           summary: 'Target mismatch',
           contractStorageHash,
           marker,
@@ -421,7 +421,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RTM-3002',
+          code: 'PN-RUN-3002',
           summary: 'Hash mismatch',
           contractStorageHash,
           marker,
@@ -439,7 +439,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RTM-3002',
+          code: 'PN-RUN-3002',
           summary: 'Hash mismatch',
           contractStorageHash,
           contractProfileHash,

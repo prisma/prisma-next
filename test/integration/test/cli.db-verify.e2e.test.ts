@@ -336,7 +336,7 @@ withTempDir(({ createTempDir }) => {
             unknown
           >;
           expect(parsed).toMatchObject({
-            code: 'PN-RTM-3001',
+            code: 'PN-RUN-3001',
             summary: expect.any(String),
             why: expect.any(String),
             fix: expect.any(String),
@@ -884,7 +884,7 @@ withTempDir(({ createTempDir }) => {
           // consoleOutput may contain Clack decoration alongside JSON; extract the JSON block.
           const parsed = extractJson(consoleOutput) as Record<string, unknown>;
           expect(parsed).toMatchObject({
-            code: 'PN-RTM-3001',
+            code: 'PN-RUN-3001',
             summary: expect.any(String),
             why: expect.any(String),
             fix: expect.any(String),

@@ -58,16 +58,16 @@ type DbVerifyMode = 'full' | 'marker-only' | 'schema-only';
  */
 function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredError {
   if (!verifyResult.ok && verifyResult.code) {
-    if (verifyResult.code === 'PN-RTM-3001') {
+    if (verifyResult.code === 'PN-RUN-3001') {
       return errorMarkerMissing();
     }
-    if (verifyResult.code === 'PN-RTM-3002') {
+    if (verifyResult.code === 'PN-RUN-3002') {
       return errorHashMismatch({
         expected: verifyResult.contract.storageHash,
         ...ifDefined('actual', verifyResult.marker?.storageHash),
       });
     }
-    if (verifyResult.code === 'PN-RTM-3003') {
+    if (verifyResult.code === 'PN-RUN-3003') {
       return errorTargetMismatch(
         verifyResult.target.expected,
         verifyResult.target.actual ?? 'unknown',

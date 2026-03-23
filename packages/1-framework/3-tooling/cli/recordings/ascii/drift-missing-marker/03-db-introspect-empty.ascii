@@ -197,7 +197,7 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 prisma-next db introspect → Inspect the database schema
 │
 │ config:               prisma-next.config.ts
-│ database:             postgres://****:****@127.0.0.1:5432/prisma_rec_2
+│ database:             postgres://****:****@127.0.0.1:5433/prisma_rec_2
 │
 │ Read more             https://pris.ly/db-introspect
 └
