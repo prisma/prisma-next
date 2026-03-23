@@ -58,6 +58,14 @@ function toParamAssignments(
   };
 }
 
+/**
+ * Converts sparse user-provided rows into a uniform shape for multi-row INSERT.
+ *
+ * Collects the union of all column names across every row to produce a stable
+ * column list. Present values become `ParamRef`s (1-based, appended to a flat
+ * params array); missing columns are filled with `DefaultValueExpr` so they
+ * lower to `DEFAULT` in SQL.
+ */
 function normalizeInsertRows(
   contract: SqlContract<SqlStorage>,
   tableName: string,
