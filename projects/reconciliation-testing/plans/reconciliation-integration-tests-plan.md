@@ -4,7 +4,7 @@
 
 Add end-to-end integration tests that prove reconciliation operations (ALTER COLUMN TYPE, SET DEFAULT, ALTER DEFAULT) work correctly against a live Postgres instance through the full planner→runner→verify pipeline. Uses existing test infrastructure from `runner-fixtures.ts`.
 
-**Spec:** `projects/on-disk-migrations-v2/specs/reconciliation-integration-tests.spec.md`
+**Spec:** `projects/reconciliation-testing/specs/reconciliation-integration-tests.spec.md`
 
 ## Status: Complete (Phase 2)
 
@@ -57,8 +57,9 @@ Added integration tests for all remaining reconciliation operations, achieving 1
 `buildAlterDefaultOperation` used `columnDefaultCheck` which only verified `column_default IS NOT NULL`. This caused the idempotency probe to skip execution when a column already had any default (same class as TML-2077).
 
 - [x] Add unit test `default_mismatch postcheck verifies actual default value, not just existence`
-- [x] Add `columnDefaultValueCheck` helper using `LIKE '%<expected>%'` to verify actual default value
-- [x] Update `buildAlterDefaultOperation` to use `columnDefaultValueCheck`
+- [x] Add `columnDefaultValueCheck` helper with exact `=` comparison against predicted PG-normalized form
+- [x] Add `renderExpectedPgDefault()` to predict PG's normalized `column_default` value (e.g., `'active'::text`)
+- [x] Update `buildAlterDefaultOperation` to use `columnDefaultValueCheck` with `renderExpectedPgDefault`
 
 ### Bugs discovered and fixed during Phase 2
 
@@ -89,6 +90,17 @@ Added integration tests for all remaining reconciliation operations, achieving 1
 
 **Files:** `packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts`, `planner-reconciliation.ts`
 
+#### Bug 4: Verifier does not detect extra defaults (TML-2091)
+
+When the contract specifies no default but the database has one, the verifier didn't report it. The default silently remained after migration.
+
+- [x] Add `extra_default` to `SchemaIssue` kind union (both copies)
+- [x] Detect `extra_default` in strict mode when contract column has no default but schema column does
+- [x] Add `buildDropDefaultOperation` (destructive — removing a default narrows behavior)
+- [x] Thread `strict` through `collectContractColumnNodes` → `verifyColumn`
+
+**Files:** `packages/1-framework/1-core/migration/control-plane/src/types.ts`, `packages/1-framework/1-core/shared/config/src/types.ts`, `packages/2-sql/3-tooling/family/src/core/schema-verify/verify-sql-schema.ts`, `packages/3-targets/3-targets/postgres/src/core/migrations/planner-reconciliation.ts`
+
 ## Test Coverage
 
 | Acceptance Criterion | Test Type | Status | Notes |
@@ -106,16 +118,21 @@ Added integration tests for all remaining reconciliation operations, achieving 1
 | SET NOT NULL makes column non-nullable | Integration | ✅ | Verified via `information_schema.columns` |
 | Tests use planner→runner pipeline | Integration | ✅ | Each test calls `planner.plan()` then `runner.execute()` |
 | Final DB state verified via direct SQL | Integration | ✅ | Each test queries catalog tables |
-| No regressions | Integration | ✅ | 145/145 postgres tests, 139/139 family tests |
-| ALTER DEFAULT postcheck verifies value | Unit | ✅ | Bug fix — postcheck now uses `columnDefaultValueCheck` |
+| DROP DEFAULT removes stale default | Integration | ✅ | Verified via `information_schema.columns` (column_default IS NULL) |
+| No regressions | Integration | ✅ | 155 postgres tests (153 pass, 2 known failures), 140 family tests |
+| ALTER DEFAULT postcheck verifies value | Unit | ✅ | Bug fix — postcheck uses exact `=` via `renderExpectedPgDefault` |
+| FK strict-mode detects extra FKs | Unit | ✅ | Verifier detects extra FK when contract has no FKs |
 
 ## Files Changed
 
 | File | Change |
 |---|---|
-| `test/migrations/planner.reconciliation.integration.test.ts` | New — 11 integration tests (3 phase 1 + 8 phase 2) |
-| `test/migrations/planner.reconciliation-unit.test.ts` | Added unit test for ALTER DEFAULT postcheck bug |
-| `src/core/migrations/planner.ts` | Exported `columnTypeCheck`, `columnDefaultCheck`, `columnDefaultValueCheck` |
-| `src/core/migrations/planner-reconciliation.ts` | Imported check helpers from `planner.ts`, removed private duplicates |
+| `test/migrations/planner.reconciliation.integration.test.ts` | New — 21 integration tests (3 phase 1 + 8 phase 2 + 7 compound + 3 known-failure) |
+| `test/migrations/planner.reconciliation-unit.test.ts` | Added unit tests for default operations, postcheck precision, invariant violations |
+| `packages/2-sql/3-tooling/family/test/schema-verify.strict.test.ts` | Added unit test for FK strict-mode detection |
+| `src/core/migrations/planner.ts` | Exported check helpers, added `renderExpectedPgDefault` |
+| `src/core/migrations/planner-reconciliation.ts` | Added default/extra_default operation builders, invariant guards, imported check helpers |
+| `packages/1-framework/1-core/migration/control-plane/src/types.ts` | Added `extra_default` to `SchemaIssue` kind |
+| `packages/1-framework/1-core/shared/config/src/types.ts` | Added `extra_default` to `SchemaIssue` kind |
 | `packages/2-sql/3-tooling/family/src/core/schema-verify/verify-helpers.ts` | Added `indexOrConstraint` to extra-index/unique/FK issues |
-| `packages/2-sql/3-tooling/family/src/core/schema-verify/verify-sql-schema.ts` | Fixed FK verification to run in strict mode even when contract has no FKs |
+| `packages/2-sql/3-tooling/family/src/core/schema-verify/verify-sql-schema.ts` | Fixed FK strict mode, added `extra_default` detection |
