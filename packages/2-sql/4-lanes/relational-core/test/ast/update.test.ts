@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BinaryExpr } from '../../src/ast/predicate';
-import { UpdateAst } from '../../src/ast/update';
+import { BinaryExpr, UpdateAst } from '../../src/ast/types';
 import { col, param, table } from './test-helpers';
 
 describe('ast/update', () => {

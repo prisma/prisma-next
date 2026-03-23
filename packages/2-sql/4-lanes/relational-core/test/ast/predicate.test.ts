@@ -6,7 +6,7 @@ import {
   ListLiteralExpr,
   NullCheckExpr,
   OrExpr,
-} from '../../src/ast/predicate';
+} from '../../src/ast/types';
 import { col, lit, lowerExpr, param, simpleSelect } from './test-helpers';
 
 describe('ast/predicate', () => {

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { OrderByItem } from '../../src/ast/order';
-import { BinaryExpr } from '../../src/ast/predicate';
 import {
+  BinaryExpr,
   DefaultValueExpr,
   DeleteAst,
   DoNothingConflictAction,
   DoUpdateSetConflictAction,
   InsertAst,
   InsertOnConflict,
+  OrderByItem,
   SelectAst,
   UpdateAst,
 } from '../../src/exports/ast';
