@@ -67,6 +67,31 @@ describe('verifySqlSchema - strict mode', () => {
       }),
     );
   });
+
+  it('does not report extra_default for serial/identity columns with nextval default', () => {
+    const contract = createTestContract({
+      user: createContractTable({
+        id: { nativeType: 'int4', nullable: false },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      user: createSchemaTable('user', {
+        id: { nativeType: 'int4', nullable: false, default: "nextval('user_id_seq'::regclass)" },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: true,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+    });
+
+    const extraDefaultIssues = result.schema.issues.filter((i) => i.kind === 'extra_default');
+    expect(extraDefaultIssues).toHaveLength(0);
+  });
 });
 
 describe('verifySqlSchema - result structure', () => {
