@@ -976,6 +976,7 @@ export function columnNullabilityCheck({
 )`;
 }
 
+/** Checks that the column's type OID matches the expected native type via `::regtype` cast. */
 export function columnTypeCheck({
   schema,
   table,
@@ -1000,7 +1001,8 @@ export function columnTypeCheck({
 )`;
 }
 
-export function columnDefaultCheck({
+/** Checks that a column default exists (or does not exist). Does NOT verify the default value — use `columnDefaultValueCheck` for that. */
+export function columnDefaultExistsCheck({
   schema,
   table,
   column,
@@ -1022,6 +1024,7 @@ export function columnDefaultCheck({
 )`;
 }
 
+/** Checks that a column's default expression matches the expected value exactly. */
 export function columnDefaultValueCheck({
   schema,
   table,

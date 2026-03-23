@@ -14,7 +14,7 @@ import {
   buildColumnDefaultSql,
   buildColumnTypeSql,
   buildTargetDetails,
-  columnDefaultCheck,
+  columnDefaultExistsCheck,
   columnDefaultValueCheck,
   columnExistsCheck,
   columnNullabilityCheck,
@@ -208,7 +208,13 @@ function buildReconciliationOperationFromIssue(options: {
         contractColMissing.default !== undefined,
         `default_missing issue for "${issue.table}"."${issue.column}" but contract column has no default`,
       );
-      return buildSetDefaultOperation(schemaName, issue.table, issue.column, contractColMissing);
+      return buildSetDefaultOperation(
+        schemaName,
+        issue.table,
+        issue.column,
+        contractColMissing,
+        contractColMissing.default,
+      );
     }
 
     case 'default_mismatch': {
@@ -227,10 +233,13 @@ function buildReconciliationOperationFromIssue(options: {
         contractColMismatch.default !== undefined,
         `default_mismatch issue for "${issue.table}"."${issue.column}" but contract column has no default`,
       );
-      return buildAlterDefaultOperation(schemaName, issue.table, issue.column, {
-        ...contractColMismatch,
-        default: contractColMismatch.default,
-      });
+      return buildAlterDefaultOperation(
+        schemaName,
+        issue.table,
+        issue.column,
+        contractColMismatch,
+        contractColMismatch.default,
+      );
     }
 
     case 'extra_default': {
@@ -558,10 +567,12 @@ function buildSetDefaultOperation(
   schemaName: string,
   tableName: string,
   columnName: string,
-  column: StorageColumn,
+  column: Omit<StorageColumn, 'default'>,
+  columnDefault: NonNullable<StorageColumn['default']>,
 ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
   const qualified = qualifyTableName(schemaName, tableName);
-  const defaultClause = buildColumnDefaultSql(column.default, column);
+  const defaultClause = buildColumnDefaultSql(columnDefault, column);
+  const expectedDefault = renderExpectedPgDefault(columnDefault, column);
   return {
     id: `setDefault.${tableName}.${columnName}`,
     label: `Set default for ${columnName} on ${tableName}`,
@@ -585,8 +596,13 @@ function buildSetDefaultOperation(
     ],
     postcheck: [
       {
-        description: `verify column "${columnName}" has a default`,
-        sql: columnDefaultCheck({ schema: schemaName, table: tableName, column: columnName }),
+        description: `verify column "${columnName}" default matches expected value`,
+        sql: columnDefaultValueCheck({
+          schema: schemaName,
+          table: tableName,
+          column: columnName,
+          expectedDefault,
+        }),
       },
     ],
   };
@@ -596,11 +612,12 @@ function buildAlterDefaultOperation(
   schemaName: string,
   tableName: string,
   columnName: string,
-  column: StorageColumn & { readonly default: NonNullable<StorageColumn['default']> },
+  column: Omit<StorageColumn, 'default'>,
+  columnDefault: NonNullable<StorageColumn['default']>,
 ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
   const qualified = qualifyTableName(schemaName, tableName);
-  const defaultClause = buildColumnDefaultSql(column.default, column);
-  const expectedDefault = renderExpectedPgDefault(column.default, column);
+  const defaultClause = buildColumnDefaultSql(columnDefault, column);
+  const expectedDefault = renderExpectedPgDefault(columnDefault, column);
   return {
     id: `setDefault.${tableName}.${columnName}`,
     label: `Change default for ${columnName} on ${tableName}`,
@@ -666,7 +683,7 @@ function buildDropDefaultOperation(
     postcheck: [
       {
         description: `verify column "${columnName}" has no default`,
-        sql: columnDefaultCheck({
+        sql: columnDefaultExistsCheck({
           schema: schemaName,
           table: tableName,
           column: columnName,

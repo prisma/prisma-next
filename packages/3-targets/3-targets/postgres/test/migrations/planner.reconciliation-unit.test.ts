@@ -679,7 +679,7 @@ describe('buildReconciliationPlan', () => {
       expect(result.conflicts).toHaveLength(1);
     });
 
-    it('includes postcheck that verifies column default is set', () => {
+    it('default_missing postcheck verifies actual default value', () => {
       const contract = contractWithColumnDefault('user', 'bio', 'text', {
         kind: 'literal',
         value: 'no bio',
@@ -699,8 +699,8 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations).toHaveLength(1);
       const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
-      expect(postcheckSql).toContain('column_default');
-      expect(postcheckSql).toContain('IS NOT NULL');
+      expect(postcheckSql).toContain("''no bio''::text");
+      expect(postcheckSql).toContain('column_default =');
     });
 
     it('default_mismatch postcheck verifies actual default value, not just existence', () => {
