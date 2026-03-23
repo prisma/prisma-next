@@ -14,6 +14,7 @@ import {
   LiteralExpr,
   NullCheckExpr,
   OperationExpr,
+  OrExpr,
   ParamRef,
   ProjectionItem,
   QueryAst,
@@ -218,5 +219,44 @@ describe('Postgres adapter', () => {
     expect(sql).toBe(
       `SELECT 12 AS "bigintValue", '2024-01-01T00:00:00.000Z' AS "createdAtLiteral", ARRAY[1, 'two'] AS "arrayValue", '{"ok":true}' AS "jsonValue", NULL AS "missingValue" FROM "user"`,
     );
+  });
+
+  it('renders DISTINCT, GROUP BY, HAVING, and OR clauses', () => {
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProject([
+        ProjectionItem.of('email', ColumnRef.of('user', 'email')),
+        ProjectionItem.of('cnt', AggregateExpr.count()),
+      ])
+      .withDistinct()
+      .withGroupBy([ColumnRef.of('user', 'email')])
+      .withHaving(BinaryExpr.gt(AggregateExpr.count(), LiteralExpr.of(1)))
+      .withWhere(OrExpr.of([BinaryExpr.eq(ColumnRef.of('user', 'id'), LiteralExpr.of(1))]));
+
+    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+
+    expect(sql).toContain('SELECT DISTINCT');
+    expect(sql).toContain('GROUP BY "user"."email"');
+    expect(sql).toContain('HAVING COUNT(*) > 1');
+    expect(sql).toContain('WHERE ("user"."id" = 1)');
+  });
+
+  it('renders TableSource with alias', () => {
+    const ast = SelectAst.from(TableSource.named('user', 'u')).withProject([
+      ProjectionItem.of('id', ColumnRef.of('u', 'id')),
+    ]);
+
+    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+
+    expect(sql).toContain('FROM "user" AS "u"');
+  });
+
+  it('renders empty OR as FALSE', () => {
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(OrExpr.false());
+
+    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+
+    expect(sql).toContain('WHERE FALSE');
   });
 });
