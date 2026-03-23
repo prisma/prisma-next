@@ -66,17 +66,17 @@ export type JsonObjectEntry = {
   readonly value: ProjectionExpr;
 };
 
-function freezeArray<T>(values: readonly T[]): ReadonlyArray<T> {
+function frozenArrayCopy<T>(values: readonly T[]): ReadonlyArray<T> {
   return Object.freeze([...values]);
 }
 
-function freezeOptionalObject<T extends Record<string, unknown>>(
+function frozenOptionalRecordCopy<T extends Record<string, unknown>>(
   value: T | undefined,
 ): Readonly<T> | undefined {
   return value === undefined ? undefined : Object.freeze({ ...value });
 }
 
-function freezeRecord<T>(record: Readonly<Record<string, T>>): Readonly<Record<string, T>> {
+function frozenRecordCopy<T>(record: Readonly<Record<string, T>>): Readonly<Record<string, T>> {
   return Object.freeze({ ...record });
 }
 
@@ -427,7 +427,7 @@ export class OperationExpr extends Expression {
     this.method = options.method;
     this.forTypeId = options.forTypeId;
     this.self = options.self;
-    this.args = freezeArray(options.args ?? []);
+    this.args = frozenArrayCopy(options.args ?? []);
     this.returns = options.returns;
     this.lowering = options.lowering;
     this.freeze();
@@ -528,7 +528,7 @@ export class JsonObjectExpr extends Expression {
 
   constructor(entries: ReadonlyArray<JsonObjectEntry>) {
     super();
-    this.entries = freezeArray(entries.map((entry) => Object.freeze({ ...entry })));
+    this.entries = frozenArrayCopy(entries.map((entry) => Object.freeze({ ...entry })));
     this.freeze();
   }
 
@@ -609,7 +609,7 @@ export class JsonArrayAggExpr extends Expression {
     super();
     this.expr = expr;
     this.onEmpty = onEmpty;
-    this.orderBy = orderBy && orderBy.length > 0 ? freezeArray(orderBy) : undefined;
+    this.orderBy = orderBy && orderBy.length > 0 ? frozenArrayCopy(orderBy) : undefined;
     this.freeze();
   }
 
@@ -642,7 +642,7 @@ export class ListLiteralExpr extends AstNode {
 
   constructor(values: ReadonlyArray<ParamRef | LiteralExpr>) {
     super();
-    this.values = freezeArray(values);
+    this.values = frozenArrayCopy(values);
     this.freeze();
   }
 
@@ -799,7 +799,7 @@ export class AndExpr extends WhereExpr {
 
   constructor(exprs: ReadonlyArray<WhereExpr>) {
     super();
-    this.exprs = freezeArray(exprs);
+    this.exprs = frozenArrayCopy(exprs);
     this.freeze();
   }
 
@@ -836,7 +836,7 @@ export class OrExpr extends WhereExpr {
 
   constructor(exprs: ReadonlyArray<WhereExpr>) {
     super();
-    this.exprs = freezeArray(exprs);
+    this.exprs = frozenArrayCopy(exprs);
     this.freeze();
   }
 
@@ -1054,22 +1054,23 @@ export class SelectAst extends QueryAst {
   constructor(options: SelectAstOptions) {
     super();
     this.from = options.from;
-    this.joins = options.joins && options.joins.length > 0 ? freezeArray(options.joins) : undefined;
-    this.projection = freezeArray(options.projection);
+    this.joins =
+      options.joins && options.joins.length > 0 ? frozenArrayCopy(options.joins) : undefined;
+    this.projection = frozenArrayCopy(options.projection);
     this.where = options.where;
     this.orderBy =
-      options.orderBy && options.orderBy.length > 0 ? freezeArray(options.orderBy) : undefined;
+      options.orderBy && options.orderBy.length > 0 ? frozenArrayCopy(options.orderBy) : undefined;
     this.distinct = options.distinct;
     this.distinctOn =
       options.distinctOn && options.distinctOn.length > 0
-        ? freezeArray(options.distinctOn)
+        ? frozenArrayCopy(options.distinctOn)
         : undefined;
     this.groupBy =
-      options.groupBy && options.groupBy.length > 0 ? freezeArray(options.groupBy) : undefined;
+      options.groupBy && options.groupBy.length > 0 ? frozenArrayCopy(options.groupBy) : undefined;
     this.having = options.having;
     this.limit = options.limit;
     this.offset = options.offset;
-    this.selectAllIntent = freezeOptionalObject(options.selectAllIntent);
+    this.selectAllIntent = frozenOptionalRecordCopy(options.selectAllIntent);
     this.freeze();
   }
 
@@ -1321,7 +1322,7 @@ export class DoUpdateSetConflictAction extends InsertOnConflictAction {
 
   constructor(set: Readonly<Record<string, ColumnRef | ParamRef>>) {
     super();
-    this.set = freezeRecord(set);
+    this.set = frozenRecordCopy(set);
     this.freeze();
   }
 }
@@ -1332,7 +1333,7 @@ export class InsertOnConflict extends AstNode {
 
   constructor(columns: ReadonlyArray<ColumnRef>, action: InsertOnConflictAction) {
     super();
-    this.columns = freezeArray(columns);
+    this.columns = frozenArrayCopy(columns);
     this.action = action;
     this.freeze();
   }
@@ -1366,7 +1367,7 @@ export class InsertAst extends QueryAst {
     this.table = table;
     this.rows = freezeRows(rows);
     this.onConflict = onConflict;
-    this.returning = returning && returning.length > 0 ? freezeArray(returning) : undefined;
+    this.returning = returning && returning.length > 0 ? frozenArrayCopy(returning) : undefined;
     this.freeze();
   }
 
@@ -1457,9 +1458,9 @@ export class UpdateAst extends QueryAst {
   ) {
     super();
     this.table = table;
-    this.set = freezeRecord(set);
+    this.set = frozenRecordCopy(set);
     this.where = where;
-    this.returning = returning && returning.length > 0 ? freezeArray(returning) : undefined;
+    this.returning = returning && returning.length > 0 ? frozenArrayCopy(returning) : undefined;
     this.freeze();
   }
 
@@ -1510,7 +1511,7 @@ export class DeleteAst extends QueryAst {
     super();
     this.table = table;
     this.where = where;
-    this.returning = returning && returning.length > 0 ? freezeArray(returning) : undefined;
+    this.returning = returning && returning.length > 0 ? frozenArrayCopy(returning) : undefined;
     this.freeze();
   }
 
