@@ -65,7 +65,7 @@ describe('Postgres rich AST lowering', () => {
 
   it('lowers selects with derived lateral joins and rich JSON expressions', () => {
     const childRows = SelectAst.from(TableSource.named('post'))
-      .withProject([
+      .withProjection([
         ProjectionItem.of('id', ColumnRef.of('post', 'id')),
         ProjectionItem.of('title', ColumnRef.of('post', 'title')),
       ])
@@ -75,7 +75,7 @@ describe('Postgres rich AST lowering', () => {
 
     const aggregateQuery = SelectAst.from(
       DerivedTableSource.as('post_rows', childRows),
-    ).withProject([
+    ).withProjection([
       ProjectionItem.of(
         'posts',
         JsonArrayAggExpr.of(
@@ -90,7 +90,7 @@ describe('Postgres rich AST lowering', () => {
     ]);
 
     const ast = SelectAst.from(TableSource.named('user'))
-      .withProject([
+      .withProjection([
         ProjectionItem.of('id', ColumnRef.of('user', 'id')),
         ProjectionItem.of('posts', ColumnRef.of('posts_lateral', 'posts')),
       ])
@@ -126,7 +126,7 @@ describe('Postgres rich AST lowering', () => {
       },
     });
 
-    const ast = SelectAst.from(TableSource.named('user')).withProject([
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('distance', distance),
       ProjectionItem.of('count', AggregateExpr.count()),
     ]);
@@ -139,10 +139,10 @@ describe('Postgres rich AST lowering', () => {
 
   it('lowers scalar subquery expressions in projections', () => {
     const subquery = SelectAst.from(TableSource.named('post'))
-      .withProject([ProjectionItem.of('cnt', AggregateExpr.count())])
+      .withProjection([ProjectionItem.of('cnt', AggregateExpr.count())])
       .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'user_id'), ColumnRef.of('user', 'id')));
 
-    const ast = SelectAst.from(TableSource.named('user')).withProject([
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('id', ColumnRef.of('user', 'id')),
       ProjectionItem.of('post_count', SubqueryExpr.of(subquery)),
     ]);

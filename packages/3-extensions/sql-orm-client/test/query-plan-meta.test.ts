@@ -35,7 +35,7 @@ describe('query plan meta', () => {
 
   it('adds limit annotations for select plans', () => {
     const ast = SelectAst.from(TableSource.named('users'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
       .withLimit(5);
 
     const plan = buildOrmQueryPlan(baseContract, ast, ['Alice'], [{ index: 1, source: 'dsl' }]);

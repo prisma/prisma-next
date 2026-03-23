@@ -252,7 +252,7 @@ export function transformSelect(node: SelectQueryNode, ctx: TransformContext): S
     }
   }
 
-  let ast = SelectAst.from(fromRef).withProject(project);
+  let ast = SelectAst.from(fromRef).withProjection(project);
   if (joins.length > 0) {
     ast = ast.withJoins(joins);
   }

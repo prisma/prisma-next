@@ -91,7 +91,7 @@ describe('compileSelectWithIncludeStrategy', () => {
       BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
     );
 
-    const postsProjection = plan.ast.project.find((item) => item.alias === 'posts');
+    const postsProjection = plan.ast.projection.find((item) => item.alias === 'posts');
     expectSubqueryExpr(postsProjection?.expr);
 
     const childRowsSource = postsProjection.expr.query.from;

@@ -181,7 +181,7 @@ function buildExistsExpr<TContract extends SqlContract<SqlStorage>>(
 
   const selectProjectionColumn = firstChildColumn(relation) ?? 'id';
   const subquery = SelectAst.from(TableSource.named(relatedTableName))
-    .withProject([
+    .withProjection([
       ProjectionItem.of('_exists', ColumnRef.of(relatedTableName, selectProjectionColumn)),
     ])
     .withWhere(subqueryWhere);

@@ -69,7 +69,7 @@ describe('SQL ORM rich AST query plans', () => {
     const ast = plan.ast as SelectAst;
     expect(ast.where).toBeInstanceOf(BinaryExpr);
 
-    const postsProjection = ast.project.find((item) => item.alias === 'posts');
+    const postsProjection = ast.projection.find((item) => item.alias === 'posts');
     expect(postsProjection?.expr).toBeInstanceOf(SubqueryExpr);
     const aggregateQuery = (postsProjection?.expr as SubqueryExpr).query;
     expect(aggregateQuery.from).toBeInstanceOf(DerivedTableSource);

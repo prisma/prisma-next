@@ -342,7 +342,7 @@ export class SelectBuilderImpl<
     }
 
     let ast = SelectAst.from(TableSource.named(table.name, table.alias))
-      .withProject(projectEntries)
+      .withProjection(projectEntries)
       .withWhere(whereExpr);
     const allJoins = [...joins, ...includeArtifacts.map((artifact) => artifact.join)];
     if (allJoins.length > 0) {

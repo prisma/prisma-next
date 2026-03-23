@@ -100,10 +100,10 @@ export function compileAggregate(
     throw new Error('aggregate() requires at least one aggregation selector');
   }
 
-  const project: ProjectionItem[] = entries.map(([alias, selector]) =>
+  const projection: ProjectionItem[] = entries.map(([alias, selector]) =>
     ProjectionItem.of(alias, toAggregateExpr(tableName, selector)),
   );
-  let ast = SelectAst.from(TableSource.named(tableName)).withProject(project);
+  let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
   const where = combineWhereFilters(filters);
   if (where) {
     ast = ast.withWhere(where.expr);
@@ -137,7 +137,7 @@ export function compileGroupedAggregate(
   ];
 
   let ast = SelectAst.from(TableSource.named(tableName))
-    .withProject(projection)
+    .withProjection(projection)
     .withGroupBy(groupByColumns.map((column) => ColumnRef.of(tableName, column)));
   const where = combineWhereFilters(filters);
   if (where) {

@@ -73,7 +73,7 @@ describe('createModelAccessor', () => {
     expect(accessor['posts']!.some()).toEqual(
       ExistsExpr.exists(
         SelectAst.from(TableSource.named('posts'))
-          .withProject([ProjectionItem.of('_exists', ColumnRef.of('posts', 'user_id'))])
+          .withProjection([ProjectionItem.of('_exists', ColumnRef.of('posts', 'user_id'))])
           .withWhere(BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id'))),
       ),
     );
@@ -242,7 +242,7 @@ describe('createModelAccessor', () => {
         { some: () => unknown }
       >
     )['posts']!.some() as ExistsExpr;
-    expect(compositeExpr.subquery.project).toEqual([
+    expect(compositeExpr.subquery.projection).toEqual([
       ProjectionItem.of('_exists', ColumnRef.of('posts', 'user_id')),
     ]);
     expect(compositeExpr.subquery.where).toEqual(
@@ -275,7 +275,7 @@ describe('createModelAccessor', () => {
         { some: () => unknown }
       >
     )['posts']!.some() as ExistsExpr;
-    expect(fallbackExpr.subquery.project).toEqual([
+    expect(fallbackExpr.subquery.projection).toEqual([
       ProjectionItem.of('_exists', ColumnRef.of('posts', 'id')),
     ]);
   });

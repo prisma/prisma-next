@@ -31,14 +31,14 @@ describe('Join AST types', () => {
 
   it('allows selects with and without joins', () => {
     const withJoin = SelectAst.from(TableSource.named('user'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withJoins([
         JoinAst.left(
           TableSource.named('post'),
           EqColJoinOn.of(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId')),
         ),
       ]);
-    const withoutJoin = SelectAst.from(TableSource.named('user')).withProject([
+    const withoutJoin = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('id', ColumnRef.of('user', 'id')),
     ]);
 

@@ -91,8 +91,8 @@ describe('rich SQL AST', () => {
     const where = BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, 'id'));
 
     const next = base
-      .addProject('id', ColumnRef.of('user', 'id'))
-      .addProject('email', lowerEmail(ColumnRef.of('user', 'email')))
+      .addProjection('id', ColumnRef.of('user', 'id'))
+      .addProjection('email', lowerEmail(ColumnRef.of('user', 'email')))
       .withWhere(where)
       .withOrderBy([OrderByItem.asc(ColumnRef.of('user', 'email'))])
       .withDistinct()
@@ -103,25 +103,25 @@ describe('rich SQL AST', () => {
       .withOffset(20)
       .withSelectAllIntent({ table: 'user' });
 
-    expect(base).toMatchObject({ project: [], where: undefined });
+    expect(base).toMatchObject({ projection: [], where: undefined });
     expect(next).toMatchObject({
       where,
       limit: 10,
       offset: 20,
       selectAllIntent: { table: 'user' },
     });
-    expect(next.project.map((item) => item.alias)).toEqual(['id', 'email']);
-    expect(Object.isFrozen(next.project)).toBe(true);
+    expect(next.projection.map((item) => item.alias)).toEqual(['id', 'email']);
+    expect(Object.isFrozen(next.projection)).toBe(true);
   });
 
   it('rewrites expressions, joins, and nested selects through rich-node methods', () => {
     const inner = SelectAst.from(TableSource.named('post'))
-      .addProject('authorId', ColumnRef.of('post', 'authorId'))
+      .addProjection('authorId', ColumnRef.of('post', 'authorId'))
       .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'published'), LiteralExpr.of(true)));
 
     const ast = SelectAst.from(TableSource.named('user'))
-      .addProject('id', ColumnRef.of('user', 'id'))
-      .addProject('email', lowerEmail(ColumnRef.of('user', 'email'), ParamRef.of(0, 'email')))
+      .addProjection('id', ColumnRef.of('user', 'id'))
+      .addProjection('email', lowerEmail(ColumnRef.of('user', 'email'), ParamRef.of(0, 'email')))
       .withJoins([
         JoinAst.left(
           DerivedTableSource.as('posts', inner),
@@ -134,7 +134,7 @@ describe('rich SQL AST', () => {
           BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'id')),
           ExistsExpr.exists(
             SelectAst.from(TableSource.named('comment'))
-              .addProject('id', ColumnRef.of('comment', 'id'))
+              .addProjection('id', ColumnRef.of('comment', 'id'))
               .withWhere(
                 BinaryExpr.eq(ColumnRef.of('comment', 'postId'), ColumnRef.of('post', 'id')),
               ),
@@ -158,9 +158,11 @@ describe('rich SQL AST', () => {
 
     expect(rewritten.from).toEqual(TableSource.named('member'));
     expect(rewritten.limit).toBe(99);
-    expect(rewritten.project[0]?.expr).toEqual(ColumnRef.of('member', 'id'));
-    expect(rewritten.project[1]?.expr).toBeInstanceOf(OperationExpr);
-    expect((rewritten.project[1]?.expr as OperationExpr).args[0]).toEqual(ParamRef.of(10, 'email'));
+    expect(rewritten.projection[0]?.expr).toEqual(ColumnRef.of('member', 'id'));
+    expect(rewritten.projection[1]?.expr).toBeInstanceOf(OperationExpr);
+    expect((rewritten.projection[1]?.expr as OperationExpr).args[0]).toEqual(
+      ParamRef.of(10, 'email'),
+    );
     expect(rewritten.joins?.[0]?.on).toEqual(
       EqColJoinOn.of(
         ColumnRef.of('rewritten_user', 'id'),
@@ -235,8 +237,8 @@ describe('rich SQL AST', () => {
 
   it('collects plan refs across select, insert, update, and delete ASTs', () => {
     const select = SelectAst.from(TableSource.named('user'))
-      .addProject('id', ColumnRef.of('user', 'id'))
-      .addProject(
+      .addProjection('id', ColumnRef.of('user', 'id'))
+      .addProjection(
         'posts',
         JsonArrayAggExpr.of(
           JsonObjectExpr.fromEntries([
@@ -256,7 +258,7 @@ describe('rich SQL AST', () => {
       .withWhere(
         ExistsExpr.exists(
           SelectAst.from(TableSource.named('comment'))
-            .addProject('id', ColumnRef.of('comment', 'id'))
+            .addProjection('id', ColumnRef.of('comment', 'id'))
             .withWhere(
               BinaryExpr.eq(ColumnRef.of('comment', 'postId'), ColumnRef.of('post', 'id')),
             ),
@@ -291,7 +293,7 @@ describe('rich SQL AST', () => {
       .withWhere(
         ExistsExpr.exists(
           SelectAst.from(TableSource.named('session'))
-            .addProject('id', ColumnRef.of('session', 'id'))
+            .addProjection('id', ColumnRef.of('session', 'id'))
             .withWhere(
               BinaryExpr.eq(ColumnRef.of('session', 'userId'), ColumnRef.of('user', 'id')),
             ),

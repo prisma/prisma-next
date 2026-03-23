@@ -20,7 +20,7 @@ describe('static context (no runtime)', () => {
     expect(plan).toMatchObject({
       ast: SelectAst.from(TableSource.named('user'))
         .withLimit(1)
-        .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]),
+        .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]),
       meta: { lane: 'dsl' },
     });
   });

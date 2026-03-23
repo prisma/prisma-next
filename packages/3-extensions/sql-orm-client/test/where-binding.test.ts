@@ -60,7 +60,7 @@ describe('bindWhereExpr', () => {
 
   it('binds EXISTS subquery expressions', () => {
     const subquery = SelectAst.from(TableSource.named('posts'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('posts', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('posts', 'id'))])
       .withWhere(BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')));
     const expr = ExistsExpr.exists(subquery);
     const bound = bindWhereExpr(contract, expr);
@@ -70,7 +70,7 @@ describe('bindWhereExpr', () => {
   });
 
   it('binds NOT EXISTS subquery expressions', () => {
-    const subquery = SelectAst.from(TableSource.named('posts')).withProject([
+    const subquery = SelectAst.from(TableSource.named('posts')).withProjection([
       ProjectionItem.of('id', ColumnRef.of('posts', 'id')),
     ]);
     const expr = ExistsExpr.notExists(subquery);
@@ -123,16 +123,16 @@ describe('bindWhereExpr', () => {
 
   it('binds subquery within a select that has joins, orderBy, and derived sources', () => {
     const inner = SelectAst.from(TableSource.named('posts'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('posts', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('posts', 'id'))])
       .withOrderBy([OrderByItem.asc(ColumnRef.of('posts', 'id'))])
       .withWhere(BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')));
 
-    const lateral = SelectAst.from(DerivedTableSource.as('p', inner)).withProject([
+    const lateral = SelectAst.from(DerivedTableSource.as('p', inner)).withProjection([
       ProjectionItem.of('id', ColumnRef.of('p', 'id')),
     ]);
 
     const main = SelectAst.from(TableSource.named('users'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
       .withJoins([
         JoinAst.left(
           DerivedTableSource.as('lat', lateral),
@@ -148,7 +148,7 @@ describe('bindWhereExpr', () => {
   });
 
   it('handles binary expression with non-column left side and literal right', () => {
-    const subquery = SelectAst.from(TableSource.named('users')).withProject([
+    const subquery = SelectAst.from(TableSource.named('users')).withProjection([
       ProjectionItem.of('cnt', AggregateExpr.count()),
     ]);
     const expr = BinaryExpr.gt(SubqueryExpr.of(subquery), LiteralExpr.of(0));
@@ -160,7 +160,7 @@ describe('bindWhereExpr', () => {
   });
 
   it('handles binary expression with non-column left side and column right', () => {
-    const subquery = SelectAst.from(TableSource.named('users')).withProject([
+    const subquery = SelectAst.from(TableSource.named('users')).withProjection([
       ProjectionItem.of('cnt', AggregateExpr.count()),
     ]);
     const expr = BinaryExpr.gt(SubqueryExpr.of(subquery), ColumnRef.of('users', 'id'));
@@ -173,7 +173,7 @@ describe('bindWhereExpr', () => {
 
   it('binds EXISTS with a select that has HAVING, literal projections, and where-expr joins', () => {
     const subquery = SelectAst.from(TableSource.named('users'))
-      .withProject([
+      .withProjection([
         ProjectionItem.of('email', ColumnRef.of('users', 'email')),
         ProjectionItem.of('one', LiteralExpr.of(1)),
       ])

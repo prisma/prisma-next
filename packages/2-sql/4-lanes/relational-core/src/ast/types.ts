@@ -1025,7 +1025,7 @@ export class ProjectionItem extends AstNode {
 export interface SelectAstOptions {
   readonly from: FromSource;
   readonly joins: ReadonlyArray<JoinAst> | undefined;
-  readonly project: ReadonlyArray<ProjectionItem>;
+  readonly projection: ReadonlyArray<ProjectionItem>;
   readonly where: WhereExpr | undefined;
   readonly orderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly distinct: true | undefined;
@@ -1040,7 +1040,7 @@ export interface SelectAstOptions {
 export class SelectAst extends QueryAst {
   readonly from: FromSource;
   readonly joins: ReadonlyArray<JoinAst> | undefined;
-  readonly project: ReadonlyArray<ProjectionItem>;
+  readonly projection: ReadonlyArray<ProjectionItem>;
   readonly where: WhereExpr | undefined;
   readonly orderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly distinct: true | undefined;
@@ -1055,7 +1055,7 @@ export class SelectAst extends QueryAst {
     super();
     this.from = options.from;
     this.joins = options.joins && options.joins.length > 0 ? freezeArray(options.joins) : undefined;
-    this.project = freezeArray(options.project);
+    this.projection = freezeArray(options.projection);
     this.where = options.where;
     this.orderBy =
       options.orderBy && options.orderBy.length > 0 ? freezeArray(options.orderBy) : undefined;
@@ -1077,7 +1077,7 @@ export class SelectAst extends QueryAst {
     return new SelectAst({
       from,
       joins: undefined,
-      project: [],
+      projection: [],
       where: undefined,
       orderBy: undefined,
       distinct: undefined,
@@ -1101,14 +1101,14 @@ export class SelectAst extends QueryAst {
     });
   }
 
-  withProject(project: ReadonlyArray<ProjectionItem>): SelectAst {
-    return new SelectAst({ ...this, project });
+  withProjection(projection: ReadonlyArray<ProjectionItem>): SelectAst {
+    return new SelectAst({ ...this, projection });
   }
 
-  addProject(alias: string, expr: ProjectionExpr): SelectAst {
+  addProjection(alias: string, expr: ProjectionExpr): SelectAst {
     return new SelectAst({
       ...this,
-      project: [...this.project, new ProjectionItem(alias, expr)],
+      projection: [...this.projection, new ProjectionItem(alias, expr)],
     });
   }
 
@@ -1164,7 +1164,7 @@ export class SelectAst extends QueryAst {
     const rewritten = new SelectAst({
       from: this.from.rewrite(rewriter),
       joins: this.joins?.map((join) => join.rewrite(rewriter)),
-      project: this.project.map(
+      projection: this.projection.map(
         (projection) =>
           new ProjectionItem(
             projection.alias,
@@ -1199,7 +1199,7 @@ export class SelectAst extends QueryAst {
       pushRefs(this.from.query.collectColumnRefs());
     }
 
-    for (const projection of this.project) {
+    for (const projection of this.projection) {
       if (!(projection.expr instanceof LiteralExpr)) {
         pushRefs(projection.expr.collectColumnRefs());
       }
@@ -1244,7 +1244,7 @@ export class SelectAst extends QueryAst {
       pushRefs(this.from.query.collectParamRefs());
     }
 
-    for (const projection of this.project) {
+    for (const projection of this.projection) {
       if (!(projection.expr instanceof LiteralExpr)) {
         pushRefs(projection.expr.collectParamRefs());
       }

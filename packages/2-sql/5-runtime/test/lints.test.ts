@@ -89,7 +89,7 @@ describe('lints plugin', () => {
     'warns for unbounded selects and selectAll intent',
     async () => {
       const ast = SelectAst.from(userTable)
-        .withProject([ProjectionItem.of('id', idCol)])
+        .withProjection([ProjectionItem.of('id', idCol)])
         .withSelectAllIntent({ table: 'user' });
       const plan = createPlan({ ast });
       const plugin = lints();
@@ -111,9 +111,9 @@ describe('lints plugin', () => {
     async () => {
       const derived = DerivedTableSource.as(
         'user_ids',
-        SelectAst.from(userTable).withProject([ProjectionItem.of('id', idCol)]),
+        SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]),
       );
-      const ast = SelectAst.from(derived).withProject([
+      const ast = SelectAst.from(derived).withProjection([
         ProjectionItem.of('id', ColumnRef.of('user_ids', 'id')),
       ]);
       const plan = createPlan({ ast });
@@ -136,7 +136,7 @@ describe('lints plugin', () => {
     async () => {
       const selectPlan = createPlan({
         ast: SelectAst.from(userTable)
-          .withProject([ProjectionItem.of('id', idCol)])
+          .withProjection([ProjectionItem.of('id', idCol)])
           .withWhere(BinaryExpr.eq(idCol, ParamRef.of(1)))
           .withLimit(10),
       });

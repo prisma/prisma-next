@@ -59,16 +59,16 @@ describe('where interop select/source branches', () => {
       DerivedTableSource.as(
         'users_src',
         SelectAst.from(TableSource.named('users'))
-          .withProject([ProjectionItem.of('id', col('users', 'id'))])
+          .withProjection([ProjectionItem.of('id', col('users', 'id'))])
           .withWhere(BinaryExpr.eq(col('users', 'kind'), param(1, 'kind'))),
       ),
     )
-      .withProject([
+      .withProjection([
         ProjectionItem.of('id', col('users_src', 'id')),
         ProjectionItem.of(
           'nested',
           SubqueryExpr.of(
-            SelectAst.from(TableSource.named('posts')).withProject([
+            SelectAst.from(TableSource.named('posts')).withProjection([
               ProjectionItem.of('title', op(col('posts', 'title'), [param(3, 'nested')])),
             ]),
           ),
@@ -107,10 +107,10 @@ describe('where interop select/source branches', () => {
         DerivedTableSource.as(
           'users_src',
           SelectAst.from(TableSource.named('users'))
-            .withProject([ProjectionItem.of('id', col('users', 'id'))])
+            .withProjection([ProjectionItem.of('id', col('users', 'id'))])
             .withWhere(BinaryExpr.eq(col('users', 'id'), param(1, 'id'))),
         ),
-      ).withProject([ProjectionItem.of('id', col('users_src', 'id'))]),
+      ).withProjection([ProjectionItem.of('id', col('users_src', 'id'))]),
     );
 
     expect(() => normalizeWhereArg(expr)).toThrow(/bare WhereExpr.*ParamRef/i);
@@ -125,13 +125,13 @@ describe('where interop select/source branches', () => {
   it('accepts bare exists with literal and subquery projections when param-free', () => {
     const expr = ExistsExpr.exists(
       SelectAst.from(TableSource.named('users'))
-        .withProject([
+        .withProjection([
           ProjectionItem.of('id', col('users', 'id')),
           ProjectionItem.of('tag', literal('x')),
           ProjectionItem.of(
             'postId',
             SubqueryExpr.of(
-              SelectAst.from(TableSource.named('posts')).withProject([
+              SelectAst.from(TableSource.named('posts')).withProjection([
                 ProjectionItem.of('id', col('posts', 'id')),
               ]),
             ),
@@ -146,11 +146,11 @@ describe('where interop select/source branches', () => {
   it('rejects bare exists with params in top-level and nested subqueries', () => {
     const expr = ExistsExpr.exists(
       SelectAst.from(TableSource.named('users'))
-        .withProject([
+        .withProjection([
           ProjectionItem.of(
             'postId',
             SubqueryExpr.of(
-              SelectAst.from(TableSource.named('posts')).withProject([
+              SelectAst.from(TableSource.named('posts')).withProjection([
                 ProjectionItem.of('id', op(col('posts', 'id'), [param(2, 'nested')])),
               ]),
             ),

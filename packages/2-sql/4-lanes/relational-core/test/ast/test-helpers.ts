@@ -43,7 +43,7 @@ export function lowerExpr(
 
 export function simpleSelect(tableName: string, columns: ReadonlyArray<string>): SelectAst {
   return columns.reduce(
-    (ast, column) => ast.addProject(column, col(tableName, column)),
+    (ast, column) => ast.addProjection(column, col(tableName, column)),
     SelectAst.from(table(tableName)),
   );
 }

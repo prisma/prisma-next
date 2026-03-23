@@ -16,7 +16,7 @@ import { createMockRuntime, getTestContract } from './helpers';
 
 function makeCompiled(sqlText = 'select 1'): SqlQueryPlan<Record<string, unknown>> {
   return {
-    ast: SelectAst.from(TableSource.named('users')).withProject([
+    ast: SelectAst.from(TableSource.named('users')).withProjection([
       ProjectionItem.of('_sql', LiteralExpr.of(sqlText)),
     ]),
     params: [],

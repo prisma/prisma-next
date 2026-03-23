@@ -102,7 +102,7 @@ describe('buildKyselyPlan', () => {
     expect(plan.ast).toBeInstanceOf(SelectAst);
     const ast = plan.ast as SelectAst;
     expect(ast.from).toEqual(TableSource.named('user'));
-    expect((ast.where as BinaryExpr).left).toEqual(ast.project[0]!.expr);
+    expect((ast.where as BinaryExpr).left).toEqual(ast.projection[0]!.expr);
     expect((ast.where as BinaryExpr).right).toEqual(ParamRef.of(1));
     expect(ast.limit).toBe(2);
     expect(plan.params).toEqual(['u1']);
