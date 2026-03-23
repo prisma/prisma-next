@@ -1,5 +1,11 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import { BinaryExpr, ColumnRef, ParamRef, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  ColumnRef,
+  OrderByItem,
+  ParamRef,
+  SelectAst,
+} from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
@@ -32,6 +38,7 @@ describe('sql DSL builder', () => {
       { alias: 'email', expr: ColumnRef.of('user', 'email') },
     ]);
     expect(ast.where).toEqual(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'userId')));
+    expect(ast.orderBy).toEqual([OrderByItem.desc(ColumnRef.of('user', 'createdAt'))]);
     expect(ast.limit).toBe(5);
     expect(plan.params).toEqual([42]);
     expect(plan.meta).toMatchObject({
