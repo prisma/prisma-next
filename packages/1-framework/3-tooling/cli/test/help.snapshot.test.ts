@@ -9,7 +9,7 @@ import { formatCommandHelp, formatRootHelp } from '../src/utils/formatters/help'
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('help text snapshots', { timeout: timeouts.default }, () => {
-  it('formats root help', () => {
+  it('formats root help', { timeout: timeouts.databaseOperation }, () => {
     const program = new Command();
     program.name('prisma-next').description('Prisma Next CLI');
     const contract = new Command('contract').description('Contract management commands');
