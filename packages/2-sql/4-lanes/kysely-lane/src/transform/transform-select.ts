@@ -85,7 +85,7 @@ export function transformSelections(
   selections: ReadonlyArray<SelectionNode> | undefined,
   ctx: TransformContext,
   fromTable: string,
-): SelectAst['project'] {
+): SelectAst['projection'] {
   const project: ProjectionItem[] = [];
 
   if (!selections || selections.length === 0) {

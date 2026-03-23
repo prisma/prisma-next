@@ -249,7 +249,7 @@ describe('Kysely build-only lane', () => {
         ast: {
           from: { name: 'user' },
           limit: 5,
-          project: [
+          projection: [
             { expr: { table: 'user', column: 'id' } },
             { expr: { table: 'user', column: 'email' } },
           ],
