@@ -359,8 +359,8 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations).toHaveLength(1);
       const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
-      expect(postcheckSql).toContain('regtype');
-      expect(postcheckSql).toContain('int4');
+      expect(postcheckSql).toContain('format_type');
+      expect(postcheckSql).toContain('integer');
       expect(postcheckSql).not.toBe(result.operations[0]!.precheck[0]!.sql);
     });
 

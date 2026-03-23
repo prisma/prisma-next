@@ -976,7 +976,53 @@ export function columnNullabilityCheck({
 )`;
 }
 
-/** Checks that the column's type OID matches the expected native type via `::regtype` cast. */
+/**
+ * Maps contract native type names to the display form returned by PostgreSQL's
+ * `format_type()`. Base types use short names in the contract (e.g., `int4`)
+ * but `format_type()` returns SQL-standard names (e.g., `integer`).
+ */
+const FORMAT_TYPE_DISPLAY: ReadonlyMap<string, string> = new Map([
+  ['int2', 'smallint'],
+  ['int4', 'integer'],
+  ['int8', 'bigint'],
+  ['float4', 'real'],
+  ['float8', 'double precision'],
+  ['bool', 'boolean'],
+]);
+
+/**
+ * Builds the string that `format_type(atttypid, atttypmod)` would return for a
+ * contract column. Used for postchecks — separate from `buildColumnTypeSql` which
+ * produces DDL-safe strings (e.g., quoted identifiers, SERIAL).
+ */
+export function buildExpectedFormatType(
+  column: StorageColumn,
+  codecHooks: Map<string, CodecControlHooks>,
+): string {
+  // Parameterized types: expand with typeParams.
+  // format_type() returns the same form (e.g., 'character varying(255)').
+  if (column.typeParams && column.codecId) {
+    const hooks = codecHooks.get(column.codecId);
+    if (hooks?.expandNativeType) {
+      return hooks.expandNativeType({
+        nativeType: column.nativeType,
+        codecId: column.codecId,
+        typeParams: column.typeParams,
+      });
+    }
+  }
+
+  // User-defined types (enums, composites): format_type() returns the bare name,
+  // unlike DDL which needs quoteIdentifier().
+  if (column.typeRef) {
+    return column.nativeType;
+  }
+
+  // Base types: map contract short names to format_type() display names.
+  return FORMAT_TYPE_DISPLAY.get(column.nativeType) ?? column.nativeType;
+}
+
+/** Checks that the column's full type (including typmods) matches the expected type via `format_type()`. */
 export function columnTypeCheck({
   schema,
   table,
@@ -996,7 +1042,7 @@ export function columnTypeCheck({
   WHERE n.nspname = '${escapeLiteral(schema)}'
     AND c.relname = '${escapeLiteral(table)}'
     AND a.attname = '${escapeLiteral(column)}'
-    AND a.atttypid = '${escapeLiteral(expectedType)}'::regtype
+    AND format_type(a.atttypid, a.atttypmod) = '${escapeLiteral(expectedType)}'
     AND NOT a.attisdropped
 )`;
 }
