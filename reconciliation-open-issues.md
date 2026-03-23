@@ -1,0 +1,92 @@
+# Reconciliation Issues — fix/planner-issues branch
+
+Consolidated from code review, TODOs, and issue triage. Verified against codebase on 2026-03-23.
+
+---
+
+## Open bugs
+
+### 2. `extra_default` false positives on serial/identity columns
+
+**Location:** `verify-sql-schema.ts:739`
+**Code review:** #2
+
+The `extra_default` check fires when `strict && schemaColumn.default` is truthy but the contract has no default. Serial/identity columns have implicit defaults (`nextval('..._seq')`) that the contract doesn't declare — the contract uses `autoincrement` semantics instead. There is no guard for this anywhere in the verify path (confirmed: no `nextval`, `serial`, `isGenerated`, or `autoincrement` references in `verify-sql-schema.ts`).
+
+This will produce false positives for any serial/identity column in strict mode.
+
+**Fix:** Guard the `extra_default` check to skip columns where `schemaColumn.default` starts with `nextval(` or the contract column has generated/autoincrement semantics.
+
+### 9. `columnTypeCheck` postcheck silently passes for wrong typmods
+
+**Location:** `planner.ts:979-1002`
+**Code review:** #3 (CodeRabbit re-review on PR #248)
+
+`columnTypeCheck` compares `a.atttypid = '${expectedType}'::regtype`. PostgreSQL's `::regtype` cast drops type modifiers — `'varchar(255)'::regtype` resolves to the same OID as `'varchar(64)'::regtype`. This means:
+
+1. `buildColumnTypeSql` can return parameterized types (e.g., `varchar(255)`) via `renderParameterizedTypeSql` (line 793).
+2. That value becomes `expectedType` in the postcheck.
+3. The postcheck passes for *any* typmod variant of the same base type.
+
+So an `ALTER COLUMN TYPE varchar(255)` postcheck would pass even if the column is still `varchar(64)`.
+
+**Fix:** Use `format_type(a.atttypid, a.atttypmod)` instead of `a.atttypid = ...::regtype` to compare the full type specification including typmods. Needs a normalizer for the comparison since `format_type` returns display names (e.g., `character varying(255)` not `varchar(255)`).
+
+---
+
+## Open design questions
+
+### 7. `default_mismatch` classified as `widening` — intentional?
+
+**Location:** `planner-reconciliation.ts:214-234, 610`
+**Code review:** #4
+
+`default_mismatch` requires `mode.allowWidening` and produces `operationClass: 'widening'`. Changing a default doesn't break existing rows, so this is defensible. But it means changing `DEFAULT 'draft'` to `DEFAULT 'active'` is classified the same as `DROP NOT NULL`. Worth confirming this matches the intended operation class taxonomy.
+
+User input: I don't feel like this is narrowing, widening or destructive, I don't think?
+
+### 8. Operation ordering in compound scenarios
+
+**Location:** `planner-reconciliation.ts:740-750`
+**Code review:** #7
+
+`sortSchemaIssues` sorts alphabetically by `kind`. For "change type and default together", this means `default_mismatch` executes before `type_mismatch`. This works today because tested cases are forgiving, but a type-sensitive default (only valid for the new type) would fail. Pre-existing issue, not introduced by this PR.
+
+---
+
+## Deferred
+
+### 3. Duplicate `SchemaIssue` type in two packages
+
+**Location:**
+- `packages/1-framework/1-core/migration/control-plane/src/types.ts:391-420`
+- `packages/1-framework/1-core/shared/config/src/types.ts:191-220`
+
+**Code review:** #9
+
+`SchemaIssue`, `SchemaVerificationNode`, and `VerifyDatabaseSchemaResult` are duplicated identically across both files. The duplicate was introduced in `af0712a3b` ("feat(config): add shared config package for authoring surface") — copy-pasted from `core-control-plane`, kept in sync manually since. Every new issue kind (like `extra_default`) must be added to both.
+
+**Layering analysis:** `@prisma-next/config` is in the `shared` plane; `@prisma-next/core-control-plane` is in the `migration` plane. Plane rules forbid shared from importing migration. Migration can import shared. So the canonical types must live in `config` (shared), and `core-control-plane` should add a dependency on `@prisma-next/config` and re-export them. All external consumers import from `core-control-plane/types` today, so the re-export keeps them working unchanged. Config's copy is not even exported from its public API — it's only used internally by the `ControlFamilyInstance.schemaVerify()` return type.
+
+---
+
+## Fixed / not applicable
+
+### Fixed in this branch
+
+| Item | Resolution |
+|---|---|
+| #1 — `buildSetDefaultOperation` postcheck checks existence, not value | `buildSetDefaultOperation` now uses `columnDefaultValueCheck` with `renderExpectedPgDefault`. Both default builders refactored to take `columnDefault` as a separate parameter. |
+| #4 — `columnDefaultCheck` naming | Renamed to `columnDefaultExistsCheck`, added JSDoc to all three check helpers. |
+| #5 — Spread workaround in default builders | Eliminated by refactoring to take `columnDefault` as a separate parameter with `Omit<StorageColumn, 'default'>`. |
+| Issue triage: extra_default | TML-2091 — implemented in this branch. |
+| TODO at line 629 | Stale — `buildAlterDefaultOperation` already uses `columnDefaultValueCheck`. Removed. |
+
+### Not applicable
+
+| Item | Reason |
+|---|---|
+| #3 — `columnTypeCheck` fragility with aliased PG types | Original alias concern is N/A (contract stores canonical types). The *typmod* variant of this concern is real — tracked as Bug #9 above. |
+| #6 — Missing `default: never` in switch | `noImplicitReturns` is enabled, making this redundant. |
+| #10 — Same operation id for set/alter default | A column can only have `default_missing` OR `default_mismatch`, never both — the verifier logic is mutually exclusive. |
+| #11 — `makeTable` implicit PK | Test helper convention is clear from usage; callers that need different PK behavior use inline definitions. |
