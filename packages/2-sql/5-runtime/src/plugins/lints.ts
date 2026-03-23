@@ -1,4 +1,4 @@
-import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { Plugin, PluginContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
 import {
@@ -64,7 +64,7 @@ function getFromSourceTableDetail(source: FromSource): string | undefined {
   return undefined;
 }
 
-function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
+function evaluateAstLints(ast: QueryAst): LintFinding[] {
   const findings: LintFinding[] = [];
 
   if (ast instanceof DeleteAst) {
@@ -101,11 +101,8 @@ function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
         ...ifDefined('details', table !== undefined ? { table } : undefined),
       });
     }
-    const annotationIntent = meta.annotations?.['selectAllIntent'] as
-      | { table?: string }
-      | undefined;
-    if (ast.selectAllIntent !== undefined || annotationIntent !== undefined) {
-      const table = ast.selectAllIntent?.table ?? annotationIntent?.table;
+    if (ast.selectAllIntent !== undefined) {
+      const table = ast.selectAllIntent.table;
       findings.push({
         code: 'LINT.SELECT_STAR',
         severity: 'warn',
@@ -164,7 +161,7 @@ export function lints<TContract = unknown, TAdapter = unknown, TDriver = unknown
 
     async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
       if (isSqlQueryAst(plan.ast)) {
-        const findings = evaluateAstLints(plan.ast, plan.meta);
+        const findings = evaluateAstLints(plan.ast);
 
         for (const lint of findings) {
           const configuredSeverity = getConfiguredSeverity(lint.code, options);
