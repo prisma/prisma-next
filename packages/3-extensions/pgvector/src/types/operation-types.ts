@@ -1,3 +1,5 @@
+import type { SqlQueryOperationTypes } from '@prisma-next/sql-contract/types';
+
 /**
  * Operation type definitions for pgvector extension.
  *
@@ -31,7 +33,7 @@ export type OperationTypes = {
 };
 
 /** Flat operation signatures for the query builder. */
-export type QueryOperationTypes = {
+export type QueryOperationTypes = SqlQueryOperationTypes<{
   readonly cosineDistance: {
     readonly args: readonly [
       { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
@@ -39,4 +41,4 @@ export type QueryOperationTypes = {
     ];
     readonly returns: { readonly codecId: 'pg/float8@1'; readonly nullable: false };
   };
-};
+}>;

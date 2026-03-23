@@ -1,4 +1,4 @@
-import type { StorageTable } from '@prisma-next/sql-contract/types';
+import type { QueryOperationTypesBase, StorageTable } from '@prisma-next/sql-contract/types';
 
 export type CapabilityGated<Capabilities, Required, TrueBranch> = Capabilities extends Required
   ? TrueBranch
@@ -68,18 +68,10 @@ export type Subquery<RowType extends Record<string, ScopeField>> = {
   [SubqueryMarker]: RowType;
 };
 
-export type OperationTypesBase = Record<
-  string,
-  {
-    readonly args: readonly ScopeField[];
-    readonly returns: ScopeField;
-  }
->;
-
 export type QueryContext = {
   readonly codecTypes: CodecTypesBase;
   readonly capabilities: Record<string, Record<string, boolean>>;
-  readonly queryOperationTypes: OperationTypesBase;
+  readonly queryOperationTypes: QueryOperationTypesBase;
 };
 
 export type { CodecTypesBase, StorageTable };

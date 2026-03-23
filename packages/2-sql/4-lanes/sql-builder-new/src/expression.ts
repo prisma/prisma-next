@@ -1,7 +1,7 @@
+import type { QueryOperationTypesBase } from '@prisma-next/sql-contract/types';
 import type {
   Expand,
   ExpressionType,
-  OperationTypesBase,
   QueryContext,
   Scope,
   ScopeField,
@@ -71,7 +71,7 @@ type ExtensionFunctionArgs<
 > = { [I in keyof Args]: ExpressionOrValue<Args[I], CT> };
 
 type DeriveExtFunctions<
-  OT extends OperationTypesBase,
+  OT extends QueryOperationTypesBase,
   CT extends Record<string, { readonly input: unknown }>,
 > = {
   [K in keyof OT]: (

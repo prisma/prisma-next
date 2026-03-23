@@ -179,6 +179,15 @@ export type OperationTypesOf<T> = [T] extends [never]
       : Record<string, never>
     : Record<string, never>;
 
+export type QueryOperationTypeEntry = {
+  readonly args: readonly { readonly codecId: string; readonly nullable: boolean }[];
+  readonly returns: { readonly codecId: string; readonly nullable: boolean };
+};
+
+export type SqlQueryOperationTypes<T extends Record<string, QueryOperationTypeEntry>> = T;
+
+export type QueryOperationTypesBase = Record<string, QueryOperationTypeEntry>;
+
 export type QueryOperationTypesOf<T> = [T] extends [never]
   ? Record<string, never>
   : T extends { readonly queryOperationTypes: infer Q }
