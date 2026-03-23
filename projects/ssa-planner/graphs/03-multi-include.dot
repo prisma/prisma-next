@@ -1,0 +1,40 @@
+// db.users.include('posts').include('profile').all()
+digraph {
+  label="db.users.include('posts').include('profile').all()"
+  labelloc=t
+  fontsize=16
+  fontname="Helvetica-Bold"
+  rankdir=BT
+  node [fontname="Helvetica" fontsize=11 style=filled]
+  edge [fontname="Helvetica" fontsize=9]
+
+  // Nodes
+  start [label="Start" shape=circle fillcolor=white]
+  cs_users_0 [label="CollectionState\n(users, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  cs_posts_0 [label="CollectionState\n(posts, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  cs_profiles_0 [label="CollectionState\n(profiles, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  read_users [label="Read\n(users, [*])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  read_posts [label="Read\n(posts, [*])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  read_profiles [label="Read\n(profiles, [*])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  nest_posts [label="Nest\nleftKeys=[id]\nrightKeys=[userId]\nfield=posts" shape=box fillcolor="#d5e8d4" color="#82b366"]
+  nest_profile [label="Nest\nleftKeys=[id]\nrightKeys=[userId]\nfield=profile" shape=box fillcolor="#d5e8d4" color="#82b366"]
+  ret [label="Return" shape=doublecircle fillcolor=black fontcolor=white]
+
+  // Edges
+  cs_users_0 -> start [color=gray60]
+  cs_posts_0 -> start [color=gray60]
+  cs_profiles_0 -> start [color=gray60]
+  read_users -> cs_users_0 [color=gray60]
+  read_posts -> read_users [label="FilterData\n(users.id -> posts.userId)" color="#2196F3" fontcolor="#2196F3"]
+  read_posts -> cs_posts_0 [color=gray60]
+  read_profiles -> read_users [label="FilterData\n(users.id -> profiles.userId)" color="#2196F3" fontcolor="#2196F3"]
+  read_profiles -> cs_profiles_0 [color=gray60]
+  nest_posts -> read_users [label="left" color=gray60]
+  nest_posts -> read_posts [label="right" color=gray60]
+  nest_profile -> nest_posts [label="left" color=gray60]
+  nest_profile -> read_profiles [label="right" color=gray60]
+  ret -> nest_profile [color=gray60]
+  ret -> cs_users_0 [color=gray60 style=dashed]
+  ret -> cs_posts_0 [color=gray60 style=dashed]
+  ret -> cs_profiles_0 [color=gray60 style=dashed]
+}
