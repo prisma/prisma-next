@@ -355,6 +355,11 @@ export interface GenerateContractTypesOptions {
    * These are merged with codec and operation type imports in contract.d.ts.
    */
   readonly parameterizedTypeImports?: ReadonlyArray<TypesImportSpec>;
+  /**
+   * Query operation type imports for the query builder.
+   * Flat operation signatures keyed by operation name, emitted as standalone QueryOperationTypes.
+   */
+  readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;
 }
 
 /**

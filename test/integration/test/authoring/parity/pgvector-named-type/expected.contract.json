@@ -108,6 +108,13 @@
             "package": "@prisma-next/extension-pgvector/operation-types"
           }
         },
+        "queryOperationTypes": {
+          "import": {
+            "alias": "PgVectorQueryOperationTypes",
+            "named": "QueryOperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
         "storage": [
           {
             "familyId": "sql",
