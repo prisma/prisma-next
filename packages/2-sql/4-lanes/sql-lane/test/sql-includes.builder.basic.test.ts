@@ -6,6 +6,7 @@ import {
   JoinAst,
   JsonArrayAggExpr,
   type JsonObjectExpr,
+  ParamRef,
   type SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -80,7 +81,7 @@ describe('SQL builder includeMany', () => {
     expect(rowsQuery.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId')),
-        BinaryExpr.eq(ColumnRef.of('post', 'title'), { index: 1, name: 'title' } as never),
+        BinaryExpr.eq(ColumnRef.of('post', 'title'), ParamRef.of(1, 'title')),
       ]),
     );
   });
