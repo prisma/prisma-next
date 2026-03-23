@@ -3,6 +3,7 @@ import {
   EqColJoinOn,
   JoinAst,
   type SelectAst,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { describe, expect, it } from 'vitest';
@@ -33,6 +34,7 @@ describe('SQL join builder', () => {
     const join = (plan.ast as SelectAst).joins?.[0];
     expect(join).toBeInstanceOf(JoinAst);
     expect(join?.joinType).toBe(expectedJoinType);
+    expect(join?.source).toEqual(TableSource.named('post'));
     expect(join?.on).toEqual(
       EqColJoinOn.of(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId')),
     );
