@@ -948,6 +948,74 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     expect(defaultRow.rows[0]?.column_default).toContain('gen_random_uuid');
   });
 
+  it('changes column type from text to enum', { timeout: testTimeout }, async () => {
+    const baselineContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        }),
+      },
+      'text-to-enum-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
+
+    const updatedContract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
+      profileHash: profileHash('sha256:reconciliation-integ-text-to-enum-updated'),
+      storage: {
+        tables: {
+          item: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              status: {
+                nativeType: 'status_type',
+                codecId: 'pg/enum@1',
+                nullable: false,
+                typeRef: 'status_type',
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+        types: {
+          status_type: {
+            codecId: 'pg/enum@1',
+            nativeType: 'status_type',
+            typeParams: { values: ['active', 'inactive'] },
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      sources: {},
+    };
+
+    await planAndExecute(driver!, updatedContract);
+
+    const typeRow = await driver!.query<{ formatted_type: string }>(
+      `SELECT format_type(a.atttypid, a.atttypmod) AS formatted_type
+         FROM pg_attribute a
+         JOIN pg_class c ON c.oid = a.attrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public'
+           AND c.relname = 'item'
+           AND a.attname = 'status'
+           AND NOT a.attisdropped`,
+    );
+    expect(typeRow.rows[0]?.formatted_type).toBe('status_type');
+  });
+
   it(
     'widens nullability and drops default from a NOT NULL DEFAULT column',
     { timeout: testTimeout },
