@@ -17,21 +17,6 @@ This will produce false positives for any serial/identity column in strict mode.
 
 **Fix:** Guard the `extra_default` check to skip columns where `schemaColumn.default` starts with `nextval(` or the contract column has generated/autoincrement semantics.
 
-### 9. `columnTypeCheck` postcheck silently passes for wrong typmods
-
-**Location:** `planner.ts:979-1002`
-**Code review:** #3 (CodeRabbit re-review on PR #248)
-
-`columnTypeCheck` compares `a.atttypid = '${expectedType}'::regtype`. PostgreSQL's `::regtype` cast drops type modifiers — `'varchar(255)'::regtype` resolves to the same OID as `'varchar(64)'::regtype`. This means:
-
-1. `buildColumnTypeSql` can return parameterized types (e.g., `varchar(255)`) via `renderParameterizedTypeSql` (line 793).
-2. That value becomes `expectedType` in the postcheck.
-3. The postcheck passes for *any* typmod variant of the same base type.
-
-So an `ALTER COLUMN TYPE varchar(255)` postcheck would pass even if the column is still `varchar(64)`.
-
-**Fix:** Use `format_type(a.atttypid, a.atttypmod)` instead of `a.atttypid = ...::regtype` to compare the full type specification including typmods. Needs a normalizer for the comparison since `format_type` returns display names (e.g., `character varying(255)` not `varchar(255)`).
-
 ---
 
 ## Open design questions
@@ -81,12 +66,13 @@ User input: I don't feel like this is narrowing, widening or destructive, I don'
 | #5 — Spread workaround in default builders | Eliminated by refactoring to take `columnDefault` as a separate parameter with `Omit<StorageColumn, 'default'>`. |
 | Issue triage: extra_default | TML-2091 — implemented in this branch. |
 | TODO at line 629 | Stale — `buildAlterDefaultOperation` already uses `columnDefaultValueCheck`. Removed. |
+| #9 — `columnTypeCheck` typmod blindness | Fixed: `columnTypeCheck` now uses `format_type(atttypid, atttypmod)` with `buildExpectedFormatType` for typmod-aware comparison. |
 
 ### Not applicable
 
 | Item | Reason |
 |---|---|
-| #3 — `columnTypeCheck` fragility with aliased PG types | Original alias concern is N/A (contract stores canonical types). The *typmod* variant of this concern is real — tracked as Bug #9 above. |
+| #3 — `columnTypeCheck` fragility with aliased PG types | Original alias concern is N/A (contract stores canonical types). The typmod variant was real and is now fixed (#9). |
 | #6 — Missing `default: never` in switch | `noImplicitReturns` is enabled, making this redundant. |
 | #10 — Same operation id for set/alter default | A column can only have `default_missing` OR `default_mismatch`, never both — the verifier logic is mutually exclusive. |
 | #11 — `makeTable` implicit PK | Test helper convention is clear from usage; callers that need different PK behavior use inline definitions. |
