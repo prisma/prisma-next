@@ -2,6 +2,8 @@ import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
+import { builtinGeneratorIds } from '@prisma-next/ids';
+import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -25,6 +27,13 @@ import type {
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
+
+function createTestMutationDefaultGenerators() {
+  return builtinGeneratorIds.map((id) => ({
+    id,
+    generate: (params?: Record<string, unknown>) => generateId(params ? { id, params } : { id }),
+  }));
+}
 
 /**
  * Executes a plan and collects all results into an array.
@@ -121,6 +130,7 @@ export function createTestAdapterDescriptor(
     codecs: () => codecRegistry,
     operationSignatures: () => [],
     parameterizedCodecs: () => [],
+    mutationDefaultGenerators: createTestMutationDefaultGenerators,
     create(): SqlRuntimeAdapterInstance<'postgres'> {
       return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
     },

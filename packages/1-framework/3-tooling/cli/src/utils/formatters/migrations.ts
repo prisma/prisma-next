@@ -1,6 +1,7 @@
-import { cyan, green, yellow } from 'colorette';
+import { bold, cyan, green, yellow } from 'colorette';
 
 import type { GlobalFlags } from '../global-flags';
+import type { StatusDiagnostic, StatusRef } from '../migration-types';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
 // ============================================================================
@@ -304,21 +305,15 @@ interface MigrationStatusEntry {
   readonly status: 'applied' | 'pending' | 'unknown';
 }
 
-interface StatusDiagnostic {
-  readonly code: string;
-  readonly severity: 'warn' | 'info';
-  readonly message: string;
-  readonly hints: readonly string[];
-}
-
 interface MigrationStatusResult {
   readonly mode: 'online' | 'offline';
   readonly migrations: readonly MigrationStatusEntry[];
   readonly markerHash?: string;
-  readonly leafHash: string;
+  readonly targetHash: string;
   readonly contractHash: string;
   readonly summary: string;
   readonly diagnostics?: readonly StatusDiagnostic[];
+  readonly refs?: readonly StatusRef[];
 }
 
 export function formatMigrationStatusOutput(
@@ -336,6 +331,19 @@ export function formatMigrationStatusOutput(
   const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
   const formatCyan = createColorFormatter(useColor, cyan);
+  const formatBold = createColorFormatter(useColor, bold);
+
+  const refsByHash = new Map<string, StatusRef[]>();
+  if (result.refs) {
+    for (const ref of result.refs) {
+      let bucket = refsByHash.get(ref.hash);
+      if (!bucket) {
+        bucket = [];
+        refsByHash.set(ref.hash, bucket);
+      }
+      bucket.push(ref);
+    }
+  }
 
   if (result.migrations.length === 0) {
     lines.push(`${formatDimText('No migrations found')}`);
@@ -365,10 +373,22 @@ export function formatMigrationStatusOutput(
           marker = formatCyan('  ◄ DB');
         }
       }
+      const matchingRefs = refsByHash.get(entry.to);
+      if (matchingRefs) {
+        for (const ref of matchingRefs) {
+          const label = `◄ ref:${ref.name}`;
+          marker += ref.active ? `  ${formatBold(formatCyan(label))}` : `  ${formatDimText(label)}`;
+        }
+      }
       if (isLast && entry.to === result.contractHash) {
         marker += `  ${formatCyan('◄ Contract')}`;
       } else if (isLast && result.contractHash !== entry.to) {
-        marker += `  ${formatYellow('◄ Contract is ahead — run migration plan')}`;
+        const hasActiveRef = result.refs?.some((r) => r.active);
+        if (hasActiveRef) {
+          marker += `  ${formatCyan('◄ Contract')}`;
+        } else {
+          marker += `  ${formatYellow('◄ Contract is ahead — run migration plan')}`;
+        }
       }
 
       lines.push(`${formatDimText(treeChar)}─ ${entry.dirName}${statusBadge}${marker}`);

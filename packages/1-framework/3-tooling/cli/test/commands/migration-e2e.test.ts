@@ -13,6 +13,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { isAttested } from '@prisma-next/migration-tools/types';
 import { describe, expect, it } from 'vitest';
 
 function createContract(
@@ -76,7 +77,6 @@ describe('migration plan → verify end-to-end', () => {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:initial-hash',
       migrationId: null,
-      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract,
@@ -132,7 +132,6 @@ describe('migration plan → verify end-to-end', () => {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         migrationId: null,
-        parentMigrationId: null,
         kind: 'regular',
         fromContract: null,
         toContract: contractA,
@@ -147,7 +146,7 @@ describe('migration plan → verify end-to-end', () => {
       },
       [createTableOp('user')],
     );
-    const migrationId1 = await attestMigration(path1);
+    await attestMigration(path1);
 
     // Plan 2: A → B
     const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
@@ -158,7 +157,6 @@ describe('migration plan → verify end-to-end', () => {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
         migrationId: null,
-        parentMigrationId: migrationId1,
         kind: 'regular',
         fromContract: contractA,
         toContract: contractB,
@@ -179,7 +177,7 @@ describe('migration plan → verify end-to-end', () => {
     const packages = await readMigrationsDir(migrationsDir);
     expect(packages).toHaveLength(2);
 
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     expect(leaf).toBe('sha256:hash-b');
 
@@ -211,7 +209,6 @@ describe('migration plan → verify end-to-end', () => {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:target-hash',
         migrationId: null,
-        parentMigrationId: null,
         kind: 'regular',
         fromContract: null,
         toContract: contract,
@@ -230,7 +227,7 @@ describe('migration plan → verify end-to-end', () => {
 
     // Read migrations and check leaf
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
 
     // Same hash → no-op
@@ -253,7 +250,6 @@ describe('migration plan → verify end-to-end', () => {
         from: EMPTY_CONTRACT_HASH,
         to: EMPTY_CONTRACT_HASH,
         migrationId: null,
-        parentMigrationId: null,
         kind: 'regular',
         fromContract: null,
         toContract: createContract({}),

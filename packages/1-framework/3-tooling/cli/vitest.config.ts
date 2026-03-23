@@ -52,6 +52,7 @@ export default defineConfig({
         'src/commands/migration-plan.ts',
         'src/commands/migration-show.ts',
         'src/commands/migration-status.ts',
+        'src/commands/migration-ref.ts',
         'src/commands/migration-verify.ts',
         // Error factory functions — just constructors
         'src/utils/cli-errors.ts',

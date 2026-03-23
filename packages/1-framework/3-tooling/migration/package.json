@@ -52,6 +52,10 @@
       "types": "./dist/exports/dag.d.mts",
       "import": "./dist/exports/dag.mjs"
     },
+    "./refs": {
+      "types": "./dist/exports/refs.d.mts",
+      "import": "./dist/exports/refs.mjs"
+    },
     "./package.json": "./package.json"
   },
   "repository": {

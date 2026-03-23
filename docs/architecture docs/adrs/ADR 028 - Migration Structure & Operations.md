@@ -6,10 +6,10 @@ Prisma Next models migrations as edges between data contract hashes rather than 
 
 ## Decision
 
-Migrations are defined as directed edges in a DAG, with rich metadata supporting graph reconstruction and squashing operations:
+Migrations are defined as directed edges in a graph, with rich metadata supporting graph reconstruction and squashing operations:
 
 **Structure (Primary):**
-- Migrations are directed edges from `fromCoreHash` → `toCoreHash` with complete contract context
+- Migrations are directed edges from `from` → `to` (contract storage hashes) with complete contract context
 - Each migration file carries metadata enabling graph reconstruction without a separate ledger
 - Baseline migrations can subsume a contiguous path of regular migrations
 
@@ -48,8 +48,8 @@ ADR 102 (Squash-first policy & squash advisor) defines the **policy layer** that
 Together, they form composable primitives: ADR 028 provides the mechanisms, ADR 102 provides the policy for using those mechanisms.
 
 ## Migration file model
-- **Node**: coreHash string identifying a canonical data contract
-- **Edge**: Directed transition fromCoreHash -> toCoreHash with:
+- **Node**: storageHash string identifying a canonical data contract
+- **Edge**: Directed transition `from` → `to` (storage hashes) with:
   - edgeId deterministic id derived from content-addressed hashing (see Edge attestation)
   - fromContract, toContract complete contract JSON for state reconstruction
   - hints planner hints and strategies used during planning (derived from authoring-layer annotations or planner configuration, not from the canonical contract IR)

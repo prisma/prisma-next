@@ -1,5 +1,13 @@
+import { readFile } from 'node:fs/promises';
+import type { ControlTargetDescriptor } from '@prisma-next/core-control-plane/types';
+import type { PathDecision } from '@prisma-next/migration-tools/dag';
+import { reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import type { AttestedMigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
+import { isAttested } from '@prisma-next/migration-tools/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
-import { resolve } from 'pathe';
+import { relative, resolve } from 'pathe';
 import { formatCommandHelp } from './formatters/help';
 import type { CommonCommandOptions } from './global-flags';
 import { parseGlobalFlags } from './global-flags';
@@ -64,6 +72,164 @@ export function resolveContractPath(config: { contract?: { output?: string } }):
   return config.contract?.output
     ? resolve(config.contract.output)
     : resolve('src/prisma/contract.json');
+}
+
+/**
+ * Resolves the migrations directory and config path from CLI options.
+ * Shared by migration-apply, migration-plan, and migration-status.
+ */
+export function resolveMigrationPaths(
+  configOption: string | undefined,
+  config: { migrations?: { dir?: string } },
+): {
+  configPath: string;
+  migrationsDir: string;
+  migrationsRelative: string;
+  refsPath: string;
+} {
+  const configPath = configOption
+    ? relative(process.cwd(), resolve(configOption))
+    : 'prisma-next.config.ts';
+  const migrationsDir = resolve(
+    configOption ? resolve(configOption, '..') : process.cwd(),
+    config.migrations?.dir ?? 'migrations',
+  );
+  const migrationsRelative = relative(process.cwd(), migrationsDir);
+  const refsPath = resolve(migrationsDir, 'refs.json');
+  return { configPath, migrationsDir, migrationsRelative, refsPath };
+}
+
+/**
+ * Slim representation of a PathDecision for CLI JSON output.
+ * Strips internal fields (createdAt, labels) from chain entries.
+ */
+export interface PathDecisionResult {
+  readonly fromHash: string;
+  readonly toHash: string;
+  readonly alternativeCount: number;
+  readonly tieBreakReasons: readonly string[];
+  readonly refName?: string;
+  readonly selectedPath: readonly {
+    readonly dirName: string;
+    readonly migrationId: string;
+    readonly from: string;
+    readonly to: string;
+  }[];
+}
+
+/**
+ * Maps a PathDecision to the slim CLI output representation.
+ */
+export function toPathDecisionResult(decision: PathDecision): PathDecisionResult {
+  return {
+    fromHash: decision.fromHash,
+    toHash: decision.toHash,
+    alternativeCount: decision.alternativeCount,
+    tieBreakReasons: decision.tieBreakReasons,
+    ...ifDefined('refName', decision.refName),
+    selectedPath: decision.selectedPath.map((entry) => ({
+      dirName: entry.dirName,
+      migrationId: entry.migrationId,
+      from: entry.from,
+      to: entry.to,
+    })),
+  };
+}
+
+/**
+ * Checks whether a target descriptor supports migrations.
+ *
+ * The config-level `ControlTargetDescriptor` (from `@prisma-next/config`) does not include
+ * `migrations` — that property lives on the migration-control-plane's version of the same
+ * interface. At runtime the postgres target descriptor *does* carry `migrations`, so we
+ * widen to the migration-aware descriptor and check the optional property directly.
+ */
+export function targetSupportsMigrations(target: ControlTargetDescriptor<string, string>): boolean {
+  return !!target.migrations;
+}
+
+/**
+ * Extracts the typed migrations capability from a target descriptor.
+ * Returns `undefined` when the target does not support migrations.
+ */
+export function getTargetMigrations(target: ControlTargetDescriptor<string, string>) {
+  return target.migrations;
+}
+
+/**
+ * Reads the migrations directory, filters to attested bundles, and builds
+ * the migration graph. Throws on I/O or graph errors — callers handle
+ * error mapping.
+ */
+export async function loadMigrationBundles(migrationsDir: string): Promise<{
+  bundles: readonly AttestedMigrationBundle[];
+  graph: MigrationGraph;
+}> {
+  const allBundles = await readMigrationsDir(migrationsDir);
+  const bundles = allBundles.filter(isAttested);
+  const graph = reconstructGraph(bundles);
+  return { bundles, graph };
+}
+
+/**
+ * The subset of the emitted contract.json that the framework layer can
+ * safely type. The emitter adds these fields on top of the family-specific
+ * storage/models/relations. Other fields exist in the JSON but are opaque
+ * at this layer — the index signature preserves them for downstream
+ * consumers that operate at the family level (e.g., the control client).
+ */
+export interface ContractEnvelope {
+  readonly storageHash: string;
+  readonly schemaVersion: string;
+  readonly target: string;
+  readonly targetFamily: string;
+  readonly profileHash?: string;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * Reads and parses contract.json, validating the framework-level envelope
+ * fields (storageHash, schemaVersion, target, targetFamily).
+ *
+ * Family-specific validation (storage structure, codec mappings, etc.)
+ * happens downstream in the control client via the family instance.
+ */
+export async function readContractEnvelope(config: {
+  contract?: { output?: string };
+}): Promise<ContractEnvelope> {
+  const contractPath = resolveContractPath(config);
+  const content = await readFile(contractPath, 'utf-8');
+  const json = JSON.parse(content) as Record<string, unknown>;
+
+  const { storageHash, schemaVersion, target, targetFamily, profileHash } = json;
+
+  if (typeof storageHash !== 'string') {
+    throw new Error(
+      `Contract at ${relative(process.cwd(), contractPath)} is missing a valid storageHash. Run \`prisma-next contract emit\` to regenerate.`,
+    );
+  }
+  if (typeof schemaVersion !== 'string') {
+    throw new Error(
+      `Contract at ${relative(process.cwd(), contractPath)} is missing schemaVersion.`,
+    );
+  }
+  if (typeof target !== 'string') {
+    throw new Error(`Contract at ${relative(process.cwd(), contractPath)} is missing target.`);
+  }
+  if (typeof targetFamily !== 'string') {
+    throw new Error(
+      `Contract at ${relative(process.cwd(), contractPath)} is missing targetFamily.`,
+    );
+  }
+
+  return {
+    ...json,
+    storageHash,
+    schemaVersion,
+    target,
+    targetFamily,
+    ...(typeof profileHash === 'string' ? { profileHash } : {}),
+  };
 }
 
 /**
