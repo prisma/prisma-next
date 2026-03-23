@@ -648,6 +648,73 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     expect(defaultRow.rows[0]?.column_default).toContain('1');
   });
 
+  it(
+    'changes column type and default when new default is incompatible with old type',
+    { timeout: testTimeout },
+    async () => {
+      // Baseline: int4 DEFAULT 1
+      const baselineContract = makeContract(
+        {
+          config: makeTable({
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            status: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
+              default: { kind: 'literal', value: 1 },
+            },
+          }),
+        },
+        'compound-type-default-incompat-baseline',
+      );
+      await applyBaseline(driver!, baselineContract);
+
+      // Updated: text DEFAULT 'active'
+      // The alphabetical sort runs default_mismatch before type_mismatch,
+      // so SET DEFAULT 'active' executes against the old int4 column and fails.
+      const updatedContract = makeContract(
+        {
+          config: makeTable({
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            status: {
+              nativeType: 'text',
+              codecId: 'pg/text@1',
+              nullable: false,
+              default: { kind: 'literal', value: 'active' },
+            },
+          }),
+        },
+        'compound-type-default-incompat-updated',
+      );
+
+      await planAndExecute(driver!, updatedContract);
+
+      const typeRow = await driver!.query<{ matches: boolean }>(
+        `SELECT EXISTS (
+            SELECT 1 FROM pg_attribute a
+            JOIN pg_class c ON c.oid = a.attrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+              AND c.relname = 'config'
+              AND a.attname = 'status'
+              AND a.atttypid = 'text'::regtype
+              AND NOT a.attisdropped
+          ) AS matches`,
+      );
+      expect(typeRow.rows[0]?.matches).toBe(true);
+
+      const defaultRow = await driver!.query<{ column_default: string | null }>(
+        `SELECT column_default
+           FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'config'
+             AND column_name = 'status'`,
+      );
+      expect(defaultRow.rows[0]?.column_default).not.toBeNull();
+      expect(defaultRow.rows[0]?.column_default).toContain('active');
+    },
+  );
+
   it('tightens nullability and adds a default together', { timeout: testTimeout }, async () => {
     const baselineContract = makeContract(
       {
