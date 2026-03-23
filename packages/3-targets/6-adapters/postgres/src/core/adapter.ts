@@ -143,7 +143,7 @@ class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, Postgre
 
 function renderSelect(ast: SelectAst, contract?: PostgresContract): string {
   const selectClause = `SELECT ${renderDistinctPrefix(ast.distinct, ast.distinctOn, contract)}${renderProjection(
-    ast.project,
+    ast.projection,
     contract,
   )}`;
   const fromClause = `FROM ${renderSource(ast.from, contract)}`;
@@ -185,10 +185,10 @@ function renderSelect(ast: SelectAst, contract?: PostgresContract): string {
 }
 
 function renderProjection(
-  project: ReadonlyArray<ProjectionItem>,
+  projection: ReadonlyArray<ProjectionItem>,
   contract?: PostgresContract,
 ): string {
-  return project
+  return projection
     .map((item) => {
       const alias = quoteIdentifier(item.alias);
       if (item.expr instanceof LiteralExpr) {
@@ -231,7 +231,7 @@ function renderSource(source: FromSource, contract?: PostgresContract): string {
 }
 
 function assertScalarSubquery(query: SelectAst): void {
-  if (query.project.length !== 1) {
+  if (query.projection.length !== 1) {
     throw new Error('Subquery expressions must project exactly one column');
   }
 }

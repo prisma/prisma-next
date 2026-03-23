@@ -264,7 +264,7 @@ export function buildIncludeJoinArtifact(
     rowsAlias,
   );
   let childRowsAst = SelectAst.from(TableSource.named(include.table.name, include.table.alias))
-    .withProject([...childProjectItems, ...hiddenOrderProjection])
+    .withProjection([...childProjectItems, ...hiddenOrderProjection])
     .withWhere(rowsWhere);
   if (childOrderBy) {
     childRowsAst = childRowsAst.withOrderBy(childOrderBy);
@@ -283,7 +283,7 @@ export function buildIncludeJoinArtifact(
 
   const aggregateSelect = SelectAst.from(
     DerivedTableSource.as(rowsAlias, childRowsAst),
-  ).withProject([ProjectionItem.of(include.alias, jsonAggExpr)]);
+  ).withProjection([ProjectionItem.of(include.alias, jsonAggExpr)]);
 
   return {
     join: JoinAst.left(

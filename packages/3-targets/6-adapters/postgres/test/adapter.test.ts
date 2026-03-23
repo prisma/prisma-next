@@ -75,10 +75,10 @@ describe('Postgres adapter', () => {
 
   it('lowers rich select statements with aggregates, JSON, and subqueries', () => {
     const subquery = SelectAst.from(TableSource.named('post'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
       .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')));
     const ast = SelectAst.from(TableSource.named('user'))
-      .withProject([
+      .withProjection([
         ProjectionItem.of('id', ColumnRef.of('user', 'id')),
         ProjectionItem.of(
           'payload',
@@ -146,7 +146,7 @@ describe('Postgres adapter', () => {
 
   it('lowers distinct, exists, null checks, and typed JSON parameters in WHERE clauses', () => {
     const existsSubquery = SelectAst.from(TableSource.named('post'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
       .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')));
     const vectorLength = OperationExpr.function({
       method: 'vectorLength',
@@ -158,11 +158,11 @@ describe('Postgres adapter', () => {
       template: 'vector_length(${self})',
     });
     const scalarSubquery = SelectAst.from(TableSource.named('post'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
       .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')));
     const ast = SelectAst.from(TableSource.named('user'))
       .withDistinctOn([ColumnRef.of('user', 'email')])
-      .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withWhere(
         AndExpr.of([
           ExistsExpr.notExists(existsSubquery),
@@ -206,7 +206,7 @@ describe('Postgres adapter', () => {
   });
 
   it('renders bigint, date, array, object, and undefined literals in projections', () => {
-    const ast = SelectAst.from(TableSource.named('user')).withProject([
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('bigintValue', LiteralExpr.of(12n)),
       ProjectionItem.of('createdAtLiteral', LiteralExpr.of(new Date('2024-01-01T00:00:00.000Z'))),
       ProjectionItem.of('arrayValue', LiteralExpr.of([1, 'two'])),
@@ -223,7 +223,7 @@ describe('Postgres adapter', () => {
 
   it('renders DISTINCT, GROUP BY, HAVING, and OR clauses', () => {
     const ast = SelectAst.from(TableSource.named('user'))
-      .withProject([
+      .withProjection([
         ProjectionItem.of('email', ColumnRef.of('user', 'email')),
         ProjectionItem.of('cnt', AggregateExpr.count()),
       ])
@@ -241,7 +241,7 @@ describe('Postgres adapter', () => {
   });
 
   it('renders TableSource with alias', () => {
-    const ast = SelectAst.from(TableSource.named('user', 'u')).withProject([
+    const ast = SelectAst.from(TableSource.named('user', 'u')).withProjection([
       ProjectionItem.of('id', ColumnRef.of('u', 'id')),
     ]);
 
@@ -252,7 +252,7 @@ describe('Postgres adapter', () => {
 
   it('renders empty OR as FALSE', () => {
     const ast = SelectAst.from(TableSource.named('user'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withWhere(OrExpr.false());
 
     const sql = adapter.lower(ast, { contract, params: [] }).body.sql;

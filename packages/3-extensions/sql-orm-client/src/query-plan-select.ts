@@ -253,7 +253,7 @@ function buildIncludeChildRowsSelect(
   const whereExpr = shiftedChildWhere ? AndExpr.of([joinExpr, shiftedChildWhere.expr]) : joinExpr;
 
   let childRows = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
-    .withProject([...childProjection, ...hiddenOrderProjection])
+    .withProjection([...childProjection, ...hiddenOrderProjection])
     .withWhere(whereExpr);
 
   if (childOrderBy) {
@@ -303,12 +303,14 @@ function buildLateralIncludeArtifacts(
     ),
   );
 
-  const aggregateQuery = SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProject([
-    ProjectionItem.of(
-      include.relationName,
-      JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
-    ),
-  ]);
+  const aggregateQuery = SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProjection(
+    [
+      ProjectionItem.of(
+        include.relationName,
+        JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
+      ),
+    ],
+  );
 
   return {
     join: JoinAst.left(DerivedTableSource.as(lateralAlias, aggregateQuery), AndExpr.true(), true),
@@ -338,12 +340,14 @@ function buildCorrelatedIncludeProjection(
       JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
     ),
   );
-  const aggregateQuery = SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProject([
-    ProjectionItem.of(
-      include.relationName,
-      JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
-    ),
-  ]);
+  const aggregateQuery = SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProjection(
+    [
+      ProjectionItem.of(
+        include.relationName,
+        JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
+      ),
+    ],
+  );
 
   return {
     projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(aggregateQuery)),
@@ -373,7 +377,7 @@ function buildSelectAst(
   const where = options.where ?? buildStateWhere(contract, tableName, state);
   const orderBy = toOrderBy(tableName, state.orderBy);
 
-  let ast = SelectAst.from(TableSource.named(tableName)).withProject(projection);
+  let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
   if (where) {
     ast = ast.withWhere(where.expr);
   }

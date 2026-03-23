@@ -27,7 +27,7 @@ describe('sql DSL builder', () => {
 
     expect(plan.ast).toBeInstanceOf(SelectAst);
     const ast = plan.ast as SelectAst;
-    expect(ast.project).toEqual([
+    expect(ast.projection).toEqual([
       { alias: 'id', expr: ColumnRef.of('user', 'id') },
       { alias: 'email', expr: ColumnRef.of('user', 'email') },
     ]);
@@ -129,7 +129,7 @@ describe('sql DSL builder', () => {
       })
       .build();
 
-    expect((plan.ast as SelectAst).project.map((item) => item.alias)).toEqual([
+    expect((plan.ast as SelectAst).projection.map((item) => item.alias)).toEqual([
       'user_id',
       'user_email',
     ]);

@@ -14,7 +14,7 @@ describe('execute query plan', () => {
     const execute = vi.fn();
     const executor = { execute };
     const plan: SqlQueryPlan<{ id: number }> = {
-      ast: SelectAst.from(TableSource.named('users')).withProject([
+      ast: SelectAst.from(TableSource.named('users')).withProjection([
         ProjectionItem.of('id', ColumnRef.of('users', 'id')),
       ]),
       params: [],

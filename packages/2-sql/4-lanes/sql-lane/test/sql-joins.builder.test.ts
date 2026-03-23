@@ -48,7 +48,7 @@ describe('SQL join builder', () => {
       })
       .build();
 
-    expect((plan.ast as SelectAst).project).toEqual([
+    expect((plan.ast as SelectAst).projection).toEqual([
       { alias: 'user_id', expr: ColumnRef.of('user', 'id') },
       { alias: 'post_title', expr: ColumnRef.of('post', 'title') },
     ]);

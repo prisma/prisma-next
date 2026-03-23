@@ -350,7 +350,7 @@ describe('integration/include', () => {
         expect(includeJoin).toBeDefined();
 
         expectDerivedTableSource(includeJoin?.source);
-        const includeAggregateProjection = includeJoin.source.query.project[0];
+        const includeAggregateProjection = includeJoin.source.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
         expect(includeAggregateProjection.expr.expr).toBeInstanceOf(JsonObjectExpr);
@@ -362,7 +362,7 @@ describe('integration/include', () => {
         expectDerivedTableSource(rowsSource);
         expect(rowsSource.query.limit).toBe(1);
         expect(rowsSource.query.offset).toBe(1);
-        expect(rowsSource.query.project.map((item) => item.alias)).toContain('posts__order_0');
+        expect(rowsSource.query.projection.map((item) => item.alias)).toContain('posts__order_0');
       });
     },
     timeouts.spinUpPpgDev,
@@ -437,7 +437,7 @@ describe('integration/include', () => {
         expect(includeJoin).toBeDefined();
 
         expectDerivedTableSource(includeJoin?.source);
-        const includeAggregateProjection = includeJoin.source.query.project[0];
+        const includeAggregateProjection = includeJoin.source.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.orderBy).toEqual([
           OrderByItem.asc(ColumnRef.of('invitedUsers__rows', 'invitedUsers__order_0')),
@@ -445,7 +445,7 @@ describe('integration/include', () => {
 
         const rowsSource = includeJoin.source.query.from;
         expectDerivedTableSource(rowsSource);
-        expect(rowsSource.query.project.map((item) => item.alias)).toContain(
+        expect(rowsSource.query.projection.map((item) => item.alias)).toContain(
           'invitedUsers__order_0',
         );
 
@@ -485,9 +485,9 @@ describe('integration/include', () => {
         expectSelectAst(ast);
         expect(ast.joins ?? []).toHaveLength(0);
 
-        const postsProjection = ast.project.find((item) => item.alias === 'posts');
+        const postsProjection = ast.projection.find((item) => item.alias === 'posts');
         expectSubqueryExpr(postsProjection?.expr);
-        const includeAggregateProjection = postsProjection.expr.query.project[0];
+        const includeAggregateProjection = postsProjection.expr.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
         expect(includeAggregateProjection.expr.expr).toBeInstanceOf(JsonObjectExpr);
@@ -556,9 +556,9 @@ describe('integration/include', () => {
         const ast = runtime.executions[0]?.ast;
         expectSelectAst(ast);
 
-        const invitedUsersProjection = ast.project.find((item) => item.alias === 'invitedUsers');
+        const invitedUsersProjection = ast.projection.find((item) => item.alias === 'invitedUsers');
         expectSubqueryExpr(invitedUsersProjection?.expr);
-        const includeAggregateProjection = invitedUsersProjection.expr.query.project[0];
+        const includeAggregateProjection = invitedUsersProjection.expr.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.orderBy).toEqual([
           OrderByItem.asc(ColumnRef.of('invitedUsers__rows', 'invitedUsers__order_0')),
@@ -566,7 +566,7 @@ describe('integration/include', () => {
 
         const rowsSource = invitedUsersProjection.expr.query.from;
         expectDerivedTableSource(rowsSource);
-        expect(rowsSource.query.project.map((item) => item.alias)).toContain(
+        expect(rowsSource.query.projection.map((item) => item.alias)).toContain(
           'invitedUsers__order_0',
         );
 

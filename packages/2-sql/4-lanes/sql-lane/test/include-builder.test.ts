@@ -93,7 +93,7 @@ describe('buildIncludeJoinArtifact', () => {
     expect(artifact.projection.expr).toEqual(ColumnRef.of('posts_lateral', 'posts'));
 
     const aggregateSelect = (artifact.join.source as DerivedTableSource).query;
-    expect(aggregateSelect.project[0]?.expr).toBeInstanceOf(JsonArrayAggExpr);
+    expect(aggregateSelect.projection[0]?.expr).toBeInstanceOf(JsonArrayAggExpr);
     expect(aggregateSelect.from).toBeInstanceOf(DerivedTableSource);
     const rowsQuery = (aggregateSelect.from as DerivedTableSource).query;
     expect(rowsQuery.where).toEqual(

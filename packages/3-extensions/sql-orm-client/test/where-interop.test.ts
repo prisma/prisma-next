@@ -80,7 +80,7 @@ describe('where interop', () => {
         BinaryExpr.eq(col('users', 'email'), param(2, 'email')),
         ExistsExpr.exists(
           SelectAst.from(TableSource.named('posts'))
-            .withProject([ProjectionItem.of('id', col('posts', 'id'))])
+            .withProjection([ProjectionItem.of('id', col('posts', 'id'))])
             .withWhere(BinaryExpr.eq(col('posts', 'user_id'), param(3, 'postUserId'))),
         ),
       ]),
@@ -121,7 +121,7 @@ describe('where interop', () => {
             BinaryExpr.eq(col('users', 'id'), literal('u1')),
           ),
         ])
-        .withProject([ProjectionItem.of('id', col('users', 'id'))])
+        .withProjection([ProjectionItem.of('id', col('users', 'id'))])
         .withWhere(
           BinaryExpr.in(col('users', 'id'), ListLiteralExpr.of([literal('u1'), literal('u2')])),
         ),

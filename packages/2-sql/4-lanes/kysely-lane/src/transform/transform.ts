@@ -79,14 +79,14 @@ export function transformKyselyToPnAst(
   let projectionTypes: Record<string, string> | undefined;
   if (ast instanceof SelectAst) {
     projection = Object.fromEntries(
-      ast.project.map((projected) => [
+      ast.projection.map((projected) => [
         projected.alias,
         projected.expr instanceof ColumnRef ? projected.expr.column : projected.alias,
       ]),
     );
 
     projectionTypes = {};
-    for (const projected of ast.project) {
+    for (const projected of ast.projection) {
       if (projected.expr instanceof ColumnRef) {
         const column =
           ctx.contract.storage.tables[projected.expr.table]?.columns[projected.expr.column];
@@ -161,14 +161,14 @@ export function transformKyselyToPnAstCollectingParams(
   let projectionTypes: Record<string, string> | undefined;
   if (ast instanceof SelectAst) {
     projection = Object.fromEntries(
-      ast.project.map((projected) => [
+      ast.projection.map((projected) => [
         projected.alias,
         projected.expr instanceof ColumnRef ? projected.expr.column : projected.alias,
       ]),
     );
 
     projectionTypes = {};
-    for (const projected of ast.project) {
+    for (const projected of ast.projection) {
       if (projected.expr instanceof ColumnRef) {
         const column =
           ctx.contract.storage.tables[projected.expr.table]?.columns[projected.expr.column];

@@ -16,11 +16,11 @@ describe('include AST shapes', () => {
     const includeAggregate = SelectAst.from(
       DerivedTableSource.as(
         'posts__rows',
-        SelectAst.from(TableSource.named('post')).withProject([
+        SelectAst.from(TableSource.named('post')).withProjection([
           ProjectionItem.of('id', ColumnRef.of('post', 'id')),
         ]),
       ),
-    ).withProject([
+    ).withProjection([
       ProjectionItem.of(
         'posts',
         JsonArrayAggExpr.of(ColumnRef.of('posts__rows', 'id'), 'emptyArray'),
@@ -28,7 +28,7 @@ describe('include AST shapes', () => {
     ]);
 
     const selectAst = SelectAst.from(TableSource.named('user'))
-      .withProject([
+      .withProjection([
         ProjectionItem.of('id', ColumnRef.of('user', 'id')),
         ProjectionItem.of('posts', ColumnRef.of('posts_lateral', 'posts')),
       ])
@@ -43,22 +43,22 @@ describe('include AST shapes', () => {
     expect(selectAst.joins?.[0]?.lateral).toBe(true);
     expect(selectAst.joins?.[0]?.source).toBeInstanceOf(DerivedTableSource);
     expect(
-      (selectAst.joins?.[0]?.source as DerivedTableSource).query.project[0]?.expr,
+      (selectAst.joins?.[0]?.source as DerivedTableSource).query.projection[0]?.expr,
     ).toBeInstanceOf(JsonArrayAggExpr);
   });
 
   it('represents scalar include subqueries as subquery expressions', () => {
     const childQuery = SelectAst.from(TableSource.named('post'))
-      .withProject([ProjectionItem.of('posts', ColumnRef.of('post', 'id'))])
+      .withProjection([ProjectionItem.of('posts', ColumnRef.of('post', 'id'))])
       .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')));
 
-    const selectAst = SelectAst.from(TableSource.named('user')).withProject([
+    const selectAst = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('id', ColumnRef.of('user', 'id')),
       ProjectionItem.of('posts', SubqueryExpr.of(childQuery)),
     ]);
 
-    expect(selectAst.project[1]?.expr).toBeInstanceOf(SubqueryExpr);
-    expect((selectAst.project[1]?.expr as SubqueryExpr).query.where).toEqual(
+    expect(selectAst.projection[1]?.expr).toBeInstanceOf(SubqueryExpr);
+    expect((selectAst.projection[1]?.expr as SubqueryExpr).query.where).toEqual(
       BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')),
     );
   });

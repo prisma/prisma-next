@@ -64,11 +64,11 @@ describe('ast/visitors', () => {
 
   it('rewrites nested selects deeply through select.rewrite', () => {
     const inner = SelectAst.from(table('post'))
-      .addProject('userId', col('post', 'userId'))
+      .addProjection('userId', col('post', 'userId'))
       .withWhere(BinaryExpr.eq(col('post', 'published'), lit(true)));
     const ast = SelectAst.from(table('user'))
-      .addProject('id', col('user', 'id'))
-      .addProject('latestPost', SubqueryExpr.of(inner))
+      .addProjection('id', col('user', 'id'))
+      .addProjection('latestPost', SubqueryExpr.of(inner))
       .withJoins([
         JoinAst.left(
           DerivedTableSource.as('posts', inner),
@@ -105,9 +105,9 @@ describe('ast/visitors', () => {
     expect(rewritten.joins?.[0]?.on).toEqual(
       EqColJoinOn.of(col('member', 'id'), col('posts', 'userId')),
     );
-    expect(((rewritten.project[1]?.expr as SubqueryExpr).query.where as BinaryExpr).right).toEqual(
-      lit('TRUE'),
-    );
+    expect(
+      ((rewritten.projection[1]?.expr as SubqueryExpr).query.where as BinaryExpr).right,
+    ).toEqual(lit('TRUE'));
   });
 
   it('folds expression and where trees through node-level fold methods', () => {
@@ -137,7 +137,7 @@ describe('ast/visitors', () => {
     expect(operation.baseColumnRef()).toEqual(col('user', 'email'));
     expect(
       SelectAst.from(table('user'))
-        .addProject('email', operation)
+        .addProjection('email', operation)
         .withWhere(BinaryExpr.eq(aggregate, lit(10)))
         .collectColumnRefs(),
     ).toEqual([col('user', 'email'), col('post', 'likes')]);

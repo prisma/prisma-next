@@ -189,7 +189,7 @@ function bindSelectAst(
   return new SelectAst({
     from: bindFromSource(contract, ast.from, state),
     joins: ast.joins?.map((join) => bindJoin(contract, join, state)),
-    project: ast.project.map(
+    projection: ast.projection.map(
       (projection) =>
         new ProjectionItem(projection.alias, bindProjectionExpr(contract, projection.expr, state)),
     ),

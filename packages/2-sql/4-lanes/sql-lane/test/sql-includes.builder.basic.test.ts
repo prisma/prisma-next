@@ -43,10 +43,10 @@ describe('SQL builder includeMany', () => {
     );
 
     expect(includeJoin).toBeInstanceOf(JoinAst);
-    expect(ast.project.find((item) => item.alias === 'post')?.expr).toEqual(
+    expect(ast.projection.find((item) => item.alias === 'post')?.expr).toEqual(
       ColumnRef.of('post_lateral', 'post'),
     );
-    const includeProjection = (includeJoin?.source as DerivedTableSource).query.project[0];
+    const includeProjection = (includeJoin?.source as DerivedTableSource).query.projection[0];
     expect(includeProjection?.expr).toBeInstanceOf(JsonArrayAggExpr);
   });
 
@@ -107,7 +107,7 @@ describe('SQL builder includeMany', () => {
     const aggregateSelect = ((plan.ast as SelectAst).joins?.[0]?.source as DerivedTableSource)
       .query;
     const rowsQuery = (aggregateSelect.from as DerivedTableSource).query;
-    const aggregateExpr = aggregateSelect.project[0]?.expr as JsonArrayAggExpr;
+    const aggregateExpr = aggregateSelect.projection[0]?.expr as JsonArrayAggExpr;
 
     expect(rowsQuery.limit).toBe(2);
     expect(rowsQuery.orderBy?.[0]?.expr).toEqual(ColumnRef.of('post', 'createdAt'));

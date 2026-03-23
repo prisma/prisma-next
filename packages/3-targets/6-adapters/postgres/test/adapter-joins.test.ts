@@ -62,7 +62,7 @@ describe('Postgres adapter join rendering', () => {
   function selectWithJoin(join: JoinAst): SelectAst {
     return SelectAst.from(TableSource.named('user'))
       .withJoins([join])
-      .withProject([
+      .withProjection([
         ProjectionItem.of('id', ColumnRef.of('user', 'id')),
         ProjectionItem.of('title', ColumnRef.of('post', 'title')),
       ]);
@@ -115,7 +115,7 @@ describe('Postgres adapter join rendering', () => {
           EqColJoinOn.of(ColumnRef.of('post', 'id'), ColumnRef.of('comment', 'postId')),
         ),
       ])
-      .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'email'), ColumnRef.of('post', 'title')));
 
     const lowered = adapter.lower(ast, { contract, params: [] });
@@ -126,11 +126,11 @@ describe('Postgres adapter join rendering', () => {
   });
 
   it('renders lateral derived-table joins', () => {
-    const lateralRows = SelectAst.from(TableSource.named('post')).withProject([
+    const lateralRows = SelectAst.from(TableSource.named('post')).withProjection([
       ProjectionItem.of('userId', ColumnRef.of('post', 'userId')),
     ]);
     const ast = SelectAst.from(TableSource.named('user'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withJoins([
         JoinAst.left(DerivedTableSource.as('post_rows', lateralRows), AndExpr.true(), true),
       ]);

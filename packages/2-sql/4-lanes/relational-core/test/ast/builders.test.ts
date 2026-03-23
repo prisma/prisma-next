@@ -16,7 +16,7 @@ import { col, param, table } from './test-helpers';
 describe('ast/builders', () => {
   it('builds select ASTs through fluent rich-node methods', () => {
     const ast = SelectAst.from(table('user'))
-      .addProject('id', col('user', 'id'))
+      .addProjection('id', col('user', 'id'))
       .withWhere(BinaryExpr.eq(col('user', 'id'), param(1, 'id')))
       .withOrderBy([OrderByItem.asc(col('user', 'id'))])
       .withDistinct()
@@ -28,7 +28,7 @@ describe('ast/builders', () => {
 
     expect(ast).toMatchObject({
       from: table('user'),
-      project: [{ alias: 'id', expr: col('user', 'id') }],
+      projection: [{ alias: 'id', expr: col('user', 'id') }],
       where: BinaryExpr.eq(col('user', 'id'), param(1, 'id')),
       distinct: true,
       distinctOn: [col('user', 'email')],

@@ -53,7 +53,7 @@ describe('query plan aggregate', () => {
   });
 
   it('validates grouped having expressions before lowering them', () => {
-    const scalarSubquery = SelectAst.from(TableSource.named('posts')).withProject([
+    const scalarSubquery = SelectAst.from(TableSource.named('posts')).withProjection([
       ProjectionItem.of('id', ColumnRef.of('posts', 'id')),
     ]);
 

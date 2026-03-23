@@ -78,11 +78,11 @@ function createDescriptor(index: number, name: string): ParamDescriptor {
 
 function createNestedWhereAst(): SelectAst {
   const derivedUsers = SelectAst.from(TableSource.named('user'))
-    .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+    .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
     .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'kind'), ParamRef.of(4, 'kind')));
 
   const derivedPosts = SelectAst.from(TableSource.named('post'))
-    .withProject([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
+    .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
     .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'title'), ParamRef.of(5, 'title')));
 
   const orderedTitleExpr = OperationExpr.function({
@@ -102,7 +102,7 @@ function createNestedWhereAst(): SelectAst {
         BinaryExpr.eq(ColumnRef.of('matching_posts', 'userId'), ParamRef.of(2, 'userId')),
       ),
     ])
-    .withProject([
+    .withProjection([
       ProjectionItem.of(
         'items',
         JsonArrayAggExpr.of(
@@ -118,7 +118,7 @@ function createNestedWhereAst(): SelectAst {
     .withOrderBy([OrderByItem.asc(orderedTitleExpr)]);
 
   return SelectAst.from(TableSource.named('user'))
-    .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+    .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
     .withWhere(ExistsExpr.exists(existsSubquery));
 }
 
@@ -170,7 +170,7 @@ describe('buildKyselyWhereExpr nested AST traversal', () => {
 
     expect((subquery.having as BinaryExpr).right).toEqual(ParamRef.of(2, 'minCount'));
 
-    const aggregate = subquery.project[0]?.expr;
+    const aggregate = subquery.projection[0]?.expr;
     expect(aggregate).toBeInstanceOf(JsonArrayAggExpr);
     expect(((aggregate as JsonArrayAggExpr).orderBy?.[0]?.expr as OperationExpr).args[0]).toEqual(
       ParamRef.of(5, 'fallback'),

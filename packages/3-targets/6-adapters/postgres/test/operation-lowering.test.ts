@@ -58,7 +58,7 @@ describe('Operation lowering', () => {
   }
 
   it('lowers infix operations in projections', () => {
-    const ast = SelectAst.from(TableSource.named('user')).withProject([
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('id', ColumnRef.of('user', 'id')),
       ProjectionItem.of('distance', distanceExpr()),
     ]);
@@ -78,7 +78,7 @@ describe('Operation lowering', () => {
       // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
       template: 'cosine_similarity(${self}, ${arg0}, ${arg1}, ${arg2})',
     });
-    const ast = SelectAst.from(TableSource.named('user')).withProject([
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('similarity', operationExpr),
     ]);
 
@@ -90,7 +90,7 @@ describe('Operation lowering', () => {
 
   it('lowers operations in where and orderBy clauses', () => {
     const ast = SelectAst.from(TableSource.named('user'))
-      .withProject([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withWhere(BinaryExpr.eq(distanceExpr(), ParamRef.of(2, 'threshold')))
       .withOrderBy([OrderByItem.asc(distanceExpr())]);
 
@@ -114,7 +114,7 @@ describe('Operation lowering', () => {
         template: 'contains(${self}, ${arg0})',
       },
     });
-    const ast = SelectAst.from(TableSource.named('user')).withProject([
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('matches', operationExpr),
     ]);
 

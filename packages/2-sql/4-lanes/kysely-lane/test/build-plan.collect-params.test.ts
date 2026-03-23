@@ -93,7 +93,7 @@ describe('buildKyselyPlan', () => {
       new SelectAst({
         from: new TableSource('user'),
         joins: undefined,
-        project: userSelectAllProjection,
+        projection: userSelectAllProjection,
         where: BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1)),
         orderBy: undefined,
         distinct: undefined,
@@ -153,7 +153,7 @@ describe('buildKyselyPlan', () => {
       new SelectAst({
         from: new TableSource('user'),
         joins: undefined,
-        project: userSelectAllProjection,
+        projection: userSelectAllProjection,
         where: BinaryExpr.in(
           ColumnRef.of('user', 'id'),
           ListLiteralExpr.of([ParamRef.of(1), ParamRef.of(2), ParamRef.of(3)]),

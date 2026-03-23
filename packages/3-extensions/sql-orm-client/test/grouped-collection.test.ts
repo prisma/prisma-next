@@ -37,7 +37,7 @@ describe('GroupedCollection', () => {
     if (firstAst.having instanceof BinaryExpr) {
       expect(firstAst.having.left).toEqual(AggregateExpr.count());
     }
-    const totalViewsProjection = firstAst.project.find((item) => item.alias === 'totalViews');
+    const totalViewsProjection = firstAst.projection.find((item) => item.alias === 'totalViews');
     expect(totalViewsProjection?.expr).toBeInstanceOf(AggregateExpr);
     if (totalViewsProjection?.expr instanceof AggregateExpr) {
       expect(totalViewsProjection.expr.fn).toBe('sum');
