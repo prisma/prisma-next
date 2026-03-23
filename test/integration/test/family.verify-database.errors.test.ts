@@ -166,7 +166,7 @@ describe('family instance verify - errors', () => {
 
           expect(result).toMatchObject({
             ok: false,
-            code: 'PN-RTM-3001',
+            code: 'PN-RUN-3001',
             summary: 'Marker missing',
             contract: expectedContract,
           });
@@ -224,7 +224,7 @@ describe('family instance verify - errors', () => {
 
           expect(result).toMatchObject({
             ok: false,
-            code: 'PN-RTM-3002',
+            code: 'PN-RUN-3002',
             summary: 'Hash mismatch',
             contract: expectedContract,
             marker: { storageHash: 'sha256:different-hash' },
@@ -282,7 +282,7 @@ describe('family instance verify - errors', () => {
 
           expect(result).toMatchObject({
             ok: false,
-            code: 'PN-RTM-3002',
+            code: 'PN-RUN-3002',
             summary: 'Hash mismatch',
             contract: expectedContract,
             marker: { profileHash: 'sha256:different-profile-hash' },

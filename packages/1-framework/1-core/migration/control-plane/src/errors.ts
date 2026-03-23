@@ -38,7 +38,7 @@ export interface CliErrorConflict {
  */
 export class CliStructuredError extends Error {
   readonly code: string;
-  readonly domain: 'CLI' | 'RTM';
+  readonly domain: 'CLI' | 'RUN';
   readonly severity: 'error' | 'warn' | 'info';
   readonly why: string | undefined;
   readonly fix: string | undefined;
@@ -55,7 +55,7 @@ export class CliStructuredError extends Error {
     code: string,
     summary: string,
     options?: {
-      readonly domain?: 'CLI' | 'RTM';
+      readonly domain?: 'CLI' | 'RUN';
       readonly severity?: 'error' | 'warn' | 'info';
       readonly why?: string;
       readonly fix?: string;
@@ -85,7 +85,7 @@ export class CliStructuredError extends Error {
    * Converts this error to a CLI error envelope for output formatting.
    */
   toEnvelope(): CliErrorEnvelope {
-    const codePrefix = this.domain === 'CLI' ? 'PN-CLI-' : 'PN-RTM-';
+    const codePrefix = this.domain === 'CLI' ? 'PN-CLI-' : 'PN-RUN-';
     return {
       ok: false as const,
       code: `${codePrefix}${this.code}`,
@@ -112,7 +112,7 @@ export class CliStructuredError extends Error {
     return (
       candidate.name === 'CliStructuredError' &&
       typeof candidate.code === 'string' &&
-      (candidate.domain === 'CLI' || candidate.domain === 'RTM') &&
+      (candidate.domain === 'CLI' || candidate.domain === 'RUN') &&
       typeof candidate.toEnvelope === 'function'
     );
   }
@@ -356,7 +356,7 @@ export function errorConfigValidation(
 }
 
 // ============================================================================
-// Runtime Errors (PN-RTM-3000-3030)
+// Runtime Errors (PN-RUN-3000-3030)
 // ============================================================================
 
 /**
@@ -367,7 +367,7 @@ export function errorMarkerMissing(options?: {
   readonly dbUrl?: string;
 }): CliStructuredError {
   return new CliStructuredError('3001', 'Database not signed', {
-    domain: 'RTM',
+    domain: 'RUN',
     why: options?.why ?? 'No database signature (marker) found',
     fix: 'Run `prisma-next db sign --db <url>` to sign the database',
   });
@@ -382,7 +382,7 @@ export function errorHashMismatch(options?: {
   readonly actual?: string;
 }): CliStructuredError {
   return new CliStructuredError('3002', 'Hash mismatch', {
-    domain: 'RTM',
+    domain: 'RUN',
     why: options?.why ?? 'Contract hash does not match database marker',
     fix: 'Migrate database or re-sign if intentional',
     ...(options?.expected || options?.actual
@@ -407,7 +407,7 @@ export function errorTargetMismatch(
   },
 ): CliStructuredError {
   return new CliStructuredError('3003', 'Target mismatch', {
-    domain: 'RTM',
+    domain: 'RUN',
     why:
       options?.why ??
       `Contract target does not match config target (expected: ${expected}, actual: ${actual})`,
@@ -425,7 +425,7 @@ export function errorMarkerRequired(options?: {
   readonly fix?: string;
 }): CliStructuredError {
   return new CliStructuredError('3010', 'Database must be signed first', {
-    domain: 'RTM',
+    domain: 'RUN',
     why: options?.why ?? 'No database signature (marker) found',
     fix: options?.fix ?? 'Run `prisma-next db init` first to sign the database',
   });
@@ -441,7 +441,7 @@ export function errorSchemaVerificationFailed(options: {
   readonly issues?: readonly SchemaIssue[];
 }): CliStructuredError {
   return new CliStructuredError('3004', options.summary, {
-    domain: 'RTM',
+    domain: 'RUN',
     why: 'Database schema does not satisfy the contract',
     fix: 'Run `prisma-next db update` to reconcile, or adjust your contract to match the database',
     meta: {
@@ -463,7 +463,7 @@ export function errorRunnerFailed(
   },
 ): CliStructuredError {
   return new CliStructuredError('3020', summary, {
-    domain: 'RTM',
+    domain: 'RUN',
     why: options?.why ?? 'Migration runner failed',
     fix: options?.fix ?? 'Inspect the reported conflict and reconcile schema drift',
     ...(options?.meta ? { meta: options.meta } : {}),
@@ -485,7 +485,7 @@ export function errorDestructiveChanges(
   },
 ): CliStructuredError {
   return new CliStructuredError(ERROR_CODE_DESTRUCTIVE_CHANGES, summary, {
-    domain: 'RTM',
+    domain: 'RUN',
     why: options?.why ?? 'Planned operations include destructive changes that require confirmation',
     fix: options?.fix ?? 'Re-run with `-y` to apply, or use `--dry-run` to preview first',
     ...(options?.meta ? { meta: options.meta } : {}),
@@ -504,7 +504,7 @@ export function errorRuntime(
   },
 ): CliStructuredError {
   return new CliStructuredError('3000', summary, {
-    domain: 'RTM',
+    domain: 'RUN',
     ...(options?.why ? { why: options.why } : { why: 'Verification failed' }),
     ...(options?.fix ? { fix: options.fix } : { fix: 'Check contract and database state' }),
     ...(options?.meta ? { meta: options.meta } : {}),

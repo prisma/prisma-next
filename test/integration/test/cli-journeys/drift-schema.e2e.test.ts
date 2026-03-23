@@ -76,7 +76,7 @@ withTempDir(({ createTempDir }) => {
         // The planner cannot re-add a dropped NOT NULL column to an existing table
         // because Postgres requires a DEFAULT for NOT NULL columns on non-empty tables
         // (even if the table is technically empty, the planner validates post-update schema).
-        // db update correctly detects the drift but the runner fails (PN-RTM-3020).
+        // db update correctly detects the drift but the runner fails (PN-RUN-3020).
         // Recovery in this scenario requires manual DDL or db init with a fresh database.
         const update = await runDbUpdate(ctx, ['-y']);
         expect(update.exitCode, 'M.05: db update detects unrecoverable drift').toBe(1);
