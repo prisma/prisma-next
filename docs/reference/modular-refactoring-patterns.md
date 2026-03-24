@@ -20,17 +20,12 @@ Start by extracting pure, side-effect-free utility functions:
 **✅ CORRECT: Extract pure helpers first**
 
 ```typescript
-// utils/ast.ts - Thin wrappers around AST factories
-export { createBinaryExpr, createColumnRef, ... } from '@prisma-next/sql-relational-core/ast';
+// utils/ast.ts - Thin wrappers around rich AST classes
+export { BinaryExpr, ColumnRef, OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 
 // utils/errors.ts - Centralized error constructors
 export function errorModelNotFound(modelName: string): never {
   throw planInvalid(`Model ${modelName} not found in mappings`);
-}
-
-// utils/guards.ts - Type guards and helpers
-export function isOperationExpr(expr: AnyColumnBuilder | OperationExpr): expr is OperationExpr {
-  return typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'operation';
 }
 ```
 

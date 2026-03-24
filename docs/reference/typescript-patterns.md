@@ -499,12 +499,6 @@ if (isColumnBuilder(where.left)) {
   const { table, column } = getColumnInfo(where.left);
   // TypeScript knows where.left is ColumnBuilder here
 }
-
-// ✅ CORRECT: Use type predicate to check and extract
-const operationExpr = getOperationExpr(where.left);
-if (operationExpr) {
-  // TypeScript knows operationExpr is OperationExpr here
-}
 ```
 
 ### Why Blind Casts Are Forbidden
@@ -583,27 +577,7 @@ export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
     (value as { kind: unknown }).kind === 'column'
   );
 }
-
-/**
- * Helper to extract operation expression from builder.
- * Returns OperationExpr if present, undefined otherwise.
- */
-export function getOperationExpr(
-  builder: AnyColumnBuilder | OperationExpr,
-): OperationExpr | undefined {
-  if (isOperationExpr(builder)) {
-    return builder;
-  }
-  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
-  return builderWithExpr._operationExpr;
-}
 ```
-
-**Note**: The `getOperationExpr` helper still uses a cast internally, but it's:
-- Centralized in one place
-- Documented and tested
-- Used consistently across the codebase
-- Better than having blind casts everywhere
 
 ### Related Patterns
 

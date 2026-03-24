@@ -1,65 +1,56 @@
-import type { ContractBase } from '@prisma-next/contract/types';
-import type { CompiledQuery } from 'kysely';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
+import {
+  ColumnRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
-import { executeCompiledQuery } from '../src/raw-compiled-query';
+import { executeQueryPlan } from '../src/execute-query-plan';
 
-const baseContract = {
-  target: 'postgres',
-  targetFamily: 'sql',
-  storageHash: 'storage-hash',
-} as unknown as ContractBase;
-
-describe('raw compiled query execution', () => {
-  it('uses raw lane and omits profileHash by default', () => {
+describe('execute query plan', () => {
+  it('forwards SQL query plans to runtime.execute', () => {
     const execute = vi.fn();
     const executor = { execute };
-
-    const compiledQuery = {
-      sql: 'select 1',
-      parameters: [1, 'x'],
-    } as unknown as CompiledQuery<unknown>;
-
-    executeCompiledQuery(executor, baseContract, compiledQuery);
-
-    expect(execute).toHaveBeenCalledOnce();
-    expect(execute.mock.calls[0]?.[0]).toEqual({
-      ast: undefined,
-      sql: 'select 1',
-      params: [1, 'x'],
+    const plan: SqlQueryPlan<{ id: number }> = {
+      ast: SelectAst.from(TableSource.named('users')).withProjection([
+        ProjectionItem.of('id', ColumnRef.of('users', 'id')),
+      ]),
+      params: [],
       meta: {
         target: 'postgres',
         targetFamily: 'sql',
         storageHash: 'storage-hash',
-        lane: 'raw',
+        lane: 'orm-client',
         paramDescriptors: [],
       },
-    });
-  });
+    };
 
-  it('forwards profileHash and custom lane when provided', () => {
-    const execute = vi.fn();
-    const executor = { execute };
-    const contract = {
-      ...baseContract,
-      profileHash: 'profile-hash',
-    } as unknown as ContractBase;
-
-    executeCompiledQuery(
-      executor,
-      contract,
-      {
-        sql: 'select 2',
-        parameters: [],
-      } as unknown as CompiledQuery<unknown>,
-      { lane: 'kysely' },
-    );
+    executeQueryPlan(executor, plan);
 
     expect(execute).toHaveBeenCalledOnce();
-    expect(execute.mock.calls[0]?.[0]).toMatchObject({
+    expect(execute.mock.calls[0]?.[0]).toBe(plan);
+  });
+
+  it('also forwards already-lowered execution plans', () => {
+    const execute = vi.fn();
+    const executor = { execute };
+    const plan: ExecutionPlan<{ id: number }> = {
+      sql: 'select 1',
+      params: [],
       meta: {
-        profileHash: 'profile-hash',
-        lane: 'kysely',
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'storage-hash',
+        lane: 'orm-client',
+        paramDescriptors: [],
       },
-    });
+    };
+
+    executeQueryPlan(executor, plan);
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(execute.mock.calls[0]?.[0]).toBe(plan);
   });
 });

@@ -46,24 +46,28 @@ import { TerminalUI } from '../utils/terminal-ui';
 interface DbVerifyOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly shallow?: boolean;
+  readonly markerOnly?: boolean;
+  readonly schemaOnly?: boolean;
+  readonly strict?: boolean;
 }
+
+type DbVerifyMode = 'full' | 'marker-only' | 'schema-only';
 
 /**
  * Maps a VerifyDatabaseResult failure to a CliStructuredError.
  */
 function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredError {
   if (!verifyResult.ok && verifyResult.code) {
-    if (verifyResult.code === 'PN-RTM-3001') {
+    if (verifyResult.code === 'PN-RUN-3001') {
       return errorMarkerMissing();
     }
-    if (verifyResult.code === 'PN-RTM-3002') {
+    if (verifyResult.code === 'PN-RUN-3002') {
       return errorHashMismatch({
         expected: verifyResult.contract.storageHash,
         ...ifDefined('actual', verifyResult.marker?.storageHash),
       });
     }
-    if (verifyResult.code === 'PN-RTM-3003') {
+    if (verifyResult.code === 'PN-RUN-3003') {
       return errorTargetMismatch(
         verifyResult.target.expected,
         verifyResult.target.actual ?? 'unknown',
@@ -76,48 +80,150 @@ function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredErro
 
 type DbVerifyFailure = CliStructuredError | VerifyDatabaseSchemaResult;
 
-/**
- * Executes the db verify command and returns a structured Result.
- */
-async function executeDbVerifyCommand(
+function errorInvalidVerifyMode(options: {
+  readonly why: string;
+  readonly fix: string;
+}): CliStructuredError {
+  return new CliStructuredError('4012', 'Invalid verify mode', {
+    domain: 'CLI',
+    why: options.why,
+    fix: options.fix,
+    docsUrl: 'https://pris.ly/db-verify',
+  });
+}
+
+function resolveDbVerifyMode(options: DbVerifyOptions): Result<DbVerifyMode, CliStructuredError> {
+  if (options.markerOnly && options.schemaOnly) {
+    return notOk(
+      errorInvalidVerifyMode({
+        why: '`--marker-only` and `--schema-only` cannot be used together',
+        fix: 'Choose one mode: omit both to check the marker and schema, use `--marker-only` to check only the marker, or use `--schema-only` to check only the live schema.',
+      }),
+    );
+  }
+
+  if (options.markerOnly && options.strict) {
+    return notOk(
+      errorInvalidVerifyMode({
+        why: '`--strict` requires schema verification, but `--marker-only` skips it',
+        fix: 'Remove `--strict`, or use `db verify` / `db verify --schema-only` when you want to check the live schema in strict mode.',
+      }),
+    );
+  }
+
+  if (options.schemaOnly) {
+    return ok('schema-only');
+  }
+
+  if (options.markerOnly) {
+    return ok('marker-only');
+  }
+
+  return ok('full');
+}
+
+function formatDbVerifyModeLabel(mode: DbVerifyMode, strict: boolean): string {
+  if (mode === 'marker-only') {
+    return 'marker only';
+  }
+
+  if (mode === 'schema-only') {
+    return `schema only (${strict ? 'strict' : 'tolerant'})`;
+  }
+
+  return `full (marker + schema, ${strict ? 'strict' : 'tolerant'})`;
+}
+
+function formatDbVerifyInvocation(mode: DbVerifyMode, strict: boolean): string {
+  const args = ['db verify'];
+
+  if (mode === 'marker-only') {
+    args.push('--marker-only');
+  }
+
+  if (mode === 'schema-only') {
+    args.push('--schema-only');
+  }
+
+  if (strict) {
+    args.push('--strict');
+  }
+
+  return args.join(' ');
+}
+
+function createDbVerifyConnectionRequiredError(options: {
+  readonly configPath: string;
+  readonly mode: DbVerifyMode;
+  readonly strict: boolean;
+}): CliStructuredError {
+  const invocation = formatDbVerifyInvocation(options.mode, options.strict);
+  return errorDatabaseConnectionRequired({
+    why: `Database connection is required for ${invocation} (set db.connection in ${options.configPath}, or pass --db <url>)`,
+    retryCommand: `prisma-next ${invocation} --db <url>`,
+  });
+}
+
+function renderVerifyHeader(
+  paths: { configPath: string; contractPath: string },
   options: DbVerifyOptions,
+  mode: DbVerifyMode,
   flags: GlobalFlags,
   ui: TerminalUI,
-): Promise<Result<DbVerifyCommandSuccessResult, DbVerifyFailure>> {
-  const startTime = Date.now();
+): void {
+  if (flags.json || flags.quiet) return;
 
-  // Load config
+  const description =
+    mode === 'schema-only'
+      ? 'Check whether the live database schema matches your contract'
+      : mode === 'marker-only'
+        ? 'Check whether the database marker matches your contract'
+        : 'Check whether the database marker and live schema match your contract';
+
+  const details: Array<{ label: string; value: string }> = [
+    { label: 'config', value: paths.configPath },
+    { label: 'contract', value: paths.contractPath },
+    { label: 'mode', value: formatDbVerifyModeLabel(mode, options.strict ?? false) },
+  ];
+  if (options.db) {
+    details.push({ label: 'database', value: maskConnectionUrl(options.db) });
+  }
+
+  ui.stderr(
+    formatStyledHeader({
+      command: 'db verify',
+      description,
+      url: 'https://pris.ly/db-verify',
+      details,
+      flags,
+    }),
+  );
+}
+
+async function resolveVerifyPaths(options: DbVerifyOptions) {
   const config = await loadConfig(options.config);
   const configPath = options.config
     ? relative(process.cwd(), resolve(options.config))
     : 'prisma-next.config.ts';
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
+  return { config, configPath, contractPathAbsolute, contractPath };
+}
 
-  // Output header
-  if (!flags.json && !flags.quiet) {
-    const details: Array<{ label: string; value: string }> = [
-      { label: 'config', value: configPath },
-      { label: 'contract', value: contractPath },
-      {
-        label: 'mode',
-        value: options.shallow ? 'shallow (marker only)' : 'full (marker + schema)',
-      },
-    ];
-    if (options.db) {
-      details.push({ label: 'database', value: maskConnectionUrl(options.db) });
-    }
-    const header = formatStyledHeader({
-      command: 'db verify',
-      description: 'Check whether the database signature and live schema match your contract',
-      url: 'https://pris.ly/db-verify',
-      details,
-      flags,
-    });
-    ui.stderr(header);
-  }
+type VerifyPaths = Awaited<ReturnType<typeof resolveVerifyPaths>>;
 
-  // Load contract file
+interface VerifySetup extends VerifyPaths {
+  readonly contractJson: Record<string, unknown>;
+  readonly dbConnection: string;
+}
+
+async function resolveVerifySetup(
+  paths: VerifyPaths,
+  options: DbVerifyOptions,
+  mode: DbVerifyMode,
+): Promise<Result<VerifySetup, CliStructuredError>> {
+  const { config, configPath, contractPathAbsolute, contractPath } = paths;
+
   let contractJsonContent: string;
   try {
     contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
@@ -149,32 +255,78 @@ async function executeDbVerifyCommand(
     );
   }
 
-  // Resolve database connection (--db flag or config.db.connection)
   const dbConnection = options.db ?? config.db?.connection;
-  if (!dbConnection) {
+  if (typeof dbConnection !== 'string' || dbConnection.length === 0) {
     return notOk(
-      errorDatabaseConnectionRequired({
-        why: `Database connection is required for db verify (set db.connection in ${configPath}, or pass --db <url>)`,
-        commandName: 'db verify',
+      createDbVerifyConnectionRequiredError({
+        configPath,
+        mode,
+        strict: options.strict ?? false,
       }),
     );
   }
 
-  // Check for driver
   if (!config.driver) {
-    return notOk(errorDriverRequired({ why: 'Config.driver is required for db verify' }));
+    return notOk(
+      errorDriverRequired({
+        why: `Config.driver is required for ${formatDbVerifyInvocation(mode, options.strict ?? false)}`,
+      }),
+    );
   }
 
-  // Create control client
-  const client = createControlClient({
-    family: config.family,
-    target: config.target,
-    adapter: config.adapter,
-    driver: config.driver,
-    extensionPacks: config.extensionPacks ?? [],
-  });
+  return ok({ ...paths, contractJson, dbConnection });
+}
 
-  // Create progress adapter
+function createVerifyClient(setup: VerifySetup) {
+  return createControlClient({
+    family: setup.config.family,
+    target: setup.config.target,
+    adapter: setup.config.adapter,
+    driver: setup.config.driver!,
+    extensionPacks: setup.config.extensionPacks ?? [],
+  });
+}
+
+function wrapVerifyError(
+  error: unknown,
+  contractPathAbsolute: string,
+  modeLabel: string,
+): Result<never, CliStructuredError> {
+  if (error instanceof CliStructuredError) {
+    return notOk(error);
+  }
+  if (error instanceof ContractValidationError) {
+    return notOk(
+      errorContractValidationFailed(`Contract validation failed: ${error.message}`, {
+        where: { path: contractPathAbsolute },
+      }),
+    );
+  }
+  return notOk(
+    errorUnexpected(error instanceof Error ? error.message : String(error), {
+      why: `Unexpected error during ${modeLabel}: ${error instanceof Error ? error.message : String(error)}`,
+    }),
+  );
+}
+
+/**
+ * Executes the db verify command and returns a structured Result.
+ */
+async function executeDbVerifyCommand(
+  options: DbVerifyOptions,
+  flags: GlobalFlags,
+  ui: TerminalUI,
+  mode: Extract<DbVerifyMode, 'full' | 'marker-only'>,
+): Promise<Result<DbVerifyCommandSuccessResult, DbVerifyFailure>> {
+  const startTime = Date.now();
+  const paths = await resolveVerifyPaths(options);
+  renderVerifyHeader(paths, options, mode, flags, ui);
+
+  const setupResult = await resolveVerifySetup(paths, options, mode);
+  if (!setupResult.ok) return setupResult;
+  const { contractJson, dbConnection, contractPathAbsolute } = setupResult.value;
+
+  const client = createVerifyClient(setupResult.value);
   const onProgress = createProgressAdapter({ ui, flags });
 
   try {
@@ -189,18 +341,17 @@ async function executeDbVerifyCommand(
       return notOk(mapVerifyFailure(verifyResult));
     }
 
-    if (options.shallow) {
+    if (mode === 'marker-only') {
       return ok({
         ok: true,
-        mode: 'shallow',
+        mode: 'marker-only',
         summary: 'Database marker matches contract',
         contract: verifyResult.contract,
         marker: verifyResult.marker,
         target: verifyResult.target,
         ...ifDefined('missingCodecs', verifyResult.missingCodecs),
         ...ifDefined('codecCoverageSkipped', verifyResult.codecCoverageSkipped),
-        warning:
-          'Schema verification skipped because --shallow was provided. Run `prisma-next db schema-verify` to detect structural drift.',
+        warning: 'Schema verification skipped because --marker-only was provided',
         meta: {
           ...(verifyResult.meta ?? {}),
           schemaVerification: 'skipped',
@@ -211,7 +362,7 @@ async function executeDbVerifyCommand(
 
     const schemaVerifyResult = await client.schemaVerify({
       contractIR: contractJson,
-      strict: false,
+      strict: options.strict ?? false,
       onProgress,
     });
 
@@ -222,7 +373,7 @@ async function executeDbVerifyCommand(
     return ok({
       ok: true,
       mode: 'full',
-      summary: 'Database signature and schema match contract',
+      summary: 'Database marker and schema match contract',
       contract: verifyResult.contract,
       marker: verifyResult.marker,
       target: verifyResult.target,
@@ -240,25 +391,38 @@ async function executeDbVerifyCommand(
       timings: { total: Date.now() - startTime },
     });
   } catch (error) {
-    // Driver already throws CliStructuredError for connection failures
-    if (error instanceof CliStructuredError) {
-      return notOk(error);
-    }
+    return wrapVerifyError(error, contractPathAbsolute, 'db verify');
+  } finally {
+    await client.close();
+  }
+}
 
-    if (error instanceof ContractValidationError) {
-      return notOk(
-        errorContractValidationFailed(`Contract validation failed: ${error.message}`, {
-          where: { path: contractPathAbsolute },
-        }),
-      );
-    }
+async function executeDbSchemaOnlyVerifyCommand(
+  options: DbVerifyOptions,
+  flags: GlobalFlags,
+  ui: TerminalUI,
+): Promise<Result<VerifyDatabaseSchemaResult, CliStructuredError>> {
+  const paths = await resolveVerifyPaths(options);
+  renderVerifyHeader(paths, options, 'schema-only', flags, ui);
 
-    // Wrap unexpected errors
-    return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Unexpected error during db verify: ${error instanceof Error ? error.message : String(error)}`,
-      }),
-    );
+  const setupResult = await resolveVerifySetup(paths, options, 'schema-only');
+  if (!setupResult.ok) return setupResult;
+  const { contractJson, dbConnection, contractPathAbsolute } = setupResult.value;
+
+  const client = createVerifyClient(setupResult.value);
+  const onProgress = createProgressAdapter({ ui, flags });
+
+  try {
+    const schemaVerifyResult = await client.schemaVerify({
+      contractIR: contractJson,
+      strict: options.strict ?? false,
+      connection: dbConnection,
+      onProgress,
+    });
+
+    return ok(schemaVerifyResult);
+  } catch (error) {
+    return wrapVerifyError(error, contractPathAbsolute, 'db verify --schema-only');
   } finally {
     await client.close();
   }
@@ -268,25 +432,66 @@ export function createDbVerifyCommand(): Command {
   const command = new Command('verify');
   setCommandDescriptions(
     command,
-    'Check whether the database signature and live schema match your contract',
-    'Verifies the database marker first, then runs tolerant structural schema verification to\n' +
-      'catch drift such as manual DDL changes. Use `--shallow` to skip the schema check and accept\n' +
-      'marker-only verification.',
+    'Check whether the database marker and live schema match your contract',
+    'Verifies the database marker first, then checks the database schema matches your contract.\n' +
+      'Use `--marker-only` for marker-only verification, `--schema-only` to skip marker checks and\n' +
+      'inspect only the live schema, and `--strict` to fail if the database includes elements\n' +
+      'not present in the contract.',
   );
   setCommandExamples(command, [
     'prisma-next db verify --db $DATABASE_URL',
-    'prisma-next db verify --db $DATABASE_URL --shallow',
+    'prisma-next db verify --db $DATABASE_URL --strict',
+    'prisma-next db verify --db $DATABASE_URL --schema-only',
+    'prisma-next db verify --db $DATABASE_URL --schema-only --strict',
+    'prisma-next db verify --db $DATABASE_URL --marker-only',
     'prisma-next db verify --db $DATABASE_URL --json',
   ]);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--shallow', 'Skip structural schema verification and only check the database marker')
+    .option('--marker-only', 'Skip schema verification and only check the database marker')
+    .option(
+      '--schema-only',
+      'Skip marker verification and only check whether the live schema satisfies the contract',
+    )
+    .option(
+      '--strict',
+      'Strict mode: schema elements not present in the contract are considered an error',
+      false,
+    )
     .action(async (options: DbVerifyOptions) => {
       const flags = parseGlobalFlags(options);
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const result = await executeDbVerifyCommand(options, flags, ui);
+      const modeResult = resolveDbVerifyMode(options);
+      if (!modeResult.ok) {
+        const exitCode = handleResult(modeResult as Result<never, CliStructuredError>, flags, ui);
+        process.exit(exitCode);
+      }
+
+      const mode = modeResult.value;
+
+      if (mode === 'schema-only') {
+        const result = await executeDbSchemaOnlyVerifyCommand(options, flags, ui);
+        const exitCode = handleResult(result, flags, ui, (schemaVerifyResult) => {
+          if (flags.json) {
+            ui.output(formatSchemaVerifyJson(schemaVerifyResult));
+          } else {
+            const output = formatSchemaVerifyOutput(schemaVerifyResult, flags);
+            if (output) {
+              ui.log(output);
+            }
+          }
+        });
+
+        if (result.ok && !result.value.ok) {
+          process.exit(1);
+        }
+
+        process.exit(exitCode);
+      }
+
+      const result = await executeDbVerifyCommand(options, flags, ui, mode);
 
       if (result.ok) {
         if (flags.json) {

@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — no marker, db init never run [empty database, contract emitted]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,7 +30,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — no marker, db init never run [empty database, contract emitted]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify no marker, db init never run [empty database, contract emitted]
 >
 
 
@@ -92,43 +61,10 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — no marker, db init never run [empty database, contract emitted]
-> prisma-next db verify
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — no marker, db init never run [empty database, contract emitted]
-> prisma-next db verify
-
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify no marker, db init never run [empty database, contract emitted]
+>
 
 
 
@@ -158,9 +94,9 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — no marker, db init never run [empty database, contract emitted]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify no marker, db init never run [empty database, contract emitted]
 > prisma-next db verify
-
 
 
 
@@ -190,24 +126,88 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Verify fails — no marker, db init never run [empty database, contract emitted]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify no marker, db init never run [empty database, contract emitted]
 > prisma-next db verify
-prisma-next db verify → Check whether the database signature and live schema match your contract
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify no marker, db init never run [empty database, contract emitted]
+> prisma-next db verify
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # fails Verify no marker, db init never run [empty database, contract emitted]
+> prisma-next db verify
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+prisma-next db verify → Check whether the database marker and live schema match your contract
 │
 │ config:               prisma-next.config.ts
 │ contract:             contract.json
-│ mode:                 full (marker + schema)
+│ mode:                 full (marker + schema, tolerant)
 │
 │ Read more             https://pris.ly/db-verify
 └
 
 │
-■  ✖ Database not signed (PN-RTM-3001)
+■  ✖ Database not signed (PN-RUN-3001)
 │    Why: No database signature (marker) found
 │    Fix: Run `prisma-next db sign --db <url>` to sign the database
 >
-
-
 
 
 

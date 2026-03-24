@@ -6,7 +6,7 @@ import {
   vectorColumn as vectorColumnType,
 } from '@prisma-next/test-utils/column-descriptors';
 import { describe, expect, it } from 'vitest';
-import type { OperationExpr } from '../src/ast/types';
+import { ColumnRef, OperationExpr } from '../src/ast/types';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { createStubAdapter, createTestContext } from './utils';
@@ -337,24 +337,14 @@ describe('ColumnBuilder operations', () => {
     const outerOp = expressionBuilder.toExpr();
 
     // Verify the outer operation (cosineDistance) has the inner operation (normalize) as its self
-    expect(outerOp).toMatchObject({
-      kind: 'operation',
-      method: 'cosineDistance',
-      self: expect.objectContaining({
-        kind: 'operation',
-      }),
-    });
+    expect(outerOp).toBeInstanceOf(OperationExpr);
+    expect(outerOp.method).toBe('cosineDistance');
+    expect(outerOp.self).toBeInstanceOf(OperationExpr);
 
     // Verify the inner operation (normalize) has the column as its self
     const innerOp = outerOp.self as OperationExpr;
-    expect(innerOp).toMatchObject({
-      kind: 'operation',
-      method: 'normalize',
-      self: {
-        kind: 'col',
-        table: 'user',
-        column: 'vector',
-      },
-    });
+    expect(innerOp).toBeInstanceOf(OperationExpr);
+    expect(innerOp.method).toBe('normalize');
+    expect(innerOp.self).toEqual(ColumnRef.of('user', 'vector'));
   });
 });

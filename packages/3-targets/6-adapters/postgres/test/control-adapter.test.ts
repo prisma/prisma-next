@@ -1637,5 +1637,17 @@ describe('PostgresControlAdapter', () => {
     ])('normalizes $input -> $expected', ({ input, expected }) => {
       expect(normalizeSchemaNativeType(input)).toBe(expected);
     });
+
+    it.each([
+      { input: 'citext', expected: 'citext' },
+      { input: 'ltree', expected: 'ltree' },
+      { input: 'uuid', expected: 'uuid' },
+      { input: 'jsonb', expected: 'jsonb' },
+      { input: 'json', expected: 'json' },
+      { input: 'geometry', expected: 'geometry' },
+      { input: 'hstore', expected: 'hstore' },
+    ])('passes through extension type $input unchanged', ({ input, expected }) => {
+      expect(normalizeSchemaNativeType(input)).toBe(expected);
+    });
   });
 });

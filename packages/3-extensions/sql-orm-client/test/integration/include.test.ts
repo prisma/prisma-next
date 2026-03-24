@@ -1,4 +1,15 @@
+import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import {
+  ColumnRef,
+  DerivedTableSource,
+  JsonArrayAggExpr,
+  JsonObjectExpr,
+  OrderByItem,
+  SubqueryExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import { Collection } from '../../src/collection';
+import { getTestContract, isSelectAst } from '../helpers';
 import {
   createPostsCollection,
   createUsersCollection,
@@ -6,6 +17,43 @@ import {
   withCollectionRuntime,
 } from './helpers';
 import { seedComments, seedPosts, seedProfiles, seedUsers } from './runtime-helpers';
+
+function expectSelectAst(ast: unknown): asserts ast is SelectAst {
+  expect(isSelectAst(ast)).toBe(true);
+}
+
+function expectDerivedTableSource(source: unknown): asserts source is DerivedTableSource {
+  expect(source).toBeInstanceOf(DerivedTableSource);
+}
+
+function expectSubqueryExpr(expr: unknown): asserts expr is SubqueryExpr {
+  expect(expr).toBeInstanceOf(SubqueryExpr);
+}
+
+function expectJsonArrayAggExpr(expr: unknown): asserts expr is JsonArrayAggExpr {
+  expect(expr).toBeInstanceOf(JsonArrayAggExpr);
+}
+
+function createUsersCollectionWithCapabilities(
+  runtime: Parameters<typeof createUsersCollection>[0],
+  capabilities: Record<string, unknown>,
+) {
+  const base = getTestContract();
+  const contract = {
+    ...base,
+    capabilities: {
+      ...base.capabilities,
+      ...capabilities,
+    },
+  } as typeof base;
+
+  return new Collection({ contract, runtime }, 'User');
+}
+
+type NumericPostField = import('../../src/types').NumericFieldNames<
+  ReturnType<typeof getTestContract>,
+  'Post'
+>;
 
 describe('integration/include', () => {
   it(
@@ -109,7 +157,7 @@ describe('integration/include', () => {
         ]);
 
         runtime.resetExecutions();
-        const numericField = 'views' as never;
+        const numericField: NumericPostField = 'views';
         const rows = await users
           .orderBy((user) => user.id.asc())
           .include('posts', (posts) => posts.sum(numericField))
@@ -144,7 +192,7 @@ describe('integration/include', () => {
         ]);
 
         runtime.resetExecutions();
-        const numericField = 'views' as never;
+        const numericField: NumericPostField = 'views';
         const rows = await users
           .orderBy((user) => user.id.asc())
           .include('posts', (posts) =>
@@ -238,6 +286,369 @@ describe('integration/include', () => {
           },
         ]);
         expect(runtime.executions).toHaveLength(4);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'single-query include uses lateral strategy when lateral and jsonAgg are enabled',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {
+          lateral: { enabled: true },
+          jsonAgg: { enabled: true },
+        });
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 1, views: 200 },
+          { id: 12, title: 'Post C', userId: 2, views: 300 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('posts', (posts) =>
+            posts
+              .orderBy((post) => post.id.asc())
+              .skip(1)
+              .take(1),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            posts: [{ id: 11, title: 'Post B', userId: 1, views: 200 }],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            posts: [],
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
+
+        const ast = runtime.executions[0]?.ast;
+        expectSelectAst(ast);
+        const includeJoin = ast.joins?.find(
+          (join) =>
+            join.lateral &&
+            join.source instanceof DerivedTableSource &&
+            join.source.alias === 'posts_lateral',
+        );
+        expect(includeJoin).toBeDefined();
+
+        expectDerivedTableSource(includeJoin?.source);
+        const includeAggregateProjection = includeJoin.source.query.projection[0];
+        expectJsonArrayAggExpr(includeAggregateProjection?.expr);
+        expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
+        expect(includeAggregateProjection.expr.expr).toBeInstanceOf(JsonObjectExpr);
+        expect(includeAggregateProjection.expr.orderBy).toEqual([
+          OrderByItem.asc(ColumnRef.of('posts__rows', 'posts__order_0')),
+        ]);
+
+        const rowsSource = includeJoin.source.query.from;
+        expectDerivedTableSource(rowsSource);
+        expect(rowsSource.query.limit).toBe(1);
+        expect(rowsSource.query.offset).toBe(1);
+        expect(rowsSource.query.projection.map((item) => item.alias)).toContain('posts__order_0');
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'single-query lateral include correlates self-relations with child alias',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {
+          lateral: { enabled: true },
+          jsonAgg: { enabled: true },
+        });
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+          { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1 },
+          { id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('invitedUsers', (invitedUsers) =>
+            invitedUsers.orderBy((invitedUser) => invitedUser.id.asc()),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            invitedUsers: [
+              { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+              { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1 },
+            ],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: 1,
+            invitedUsers: [{ id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2 }],
+          },
+          {
+            id: 3,
+            name: 'Cara',
+            email: 'cara@example.com',
+            invitedById: 1,
+            invitedUsers: [],
+          },
+          {
+            id: 4,
+            name: 'Dan',
+            email: 'dan@example.com',
+            invitedById: 2,
+            invitedUsers: [],
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
+        const ast = runtime.executions[0]?.ast;
+        expectSelectAst(ast);
+        const includeJoin = ast.joins?.find(
+          (join) =>
+            join.lateral &&
+            join.source instanceof DerivedTableSource &&
+            join.source.alias === 'invitedUsers_lateral',
+        );
+        expect(includeJoin).toBeDefined();
+
+        expectDerivedTableSource(includeJoin?.source);
+        const includeAggregateProjection = includeJoin.source.query.projection[0];
+        expectJsonArrayAggExpr(includeAggregateProjection?.expr);
+        expect(includeAggregateProjection.expr.orderBy).toEqual([
+          OrderByItem.asc(ColumnRef.of('invitedUsers__rows', 'invitedUsers__order_0')),
+        ]);
+
+        const rowsSource = includeJoin.source.query.from;
+        expectDerivedTableSource(rowsSource);
+        expect(rowsSource.query.projection.map((item) => item.alias)).toContain(
+          'invitedUsers__order_0',
+        );
+
+        const sql = runtime.executions[0]?.sql;
+        expect(sql).toContain('"invitedUsers__child"."invited_by_id" = "users"."id"');
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'single-query include uses correlated strategy when only jsonAgg is enabled',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {
+          jsonAgg: { enabled: true },
+        });
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedPosts(runtime, [{ id: 10, title: 'Post A', userId: 1, views: 100 }]);
+
+        runtime.resetExecutions();
+        const rows = await users.include('posts').all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            posts: [{ id: 10, title: 'Post A', userId: 1, views: 100 }],
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
+
+        const ast = runtime.executions[0]?.ast;
+        expectSelectAst(ast);
+        expect(ast.joins ?? []).toHaveLength(0);
+
+        const postsProjection = ast.projection.find((item) => item.alias === 'posts');
+        expectSubqueryExpr(postsProjection?.expr);
+        const includeAggregateProjection = postsProjection.expr.query.projection[0];
+        expectJsonArrayAggExpr(includeAggregateProjection?.expr);
+        expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
+        expect(includeAggregateProjection.expr.expr).toBeInstanceOf(JsonObjectExpr);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'single-query correlated include correlates self-relations with child alias',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {
+          jsonAgg: { enabled: true },
+        });
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+          { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1 },
+          { id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('invitedUsers', (invitedUsers) =>
+            invitedUsers.orderBy((invitedUser) => invitedUser.id.asc()),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            invitedUsers: [
+              { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+              { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1 },
+            ],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: 1,
+            invitedUsers: [{ id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2 }],
+          },
+          {
+            id: 3,
+            name: 'Cara',
+            email: 'cara@example.com',
+            invitedById: 1,
+            invitedUsers: [],
+          },
+          {
+            id: 4,
+            name: 'Dan',
+            email: 'dan@example.com',
+            invitedById: 2,
+            invitedUsers: [],
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
+        const ast = runtime.executions[0]?.ast;
+        expectSelectAst(ast);
+
+        const invitedUsersProjection = ast.projection.find((item) => item.alias === 'invitedUsers');
+        expectSubqueryExpr(invitedUsersProjection?.expr);
+        const includeAggregateProjection = invitedUsersProjection.expr.query.projection[0];
+        expectJsonArrayAggExpr(includeAggregateProjection?.expr);
+        expect(includeAggregateProjection.expr.orderBy).toEqual([
+          OrderByItem.asc(ColumnRef.of('invitedUsers__rows', 'invitedUsers__order_0')),
+        ]);
+
+        const rowsSource = invitedUsersProjection.expr.query.from;
+        expectDerivedTableSource(rowsSource);
+        expect(rowsSource.query.projection.map((item) => item.alias)).toContain(
+          'invitedUsers__order_0',
+        );
+
+        const sql = runtime.executions[0]?.sql;
+        expect(sql).toContain('"invitedUsers__child"."invited_by_id" = "users"."id"');
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'include() supports nested 2-level includes (users -> posts -> comments)',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 1, views: 200 },
+          { id: 12, title: 'Post C', userId: 2, views: 300 },
+        ]);
+        await seedComments(runtime, [
+          { id: 100, body: 'Comment A', postId: 10 },
+          { id: 101, body: 'Comment B', postId: 10 },
+          { id: 102, body: 'Comment C', postId: 11 },
+        ]);
+
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('posts', (posts) =>
+            posts
+              .orderBy((post) => post.id.asc())
+              .include('comments', (comments) => comments.orderBy((c) => c.id.asc())),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            posts: [
+              {
+                id: 10,
+                title: 'Post A',
+                userId: 1,
+                views: 100,
+                comments: [
+                  { id: 100, body: 'Comment A', postId: 10 },
+                  { id: 101, body: 'Comment B', postId: 10 },
+                ],
+              },
+              {
+                id: 11,
+                title: 'Post B',
+                userId: 1,
+                views: 200,
+                comments: [{ id: 102, body: 'Comment C', postId: 11 }],
+              },
+            ],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            posts: [
+              {
+                id: 12,
+                title: 'Post C',
+                userId: 2,
+                views: 300,
+                comments: [],
+              },
+            ],
+          },
+        ]);
       });
     },
     timeouts.spinUpPpgDev,

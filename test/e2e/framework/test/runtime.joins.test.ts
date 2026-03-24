@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sql } from '@prisma-next/sql-lane/sql';
-import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
@@ -278,17 +278,16 @@ describe('end-to-end JOIN queries', () => {
             })
             .build();
 
-          const ast = plan.ast as SelectAst | undefined;
-          expect(ast?.joins).toMatchObject([
+          expect(plan.ast).toBeInstanceOf(SelectAst);
+          const ast = plan.ast as SelectAst;
+          expect(ast.joins).toMatchObject([
             {
-              kind: 'join',
               joinType: 'inner',
-              table: { kind: 'table', name: 'post' },
+              source: { name: 'post' },
             },
             {
-              kind: 'join',
               joinType: 'left',
-              table: { kind: 'table', name: 'comment' },
+              source: { name: 'comment' },
             },
           ]);
 

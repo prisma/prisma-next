@@ -13,6 +13,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { isAttested } from '@prisma-next/migration-tools/types';
 import { describe, expect, it } from 'vitest';
 
 function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
@@ -72,7 +73,6 @@ describe('migration plan — core flow', () => {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:test-hash',
       migrationId: null,
-      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract,
@@ -115,7 +115,6 @@ describe('migration plan — core flow', () => {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:same-hash',
       migrationId: null,
-      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract: contract,
@@ -136,7 +135,7 @@ describe('migration plan — core flow', () => {
 
     // Read migrations and find leaf — leaf should be 'sha256:same-hash'
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
 
     expect(leaf).toBe('sha256:same-hash');
@@ -176,7 +175,6 @@ describe('migration plan — core flow', () => {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
         migrationId: null,
-        parentMigrationId: null,
         kind: 'regular',
         fromContract: null,
         toContract: contractA,
@@ -191,7 +189,7 @@ describe('migration plan — core flow', () => {
       },
       [createTableOp('user')],
     );
-    const migrationId1 = await attestMigration(path1);
+    await attestMigration(path1);
 
     // Second migration: A -> B
     const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
@@ -202,7 +200,6 @@ describe('migration plan — core flow', () => {
         from: 'sha256:hash-a',
         to: 'sha256:hash-b',
         migrationId: null,
-        parentMigrationId: migrationId1,
         kind: 'regular',
         fromContract: contractA,
         toContract: contractB,
@@ -223,7 +220,7 @@ describe('migration plan — core flow', () => {
     const packages = await readMigrationsDir(migrationsDir);
     expect(packages).toHaveLength(2);
 
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     expect(leaf).toBe('sha256:hash-b');
 
@@ -258,7 +255,6 @@ describe('--from hash lookup', () => {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:known-hash',
       migrationId: null,
-      parentMigrationId: null,
       kind: 'regular',
       fromContract: null,
       toContract: createTestContract(),

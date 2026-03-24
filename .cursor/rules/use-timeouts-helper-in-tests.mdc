@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Use Timeouts Helper In Tests
 
-When a test needs an explicit timeout, use a shared helper from `@prisma-next/test-utils` (for example `timeouts.spinUpPpgDev`).
+When a test needs an explicit timeout, always use a shared named helper from `@prisma-next/test-utils` (for example `timeouts.spinUpPpgDev`).
 
 ## Do
 

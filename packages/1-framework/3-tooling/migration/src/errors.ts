@@ -92,19 +92,70 @@ export function errorSelfLoop(dirName: string, hash: string): MigrationToolsErro
   });
 }
 
-export function errorAmbiguousLeaf(leaves: readonly string[]): MigrationToolsError {
+export function errorAmbiguousLeaf(
+  leaves: readonly string[],
+  context?: {
+    divergencePoint: string;
+    branches: readonly {
+      leaf: string;
+      edges: readonly { dirName: string; from: string; to: string }[];
+    }[];
+  },
+): MigrationToolsError {
+  const divergenceInfo = context
+    ? `\nDivergence point: ${context.divergencePoint}\nBranches:\n${context.branches.map((b) => `  → ${b.leaf} (${b.edges.length} edge(s): ${b.edges.map((e) => e.dirName).join(' → ') || 'direct'})`).join('\n')}`
+    : '';
   return new MigrationToolsError('MIGRATION.AMBIGUOUS_LEAF', 'Ambiguous migration graph', {
-    why: `Multiple leaf nodes found: ${leaves.join(', ')}. The migration graph has diverged — this typically happens when two developers plan migrations from the same starting point.`,
-    fix: 'Delete one of the conflicting migration directories, then re-run `migration plan` to re-plan it from the remaining branch. Or use --from <hash> to explicitly select a starting point.',
-    details: { leaves },
+    why: `Multiple leaf nodes found: ${leaves.join(', ')}. The migration graph has diverged — this typically happens when two developers plan migrations from the same starting point.${divergenceInfo}`,
+    fix: 'Use `migration ref set <name> <hash>` to target a specific branch, delete one of the conflicting migration directories and re-run `migration plan`, or use --from <hash> to explicitly select a starting point.',
+    details: {
+      leaves,
+      ...(context ? { divergencePoint: context.divergencePoint, branches: context.branches } : {}),
+    },
   });
 }
 
 export function errorNoRoot(nodes: readonly string[]): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.NO_ROOT', 'Migration graph has no root', {
-    why: `No root migration found in the migration graph (nodes: ${nodes.join(', ')}). Every migration references a parentMigrationId that does not exist, or the graph contains a cycle in parent pointers.`,
-    fix: 'Inspect the migrations directory for corrupted migration.json files. Exactly one migration must have parentMigrationId set to null (the first migration).',
+    why: `No root migration found in the migration graph (nodes: ${nodes.join(', ')}). No migration starts from the empty contract hash, or all edges form a disconnected subgraph.`,
+    fix: 'Inspect the migrations directory for corrupted migration.json files. At least one migration must start from the empty contract hash.',
     details: { nodes },
+  });
+}
+
+export function errorInvalidRefs(refsPath: string, reason: string): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.INVALID_REFS', 'Invalid refs.json', {
+    why: `refs.json at "${refsPath}" is invalid: ${reason}`,
+    fix: 'Ensure refs.json is a flat object mapping valid ref names to contract hash strings.',
+    details: { path: refsPath, reason },
+  });
+}
+
+export function errorInvalidRefName(refName: string): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.INVALID_REF_NAME', 'Invalid ref name', {
+    why: `Ref name "${refName}" is invalid. Names must be lowercase alphanumeric with hyphens or forward slashes (no "." or ".." segments).`,
+    fix: `Use a valid ref name (e.g., "staging", "envs/production").`,
+    details: { refName },
+  });
+}
+
+export function errorNoResolvableLeaf(reachableNodes: readonly string[]): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.NO_RESOLVABLE_LEAF',
+    'Migration graph has no resolvable leaf',
+    {
+      why: `The migration graph contains cycles and no node has zero outgoing edges (reachable nodes: ${reachableNodes.join(', ')}). This typically happens after rollback migrations (e.g., C1→C2→C1).`,
+      fix: 'Use --from <hash> to specify the planning origin explicitly.',
+      details: { reachableNodes },
+    },
+  );
+}
+
+export function errorInvalidRefValue(value: string): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.INVALID_REF_VALUE', 'Invalid ref value', {
+    why: `Ref value "${value}" is not a valid contract hash. Values must be in the format "sha256:<64 hex chars>" or "sha256:empty".`,
+    fix: 'Use a valid storage hash from `prisma-next contract emit` output or an existing migration.',
+    details: { value },
   });
 }
 
@@ -113,7 +164,7 @@ export function errorDuplicateMigrationId(migrationId: string): MigrationToolsEr
     'MIGRATION.DUPLICATE_MIGRATION_ID',
     'Duplicate migrationId in migration graph',
     {
-      why: `Multiple migrations share migrationId "${migrationId}". This makes parent-chain reconstruction ambiguous and unsafe.`,
+      why: `Multiple migrations share migrationId "${migrationId}". Each migration must have a unique content-addressed identity.`,
       fix: 'Regenerate one of the conflicting migrations so each migrationId is unique, then re-run migration commands.',
       details: { migrationId },
     },

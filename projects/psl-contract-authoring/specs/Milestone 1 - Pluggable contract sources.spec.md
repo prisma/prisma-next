@@ -57,7 +57,7 @@ This spec defines the provider interface, config wiring, error behavior, and the
 # References
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
-- Project plan: `projects/psl-contract-authoring/plans/plan.md`
+- Project plan: `projects/psl-contract-authoring/plan.md`
 - Milestone 2 spec: `projects/psl-contract-authoring/specs/Milestone 2 - PSL parser.spec.md`
 - Milestone 3 spec: `projects/psl-contract-authoring/specs/Milestone 3 - Fixture-driven parity harness.spec.md`
 - ADR 006: `docs/architecture docs/adrs/ADR 006 - Dual Authoring Modes (PSL-first and TS-first) with a Single Canonical Artifact.md`

@@ -1,36 +1,4 @@
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────
-> # Introspect shows empty schema [empty database]
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 >
 
 
@@ -62,6 +30,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Introspect shows empty schema [empty database]
 >
 
@@ -92,8 +61,40 @@
 
 
 
+────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+> # Introspect shows empty schema [empty database]
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Introspect shows empty schema [empty database]
 > prisma-next db introspect
 
@@ -124,8 +125,8 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Introspect shows empty schema [empty database]
 > prisma-next db introspect
 
@@ -156,8 +157,8 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Introspect shows empty schema [empty database]
 > prisma-next db introspect
 
@@ -188,10 +189,11 @@
 
 
 
-
 ────────────────────────────────────────────────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Introspect shows empty schema [empty database]
 > prisma-next db introspect
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 prisma-next db introspect → Inspect the database schema
 │
 │ config:               prisma-next.config.ts
@@ -204,8 +206,6 @@ prisma-next db introspect → Inspect the database schema
 │  contract
 │  └─ plpgsql dependency is installed
 >
-
-
 
 
 

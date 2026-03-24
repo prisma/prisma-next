@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
@@ -11,11 +11,13 @@ import {
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import { buildMigrationEntries } from '../../src/commands/migration-status';
+import { buildMigrationEntries, resolveDisplayChain } from '../../src/commands/migration-status';
 import { formatMigrationStatusOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 
@@ -40,13 +42,11 @@ function createManifest(
   to: string,
   toContract: ContractIR,
   fromContract: ContractIR | null = null,
-  parentMigrationId: string | null = null,
 ): MigrationManifest {
   return {
     from,
     to,
     migrationId: null,
-    parentMigrationId,
     kind: 'regular',
     fromContract,
     toContract,
@@ -114,22 +114,22 @@ async function setupChain(migrationsDir: string) {
     createManifest(EMPTY_CONTRACT_HASH, 'sha256:hash-a', contractA),
     [createOp('table.user', 'Create table "user"', 'additive')],
   );
-  const migrationId1 = await attestMigration(path1);
+  await attestMigration(path1);
 
   const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_email');
   const path2 = join(migrationsDir, dir2);
   await writeMigrationPackage(
     path2,
-    createManifest('sha256:hash-a', 'sha256:hash-b', contractB, contractA, migrationId1),
+    createManifest('sha256:hash-a', 'sha256:hash-b', contractB, contractA),
     [createOp('column.user.email', 'Add column "email" on "user"', 'additive')],
   );
-  const migrationId2 = await attestMigration(path2);
+  await attestMigration(path2);
 
   const dir3 = formatMigrationDirName(new Date(2026, 0, 3, 10, 0), 'add_post');
   const path3 = join(migrationsDir, dir3);
   await writeMigrationPackage(
     path3,
-    createManifest('sha256:hash-b', 'sha256:hash-c', contractC, contractB, migrationId2),
+    createManifest('sha256:hash-b', 'sha256:hash-c', contractC, contractB),
     [
       createOp('table.post', 'Create table "post"', 'additive'),
       createOp('column.post.legacy', 'Drop column "legacy" on "post"', 'destructive'),
@@ -149,11 +149,11 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, undefined);
+    const entries = buildMigrationEntries(chain, packages, 'offline', undefined);
 
     expect(entries).toHaveLength(3);
     expect(entries[0]!.status).toBe('unknown');
@@ -169,11 +169,11 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, 'sha256:hash-a');
+    const entries = buildMigrationEntries(chain, packages, 'online', 'sha256:hash-a');
 
     expect(entries[0]!.status).toBe('applied');
     expect(entries[1]!.status).toBe('pending');
@@ -188,11 +188,11 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, 'sha256:hash-c');
+    const entries = buildMigrationEntries(chain, packages, 'online', 'sha256:hash-c');
 
     expect(entries[0]!.status).toBe('applied');
     expect(entries[1]!.status).toBe('applied');
@@ -207,11 +207,11 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, EMPTY_CONTRACT_HASH);
+    const entries = buildMigrationEntries(chain, packages, 'online', undefined);
 
     expect(entries[0]!.status).toBe('pending');
     expect(entries[1]!.status).toBe('pending');
@@ -226,11 +226,11 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, 'sha256:totally-unknown');
+    const entries = buildMigrationEntries(chain, packages, 'online', 'sha256:totally-unknown');
 
     expect(entries[0]!.status).toBe('unknown');
     expect(entries[1]!.status).toBe('unknown');
@@ -245,11 +245,11 @@ describe('buildMigrationEntries', { timeout: timeouts.databaseOperation }, () =>
     await setupChain(migrationsDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const graph = reconstructGraph(packages);
+    const graph = reconstructGraph(packages.filter(isAttested));
     const leaf = findLeaf(graph);
     const chain = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
 
-    const entries = buildMigrationEntries(chain, packages, undefined);
+    const entries = buildMigrationEntries(chain, packages, 'offline', undefined);
 
     expect(entries[0]!.operationSummary).toBe('1 op (all additive)');
     expect(entries[0]!.hasDestructive).toBe(false);
@@ -283,7 +283,7 @@ describe('formatMigrationStatusOutput', () => {
             status: 'unknown',
           },
         ],
-        leafHash: 'sha256:hash-b',
+        targetHash: 'sha256:hash-b',
         contractHash: 'sha256:hash-b',
         summary: '2 migration(s) on disk',
       },
@@ -324,7 +324,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         markerHash: 'sha256:hash-a',
-        leafHash: 'sha256:hash-b',
+        targetHash: 'sha256:hash-b',
         contractHash: 'sha256:hash-b',
         summary: "1 pending migration(s) — run 'prisma-next migration apply' to apply",
       },
@@ -355,7 +355,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         markerHash: 'sha256:hash-a',
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary: 'Database is up to date (1 migration applied)',
       },
@@ -386,7 +386,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         markerHash: 'sha256:totally-different',
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary:
           "Database marker does not match any migration — was the database managed with 'db update'?",
@@ -416,7 +416,7 @@ describe('formatMigrationStatusOutput', () => {
             status: 'unknown',
           },
         ],
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-b',
         summary: '1 migration(s) on disk',
         diagnostics: [
@@ -453,7 +453,7 @@ describe('formatMigrationStatusOutput', () => {
             status: 'unknown',
           },
         ],
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary: '1 migration(s) on disk',
         diagnostics: [
@@ -489,7 +489,7 @@ describe('formatMigrationStatusOutput', () => {
           },
         ],
         markerHash: 'sha256:hash-a',
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary: 'Database is up to date (1 migration applied)',
         diagnostics: [
@@ -524,7 +524,7 @@ describe('formatMigrationStatusOutput', () => {
             status: 'unknown',
           },
         ],
-        leafHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
         contractHash: 'sha256:hash-a',
         summary: '1 migration(s) on disk',
       },
@@ -541,7 +541,7 @@ describe('formatMigrationStatusOutput', () => {
       {
         mode: 'offline',
         migrations: [],
-        leafHash: EMPTY_CONTRACT_HASH,
+        targetHash: EMPTY_CONTRACT_HASH,
         contractHash: EMPTY_CONTRACT_HASH,
         summary: 'No migrations found',
       },
@@ -559,7 +559,7 @@ describe('formatMigrationStatusOutput', () => {
       {
         mode: 'online',
         migrations: [],
-        leafHash: EMPTY_CONTRACT_HASH,
+        targetHash: EMPTY_CONTRACT_HASH,
         contractHash: 'sha256:some-new-hash',
         summary: 'No migrations found',
         markerHash: EMPTY_CONTRACT_HASH,
@@ -589,7 +589,7 @@ describe('formatMigrationStatusOutput', () => {
       {
         mode: 'offline',
         migrations: [],
-        leafHash: EMPTY_CONTRACT_HASH,
+        targetHash: EMPTY_CONTRACT_HASH,
         contractHash: EMPTY_CONTRACT_HASH,
         summary: 'No migrations found',
       },
@@ -597,5 +597,250 @@ describe('formatMigrationStatusOutput', () => {
     );
 
     expect(output).toBe('');
+  });
+
+  it('renders active ref in bold and inactive refs as dim', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'online',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            migrationId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'applied',
+          },
+          {
+            dirName: '20260102_100000_add_email',
+            to: 'sha256:hash-b',
+            migrationId: 'sha256:e2',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'applied',
+          },
+        ],
+        markerHash: 'sha256:hash-b',
+        targetHash: 'sha256:hash-b',
+        contractHash: 'sha256:hash-b',
+        refs: [
+          { name: 'staging', hash: 'sha256:hash-a', active: false },
+          { name: 'prod', hash: 'sha256:hash-b', active: true },
+        ],
+        summary: 'Database is up to date (2 migrations applied)',
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('◄ ref:staging');
+    expect(stripped).toContain('◄ ref:prod');
+  });
+
+  it('renders multiple refs pointing to the same hash', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'online',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            migrationId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'applied',
+          },
+        ],
+        markerHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-a',
+        refs: [
+          { name: 'staging', hash: 'sha256:hash-a', active: false },
+          { name: 'prod', hash: 'sha256:hash-a', active: true },
+        ],
+        summary: 'Database is up to date (1 migration applied)',
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('◄ ref:staging');
+    expect(stripped).toContain('◄ ref:prod');
+  });
+});
+
+describe('resolveDisplayChain', { timeout: timeouts.databaseOperation }, () => {
+  it('includes marker in chain when marker is ahead of ref target', async () => {
+    const tempDir = await createTempDir('ahead-of-ref');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    await setupChain(migrationsDir);
+
+    const packages = await readMigrationsDir(migrationsDir);
+    const graph = reconstructGraph(packages.filter(isAttested));
+
+    const chain = resolveDisplayChain(graph, 'sha256:hash-b', 'sha256:hash-c');
+
+    expect(chain).not.toBeNull();
+    expect(chain!.length).toBe(3);
+    expect(chain!.some((e) => e.to === 'sha256:hash-c')).toBe(true);
+
+    const entries = buildMigrationEntries(chain!, packages, 'online', 'sha256:hash-c');
+    expect(entries[0]!.status).toBe('applied');
+    expect(entries[1]!.status).toBe('applied');
+    expect(entries[2]!.status).toBe('applied');
+  });
+
+  it('returns chain to target when marker is behind ref target', async () => {
+    const tempDir = await createTempDir('behind-ref');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    await setupChain(migrationsDir);
+
+    const packages = await readMigrationsDir(migrationsDir);
+    const graph = reconstructGraph(packages.filter(isAttested));
+
+    const chain = resolveDisplayChain(graph, 'sha256:hash-c', 'sha256:hash-a');
+
+    expect(chain).not.toBeNull();
+    expect(chain!.length).toBe(3);
+
+    const entries = buildMigrationEntries(chain!, packages, 'online', 'sha256:hash-a');
+    expect(entries[0]!.status).toBe('applied');
+    expect(entries[1]!.status).toBe('pending');
+    expect(entries[2]!.status).toBe('pending');
+  });
+
+  it('returns chain when marker equals ref target', async () => {
+    const tempDir = await createTempDir('at-ref');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    await setupChain(migrationsDir);
+
+    const packages = await readMigrationsDir(migrationsDir);
+    const graph = reconstructGraph(packages.filter(isAttested));
+
+    const chain = resolveDisplayChain(graph, 'sha256:hash-b', 'sha256:hash-b');
+
+    expect(chain).not.toBeNull();
+    expect(chain!.length).toBe(2);
+    expect(chain![1]!.to).toBe('sha256:hash-b');
+  });
+});
+
+describe('readRefs error surface (F01/F04)', () => {
+  it('returns empty object for missing refs.json', async () => {
+    const tempDir = await createTempDir('missing-refs');
+    const refs = await readRefs(join(tempDir, 'refs.json'));
+    expect(refs).toEqual({});
+  });
+
+  it('throws MigrationToolsError for malformed JSON', async () => {
+    const tempDir = await createTempDir('bad-json');
+    const refsPath = join(tempDir, 'refs.json');
+    await writeFile(refsPath, '{ not valid json !!!');
+
+    await expect(readRefs(refsPath)).rejects.toSatisfy((error: unknown) => {
+      return (
+        MigrationToolsError.is(error) &&
+        error.code === 'MIGRATION.INVALID_REFS' &&
+        error.message.includes('Invalid refs.json')
+      );
+    });
+  });
+
+  it('throws MigrationToolsError for invalid ref names', async () => {
+    const tempDir = await createTempDir('bad-names');
+    const refsPath = join(tempDir, 'refs.json');
+    await writeFile(refsPath, JSON.stringify({ 'UPPER-CASE': 'sha256:empty' }));
+
+    await expect(readRefs(refsPath)).rejects.toSatisfy((error: unknown) => {
+      return MigrationToolsError.is(error) && error.code === 'MIGRATION.INVALID_REFS';
+    });
+  });
+
+  it('throws MigrationToolsError for invalid ref values', async () => {
+    const tempDir = await createTempDir('bad-values');
+    const refsPath = join(tempDir, 'refs.json');
+    await writeFile(refsPath, JSON.stringify({ staging: 'not-a-hash' }));
+
+    await expect(readRefs(refsPath)).rejects.toSatisfy((error: unknown) => {
+      return MigrationToolsError.is(error) && error.code === 'MIGRATION.INVALID_REFS';
+    });
+  });
+});
+
+describe('CONTRACT.AHEAD diagnostic under --ref (F04)', () => {
+  it('emits CONTRACT.AHEAD when contract differs from target in non-ref mode', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'offline',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            migrationId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'unknown',
+          },
+        ],
+        targetHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-b',
+        summary: '1 migration(s) on disk',
+        diagnostics: [
+          {
+            code: 'CONTRACT.AHEAD',
+            severity: 'warn',
+            message: 'Contract has changed since the last migration was planned',
+            hints: [
+              "Run 'prisma-next migration plan' to generate a migration for the current contract",
+            ],
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('Contract is ahead');
+    expect(stripped).toContain('migration plan');
+  });
+
+  it('suppresses CONTRACT.AHEAD hint in ref mode (contract ahead of ref is expected)', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationStatusOutput(
+      {
+        mode: 'online',
+        migrations: [
+          {
+            dirName: '20260101_100000_add_user',
+            to: 'sha256:hash-a',
+            migrationId: 'sha256:e1',
+            operationSummary: '1 op (all additive)',
+            hasDestructive: false,
+            status: 'applied',
+          },
+        ],
+        markerHash: 'sha256:hash-a',
+        targetHash: 'sha256:hash-a',
+        contractHash: 'sha256:hash-b',
+        refs: [{ name: 'production', hash: 'sha256:hash-a', active: true }],
+        summary: 'At ref "production" target',
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).not.toContain('Contract is ahead');
+    expect(stripped).toContain('◄ Contract');
+    expect(stripped).toContain('At ref "production" target');
   });
 });

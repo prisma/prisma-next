@@ -75,10 +75,6 @@
       "types": "./dist/commands/db-introspect.d.mts",
       "import": "./dist/commands/db-introspect.mjs"
     },
-    "./commands/db-schema-verify": {
-      "types": "./dist/commands/db-schema-verify.d.mts",
-      "import": "./dist/commands/db-schema-verify.mjs"
-    },
     "./commands/db-sign": {
       "types": "./dist/commands/db-sign.d.mts",
       "import": "./dist/commands/db-sign.mjs"
@@ -110,6 +106,10 @@
     "./commands/migration-apply": {
       "types": "./dist/commands/migration-apply.d.mts",
       "import": "./dist/commands/migration-apply.mjs"
+    },
+    "./commands/migration-ref": {
+      "types": "./dist/commands/migration-ref.d.mts",
+      "import": "./dist/commands/migration-ref.mjs"
     },
     "./config-loader": {
       "types": "./dist/config-loader.d.mts",

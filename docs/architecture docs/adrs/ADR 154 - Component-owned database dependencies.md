@@ -90,7 +90,7 @@ This is a temporary compromise, not the target architecture. When non-extension 
 
 The v1 model is intentionally narrow and has a known source-of-truth limitation:
 
-- **Live path** (`db update`, `db schema-verify`): dependency IDs come from adapter introspection of the database.
+- **Live path** (`db update`, `db verify`, `db verify --schema-only`): dependency IDs come from adapter introspection of the database.
 - **Offline path** (`migration plan`): dependency IDs are synthesized from currently active `frameworkComponents`.
 
 This means offline dependency evidence is currently composition-coupled and not a first-class projection derived from historical `fromContract` dependency state. The model is acceptable for extension-shaped presence checks today, but insufficient for richer extension-owned dependency semantics (for example, auth plugins that require structural or behavioral invariants beyond ID presence).
@@ -102,4 +102,3 @@ Related design issue: planner inputs are asymmetric (`from` as `SqlSchemaIR`, `t
 - ADR 005 — Thin Core Fat Targets
 - ADR 150 — Family-Agnostic CLI and Pack Entry Points
 - Subsystem: Migration System
-

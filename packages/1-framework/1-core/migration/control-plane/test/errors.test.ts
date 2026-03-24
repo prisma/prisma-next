@@ -70,12 +70,12 @@ describe('CliStructuredError', () => {
     expect(envelope.summary).toBe('Test error');
   });
 
-  it('converts to envelope with RTM code prefix', () => {
-    const error = new CliStructuredError('3001', 'Test error', { domain: 'RTM' });
+  it('converts to envelope with RUN code prefix', () => {
+    const error = new CliStructuredError('3001', 'Test error', { domain: 'RUN' });
     const envelope = error.toEnvelope();
 
-    expect(envelope.code).toBe('PN-RTM-3001');
-    expect(envelope.domain).toBe('RTM');
+    expect(envelope.code).toBe('PN-RUN-3001');
+    expect(envelope.domain).toBe('RUN');
     expect(envelope.summary).toBe('Test error');
   });
 
@@ -96,8 +96,8 @@ describe('CliStructuredError', () => {
       expect(CliStructuredError.is(error)).toBe(true);
     });
 
-    it('returns true for CliStructuredError with RTM domain', () => {
-      const error = new CliStructuredError('3000', 'Test error', { domain: 'RTM' });
+    it('returns true for CliStructuredError with RUN domain', () => {
+      const error = new CliStructuredError('3000', 'Test error', { domain: 'RUN' });
       expect(CliStructuredError.is(error)).toBe(true);
     });
 
@@ -240,6 +240,13 @@ describe('Config Errors', () => {
     expect(error.fix).toContain('Run `prisma-next db init --db <url>`');
   });
 
+  it('errorDatabaseConnectionRequired with retryCommand preserves command flags', () => {
+    const error = errorDatabaseConnectionRequired({
+      retryCommand: 'prisma-next db verify --schema-only --strict --db <url>',
+    });
+    expect(error.fix).toContain('Run `prisma-next db verify --schema-only --strict --db <url>`');
+  });
+
   it('errorQueryRunnerFactoryRequired creates correct error', () => {
     const error = errorQueryRunnerFactoryRequired();
     expect(error.code).toBe('4006');
@@ -300,7 +307,7 @@ describe('Config Errors', () => {
   it('errorMigrationPlanningFailed with no conflict fixes', () => {
     const conflicts = [{ kind: 'conflict-1', summary: 'Summary 1' }];
     const error = errorMigrationPlanningFailed({ conflicts });
-    expect(error.fix).toContain('db schema-verify');
+    expect(error.fix).toContain('db verify --schema-only');
   });
 
   it('errorTargetMigrationNotSupported creates correct error', () => {
@@ -377,7 +384,7 @@ describe('Runtime Errors', () => {
     const error = errorMarkerMissing();
     expect(error.code).toBe('3001');
     expect(error.message).toBe('Database not signed');
-    expect(error.domain).toBe('RTM');
+    expect(error.domain).toBe('RUN');
   });
 
   it('errorMarkerMissing with custom why and dbUrl', () => {
@@ -389,7 +396,7 @@ describe('Runtime Errors', () => {
     const error = errorHashMismatch();
     expect(error.code).toBe('3002');
     expect(error.message).toBe('Hash mismatch');
-    expect(error.domain).toBe('RTM');
+    expect(error.domain).toBe('RUN');
   });
 
   it('errorHashMismatch with expected and actual', () => {
@@ -431,7 +438,7 @@ describe('Runtime Errors', () => {
     const error = errorTargetMismatch('postgres', 'mysql');
     expect(error.code).toBe('3003');
     expect(error.message).toBe('Target mismatch');
-    expect(error.domain).toBe('RTM');
+    expect(error.domain).toBe('RUN');
     expect(error.why).toContain('postgres');
     expect(error.why).toContain('mysql');
     expect(error.meta?.['expected']).toBe('postgres');
@@ -447,7 +454,7 @@ describe('Runtime Errors', () => {
     const error = errorMarkerRequired();
     expect(error.code).toBe('3010');
     expect(error.message).toBe('Database must be signed first');
-    expect(error.domain).toBe('RTM');
+    expect(error.domain).toBe('RUN');
   });
 
   it('errorMarkerRequired with custom why and fix', () => {
@@ -460,7 +467,7 @@ describe('Runtime Errors', () => {
     const error = errorRunnerFailed('Runner failed');
     expect(error.code).toBe('3020');
     expect(error.message).toBe('Runner failed');
-    expect(error.domain).toBe('RTM');
+    expect(error.domain).toBe('RUN');
   });
 
   it('errorRunnerFailed with all options', () => {
@@ -478,7 +485,7 @@ describe('Runtime Errors', () => {
     const error = errorDestructiveChanges('Destructive changes detected');
     expect(error.code).toBe('3030');
     expect(error.message).toBe('Destructive changes detected');
-    expect(error.domain).toBe('RTM');
+    expect(error.domain).toBe('RUN');
   });
 
   it('errorDestructiveChanges with all options', () => {
@@ -496,7 +503,7 @@ describe('Runtime Errors', () => {
     const error = errorRuntime('Something failed');
     expect(error.code).toBe('3000');
     expect(error.message).toBe('Something failed');
-    expect(error.domain).toBe('RTM');
+    expect(error.domain).toBe('RUN');
   });
 
   it('errorRuntime with all options', () => {

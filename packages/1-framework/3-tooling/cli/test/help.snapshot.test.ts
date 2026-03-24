@@ -1,3 +1,4 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { Command } from 'commander';
 import { describe, expect, it } from 'vitest';
 import { createContractEmitCommand } from '../src/commands/contract-emit';
@@ -7,8 +8,8 @@ import { createDbVerifyCommand } from '../src/commands/db-verify';
 import { formatCommandHelp, formatRootHelp } from '../src/utils/formatters/help';
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
-describe('help text snapshots', () => {
-  it('formats root help', () => {
+describe('help text snapshots', { timeout: timeouts.default }, () => {
+  it('formats root help', { timeout: timeouts.databaseOperation }, () => {
     const program = new Command();
     program.name('prisma-next').description('Prisma Next CLI');
     const contract = new Command('contract').description('Contract management commands');

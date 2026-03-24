@@ -1,161 +1,106 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createColumnRef,
-  createLiteralExpr,
-  createOperationExpr,
-  createParamRef,
-  createTableRef,
-} from '../../src/ast/common';
-import type { OperationExpr } from '../../src/ast/types';
+  AggregateExpr,
+  ColumnRef,
+  JsonArrayAggExpr,
+  JsonObjectExpr,
+  LiteralExpr,
+  OperationExpr,
+  OrderByItem,
+  ParamRef,
+  TableSource,
+} from '../../src/exports/ast';
+import { col, lit, lowerExpr, param, stringReturn, table } from './test-helpers';
 
 describe('ast/common', () => {
-  describe('createTableRef', () => {
-    it('creates table ref with name', () => {
-      const tableRef = createTableRef('user');
-      expect(tableRef).toEqual({
-        kind: 'table',
-        name: 'user',
-      });
-      expect(tableRef.kind).toBe('table');
-      expect(tableRef.name).toBe('user');
-    });
+  it('creates table and column refs through rich objects', () => {
+    const source = table('user', 'u');
+    const column = col('user', 'id');
 
-    it('creates table ref with different name', () => {
-      const tableRef = createTableRef('post');
-      expect(tableRef.name).toBe('post');
+    expect(source).toBeInstanceOf(TableSource);
+    expect(source).toMatchObject({ name: 'user', alias: 'u' });
+    expect(column).toBeInstanceOf(ColumnRef);
+    expect(column).toMatchObject({ table: 'user', column: 'id' });
+  });
+
+  it('creates param refs and preserves immutability when changing indexes', () => {
+    const original = param(1, 'userId');
+    const shifted = original.withIndex(4);
+
+    expect(original).toBeInstanceOf(ParamRef);
+    expect(original).toMatchObject({ index: 1, name: 'userId' });
+    expect(shifted).toEqual(param(4, 'userId'));
+    expect(shifted).not.toBe(original);
+  });
+
+  it('creates operation expressions directly and through function helpers', () => {
+    const explicit = new OperationExpr({
+      method: 'concat',
+      forTypeId: 'pg/text@1',
+      self: col('user', 'email'),
+      args: [param(0, 'suffix')],
+      returns: stringReturn,
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+        template: '${self} || ${arg0}',
+      },
+    });
+    const lowered = lowerExpr(col('user', 'email'));
+
+    expect(explicit).toBeInstanceOf(OperationExpr);
+    expect(explicit).toMatchObject({ method: 'concat', args: [param(0, 'suffix')] });
+    expect(explicit.baseColumnRef()).toEqual(col('user', 'email'));
+    expect(lowered.lowering).toEqual({
+      targetFamily: 'sql',
+      strategy: 'function',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+      template: 'lower(${self})',
     });
   });
 
-  describe('createColumnRef', () => {
-    it('creates column ref with table and column', () => {
-      const columnRef = createColumnRef('user', 'id');
-      expect(columnRef).toEqual({
-        kind: 'col',
-        table: 'user',
-        column: 'id',
-      });
-      expect(columnRef.kind).toBe('col');
-      expect(columnRef.table).toBe('user');
-      expect(columnRef.column).toBe('id');
-    });
-
-    it('creates column ref with different table and column', () => {
-      const columnRef = createColumnRef('post', 'title');
-      expect(columnRef.table).toBe('post');
-      expect(columnRef.column).toBe('title');
-    });
+  it('creates aggregate expressions and validates required operands', () => {
+    expect(AggregateExpr.count()).toEqual(new AggregateExpr('count'));
+    expect(AggregateExpr.sum(col('post', 'likes'))).toEqual(
+      new AggregateExpr('sum', col('post', 'likes')),
+    );
+    expect(() => new AggregateExpr('sum')).toThrow(
+      'Aggregate function "sum" requires an expression',
+    );
   });
 
-  describe('createParamRef', () => {
-    it('creates param ref with index', () => {
-      const paramRef = createParamRef(0);
-      expect(paramRef).toEqual({
-        kind: 'param',
-        index: 0,
-      });
-      expect(paramRef.kind).toBe('param');
-      expect(paramRef.index).toBe(0);
-      expect(paramRef.name).toBeUndefined();
-    });
+  it('creates JSON expression nodes from rich entries and order items', () => {
+    const objectExpr = JsonObjectExpr.fromEntries([
+      JsonObjectExpr.entry('id', col('user', 'id')),
+      JsonObjectExpr.entry('name', lit('Alice')),
+    ]);
+    const arrayExpr = JsonArrayAggExpr.of(col('post', 'id'), 'emptyArray', [
+      OrderByItem.desc(col('post', 'createdAt')),
+    ]);
 
-    it('creates param ref with index and name', () => {
-      const paramRef = createParamRef(1, 'userId');
-      expect(paramRef).toEqual({
-        kind: 'param',
-        index: 1,
-        name: 'userId',
-      });
-      expect(paramRef.index).toBe(1);
-      expect(paramRef.name).toBe('userId');
-    });
-
-    it('creates param ref with different index', () => {
-      const paramRef = createParamRef(5);
-      expect(paramRef.index).toBe(5);
-    });
+    expect(objectExpr).toEqual(
+      new JsonObjectExpr([
+        { key: 'id', value: col('user', 'id') },
+        { key: 'name', value: lit('Alice') },
+      ]),
+    );
+    expect(arrayExpr).toEqual(
+      new JsonArrayAggExpr(col('post', 'id'), 'emptyArray', [
+        OrderByItem.desc(col('post', 'createdAt')),
+      ]),
+    );
   });
 
-  describe('createOperationExpr', () => {
-    it('returns operation expr as-is', () => {
-      const operationExpr: OperationExpr = {
-        kind: 'operation',
-        method: 'test',
-        forTypeId: 'pg/text@1',
-        self: { kind: 'col', table: 'user', column: 'email' },
-        args: [],
-        returns: { kind: 'builtin', type: 'string' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'test(${self})',
-        },
-      };
+  it('creates literal expressions by value reference', () => {
+    const obj = { foo: 'bar' };
+    const arr = [1, 2, 3];
 
-      const result = createOperationExpr(operationExpr);
-      expect(result).toBe(operationExpr);
-      expect(result.kind).toBe('operation');
-      expect(result.method).toBe('test');
-    });
-
-    it('returns operation expr with args', () => {
-      const operationExpr: OperationExpr = {
-        kind: 'operation',
-        method: 'add',
-        forTypeId: 'pg/int4@1',
-        self: { kind: 'col', table: 'user', column: 'id' },
-        args: [{ kind: 'param', index: 0, name: 'value' }],
-        returns: { kind: 'builtin', type: 'number' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'infix',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: '${self} + ${arg0}',
-        },
-      };
-
-      const result = createOperationExpr(operationExpr);
-      expect(result).toBe(operationExpr);
-      expect(result.args).toHaveLength(1);
-    });
-  });
-
-  describe('createLiteralExpr', () => {
-    it('creates literal expr with string value', () => {
-      const literalExpr = createLiteralExpr('test');
-      expect(literalExpr).toEqual({
-        kind: 'literal',
-        value: 'test',
-      });
-      expect(literalExpr.kind).toBe('literal');
-      expect(literalExpr.value).toBe('test');
-    });
-
-    it('creates literal expr with number value', () => {
-      const literalExpr = createLiteralExpr(42);
-      expect(literalExpr.value).toBe(42);
-    });
-
-    it('creates literal expr with boolean value', () => {
-      const literalExpr = createLiteralExpr(true);
-      expect(literalExpr.value).toBe(true);
-    });
-
-    it('creates literal expr with null value', () => {
-      const literalExpr = createLiteralExpr(null);
-      expect(literalExpr.value).toBeNull();
-    });
-
-    it('creates literal expr with object value', () => {
-      const obj = { key: 'value' };
-      const literalExpr = createLiteralExpr(obj);
-      expect(literalExpr.value).toBe(obj);
-    });
-
-    it('creates literal expr with array value', () => {
-      const arr = [1, 2, 3];
-      const literalExpr = createLiteralExpr(arr);
-      expect(literalExpr.value).toBe(arr);
-    });
+    expect(lit('test')).toEqual(new LiteralExpr('test'));
+    expect(lit(42).value).toBe(42);
+    expect(lit(true).value).toBe(true);
+    expect(lit(null).value).toBeNull();
+    expect(lit(obj).value).toBe(obj);
+    expect(lit(arr).value).toBe(arr);
   });
 });

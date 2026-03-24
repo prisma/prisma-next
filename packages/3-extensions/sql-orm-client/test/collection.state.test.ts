@@ -1,3 +1,12 @@
+import {
+  AndExpr,
+  BinaryExpr,
+  type BoundWhereExpr,
+  ColumnRef,
+  NullCheckExpr,
+  ParamRef,
+  type ToWhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   baseContract,
@@ -6,159 +15,169 @@ import {
   createReturningCollectionFor,
 } from './collection-fixtures';
 
+function bound(
+  expr: BoundWhereExpr['expr'],
+  params: readonly unknown[] = [],
+  paramDescriptors = params.map((_, index) => ({ source: 'lane' as const, index: index + 1 })),
+): BoundWhereExpr {
+  return {
+    expr,
+    params,
+    paramDescriptors,
+  };
+}
+
+function dslBound(
+  expr: BoundWhereExpr['expr'],
+  params: readonly unknown[],
+  refs: ReadonlyArray<{ table: string; column: string }>,
+): BoundWhereExpr {
+  return {
+    expr,
+    params,
+    paramDescriptors: refs.map((ref, index) => {
+      const columnMeta = (
+        baseContract.storage.tables as Record<
+          string,
+          { columns: Record<string, { codecId: string; nativeType: string; nullable: boolean }> }
+        >
+      )[ref.table]!.columns[ref.column]!;
+      return {
+        index: index + 1,
+        name: ref.column,
+        source: 'dsl' as const,
+        refs: ref,
+        codecId: columnMeta.codecId,
+        nativeType: columnMeta.nativeType,
+        nullable: columnMeta.nullable,
+      };
+    }),
+  };
+}
+
 describe('Collection', () => {
-  const contract = baseContract;
-  const userCol = (column: string) => ({ kind: 'col' as const, table: 'users', column });
-  const literal = (value: unknown) => ({ kind: 'literal' as const, value });
-  const eq = (
-    column: string,
-    right: { kind: 'literal'; value: unknown } | { kind: 'param'; index: number },
-  ) => ({
-    kind: 'bin' as const,
-    op: 'eq' as const,
-    left: userCol(column),
-    right,
-  });
   describe('chain methods', () => {
-    it('where() appends a filter and returns new collection', () => {
+    it('where() appends rich filters and stays immutable', () => {
       const { collection } = createCollection();
-      const filtered = collection.where((u) => u.name.eq('Alice'));
-      expect(filtered.state.filters).toHaveLength(1);
-      expect(filtered.state.filters[0]).toEqual(eq('name', literal('Alice')));
-      // Original is not mutated
-      expect(collection.state.filters).toHaveLength(0);
+
+      const filtered = collection.where((user) => user.name.eq('Alice'));
+      expect(filtered.state.filters).toEqual([
+        dslBound(
+          BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
+          ['Alice'],
+          [{ table: 'users', column: 'name' }],
+        ),
+      ]);
+      expect(collection.state.filters).toEqual([]);
+
+      const chained = filtered.where((user) => user.email.neq('old@example.com'));
+      expect(chained.state.filters).toEqual([
+        dslBound(
+          BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
+          ['Alice'],
+          [{ table: 'users', column: 'name' }],
+        ),
+        dslBound(
+          BinaryExpr.neq(ColumnRef.of('users', 'email'), ParamRef.of(1, 'email')),
+          ['old@example.com'],
+          [{ table: 'users', column: 'email' }],
+        ),
+      ]);
     });
 
-    it('where() can be chained multiple times', () => {
+    it('where() accepts ToWhereExpr payloads and rejects bare ParamRef expressions', () => {
       const { collection } = createCollection();
-      const filtered = collection
-        .where((u) => u.name.eq('Alice'))
-        .where((u) => u.email.neq('old@example.com'));
-      expect(filtered.state.filters).toHaveLength(2);
-    });
 
-    it('where() accepts ToWhereExpr payloads', () => {
-      const { collection } = createCollection();
-      const filtered = collection.where(() => ({
-        toWhereExpr: () => ({
-          expr: eq('name', { kind: 'param', index: 1 }),
-          params: ['Alice'],
-          paramDescriptors: [{ source: 'lane' }],
-        }),
-      }));
-
-      expect(filtered.state.filters).toEqual([eq('name', literal('Alice'))]);
-    });
-
-    it('where() rejects bare WhereExpr with ParamRef', () => {
-      const { collection } = createCollection();
-      expect(() => collection.where(() => eq('id', { kind: 'param', index: 1 }))).toThrow(
-        /bare WhereExpr.*ParamRef/i,
+      const filtered = collection.where(
+        (_user) =>
+          ({
+            toWhereExpr: () => ({
+              expr: BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
+              params: ['Alice'],
+              paramDescriptors: [{ source: 'lane' as const }],
+            }),
+          }) satisfies ToWhereExpr,
       );
+
+      expect(filtered.state.filters).toEqual([
+        bound(BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')), ['Alice']),
+      ]);
+
+      expect(() =>
+        collection.where((_user) =>
+          BinaryExpr.eq(ColumnRef.of('users', 'id'), ParamRef.of(1, 'id')),
+        ),
+      ).toThrow(/bare WhereExpr.*ParamRef/i);
     });
 
-    it('where() accepts shorthand object filters', () => {
+    it('where() accepts shorthand filters, handles null and undefined, and treats {} as identity', () => {
       const { collection } = createCollection();
-      const filtered = collection.where({ name: 'Alice', email: 'alice@example.com' });
-      expect(filtered.state.filters).toHaveLength(1);
-      expect(filtered.state.filters[0]).toEqual({
-        kind: 'and',
-        exprs: [eq('name', literal('Alice')), eq('email', literal('alice@example.com'))],
-      });
-    });
 
-    it('where() converts null and ignores undefined in shorthand filters', () => {
-      const { collection } = createCollection();
       const filtered = collection.where({
+        name: 'Alice',
         email: null,
-        name: undefined!,
+        id: undefined!,
       });
 
-      expect(filtered.state.filters).toHaveLength(1);
-      expect(filtered.state.filters[0]).toEqual({
-        kind: 'nullCheck',
-        expr: { kind: 'col', table: 'users', column: 'email' },
-        isNull: true,
-      });
+      expect(filtered.state.filters).toEqual([
+        dslBound(
+          AndExpr.of([
+            BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
+            NullCheckExpr.isNull(ColumnRef.of('users', 'email')),
+          ]),
+          ['Alice'],
+          [{ table: 'users', column: 'name' }],
+        ),
+      ]);
+
+      expect(collection.where({})).toBe(collection);
     });
 
-    it('where({}) is identity', () => {
-      const { collection } = createCollection();
-      const filtered = collection.where({});
-      expect(filtered).toBe(collection);
-      expect(filtered.state.filters).toHaveLength(0);
+    it('select() replaces the prior selection set', () => {
+      const { collection: postCollection } = createCollectionFor('Post', baseContract);
+
+      const selected = postCollection.select('title');
+      const reselected = selected.select('userId');
+
+      expect(selected.state.selectedFields).toEqual(['title']);
+      expect(reselected.state.selectedFields).toEqual(['user_id']);
     });
 
-    it('take() sets limit', () => {
-      const { collection } = createCollection();
-      const limited = collection.take(10);
-      expect(limited.state.limit).toBe(10);
-      expect(collection.state.limit).toBeUndefined();
-    });
+    it('orderBy() appends later directives', () => {
+      const { collection: postCollection } = createCollectionFor('Post', baseContract);
 
-    it('skip() sets offset', () => {
-      const { collection } = createCollection();
-      const skipped = collection.skip(5);
-      expect(skipped.state.offset).toBe(5);
-      expect(collection.state.offset).toBeUndefined();
-    });
+      const ordered = postCollection.orderBy((post) => post.userId.asc());
+      const reordered = ordered.orderBy((post) => post.id.desc());
 
-    it('orderBy() accepts typed accessor directives', () => {
-      const { collection } = createCollection();
-      const ordered = collection.orderBy((u) => u.name.desc());
-      expect(ordered.state.orderBy).toEqual([{ column: 'name', direction: 'desc' }]);
-    });
-
-    it('orderBy() accepts an array of accessor directives', () => {
-      const { collection } = createCollection();
-      const ordered = collection.orderBy([(u) => u.name.asc(), (u) => u.email.asc()]);
-      expect(ordered.state.orderBy).toEqual([
-        { column: 'name', direction: 'asc' },
-        { column: 'email', direction: 'asc' },
+      expect(ordered.state.orderBy).toEqual([{ column: 'user_id', direction: 'asc' }]);
+      expect(reordered.state.orderBy).toEqual([
+        { column: 'user_id', direction: 'asc' },
+        { column: 'id', direction: 'desc' },
       ]);
     });
 
-    it('chained orderBy() appends directives', () => {
-      const { collection } = createCollection();
-      const ordered = collection.orderBy((u) => u.name.asc()).orderBy((u) => u.email.desc());
-      expect(ordered.state.orderBy).toEqual([
-        { column: 'name', direction: 'asc' },
-        { column: 'email', direction: 'desc' },
-      ]);
-    });
+    it('tracks ordering, paging, selection, distinct, and cursor state', () => {
+      const { collection: postCollection } = createCollectionFor('Post', baseContract);
 
-    it('cursor() stores mapped order cursor values', () => {
-      const { collection: postCollection } = createCollectionFor('Post', contract);
-      const paged = postCollection.orderBy((p) => p.userId.asc()).cursor({ userId: 7 });
+      const ordered = postCollection.orderBy((post) => post.userId.asc());
+      expect(ordered.state.orderBy).toEqual([{ column: 'user_id', direction: 'asc' }]);
 
+      const paged = ordered.cursor({ userId: 7 }).take(10).skip(5);
       expect(paged.state.cursor).toEqual({ user_id: 7 });
+      expect(paged.state.limit).toBe(10);
+      expect(paged.state.offset).toBe(5);
+
+      expect(postCollection.distinct('userId').state.distinct).toEqual(['user_id']);
+      expect(ordered.distinctOn('userId').state.distinctOn).toEqual(['user_id']);
+      expect(postCollection.select('userId').state.selectedFields).toEqual(['user_id']);
     });
 
-    it('distinct() and distinctOn() map fields to storage columns', () => {
-      const { collection: postCollection } = createCollectionFor('Post', contract);
-
-      const distinctCollection = postCollection.distinct('userId');
-      expect(distinctCollection.state.distinct).toEqual(['user_id']);
-
-      const distinctOnCollection = postCollection
-        .orderBy((p) => p.userId.asc())
-        .distinctOn('userId');
-      expect(distinctOnCollection.state.distinctOn).toEqual(['user_id']);
-    });
-
-    it('select() stores mapped selected fields and replaces previous selections', () => {
+    it('captures include metadata, scalar selectors, and combine branches', () => {
       const { collection } = createCollection();
-      const selected = collection.select('name', 'email');
-      expect(selected.state.selectedFields).toEqual(['name', 'email']);
 
-      const replaced = selected.select('email');
-      expect(replaced.state.selectedFields).toEqual(['email']);
-    });
-
-    it('include() appends an include expression', () => {
-      const { collection } = createCollection();
-      const withPosts = collection.include('posts');
-      expect(withPosts.state.includes).toHaveLength(1);
+      const withPosts = collection.include('posts', (posts) =>
+        posts.where((post) => post.views.gt(100)).take(5),
+      );
       expect(withPosts.state.includes[0]).toMatchObject({
         relationName: 'posts',
         relatedModelName: 'Post',
@@ -166,73 +185,54 @@ describe('Collection', () => {
         fkColumn: 'user_id',
         cardinality: '1:N',
       });
-      // Original is not mutated
-      expect(collection.state.includes).toHaveLength(0);
-    });
+      expect(withPosts.state.includes[0]?.nested.filters).toEqual([
+        dslBound(
+          BinaryExpr.gt(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'views')),
+          [100],
+          [{ table: 'posts', column: 'views' }],
+        ),
+      ]);
+      expect(withPosts.state.includes[0]?.nested.limit).toBe(5);
+      expect(collection.state.includes).toEqual([]);
 
-    it('include() with refine callback captures nested state', () => {
-      const { collection } = createCollection();
-      const withPosts = collection.include('posts', (p) =>
-        p.where((post) => post.views.gt(100)).take(5),
-      );
-      const inc = withPosts.state.includes[0]!;
-      expect(inc.nested.filters).toHaveLength(1);
-      expect(inc.nested.filters[0]).toEqual({
-        kind: 'bin',
-        op: 'gt',
-        left: { kind: 'col', table: 'posts', column: 'views' },
-        right: { kind: 'literal', value: 100 },
-      });
-      expect(inc.nested.limit).toBe(5);
-    });
-
-    it('include() supports scalar selectors for to-many relations', () => {
-      const { collection } = createCollection();
       const withPostCount = collection.include('posts', (posts) =>
         posts.where((post) => post.views.gt(100)).count(),
       );
-
-      const include = withPostCount.state.includes[0]!;
-      expect(include.scalar).toMatchObject({
+      expect(withPostCount.state.includes[0]?.scalar).toMatchObject({
         kind: 'includeScalar',
         fn: 'count',
       });
-      expect(include.scalar?.state.filters).toHaveLength(1);
-      expect(include.combine).toBeUndefined();
-    });
+      expect(withPostCount.state.includes[0]?.scalar?.state.filters).toEqual([
+        dslBound(
+          BinaryExpr.gt(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'views')),
+          [100],
+          [{ table: 'posts', column: 'views' }],
+        ),
+      ]);
 
-    it('include() supports combine() branches with independent states', () => {
-      const { collection } = createCollection();
       const combined = collection.include('posts', (posts) =>
         posts.combine({
           recent: posts.orderBy((post) => post.id.desc()).take(1),
           totalCount: posts.count(),
         }),
       );
-
-      const include = combined.state.includes[0]!;
-      expect(include.combine).toBeDefined();
-      expect(include.scalar).toBeUndefined();
-      expect(include.nested.filters).toHaveLength(0);
-
-      const recentBranch = include.combine?.['recent'];
+      const recentBranch = combined.state.includes[0]?.combine?.['recent'];
       expect(recentBranch?.kind).toBe('rows');
       if (recentBranch?.kind === 'rows') {
         expect(recentBranch.state.limit).toBe(1);
       }
 
-      const totalCountBranch = include.combine?.['totalCount'];
+      const totalCountBranch = combined.state.includes[0]?.combine?.['totalCount'];
       expect(totalCountBranch?.kind).toBe('scalar');
       if (totalCountBranch?.kind === 'scalar') {
         expect(totalCountBranch.selector.fn).toBe('count');
       }
     });
 
-    it('include() captures to-one relation metadata', () => {
-      const { collection: postCollection } = createCollectionFor('Post', contract);
-      const withAuthor = postCollection.include('author');
+    it('captures to-one metadata and rejects unsupported to-one refinements', () => {
+      const { collection: postCollection } = createCollectionFor('Post', baseContract);
 
-      expect(withAuthor.state.includes[0]).toMatchObject({
+      expect(postCollection.include('author').state.includes[0]).toMatchObject({
         relationName: 'author',
         relatedModelName: 'User',
         relatedTableName: 'users',
@@ -240,10 +240,6 @@ describe('Collection', () => {
         parentPkColumn: 'user_id',
         cardinality: 'N:1',
       });
-    });
-
-    it('include() rejects scalar and combine refinements on to-one relations', () => {
-      const { collection: postCollection } = createCollectionFor('Post', contract);
 
       expect(() =>
         postCollection.include(
@@ -256,24 +252,24 @@ describe('Collection', () => {
         postCollection.include(
           'author',
           (author) =>
-            (author as unknown as { combine: (spec: Record<string, unknown>) => unknown }).combine({
+            (
+              author as unknown as {
+                combine: (spec: Record<string, unknown>) => unknown;
+                count: () => unknown;
+              }
+            ).combine({
               count: (author as unknown as { count: () => unknown }).count(),
             }) as never,
         ),
       ).toThrow(/combine\(\) is only supported for to-many relations/);
     });
 
-    it('include() rejects invalid refinement return values', () => {
+    it('rejects invalid include refinement returns and invalid branches', () => {
       const { collection } = createCollection();
 
       expect(() => collection.include('posts', () => ({ invalid: true }) as never)).toThrow(
         /refinement must return a collection/,
       );
-    });
-
-    it('combine() rejects invalid branches and include scalar helpers are refinement-only', () => {
-      const { collection } = createCollection();
-
       expect(() =>
         collection.include('posts', (posts) =>
           posts.combine({
@@ -281,7 +277,6 @@ describe('Collection', () => {
           }),
         ),
       ).toThrow(/branch "invalid" is invalid/);
-
       expect(() => collection.count()).toThrow(
         /only available inside include\(\) refinement callbacks/,
       );
@@ -293,12 +288,10 @@ describe('Collection', () => {
       );
     });
 
-    it('cursor() is identity when mapped cursor values are empty', () => {
+    it('keeps cursor() as identity when mapped cursor values are empty', () => {
       const { collection } = createCollection();
       const ordered = collection.orderBy((user) => user.id.asc());
-      const same = ordered.cursor({ id: undefined } as never);
-
-      expect(same).toBe(ordered);
+      expect(ordered.cursor({ id: undefined } as never)).toBe(ordered);
     });
   });
 
@@ -351,23 +344,22 @@ describe('Collection', () => {
       ).rejects.toThrow(/did not return a row/);
     }, 500);
 
-    it('update() returns null when nested mutation target is missing', async () => {
-      const { collection, runtime } = createReturningCollectionFor('User');
-      runtime.setNextResults([[]]);
+    it('update() returns null when nested or scalar updates return no rows', async () => {
+      const { collection: nestedCollection, runtime: nestedRuntime } =
+        createReturningCollectionFor('User');
+      nestedRuntime.setNextResults([[]]);
 
-      const updated = await collection.where({ id: 1 }).update({
+      const nestedUpdated = await nestedCollection.where({ id: 1 }).update({
         posts: (posts: { connect: (criterion: Record<string, unknown>) => unknown }) =>
           posts.connect({ id: 10 }),
       } as never);
+      expect(nestedUpdated).toBeNull();
 
-      expect(updated).toBeNull();
-    });
+      const { collection: updateCollection, runtime: updateRuntime } =
+        createReturningCollectionFor('User');
+      updateRuntime.setNextResults([[]]);
 
-    it('update() returns null when non-nested updateAll() returns no rows', async () => {
-      const { collection, runtime } = createReturningCollectionFor('User');
-      runtime.setNextResults([[]]);
-
-      const updated = await collection.where({ id: 1 }).update({ name: 'Updated' });
+      const updated = await updateCollection.where({ id: 1 }).update({ name: 'Updated' });
       expect(updated).toBeNull();
     });
   });

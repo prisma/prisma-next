@@ -7,12 +7,12 @@ installShutdownHandlers();
 
 import { createDbInitCommand } from './commands/db-init';
 import { createDbIntrospectCommand } from './commands/db-introspect';
-import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
 import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
 import { createMigrationApplyCommand } from './commands/migration-apply';
 import { createMigrationPlanCommand } from './commands/migration-plan';
+import { createMigrationRefCommand } from './commands/migration-ref';
 import { createMigrationShowCommand } from './commands/migration-show';
 import { createMigrationStatusCommand } from './commands/migration-status';
 import { createMigrationVerifyCommand } from './commands/migration-verify';
@@ -196,10 +196,6 @@ dbCommand.addCommand(dbUpdateCommand);
 const dbIntrospectCommand = createDbIntrospectCommand();
 dbCommand.addCommand(dbIntrospectCommand);
 
-// Add schema-verify subcommand to db
-const dbSchemaVerifyCommand = createDbSchemaVerifyCommand();
-dbCommand.addCommand(dbSchemaVerifyCommand);
-
 // Add sign subcommand to db
 const dbSignCommand = createDbSignCommand();
 dbCommand.addCommand(dbSignCommand);
@@ -237,6 +233,9 @@ migrationCommand.addCommand(migrationVerifyCommand);
 
 const migrationApplyCommand = createMigrationApplyCommand();
 migrationCommand.addCommand(migrationApplyCommand);
+
+const migrationRefCommand = createMigrationRefCommand();
+migrationCommand.addCommand(migrationRefCommand);
 
 program.addCommand(migrationCommand);
 

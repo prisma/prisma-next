@@ -45,7 +45,6 @@ export default defineConfig({
         'src/commands/contract-emit.ts',
         'src/commands/db-init.ts',
         'src/commands/db-introspect.ts',
-        'src/commands/db-schema-verify.ts',
         'src/commands/db-sign.ts',
         'src/commands/db-update.ts',
         'src/commands/db-verify.ts',
@@ -53,6 +52,7 @@ export default defineConfig({
         'src/commands/migration-plan.ts',
         'src/commands/migration-show.ts',
         'src/commands/migration-status.ts',
+        'src/commands/migration-ref.ts',
         'src/commands/migration-verify.ts',
         // Error factory functions — just constructors
         'src/utils/cli-errors.ts',

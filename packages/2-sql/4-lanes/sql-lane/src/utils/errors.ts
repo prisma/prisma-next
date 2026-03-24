@@ -73,7 +73,7 @@ export function errorIncludeAliasCollision(alias: string, type: 'projection' | '
 }
 
 export function errorMissingColumnForAlias(alias: string, index: number): never {
-  throw planInvalid(`Missing column for alias ${alias ?? 'unknown'} at index ${index}`);
+  throw planInvalid(`Missing column for alias ${alias} at index ${index}`);
 }
 
 export function errorMissingAlias(index: number): never {

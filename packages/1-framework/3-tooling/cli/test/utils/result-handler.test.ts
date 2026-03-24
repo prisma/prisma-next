@@ -46,7 +46,7 @@ describe('result handler', () => {
     expect(exitCode).toBe(2);
   });
 
-  it('returns exit code 1 for RTM errors', () => {
+  it('returns exit code 1 for RUN errors', () => {
     const error = errorMarkerMissing();
     const result = notOk(error);
     const exitCode = handleResult(result, {}, createUI());

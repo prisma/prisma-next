@@ -1,0 +1,305 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "storageHash": "sha256:09fd32ad8b0c75e83d46508cfaeca1ff1a9813e4615e7ed23ffc742cfa190710",
+  "profileHash": "sha256:eb014c98c4ba6a3e1ddd72bb170d48c49a4e8d5d411e473b80b9c16b57d0469b",
+  "models": {
+    "Comment": {
+      "fields": {
+        "body": {
+          "column": "body"
+        },
+        "id": {
+          "column": "id"
+        },
+        "postId": {
+          "column": "post_id"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "comments"
+      }
+    },
+    "Post": {
+      "fields": {
+        "id": {
+          "column": "id"
+        },
+        "title": {
+          "column": "title"
+        },
+        "userId": {
+          "column": "user_id"
+        },
+        "views": {
+          "column": "views"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "posts"
+      }
+    },
+    "Profile": {
+      "fields": {
+        "bio": {
+          "column": "bio"
+        },
+        "id": {
+          "column": "id"
+        },
+        "userId": {
+          "column": "user_id"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "profiles"
+      }
+    },
+    "User": {
+      "fields": {
+        "email": {
+          "column": "email"
+        },
+        "id": {
+          "column": "id"
+        },
+        "invitedById": {
+          "column": "invited_by_id"
+        },
+        "name": {
+          "column": "name"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "users"
+      }
+    }
+  },
+  "relations": {
+    "posts": {
+      "author": {
+        "cardinality": "N:1",
+        "on": {
+          "childCols": [
+            "id"
+          ],
+          "parentCols": [
+            "user_id"
+          ]
+        },
+        "to": "User"
+      },
+      "comments": {
+        "cardinality": "1:N",
+        "on": {
+          "childCols": [
+            "post_id"
+          ],
+          "parentCols": [
+            "id"
+          ]
+        },
+        "to": "Comment"
+      }
+    },
+    "users": {
+      "invitedBy": {
+        "cardinality": "N:1",
+        "on": {
+          "childCols": [
+            "id"
+          ],
+          "parentCols": [
+            "invited_by_id"
+          ]
+        },
+        "to": "User"
+      },
+      "invitedUsers": {
+        "cardinality": "1:N",
+        "on": {
+          "childCols": [
+            "invited_by_id"
+          ],
+          "parentCols": [
+            "id"
+          ]
+        },
+        "to": "User"
+      },
+      "posts": {
+        "cardinality": "1:N",
+        "on": {
+          "childCols": [
+            "user_id"
+          ],
+          "parentCols": [
+            "id"
+          ]
+        },
+        "to": "Post"
+      },
+      "profile": {
+        "cardinality": "1:1",
+        "on": {
+          "childCols": [
+            "user_id"
+          ],
+          "parentCols": [
+            "id"
+          ]
+        },
+        "to": "Profile"
+      }
+    }
+  },
+  "storage": {
+    "tables": {
+      "comments": {
+        "columns": {
+          "body": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          },
+          "post_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "posts": {
+        "columns": {
+          "embedding": {
+            "codecId": "pg/vector@1",
+            "nativeType": "vector",
+            "nullable": true
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          },
+          "title": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "user_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          },
+          "views": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "profiles": {
+        "columns": {
+          "bio": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          },
+          "user_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "users": {
+        "columns": {
+          "email": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          },
+          "invited_by_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": true
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      }
+    }
+  },
+  "capabilities": {
+    "pgvector": {
+      "hnsw": true,
+      "ivfflat": true,
+      "vector": true
+    },
+    "postgres": {
+      "deferrableConstraints": true,
+      "distinctOn": true,
+      "partialIndex": true,
+      "savepoints": true,
+      "transactionalDDL": true
+    },
+    "sql": {
+      "enums": true,
+      "foreignKeys": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "returning": true
+    }
+  },
+  "extensionPacks": {
+    "pgvector": {}
+  },
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}

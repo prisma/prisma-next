@@ -17,18 +17,32 @@ pnpm test:journeys
 
 | File | What it covers |
 |---|---|
-| `greenfield-setup.e2e.test.ts` | New project with empty database: emit a contract, dry-run init to preview operations, apply init, confirm idempotency on re-run, verify marker and schema (tolerant + strict), introspect, and JSON output variants of verify/schema-verify |
+| `greenfield-setup.e2e.test.ts` | New project with empty database: emit a contract, dry-run init to preview operations, apply init, confirm idempotency on re-run, verify marker and schema (`db verify`, `db verify --schema-only`, `db verify --strict`), introspect, and JSON output variants of full and schema-only verify |
 | `schema-evolution-migrations.e2e.test.ts` | **Migration lifecycle**: plan a migration, show its details, verify the planned directory, check status (offline + online), apply, confirm all applied, db verify. Also covers edge cases: apply when already up-to-date (noop), plan when contract is unchanged (noop), show by path and not-found. **Init-to-migrations transition**: initialize with `db init`, then switch to the migration workflow |
 | `multi-step-migration.e2e.test.ts` | Planning two migrations (base → additive → v3) without applying either, then batch-applying both at once. Verifies pending/applied status reporting |
+| `migration-plan-details.e2e.test.ts` | **Plan JSON envelope**: full `--json` output shape with operations, attestation round-trip (plan → verify). **Destructive planning**: drop-column migration produces destructive operation class |
+| `migration-apply-edge-cases.e2e.test.ts` | **No path**: apply fails when contract changed without planning. **Resume**: partial failure (NOT NULL violation) leaves marker at last success, re-apply resumes. **Destructive apply**: single drop-column migration verifies column removed + marker updated. **Multi-step destructive**: three-migration batch (create → add → drop) in one apply |
 | `db-update-workflows.e2e.test.ts` | **Direct update**: `db update` without migrations (additive-only, dry-run, noop). **Destructive update**: drops a column, tests `--no-interactive` rejection, `--json` error envelope, and `--json -y` auto-accept. **Re-init conflict**: `db init` on an already-initialized DB with a different contract fails; recovery via `db update` |
-| `brownfield-adoption.e2e.test.ts` | **Adopt Prisma on existing DB**: introspect → emit matching contract → schema-verify → sign → verify → evolve via db update. **Schema mismatch**: emit a contract that doesn't match the DB, observe sign/schema-verify failures, fix contract, retry |
+| `brownfield-adoption.e2e.test.ts` | **Adopt Prisma on existing DB**: introspect → emit matching contract → `db verify --schema-only` → sign → verify → evolve via db update. **Schema mismatch**: emit a contract that doesn't match the DB, observe sign / schema-only verify failures, fix contract, retry |
+
+### Graph features and refs
+
+| File | What it covers |
+|---|---|
+| `rollback-cycle.e2e.test.ts` | **Rollback cycle (P-2)**: C1→C2→C1 creates a cycle. `findLeaf` fails with `NO_RESOLVABLE_LEAF`. Plan with `--from` bypasses cycle, apply recovers |
+| `converging-paths.e2e.test.ts` | **Converging paths (P-3)**: two paths to the same target (C1→C2→C3 and C1→C3 direct). Pathfinder selects shortest path (2 steps not 3) |
+| `divergence-and-refs.e2e.test.ts` | **Same-base divergence (P-4)**: two edges from C1 (C1→C2, C1→C3). Status without `--ref` fails with `AMBIGUOUS_LEAF`. Ref-based resolution routes apply to the correct branch |
+| `ref-routing.e2e.test.ts` | **Staging ahead via refs (P-5)**: production=C1, staging=C2 on same DB. Apply `--ref staging` advances staging; production unaffected. **Marker ahead of ref (P-6)**: after staging apply, DB at C2 but production ref at C1 — apply fails, status reports ahead-of-ref |
+| `adopt-migrations.e2e.test.ts` | **Adopting migrations (P-9)**: DB managed via `db update` (at C2). Baseline migration EMPTY→C2 is no-op. Incremental C2→C3 applies normally. Status shows both migrations applied |
+| `diamond-convergence.e2e.test.ts` | **Diamond convergence**: Two environments (staging, production) diverge from C1 via independent branches (C1→C2→C3 and C1→C4), then converge to C5. Uses two PGlite instances with separate configs sharing the same migration graph on disk. Verifies both DBs reach C5 via their respective merge migrations and status shows 0 pending for both refs |
+| `interleaved-db-update.e2e.test.ts` | **Interleaved db update + migrations**: User on migrations (∅→C1→C2) runs `db update` to C3 instead of `migration plan`. Retroactive `migration plan` creates the C2→C3 edge, `migration apply` is a noop (DB already at C3). Future migrations (C3→C4) resume normally. Documents that `migration plan` is offline (uses graph leaf, not DB marker) |
 
 ### Drift detection and recovery
 
 | File | What it covers |
 |---|---|
-| `drift-schema.e2e.test.ts` | **Phantom drift**: marker OK but schema diverged via manual DDL (dropped column); `db verify` now fails by default because it runs structural verification, while `db verify --shallow` reproduces marker-only verification. **Extra column drift**: DBA adds a column via manual DDL; tolerant `db verify` / `db schema-verify` pass, strict schema-verify fails; recover by expanding the contract and running `db update` |
-| `drift-marker.e2e.test.ts` | **Missing marker**: contract emitted but `db init` never run — verify/schema-verify fail, init recovers. **Stale marker**: contract changed without updating DB — verify fails, `db update` recovers. **Mixed-mode evolution**: iterate through multiple contract versions using `db update` (no migration files). **Corrupt marker**: marker row overwritten with garbage — verify fails, schema-verify passes (schema intact), `db sign` recovers |
+| `drift-schema.e2e.test.ts` | **Manual schema change with unchanged marker**: a DBA drops a column; `db verify` now fails by default because it runs schema verification, while `db verify --marker-only` reproduces marker-only verification. **Extra column drift**: DBA adds a column via manual DDL; tolerant `db verify` / `db verify --schema-only` pass, strict `db verify` fails; recover by expanding the contract and running `db update` |
+| `drift-marker.e2e.test.ts` | **Missing marker**: contract emitted but `db init` never run — `db verify` fails, `db verify --schema-only` shows the schema mismatch, init recovers. **Stale marker**: contract changed without updating DB — verify fails, schema-only verify shows the missing column, `db update` recovers. **Mixed-mode evolution**: iterate through multiple contract versions using `db update` (no migration files). **Corrupt marker**: marker row overwritten with garbage — verify fails, `db verify --schema-only` passes (schema intact), `db sign` recovers |
 | `drift-migration-dag.e2e.test.ts` | **Chain breakage**: after building a migration chain, a migration directory is deleted from disk. `migration apply` fails (no path to destination), recovery by re-planning the missing edge |
 
 ### Error scenarios (no database needed)

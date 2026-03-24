@@ -2,7 +2,7 @@
  * Marker Drift Scenarios (Journeys K + L + P + P2)
  *
  * K — Missing marker: contract emitted but db init never run. db verify and
- *     schema-verify both fail. Recovery via db init.
+ *     db verify --schema-only both fail. Recovery via db init.
  *
  * L — Stale marker: database initialized, then contract changed without
  *     updating the DB. db verify fails (hash mismatch). Recovery via db update.
@@ -12,7 +12,7 @@
  *     across successive updates.
  *
  * P2 — Corrupt marker: marker row overwritten with garbage via raw SQL.
- *      db verify fails, but db schema-verify passes (schema intact).
+ *      db verify fails, but db verify --schema-only passes (schema intact).
  *      Recovery via db sign.
  */
 
@@ -24,7 +24,6 @@ import {
   runContractEmit,
   runDbInit,
   runDbIntrospect,
-  runDbSchemaVerify,
   runDbSign,
   runDbUpdate,
   runDbVerify,
@@ -42,7 +41,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'verify fails → schema-verify fails → introspect empty → init recovers → verify passes',
+      'verify fails → verify --schema-only fails → introspect empty → init recovers → verify passes',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -57,9 +56,9 @@ withTempDir(({ createTempDir }) => {
         const verifyFail = await runDbVerify(ctx);
         expect(verifyFail.exitCode, 'K.01: db verify fails').toBe(1);
 
-        // K.02: db schema-verify (fails — missing tables)
-        const schemaVerifyFail = await runDbSchemaVerify(ctx);
-        expect(schemaVerifyFail.exitCode, 'K.02: db schema-verify fails').toBe(1);
+        // K.02: db verify --schema-only (fails — missing tables)
+        const schemaVerifyFail = await runDbVerify(ctx, ['--schema-only']);
+        expect(schemaVerifyFail.exitCode, 'K.02: db verify --schema-only fails').toBe(1);
 
         // K.03: db introspect (empty schema)
         const introspect = await runDbIntrospect(ctx);
@@ -84,7 +83,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'init → swap contract → verify fails → schema-verify fails → db update recovers',
+      'init → swap contract → verify fails → verify --schema-only fails → db update recovers',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -106,9 +105,9 @@ withTempDir(({ createTempDir }) => {
         const verifyFail = await runDbVerify(ctx);
         expect(verifyFail.exitCode, 'L.01: db verify fails').toBe(1);
 
-        // L.02: db schema-verify (fails — missing name column)
-        const schemaVerifyFail = await runDbSchemaVerify(ctx);
-        expect(schemaVerifyFail.exitCode, 'L.02: db schema-verify fails').toBe(1);
+        // L.02: db verify --schema-only (fails — missing name column)
+        const schemaVerifyFail = await runDbVerify(ctx, ['--schema-only']);
+        expect(schemaVerifyFail.exitCode, 'L.02: db verify --schema-only fails').toBe(1);
 
         // L.03: db update (recovery)
         const update = await runDbUpdate(ctx);
@@ -177,7 +176,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'init → corrupt marker → verify fails → schema-verify passes → sign recovers → verify passes',
+      'init → corrupt marker → verify fails → verify --schema-only passes → sign recovers → verify passes',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -201,9 +200,9 @@ withTempDir(({ createTempDir }) => {
         const verifyFail = await runDbVerify(ctx);
         expect(verifyFail.exitCode, 'P2.01: db verify fails').toBe(1);
 
-        // P2.02: db schema-verify (passes — schema is intact)
-        const schemaVerify = await runDbSchemaVerify(ctx);
-        expect(schemaVerify.exitCode, 'P2.02: db schema-verify passes').toBe(0);
+        // P2.02: db verify --schema-only (passes — schema is intact)
+        const schemaVerify = await runDbVerify(ctx, ['--schema-only']);
+        expect(schemaVerify.exitCode, 'P2.02: db verify --schema-only passes').toBe(0);
 
         // P2.03: db sign (recovery — overwrites corrupt marker)
         const sign = await runDbSign(ctx);

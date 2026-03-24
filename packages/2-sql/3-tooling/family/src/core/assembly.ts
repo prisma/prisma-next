@@ -7,7 +7,13 @@ import { normalizeRenderer } from '@prisma-next/contract/framework-components';
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
-import type { CodecControlHooks, SqlControlStaticContributions } from './migrations/types';
+import type {
+  CodecControlHooks,
+  ControlMutationDefaultFunctionEntry,
+  ControlMutationDefaultGeneratorDescriptor,
+  PslScalarTypeDescriptor,
+  SqlControlStaticContributions,
+} from './migrations/types';
 
 function addUniqueId(ids: string[], seen: Set<string>, id: string): void {
   if (!seen.has(id)) {
@@ -45,6 +51,16 @@ export interface SqlControlDescriptorWithContributions extends SqlControlStaticC
   };
 }
 
+export interface AssembledControlMutationDefaultContributions {
+  readonly defaultFunctionRegistry: ReadonlyMap<string, ControlMutationDefaultFunctionEntry>;
+  readonly generatorDescriptors: readonly ControlMutationDefaultGeneratorDescriptor[];
+}
+
+export interface AssembledPslInterpretationContributions
+  extends AssembledControlMutationDefaultContributions {
+  readonly scalarTypeDescriptors: ReadonlyMap<string, PslScalarTypeDescriptor>;
+}
+
 export function assembleOperationRegistry(
   descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
 ): OperationRegistry {
@@ -69,6 +85,7 @@ interface DescriptorWithTypes {
       readonly typeImports?: ReadonlyArray<TypesImportSpec>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
+    readonly queryOperationTypes?: { readonly import: TypesImportSpec };
   };
 }
 
@@ -101,6 +118,22 @@ export function extractOperationTypeImports(
     const operationTypes = types?.operationTypes;
     if (operationTypes?.import) {
       imports.push(operationTypes.import);
+    }
+  }
+
+  return imports;
+}
+
+export function extractQueryOperationTypeImports(
+  descriptors: ReadonlyArray<DescriptorWithTypes>,
+): ReadonlyArray<TypesImportSpec> {
+  const imports: TypesImportSpec[] = [];
+
+  for (const descriptor of descriptors) {
+    const types = descriptor.types;
+    const queryOperationTypes = types?.queryOperationTypes;
+    if (queryOperationTypes?.import) {
+      imports.push(queryOperationTypes.import);
     }
   }
 
@@ -213,4 +246,78 @@ export function extractParameterizedTypeImports(
   }
 
   return imports;
+}
+
+export function assembleControlMutationDefaultContributions(
+  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
+): AssembledControlMutationDefaultContributions {
+  const defaultFunctionRegistry = new Map<string, ControlMutationDefaultFunctionEntry>();
+  const functionOwners = new Map<string, string>();
+  const generatorMap = new Map<string, ControlMutationDefaultGeneratorDescriptor>();
+  const generatorOwners = new Map<string, string>();
+
+  for (const descriptor of descriptors) {
+    const contributions = descriptor.controlMutationDefaults?.();
+    if (!contributions) {
+      continue;
+    }
+
+    for (const generatorDescriptor of contributions.generatorDescriptors) {
+      const owner = generatorOwners.get(generatorDescriptor.id);
+      if (owner) {
+        throw new Error(
+          `Duplicate mutation default generator id "${generatorDescriptor.id}". Descriptor "${descriptor.id}" conflicts with "${owner}".`,
+        );
+      }
+      generatorMap.set(generatorDescriptor.id, generatorDescriptor);
+      generatorOwners.set(generatorDescriptor.id, descriptor.id);
+    }
+
+    for (const [functionName, handler] of contributions.defaultFunctionRegistry) {
+      const owner = functionOwners.get(functionName);
+      if (owner) {
+        throw new Error(
+          `Duplicate mutation default function "${functionName}". Descriptor "${descriptor.id}" conflicts with "${owner}".`,
+        );
+      }
+      defaultFunctionRegistry.set(functionName, handler);
+      functionOwners.set(functionName, descriptor.id);
+    }
+  }
+
+  return {
+    defaultFunctionRegistry,
+    generatorDescriptors: Array.from(generatorMap.values()),
+  };
+}
+
+export function assemblePslInterpretationContributions(
+  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
+): AssembledPslInterpretationContributions {
+  const mutationDefaults = assembleControlMutationDefaultContributions(descriptors);
+  const scalarTypeDescriptors = new Map<string, PslScalarTypeDescriptor>();
+  const scalarOwners = new Map<string, string>();
+
+  for (const descriptor of descriptors) {
+    const pslTypeContributions = descriptor.pslTypeDescriptors?.();
+    if (!pslTypeContributions) {
+      continue;
+    }
+
+    for (const [typeName, scalarDescriptor] of pslTypeContributions.scalarTypeDescriptors) {
+      const owner = scalarOwners.get(typeName);
+      if (owner) {
+        throw new Error(
+          `Duplicate PSL scalar type descriptor "${typeName}". Descriptor "${descriptor.id}" conflicts with "${owner}".`,
+        );
+      }
+      scalarTypeDescriptors.set(typeName, scalarDescriptor);
+      scalarOwners.set(typeName, descriptor.id);
+    }
+  }
+
+  return {
+    ...mutationDefaults,
+    scalarTypeDescriptors,
+  };
 }
