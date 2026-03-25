@@ -1,8 +1,19 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
 import type { AfterExecuteResult, PluginContext } from '@prisma-next/runtime-executor';
+import {
+  AggregateExpr,
+  ColumnRef,
+  DeleteAst,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { budgets } from '../src/plugins/budgets';
+
+const userTable = TableSource.named('user');
+const idCol = ColumnRef.of('user', 'id');
 
 function createPluginContext(
   overrides?: Partial<PluginContext<unknown, unknown, unknown>>,
@@ -283,6 +294,120 @@ describe('budgets plugin', () => {
         expect(ctx.log.warn).toHaveBeenCalledWith(
           expect.objectContaining({ code: 'BUDGET.ROWS_EXCEEDED' }),
         );
+      },
+      timeouts.default,
+    );
+  });
+
+  describe('AST-based row budget', () => {
+    it(
+      'allows bounded SelectAst with limit within budget',
+      async () => {
+        const ast = SelectAst.from(userTable)
+          .withProjection([ProjectionItem.of('id', idCol)])
+          .withLimit(5);
+        const plan = createPlan({
+          ast,
+          meta: { refs: { tables: ['user'] } },
+        });
+        const plugin = budgets({ maxRows: 10_000, defaultTableRows: 10_000 });
+        const ctx = createPluginContext();
+
+        await plugin.beforeExecute?.(plan, ctx);
+        expect(ctx.log.warn).not.toHaveBeenCalled();
+      },
+      timeouts.default,
+    );
+
+    it(
+      'throws for unbounded SelectAst without limit',
+      async () => {
+        const ast = SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]);
+        const plan = createPlan({
+          ast,
+          meta: { refs: { tables: ['user'] } },
+        });
+        const plugin = budgets({ maxRows: 50, defaultTableRows: 10_000 });
+        const ctx = createPluginContext();
+
+        await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+          category: 'BUDGET',
+        });
+      },
+      timeouts.default,
+    );
+
+    it(
+      'reads limit from AST, not from annotations',
+      async () => {
+        const ast = SelectAst.from(userTable)
+          .withProjection([ProjectionItem.of('id', idCol)])
+          .withLimit(5);
+        const plan = createPlan({
+          ast,
+          meta: {
+            refs: { tables: ['user'] },
+            annotations: { limit: 99999 },
+          },
+        });
+        const plugin = budgets({ maxRows: 10_000, defaultTableRows: 10_000 });
+        const ctx = createPluginContext();
+
+        await plugin.beforeExecute?.(plan, ctx);
+        expect(ctx.log.warn).not.toHaveBeenCalled();
+      },
+      timeouts.default,
+    );
+
+    it(
+      'does not check row budget for non-SelectAst (e.g. DeleteAst)',
+      async () => {
+        const ast = DeleteAst.from(userTable);
+        const plan = createPlan({ ast });
+        const plugin = budgets({ maxRows: 1 });
+        const ctx = createPluginContext();
+
+        await plugin.beforeExecute?.(plan, ctx);
+      },
+      timeouts.default,
+    );
+
+    it(
+      'estimates 1 row for aggregate without GROUP BY',
+      async () => {
+        const ast = SelectAst.from(userTable).withProjection([
+          ProjectionItem.of('count', AggregateExpr.count()),
+        ]);
+        const plan = createPlan({
+          ast,
+          meta: { refs: { tables: ['user'] } },
+        });
+        const plugin = budgets({ maxRows: 1, defaultTableRows: 10_000 });
+        const ctx = createPluginContext();
+
+        await plugin.beforeExecute?.(plan, ctx);
+        expect(ctx.log.warn).not.toHaveBeenCalled();
+      },
+      timeouts.default,
+    );
+
+    it(
+      'does not reduce estimate for aggregate with GROUP BY',
+      async () => {
+        const ast = SelectAst.from(userTable)
+          .withProjection([ProjectionItem.of('count', AggregateExpr.count())])
+          .withGroupBy([idCol]);
+        const plan = createPlan({
+          ast,
+          meta: { refs: { tables: ['user'] } },
+        });
+        const plugin = budgets({ maxRows: 50, defaultTableRows: 10_000 });
+        const ctx = createPluginContext();
+
+        await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+        });
       },
       timeouts.default,
     );
