@@ -1,7 +1,6 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  AnyExpression,
   Expression,
   NullCheckExpr,
   ParamRef,
@@ -90,19 +89,7 @@ export function buildWhereExpr(
   let rightExpr: Expression | ParamRef;
   let paramName: string;
 
-  const expressionKinds = new Set<string>([
-    'column-ref',
-    'subquery',
-    'operation',
-    'aggregate',
-    'json-object',
-    'json-array-agg',
-  ]);
-  if (!('kind' in where.left && expressionKinds.has((where.left as AnyExpression).kind))) {
-    errorFailedToBuildWhereClause();
-  }
-
-  leftExpr = where.left as Expression;
+  leftExpr = where.left;
 
   if (leftExpr.kind === 'column-ref') {
     const { table, column } = leftExpr;

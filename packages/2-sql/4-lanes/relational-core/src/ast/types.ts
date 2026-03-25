@@ -203,6 +203,7 @@ export abstract class AstNode {
 }
 
 export abstract class QueryAst extends AstNode {
+  abstract readonly kind: 'select' | 'insert' | 'update' | 'delete';
   abstract collectRefs(): PlanRefs;
 
   collectColumnRefs(): ColumnRef[] {
@@ -212,11 +213,19 @@ export abstract class QueryAst extends AstNode {
 }
 
 export abstract class FromSource extends AstNode {
+  abstract readonly kind: 'table-source' | 'derived-table-source';
   abstract collectRefs(): PlanRefs;
   abstract rewrite(rewriter: AstRewriter): FromSource;
 }
 
 export abstract class Expression extends AstNode implements ExpressionSource {
+  abstract readonly kind:
+    | 'column-ref'
+    | 'subquery'
+    | 'operation'
+    | 'aggregate'
+    | 'json-object'
+    | 'json-array-agg';
   abstract rewrite(rewriter: ExpressionRewriter): Expression;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
 
@@ -238,6 +247,7 @@ export abstract class Expression extends AstNode implements ExpressionSource {
 }
 
 export abstract class WhereExpr extends AstNode {
+  abstract readonly kind: 'binary' | 'and' | 'or' | 'exists' | 'null-check';
   abstract accept<R>(visitor: WhereExprVisitor<R>): R;
   abstract rewrite(rewriter: ExpressionRewriter): WhereExpr;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
@@ -1329,7 +1339,9 @@ export class SelectAst extends QueryAst {
   }
 }
 
-export abstract class InsertOnConflictAction extends AstNode {}
+export abstract class InsertOnConflictAction extends AstNode {
+  abstract readonly kind: 'do-nothing' | 'do-update-set';
+}
 
 export class DoNothingConflictAction extends InsertOnConflictAction {
   readonly kind = 'do-nothing' as const;

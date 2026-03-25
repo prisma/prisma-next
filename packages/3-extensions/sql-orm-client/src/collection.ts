@@ -100,7 +100,13 @@ import { createBoundWhereExpr } from './where-utils';
 
 type WhereDirectInput = WhereArg;
 
-const whereExprKinds = new Set<string>(['binary', 'and', 'or', 'exists', 'null-check']);
+const whereExprKinds: ReadonlySet<string> = new Set<WhereExpr['kind']>([
+  'binary',
+  'and',
+  'or',
+  'exists',
+  'null-check',
+]);
 
 function isWhereExprInput(value: unknown): value is AnyWhereExpr {
   return (

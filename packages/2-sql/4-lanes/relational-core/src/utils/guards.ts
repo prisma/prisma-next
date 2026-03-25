@@ -30,7 +30,7 @@ export function getColumnInfo(expr: AnyExpressionSource | OperationExpr): {
   table: string;
   column: string;
 } {
-  if ('kind' in expr && expr.kind === 'operation') {
+  if (expr.kind === 'operation') {
     const baseCol = (expr as OperationExpr).baseColumnRef();
     return { table: baseCol.table, column: baseCol.column };
   }
