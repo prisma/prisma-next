@@ -6,6 +6,7 @@ import {
   ExistsExpr,
   JoinAst,
   OrderByItem,
+  ProjectionItem,
   SelectAst,
 } from '../../src/exports/ast';
 import { col, lowerExpr, param, simpleSelect, table } from './test-helpers';
@@ -92,7 +93,7 @@ describe('ast/select', () => {
     expect(rewritten.projection[0]?.expr).toEqual(lowerExpr(col('member', 'email')));
     expect(rewritten.where).toEqual(BinaryExpr.eq(col('member', 'id'), param(1, 'userId')));
     expect((rewritten.joins?.[0]?.source as DerivedTableSource).query.projection).toEqual([
-      { alias: 'userId', expr: col('post', 'userId') },
+      ProjectionItem.of('userId', col('post', 'userId')),
     ]);
   });
 

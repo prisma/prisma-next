@@ -199,6 +199,8 @@ function mergeRefsInto(
 // checks fail silently. Consider adding a structural brand (kind tag / Symbol.hasInstance)
 // if this becomes a problem.
 export abstract class AstNode {
+  abstract readonly kind: string;
+
   protected freeze(): void {
     Object.freeze(this);
   }
@@ -255,6 +257,7 @@ export abstract class WhereExpr extends AstNode {
 }
 
 export class TableSource extends FromSource {
+  readonly kind = 'table-source' as const;
   readonly name: string;
   readonly alias: string | undefined;
 
@@ -287,6 +290,7 @@ export interface TableRef {
 }
 
 export class DerivedTableSource extends FromSource {
+  readonly kind = 'derived-table-source' as const;
   readonly alias: string;
   readonly query: SelectAst;
 
@@ -314,6 +318,7 @@ export class DerivedTableSource extends FromSource {
 }
 
 export class ColumnRef extends Expression {
+  readonly kind = 'column-ref' as const;
   readonly table: string;
   readonly column: string;
 
@@ -342,6 +347,7 @@ export class ColumnRef extends Expression {
 }
 
 export class ParamRef extends AstNode {
+  readonly kind = 'param-ref' as const;
   // 1-based index matching PostgreSQL's $1, $2, ... convention.
   // The corresponding value lives at params[index - 1] in the bound params array.
   readonly index: number;
@@ -364,6 +370,8 @@ export class ParamRef extends AstNode {
 }
 
 export class DefaultValueExpr extends AstNode {
+  readonly kind = 'default-value' as const;
+
   constructor() {
     super();
     this.freeze();
@@ -371,6 +379,7 @@ export class DefaultValueExpr extends AstNode {
 }
 
 export class LiteralExpr extends AstNode {
+  readonly kind = 'literal' as const;
   readonly value: unknown;
 
   constructor(value: unknown) {
@@ -385,6 +394,7 @@ export class LiteralExpr extends AstNode {
 }
 
 export class SubqueryExpr extends Expression {
+  readonly kind = 'subquery' as const;
   readonly query: SelectAst;
 
   constructor(query: SelectAst) {
@@ -408,6 +418,7 @@ export class SubqueryExpr extends Expression {
 }
 
 export class OperationExpr extends Expression {
+  readonly kind = 'operation' as const;
   readonly method: string;
   readonly forTypeId: string;
   readonly self: Expression;
@@ -481,6 +492,7 @@ export class OperationExpr extends Expression {
 }
 
 export class AggregateExpr extends Expression {
+  readonly kind = 'aggregate' as const;
   readonly fn: AggregateFn;
   readonly expr: Expression | undefined;
 
@@ -524,6 +536,7 @@ export class AggregateExpr extends Expression {
 }
 
 export class JsonObjectExpr extends Expression {
+  readonly kind = 'json-object' as const;
   readonly entries: ReadonlyArray<JsonObjectEntry>;
 
   constructor(entries: ReadonlyArray<JsonObjectEntry>) {
@@ -573,6 +586,7 @@ export class JsonObjectExpr extends Expression {
 }
 
 export class OrderByItem extends AstNode {
+  readonly kind = 'order-by-item' as const;
   readonly expr: Expression;
   readonly dir: Direction;
 
@@ -597,6 +611,7 @@ export class OrderByItem extends AstNode {
 }
 
 export class JsonArrayAggExpr extends Expression {
+  readonly kind = 'json-array-agg' as const;
   readonly expr: Expression;
   readonly onEmpty: 'null' | 'emptyArray';
   readonly orderBy: ReadonlyArray<OrderByItem> | undefined;
@@ -638,6 +653,7 @@ export class JsonArrayAggExpr extends Expression {
 }
 
 export class ListLiteralExpr extends AstNode {
+  readonly kind = 'list-literal' as const;
   readonly values: ReadonlyArray<ParamRef | LiteralExpr>;
 
   constructor(values: ReadonlyArray<ParamRef | LiteralExpr>) {
@@ -690,6 +706,7 @@ export class ListLiteralExpr extends AstNode {
 }
 
 export class BinaryExpr extends WhereExpr {
+  readonly kind = 'binary' as const;
   readonly op: BinaryOp;
   readonly left: Expression;
   readonly right: SqlComparable;
@@ -795,6 +812,7 @@ function negateBinaryOp(op: BinaryOp): BinaryOp {
 }
 
 export class AndExpr extends WhereExpr {
+  readonly kind = 'and' as const;
   readonly exprs: ReadonlyArray<WhereExpr>;
 
   constructor(exprs: ReadonlyArray<WhereExpr>) {
@@ -832,6 +850,7 @@ export class AndExpr extends WhereExpr {
 }
 
 export class OrExpr extends WhereExpr {
+  readonly kind = 'or' as const;
   readonly exprs: ReadonlyArray<WhereExpr>;
 
   constructor(exprs: ReadonlyArray<WhereExpr>) {
@@ -869,6 +888,7 @@ export class OrExpr extends WhereExpr {
 }
 
 export class ExistsExpr extends WhereExpr {
+  readonly kind = 'exists' as const;
   readonly notExists: boolean;
   readonly subquery: SelectAst;
 
@@ -905,6 +925,7 @@ export class ExistsExpr extends WhereExpr {
 }
 
 export class NullCheckExpr extends WhereExpr {
+  readonly kind = 'null-check' as const;
   readonly expr: Expression;
   readonly isNull: boolean;
 
@@ -941,6 +962,7 @@ export class NullCheckExpr extends WhereExpr {
 }
 
 export class EqColJoinOn extends AstNode {
+  readonly kind = 'eq-col-join-on' as const;
   readonly left: ColumnRef;
   readonly right: ColumnRef;
 
@@ -961,6 +983,7 @@ export class EqColJoinOn extends AstNode {
 }
 
 export class JoinAst extends AstNode {
+  readonly kind = 'join' as const;
   readonly joinType: 'inner' | 'left' | 'right' | 'full';
   readonly source: FromSource;
   readonly lateral: boolean;
@@ -1007,6 +1030,7 @@ export class JoinAst extends AstNode {
 }
 
 export class ProjectionItem extends AstNode {
+  readonly kind = 'projection-item' as const;
   readonly alias: string;
   readonly expr: ProjectionExpr;
 
@@ -1038,6 +1062,7 @@ export interface SelectAstOptions {
 }
 
 export class SelectAst extends QueryAst {
+  readonly kind = 'select' as const;
   readonly from: FromSource;
   readonly joins: ReadonlyArray<JoinAst> | undefined;
   readonly projection: ReadonlyArray<ProjectionItem>;
@@ -1311,6 +1336,8 @@ export class SelectAst extends QueryAst {
 export abstract class InsertOnConflictAction extends AstNode {}
 
 export class DoNothingConflictAction extends InsertOnConflictAction {
+  readonly kind = 'do-nothing' as const;
+
   constructor() {
     super();
     this.freeze();
@@ -1318,6 +1345,7 @@ export class DoNothingConflictAction extends InsertOnConflictAction {
 }
 
 export class DoUpdateSetConflictAction extends InsertOnConflictAction {
+  readonly kind = 'do-update-set' as const;
   readonly set: Readonly<Record<string, ColumnRef | ParamRef>>;
 
   constructor(set: Readonly<Record<string, ColumnRef | ParamRef>>) {
@@ -1328,6 +1356,7 @@ export class DoUpdateSetConflictAction extends InsertOnConflictAction {
 }
 
 export class InsertOnConflict extends AstNode {
+  readonly kind = 'insert-on-conflict' as const;
   readonly columns: ReadonlyArray<ColumnRef>;
   readonly action: InsertOnConflictAction;
 
@@ -1352,6 +1381,7 @@ export class InsertOnConflict extends AstNode {
 }
 
 export class InsertAst extends QueryAst {
+  readonly kind = 'insert' as const;
   readonly table: TableSource;
   readonly rows: ReadonlyArray<Readonly<Record<string, InsertValue>>>;
   readonly onConflict: InsertOnConflict | undefined;
@@ -1445,6 +1475,7 @@ export class InsertAst extends QueryAst {
 }
 
 export class UpdateAst extends QueryAst {
+  readonly kind = 'update' as const;
   readonly table: TableSource;
   readonly set: Readonly<Record<string, ColumnRef | ParamRef>>;
   readonly where: WhereExpr | undefined;
@@ -1503,6 +1534,7 @@ export class UpdateAst extends QueryAst {
 }
 
 export class DeleteAst extends QueryAst {
+  readonly kind = 'delete' as const;
   readonly table: TableSource;
   readonly where: WhereExpr | undefined;
   readonly returning: ReadonlyArray<ColumnRef> | undefined;
@@ -1542,6 +1574,18 @@ export class DeleteAst extends QueryAst {
     return sortRefs(tables, columns);
   }
 }
+
+export type AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst;
+export type AnyFromSource = TableSource | DerivedTableSource;
+export type AnyExpression =
+  | ColumnRef
+  | SubqueryExpr
+  | OperationExpr
+  | AggregateExpr
+  | JsonObjectExpr
+  | JsonArrayAggExpr;
+export type AnyWhereExpr = BinaryExpr | AndExpr | OrExpr | ExistsExpr | NullCheckExpr;
+export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
 
 export interface BoundWhereExpr {
   readonly expr: WhereExpr;
