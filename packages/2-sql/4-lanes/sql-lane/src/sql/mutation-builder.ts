@@ -1,4 +1,3 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   ColumnRef,
@@ -109,8 +108,6 @@ export class InsertBuilderImpl<
 
   build(options?: BuildOptions): SqlQueryPlan<Row> {
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
-    const paramDescriptors: ParamDescriptor[] = [];
-    const paramValues: unknown[] = [];
     const paramCodecs: Record<string, string> = {};
 
     const contractTable = this.contract.storage.tables[this.table.name];
@@ -130,24 +127,17 @@ export class InsertBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      const index = paramValues.push(value);
-
       const columnMeta = contractTable.columns[columnName];
       const codecId = columnMeta?.codecId;
       if (paramName && codecId) {
         paramCodecs[paramName] = codecId;
       }
 
-      paramDescriptors.push({
+      values[columnName] = ParamRef.of(value, {
         name: paramName,
-        source: 'dsl',
-        refs: { table: this.table.name, column: columnName },
-        ...(codecId ? { codecId } : {}),
-        ...(columnMeta?.nativeType ? { nativeType: columnMeta.nativeType } : {}),
-        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+        codecId,
+        nativeType: columnMeta?.nativeType,
       });
-
-      values[columnName] = ParamRef.of(index, paramName);
     }
 
     const appliedDefaults = this.context.applyMutationDefaults({
@@ -162,21 +152,15 @@ export class InsertBuilderImpl<
         errorUnknownColumn(defaultValue.column, this.table.name);
       }
 
-      const index = paramValues.push(defaultValue.value);
       paramCodecs[defaultValue.column] = columnMeta.codecId;
-      paramDescriptors.push({
+      values[defaultValue.column] = ParamRef.of(defaultValue.value, {
         name: defaultValue.column,
-        source: 'dsl',
-        refs: { table: this.table.name, column: defaultValue.column },
         codecId: columnMeta.codecId,
         nativeType: columnMeta.nativeType,
-        nullable: columnMeta.nullable,
       });
-      values[defaultValue.column] = ParamRef.of(index, defaultValue.column);
     }
 
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
-      // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
       return ColumnRef.of(c.table, c.column);
     });
@@ -186,9 +170,17 @@ export class InsertBuilderImpl<
       ast = ast.withReturning(returning);
     }
 
+    const collectedParams = ast.collectParamRefs();
+    const paramValues = collectedParams.map((p) => p.value);
+    const paramDescriptors = collectedParams.map((p) => ({
+      name: p.name,
+      source: 'dsl' as const,
+      ...(p.codecId ? { codecId: p.codecId } : {}),
+      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
+    }));
+
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
-        // TypeScript can't narrow ColumnBuilder properly
         const c = col as unknown as { column: string };
         return c.column;
       }),
@@ -283,8 +275,6 @@ export class UpdateBuilderImpl<
     }
 
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
-    const paramDescriptors: ParamDescriptor[] = [];
-    const paramValues: unknown[] = [];
     const paramCodecs: Record<string, string> = {};
 
     const contractTable = this.contract.storage.tables[this.table.name];
@@ -304,24 +294,17 @@ export class UpdateBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      const index = paramValues.push(value);
-
       const columnMeta = contractTable.columns[columnName];
       const codecId = columnMeta?.codecId;
       if (paramName && codecId) {
         paramCodecs[paramName] = codecId;
       }
 
-      paramDescriptors.push({
+      set[columnName] = ParamRef.of(value, {
         name: paramName,
-        source: 'dsl',
-        refs: { table: this.table.name, column: columnName },
-        ...(codecId ? { codecId } : {}),
-        ...(columnMeta?.nativeType ? { nativeType: columnMeta.nativeType } : {}),
-        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+        codecId,
+        nativeType: columnMeta?.nativeType,
       });
-
-      set[columnName] = ParamRef.of(index, paramName);
     }
 
     const appliedDefaults = this.context.applyMutationDefaults({
@@ -336,25 +319,18 @@ export class UpdateBuilderImpl<
         errorUnknownColumn(defaultValue.column, this.table.name);
       }
 
-      const index = paramValues.push(defaultValue.value);
       paramCodecs[defaultValue.column] = columnMeta.codecId;
-      paramDescriptors.push({
+      set[defaultValue.column] = ParamRef.of(defaultValue.value, {
         name: defaultValue.column,
-        source: 'dsl',
-        refs: { table: this.table.name, column: defaultValue.column },
         codecId: columnMeta.codecId,
         nativeType: columnMeta.nativeType,
-        nullable: columnMeta.nullable,
       });
-      set[defaultValue.column] = ParamRef.of(index, defaultValue.column);
     }
 
     const whereResult = buildWhereExpr(
       this.contract,
       this.wherePredicate,
       paramsMap,
-      paramDescriptors,
-      paramValues,
     );
     const whereExpr = whereResult.expr;
     if (!whereExpr) {
@@ -366,7 +342,6 @@ export class UpdateBuilderImpl<
     }
 
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
-      // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
       return ColumnRef.of(c.table, c.column);
     });
@@ -376,9 +351,17 @@ export class UpdateBuilderImpl<
       ast = ast.withReturning(returning);
     }
 
+    const collectedParams = ast.collectParamRefs();
+    const paramValues = collectedParams.map((p) => p.value);
+    const paramDescriptors = collectedParams.map((p) => ({
+      name: p.name,
+      source: 'dsl' as const,
+      ...(p.codecId ? { codecId: p.codecId } : {}),
+      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
+    }));
+
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
-        // TypeScript can't narrow ColumnBuilder properly
         const c = col as unknown as { column: string };
         return c.column;
       }),
@@ -467,8 +450,6 @@ export class DeleteBuilderImpl<
     }
 
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
-    const paramDescriptors: ParamDescriptor[] = [];
-    const paramValues: unknown[] = [];
     const paramCodecs: Record<string, string> = {};
 
     const contractTable = this.contract.storage.tables[this.table.name];
@@ -480,8 +461,6 @@ export class DeleteBuilderImpl<
       this.contract,
       this.wherePredicate,
       paramsMap,
-      paramDescriptors,
-      paramValues,
     );
     const whereExpr = whereResult.expr;
     if (!whereExpr) {
@@ -493,7 +472,6 @@ export class DeleteBuilderImpl<
     }
 
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
-      // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
       return ColumnRef.of(c.table, c.column);
     });
@@ -503,9 +481,17 @@ export class DeleteBuilderImpl<
       ast = ast.withReturning(returning);
     }
 
+    const collectedParams = ast.collectParamRefs();
+    const paramValues = collectedParams.map((p) => p.value);
+    const paramDescriptors = collectedParams.map((p) => ({
+      name: p.name,
+      source: 'dsl' as const,
+      ...(p.codecId ? { codecId: p.codecId } : {}),
+      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
+    }));
+
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
-        // TypeScript can't narrow ColumnBuilder properly
         const c = col as unknown as { column: string };
         return c.column;
       }),

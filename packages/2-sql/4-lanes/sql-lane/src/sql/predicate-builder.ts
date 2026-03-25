@@ -1,4 +1,3 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
   AnyExpression,
@@ -35,16 +34,10 @@ export interface BuildWhereExprResult {
   paramName: string;
 }
 
-/**
- * Type guard to check if a builder is a NullCheckBuilder (unary).
- */
 function isNullCheckBuilder(builder: BinaryBuilder | UnaryBuilder): builder is NullCheckBuilder {
   return builder.kind === 'nullCheck';
 }
 
-/**
- * Builds a NullCheckExpr from a NullCheckBuilder.
- */
 function buildNullCheckExpr(
   contract: SqlContract<SqlStorage>,
   where: NullCheckBuilder,
@@ -71,10 +64,7 @@ export function buildWhereExpr(
   contract: SqlContract<SqlStorage>,
   where: BinaryBuilder | UnaryBuilder,
   paramsMap: Record<string, unknown>,
-  descriptors: ParamDescriptor[],
-  values: unknown[],
 ): BuildWhereExprResult {
-  // Handle NullCheckBuilder (unary expression)
   if (isNullCheckBuilder(where)) {
     return {
       expr: buildNullCheckExpr(contract, where),
@@ -83,7 +73,6 @@ export function buildWhereExpr(
     };
   }
 
-  // Handle BinaryBuilder (binary expression)
   let leftExpr: AnyExpression;
   let codecId: string | undefined;
   let rightExpr: AnySqlComparable;
@@ -115,25 +104,20 @@ export function buildWhereExpr(
     }
 
     const value = paramsMap[paramName];
-    const index = values.push(value);
 
+    let nativeType: string | undefined;
     if (leftExpr.kind === 'column-ref') {
       const { table, column } = leftExpr;
       const contractTable = contract.storage.tables[table];
       const columnMeta = contractTable?.columns[column];
-      if (columnMeta) {
-        descriptors.push({
-          name: paramName,
-          source: 'dsl',
-          refs: { table, column },
-          nullable: columnMeta.nullable,
-          codecId: columnMeta.codecId,
-          nativeType: columnMeta.nativeType,
-        });
-      }
+      nativeType = columnMeta?.nativeType;
     }
 
-    rightExpr = ParamRefNode.of(index, paramName);
+    rightExpr = ParamRefNode.of(value, {
+      name: paramName,
+      codecId,
+      nativeType,
+    });
   } else if (isColumnBuilder(where.right) || isExpressionBuilder(where.right)) {
     rightExpr = where.right.toExpr();
 

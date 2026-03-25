@@ -1,4 +1,3 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import {
   createJoinOnBuilder,
@@ -294,12 +293,10 @@ export class SelectBuilderImpl<
       errorUnknownTable(table.name);
     }
 
-    const paramDescriptors: ParamDescriptor[] = [];
-    const paramValues: unknown[] = [];
     const paramCodecs: Record<string, string> = {};
 
     const whereResult = this.state.where
-      ? buildWhereExpr(this.contract, this.state.where, paramsMap, paramDescriptors, paramValues)
+      ? buildWhereExpr(this.contract, this.state.where, paramsMap)
       : undefined;
     const whereExpr = whereResult?.expr;
 
@@ -317,7 +314,7 @@ export class SelectBuilderImpl<
     const joins = this.state.joins?.map((join) => buildJoinAst(join)) ?? [];
     const includeArtifacts =
       this.state.includes?.map((include) =>
-        buildIncludeJoinArtifact(include, this.contract, paramsMap, paramDescriptors, paramValues),
+        buildIncludeJoinArtifact(include, this.contract, paramsMap),
       ) ?? [];
     const includeProjectionByAlias = new Map(
       includeArtifacts.map((artifact) => [artifact.projection.alias, artifact.projection]),
@@ -355,6 +352,15 @@ export class SelectBuilderImpl<
       ast = ast.withLimit(this.state.limit);
     }
 
+    const collectedParams = ast.collectParamRefs();
+    const paramValues = collectedParams.map((p) => p.value);
+    const paramDescriptors = collectedParams.map((p) => ({
+      name: p.name,
+      source: 'dsl' as const,
+      ...(p.codecId ? { codecId: p.codecId } : {}),
+      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
+    }));
+
     const planMeta = buildMeta({
       contract: this.contract,
       table,
@@ -375,7 +381,7 @@ export class SelectBuilderImpl<
       where?: BinaryBuilder | UnaryBuilder;
       orderBy?: AnyOrderBuilder;
       limit?: number;
-      paramDescriptors: ParamDescriptor[];
+      paramDescriptors: typeof paramDescriptors;
       paramCodecs?: Record<string, string>;
     });
 
