@@ -9,6 +9,7 @@ import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
 import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
 import { ormClientCreateUser } from '../src/orm-client/create-user';
+import { ormClientDeleteUser } from '../src/orm-client/delete-user';
 import { ormClientFindUserByEmail } from '../src/orm-client/find-user-by-email';
 import { ormClientFindUserById } from '../src/orm-client/find-user-by-id';
 import { ormClientGetAdminUsers } from '../src/orm-client/get-admin-users';
@@ -19,6 +20,7 @@ import { ormClientGetUserInsights } from '../src/orm-client/get-user-insights';
 import { ormClientGetUserKindBreakdown } from '../src/orm-client/get-user-kind-breakdown';
 import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
 import { ormClientGetUsers } from '../src/orm-client/get-users';
+import { ormClientGetUsersBackwardCursor } from '../src/orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
 import { ormClientGetUsersViaWhereArg } from '../src/orm-client/get-users-via-wherearg';
 import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
@@ -609,6 +611,55 @@ describe('ORM client integration examples', () => {
             email: 'inserted-upsert@example.com',
             kind: 'user',
           });
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientDeleteUser removes a user by id',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const before = await ormClientFindUserById(seededUserIds.reader, runtime);
+          expect(before).not.toBeNull();
+
+          await ormClientDeleteUser(seededUserIds.reader, runtime);
+
+          const after = await ormClientFindUserById(seededUserIds.reader, runtime);
+          expect(after).toBeNull();
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientGetUsersBackwardCursor returns rows before cursor in descending id order',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+
+          const page = await ormClientGetUsersBackwardCursor(seededUserIds.reader, 2, runtime);
+          const records = page as Array<Record<string, unknown>>;
+
+          expect(records.map((user) => asId(user['id']))).toEqual([
+            seededUserIds.adminTwo,
+            seededUserIds.member,
+          ]);
         } finally {
           await runtime.close();
         }
