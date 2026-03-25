@@ -4,6 +4,7 @@ import {
   ColumnRef,
   OrderByItem,
   ParamRef,
+  ProjectionItem,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -34,8 +35,8 @@ describe('sql DSL builder', () => {
     expect(plan.ast).toBeInstanceOf(SelectAst);
     const ast = plan.ast as SelectAst;
     expect(ast.projection).toEqual([
-      { alias: 'id', expr: ColumnRef.of('user', 'id') },
-      { alias: 'email', expr: ColumnRef.of('user', 'email') },
+      ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+      ProjectionItem.of('email', ColumnRef.of('user', 'email')),
     ]);
     expect(ast.where).toEqual(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'userId')));
     expect(ast.orderBy).toEqual([OrderByItem.desc(ColumnRef.of('user', 'createdAt'))]);

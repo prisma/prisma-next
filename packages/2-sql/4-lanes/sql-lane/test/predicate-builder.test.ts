@@ -3,6 +3,7 @@ import {
   ColumnRef,
   NullCheckExpr,
   OperationExpr,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -70,7 +71,7 @@ describe('buildWhereExpr', () => {
     );
     const columnResult = buildWhereExpr(contract, userColumns.id.eq(userColumns.id), {}, [], []);
 
-    expect(opResult.expr).toEqual(BinaryExpr.eq(operation, { index: 1, name: 'value' } as never));
+    expect(opResult.expr).toEqual(BinaryExpr.eq(operation, ParamRef.of(1, 'value')));
     expect(columnResult.expr).toEqual(
       BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'id')),
     );

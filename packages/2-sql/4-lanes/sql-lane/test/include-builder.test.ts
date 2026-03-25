@@ -5,6 +5,7 @@ import {
   DerivedTableSource,
   JoinAst,
   JsonArrayAggExpr,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -99,7 +100,7 @@ describe('buildIncludeJoinArtifact', () => {
     expect(rowsQuery.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'id')),
-        BinaryExpr.eq(ColumnRef.of('user', 'id'), { index: 1, name: 'userId' } as never),
+        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'userId')),
       ]),
     );
     expect(rowsQuery.limit).toBe(10);

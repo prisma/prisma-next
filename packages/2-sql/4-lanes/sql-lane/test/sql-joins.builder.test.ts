@@ -2,6 +2,7 @@ import {
   ColumnRef,
   EqColJoinOn,
   JoinAst,
+  ProjectionItem,
   type SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
@@ -51,8 +52,8 @@ describe('SQL join builder', () => {
       .build();
 
     expect((plan.ast as SelectAst).projection).toEqual([
-      { alias: 'user_id', expr: ColumnRef.of('user', 'id') },
-      { alias: 'post_title', expr: ColumnRef.of('post', 'title') },
+      ProjectionItem.of('user_id', ColumnRef.of('user', 'id')),
+      ProjectionItem.of('post_title', ColumnRef.of('post', 'title')),
     ]);
     expect(plan.meta.refs?.tables).toContain('post');
   });
