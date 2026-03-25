@@ -72,7 +72,9 @@ describe('lints plugin', () => {
     'blocks update without where',
     async () => {
       const plan = createPlan({
-        ast: UpdateAst.table(userTable).withSet({ email: ParamRef.of(1, 'email') }),
+        ast: UpdateAst.table(userTable).withSet({
+          email: ParamRef.of('new@example.com', { name: 'email' }),
+        }),
       });
       const plugin = lints();
       const ctx = createPluginContext();
@@ -137,13 +139,13 @@ describe('lints plugin', () => {
       const selectPlan = createPlan({
         ast: SelectAst.from(userTable)
           .withProjection([ProjectionItem.of('id', idCol)])
-          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(1)))
+          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(42)))
           .withLimit(10),
       });
       const updatePlan = createPlan({
         ast: UpdateAst.table(userTable)
-          .withSet({ email: ParamRef.of(1, 'email') })
-          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(2, 'id'))),
+          .withSet({ email: ParamRef.of('new@example.com', { name: 'email' }) })
+          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(1, { name: 'id' }))),
       });
       const plugin = lints();
       const ctx = createPluginContext();

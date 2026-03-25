@@ -39,10 +39,8 @@ describe('DSL Lane Codec Type Stamping', () => {
     expect(paramDesc).toMatchObject({
       codecId: expect.anything(),
       nativeType: expect.anything(),
-      refs: {
-        table: 'user',
-        column: 'id',
-      },
+      name: 'userId',
+      source: 'dsl',
     });
   });
 

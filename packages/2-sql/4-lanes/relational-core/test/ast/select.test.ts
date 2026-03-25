@@ -9,7 +9,7 @@ import {
   ProjectionItem,
   SelectAst,
 } from '../../src/exports/ast';
-import { col, lowerExpr, param, simpleSelect, table } from './test-helpers';
+import { col, lowerExpr, param, shiftParamRef, simpleSelect, table } from './test-helpers';
 
 describe('ast/select', () => {
   it('creates select ASTs with from and project', () => {
@@ -85,7 +85,7 @@ describe('ast/select', () => {
     const rewritten = selectAst.rewrite({
       tableSource: (source) => (source.name === 'user' ? table('member') : source),
       columnRef: (expr) => (expr.table === 'user' ? col('member', expr.column) : expr),
-      paramRef: (expr) => expr.withIndex(expr.index + 1),
+      paramRef: shiftParamRef(1),
     });
 
     expect(rewritten.from).toEqual(table('member'));

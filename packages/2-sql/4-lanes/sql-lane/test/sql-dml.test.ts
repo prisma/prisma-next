@@ -22,8 +22,16 @@ describe('DML builders', () => {
 
     expect(plan.ast.kind).toBe('insert');
     expect((plan.ast as InsertAst).rows[0]).toEqual({
-      email: ParamRef.of(1, 'email'),
-      createdAt: ParamRef.of(2, 'createdAt'),
+      email: ParamRef.of('test@example.com', {
+        name: 'email',
+        codecId: 'pg/text@1',
+        nativeType: 'text',
+      }),
+      createdAt: ParamRef.of(new Date('2024-01-01'), {
+        name: 'createdAt',
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+      }),
     });
     expect(plan.meta.annotations).toMatchObject({
       intent: 'write',
@@ -43,13 +51,19 @@ describe('DML builders', () => {
 
     expect(updatePlan.ast.kind).toBe('update');
     expect((updatePlan.ast as UpdateAst).where).toEqual(
-      BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(2, 'userId')),
+      BinaryExpr.eq(
+        ColumnRef.of('user', 'id'),
+        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1', nativeType: 'int4' }),
+      ),
     );
     expect(updatePlan.meta.annotations).toMatchObject({ hasWhere: true });
 
     expect(deletePlan.ast.kind).toBe('delete');
     expect((deletePlan.ast as DeleteAst).where).toEqual(
-      BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'userId')),
+      BinaryExpr.eq(
+        ColumnRef.of('user', 'id'),
+        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1', nativeType: 'int4' }),
+      ),
     );
     expect(deletePlan.meta.annotations).toMatchObject({ hasWhere: true });
   });

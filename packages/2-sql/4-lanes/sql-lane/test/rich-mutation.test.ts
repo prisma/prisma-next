@@ -48,9 +48,17 @@ describe('sql lane rich mutation ASTs', () => {
     expect(insertPlan.ast.kind).toBe('insert');
     const insertAst = insertPlan.ast as InsertAst;
     expect(insertAst.rows[0]).toMatchObject({
-      id: ParamRef.of(1, 'id'),
-      email: ParamRef.of(2, 'email'),
-      createdAt: ParamRef.of(3, 'createdAt'),
+      id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1', nativeType: 'int4' }),
+      email: ParamRef.of('a@example.com', {
+        name: 'email',
+        codecId: 'pg/text@1',
+        nativeType: 'text',
+      }),
+      createdAt: ParamRef.of('2024-01-01T00:00:00.000Z', {
+        name: 'createdAt',
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+      }),
     });
     expect(insertAst.returning).toEqual([ColumnRef.of('user', 'id')]);
 
@@ -67,9 +75,18 @@ describe('sql lane rich mutation ASTs', () => {
 
     expect(updatePlan.ast.kind).toBe('update');
     const updateAst = updatePlan.ast as UpdateAst;
-    expect(updateAst.set['email']).toEqual(ParamRef.of(1, 'email'));
+    expect(updateAst.set['email']).toEqual(
+      ParamRef.of('updated@example.com', {
+        name: 'email',
+        codecId: 'pg/text@1',
+        nativeType: 'text',
+      }),
+    );
     expect(updateAst.where).toEqual(
-      BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(2, 'id')),
+      BinaryExpr.eq(
+        ColumnRef.of('user', 'id'),
+        ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1', nativeType: 'int4' }),
+      ),
     );
     expect(updateAst.returning).toEqual([ColumnRef.of('user', 'email')]);
 

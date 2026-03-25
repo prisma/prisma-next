@@ -40,7 +40,11 @@ describe('sql comparison operators', () => {
 
     expect(plan.ast.kind).toBe('select');
     expect((plan.ast as SelectAst).where).toEqual(
-      new BinaryExpr(op, ColumnRef.of('user', 'id'), ParamRef.of(1, paramName)),
+      new BinaryExpr(
+        op,
+        ColumnRef.of('user', 'id'),
+        ParamRef.of(paramValue, { name: paramName, codecId: 'pg/int4@1', nativeType: 'int4' }),
+      ),
     );
   });
 

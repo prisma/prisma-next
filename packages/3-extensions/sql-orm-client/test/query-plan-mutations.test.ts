@@ -21,6 +21,19 @@ function assertInsertAst(ast: unknown): asserts ast is InsertAst {
   expect((ast as { kind: string }).kind).toBe('insert');
 }
 
+function usersColParam(
+  contract: ReturnType<typeof getTestContract>,
+  column: string,
+  value: unknown,
+): ParamRef {
+  const columnMeta = contract.storage.tables.users?.columns[column];
+  return ParamRef.of(value, {
+    name: column,
+    codecId: columnMeta?.codecId,
+    nativeType: columnMeta?.nativeType,
+  });
+}
+
 describe('query plan mutations', () => {
   it('compileInsertReturning() batches rows with stable column order and DEFAULT cells', () => {
     const contract = withReturningCapability(getTestContract());
@@ -46,16 +59,16 @@ describe('query plan mutations', () => {
     ]);
     expect(plan.ast.rows).toHaveLength(2);
     expect(plan.ast.rows[0]).toMatchObject({
-      id: ParamRef.of(1, 'id'),
-      name: ParamRef.of(2, 'name'),
-      email: ParamRef.of(3, 'email'),
+      id: usersColParam(contract, 'id', 10),
+      name: usersColParam(contract, 'name', 'Alice'),
+      email: usersColParam(contract, 'email', 'alice@example.com'),
     });
     expect(plan.ast.rows[0]?.['invited_by_id']?.kind).toBe('default-value');
     expect(plan.ast.rows[1]).toEqual({
-      id: ParamRef.of(4, 'id'),
-      name: ParamRef.of(5, 'name'),
-      email: ParamRef.of(6, 'email'),
-      invited_by_id: ParamRef.of(7, 'invited_by_id'),
+      id: usersColParam(contract, 'id', 11),
+      name: usersColParam(contract, 'name', 'Bob'),
+      email: usersColParam(contract, 'email', 'bob@example.com'),
+      invited_by_id: usersColParam(contract, 'invited_by_id', 10),
     });
     expect(plan.ast.returning).toEqual([
       ColumnRef.of('users', 'email'),
@@ -123,7 +136,9 @@ describe('query plan mutations', () => {
     assertInsertAst(plan.ast);
     expect(plan.ast.onConflict?.action?.kind).toBe('do-update-set');
     const action = plan.ast.onConflict?.action as DoUpdateSetConflictAction;
-    expect(action.set).toEqual({ name: ParamRef.of(4, 'name') });
+    expect(action.set).toEqual({
+      name: usersColParam(contract, 'name', 'Updated Alice'),
+    });
     expect(plan.params).toEqual([10, 'Alice', 'alice@example.com', 'Updated Alice']);
   });
 

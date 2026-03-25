@@ -94,7 +94,10 @@ describe('buildKyselyPlan', () => {
         from: new TableSource('user'),
         joins: undefined,
         projection: userSelectAllProjection,
-        where: BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1)),
+        where: BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of('user_123', { codecId: 'pg/text@1', nativeType: 'text' }),
+        ),
         orderBy: undefined,
         distinct: undefined,
         distinctOn: undefined,
@@ -116,10 +119,8 @@ describe('buildKyselyPlan', () => {
         {
           index: 1,
           source: 'lane',
-          refs: { table: 'user', column: 'id' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
       ],
       refs: {
@@ -156,7 +157,11 @@ describe('buildKyselyPlan', () => {
         projection: userSelectAllProjection,
         where: BinaryExpr.in(
           ColumnRef.of('user', 'id'),
-          ListLiteralExpr.of([ParamRef.of(1), ParamRef.of(2), ParamRef.of(3)]),
+          ListLiteralExpr.of([
+            ParamRef.of('a', { codecId: 'pg/text@1', nativeType: 'text' }),
+            ParamRef.of('b', { codecId: 'pg/text@1', nativeType: 'text' }),
+            ParamRef.of('c', { codecId: 'pg/text@1', nativeType: 'text' }),
+          ]),
         ),
         orderBy: undefined,
         distinct: undefined,
@@ -179,26 +184,20 @@ describe('buildKyselyPlan', () => {
         {
           index: 1,
           source: 'lane',
-          refs: { table: 'user', column: 'id' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
         {
           index: 2,
           source: 'lane',
-          refs: { table: 'user', column: 'id' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
         {
           index: 3,
           source: 'lane',
-          refs: { table: 'user', column: 'id' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
       ],
       refs: {
@@ -229,11 +228,11 @@ describe('buildKyselyPlan', () => {
     expect(plan.ast).toEqual(
       new InsertAst(new TableSource('user'), [
         {
-          id: ParamRef.of(1),
-          email: ParamRef.of(2),
+          id: ParamRef.of('u1', { codecId: 'pg/text@1', nativeType: 'text' }),
+          email: ParamRef.of('alice@example.com', { codecId: 'pg/text@1', nativeType: 'text' }),
         },
         {
-          id: ParamRef.of(3),
+          id: ParamRef.of('u2', { codecId: 'pg/text@1', nativeType: 'text' }),
           email: new DefaultValueExpr(),
         },
       ]),
@@ -249,26 +248,20 @@ describe('buildKyselyPlan', () => {
         {
           index: 1,
           source: 'lane',
-          refs: { table: 'user', column: 'id' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
         {
           index: 2,
           source: 'lane',
-          refs: { table: 'user', column: 'email' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
         {
           index: 3,
           source: 'lane',
-          refs: { table: 'user', column: 'id' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
       ],
       refs: {
@@ -330,8 +323,8 @@ describe('buildKyselyPlan', () => {
         new TableSource('user'),
         [
           {
-            id: ParamRef.of(1),
-            email: ParamRef.of(2),
+            id: ParamRef.of('u1', { codecId: 'pg/text@1', nativeType: 'text' }),
+            email: ParamRef.of('alice@example.com', { codecId: 'pg/text@1', nativeType: 'text' }),
           },
         ],
         new InsertOnConflict(
@@ -351,18 +344,14 @@ describe('buildKyselyPlan', () => {
         {
           index: 1,
           source: 'lane',
-          refs: { table: 'user', column: 'id' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
         {
           index: 2,
           source: 'lane',
-          refs: { table: 'user', column: 'email' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
       ],
       refs: {
@@ -406,7 +395,7 @@ describe('buildKyselyPlan', () => {
     expect(plan.ast).toEqual(
       new InsertAst(new TableSource('user'), [
         {
-          id: ParamRef.of(1),
+          id: ParamRef.of('u1', { codecId: 'pg/text@1', nativeType: 'text' }),
           email: new DefaultValueExpr(),
         },
       ]),
@@ -422,10 +411,8 @@ describe('buildKyselyPlan', () => {
         {
           index: 1,
           source: 'lane',
-          refs: { table: 'user', column: 'id' },
           codecId: 'pg/text@1',
           nativeType: 'text',
-          nullable: false,
         },
       ],
       refs: {

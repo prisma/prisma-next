@@ -103,7 +103,9 @@ describe('buildKyselyPlan', () => {
     const ast = plan.ast as SelectAst;
     expect(ast.from).toEqual(TableSource.named('user'));
     expect((ast.where as BinaryExpr).left).toEqual(ast.projection[0]!.expr);
-    expect((ast.where as BinaryExpr).right).toEqual(ParamRef.of(1));
+    expect((ast.where as BinaryExpr).right).toEqual(
+      ParamRef.of('u1', { codecId: 'string', nativeType: 'uuid' }),
+    );
     expect(ast.limit).toBe(2);
     expect(plan.params).toEqual(['u1']);
     expect(plan.meta.annotations).toMatchObject({ sql: REDACTED_SQL, limit: 2 });

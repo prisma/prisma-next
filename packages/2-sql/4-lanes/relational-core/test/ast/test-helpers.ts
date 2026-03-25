@@ -18,8 +18,17 @@ export function col(tableName: string, column: string): ColumnRef {
   return ColumnRef.of(tableName, column);
 }
 
-export function param(index: number, name?: string): ParamRef {
-  return ParamRef.of(index, name);
+export function param(value: unknown, name?: string): ParamRef {
+  return name !== undefined ? ParamRef.of(value, { name }) : ParamRef.of(value);
+}
+
+export function shiftParamRef(delta: number): (expr: ParamRef) => ParamRef {
+  return (expr: ParamRef) =>
+    ParamRef.of(typeof expr.value === 'number' ? (expr.value as number) + delta : expr.value, {
+      name: expr.name,
+      codecId: expr.codecId,
+      nativeType: expr.nativeType,
+    });
 }
 
 export function lit(value: unknown): LiteralExpr {

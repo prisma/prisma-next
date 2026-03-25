@@ -80,7 +80,10 @@ describe('SQL builder includeMany', () => {
     expect(rowsQuery.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId')),
-        BinaryExpr.eq(ColumnRef.of('post', 'title'), ParamRef.of(1, 'title')),
+        BinaryExpr.eq(
+          ColumnRef.of('post', 'title'),
+          ParamRef.of('Test', { name: 'title', codecId: 'pg/text@1', nativeType: 'text' }),
+        ),
       ]),
     );
   });

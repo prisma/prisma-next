@@ -1,4 +1,4 @@
-import { DefaultValueExpr, type InsertAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import { DefaultValueExpr, InsertAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   createReturningUsersCollection,
@@ -7,25 +7,51 @@ import {
   withCollectionRuntime,
 } from './helpers';
 
-function isInsertAst(ast: unknown): ast is InsertAst {
-  return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'insert';
-}
+function expectInsertBatchAst(
+  ast: unknown,
+  rows: ReadonlyArray<{
+    id: number;
+    name: string;
+    email: string;
+    invitedById: null | undefined;
+  }>,
+): asserts ast is InsertAst {
+  expect(ast).toBeInstanceOf(InsertAst);
+  if (!(ast instanceof InsertAst)) {
+    throw new Error('Expected execution to emit an insert AST');
+  }
 
-function expectInsertBatchAst(ast: unknown): asserts ast is InsertAst {
-  expect(isInsertAst(ast)).toBe(true);
-
-  expect((ast as InsertAst).rows).toEqual([
+  expect(ast.rows).toEqual([
     {
-      id: ParamRef.of(1, 'id'),
-      name: ParamRef.of(2, 'name'),
-      email: ParamRef.of(3, 'email'),
-      invited_by_id: ParamRef.of(4, 'invited_by_id'),
+      id: ParamRef.of(rows[0]!.id, { name: 'id', codecId: 'pg/int4@1', nativeType: 'int4' }),
+      name: ParamRef.of(rows[0]!.name, { name: 'name', codecId: 'pg/text@1', nativeType: 'text' }),
+      email: ParamRef.of(rows[0]!.email, {
+        name: 'email',
+        codecId: 'pg/text@1',
+        nativeType: 'text',
+      }),
+      invited_by_id: ParamRef.of(rows[0]!.invitedById ?? null, {
+        name: 'invited_by_id',
+        codecId: 'pg/int4@1',
+        nativeType: 'int4',
+      }),
     },
     {
-      id: ParamRef.of(5, 'id'),
-      name: ParamRef.of(6, 'name'),
-      email: ParamRef.of(7, 'email'),
-      invited_by_id: new DefaultValueExpr(),
+      id: ParamRef.of(rows[1]!.id, { name: 'id', codecId: 'pg/int4@1', nativeType: 'int4' }),
+      name: ParamRef.of(rows[1]!.name, { name: 'name', codecId: 'pg/text@1', nativeType: 'text' }),
+      email: ParamRef.of(rows[1]!.email, {
+        name: 'email',
+        codecId: 'pg/text@1',
+        nativeType: 'text',
+      }),
+      invited_by_id:
+        rows[1]!.invitedById === undefined
+          ? new DefaultValueExpr()
+          : ParamRef.of(rows[1]!.invitedById, {
+              name: 'invited_by_id',
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
+            }),
     },
   ]);
 }
@@ -77,7 +103,10 @@ describe('integration/create', () => {
           { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null },
         ]);
         expect(runtime.executions).toHaveLength(1);
-        expectInsertBatchAst(runtime.executions[0]?.ast);
+        expectInsertBatchAst(runtime.executions[0]?.ast, [
+          { id: 10, name: 'Alice', email: 'alice@example.com', invitedById: null },
+          { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: undefined },
+        ]);
 
         const rows = await runtime.query<{ id: number; name: string; email: string }>(
           'select id, name, email from users order by id',
@@ -104,7 +133,10 @@ describe('integration/create', () => {
         ]);
         expect(count).toBe(2);
         expect(runtime.executions).toHaveLength(1);
-        expectInsertBatchAst(runtime.executions[0]?.ast);
+        expectInsertBatchAst(runtime.executions[0]?.ast, [
+          { id: 20, name: 'Cara', email: 'cara@example.com', invitedById: null },
+          { id: 21, name: 'Dan', email: 'dan@example.com', invitedById: undefined },
+        ]);
 
         const rows = await runtime.query<{ id: number; name: string }>(
           'select id, name from users order by id',

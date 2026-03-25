@@ -131,7 +131,7 @@ describe('delete with vector operations', () => {
     expect(where.left.kind).toBe('operation');
     const left = where.left as OperationExpr;
     expect(left.method).toBe('cosineDistance');
-    expect(left.args).toEqual([ParamRef.of(0, 'other')]);
+    expect(left.args).toEqual([ParamRef.of(undefined, { name: 'other' })]);
     expect(plan.params).toContain(0.5);
   });
 });
