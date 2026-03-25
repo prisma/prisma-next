@@ -6,13 +6,11 @@ import {
   type BoundWhereExpr,
   ColumnRef,
   type Expression,
-  ListLiteralExpr,
-  LiteralExpr,
   NullCheckExpr,
   OrExpr,
-  ParamRef,
   ProjectionItem,
   SelectAst,
+  type SqlComparable,
   TableSource,
   type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -36,29 +34,24 @@ function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>
 // ORM HAVING filters use literal binding (values inlined at plan-build time),
 // not parameterized binding. ParamRef is rejected because the ORM's grouped
 // collection API always produces literal comparisons for having() predicates.
-function validateGroupedComparable(
-  value: Expression | ParamRef | LiteralExpr | ListLiteralExpr,
-): Expression | LiteralExpr | ListLiteralExpr {
-  if (value instanceof ParamRef) {
-    throw new Error('ParamRef is not supported in grouped having expressions');
-  }
-
-  if (value instanceof LiteralExpr) {
-    return value;
-  }
-
-  if (value instanceof ListLiteralExpr) {
-    if (value.values.some((entry) => entry instanceof ParamRef)) {
+function validateGroupedComparable(value: SqlComparable): SqlComparable {
+  switch (value.kind) {
+    case 'param-ref':
       throw new Error('ParamRef is not supported in grouped having expressions');
-    }
-    return value;
+    case 'literal':
+      return value;
+    case 'list-literal':
+      if (value.values.some((entry) => entry.kind === 'param-ref')) {
+        throw new Error('ParamRef is not supported in grouped having expressions');
+      }
+      return value;
+    default:
+      return value;
   }
-
-  return value;
 }
 
 function validateGroupedMetricExpr(expr: Expression): AggregateExpr {
-  if (!(expr instanceof AggregateExpr)) {
+  if (expr.kind !== 'aggregate') {
     throw new Error('groupBy().having() only supports aggregate metric expressions');
   }
 

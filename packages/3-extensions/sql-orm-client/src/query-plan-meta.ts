@@ -1,6 +1,6 @@
 import type { ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { type QueryAst, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { QueryAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 
 export function resolveTableColumns(
@@ -35,7 +35,7 @@ export function buildOrmQueryPlan<Row>(
   paramDescriptors: readonly ParamDescriptor[] = [],
 ): SqlQueryPlan<Row> {
   const annotations =
-    ast instanceof SelectAst && typeof ast.limit === 'number' ? { limit: ast.limit } : undefined;
+    ast.kind === 'select' && typeof ast.limit === 'number' ? { limit: ast.limit } : undefined;
 
   return Object.freeze({
     ast,
