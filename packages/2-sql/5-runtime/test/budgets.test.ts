@@ -47,9 +47,9 @@ function createPlan(overrides: PlanOverrides): ExecutionPlan {
   return {
     sql: 'SELECT 1',
     params: [],
-    meta: { ...baseMeta, ...(metaOverrides ?? {}) } as PlanMeta,
+    meta: { ...baseMeta, ...(metaOverrides ?? {}) } as unknown as PlanMeta,
     ...rest,
-  } as ExecutionPlan;
+  } as unknown as ExecutionPlan;
 }
 
 describe('budgets plugin', () => {

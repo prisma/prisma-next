@@ -127,8 +127,9 @@ function estimateRowsFromAst(
   tableRows: Record<string, number>,
   defaultTableRows: number,
   refs: { tables?: readonly string[] } | undefined,
+  hasAggregateWithoutGroup?: boolean,
 ): number | null {
-  if (hasAggregateWithoutGroupBy(ast)) {
+  if (hasAggregateWithoutGroup ?? hasAggregateWithoutGroupBy(ast)) {
     return 1;
   }
 
@@ -263,8 +264,15 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     ast: SelectAst,
     ctx: PluginContext<TContract, TAdapter, TDriver>,
   ) {
-    const estimated = estimateRowsFromAst(ast, tableRows, defaultTableRows, plan.meta.refs);
-    const isUnbounded = ast.limit === undefined && !hasAggregateWithoutGroupBy(ast);
+    const hasAggNoGroup = hasAggregateWithoutGroupBy(ast);
+    const estimated = estimateRowsFromAst(
+      ast,
+      tableRows,
+      defaultTableRows,
+      plan.meta.refs,
+      hasAggNoGroup,
+    );
+    const isUnbounded = ast.limit === undefined && !hasAggNoGroup;
     const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
 
     if (isUnbounded) {
