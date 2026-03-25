@@ -6,7 +6,6 @@ const REPO_ROOT = join(import.meta.dirname, '../../../../');
 
 const GENERATED_ARTIFACT_ROOTS = [
   'examples/prisma-next-demo/src/prisma/contract.d.ts',
-  'examples/prisma-orm-demo/src/prisma-next/contract.d.ts',
   'test/e2e/framework/test/fixtures/generated/contract.d.ts',
 ] as const;
 
