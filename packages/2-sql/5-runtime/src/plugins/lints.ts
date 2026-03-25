@@ -1,15 +1,14 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { Plugin, PluginContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
-import type {
-  AnyFromSource,
-  AnyQueryAst,
-  FromSource,
-  QueryAst,
+import {
+  type AnyFromSource,
+  type AnyQueryAst,
+  type FromSource,
+  type QueryAst,
+  queryAstKinds,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
-
-const queryAstKinds = new Set<string>(['select', 'insert', 'update', 'delete']);
 
 function isSqlQueryAst(ast: unknown): ast is AnyQueryAst {
   return (

@@ -1595,6 +1595,20 @@ export type AnyExpression =
 export type AnyWhereExpr = BinaryExpr | AndExpr | OrExpr | ExistsExpr | NullCheckExpr;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
 
+export const queryAstKinds: ReadonlySet<string> = new Set<QueryAst['kind']>([
+  'select',
+  'insert',
+  'update',
+  'delete',
+]);
+export const whereExprKinds: ReadonlySet<string> = new Set<WhereExpr['kind']>([
+  'binary',
+  'and',
+  'or',
+  'exists',
+  'null-check',
+]);
+
 export interface BoundWhereExpr {
   readonly expr: WhereExpr;
   readonly params: readonly unknown[];
