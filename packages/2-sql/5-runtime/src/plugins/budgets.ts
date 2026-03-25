@@ -1,6 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { AfterExecuteResult, Plugin, PluginContext } from '@prisma-next/runtime-executor';
-import { AggregateExpr, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 
 export interface BudgetsOptions {
   readonly maxRows?: number;
@@ -119,7 +119,7 @@ function hasAggregateWithoutGroupBy(ast: SelectAst): boolean {
   if (ast.groupBy !== undefined) {
     return false;
   }
-  return ast.projection.some((item) => item.expr instanceof AggregateExpr);
+  return ast.projection.some((item) => item.expr.kind === 'aggregate');
 }
 
 function estimateRowsFromAst(
@@ -204,7 +204,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
       observedRowsByPlan.set(plan, { count: 0 });
 
-      if (plan.ast instanceof SelectAst) {
+      if (plan.ast?.kind === 'select') {
         return evaluateSelectAst(plan, plan.ast, ctx);
       }
 
