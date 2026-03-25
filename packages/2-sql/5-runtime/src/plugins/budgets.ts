@@ -1,5 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { AfterExecuteResult, Plugin, PluginContext } from '@prisma-next/runtime-executor';
+import { AggregateExpr, SelectAst } from '@prisma-next/sql-relational-core/ast';
 
 export interface BudgetsOptions {
   readonly maxRows?: number;
@@ -114,7 +115,38 @@ function budgetError(code: string, message: string, details?: Record<string, unk
   });
 }
 
-function estimateRows(
+function hasAggregateWithoutGroupBy(ast: SelectAst): boolean {
+  if (ast.groupBy !== undefined) {
+    return false;
+  }
+  return ast.projection.some((item) => item.expr instanceof AggregateExpr);
+}
+
+function estimateRowsFromAst(
+  ast: SelectAst,
+  tableRows: Record<string, number>,
+  defaultTableRows: number,
+  refs: { tables?: string[] } | undefined,
+): number | null {
+  if (hasAggregateWithoutGroupBy(ast)) {
+    return 1;
+  }
+
+  const table = refs?.tables?.[0];
+  if (!table) {
+    return null;
+  }
+
+  const tableEstimate = tableRows[table] ?? defaultTableRows;
+
+  if (ast.limit !== undefined) {
+    return Math.min(ast.limit, tableEstimate);
+  }
+
+  return tableEstimate;
+}
+
+function estimateRowsFromHeuristics(
   plan: ExecutionPlan,
   tableRows: Record<string, number>,
   defaultTableRows: number,
@@ -126,9 +158,6 @@ function estimateRows(
 
   const tableEstimate = tableRows[table] ?? defaultTableRows;
 
-  // TODO: this is really not great. It should instead walk the AST.
-  // It also doesn't check in any way that this limit correlates with the current table.
-  // Move this plugin to a higher level (close to the linter) and use AST visitors.
   const limit = plan.meta.annotations?.['limit'];
   if (typeof limit === 'number') {
     return Math.min(limit, tableEstimate);
@@ -137,8 +166,23 @@ function estimateRows(
   return tableEstimate;
 }
 
-function hasDetectableLimit(plan: ExecutionPlan): boolean {
+function hasDetectableLimitFromHeuristics(plan: ExecutionPlan): boolean {
   return typeof plan.meta.annotations?.['limit'] === 'number';
+}
+
+function emitBudgetViolation(
+  error: ReturnType<typeof budgetError>,
+  shouldBlock: boolean,
+  ctx: PluginContext<unknown, unknown, unknown>,
+): void {
+  if (shouldBlock) {
+    throw error;
+  }
+  ctx.log.warn({
+    code: error.code,
+    message: error.message,
+    details: error.details,
+  });
 }
 
 export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unknown>(
@@ -160,108 +204,15 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
       observedRows = 0;
       void ctx.now();
 
-      const estimated = estimateRows(plan, tableRows, defaultTableRows);
-      const isUnbounded = !hasDetectableLimit(plan);
-      const sqlUpper = plan.sql.trimStart().toUpperCase();
-      const isSelect = sqlUpper.startsWith('SELECT');
+      if (plan.ast instanceof SelectAst) {
+        return evaluateSelectAst(plan, plan.ast, ctx);
+      }
 
-      // Check for unbounded queries first - these should always error if they exceed or equal the budget
-      if (isSelect && isUnbounded) {
-        if (estimated !== null && estimated >= maxRows) {
-          const error = budgetError(
-            'BUDGET.ROWS_EXCEEDED',
-            'Unbounded SELECT query exceeds budget',
-            {
-              source: 'heuristic',
-              estimatedRows: estimated,
-              maxRows,
-            },
-          );
-
-          const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
-          if (shouldBlock) {
-            throw error;
-          }
-          ctx.log.warn({
-            code: error.code,
-            message: error.message,
-            details: error.details,
-          });
-          return;
-        }
-
-        // Even if we can't estimate, unbounded queries should error
-        const error = budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
-          source: 'heuristic',
-          maxRows,
-        });
-
-        const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
-        if (shouldBlock) {
-          throw error;
-        }
-        ctx.log.warn({
-          code: error.code,
-          message: error.message,
-          details: error.details,
-        });
+      if (plan.ast) {
         return;
       }
 
-      // For bounded queries, check if estimated exceeds budget
-      if (estimated !== null) {
-        if (estimated > maxRows) {
-          const error = budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
-            source: 'heuristic',
-            estimatedRows: estimated,
-            maxRows,
-          });
-
-          const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
-          if (shouldBlock) {
-            throw error;
-          }
-          ctx.log.warn({
-            code: error.code,
-            message: error.message,
-            details: error.details,
-          });
-        }
-        return;
-      }
-
-      // Fallback: if no AST, try EXPLAIN if enabled
-      if (!plan.ast) {
-        const explainEnabled = options?.explain?.enabled === true;
-
-        if (explainEnabled && isSelect && typeof ctx.driver === 'object' && ctx.driver !== null) {
-          const estimatedRows = await computeEstimatedRows(plan, ctx.driver as DriverWithExplain);
-          if (estimatedRows !== undefined) {
-            if (estimatedRows > maxRows) {
-              const error = budgetError(
-                'BUDGET.ROWS_EXCEEDED',
-                'Estimated row count exceeds budget',
-                {
-                  source: 'explain',
-                  estimatedRows,
-                  maxRows,
-                },
-              );
-
-              const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
-              if (shouldBlock) {
-                throw error;
-              }
-              ctx.log.warn({
-                code: error.code,
-                message: error.message,
-                details: error.details,
-              });
-            }
-            return;
-          }
-        }
-      }
+      return evaluateWithHeuristics(plan, ctx);
     },
 
     async onRow(
@@ -306,4 +257,120 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
       }
     },
   });
+
+  function evaluateSelectAst(
+    plan: ExecutionPlan,
+    ast: SelectAst,
+    ctx: PluginContext<TContract, TAdapter, TDriver>,
+  ) {
+    const estimated = estimateRowsFromAst(ast, tableRows, defaultTableRows, plan.meta.refs);
+    const isUnbounded = ast.limit === undefined && !hasAggregateWithoutGroupBy(ast);
+    const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
+
+    if (isUnbounded) {
+      if (estimated !== null && estimated >= maxRows) {
+        emitBudgetViolation(
+          budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+            source: 'ast',
+            estimatedRows: estimated,
+            maxRows,
+          }),
+          shouldBlock,
+          ctx as PluginContext<unknown, unknown, unknown>,
+        );
+        return;
+      }
+
+      emitBudgetViolation(
+        budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+          source: 'ast',
+          maxRows,
+        }),
+        shouldBlock,
+        ctx as PluginContext<unknown, unknown, unknown>,
+      );
+      return;
+    }
+
+    if (estimated !== null && estimated > maxRows) {
+      emitBudgetViolation(
+        budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
+          source: 'ast',
+          estimatedRows: estimated,
+          maxRows,
+        }),
+        shouldBlock,
+        ctx as PluginContext<unknown, unknown, unknown>,
+      );
+    }
+  }
+
+  async function evaluateWithHeuristics(
+    plan: ExecutionPlan,
+    ctx: PluginContext<TContract, TAdapter, TDriver>,
+  ) {
+    const estimated = estimateRowsFromHeuristics(plan, tableRows, defaultTableRows);
+    const isUnbounded = !hasDetectableLimitFromHeuristics(plan);
+    const sqlUpper = plan.sql.trimStart().toUpperCase();
+    const isSelect = sqlUpper.startsWith('SELECT');
+    const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
+
+    if (isSelect && isUnbounded) {
+      if (estimated !== null && estimated >= maxRows) {
+        emitBudgetViolation(
+          budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+            source: 'heuristic',
+            estimatedRows: estimated,
+            maxRows,
+          }),
+          shouldBlock,
+          ctx as PluginContext<unknown, unknown, unknown>,
+        );
+        return;
+      }
+
+      emitBudgetViolation(
+        budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+          source: 'heuristic',
+          maxRows,
+        }),
+        shouldBlock,
+        ctx as PluginContext<unknown, unknown, unknown>,
+      );
+      return;
+    }
+
+    if (estimated !== null) {
+      if (estimated > maxRows) {
+        emitBudgetViolation(
+          budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
+            source: 'heuristic',
+            estimatedRows: estimated,
+            maxRows,
+          }),
+          shouldBlock,
+          ctx as PluginContext<unknown, unknown, unknown>,
+        );
+      }
+      return;
+    }
+
+    const explainEnabled = options?.explain?.enabled === true;
+    if (explainEnabled && isSelect && typeof ctx.driver === 'object' && ctx.driver !== null) {
+      const estimatedRows = await computeEstimatedRows(plan, ctx.driver as DriverWithExplain);
+      if (estimatedRows !== undefined) {
+        if (estimatedRows > maxRows) {
+          emitBudgetViolation(
+            budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
+              source: 'explain',
+              estimatedRows,
+              maxRows,
+            }),
+            shouldBlock,
+            ctx as PluginContext<unknown, unknown, unknown>,
+          );
+        }
+      }
+    }
+  }
 }
