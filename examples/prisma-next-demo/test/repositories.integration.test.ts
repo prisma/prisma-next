@@ -654,8 +654,7 @@ describe('ORM client integration examples', () => {
           await seedOrmClientData(runtime);
 
           const page = await ormClientGetUsersBackwardCursor(seededUserIds.reader, 2, runtime);
-          const records = page as Array<Record<string, unknown>>;
-          expect(records.map((user) => asId(user['id']))).toEqual([
+          expect(page.map((user) => user.id)).toEqual([
             seededUserIds.adminTwo,
             seededUserIds.member,
           ]);
@@ -665,9 +664,7 @@ describe('ORM client integration examples', () => {
             10,
             runtime,
           );
-          expect(
-            (partialPage as Array<Record<string, unknown>>).map((user) => asId(user['id'])),
-          ).toEqual([seededUserIds.admin]);
+          expect(partialPage.map((user) => user.id)).toEqual([seededUserIds.admin]);
 
           const emptyPage = await ormClientGetUsersBackwardCursor(seededUserIds.admin, 2, runtime);
           expect(emptyPage).toHaveLength(0);
