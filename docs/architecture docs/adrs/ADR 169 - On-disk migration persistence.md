@@ -13,7 +13,7 @@ ADR 028 defined the on-disk format (migration packages, attestation, graph struc
 
 ## Problem
 
-Implement `migration plan`, `migration verify`, and `migration apply` as CLI commands with an on-disk migration format that supports offline planning, content-addressed integrity, parent-pointer chain ordering, and transactional apply with resume semantics.
+Implement `migration plan`, `migration verify`, and `migration apply` as CLI commands with an on-disk migration format that supports offline planning, content-addressed integrity, graph-topology ordering, and transactional apply with resume semantics.
 
 Key tensions:
 - The planner was designed to diff a contract against a live database schema (`SqlSchemaIR`). Offline planning requires a contract-to-contract diff, but building a second diff engine is wasteful.
@@ -38,15 +38,17 @@ The conversion is intentionally lossy in the contract→schemaIR direction (drop
 
 The `contractToSchemaIR` function lives in the SQL family tooling layer (`@prisma-next/family-sql`). The CLI accesses it via `TargetMigrationsCapability.contractToSchema()`, respecting the layering boundary.
 
-### 2. Parent-pointer chain ordering (`parentMigrationId`)
+### 2. Graph-topology ordering
 
-The contract graph (nodes = contract hashes, edges = migrations) is insufficient for ordering because contract hashes can be revisited. After `empty → C1 → C2 → C1`, a migration with `from: C1` is ambiguous — it could follow either "version" of C1.
+Migrations are directed edges in a graph where nodes are contract hashes and edges are migration packages (`from` → `to`). The graph is reconstructed from on-disk migration packages at read time via `reconstructGraph()`.
 
-Each migration carries a `parentMigrationId` field: the `migrationId` of the migration it follows in the chain, or `null` for the first migration. This creates a singly-linked list that provides unambiguous ordering regardless of contract hash revisits.
+**Ordering**: `findPath(graph, source, target)` uses BFS shortest-path to determine the migration sequence between any two contract hashes. This tolerates cycles (e.g., `C1 → C2 → C1 → C3`) — the pathfinder selects the shortest route.
 
-**Branch detection**: Two migrations with the same `parentMigrationId` are a structurally detectable branch (`AMBIGUOUS_LEAF`), analogous to two git commits sharing a parent. This is a hard error requiring explicit resolution — the system never silently picks a winner.
+**Leaf resolution**: `findLeaf(graph)` finds the unique node reachable from `EMPTY_CONTRACT_HASH` that has no outgoing edges. If the graph has multiple leaves (divergent branches), `findLeaf` throws `AMBIGUOUS_LEAF`. If the graph has cycles with no exit node (e.g., `C1 ↔ C2`), it throws `NO_RESOLVABLE_LEAF` with guidance to use `--from`.
 
-**Leaf resolution**: The leaf is the migration whose `migrationId` is not referenced as `parentMigrationId` by any other migration. `findLeaf` walks the parent chain, not node-level graph analysis.
+**Branch detection**: Two migrations sharing the same `from` hash that target different `to` hashes create divergent leaves, detected as `AMBIGUOUS_LEAF`. This is a hard error requiring explicit resolution — the system never silently picks a winner.
+
+**Ref-based targeting**: Named refs (`migrations/refs.json`) map environment names (e.g., `staging`, `production`) to contract hashes. When a ref is provided via `--ref`, `migration status` and `migration apply` use the ref hash as the target, bypassing leaf resolution entirely. This allows commands to work on divergent graphs by selecting a specific branch.
 
 ### 3. Content-addressed migration identity
 
@@ -56,11 +58,7 @@ Each migration carries a `parentMigrationId` field: the `migrationId` of the mig
 - The canonicalized `fromContract`
 - The canonicalized `toContract`
 
-**`parentMigrationId` should be excluded from the hash.** The identity answers "what does this migration do?" (ops + contracts), not "where does it sit in the chain?" (parent pointer). This separation is critical for future squash and rebase operations:
-
-- **Rebase**: Re-parenting a migration changes `parentMigrationId` but not the content. If `parentMigrationId` is in the hash, rebasing cascades ID changes through every downstream migration.
-- **Squash**: Collapsing N migrations into one produces a new migration that replaces the chain. Downstream migrations update their `parentMigrationId` to point to the squashed migration. If `parentMigrationId` is in the hash, all downstream IDs change.
-- **Deduplication**: Two developers independently planning the same change get the same `migrationId` when the parent is excluded, enabling detection of identical changes.
+The `from` and `to` hashes are included in the manifest and therefore in the `migrationId`. Changing either endpoint changes the identity.
 
 ### 4. Direct SQL on disk
 
@@ -85,10 +83,13 @@ If migration N fails, migrations 1..N-1 are already committed. Re-running `migra
 
 ### 6. "From" contract resolution
 
-`migration plan` determines the "from" contract by walking the parent-pointer chain to find the leaf:
+`migration plan` determines the "from" contract by resolving the graph leaf:
 - **No migrations**: Assume `sha256:empty` (new project). The converted schema IR is empty.
-- **Linear history**: The leaf is unambiguous — the one migration with no children.
+- **Linear history**: The leaf is unambiguous — the one reachable node with no outgoing edges.
 - **Branching**: `findLeaf` throws `AMBIGUOUS_LEAF` listing both leaves. The user must resolve manually (delete one branch, re-plan) or pass `--from <hash>`.
+- **Cycles without exit**: `findLeaf` throws `NO_RESOLVABLE_LEAF`. The user must pass `--from <hash>` to specify the planning origin explicitly.
+
+When `--from` is provided, graph reconstruction and leaf resolution are skipped entirely — the specified hash is used directly as the planning origin.
 
 ### 7. Full contracts embedded in migration packages
 
@@ -100,15 +101,16 @@ If migration N fails, migrations 1..N-1 are already committed. Re-running `migra
 
 - **Offline planning**: `migration plan` requires no database connection. Same inputs produce the same plan.
 - **Reviewable artifacts**: Migration packages are committed to version control and go through code review.
-- **Deterministic ordering**: Parent-pointer chain provides unambiguous ordering even with revisited contract hashes.
+- **Deterministic ordering**: Graph-topology ordering via BFS shortest-path provides unambiguous ordering even with revisited contract hashes and cycles.
 - **Structural branch detection**: Parallel development produces a hard error with clear resolution steps, not silent data loss.
+- **Ref-based targeting**: Named refs allow commands to work on divergent graphs by explicitly selecting a target branch.
 - **Resume safety**: Transactional per-migration execution with marker-based progress tracking.
 - **Reuse**: No new planner — offline planning reuses the existing `PostgresMigrationPlanner` via schema IR conversion.
 
 ### Negative
 
 - **Lossy conversion**: `contractToSchemaIR` drops codec metadata. If the planner ever needs codec-level information, the converter must be extended.
-- **Manual branch resolution**: Two developers planning concurrently must resolve the branch manually (delete one migration, re-plan). Future `migration rebase` tooling can automate this.
+- **Manual branch resolution**: Two developers planning concurrently must resolve the branch manually (delete one migration, re-plan, or use `--from`). Future `migration rebase` tooling can automate this.
 - **No `db update` to migrations transition path**: Databases managed with `db update` have a marker but no migration history. Switching to migrations requires a baseline migration. A future `migration baseline` command would bridge this.
 
 ## Alternatives considered

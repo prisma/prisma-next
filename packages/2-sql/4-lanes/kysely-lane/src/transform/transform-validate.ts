@@ -1,5 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ColumnRef, TableRef } from '@prisma-next/sql-relational-core/ast';
+import { ColumnRef, TableSource } from '@prisma-next/sql-relational-core/ast';
 import { ReferenceNode, SelectAllNode } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
 import {
@@ -87,10 +87,10 @@ export function resolveColumnRef(
   ctx.refsTables.add(table);
   ctx.refsColumns.set(`${table}.${column}`, { table, column });
 
-  return { kind: 'col', table, column };
+  return ColumnRef.of(table, column);
 }
 
-export function transformTableRef(node: unknown, ctx: TransformContext): TableRef {
+export function transformTableRef(node: unknown, ctx: TransformContext): TableSource {
   const info = getTableReferenceInfo(node);
   if (!info) {
     throw new KyselyTransformError(
@@ -107,5 +107,5 @@ export function transformTableRef(node: unknown, ctx: TransformContext): TableRe
   }
 
   ctx.refsTables.add(resolved);
-  return { kind: 'table', name: resolved };
+  return TableSource.named(resolved, info.alias);
 }

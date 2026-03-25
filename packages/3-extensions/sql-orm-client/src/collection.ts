@@ -1,6 +1,6 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ToWhereExpr, WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import { type ToWhereExpr, type WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import {
@@ -35,6 +35,7 @@ import {
   executeMutationReturningSingleRow,
 } from './collection-mutation-dispatch';
 import { augmentSelectionForJoinColumns, mapModelDataToStorageRow } from './collection-runtime';
+import { executeQueryPlan } from './execute-query-plan';
 import { shorthandToWhereExpr } from './filters';
 import { GroupedCollection } from './grouped-collection';
 import {
@@ -44,6 +45,13 @@ import {
   isIncludeCombine,
   isIncludeScalar,
 } from './include-descriptors';
+import { createModelAccessor } from './model-accessor';
+import {
+  buildPrimaryKeyFilterFromRow,
+  executeNestedCreateMutation,
+  executeNestedUpdateMutation,
+  hasNestedMutationCallbacks,
+} from './mutation-executor';
 import {
   compileAggregate,
   compileDeleteCount,
@@ -54,15 +62,7 @@ import {
   compileUpdateCount,
   compileUpdateReturning,
   compileUpsertReturning,
-} from './kysely-compiler';
-import { createModelAccessor } from './model-accessor';
-import {
-  buildPrimaryKeyFilterFromRow,
-  executeNestedCreateMutation,
-  executeNestedUpdateMutation,
-  hasNestedMutationCallbacks,
-} from './mutation-executor';
-import { executeCompiledQuery } from './raw-compiled-query';
+} from './query-plan';
 import type {
   AggregateBuilder,
   AggregateResult,
@@ -91,17 +91,12 @@ import type {
 } from './types';
 import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
+import { createBoundWhereExpr } from './where-utils';
 
 type WhereDirectInput = WhereArg;
 
 function isWhereExprInput(value: unknown): value is WhereExpr {
-  if (typeof value !== 'object' || value === null || !('kind' in value)) {
-    return false;
-  }
-  const kind = (value as { kind?: unknown }).kind;
-  return (
-    kind === 'bin' || kind === 'exists' || kind === 'nullCheck' || kind === 'and' || kind === 'or'
-  );
+  return value instanceof WhereExpr;
 }
 
 function isToWhereExprInput(value: unknown): value is ToWhereExpr {
@@ -174,7 +169,7 @@ export class Collection<
         : isWhereDirectInput(input)
           ? input
           : shorthandToWhereExpr(this.ctx.contract, this.modelName, input);
-    const filter = normalizeWhereArg(whereArg);
+    const filter = normalizeWhereArg(whereArg, { contract: this.ctx.contract });
 
     if (!filter) {
       return this as Collection<TContract, ModelName, Row, WithWhereState<State>>;
@@ -559,12 +554,15 @@ export class Collection<
       }
     }
 
-    const compiled = compileAggregate(this.tableName, this.state.filters, aggregateSpec);
-    const rows = await executeCompiledQuery<Record<string, unknown>>(
-      this.ctx.runtime,
+    const compiled = compileAggregate(
       this.ctx.contract,
+      this.tableName,
+      this.state.filters,
+      aggregateSpec,
+    );
+    const rows = await executeQueryPlan<Record<string, unknown>>(
+      this.ctx.runtime,
       compiled,
-      { lane: 'orm-client' },
     ).toArray();
     return normalizeAggregateResult(aggregateSpec, rows[0] ?? {});
   }
@@ -625,7 +623,12 @@ export class Collection<
       this.state.selectedFields,
       parentJoinColumns,
     );
-    const compiled = compileInsertReturning(this.tableName, mappedRows, selectedForInsert);
+    const compiled = compileInsertReturning(
+      this.ctx.contract,
+      this.tableName,
+      mappedRows,
+      selectedForInsert,
+    );
     return dispatchMutationRows<Row>({
       contract: this.ctx.contract,
       runtime: this.ctx.runtime,
@@ -645,15 +648,8 @@ export class Collection<
     const mappedRows = data.map((row) =>
       mapModelDataToStorageRow(this.ctx.contract, this.modelName, row),
     );
-    const compiled = compileInsertCount(this.tableName, mappedRows);
-    await executeCompiledQuery<Record<string, unknown>>(
-      this.ctx.runtime,
-      this.ctx.contract,
-      compiled,
-      {
-        lane: 'orm-client',
-      },
-    ).toArray();
+    const compiled = compileInsertCount(this.ctx.contract, this.tableName, mappedRows);
+    await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
     return data.length;
   }
 
@@ -687,6 +683,7 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileUpsertReturning(
+      this.ctx.contract,
       this.tableName,
       createValues,
       updateValues,
@@ -773,6 +770,7 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileUpdateReturning(
+      this.ctx.contract,
       this.tableName,
       mappedData,
       this.state.filters,
@@ -803,23 +801,19 @@ export class Collection<
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
     };
-    const countCompiled = compileSelect(this.tableName, countState);
-    const matchingRows = await executeCompiledQuery<Record<string, unknown>>(
+    const countCompiled = compileSelect(this.ctx.contract, this.tableName, countState);
+    const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
-      this.ctx.contract,
       countCompiled,
-      { lane: 'orm-client' },
     ).toArray();
 
-    const compiled = compileUpdateCount(this.tableName, mappedData, this.state.filters);
-    await executeCompiledQuery<Record<string, unknown>>(
-      this.ctx.runtime,
+    const compiled = compileUpdateCount(
       this.ctx.contract,
-      compiled,
-      {
-        lane: 'orm-client',
-      },
-    ).toArray();
+      this.tableName,
+      mappedData,
+      this.state.filters,
+    );
+    await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
 
     return matchingRows.length;
   }
@@ -842,7 +836,12 @@ export class Collection<
       this.state.selectedFields,
       parentJoinColumns,
     );
-    const compiled = compileDeleteReturning(this.tableName, this.state.filters, selectedForDelete);
+    const compiled = compileDeleteReturning(
+      this.ctx.contract,
+      this.tableName,
+      this.state.filters,
+      selectedForDelete,
+    );
     return dispatchMutationRows<Row>({
       contract: this.ctx.contract,
       runtime: this.ctx.runtime,
@@ -863,23 +862,14 @@ export class Collection<
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
     };
-    const countCompiled = compileSelect(this.tableName, countState);
-    const matchingRows = await executeCompiledQuery<Record<string, unknown>>(
+    const countCompiled = compileSelect(this.ctx.contract, this.tableName, countState);
+    const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
-      this.ctx.contract,
       countCompiled,
-      { lane: 'orm-client' },
     ).toArray();
 
-    const compiled = compileDeleteCount(this.tableName, this.state.filters);
-    await executeCompiledQuery<Record<string, unknown>>(
-      this.ctx.runtime,
-      this.ctx.contract,
-      compiled,
-      {
-        lane: 'orm-client',
-      },
-    ).toArray();
+    const compiled = compileDeleteCount(this.ctx.contract, this.tableName, this.state.filters);
+    await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
 
     return matchingRows.length;
   }
@@ -926,7 +916,7 @@ export class Collection<
 
     const resultState: CollectionState = {
       ...emptyState(),
-      filters: [whereExpr],
+      filters: [createBoundWhereExpr(whereExpr)],
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       limit: 1,

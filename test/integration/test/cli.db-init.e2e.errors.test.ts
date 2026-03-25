@@ -51,7 +51,7 @@ withTempDir(({ createTempDir }) => {
             ).rejects.toThrow();
 
             const errorText = stripAnsi(consoleErrors.join('\n'));
-            expect(errorText).toContain('PN-RTM-3020');
+            expect(errorText).toContain('PN-RUN-3020');
             expect(errorText).toContain('Issues');
             expect(errorText).toContain('Extra column "user"."name"');
           });
@@ -144,8 +144,8 @@ withTempDir(({ createTempDir }) => {
             const errorJson = JSON.parse(errorText) as Record<string, unknown>;
 
             expect(errorJson).toMatchObject({
-              code: 'PN-RTM-3000',
-              domain: 'RTM',
+              code: 'PN-RUN-3000',
+              domain: 'RUN',
               summary: 'Database connection failed',
               meta: {
                 port: '1',
@@ -202,8 +202,8 @@ withTempDir(({ createTempDir }) => {
             const errorJson = JSON.parse(errorText) as Record<string, unknown>;
 
             expect(errorJson).toMatchObject({
-              code: 'PN-RTM-3000',
-              domain: 'RTM',
+              code: 'PN-RUN-3000',
+              domain: 'RUN',
               meta: { code: 'MARKER_ORIGIN_MISMATCH' },
             });
 

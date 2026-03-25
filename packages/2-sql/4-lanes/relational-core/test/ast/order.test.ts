@@ -1,79 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnRef } from '../../src/ast/common';
-import { createOrderByItem } from '../../src/ast/order';
-import type { ColumnRef, OperationExpr } from '../../src/ast/types';
+import { OrderByItem } from '../../src/ast/types';
+import { col, lowerExpr } from './test-helpers';
 
 describe('ast/order', () => {
-  describe('createOrderByItem', () => {
-    it('creates order by item with column ref and asc direction', () => {
-      const expr: ColumnRef = createColumnRef('user', 'id');
-      const orderByItem = createOrderByItem(expr, 'asc');
+  it('creates asc and desc order items from rich expressions', () => {
+    const asc = OrderByItem.asc(col('user', 'id'));
+    const desc = OrderByItem.desc(lowerExpr(col('user', 'email')));
 
-      expect(orderByItem).toEqual({
-        expr,
-        dir: 'asc',
-      });
-      expect(orderByItem.expr).toBe(expr);
-      expect(orderByItem.dir).toBe('asc');
+    expect(asc).toEqual(new OrderByItem(col('user', 'id'), 'asc'));
+    expect(desc).toEqual(new OrderByItem(lowerExpr(col('user', 'email')), 'desc'));
+  });
+
+  it('rewrites order item expressions immutably', () => {
+    const item = OrderByItem.asc(col('post', 'title'));
+    const rewritten = item.rewrite({
+      columnRef: (expr) => (expr.table === 'post' ? col('article', expr.column) : expr),
     });
 
-    it('creates order by item with column ref and desc direction', () => {
-      const expr: ColumnRef = createColumnRef('user', 'id');
-      const orderByItem = createOrderByItem(expr, 'desc');
-
-      expect(orderByItem.dir).toBe('desc');
-      expect(orderByItem.expr).toBe(expr);
-    });
-
-    it('creates order by item with operation expr and asc direction', () => {
-      const expr: OperationExpr = {
-        kind: 'operation',
-        method: 'test',
-        forTypeId: 'pg/text@1',
-        self: createColumnRef('user', 'email'),
-        args: [],
-        returns: { kind: 'builtin', type: 'string' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'test(${self})',
-        },
-      };
-
-      const orderByItem = createOrderByItem(expr, 'asc');
-
-      expect(orderByItem.expr).toBe(expr);
-      expect(orderByItem.dir).toBe('asc');
-    });
-
-    it('creates order by item with operation expr and desc direction', () => {
-      const expr: OperationExpr = {
-        kind: 'operation',
-        method: 'test',
-        forTypeId: 'pg/text@1',
-        self: createColumnRef('user', 'email'),
-        args: [],
-        returns: { kind: 'builtin', type: 'string' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'test(${self})',
-        },
-      };
-
-      const orderByItem = createOrderByItem(expr, 'desc');
-
-      expect(orderByItem.expr).toBe(expr);
-      expect(orderByItem.dir).toBe('desc');
-    });
-
-    it('creates order by item with different column', () => {
-      const expr: ColumnRef = createColumnRef('post', 'title');
-      const orderByItem = createOrderByItem(expr, 'asc');
-
-      expect(orderByItem.expr).toEqual(createColumnRef('post', 'title'));
-    });
+    expect(item.expr).toEqual(col('post', 'title'));
+    expect(rewritten.expr).toEqual(col('article', 'title'));
+    expect(rewritten.dir).toBe('asc');
   });
 });

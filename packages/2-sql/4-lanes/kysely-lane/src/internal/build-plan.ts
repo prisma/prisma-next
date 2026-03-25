@@ -14,14 +14,22 @@ function buildMeta(
     readonly projection?: PlanMeta['projection'];
     readonly projectionTypes?: PlanMeta['projectionTypes'];
     readonly selectAllIntent?: { table?: string };
+    readonly limit?: number;
   },
 ): PlanMeta {
-  const annotations: { codecs?: Record<string, string>; selectAllIntent?: { table?: string } } = {};
+  const annotations: {
+    codecs?: Record<string, string>;
+    selectAllIntent?: { table?: string };
+    limit?: number;
+  } = {};
   if (metaAdditions.projectionTypes && Object.keys(metaAdditions.projectionTypes).length > 0) {
     annotations.codecs = { ...metaAdditions.projectionTypes };
   }
   if (metaAdditions.selectAllIntent) {
     annotations.selectAllIntent = metaAdditions.selectAllIntent;
+  }
+  if (metaAdditions.limit !== undefined) {
+    annotations.limit = metaAdditions.limit;
   }
 
   return {

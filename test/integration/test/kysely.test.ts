@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import postgres from '@prisma-next/postgres';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { lints, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
 import { teardownTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
@@ -243,8 +244,16 @@ describe('Kysely build-only lane', () => {
 
       expect(captured).toHaveLength(1);
       const plan = captured[0]!;
+      expect(plan.ast).toBeInstanceOf(SelectAst);
       expect(plan).toMatchObject({
-        ast: { kind: 'select' },
+        ast: {
+          from: { name: 'user' },
+          limit: 5,
+          projection: [
+            { expr: { table: 'user', column: 'id' } },
+            { expr: { table: 'user', column: 'email' } },
+          ],
+        },
         meta: {
           lane: 'kysely',
           refs: {

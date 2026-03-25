@@ -16,6 +16,7 @@ export type { LintsOptions } from '../plugins/lints';
 export { lints } from '../plugins/lints';
 export type {
   ExecutionContext,
+  RuntimeMutationDefaultGenerator,
   RuntimeParameterizedCodecDescriptor,
   SqlExecutionStack,
   SqlExecutionStackWithDriver,
@@ -28,7 +29,10 @@ export type {
   SqlStaticContributions,
   TypeHelperRegistry,
 } from '../sql-context';
-export { createExecutionContext, createSqlExecutionStack } from '../sql-context';
+export {
+  createExecutionContext,
+  createSqlExecutionStack,
+} from '../sql-context';
 export type { SqlStatement } from '../sql-marker';
 export {
   ensureSchemaStatement,

@@ -56,6 +56,13 @@ export const pgvectorPackMeta = {
         alias: 'PgVectorOperationTypes',
       },
     },
+    queryOperationTypes: {
+      import: {
+        package: '@prisma-next/extension-pgvector/operation-types',
+        named: 'QueryOperationTypes',
+        alias: 'PgVectorQueryOperationTypes',
+      },
+    },
     storage: [
       { typeId: pgvectorTypeId, familyId: 'sql', targetId: 'postgres', nativeType: 'vector' },
     ],

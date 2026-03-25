@@ -7,6 +7,7 @@ import type {
 import type {
   BinaryExpr,
   ColumnRef,
+  DefaultValueExpr,
   DeleteAst,
   Direction,
   InsertAst,
@@ -26,7 +27,7 @@ export interface PostgresAdapterOptions {
 
 export type PostgresContract = SqlContract<SqlStorage> & { readonly target: 'postgres' };
 
-export type Expr = ColumnRef | ParamRef;
+export type Expr = ColumnRef | ParamRef | DefaultValueExpr;
 
 export interface OrderClause {
   readonly expr: ColumnRef;
@@ -38,6 +39,7 @@ export type PostgresLoweredStatement = LoweredStatement;
 export type {
   BinaryExpr,
   ColumnRef,
+  DefaultValueExpr,
   DeleteAst,
   Direction,
   InsertAst,

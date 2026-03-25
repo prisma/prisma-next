@@ -80,7 +80,7 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 - Up to 3 tied suggestions are shown.
 
 ## Errors
-- Codes: `PN-<DOMAIN>-<NNNN>` (e.g., `PN-CLI-4002`, `PN-MIG-2001`, `PN-RTM-3005`, `PN-CON-1001`, `PN-SCHEMA-0001`).
+- Codes: `PN-<DOMAIN>-<NNNN>` (e.g., `PN-CLI-4002`, `PN-MIG-2001`, `PN-RUN-3005`, `PN-CON-1001`, `PN-SCHEMA-0001`).
 - Human layout (TTY):
   - First line: `✖` concise summary + code
   - Why: one line cause

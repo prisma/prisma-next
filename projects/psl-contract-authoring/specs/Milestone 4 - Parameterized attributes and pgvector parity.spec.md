@@ -50,7 +50,7 @@ This is the first “new behavior” milestone after the fixture-driven harness:
 # References
 
 - Project spec: `projects/psl-contract-authoring/spec.md`
-- Project plan: `projects/psl-contract-authoring/plans/plan.md`
+- Project plan: `projects/psl-contract-authoring/plan.md`
 - ADR 104: `docs/architecture docs/adrs/ADR 104 - PSL extension namespacing & syntax.md`
 - Gap inventory: `projects/psl-contract-authoring/references/authoring-surface-gap-inventory.md`
 

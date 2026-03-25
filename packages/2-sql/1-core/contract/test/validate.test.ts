@@ -62,6 +62,50 @@ describe('validateContract', () => {
     });
   });
 
+  it('accepts custom execution default generator ids', () => {
+    const contract = {
+      ...baseContract,
+      execution: {
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'User', column: 'id' },
+              onCreate: { kind: 'generator', id: 'slugid' },
+            },
+          ],
+        },
+      },
+    } as const;
+
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    expect(result.execution?.mutations.defaults).toEqual([
+      {
+        ref: { table: 'User', column: 'id' },
+        onCreate: { kind: 'generator', id: 'slugid' },
+      },
+    ]);
+  });
+
+  it('rejects non-flat execution default generator ids', () => {
+    const contract = {
+      ...baseContract,
+      execution: {
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'User', column: 'id' },
+              onCreate: { kind: 'generator', id: 'pack/slugid' },
+            },
+          ],
+        },
+      },
+    } as const;
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /Contract structural validation failed/,
+    );
+  });
+
   it('throws for invalid foreign key references', () => {
     const invalid = {
       ...baseContract,

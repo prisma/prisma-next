@@ -180,10 +180,10 @@ export default defineConfig({
 3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Verify Marker**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
-   - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
-   - Compares target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
-   - Compares storage hash: Returns `PN-RTM-3002` if `storageHash` doesn't match
-   - Compares profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
+   - Compares marker presence: Returns `PN-RUN-3001` if marker is missing
+   - Compares target compatibility: Returns `PN-RUN-3003` if contract target doesn't match config target
+   - Compares storage hash: Returns `PN-RUN-3002` if `storageHash` doesn't match
+   - Compares profile hash: Returns `PN-RUN-3002` if `profileHash` doesn't match (when present)
    - Checks codec coverage (optional): Compares contract column types against supported codec types and reports missing codecs
 5. **Verify Schema (default)**: Unless `--marker-only` is provided, calls `familyInstance.schemaVerify()` to catch schema mismatches such as missing tables or columns after manual DDL. By default this runs in tolerant mode; `--strict` treats schema elements not present in the contract as an error.
 6. **Schema-only mode**: `--schema-only` skips marker verification entirely and runs only `schemaVerify()`. This is useful for brownfield adoption and corrupt-marker diagnosis.
@@ -210,7 +210,7 @@ Marker-only success:
 
 Marker failure:
 ```text
-✖ Marker missing (PN-RTM-3001)
+✖ Marker missing (PN-RUN-3001)
   Why: Contract marker not found in database
   Fix: Run `prisma-next db sign --db <url>` to create marker
 ```
@@ -261,9 +261,9 @@ Schema drift failure:
 **Error Codes:**
 
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-RTM-3001`: Marker missing - Contract marker not found in database
-- `PN-RTM-3002`: Hash mismatch - Contract hash does not match database marker
-- `PN-RTM-3003`: Target mismatch - Contract target does not match config target
+- `PN-RUN-3001`: Marker missing - Contract marker not found in database
+- `PN-RUN-3002`: Hash mismatch - Contract hash does not match database marker
+- `PN-RUN-3003`: Target mismatch - Contract target does not match config target
 - Exit code 1 with schema verification payload: Schema does not match the contract (default mode or `--schema-only`)
 
 **Family Requirements:**
@@ -806,7 +806,7 @@ Applying migration plan and verifying schema...
 - `PN-CLI-4010`: Missing driver in config
 - `PN-CLI-4020`: Migration planning failed (conflicts)
 - `PN-CLI-4021`: Target does not support migrations
-- `PN-RTM-3000`: Runtime error (includes marker mismatch failures)
+- `PN-RUN-3000`: Runtime error (includes marker mismatch failures)
 
 **Behavior Notes:**
 
@@ -894,9 +894,11 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 **What it does:**
 1. Loads config and reads `contract.json` (the "to" contract)
 2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
-3. Reconstructs the migration chain and finds the leaf (current state)
-4. Diffs the leaf contract against the new contract using the target's migration planner (same planner as `db init`)
+3. Determines the starting point: `--from <hash>` if provided, otherwise the graph leaf (latest migration)
+4. Diffs the starting contract against the new contract using the target's migration planner
 5. Writes a new migration package (`migration.json` + `ops.json`) and attests the `migrationId`
+
+**Branching with `--from`:** Use `--from` to create a migration edge from a specific contract hash instead of the graph leaf. This enables branched migration graphs where multiple environments diverge from a common ancestor.
 
 ### `prisma-next migration show`
 
@@ -927,37 +929,42 @@ Show the migration graph and applied status. Adapts based on context:
 
 - **With DB connection**: Shows applied/pending markers and "you are here" indicators
 - **Without DB connection**: Shows the graph structure from disk only
+- **With `--ref`**: Targets a specific ref instead of the contract hash; all refs from `refs.json` are rendered on the graph
 
 ```bash
-prisma-next migration status [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
+prisma-next migration status [--db <url>] [--ref <name>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
 - `--db <url>`: Database connection string (enables online mode)
+- `--ref <name>`: Target a named ref from `migrations/refs.json` instead of the current contract hash
 - `--config <path>`: Path to `prisma-next.config.ts`
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output
 
 **What it does:**
-1. Reads migration packages from disk and reconstructs the chain
-2. If a DB connection is available, reads the marker to determine applied/pending status
-3. Displays the graph as a linear chain with `◄ DB` and `◄ Contract` markers
-4. Shows operation summaries with destructive operation highlighting
-5. Falls back to offline mode if DB connection fails
+1. Reads migration packages from disk and reconstructs the migration graph
+2. Loads all refs from `migrations/refs.json` (if present) and renders them on the graph
+3. If `--ref` is provided, uses the ref's hash as the target instead of the contract hash; the active ref is highlighted in bold, other refs are dimmed
+4. If a DB connection is available, reads the marker to determine applied/pending status and shows distance from the ref target (e.g., "2 edge(s) behind ref")
+5. Displays the graph with `◄ DB`, `◄ Contract`, and `◄ ref:<name>` markers
+6. Shows operation summaries with destructive operation highlighting
+7. In `--ref` mode, the `CONTRACT.AHEAD` warning is suppressed — contract being ahead of a ref target is expected in multi-environment workflows
 
-**Known limitation:** Branched migration graphs (multiple leaves) produce an error. Only linear chains are visualized.
+**Branched graphs:** When the migration graph has multiple leaves (divergence), status reports an `AMBIGUOUS_LEAF` error with the divergence point and branch details. Use `--ref` to target a specific branch.
 
 ### `prisma-next migration apply`
 
-Apply planned migrations to the database. Executes previously planned migrations (created by `migration plan`). Compares the database marker against the migration chain to determine which migrations are pending, then executes them sequentially. Each migration runs in its own transaction. Does not plan new migrations — run `migration plan` first.
+Apply planned migrations to the database. Executes previously planned migrations (created by `migration plan`). Compares the database marker against the migration graph to determine which migrations are pending, then executes them sequentially. Each migration runs in its own transaction. Does not plan new migrations — run `migration plan` first.
 
 ```bash
-prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
+prisma-next migration apply [--db <url>] [--ref <name>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
 - `--db <url>`: Database connection string (optional; defaults to `config.db.connection`)
+- `--ref <name>`: Target a named ref from `migrations/refs.json` instead of the current contract hash
 - `--config <path>`: Path to `prisma-next.config.ts`
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -965,10 +972,10 @@ prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [-
 
 **What it does:**
 1. Reads attested migration packages from `config.migrations.dir`
-2. Reconstructs the migration chain (skips drafts with `migrationId: null`)
-3. Reads the current contract hash from `contract.json`
+2. Reconstructs the migration graph (skips drafts with `migrationId: null`)
+3. Determines the destination hash: from `--ref` (via `refs.json`) or from `contract.json`
 4. Connects to the database and reads the current marker hash
-5. Finds the path from the marker hash to the current contract hash
+5. Finds the shortest path from the marker hash to the destination using graph pathfinding
 6. Executes each pending migration in order using the target's `MigrationRunner`
 7. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
 8. After each migration, the runner verifies the schema and updates the marker/ledger
@@ -977,7 +984,7 @@ prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [-
 
 **Resume semantics:** If a migration fails, previously applied migrations are preserved. Re-running `migration apply` resumes from the last successful migration.
 
-**Planning requirement:** `migration apply` now requires the current contract hash to exist in attested on-disk migrations. If the contract has changed and no migration was planned, apply exits with an error and asks you to run `migration plan`.
+**Ref-based routing:** With `--ref`, apply targets the ref's hash instead of the contract hash. This enables multi-environment workflows where staging and production track different points in the migration graph.
 
 ### `prisma-next migration verify`
 
@@ -990,6 +997,28 @@ prisma-next migration verify --dir <path>
 - **Verified**: stored `migrationId` matches recomputed value
 - **Draft**: `migrationId` is null — automatically attests the package
 - **Mismatch**: package has been modified since attestation (command exits non-zero)
+
+### `prisma-next migration ref`
+
+Manage named refs in `migrations/refs.json`. Refs map logical environment names (e.g., `staging`, `production`) to contract hashes, enabling multi-environment migration workflows where different environments track different points in the migration graph.
+
+```bash
+prisma-next migration ref set <name> <hash>    # Set a ref to a contract hash
+prisma-next migration ref get <name>            # Get the hash for a ref
+prisma-next migration ref delete <name>         # Delete a ref
+prisma-next migration ref list                  # List all refs
+```
+
+**Options (all subcommands):**
+- `--config <path>`: Path to `prisma-next.config.ts`
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+
+**Ref naming rules:** Lowercase alphanumeric with hyphens or forward slashes (e.g., `staging`, `prod/us-east`). No `.` or `..` segments.
+
+**Ref values:** Must be valid contract hashes (`sha256:<64 hex chars>` or `sha256:empty`).
+
+**Atomic writes:** `refs.json` is written atomically via temp file + rename to prevent corruption from concurrent writes.
 
 ## Architecture
 
@@ -1068,7 +1097,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Result Processing**: `handleResult()` processes Results, formats output, and returns exit codes
 - **Exit Codes**:
   - Usage/config errors (PN-CLI-4001-4007) → exit code 2
-  - Runtime errors (PN-RTM-3xxx) → exit code 1
+  - Runtime errors (PN-RUN-3xxx) → exit code 1
   - Success → exit code 0
 - **Fail Fast**: Non-structured errors propagate and are caught by Commander.js's `exitOverride()` with stack traces
 - See `.cursor/rules/cli-error-handling.mdc` for detailed patterns

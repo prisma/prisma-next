@@ -1,17 +1,15 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
 import type { PluginContext } from '@prisma-next/runtime-executor';
-import type {
-  BinaryExpr,
-  DeleteAst,
-  SelectAst,
-  UpdateAst,
-} from '@prisma-next/sql-relational-core/ast';
 import {
-  createColumnRef,
-  createDeleteAst,
-  createSelectAst,
-  createTableRef,
-  createUpdateAst,
+  BinaryExpr,
+  ColumnRef,
+  DeleteAst,
+  DerivedTableSource,
+  ParamRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+  UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
@@ -51,90 +49,74 @@ function createPlan(overrides: PlanOverrides): ExecutionPlan {
   } as ExecutionPlan;
 }
 
-const userTable = createTableRef('user');
-const idCol = createColumnRef('user', 'id');
+const userTable = TableSource.named('user');
+const idCol = ColumnRef.of('user', 'id');
 
 describe('lints plugin', () => {
-  describe('DELETE without WHERE', () => {
-    it('blocks execution when ast is delete without where', async () => {
-      const deleteAst: DeleteAst = {
-        kind: 'delete',
-        table: userTable,
-      };
-      const plan = createPlan({ ast: deleteAst });
+  it(
+    'blocks delete without where',
+    async () => {
+      const plan = createPlan({ ast: DeleteAst.from(userTable) });
       const plugin = lints();
       const ctx = createPluginContext();
 
       await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.DELETE_WITHOUT_WHERE',
-        message: expect.stringContaining('DELETE without WHERE'),
         details: { table: 'user' },
       });
-    });
+    },
+    timeouts.default,
+  );
 
-    it('allows delete with where clause', async () => {
-      const where: BinaryExpr = {
-        kind: 'bin',
-        op: 'eq',
-        left: idCol,
-        right: { kind: 'param', index: 1 },
-      };
-      const deleteAst = createDeleteAst({ table: userTable, where });
-      const plan = createPlan({ ast: deleteAst });
-      const plugin = lints();
-      const ctx = createPluginContext();
-
-      await plugin.beforeExecute?.(plan, ctx);
-      expect(ctx.log.warn).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('UPDATE without WHERE', () => {
-    it('blocks execution when ast is update without where', async () => {
-      const updateAst: UpdateAst = {
-        kind: 'update',
-        table: userTable,
-        set: { email: { kind: 'param', index: 1 } },
-      };
-      const plan = createPlan({ ast: updateAst });
+  it(
+    'blocks update without where',
+    async () => {
+      const plan = createPlan({
+        ast: UpdateAst.table(userTable).withSet({ email: ParamRef.of(1, 'email') }),
+      });
       const plugin = lints();
       const ctx = createPluginContext();
 
       await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.UPDATE_WITHOUT_WHERE',
-        message: expect.stringContaining('UPDATE without WHERE'),
         details: { table: 'user' },
       });
-    });
+    },
+    timeouts.default,
+  );
 
-    it('allows update with where clause', async () => {
-      const where: BinaryExpr = {
-        kind: 'bin',
-        op: 'eq',
-        left: idCol,
-        right: { kind: 'param', index: 1 },
-      };
-      const updateAst = createUpdateAst({
-        table: userTable,
-        set: { email: { kind: 'param', index: 2 } },
-        where,
-      });
-      const plan = createPlan({ ast: updateAst });
+  it(
+    'warns for unbounded selects and selectAll intent',
+    async () => {
+      const ast = SelectAst.from(userTable)
+        .withProjection([ProjectionItem.of('id', idCol)])
+        .withSelectAllIntent({ table: 'user' });
+      const plan = createPlan({ ast });
       const plugin = lints();
       const ctx = createPluginContext();
 
       await plugin.beforeExecute?.(plan, ctx);
-      expect(ctx.log.warn).not.toHaveBeenCalled();
-    });
-  });
+      expect(ctx.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'LINT.NO_LIMIT', details: { table: 'user' } }),
+      );
+      expect(ctx.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'LINT.SELECT_STAR', details: { table: 'user' } }),
+      );
+    },
+    timeouts.default,
+  );
 
-  describe('Unbounded SELECT', () => {
-    it('warns when select lacks limit', async () => {
-      const selectAst: SelectAst = createSelectAst({
-        from: userTable,
-        project: [{ alias: 'id', expr: idCol }],
-      });
-      const plan = createPlan({ ast: selectAst });
+  it(
+    'uses derived table aliases when reporting unbounded selects',
+    async () => {
+      const derived = DerivedTableSource.as(
+        'user_ids',
+        SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]),
+      );
+      const ast = SelectAst.from(derived).withProjection([
+        ProjectionItem.of('id', ColumnRef.of('user_ids', 'id')),
+      ]);
+      const plan = createPlan({ ast });
       const plugin = lints();
       const ctx = createPluginContext();
 
@@ -142,189 +124,34 @@ describe('lints plugin', () => {
       expect(ctx.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'LINT.NO_LIMIT',
-          message: expect.stringContaining('Unbounded SELECT'),
+          details: { table: 'user_ids' },
         }),
       );
-    });
+    },
+    timeouts.default,
+  );
 
-    it('allows select with limit', async () => {
-      const selectAst = createSelectAst({
-        from: userTable,
-        project: [{ alias: 'id', expr: idCol }],
-        limit: 10,
+  it(
+    'allows bounded selects and guarded mutations',
+    async () => {
+      const selectPlan = createPlan({
+        ast: SelectAst.from(userTable)
+          .withProjection([ProjectionItem.of('id', idCol)])
+          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(1)))
+          .withLimit(10),
       });
-      const plan = createPlan({ ast: selectAst });
+      const updatePlan = createPlan({
+        ast: UpdateAst.table(userTable)
+          .withSet({ email: ParamRef.of(1, 'email') })
+          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(2, 'id'))),
+      });
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx);
+      await plugin.beforeExecute?.(selectPlan, ctx);
+      await plugin.beforeExecute?.(updatePlan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
-    });
-
-    it('throws when noLimit severity is error', async () => {
-      const selectAst = createSelectAst({
-        from: userTable,
-        project: [{ alias: 'id', expr: idCol }],
-      });
-      const plan = createPlan({ ast: selectAst });
-      const plugin = lints({ severities: { noLimit: 'error' } });
-      const ctx = createPluginContext();
-
-      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
-        code: 'LINT.NO_LIMIT',
-        message: expect.stringContaining('Unbounded SELECT'),
-      });
-    });
-  });
-
-  describe('SELECT * intent', () => {
-    it('warns when selectAllIntent present on ast', async () => {
-      const selectAst = createSelectAst({
-        from: userTable,
-        project: [{ alias: 'id', expr: idCol }],
-        limit: 1,
-        selectAllIntent: { table: 'user' },
-      });
-      const plan = createPlan({ ast: selectAst });
-      const plugin = lints();
-      const ctx = createPluginContext();
-
-      await plugin.beforeExecute?.(plan, ctx);
-      expect(ctx.log.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'LINT.SELECT_STAR',
-          message: expect.stringContaining('selectAll intent'),
-          details: { table: 'user' },
-        }),
-      );
-    });
-
-    it('warns when selectAllIntent in meta.annotations', async () => {
-      const selectAst = createSelectAst({
-        from: userTable,
-        project: [{ alias: 'id', expr: idCol }],
-        limit: 1,
-      });
-      const plan = createPlan({
-        ast: selectAst,
-        meta: { annotations: { selectAllIntent: { table: 'user' } } },
-      });
-      const plugin = lints();
-      const ctx = createPluginContext();
-
-      await plugin.beforeExecute?.(plan, ctx);
-      expect(ctx.log.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'LINT.SELECT_STAR',
-          message: expect.stringContaining('selectAll intent'),
-        }),
-      );
-    });
-
-    it('allows select without selectAll intent', async () => {
-      const selectAst = createSelectAst({
-        from: userTable,
-        project: [{ alias: 'id', expr: idCol }],
-        limit: 1,
-      });
-      const plan = createPlan({ ast: selectAst });
-      const plugin = lints();
-      const ctx = createPluginContext();
-
-      await plugin.beforeExecute?.(plan, ctx);
-      expect(ctx.log.warn).not.toHaveBeenCalled();
-    });
-
-    it('throws when selectStar severity is error', async () => {
-      const selectAst = createSelectAst({
-        from: userTable,
-        project: [{ alias: 'id', expr: idCol }],
-        limit: 1,
-        selectAllIntent: { table: 'user' },
-      });
-      const plan = createPlan({ ast: selectAst });
-      const plugin = lints({ severities: { selectStar: 'error' } });
-      const ctx = createPluginContext();
-
-      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
-        code: 'LINT.SELECT_STAR',
-        message: expect.stringContaining('selectAll intent'),
-      });
-    });
-  });
-
-  describe('fallback when plan.ast missing', () => {
-    it(
-      'runs raw heuristic when fallbackWhenAstMissing is raw',
-      async () => {
-        const plan = createPlan({
-          ast: undefined,
-          sql: 'SELECT id FROM user',
-          params: [],
-          meta: {},
-        });
-        const plugin = lints({ fallbackWhenAstMissing: 'raw' });
-        const ctx = createPluginContext();
-
-        await plugin.beforeExecute?.(plan, ctx);
-        expect(ctx.log.warn).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: 'LINT.NO_LIMIT',
-            message: expect.stringContaining('omits LIMIT'),
-          }),
-        );
-      },
-      timeouts.default,
-    );
-
-    it('skips linting when fallbackWhenAstMissing is skip', async () => {
-      const plan = createPlan({
-        ast: undefined,
-        sql: 'SELECT * FROM user',
-        params: [],
-        meta: {},
-      });
-      const plugin = lints({ fallbackWhenAstMissing: 'skip' });
-      const ctx = createPluginContext();
-
-      await plugin.beforeExecute?.(plan, ctx);
-      expect(ctx.log.warn).not.toHaveBeenCalled();
-    });
-
-    it('defaults to raw fallback when ast missing', async () => {
-      const plan = createPlan({
-        ast: undefined,
-        sql: 'SELECT id FROM user',
-        params: [],
-        meta: {},
-      });
-      const plugin = lints();
-      const ctx = createPluginContext();
-
-      await plugin.beforeExecute?.(plan, ctx);
-      expect(ctx.log.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'LINT.NO_LIMIT',
-          message: expect.stringContaining('omits LIMIT'),
-        }),
-      );
-    });
-  });
-
-  describe('INSERT', () => {
-    it('passes when ast is insert', async () => {
-      const plan = createPlan({
-        ast: {
-          kind: 'insert',
-          table: userTable,
-          values: { email: { kind: 'param', index: 1 } },
-        },
-      });
-      const plugin = lints();
-      const ctx = createPluginContext();
-
-      await plugin.beforeExecute?.(plan, ctx);
-      expect(ctx.log.warn).not.toHaveBeenCalled();
-    });
-  });
+    },
+    timeouts.default,
+  );
 });

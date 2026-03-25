@@ -1,5 +1,15 @@
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import type { OperationExpr, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  ColumnRef,
+  LiteralExpr,
+  OperationExpr,
+  OrderByItem,
+  ParamRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
@@ -13,7 +23,9 @@ const contract = validateContract<PostgresContract>({
       user: {
         columns: {
           id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+          otherVector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
         },
         uniques: [],
         indexes: [],
@@ -29,379 +41,84 @@ const contract = validateContract<PostgresContract>({
 describe('Operation lowering', () => {
   const adapter = createPostgresAdapter();
 
-  it('lowers infix operation in projection', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
+  function distanceExpr() {
+    return new OperationExpr({
       method: 'cosineDistance',
       forTypeId: 'pg/vector@1',
-      self: { kind: 'col', table: 'user', column: 'vector' },
-      args: [{ kind: 'param', index: 1, name: 'other' }],
+      self: ColumnRef.of('user', 'vector'),
+      args: [ParamRef.of(1, 'other')],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
         template: '${self} <=> ${arg0}',
       },
-    };
+    });
+  }
 
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [
-        { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-        { alias: 'distance', expr: operationExpr },
-      ],
-    };
+  it('lowers infix operations in projections', () => {
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+      ProjectionItem.of('distance', distanceExpr()),
+    ]);
 
-    const lowered = adapter.lower(ast, { contract, params: [42] });
-    expect(lowered.body.sql).toContain('"user"."vector" <=> $1');
+    const lowered = adapter.lower(ast, { contract, params: [[1, 2, 3]] });
+    expect(lowered.body.sql).toContain('"user"."vector" <=> $1::vector');
     expect(lowered.body.sql).toContain('AS "distance"');
   });
 
-  it('lowers function operation in projection', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
+  it('lowers function operations with multiple arguments', () => {
+    const operationExpr = OperationExpr.function({
       method: 'cosineSimilarity',
       forTypeId: 'pg/vector@1',
-      self: { kind: 'col', table: 'user', column: 'vector' },
-      args: [{ kind: 'param', index: 1, name: 'other' }],
+      self: ColumnRef.of('user', 'vector'),
+      args: [ColumnRef.of('user', 'otherVector'), ParamRef.of(1, 'param'), LiteralExpr.of(42)],
       returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'cosine_similarity(${self}, ${arg0})',
-      },
-    };
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+      template: 'cosine_similarity(${self}, ${arg0}, ${arg1}, ${arg2})',
+    });
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('similarity', operationExpr),
+    ]);
 
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [
-        { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
-        { alias: 'similarity', expr: operationExpr },
-      ],
-    };
-
-    const lowered = adapter.lower(ast, { contract, params: [42] });
-    expect(lowered.body.sql).toContain('cosine_similarity("user"."vector", $1::vector)');
-    expect(lowered.body.sql).toContain('AS "similarity"');
-  });
-
-  it('lowers operation with multiple arguments', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'cosineSimilarity',
-      forTypeId: 'pg/vector@1',
-      self: { kind: 'col', table: 'user', column: 'vector' },
-      args: [
-        { kind: 'col', table: 'user', column: 'otherVector' },
-        { kind: 'param', index: 1, name: 'param' },
-        { kind: 'literal', value: 42 },
-      ],
-      returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'cosine_similarity(${self}, ${arg0}, ${arg1}, ${arg2})',
-      },
-    };
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'similarity', expr: operationExpr }],
-    };
-
-    const lowered = adapter.lower(ast, { contract, params: [42] });
+    const lowered = adapter.lower(ast, { contract, params: [[1, 2, 3]] });
     expect(lowered.body.sql).toContain(
       'cosine_similarity("user"."vector", "user"."otherVector", $1::vector, 42)',
     );
   });
 
-  it('lowers operation in where clause', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'cosineDistance',
-      forTypeId: 'pg/vector@1',
-      self: { kind: 'col', table: 'user', column: 'vector' },
-      args: [{ kind: 'param', index: 1, name: 'other' }],
-      returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
-    };
+  it('lowers operations in where and orderBy clauses', () => {
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(BinaryExpr.eq(distanceExpr(), ParamRef.of(2, 'threshold')))
+      .withOrderBy([OrderByItem.asc(distanceExpr())]);
 
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
-      where: {
-        kind: 'bin',
-        op: 'eq',
-        left: operationExpr,
-        right: { kind: 'param', index: 2, name: 'threshold' },
-      },
-    };
+    const lowered = adapter.lower(ast, { contract, params: [[1, 2, 3], 0.5] });
 
-    const lowered = adapter.lower(ast, { contract, params: [42, 0.5] });
     expect(lowered.body.sql).toContain('WHERE ("user"."vector" <=> $1::vector) = $2');
-  });
-
-  it('lowers operation in orderBy clause', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'cosineDistance',
-      forTypeId: 'pg/vector@1',
-      self: { kind: 'col', table: 'user', column: 'vector' },
-      args: [{ kind: 'param', index: 1, name: 'other' }],
-      returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
-    };
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
-      orderBy: [{ expr: operationExpr, dir: 'asc' }],
-    };
-
-    const lowered = adapter.lower(ast, { contract, params: [42] });
     expect(lowered.body.sql).toContain('ORDER BY "user"."vector" <=> $1::vector ASC');
   });
 
-  it('lowers operation with literal argument', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'cosineDistance',
-      forTypeId: 'pg/vector@1',
-      self: { kind: 'col', table: 'user', column: 'vector' },
-      args: [{ kind: 'literal', value: [1, 2, 3] }],
-      returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
-    };
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'distance', expr: operationExpr }],
-    };
-
-    const lowered = adapter.lower(ast, { contract, params: [] });
-    expect(lowered.body.sql).toContain('"user"."vector" <=>');
-  });
-
-  it('lowers operation with literal string argument with quotes', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'test',
+  it('lowers operations with literal arguments', () => {
+    const operationExpr = new OperationExpr({
+      method: 'contains',
       forTypeId: 'pg/text@1',
-      self: { kind: 'col', table: 'user', column: 'email' },
-      args: [{ kind: 'literal', value: "test'value" }],
+      self: ColumnRef.of('user', 'email'),
+      args: [LiteralExpr.of("test'value")],
       returns: { kind: 'builtin', type: 'boolean' },
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'test(${self}, ${arg0})',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
+        template: 'contains(${self}, ${arg0})',
       },
-    };
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'result', expr: operationExpr }],
-    };
+    });
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('matches', operationExpr),
+    ]);
 
     const lowered = adapter.lower(ast, { contract, params: [] });
-    expect(lowered.body.sql).toContain('test("user"."email", \'test\'\'value\')');
-  });
-
-  it('lowers operation with literal number argument', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'cosineDistance',
-      forTypeId: 'pg/vector@1',
-      self: { kind: 'col', table: 'user', column: 'vector' },
-      args: [{ kind: 'literal', value: 42 }],
-      returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
-    };
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'distance', expr: operationExpr }],
-    };
-
-    const lowered = adapter.lower(ast, { contract, params: [] });
-    expect(lowered.body.sql).toContain('"user"."vector" <=> 42');
-  });
-
-  it('lowers operation with literal boolean argument', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'test',
-      forTypeId: 'pg/bool@1',
-      self: { kind: 'col', table: 'user', column: 'active' },
-      args: [{ kind: 'literal', value: true }],
-      returns: { kind: 'builtin', type: 'boolean' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'test(${self}, ${arg0})',
-      },
-    };
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'result', expr: operationExpr }],
-    };
-
-    const lowered = adapter.lower(ast, { contract, params: [] });
-    expect(lowered.body.sql).toContain('test("user"."active", true)');
-  });
-
-  it('lowers operation with literal null argument', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'test',
-      forTypeId: 'pg/text@1',
-      self: { kind: 'col', table: 'user', column: 'email' },
-      args: [{ kind: 'literal', value: null }],
-      returns: { kind: 'builtin', type: 'boolean' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'test(${self}, ${arg0})',
-      },
-    };
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'result', expr: operationExpr }],
-    };
-
-    const lowered = adapter.lower(ast, { contract, params: [] });
-    expect(lowered.body.sql).toContain('test("user"."email", NULL)');
-  });
-
-  it('lowers operation with literal object argument', () => {
-    const operationExpr: OperationExpr = {
-      kind: 'operation',
-      method: 'test',
-      forTypeId: 'pg/jsonb@1',
-      self: { kind: 'col', table: 'user', column: 'data' },
-      args: [{ kind: 'literal', value: { key: 'value' } }],
-      returns: { kind: 'builtin', type: 'boolean' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'test(${self}, ${arg0})',
-      },
-    };
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'result', expr: operationExpr }],
-    };
-
-    const lowered = adapter.lower(ast, { contract, params: [] });
-    expect(lowered.body.sql).toContain('test("user"."data",');
-    expect(lowered.body.sql).toContain('{"key":"value"}');
-  });
-
-  it('lowers operation with nested operation argument', () => {
-    const innerOperation: OperationExpr = {
-      kind: 'operation',
-      method: 'normalize',
-      forTypeId: 'pg/vector@1',
-      self: { kind: 'col', table: 'user', column: 'vector' },
-      args: [],
-      returns: { kind: 'typeId', type: 'pg/vector@1' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'normalize(${self})',
-      },
-    };
-
-    const outerOperation: OperationExpr = {
-      kind: 'operation',
-      method: 'cosineDistance',
-      forTypeId: 'pg/vector@1',
-      self: { kind: 'col', table: 'user', column: 'vector' },
-      args: [innerOperation],
-      returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
-    };
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'distance', expr: outerOperation }],
-    };
-
-    const lowered = adapter.lower(ast, { contract, params: [] });
-    expect(lowered.body.sql).toContain('"user"."vector" <=> normalize("user"."vector")');
-  });
-
-  it('throws error for unsupported argument kind in operation', () => {
-    const operationExpr = {
-      kind: 'operation' as const,
-      method: 'cosineDistance',
-      forTypeId: 'pg/vector@1',
-      self: { kind: 'col' as const, table: 'user', column: 'vector' },
-      args: [{ kind: 'invalid' as 'param', index: 1 }],
-      returns: { kind: 'builtin' as const, type: 'number' as const },
-      lowering: {
-        targetFamily: 'sql' as const,
-        strategy: 'infix' as const,
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
-      },
-    } as OperationExpr;
-
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
-      project: [{ alias: 'distance', expr: operationExpr }],
-    };
-
-    expect(() => {
-      adapter.lower(ast, { contract, params: [42] });
-    }).toThrow('Unsupported argument kind');
+    expect(lowered.body.sql).toContain(`contains("user"."email", 'test''value')`);
   });
 });

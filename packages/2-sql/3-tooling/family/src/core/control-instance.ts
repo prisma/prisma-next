@@ -34,6 +34,7 @@ import {
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,
+  extractQueryOperationTypeImports,
   type SqlControlDescriptorWithContributions,
 } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
@@ -297,6 +298,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const operationRegistry = assembleOperationRegistry(descriptors);
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
+  const queryOperationTypeImports = extractQueryOperationTypeImports(descriptors);
   const extensionIds = extractExtensionIds(adapter, target, extensions);
   const parameterizedRenderers = extractParameterizedRenderers(descriptors);
   const parameterizedTypeImports = extractParameterizedTypeImports(descriptors);
@@ -385,7 +387,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RTM-3001',
+          code: 'PN-RUN-3001',
           summary: 'Marker missing',
           contractStorageHash,
           expectedTargetId,
@@ -402,7 +404,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RTM-3003',
+          code: 'PN-RUN-3003',
           summary: 'Target mismatch',
           contractStorageHash,
           marker,
@@ -421,7 +423,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RTM-3002',
+          code: 'PN-RUN-3002',
           summary: 'Hash mismatch',
           contractStorageHash,
           marker,
@@ -439,7 +441,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RTM-3002',
+          code: 'PN-RUN-3002',
           summary: 'Hash mismatch',
           contractStorageHash,
           contractProfileHash,
@@ -739,6 +741,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           operationRegistry,
           codecTypeImports,
           operationTypeImports,
+          queryOperationTypeImports,
           extensionIds,
           parameterizedRenderers,
           parameterizedTypeImports,

@@ -24,16 +24,6 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { collectInitDependencies } from './types';
 
-function convertDefault(def: ColumnDefault): string {
-  if (def.kind === 'function') {
-    return def.expression;
-  }
-  if (typeof def.value === 'string') {
-    return `'${def.value.replaceAll("'", "''")}'`;
-  }
-  return String(def.value);
-}
-
 /**
  * Target-specific callback that expands a column's base `nativeType` and optional
  * `typeParams` into the fully-qualified type string used by the database
@@ -50,10 +40,22 @@ export type NativeTypeExpander = (input: {
   readonly typeParams?: Record<string, unknown>;
 }) => string;
 
+/**
+ * Target-specific callback that renders a `ColumnDefault` into the raw SQL literal
+ * string stored in `SqlColumnIR.default`.
+ *
+ * Default value serialization is target-specific (quoting, casting, type syntax vary
+ * between Postgres, MySQL, SQLite, …). This callback follows the same IoC pattern as
+ * `NativeTypeExpander`: the target provides its renderer when calling
+ * `contractToSchemaIR`, keeping the family layer target-agnostic.
+ */
+export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => string;
+
 function convertColumn(
   name: string,
   column: StorageColumn,
-  expandNativeType?: NativeTypeExpander,
+  expandNativeType: NativeTypeExpander | undefined,
+  renderDefault: DefaultRenderer | undefined,
 ): SqlColumnIR {
   const nativeType = expandNativeType
     ? expandNativeType({
@@ -66,14 +68,17 @@ function convertColumn(
     name,
     nativeType,
     nullable: column.nullable,
-    ...(column.default != null ? { default: convertDefault(column.default) } : {}),
+    ...ifDefined(
+      'default',
+      column.default != null && renderDefault ? renderDefault(column.default, column) : undefined,
+    ),
   };
 }
 
 function convertUnique(unique: UniqueConstraint): SqlUniqueIR {
   return {
     columns: unique.columns,
-    ...(unique.name != null ? { name: unique.name } : {}),
+    ...ifDefined('name', unique.name),
   };
 }
 
@@ -81,7 +86,7 @@ function convertIndex(index: Index): SqlIndexIR {
   return {
     columns: index.columns,
     unique: false,
-    ...(index.name != null ? { name: index.name } : {}),
+    ...ifDefined('name', index.name),
   };
 }
 
@@ -90,18 +95,19 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
     columns: fk.columns,
     referencedTable: fk.references.table,
     referencedColumns: fk.references.columns,
-    ...(fk.name != null ? { name: fk.name } : {}),
+    ...ifDefined('name', fk.name),
   };
 }
 
 function convertTable(
   name: string,
   table: StorageTable,
-  expandNativeType?: NativeTypeExpander,
+  expandNativeType: NativeTypeExpander | undefined,
+  renderDefault: DefaultRenderer | undefined,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIR> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
-    columns[colName] = convertColumn(colName, colDef, expandNativeType);
+    columns[colName] = convertColumn(colName, colDef, expandNativeType, renderDefault);
   }
 
   const satisfiedIndexColumns = new Set([
@@ -125,7 +131,7 @@ function convertTable(
   return {
     name,
     columns,
-    ...(table.primaryKey != null ? { primaryKey: table.primaryKey } : {}),
+    ...ifDefined('primaryKey', table.primaryKey),
     foreignKeys: table.foreignKeys.map(convertForeignKey),
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
@@ -180,6 +186,7 @@ export function detectDestructiveChanges(
 export interface ContractToSchemaIROptions {
   readonly annotationNamespace: string;
   readonly expandNativeType?: NativeTypeExpander;
+  readonly renderDefault?: DefaultRenderer;
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
@@ -213,7 +220,12 @@ export function contractToSchemaIR(
   const storage = contract.storage;
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
-    tables[tableName] = convertTable(tableName, tableDef, options.expandNativeType);
+    tables[tableName] = convertTable(
+      tableName,
+      tableDef,
+      options.expandNativeType,
+      options.renderDefault,
+    );
   }
 
   const dependencies = deduplicateDependencyIRs(

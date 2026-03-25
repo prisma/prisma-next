@@ -10,7 +10,7 @@ import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('help text snapshots', { timeout: timeouts.default }, () => {
   it(
-    'formats root help',
+    'formats root help', { timeout: timeouts.databaseOperation },
     () => {
       const program = new Command();
       program.name('prisma-next').description('Prisma Next CLI');

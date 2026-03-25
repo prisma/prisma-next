@@ -97,6 +97,7 @@ flowchart TD
 - Predicates: `BinaryExpr` (ops: `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `like`, `ilike`, `in`, `notIn`), `AndExpr`, `OrExpr`, `ExistsExpr`, `NullCheckExpr`
 - Lane-agnostic filter interop: `WhereArg`, `ToWhereExpr`, and `BoundWhereExpr` for passing pre-bound filter payloads without lane-specific types
 - Joins: `JoinAst`, `JoinOnExpr` (eqCol or WhereExpr)
+- Inserts: `InsertAst.rows` is row-based and uses `InsertValue` cells (`ColumnRef`, `ParamRef`, or the insert-only `DefaultValueExpr` sentinel for SQL `DEFAULT`) for batched inserts
 - `SelectAst.selectAllIntent` — preserves select-all intent when normalized to explicit columns
 - `DeleteAst.where` and `UpdateAst.where` optional for mutation-without-WHERE lint support
 
