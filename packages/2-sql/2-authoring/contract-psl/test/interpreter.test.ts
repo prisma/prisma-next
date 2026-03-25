@@ -214,7 +214,7 @@ model Post {
     expect(result.value.storage).toMatchObject({
       types: {
         Email: { codecId: 'pg/text@1', nativeType: 'text' },
-        Role: { codecId: 'pg/enum@1', nativeType: 'role' },
+        Role: { codecId: 'pg/enum@1', nativeType: 'Role' },
       },
       tables: {
         user: {
@@ -343,6 +343,59 @@ model Event {
             },
           },
           primaryKey: { columns: ['id'] },
+        },
+      },
+    });
+  });
+
+  it('preserves enum native type names from @@map instead of lowercasing declarations', () => {
+    const document = parsePslDocument({
+      schema: `enum UserRole {
+  USER
+  ADMIN
+  @@map("user_role")
+}
+
+enum Role {
+  OWNER
+}
+
+model User {
+  id Int @id
+  role UserRole
+  legacyRole Role
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      types: {
+        UserRole: {
+          codecId: 'pg/enum@1',
+          nativeType: 'user_role',
+          typeParams: { values: ['USER', 'ADMIN'] },
+        },
+        Role: {
+          codecId: 'pg/enum@1',
+          nativeType: 'Role',
+          typeParams: { values: ['OWNER'] },
+        },
+      },
+      tables: {
+        user: {
+          columns: {
+            role: { codecId: 'pg/enum@1', nativeType: 'user_role' },
+            legacyRole: { codecId: 'pg/enum@1', nativeType: 'Role' },
+          },
         },
       },
     });

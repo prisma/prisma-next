@@ -183,8 +183,11 @@ function lowerFirst(value: string): string {
   return value[0]?.toLowerCase() + value.slice(1);
 }
 
-function getAttribute(attributes: readonly PslAttribute[], name: string): PslAttribute | undefined {
-  return attributes.find((attribute) => attribute.name === name);
+function getAttribute(
+  attributes: readonly PslAttribute[] | undefined,
+  name: string,
+): PslAttribute | undefined {
+  return attributes?.find((attribute) => attribute.name === name);
 }
 
 function getNamedArgument(attribute: PslAttribute, name: string): string | undefined {
@@ -1498,7 +1501,14 @@ export function interpretPslDocumentToSqlContractIR(
   const namedTypeBaseTypes = new Map<string, string>();
 
   for (const enumDeclaration of input.document.ast.enums) {
-    const nativeType = enumDeclaration.name.toLowerCase();
+    const nativeType = parseMapName({
+      attribute: getAttribute(enumDeclaration.attributes, 'map'),
+      defaultValue: enumDeclaration.name,
+      sourceId,
+      diagnostics,
+      entityLabel: `Enum "${enumDeclaration.name}"`,
+      span: enumDeclaration.span,
+    });
     const descriptor: ColumnDescriptor = {
       codecId: 'pg/enum@1',
       nativeType,
