@@ -79,4 +79,27 @@ describe('ast/insert', () => {
 
     expect(insertAst.onConflict?.action?.kind).toBe('do-nothing');
   });
+
+  it('collectParamRefs returns row params then onConflict set params', () => {
+    const rowId = param('u1', 'id');
+    const rowEmail = param('a@b.com', 'email');
+    const conflictEmail = param('updated@b.com', 'updatedEmail');
+    const insertAst = InsertAst.into(table('user'))
+      .withRows([{ id: rowId, email: rowEmail }])
+      .withOnConflict(
+        InsertOnConflict.on([col('user', 'id')]).doUpdateSet({ email: conflictEmail }),
+      );
+
+    expect(insertAst.collectParamRefs()).toEqual([rowId, rowEmail, conflictEmail]);
+  });
+
+  it('collectParamRefs skips DefaultValueExpr entries', () => {
+    const rowId = param('u1', 'id');
+    const insertAst = InsertAst.into(table('user')).withValues({
+      id: rowId,
+      email: new DefaultValueExpr(),
+    });
+
+    expect(insertAst.collectParamRefs()).toEqual([rowId]);
+  });
 });

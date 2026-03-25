@@ -111,4 +111,19 @@ describe('ast/select', () => {
       groupBy: undefined,
     });
   });
+
+  it('collectParamRefs returns params from where clause', () => {
+    const whereParam = param(42, 'userId');
+    const selectAst = SelectAst.from(table('user'))
+      .addProjection('id', col('user', 'id'))
+      .withWhere(BinaryExpr.eq(col('user', 'id'), whereParam));
+
+    expect(selectAst.collectParamRefs()).toEqual([whereParam]);
+  });
+
+  it('collectParamRefs returns empty array without where', () => {
+    const selectAst = SelectAst.from(table('user')).addProjection('id', col('user', 'id'));
+
+    expect(selectAst.collectParamRefs()).toEqual([]);
+  });
 });
