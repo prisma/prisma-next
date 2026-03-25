@@ -78,7 +78,7 @@ function executeOperation(
       if (!isParamPlaceholder(arg)) {
         throw planInvalid(`Argument ${i} must be a parameter placeholder`);
       }
-      operationArgs.push(new ParamRef(0, arg.name));
+      operationArgs.push(ParamRef.of(undefined, { name: arg.name }));
     } else if (argSpec.kind === 'typeId') {
       // Accept ExpressionSource (ColumnBuilder or ExpressionBuilder)
       if (!isExpressionSource(arg)) {

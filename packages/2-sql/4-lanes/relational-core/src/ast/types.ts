@@ -1,4 +1,4 @@
-import type { ParamDescriptor, PlanRefs } from '@prisma-next/contract/types';
+import type { PlanRefs } from '@prisma-next/contract/types';
 import type { ReturnSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
@@ -225,6 +225,7 @@ abstract class AstNode {
 
 abstract class QueryAst extends AstNode {
   abstract collectRefs(): PlanRefs;
+  abstract collectParamRefs(): ParamRef[];
 
   collectColumnRefs(): ColumnRef[] {
     const refs = this.collectRefs().columns ?? [];
@@ -378,24 +379,36 @@ export class ColumnRef extends Expression {
 
 export class ParamRef extends AstNode {
   readonly kind = 'param-ref' as const;
-  // 1-based index matching PostgreSQL's $1, $2, ... convention.
-  // The corresponding value lives at params[index - 1] in the bound params array.
-  readonly index: number;
+  readonly value: unknown;
   readonly name: string | undefined;
+  readonly codecId: string | undefined;
+  readonly nativeType: string | undefined;
 
-  constructor(index: number, name?: string) {
+  constructor(
+    value: unknown,
+    options?: {
+      name?: string;
+      codecId?: string;
+      nativeType?: string;
+    },
+  ) {
     super();
-    this.index = index;
-    this.name = name;
+    this.value = value;
+    this.name = options?.name;
+    this.codecId = options?.codecId;
+    this.nativeType = options?.nativeType;
     this.freeze();
   }
 
-  static of(index: number, name?: string): ParamRef {
-    return new ParamRef(index, name);
-  }
-
-  withIndex(index: number): ParamRef {
-    return new ParamRef(index, this.name);
+  static of(
+    value: unknown,
+    options?: {
+      name?: string;
+      codecId?: string;
+      nativeType?: string;
+    },
+  ): ParamRef {
+    return new ParamRef(value, options);
   }
 }
 
@@ -1520,6 +1533,21 @@ export class InsertAst extends QueryAst {
     );
   }
 
+  override collectParamRefs(): ParamRef[] {
+    const refs: ParamRef[] = [];
+    for (const row of this.rows) {
+      for (const value of Object.values(row)) {
+        if (value instanceof ParamRef) refs.push(value);
+      }
+    }
+    if (this.onConflict?.action instanceof DoUpdateSetConflictAction) {
+      for (const value of Object.values(this.onConflict.action.set)) {
+        if (value instanceof ParamRef) refs.push(value);
+      }
+    }
+    return refs;
+  }
+
   override collectRefs(): PlanRefs {
     const tables = new Set<string>([this.table.name]);
     const columns = new Map<string, { table: string; column: string }>();
@@ -1600,6 +1628,17 @@ export class UpdateAst extends QueryAst {
     return new UpdateAst(this.table, this.set, this.where, returning);
   }
 
+  override collectParamRefs(): ParamRef[] {
+    const refs: ParamRef[] = [];
+    for (const value of Object.values(this.set)) {
+      if (value instanceof ParamRef) refs.push(value);
+    }
+    if (this.where) {
+      refs.push(...this.where.collectParamRefs());
+    }
+    return refs;
+  }
+
   override collectRefs(): PlanRefs {
     const tables = new Set<string>([this.table.name]);
     const columns = new Map<string, { table: string; column: string }>();
@@ -1650,6 +1689,10 @@ export class DeleteAst extends QueryAst {
 
   withReturning(returning: ReadonlyArray<ColumnRef> | undefined): DeleteAst {
     return new DeleteAst(this.table, this.where, returning);
+  }
+
+  override collectParamRefs(): ParamRef[] {
+    return this.where ? this.where.collectParamRefs() : [];
   }
 
   override collectRefs(): PlanRefs {
@@ -1721,8 +1764,6 @@ export function isWhereExpr(value: unknown): value is AnyWhereExpr {
 
 export interface BoundWhereExpr {
   readonly expr: AnyWhereExpr;
-  readonly params: readonly unknown[];
-  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
 }
 
 export interface ToWhereExpr {
