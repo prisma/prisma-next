@@ -471,7 +471,7 @@ describe('printPsl', () => {
     `);
   });
 
-  it('unrecognized default becomes comment', () => {
+  it('preserves raw Postgres defaults via dbgenerated attributes', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
         data: {
@@ -483,6 +483,18 @@ describe('printPsl', () => {
               nativeType: 'text',
               nullable: false,
               default: { kind: 'function', expression: 'my_custom_func()' } as unknown as string,
+            },
+            payload: {
+              name: 'payload',
+              nativeType: 'jsonb',
+              nullable: false,
+              default: "'{}'::jsonb",
+            },
+            touched_at: {
+              name: 'touched_at',
+              nativeType: 'timestamptz',
+              nullable: false,
+              default: 'clock_timestamp()',
             },
           },
           primaryKey: { columns: ['id'] },
@@ -498,9 +510,10 @@ describe('printPsl', () => {
       "// This file was introspected from the database. Do not edit manually.
 
       model Data {
-        id       Int    @id
-        // Raw default: my_custom_func()
-        computed String
+        id        Int      @id
+        computed  String   @default(dbgenerated("my_custom_func()"))
+        payload   Json     @default(dbgenerated("'{}'::jsonb"))
+        touchedAt DateTime @default(dbgenerated("clock_timestamp()")) @map("touched_at")
 
         @@map("data")
       }

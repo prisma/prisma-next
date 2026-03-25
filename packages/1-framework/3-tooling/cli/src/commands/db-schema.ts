@@ -23,7 +23,7 @@ function toIntrospectSchemaResult(
     summary: 'Schema read successfully',
     target: result.target,
     schema: result.schema,
-    ...(result.meta ? { meta: result.meta } : {}),
+    meta: result.meta,
     timings: result.timings,
   };
 }

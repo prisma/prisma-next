@@ -5,7 +5,7 @@ import {
   extractEnumTypeNames,
   printPsl,
 } from '@prisma-next/psl-printer';
-import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { dirname, relative } from 'pathe';
 import type { CliStructuredError } from '../utils/cli-errors';
@@ -35,7 +35,7 @@ interface ContractInferSuccessResult {
   readonly psl: {
     readonly path: string;
   };
-  readonly meta?: InspectLiveSchemaResult['meta'];
+  readonly meta: InspectLiveSchemaResult['meta'];
   readonly timings: {
     readonly total: number;
   };
@@ -84,7 +84,7 @@ async function executeContractInferCommand(
     psl: {
       path: pslPath,
     },
-    ...(meta ? { meta } : {}),
+    meta,
     timings: {
       total: Date.now() - startTime,
     },

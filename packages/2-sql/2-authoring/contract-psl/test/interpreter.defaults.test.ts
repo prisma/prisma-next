@@ -181,4 +181,44 @@ describe('interpretPslDocumentToSqlContractIR default lowering', () => {
       ]),
     );
   });
+
+  it('preserves raw dbgenerated defaults for timestamp and json columns', () => {
+    const document = parsePslDocument({
+      schema: `model Defaults {
+  id Int @id
+  touchedAt DateTime @default(dbgenerated("clock_timestamp()"))
+  payload Json @default(dbgenerated("'{}'::jsonb"))
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        defaults: {
+          columns: {
+            touchedAt: {
+              default: {
+                kind: 'function',
+                expression: 'clock_timestamp()',
+              },
+            },
+            payload: {
+              default: {
+                kind: 'function',
+                expression: "'{}'::jsonb",
+              },
+            },
+          },
+        },
+      },
+    });
+  });
 });

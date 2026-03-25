@@ -401,6 +401,95 @@ model User {
     });
   });
 
+  it('lowers additional Postgres native type attributes on named types', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Code = String @db.Char(12)
+  Score = Float @db.Real
+  CreatedAt = DateTime @db.Timestamp(3)
+  PublishedAt = DateTime @db.Timestamptz(6)
+  ReminderAt = DateTime @db.Timetz(2)
+}
+
+model Event {
+  id Int @id
+  code Code
+  score Score
+  createdAt CreatedAt
+  publishedAt PublishedAt
+  reminderAt ReminderAt
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      types: {
+        Code: {
+          codecId: 'sql/char@1',
+          nativeType: 'character',
+          typeParams: { length: 12 },
+        },
+        Score: {
+          codecId: 'pg/float4@1',
+          nativeType: 'float4',
+        },
+        CreatedAt: {
+          codecId: 'pg/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: 3 },
+        },
+        PublishedAt: {
+          codecId: 'pg/timestamptz@1',
+          nativeType: 'timestamptz',
+          typeParams: { precision: 6 },
+        },
+        ReminderAt: {
+          codecId: 'pg/timetz@1',
+          nativeType: 'timetz',
+          typeParams: { precision: 2 },
+        },
+      },
+      tables: {
+        event: {
+          columns: {
+            code: {
+              codecId: 'sql/char@1',
+              nativeType: 'character',
+              typeParams: { length: 12 },
+            },
+            score: {
+              codecId: 'pg/float4@1',
+              nativeType: 'float4',
+            },
+            createdAt: {
+              codecId: 'pg/timestamp@1',
+              nativeType: 'timestamp',
+              typeParams: { precision: 3 },
+            },
+            publishedAt: {
+              codecId: 'pg/timestamptz@1',
+              nativeType: 'timestamptz',
+              typeParams: { precision: 6 },
+            },
+            reminderAt: {
+              codecId: 'pg/timetz@1',
+              nativeType: 'timetz',
+              typeParams: { precision: 2 },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it('returns diagnostics for unsupported referential action tokens', () => {
     const document = parsePslDocument({
       schema: `model User {

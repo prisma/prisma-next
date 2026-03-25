@@ -128,25 +128,24 @@ export function inferRelations(
  * Detects whether a FK represents a 1:1 relationship.
  * A FK is 1:1 if:
  * - The FK columns exactly match the table's PK columns, OR
- * - A single FK column has a unique constraint on it
+ * - The FK columns exactly match a unique constraint
  */
 function detectOneToOne(fk: SqlForeignKeyIR, table: PslPrintableSqlTable): boolean {
+  const fkCols = [...fk.columns].sort();
+
   // FK columns == PK columns → 1:1
   if (table.primaryKey) {
     const pkCols = [...table.primaryKey.columns].sort();
-    const fkCols = [...fk.columns].sort();
     if (pkCols.length === fkCols.length && pkCols.every((c, i) => c === fkCols[i])) {
       return true;
     }
   }
 
-  // Single FK column with a unique constraint → 1:1
-  if (fk.columns.length === 1) {
-    const [fkCol = ''] = fk.columns;
-    for (const unique of table.uniques) {
-      if (unique.columns.length === 1 && unique.columns[0] === fkCol) {
-        return true;
-      }
+  // FK columns == unique columns → 1:1
+  for (const unique of table.uniques) {
+    const uniqueCols = [...unique.columns].sort();
+    if (uniqueCols.length === fkCols.length && uniqueCols.every((c, i) => c === fkCols[i])) {
+      return true;
     }
   }
 

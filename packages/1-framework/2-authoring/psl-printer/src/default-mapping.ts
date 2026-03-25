@@ -12,6 +12,7 @@ type TaggedBigInt = {
 
 export interface DefaultMappingOptions {
   readonly functionAttributes?: Readonly<Record<string, string>>;
+  readonly fallbackFunctionAttribute?: ((expression: string) => string | undefined) | undefined;
 }
 
 /**
@@ -33,7 +34,8 @@ export function mapDefault(
     case 'function': {
       const attribute =
         options?.functionAttributes?.[columnDefault.expression] ??
-        DEFAULT_FUNCTION_ATTRIBUTES[columnDefault.expression];
+        DEFAULT_FUNCTION_ATTRIBUTES[columnDefault.expression] ??
+        options?.fallbackFunctionAttribute?.(columnDefault.expression);
       return attribute ? { attribute } : { comment: `// Raw default: ${columnDefault.expression}` };
     }
   }

@@ -26,6 +26,14 @@ describe('mapDefault', () => {
     });
   });
 
+  it('maps unmapped Postgres defaults to dbgenerated when Postgres mapping is injected', () => {
+    expect(
+      mapDefault({ kind: 'function', expression: "'{}'::jsonb" }, createPostgresDefaultMapping()),
+    ).toEqual({
+      attribute: `@default(dbgenerated(${JSON.stringify("'{}'::jsonb")}))`,
+    });
+  });
+
   it('maps boolean true', () => {
     expect(mapDefault({ kind: 'literal', value: true })).toEqual({
       attribute: '@default(true)',

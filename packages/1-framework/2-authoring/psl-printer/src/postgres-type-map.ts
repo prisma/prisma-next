@@ -137,14 +137,15 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
         const [, baseType = nativeType, params = ''] = paramMatch;
         const template = getOwnRecordValue(PARAMETERIZED_NATIVE_TYPES, baseType);
         if (template) {
+          const nativeTypeAttribute = createNativeTypeAttribute(
+            template.attributeName,
+            splitTypeParameterList(params),
+          );
           return {
             pslType: template.pslType,
             nativeType,
             typeParams: { baseType, params },
-            nativeTypeAttribute: createNativeTypeAttribute(
-              template.attributeName,
-              splitTypeParameterList(params),
-            ),
+            ...(nativeTypeAttribute ? { nativeTypeAttribute } : {}),
           };
         }
       }
@@ -152,10 +153,11 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
       // Non-parameterized native types that still need explicit preservation.
       const preservedType = getOwnRecordValue(PRESERVED_NATIVE_TYPES, nativeType);
       if (preservedType) {
+        const nativeTypeAttribute = createNativeTypeAttribute(preservedType.attributeName);
         return {
           pslType: preservedType.pslType,
           nativeType,
-          nativeTypeAttribute: createNativeTypeAttribute(preservedType.attributeName),
+          ...(nativeTypeAttribute ? { nativeTypeAttribute } : {}),
         };
       }
 

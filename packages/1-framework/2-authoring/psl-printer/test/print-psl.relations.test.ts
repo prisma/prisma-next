@@ -121,6 +121,82 @@ describe('printPsl', () => {
     `);
   });
 
+  it('schema with 1:1 relation from a composite unique foreign key', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        account: {
+          name: 'account',
+          columns: {
+            tenant_id: {
+              name: 'tenant_id',
+              nativeType: 'int4',
+              nullable: false,
+              default: undefined,
+            },
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+          },
+          primaryKey: { columns: ['tenant_id', 'id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        profile: {
+          name: 'profile',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            tenant_id: {
+              name: 'tenant_id',
+              nativeType: 'int4',
+              nullable: false,
+              default: undefined,
+            },
+            account_id: {
+              name: 'account_id',
+              nativeType: 'int4',
+              nullable: false,
+              default: undefined,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            {
+              columns: ['tenant_id', 'account_id'],
+              referencedTable: 'account',
+              referencedColumns: ['tenant_id', 'id'],
+            },
+          ],
+          uniques: [{ columns: ['tenant_id', 'account_id'] }],
+          indexes: [],
+        },
+      },
+      dependencies: [],
+    };
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toMatchInlineSnapshot(`
+      "// This file was introspected from the database. Do not edit manually.
+
+      model Account {
+        tenantId Int      @map("tenant_id")
+        id       Int
+        profile  Profile?
+
+        @@id([tenantId, id])
+        @@map("account")
+      }
+
+      model Profile {
+        id        Int     @id
+        tenantId  Int     @map("tenant_id")
+        accountId Int     @map("account_id")
+        account   Account @relation(fields: [tenantId, accountId], references: [tenantId, id])
+
+        @@unique([tenantId, accountId])
+        @@map("profile")
+      }
+      "
+    `);
+  });
+
   it('self-referencing FK', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {

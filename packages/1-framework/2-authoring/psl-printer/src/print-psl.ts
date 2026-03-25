@@ -240,7 +240,7 @@ function processTable(
     // Default value
     let comment: string | undefined;
     if (column.default !== undefined) {
-      const parsed = parseDefaultIfNeeded(column.default);
+      const parsed = parseDefaultIfNeeded(column.default, column.nativeType);
       if (parsed) {
         const result = mapDefault(parsed, defaultMapping);
         if ('attribute' in result) {
@@ -400,12 +400,12 @@ function isColumnDefault(value: unknown): value is ColumnDefault {
   return false;
 }
 
-function parseDefaultIfNeeded(value: unknown): ColumnDefault | undefined {
+function parseDefaultIfNeeded(value: unknown, nativeType?: string): ColumnDefault | undefined {
   if (isColumnDefault(value)) {
     return value;
   }
   if (typeof value === 'string') {
-    return parseRawDefault(value);
+    return parseRawDefault(value, nativeType);
   }
   return undefined;
 }

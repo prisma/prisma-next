@@ -171,4 +171,50 @@ describe('createContractInferCommand', () => {
     expect(stderrOutput).not.toContain('Overwriting existing file');
     expect(stderrOutput).not.toContain('Contract written to');
   });
+
+  it('prints JSON output in --json mode while still writing the inferred PSL file', async () => {
+    process.chdir(testDir);
+
+    await executeCommand(createContractInferCommand(), [
+      '--config',
+      'prisma-next.config.ts',
+      '--json',
+      '--no-color',
+    ]);
+
+    const parsed = JSON.parse(consoleOutput.join('\n')) as {
+      readonly summary: string;
+      readonly psl: { readonly path: string };
+      readonly meta: { readonly configPath: string; readonly dbUrl: string };
+    };
+    expect(parsed).toMatchObject({
+      summary: 'Contract inferred successfully',
+      psl: { path: 'output/contract.prisma' },
+      meta: {
+        configPath: 'prisma-next.config.ts',
+        dbUrl: 'postgres://****:****@localhost:5432/prisma_next',
+      },
+    });
+    expect(consoleErrors).toEqual([]);
+    expect(existsSync(join(testDir, 'output/contract.prisma'))).toBe(true);
+  });
+
+  it('returns inspect errors without writing an inferred PSL file', async () => {
+    process.chdir(testDir);
+    mocks.loadConfigMock.mockResolvedValue({
+      ...baseConfig,
+      driver: undefined,
+    });
+
+    await expect(
+      executeCommand(createContractInferCommand(), [
+        '--config',
+        'prisma-next.config.ts',
+        '--no-color',
+      ]),
+    ).rejects.toThrow('process.exit called');
+
+    expect(existsSync(join(testDir, 'output/contract.prisma'))).toBe(false);
+    expect(consoleErrors.join('\n')).toContain('Driver is required for DB-connected commands');
+  });
 });

@@ -122,6 +122,52 @@ describe('inferRelations', () => {
     });
   });
 
+  it('detects 1:1 when composite FK columns match a composite unique constraint', () => {
+    const tables: Record<string, SqlTableIR> = {
+      account: {
+        name: 'account',
+        columns: {
+          tenant_id: { name: 'tenant_id', nativeType: 'int4', nullable: false },
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['tenant_id', 'id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
+      profile: {
+        name: 'profile',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          tenant_id: { name: 'tenant_id', nativeType: 'int4', nullable: false },
+          account_id: { name: 'account_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [
+          {
+            columns: ['tenant_id', 'account_id'],
+            referencedTable: 'account',
+            referencedColumns: ['tenant_id', 'id'],
+          },
+        ],
+        uniques: [{ columns: ['tenant_id', 'account_id'] }],
+        indexes: [],
+      },
+    };
+    const modelNameMap = new Map([
+      ['account', 'Account'],
+      ['profile', 'Profile'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const accountRelations = relationsByTable.get('account');
+    expect(accountRelations).toHaveLength(1);
+    expect(accountRelations![0]).toMatchObject({
+      optional: true,
+      list: false,
+    });
+  });
+
   it('produces named relations for multiple FKs to same parent', () => {
     const tables: Record<string, SqlTableIR> = {
       user: {

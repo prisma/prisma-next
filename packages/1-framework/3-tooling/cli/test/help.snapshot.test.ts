@@ -10,33 +10,28 @@ import { formatCommandHelp, formatRootHelp } from '../src/utils/formatters/help'
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('help text snapshots', { timeout: timeouts.default }, () => {
-  it(
-    'formats root help',
-    { timeout: timeouts.databaseOperation },
-    () => {
-      const program = new Command();
-      program.name('prisma-next').description('Prisma Next CLI');
-      const contract = new Command('contract').description('Contract management commands');
-      const contractEmit = createContractEmitCommand();
-      const contractInfer = createContractInferCommand();
-      contract.addCommand(contractEmit);
-      contract.addCommand(contractInfer);
-      const db = new Command('db').description('Database operations');
-      const dbSchema = createDbSchemaCommand();
-      const dbVerify = createDbVerifyCommand();
-      db.addCommand(dbSchema);
-      db.addCommand(dbVerify);
-      program.addCommand(contract);
-      program.addCommand(db);
+  it('formats root help', { timeout: timeouts.databaseOperation }, () => {
+    const program = new Command();
+    program.name('prisma-next').description('Prisma Next CLI');
+    const contract = new Command('contract').description('Contract management commands');
+    const contractEmit = createContractEmitCommand();
+    const contractInfer = createContractInferCommand();
+    contract.addCommand(contractEmit);
+    contract.addCommand(contractInfer);
+    const db = new Command('db').description('Database operations');
+    const dbSchema = createDbSchemaCommand();
+    const dbVerify = createDbVerifyCommand();
+    db.addCommand(dbSchema);
+    db.addCommand(dbVerify);
+    program.addCommand(contract);
+    program.addCommand(db);
 
-      // Explicitly disable colors for consistent snapshots
-      const flags = parseGlobalFlags({ 'no-color': true });
-      const helpText = formatRootHelp({ program, flags });
+    // Explicitly disable colors for consistent snapshots
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const helpText = formatRootHelp({ program, flags });
 
-      expect(helpText).toMatchSnapshot();
-    },
-    timeouts.default,
-  );
+    expect(helpText).toMatchSnapshot();
+  });
 
   it('formats contract emit help', () => {
     const command = createContractEmitCommand();

@@ -40,7 +40,7 @@ export interface InspectLiveSchemaResult {
     readonly familyId: string;
     readonly id: string;
   };
-  readonly meta?: {
+  readonly meta: {
     readonly configPath?: string;
     readonly dbUrl?: string;
   };
@@ -142,14 +142,10 @@ export async function inspectLiveSchema(
         familyId: config.family.familyId,
         id: config.target.targetId,
       },
-      ...(configPath || dbUrl
-        ? {
-            meta: {
-              ...(configPath ? { configPath } : {}),
-              ...(dbUrl ? { dbUrl } : {}),
-            },
-          }
-        : {}),
+      meta: {
+        configPath,
+        ...(dbUrl ? { dbUrl } : {}),
+      },
       timings: {
         total: Date.now() - startTime,
       },

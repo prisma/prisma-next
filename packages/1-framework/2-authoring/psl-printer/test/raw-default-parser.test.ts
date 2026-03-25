@@ -23,7 +23,32 @@ describe('parseRawDefault', () => {
   it('recognizes clock_timestamp()', () => {
     expect(parseRawDefault('clock_timestamp()')).toEqual({
       kind: 'function',
+      expression: 'clock_timestamp()',
+    });
+  });
+
+  it('recognizes timestamp-cast now() defaults', () => {
+    expect(parseRawDefault('now()::timestamp')).toEqual({
+      kind: 'function',
       expression: 'now()',
+    });
+    expect(parseRawDefault("('now'::text)::timestamp without time zone")).toEqual({
+      kind: 'function',
+      expression: 'now()',
+    });
+  });
+
+  it('recognizes timestamp-cast clock_timestamp() defaults', () => {
+    expect(parseRawDefault('clock_timestamp()::timestamp with time zone')).toEqual({
+      kind: 'function',
+      expression: 'clock_timestamp()',
+    });
+  });
+
+  it('preserves timestamp string literals when they are not canonical time functions', () => {
+    expect(parseRawDefault("'2024-01-01 00:00:00'::timestamp")).toEqual({
+      kind: 'literal',
+      value: '2024-01-01 00:00:00',
     });
   });
 
@@ -50,6 +75,10 @@ describe('parseRawDefault', () => {
     expect(parseRawDefault('false')).toEqual({ kind: 'literal', value: false });
   });
 
+  it('recognizes NULL literals', () => {
+    expect(parseRawDefault('NULL::jsonb')).toEqual({ kind: 'literal', value: null });
+  });
+
   it('recognizes integer literals', () => {
     expect(parseRawDefault('42')).toEqual({ kind: 'literal', value: 42 });
     expect(parseRawDefault('-1')).toEqual({ kind: 'literal', value: -1 });
@@ -72,6 +101,27 @@ describe('parseRawDefault', () => {
 
   it('recognizes string literals with type cast', () => {
     expect(parseRawDefault("'hello'::text")).toEqual({ kind: 'literal', value: 'hello' });
+  });
+
+  it('preserves jsonb string defaults as raw expressions when native type context matters', () => {
+    expect(parseRawDefault("'{}'::jsonb", 'jsonb')).toEqual({
+      kind: 'function',
+      expression: "'{}'::jsonb",
+    });
+  });
+
+  it('parses inline json literals when no cast is present', () => {
+    expect(parseRawDefault('\'{"enabled":true}\'', 'json')).toEqual({
+      kind: 'literal',
+      value: { enabled: true },
+    });
+  });
+
+  it('falls back to string literals when inline json parsing fails', () => {
+    expect(parseRawDefault("'not-json'", 'jsonb')).toEqual({
+      kind: 'literal',
+      value: 'not-json',
+    });
   });
 
   it('unescapes single quotes in strings', () => {

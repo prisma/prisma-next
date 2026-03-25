@@ -128,6 +128,53 @@ model Document {
     );
   });
 
+  it('returns diagnostics for invalid Postgres native type attribute usage', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  BadChar = Int @db.Char(10)
+  BadReal = Float @db.Real(1)
+  BadTimestamp = DateTime @db.Timestamp(-1)
+}
+
+model InvalidNativeTypes {
+  id Int @id
+  badChar BadChar
+  badReal BadReal
+  badTimestamp BadTimestamp
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            'Named type "BadChar" uses @db.Char on unsupported base type "Int". Expected "String"',
+          ),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            'Named type "BadReal" @db.Real does not accept arguments',
+          ),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            'Named type "BadTimestamp" @db.Timestamp requires a non-negative integer precision',
+          ),
+        }),
+      ]),
+    );
+  });
+
   it('returns diagnostics when relation fields and references lengths differ', () => {
     const document = parsePslDocument({
       schema: `model User {

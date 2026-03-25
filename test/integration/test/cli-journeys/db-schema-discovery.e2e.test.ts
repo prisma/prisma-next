@@ -74,7 +74,7 @@ withTempDir(({ createTempDir }) => {
           summary: 'Schema read successfully',
           schema: expect.any(Object),
         });
-        const schemaJsonText = JSON.stringify(schemaData.schema);
+        const schemaJsonText = JSON.stringify(schemaData['schema']);
         expect(schemaJsonText, 'AA.02: shows added table').toContain('"post"');
         expect(schemaJsonText, 'AA.02: shows added column').toContain('"name"');
         expect(

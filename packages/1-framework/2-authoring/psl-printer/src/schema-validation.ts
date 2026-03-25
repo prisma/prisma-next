@@ -20,6 +20,8 @@ const REFERENTIAL_ACTIONS = new Set<SqlReferentialAction>([
 
 export type PrintableSqlColumnDefault = string | ColumnDefault;
 
+type ColumnDefaultLiteralValue = Extract<ColumnDefault, { readonly kind: 'literal' }>['value'];
+
 export type PslPrintableSqlColumn = {
   readonly name: string;
   readonly nativeType: string;
@@ -221,7 +223,7 @@ function validateColumnDefault(
     }
     return {
       kind: 'literal',
-      value: columnDefault['value'] as ColumnDefault['value'],
+      value: columnDefault['value'] as ColumnDefaultLiteralValue,
     };
   }
 
