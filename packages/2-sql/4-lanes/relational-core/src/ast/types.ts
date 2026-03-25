@@ -98,32 +98,32 @@ function combineAll<T>(folder: ExpressionFolder<T>, thunks: Array<() => T>): T {
 }
 
 function rewriteComparable(value: SqlComparable, rewriter: ExpressionRewriter): SqlComparable {
-  if (value instanceof ParamRef) {
-    return rewriter.paramRef ? rewriter.paramRef(value) : value;
+  switch (value.kind) {
+    case 'param-ref':
+      return rewriter.paramRef ? rewriter.paramRef(value) : value;
+    case 'literal':
+      return rewriter.literal ? rewriter.literal(value) : value;
+    case 'list-literal':
+      if (rewriter.listLiteral) {
+        return rewriter.listLiteral(value);
+      }
+      return value.rewrite(rewriter);
+    default:
+      return value.rewrite(rewriter);
   }
-  if (value instanceof LiteralExpr) {
-    return rewriter.literal ? rewriter.literal(value) : value;
-  }
-  if (value instanceof ListLiteralExpr) {
-    if (rewriter.listLiteral) {
-      return rewriter.listLiteral(value);
-    }
-    return value.rewrite(rewriter);
-  }
-  return value.rewrite(rewriter);
 }
 
 function foldComparable<T>(value: SqlComparable, folder: ExpressionFolder<T>): T {
-  if (value instanceof ParamRef) {
-    return folder.paramRef ? folder.paramRef(value) : folder.empty;
+  switch (value.kind) {
+    case 'param-ref':
+      return folder.paramRef ? folder.paramRef(value) : folder.empty;
+    case 'literal':
+      return folder.literal ? folder.literal(value) : folder.empty;
+    case 'list-literal':
+      return value.fold(folder);
+    default:
+      return value.fold(folder);
   }
-  if (value instanceof LiteralExpr) {
-    return folder.literal ? folder.literal(value) : folder.empty;
-  }
-  if (value instanceof ListLiteralExpr) {
-    return value.fold(folder);
-  }
-  return value.fold(folder);
 }
 
 function collectColumnRefsWith<TNode extends Expression | WhereExpr>(node: TNode): ColumnRef[] {
@@ -561,7 +561,7 @@ export class JsonObjectExpr extends Expression {
       this.entries.map((entry) => ({
         key: entry.key,
         value:
-          entry.value instanceof LiteralExpr
+          entry.value.kind === 'literal'
             ? rewriter.literal
               ? rewriter.literal(entry.value)
               : entry.value
@@ -575,7 +575,7 @@ export class JsonObjectExpr extends Expression {
       folder,
       this.entries.map(
         (entry) => () =>
-          entry.value instanceof LiteralExpr
+          entry.value.kind === 'literal'
             ? folder.literal
               ? folder.literal(entry.value)
               : folder.empty
@@ -677,7 +677,7 @@ export class ListLiteralExpr extends AstNode {
 
     return new ListLiteralExpr(
       this.values.map((value) => {
-        if (value instanceof ParamRef) {
+        if (value.kind === 'param-ref') {
           return rewriter.paramRef ? rewriter.paramRef(value) : value;
         }
         return rewriter.literal ? rewriter.literal(value) : value;
@@ -693,7 +693,7 @@ export class ListLiteralExpr extends AstNode {
       folder,
       this.values.map(
         (value) => () =>
-          value instanceof ParamRef
+          value.kind === 'param-ref'
             ? folder.paramRef
               ? folder.paramRef(value)
               : folder.empty
@@ -1023,7 +1023,7 @@ export class JoinAst extends AstNode {
     return new JoinAst(
       this.joinType,
       this.source.rewrite(rewriter),
-      this.on instanceof EqColJoinOn ? this.on.rewrite(rewriter) : this.on.rewrite(rewriter),
+      this.on.kind === 'eq-col-join-on' ? this.on.rewrite(rewriter) : this.on.rewrite(rewriter),
       this.lateral,
     );
   }
@@ -1194,7 +1194,7 @@ export class SelectAst extends QueryAst {
         (projection) =>
           new ProjectionItem(
             projection.alias,
-            projection.expr instanceof LiteralExpr
+            projection.expr.kind === 'literal'
               ? rewriter.literal
                 ? rewriter.literal(projection.expr)
                 : projection.expr
@@ -1221,12 +1221,12 @@ export class SelectAst extends QueryAst {
       refs.push(...columns);
     };
 
-    if (this.from instanceof DerivedTableSource) {
+    if (this.from.kind === 'derived-table-source') {
       pushRefs(this.from.query.collectColumnRefs());
     }
 
     for (const projection of this.projection) {
-      if (!(projection.expr instanceof LiteralExpr)) {
+      if (projection.expr.kind !== 'literal') {
         pushRefs(projection.expr.collectColumnRefs());
       }
     }
@@ -1247,10 +1247,10 @@ export class SelectAst extends QueryAst {
       pushRefs(expr.collectColumnRefs());
     }
     for (const join of this.joins ?? []) {
-      if (join.source instanceof DerivedTableSource) {
+      if (join.source.kind === 'derived-table-source') {
         pushRefs(join.source.query.collectColumnRefs());
       }
-      if (join.on instanceof EqColJoinOn) {
+      if (join.on.kind === 'eq-col-join-on') {
         refs.push(join.on.left, join.on.right);
       } else {
         pushRefs(join.on.collectColumnRefs());
@@ -1266,12 +1266,12 @@ export class SelectAst extends QueryAst {
       refs.push(...params);
     };
 
-    if (this.from instanceof DerivedTableSource) {
+    if (this.from.kind === 'derived-table-source') {
       pushRefs(this.from.query.collectParamRefs());
     }
 
     for (const projection of this.projection) {
-      if (!(projection.expr instanceof LiteralExpr)) {
+      if (projection.expr.kind !== 'literal') {
         pushRefs(projection.expr.collectParamRefs());
       }
     }
@@ -1292,10 +1292,10 @@ export class SelectAst extends QueryAst {
       pushRefs(expr.collectParamRefs());
     }
     for (const join of this.joins ?? []) {
-      if (join.source instanceof DerivedTableSource) {
+      if (join.source.kind === 'derived-table-source') {
         pushRefs(join.source.query.collectParamRefs());
       }
-      if (!(join.on instanceof EqColJoinOn)) {
+      if (join.on.kind !== 'eq-col-join-on') {
         pushRefs(join.on.collectParamRefs());
       }
     }
@@ -1315,7 +1315,7 @@ export class SelectAst extends QueryAst {
 
     for (const join of this.joins ?? []) {
       addSource(join.source);
-      if (join.on instanceof EqColJoinOn) {
+      if (join.on.kind === 'eq-col-join-on') {
         addColumnRefToRefSets(join.on.left, tables, columns);
         addColumnRefToRefSets(join.on.right, tables, columns);
       } else {
@@ -1442,7 +1442,7 @@ export class InsertAst extends QueryAst {
 
     const addColumn = (columnRef: ColumnRef) => addColumnRefToRefSets(columnRef, tables, columns);
     const addValue = (value: InsertValue) => {
-      if (value instanceof ColumnRef) {
+      if (value.kind === 'column-ref') {
         addColumn(value);
       }
     };
@@ -1461,9 +1461,9 @@ export class InsertAst extends QueryAst {
       for (const columnRef of this.onConflict.columns) {
         addColumn(columnRef);
       }
-      if (this.onConflict.action instanceof DoUpdateSetConflictAction) {
+      if (this.onConflict.action.kind === 'do-update-set') {
         for (const value of Object.values(this.onConflict.action.set)) {
-          if (value instanceof ColumnRef) {
+          if (value.kind === 'column-ref') {
             addColumn(value);
           }
         }
@@ -1516,7 +1516,7 @@ export class UpdateAst extends QueryAst {
     const columns = new Map<string, { table: string; column: string }>();
 
     for (const value of Object.values(this.set)) {
-      if (value instanceof ColumnRef) {
+      if (value.kind === 'column-ref') {
         addColumnRefToRefSets(value, tables, columns);
       }
     }
