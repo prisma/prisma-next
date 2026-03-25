@@ -170,8 +170,8 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
     }
   }
 }
-
-describe('ORM client integration examples', () => {
+d;
+escribe('ORM client integration examples', () => {
   it(
     'ormClientGetUsers returns limited rows',
     async () => {
@@ -429,7 +429,7 @@ describe('ORM client integration examples', () => {
             seededPostIds.newer,
           ]);
           expect(posts.every((post) => 'embedding' in post === false)).toBe(true);
-          expect(posts.map((post) => post.user.id)).toEqual([
+          expect(posts.map((post) => post.user!.id)).toEqual([
             seededUserIds.adminTwo,
             seededUserIds.adminTwo,
             seededUserIds.admin,
