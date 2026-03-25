@@ -42,6 +42,17 @@ const ENUM_MEMBER_RESERVED_WORDS = new Set([
   'type',
   'types',
 ]);
+const PSL_SCALAR_TYPE_NAMES = new Set([
+  'String',
+  'Boolean',
+  'Int',
+  'BigInt',
+  'Float',
+  'Decimal',
+  'DateTime',
+  'Json',
+  'Bytes',
+]);
 
 /**
  * Converts a SqlSchemaIR to a PSL (Prisma Schema Language) string.
@@ -82,6 +93,7 @@ export function printPsl(schemaIR: PslPrintableSqlSchemaIR, options: PslPrinterO
   const enumNameMap = new Map(
     [...enumNames].map(([pgTypeName, result]) => [pgTypeName, result.name]),
   );
+  const reservedNamedTypeNames = createReservedNamedTypeNames(modelNames, enumNames);
 
   const fieldNamesByTable = buildFieldNamesByTable(schemaIR.tables);
 
@@ -89,7 +101,7 @@ export function printPsl(schemaIR: PslPrintableSqlSchemaIR, options: PslPrinterO
   const { relationsByTable } = inferRelations(schemaIR.tables, modelNameMap);
 
   // Collect named types for the types block
-  const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, enumNameMap);
+  const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, enumNameMap, reservedNamedTypeNames);
 
   // Process tables into models
   const models: PrinterModel[] = [];
@@ -535,10 +547,28 @@ function assertNoCrossKindNameCollisions(
   }
 }
 
+function createReservedNamedTypeNames(
+  modelNames: ReadonlyMap<string, TopLevelNameResult>,
+  enumNames: ReadonlyMap<string, TopLevelNameResult>,
+): Set<string> {
+  const reservedNames = new Set<string>(PSL_SCALAR_TYPE_NAMES);
+
+  for (const result of modelNames.values()) {
+    reservedNames.add(result.name);
+  }
+
+  for (const result of enumNames.values()) {
+    reservedNames.add(result.name);
+  }
+
+  return reservedNames;
+}
+
 function seedNamedTypeRegistry(
   schemaIR: PslPrintableSqlSchemaIR,
   typeMap: PslPrinterOptions['typeMap'],
   enumNameMap: ReadonlyMap<string, string>,
+  reservedNames: ReadonlySet<string>,
 ): NamedTypeRegistry {
   const seeds = new Map<
     string,
@@ -581,7 +611,7 @@ function seedNamedTypeRegistry(
 
   const registry: NamedTypeRegistry = {
     entriesByKey: new Map<string, PrinterNamedType>(),
-    usedNames: new Set<string>(),
+    usedNames: new Set<string>(reservedNames),
   };
 
   const sortedSeeds = [...seeds.entries()].sort((left, right) => {

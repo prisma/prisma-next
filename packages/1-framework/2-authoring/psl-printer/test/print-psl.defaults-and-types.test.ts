@@ -242,6 +242,88 @@ describe('printPsl', () => {
     `);
   });
 
+  it('disambiguates named types from scalar, model, and enum identifiers', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        user: {
+          name: 'user',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
+            user: {
+              name: 'user',
+              nativeType: 'character varying(255)',
+              nullable: false,
+              default: undefined,
+            },
+            string: {
+              name: 'string',
+              nativeType: 'character varying(64)',
+              nullable: false,
+              default: undefined,
+            },
+            role: {
+              name: 'role',
+              nativeType: 'character varying(32)',
+              nullable: false,
+              default: undefined,
+            },
+            status: {
+              name: 'status',
+              nativeType: 'role',
+              nullable: false,
+              default: undefined,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      annotations: {
+        pg: {
+          storageTypes: {
+            role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'role',
+              typeParams: { values: ['USER', 'ADMIN'] },
+            },
+          },
+        },
+      },
+      dependencies: [],
+    };
+
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toMatchInlineSnapshot(`
+      "// This file was introspected from the database. Do not edit manually.
+
+      types {
+        Role2 = String
+        String2 = String
+        User2 = String
+      }
+
+      enum Role {
+        USER
+        ADMIN
+
+        @@map("role")
+      }
+
+      model User {
+        id     Int     @id
+        user   User2
+        string String2
+        role   Role2
+        status Role
+
+        @@map("user")
+      }
+      "
+    `);
+  });
+
   it('unsupported (unmappable) types', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
