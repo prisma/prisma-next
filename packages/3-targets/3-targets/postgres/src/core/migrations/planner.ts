@@ -1220,10 +1220,11 @@ export function buildTypeZeroDefaultLiteral(
 
     // Time types
     case 'time':
-    case 'timetz':
-    case 'time with time zone':
     case 'time without time zone':
       return "'00:00:00'";
+    case 'timetz':
+    case 'time with time zone':
+      return "'00:00:00+00'";
 
     // Interval
     case 'interval':

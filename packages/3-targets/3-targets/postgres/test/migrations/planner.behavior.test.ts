@@ -215,6 +215,19 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
+  it('uses explicit UTC-offset temporary defaults for NOT NULL timetz columns', () => {
+    const addCol = planAddColumn('opensAt', {
+      nativeType: 'timetz',
+      codecId: 'pg/timetz@1',
+      nullable: false,
+    });
+
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "opensAt" timetz DEFAULT '00:00:00+00' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "opensAt" DROP DEFAULT`,
+    ]);
+  });
+
   it('uses codec hook temporary defaults for parameterized pgvector columns', () => {
     const addCol = planAddColumn(
       'embedding',
@@ -428,7 +441,9 @@ describe('buildTypeZeroDefaultLiteral (built-in fallback)', () => {
     ['timestamp', undefined, "'epoch'"],
     ['timestamptz', undefined, "'epoch'"],
     ['time', undefined, "'00:00:00'"],
-    ['timetz', undefined, "'00:00:00'"],
+    ['time without time zone', undefined, "'00:00:00'"],
+    ['timetz', undefined, "'00:00:00+00'"],
+    ['time with time zone', undefined, "'00:00:00+00'"],
     ['interval', undefined, "'0'"],
     ['bytea', undefined, "''::bytea"],
     ['tsvector', undefined, "''::tsvector"],
