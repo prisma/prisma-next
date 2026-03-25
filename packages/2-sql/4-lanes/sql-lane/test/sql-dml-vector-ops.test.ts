@@ -125,8 +125,8 @@ describe('delete with vector operations', () => {
     expect(plan.ast.kind).toBe('delete');
     const ast = plan.ast as DeleteAst;
     expect(ast.table.name).toBe('user');
-    expect(ast.where.kind).toBe('binary');
-    const where = ast.where as BinaryExpr;
+    expect(ast.where!.kind).toBe('binary');
+    const where = ast.where! as BinaryExpr;
     expect(where.op).toBe('eq');
     expect(where.left.kind).toBe('operation');
     const left = where.left as OperationExpr;

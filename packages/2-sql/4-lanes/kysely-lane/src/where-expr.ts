@@ -3,6 +3,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type BoundWhereExpr,
   ListLiteralExpr,
+  type SelectAst,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { CompiledQuery } from 'kysely';
@@ -27,21 +28,25 @@ export function buildKyselyWhereExpr<Row>(
   options: BuildKyselyPlanOptions = {},
 ): ToWhereExpr {
   const plan = buildKyselyPlan(contract, compiledQuery, options);
-  if (plan.ast.kind !== 'select' || !plan.ast.where) {
+  if (plan.ast.kind !== 'select') {
+    throw new Error('whereExpr(...) requires a select query with a where clause');
+  }
+  const selectAst = plan.ast as SelectAst;
+  if (!selectAst.where) {
     throw new Error('whereExpr(...) requires a select query with a where clause');
   }
 
-  const indexes = [...new Set(collectParamIndexes(plan.ast.where))].sort((a, b) => a - b);
+  const indexes = [...new Set(collectParamIndexes(selectAst.where))].sort((a, b) => a - b);
   if (indexes.length === 0) {
     return new LaneWhereExpr({
-      expr: plan.ast.where,
+      expr: selectAst.where,
       params: [],
       paramDescriptors: [],
     });
   }
 
   const remap = new Map<number, number>(indexes.map((index, i) => [index, i + 1]));
-  const remappedExpr = remapParamIndexes(plan.ast.where, remap);
+  const remappedExpr = remapParamIndexes(selectAst.where, remap);
   const params = indexes.map((index) => {
     if (index <= 0 || index > plan.params.length) {
       throw new Error(`whereExpr(...) payload is invalid: missing param value for index ${index}`);

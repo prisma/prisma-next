@@ -65,6 +65,7 @@ const contract = validateContract<PostgresContract>({
 });
 
 class UnsupportedAst extends QueryAst {
+  readonly kind = 'unsupported' as never;
   override collectRefs() {
     return { tables: [], columns: [] };
   }

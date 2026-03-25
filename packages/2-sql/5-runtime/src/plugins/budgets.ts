@@ -1,6 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { AfterExecuteResult, Plugin, PluginContext } from '@prisma-next/runtime-executor';
-import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { isQueryAst, type SelectAst } from '@prisma-next/sql-relational-core/ast';
 
 export interface BudgetsOptions {
   readonly maxRows?: number;
@@ -204,11 +204,10 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
       observedRowsByPlan.set(plan, { count: 0 });
 
-      if (plan.ast?.kind === 'select') {
-        return evaluateSelectAst(plan, plan.ast, ctx);
-      }
-
-      if (plan.ast) {
+      if (isQueryAst(plan.ast)) {
+        if (plan.ast.kind === 'select') {
+          return evaluateSelectAst(plan, plan.ast, ctx);
+        }
         return;
       }
 

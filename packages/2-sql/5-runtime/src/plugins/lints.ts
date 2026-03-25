@@ -6,7 +6,6 @@ import {
   type AnyQueryAst,
   type FromSource,
   isQueryAst,
-  type QueryAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 

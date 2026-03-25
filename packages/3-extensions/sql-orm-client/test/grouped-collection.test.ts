@@ -1,4 +1,8 @@
-import { AggregateExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  AggregateExpr,
+  type BinaryExpr,
+  type ColumnRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createCollectionFor } from './collection-fixtures';
 import { getTestContract, isSelectAst } from './helpers';
@@ -35,12 +39,12 @@ describe('GroupedCollection', () => {
     }
     expect(firstAst.having?.kind).toBe('binary');
     if (firstAst.having?.kind === 'binary') {
-      expect(firstAst.having.left).toEqual(AggregateExpr.count());
+      expect((firstAst.having as BinaryExpr).left).toEqual(AggregateExpr.count());
     }
     const totalViewsProjection = firstAst.projection.find((item) => item.alias === 'totalViews');
     expect(totalViewsProjection?.expr.kind).toBe('aggregate');
     if (totalViewsProjection?.expr.kind === 'aggregate') {
-      expect(totalViewsProjection.expr.fn).toBe('sum');
+      expect((totalViewsProjection.expr as AggregateExpr).fn).toBe('sum');
     }
   });
 
@@ -102,10 +106,10 @@ describe('GroupedCollection', () => {
           return undefined;
         }
         const having = entry.plan.ast.having;
-        if (having?.kind !== 'binary' || having.left.kind !== 'aggregate') {
+        if (having?.kind !== 'binary' || (having as BinaryExpr).left.kind !== 'aggregate') {
           return undefined;
         }
-        return `${having.left.fn}:${having.op}`;
+        return `${((having as BinaryExpr).left as AggregateExpr).fn}:${(having as BinaryExpr).op}`;
       })
       .filter((comparison): comparison is string => comparison !== undefined);
 
@@ -219,11 +223,12 @@ describe('GroupedCollection', () => {
           return undefined;
         }
         const having = entry.plan.ast.having;
-        if (having?.kind !== 'binary' || having.left.kind !== 'aggregate') {
+        if (having?.kind !== 'binary' || (having as BinaryExpr).left.kind !== 'aggregate') {
           return undefined;
         }
-        return having.left.expr.kind === 'column-ref'
-          ? `${having.left.expr.table}:${having.left.expr.column}`
+        const aggExpr = (having as BinaryExpr).left as AggregateExpr;
+        return aggExpr.expr?.kind === 'column-ref'
+          ? `${(aggExpr.expr as ColumnRef).table}:${(aggExpr.expr as ColumnRef).column}`
           : undefined;
       })
       .filter((column): column is string => column !== undefined);

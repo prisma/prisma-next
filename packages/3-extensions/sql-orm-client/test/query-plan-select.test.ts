@@ -96,7 +96,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     const childRowsSource = postsProjection.expr.query.from;
     expectDerivedTableSource(childRowsSource);
 
-    expect(childRowsSource.query.where.kind).toBe('and');
+    expect(childRowsSource.query.where!.kind).toBe('and');
     expect(childRowsSource.query.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),

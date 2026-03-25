@@ -1,5 +1,4 @@
 import {
-  AndExpr,
   BinaryExpr,
   type BoundWhereExpr,
   ColumnRef,
@@ -43,18 +42,18 @@ describe('SQL ORM rich AST filters', () => {
 
     expect(expr.kind).toBe('and');
     const [nameFilter, postsFilter] = expr.exprs;
-    expect(nameFilter.kind).toBe('binary');
-    expect(nameFilter).toMatchObject({
+    expect(nameFilter!.kind).toBe('binary');
+    expect(nameFilter!).toMatchObject({
       op: 'eq',
       left: ColumnRef.of('users', 'name'),
       right: LiteralExpr.of('Alice'),
     });
 
-    expect(postsFilter.kind).toBe('exists');
-    const exists = postsFilter as ExistsExpr;
+    expect(postsFilter!.kind).toBe('exists');
+    const exists = postsFilter! as ExistsExpr;
     expect(exists.subquery.kind).toBe('select');
     expect(exists.subquery.from.kind).toBe('table-source');
-    expect(exists.subquery.where.kind).toBe('and');
+    expect(exists.subquery.where!.kind).toBe('and');
   });
 
   it('normalizes, offsets, combines, and negates bound filters', () => {

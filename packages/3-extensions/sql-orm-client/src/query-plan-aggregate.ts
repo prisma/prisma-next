@@ -55,7 +55,7 @@ function validateGroupedMetricExpr(expr: Expression): AggregateExpr {
     throw new Error('groupBy().having() only supports aggregate metric expressions');
   }
 
-  return expr;
+  return expr as AggregateExpr;
 }
 
 function validateGroupedHavingExpr(expr: WhereExpr): WhereExpr {

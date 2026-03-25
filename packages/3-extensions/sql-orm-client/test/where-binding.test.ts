@@ -107,8 +107,8 @@ describe('bindWhereExpr', () => {
     const binary = bound.expr as BinaryExpr;
     expect(binary.right.kind).toBe('list-literal');
     const list = binary.right as ListLiteralExpr;
-    expect(list.values[0].kind).toBe('param-ref');
-    expect(list.values[1].kind).toBe('param-ref');
+    expect(list.values[0]!.kind).toBe('param-ref');
+    expect(list.values[1]!.kind).toBe('param-ref');
   });
 
   it('preserves ParamRef on the right side without rebinding', () => {
@@ -202,9 +202,9 @@ describe('bindWhereExpr', () => {
     expect(bound.params).toEqual([42]);
     const binary = bound.expr as BinaryExpr;
     const list = binary.right as ListLiteralExpr;
-    expect(list.values[0].kind).toBe('param-ref');
-    expect((list.values[0] as ParamRef).index).toBe(1);
-    expect(list.values[1].kind).toBe('param-ref');
-    expect((list.values[1] as ParamRef).index).toBe(1);
+    expect(list.values[0]!.kind).toBe('param-ref');
+    expect((list.values[0]! as ParamRef).index).toBe(1);
+    expect(list.values[1]!.kind).toBe('param-ref');
+    expect((list.values[1]! as ParamRef).index).toBe(1);
   });
 });

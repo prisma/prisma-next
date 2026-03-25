@@ -1,11 +1,6 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import {
-  type AnyWhereExpr,
-  isWhereExpr,
-  type ToWhereExpr,
-  type WhereArg,
-} from '@prisma-next/sql-relational-core/ast';
+import { isWhereExpr, type ToWhereExpr, type WhereArg } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import {

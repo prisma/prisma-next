@@ -35,7 +35,7 @@ describe('SQL ORM collections with rich AST plans', () => {
     expect(row).toMatchObject({ id: 1, name: 'Alice' });
 
     const plan = runtime.executions[0]?.plan;
-    expect(plan?.ast?.kind).toBe('select');
+    expect((plan?.ast as SelectAst | undefined)?.kind).toBe('select');
     expect((plan?.ast as SelectAst).limit).toBe(1);
     expect(plan?.meta.annotations).toEqual({ limit: 1 });
   });
@@ -55,7 +55,7 @@ describe('SQL ORM collections with rich AST plans', () => {
     expect(rows).toEqual([{ userId: 1, postCount: 2, totalViews: 30 }]);
 
     const plan = runtime.executions[0]?.plan;
-    expect(plan?.ast?.kind).toBe('select');
+    expect((plan?.ast as SelectAst | undefined)?.kind).toBe('select');
     const ast = plan?.ast as SelectAst;
     expect(ast!.having!.kind).toBe('binary');
     expect((ast!.having as BinaryExpr).left.kind).toBe('aggregate');

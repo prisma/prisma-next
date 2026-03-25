@@ -61,7 +61,7 @@ describe('sql lane rich select and include ASTs', () => {
     });
     expect(plan.meta.annotations).toMatchObject({ limit: 5 });
     expect(ast.orderBy?.[0]?.expr).toEqual(ColumnRef.of('user', 'email'));
-    expect(ast.where.kind).toBe('binary');
+    expect(ast.where!.kind).toBe('binary');
     expect((ast.where as BinaryExpr).right).toEqual(ParamRef.of(1, 'userId'));
   });
 

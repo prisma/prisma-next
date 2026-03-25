@@ -65,7 +65,7 @@ describe('SQL ORM rich AST query plans', () => {
     expect(plan.meta.annotations).toEqual({ limit: 5 });
 
     const ast = plan.ast as SelectAst;
-    expect(ast.where.kind).toBe('binary');
+    expect(ast.where!.kind).toBe('binary');
 
     const postsProjection = ast.projection.find((item) => item.alias === 'posts');
     expect(postsProjection?.expr?.kind).toBe('subquery');
@@ -73,7 +73,7 @@ describe('SQL ORM rich AST query plans', () => {
     expect(aggregateQuery.from.kind).toBe('derived-table-source');
 
     const rowsQuery = (aggregateQuery.from as DerivedTableSource).query;
-    expect(rowsQuery.where.kind).toBe('and');
+    expect(rowsQuery.where!.kind).toBe('and');
     const childFilter = (rowsQuery.where as AndExpr).exprs[1] as BinaryExpr;
     expect(childFilter.right.kind).toBe('param-ref');
     expect((childFilter.right as ParamRef).index).toBe(2);

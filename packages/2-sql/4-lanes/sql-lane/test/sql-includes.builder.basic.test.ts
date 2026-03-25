@@ -39,7 +39,7 @@ describe('SQL builder includeMany', () => {
       (join) =>
         join.lateral &&
         join.source.kind === 'derived-table-source' &&
-        join.source.alias === 'post_lateral',
+        (join.source as DerivedTableSource).alias === 'post_lateral',
     );
 
     expect(includeJoin?.kind).toBe('join');
@@ -72,7 +72,7 @@ describe('SQL builder includeMany', () => {
       (join) =>
         join.lateral &&
         join.source.kind === 'derived-table-source' &&
-        join.source.alias === 'posts_lateral',
+        (join.source as DerivedTableSource).alias === 'posts_lateral',
     );
     const rowsQuery = ((includeJoin?.source as DerivedTableSource).query.from as DerivedTableSource)
       .query;

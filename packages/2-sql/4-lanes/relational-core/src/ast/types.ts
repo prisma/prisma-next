@@ -203,7 +203,7 @@ export abstract class AstNode {
 }
 
 export abstract class QueryAst extends AstNode {
-  abstract readonly kind: 'select' | 'insert' | 'update' | 'delete';
+  abstract override readonly kind: 'select' | 'insert' | 'update' | 'delete';
   abstract collectRefs(): PlanRefs;
 
   collectColumnRefs(): ColumnRef[] {
@@ -213,13 +213,13 @@ export abstract class QueryAst extends AstNode {
 }
 
 export abstract class FromSource extends AstNode {
-  abstract readonly kind: 'table-source' | 'derived-table-source';
+  abstract override readonly kind: 'table-source' | 'derived-table-source';
   abstract collectRefs(): PlanRefs;
   abstract rewrite(rewriter: AstRewriter): FromSource;
 }
 
 export abstract class Expression extends AstNode implements ExpressionSource {
-  abstract readonly kind:
+  abstract override readonly kind:
     | 'column-ref'
     | 'subquery'
     | 'operation'
@@ -247,7 +247,7 @@ export abstract class Expression extends AstNode implements ExpressionSource {
 }
 
 export abstract class WhereExpr extends AstNode {
-  abstract readonly kind: 'binary' | 'and' | 'or' | 'exists' | 'null-check';
+  abstract override readonly kind: 'binary' | 'and' | 'or' | 'exists' | 'null-check';
   abstract accept<R>(visitor: WhereExprVisitor<R>): R;
   abstract rewrite(rewriter: ExpressionRewriter): WhereExpr;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
@@ -1228,7 +1228,7 @@ export class SelectAst extends QueryAst {
     };
 
     if (this.from.kind === 'derived-table-source') {
-      pushRefs(this.from.query.collectColumnRefs());
+      pushRefs((this.from as DerivedTableSource).query.collectColumnRefs());
     }
 
     for (const projection of this.projection) {
@@ -1254,7 +1254,7 @@ export class SelectAst extends QueryAst {
     }
     for (const join of this.joins ?? []) {
       if (join.source.kind === 'derived-table-source') {
-        pushRefs(join.source.query.collectColumnRefs());
+        pushRefs((join.source as DerivedTableSource).query.collectColumnRefs());
       }
       if (join.on.kind === 'eq-col-join-on') {
         refs.push(join.on.left, join.on.right);
@@ -1273,7 +1273,7 @@ export class SelectAst extends QueryAst {
     };
 
     if (this.from.kind === 'derived-table-source') {
-      pushRefs(this.from.query.collectParamRefs());
+      pushRefs((this.from as DerivedTableSource).query.collectParamRefs());
     }
 
     for (const projection of this.projection) {
@@ -1299,7 +1299,7 @@ export class SelectAst extends QueryAst {
     }
     for (const join of this.joins ?? []) {
       if (join.source.kind === 'derived-table-source') {
-        pushRefs(join.source.query.collectParamRefs());
+        pushRefs((join.source as DerivedTableSource).query.collectParamRefs());
       }
       if (join.on.kind !== 'eq-col-join-on') {
         pushRefs(join.on.collectParamRefs());
@@ -1340,7 +1340,7 @@ export class SelectAst extends QueryAst {
 }
 
 export abstract class InsertOnConflictAction extends AstNode {
-  abstract readonly kind: 'do-nothing' | 'do-update-set';
+  abstract override readonly kind: 'do-nothing' | 'do-update-set';
 }
 
 export class DoNothingConflictAction extends InsertOnConflictAction {
@@ -1470,9 +1470,10 @@ export class InsertAst extends QueryAst {
         addColumn(columnRef);
       }
       if (this.onConflict.action.kind === 'do-update-set') {
-        for (const value of Object.values(this.onConflict.action.set)) {
+        const action = this.onConflict.action as DoUpdateSetConflictAction;
+        for (const value of Object.values(action.set)) {
           if (value.kind === 'column-ref') {
-            addColumn(value);
+            addColumn(value as ColumnRef);
           }
         }
       }

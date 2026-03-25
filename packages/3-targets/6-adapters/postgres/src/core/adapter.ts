@@ -1,6 +1,7 @@
 import {
   type Adapter,
   type AdapterProfile,
+  type AggregateExpr,
   type AnyExpression,
   type AnyFromSource,
   type AnyInsertOnConflictAction,
@@ -16,6 +17,9 @@ import {
   type InsertValue,
   type JoinAst,
   type JoinOnExpr,
+  type JsonArrayAggExpr,
+  type JsonObjectExpr,
+  type ListLiteralExpr,
   LiteralExpr,
   type LowererContext,
   type NullCheckExpr,
@@ -25,7 +29,7 @@ import {
   type ProjectionItem,
   type QueryAst,
   type SelectAst,
-  type SqlComparable,
+  type SubqueryExpr,
   type UpdateAst,
   type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -295,25 +299,30 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   const left = renderExpr(leftExpr, contract);
   const leftRendered =
     leftExpr.kind === 'operation' || leftExpr.kind === 'subquery' ? `(${left})` : left;
-  const leftCol = leftExpr.kind === 'column-ref' ? leftExpr : undefined;
+  const leftCol = leftExpr.kind === 'column-ref' ? (leftExpr as ColumnRef) : undefined;
 
   const rightExpr = expr.right;
   let right: string;
   switch (rightExpr.kind) {
     case 'list-literal':
-      right = renderListLiteral(rightExpr, contract, leftCol?.table, leftCol?.column);
+      right = renderListLiteral(
+        rightExpr as ListLiteralExpr,
+        contract,
+        leftCol?.table,
+        leftCol?.column,
+      );
       break;
     case 'literal':
-      right = renderLiteral(rightExpr);
+      right = renderLiteral(rightExpr as LiteralExpr);
       break;
     case 'column-ref':
-      right = renderColumn(rightExpr);
+      right = renderColumn(rightExpr as ColumnRef);
       break;
     case 'param-ref':
-      right = renderParam(rightExpr, contract, leftCol?.table, leftCol?.column);
+      right = renderParam(rightExpr as ParamRef, contract, leftCol?.table, leftCol?.column);
       break;
     default:
-      right = renderExpr(rightExpr, contract);
+      right = renderExpr(rightExpr as Expression, contract);
       break;
   }
 

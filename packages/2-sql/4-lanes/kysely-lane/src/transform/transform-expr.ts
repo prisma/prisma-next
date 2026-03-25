@@ -1,5 +1,10 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { BinaryOp, JoinOnExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type {
+  AnyWhereExpr,
+  BinaryOp,
+  JoinOnExpr,
+  WhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
   BinaryExpr,
@@ -251,13 +256,14 @@ export function transformJoinOn(
     );
   }
 
+  const narrowed = expr as AnyWhereExpr;
   if (
-    expr.kind === 'binary' &&
-    expr.op === 'eq' &&
-    expr.left.kind === 'column-ref' &&
-    expr.right.kind === 'column-ref'
+    narrowed.kind === 'binary' &&
+    narrowed.op === 'eq' &&
+    narrowed.left.kind === 'column-ref' &&
+    narrowed.right.kind === 'column-ref'
   ) {
-    return EqColJoinOn.of(expr.left, expr.right);
+    return EqColJoinOn.of(narrowed.left as ColumnRef, narrowed.right as ColumnRef);
   }
 
   return expr;

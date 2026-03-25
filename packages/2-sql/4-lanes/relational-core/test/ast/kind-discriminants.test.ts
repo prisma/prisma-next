@@ -3,7 +3,6 @@ import {
   AggregateExpr,
   AndExpr,
   BinaryExpr,
-  ColumnRef,
   DefaultValueExpr,
   DeleteAst,
   DerivedTableSource,
@@ -19,17 +18,14 @@ import {
   ListLiteralExpr,
   LiteralExpr,
   NullCheckExpr,
-  OperationExpr,
   OrderByItem,
   OrExpr,
-  ParamRef,
   ProjectionItem,
   SelectAst,
   SubqueryExpr,
-  TableSource,
   UpdateAst,
 } from '../../src/exports/ast';
-import { col, lowerExpr, param, stringReturn, table } from './test-helpers';
+import { col, lowerExpr, param, table } from './test-helpers';
 
 const minimalSelect = SelectAst.from(table('t'));
 
