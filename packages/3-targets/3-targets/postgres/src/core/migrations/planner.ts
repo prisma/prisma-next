@@ -143,7 +143,13 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       ...storageTypePlan.operations,
       ...reconciliationPlan.operations,
       ...this.buildTableOperations(sortedTables, options.schema, schemaName, codecHooks),
-      ...this.buildColumnOperations(sortedTables, options.schema, schemaName, codecHooks),
+      ...this.buildColumnOperations(
+        sortedTables,
+        options.schema,
+        schemaLookups,
+        schemaName,
+        codecHooks,
+      ),
       ...this.buildPrimaryKeyOperations(sortedTables, options.schema, schemaName),
       ...this.buildUniqueOperations(sortedTables, schemaLookups, schemaName),
       ...this.buildIndexOperations(sortedTables, schemaLookups, schemaName),
@@ -315,6 +321,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   private buildColumnOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
     codecHooks: Map<string, CodecControlHooks>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
@@ -324,25 +331,40 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       if (!schemaTable) {
         continue;
       }
+      const schemaLookup = schemaLookups.get(tableName);
       for (const [columnName, column] of sortedEntries(table.columns)) {
         if (schemaTable.columns[columnName]) {
           continue;
         }
         operations.push(
-          this.buildAddColumnOperation(schemaName, tableName, columnName, column, codecHooks),
+          this.buildAddColumnOperation({
+            schema: schemaName,
+            tableName,
+            table,
+            schemaTable,
+            schemaLookup,
+            columnName,
+            column,
+            codecHooks,
+          }),
         );
       }
     }
     return operations;
   }
 
-  private buildAddColumnOperation(
-    schema: string,
-    tableName: string,
-    columnName: string,
-    column: StorageColumn,
-    codecHooks: Map<string, CodecControlHooks>,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  private buildAddColumnOperation(options: {
+    readonly schema: string;
+    readonly tableName: string;
+    readonly table: StorageTable;
+    readonly schemaTable: SqlSchemaIR['tables'][string];
+    readonly schemaLookup?: SchemaTableLookup;
+    readonly columnName: string;
+    readonly column: StorageColumn;
+    readonly codecHooks: Map<string, CodecControlHooks>;
+  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    const { schema, tableName, table, schemaTable, schemaLookup, columnName, column, codecHooks } =
+      options;
     const notNull = column.nullable === false;
     const hasDefault = column.default !== undefined;
     // Planner logic decides whether this column needs the coordinated multi-step
@@ -351,8 +373,17 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const temporaryDefault = needsTemporaryDefault
       ? resolveTemporaryDefaultLiteral(column, codecHooks)
       : null;
+    const canUseSharedTemporaryDefault =
+      needsTemporaryDefault &&
+      temporaryDefault !== null &&
+      canUseSharedTemporaryDefaultStrategy({
+        table,
+        schemaTable,
+        schemaLookup,
+        columnName,
+      });
 
-    if (needsTemporaryDefault && temporaryDefault !== null) {
+    if (canUseSharedTemporaryDefault) {
       return buildAddNotNullColumnWithTemporaryDefaultOperation({
         schema,
         tableName,
@@ -364,7 +395,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     }
 
     const qualified = qualifyTableName(schema, tableName);
-    const requiresEmptyTableCheck = needsTemporaryDefault && temporaryDefault === null;
+    const requiresEmptyTableCheck = needsTemporaryDefault && !canUseSharedTemporaryDefault;
     return {
       ...buildAddColumnOperationIdentity(schema, tableName, columnName),
       operationClass: 'additive',
@@ -719,6 +750,41 @@ function buildAddColumnOperationIdentity(
       details: buildTargetDetails('table', tableName, schema),
     },
   };
+}
+
+function canUseSharedTemporaryDefaultStrategy(options: {
+  readonly table: StorageTable;
+  readonly schemaTable: SqlSchemaIR['tables'][string];
+  readonly schemaLookup?: SchemaTableLookup;
+  readonly columnName: string;
+}): boolean {
+  const { table, schemaTable, schemaLookup, columnName } = options;
+
+  // Shared placeholders are only safe when later plan steps do not require
+  // row-specific values for this newly added column.
+  if (table.primaryKey?.columns.includes(columnName) && !schemaTable.primaryKey) {
+    return false;
+  }
+
+  for (const unique of table.uniques) {
+    if (!unique.columns.includes(columnName)) {
+      continue;
+    }
+    if (!schemaLookup || !hasUniqueConstraint(schemaLookup, unique.columns)) {
+      return false;
+    }
+  }
+
+  for (const foreignKey of table.foreignKeys) {
+    if (foreignKey.constraint === false || !foreignKey.columns.includes(columnName)) {
+      continue;
+    }
+    if (!schemaLookup || !hasForeignKey(schemaLookup, foreignKey)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {

@@ -3,7 +3,7 @@ import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import {
@@ -261,6 +261,119 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
+  it('uses the empty-table fallback when the new column becomes a primary key later in the same plan', () => {
+    const operations = planUserTableOperations(
+      {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['slug'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+      {
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
+        uniques: [],
+        foreignKeys: [],
+        indexes: [],
+      },
+    );
+
+    const addCol = getRequiredOperation(operations, 'column.user.slug');
+    expect(addCol.precheck.map((p) => p.sql)).toContain(
+      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+    );
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "slug" text NOT NULL`,
+    ]);
+    expect(operations.map((op) => op.id)).toContain('primaryKey.user.user_pkey');
+  });
+
+  it('uses the empty-table fallback when the new column becomes unique later in the same plan', () => {
+    const operations = planUserTableOperations(
+      {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [{ columns: ['slug'] }],
+        indexes: [],
+        foreignKeys: [],
+      },
+      buildUserTableSchemaWithoutEmail(),
+    );
+
+    const addCol = getRequiredOperation(operations, 'column.user.slug');
+    expect(addCol.precheck.map((p) => p.sql)).toContain(
+      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+    );
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "slug" text NOT NULL`,
+    ]);
+    expect(operations.map((op) => op.id)).toContain('unique.user.user_slug_key');
+  });
+
+  it('uses the empty-table fallback when the new column becomes a foreign key later in the same plan', () => {
+    const operations = planUserTableOperations(
+      {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          orgId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [
+          {
+            columns: ['orgId'],
+            references: { table: 'org', columns: ['id'] },
+            constraint: true,
+            index: true,
+          },
+        ],
+      },
+      buildUserTableSchemaWithoutEmail(),
+      {
+        extraContractTables: {
+          org: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+        extraSchemaTables: {
+          org: {
+            name: 'org',
+            columns: {
+              id: { name: 'id', nativeType: 'uuid', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            foreignKeys: [],
+            indexes: [],
+          },
+        },
+      },
+    );
+
+    const addCol = getRequiredOperation(operations, 'column.user.orgId');
+    expect(addCol.precheck.map((p) => p.sql)).toContain(
+      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+    );
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "orgId" uuid NOT NULL`,
+    ]);
+    expect(operations.map((op) => op.id)).toContain('foreignKey.user.user_orgId_fkey');
+  });
+
   it('skips temporary default for nullable columns', () => {
     const addCol = planAddColumn('bio', {
       nativeType: 'text',
@@ -418,46 +531,21 @@ function planAddColumn(
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
   },
 ) {
-  const planner = createPostgresMigrationPlanner();
-  const contract = createTestContract({
-    storage: {
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            [columnName]: columnDef,
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
+  const operations = planUserTableOperations(
+    {
+      columns: {
+        id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        [columnName]: columnDef,
       },
+      primaryKey: { columns: ['id'] },
+      uniques: [],
+      indexes: [],
+      foreignKeys: [],
     },
-  });
-  const schema: SqlSchemaIR = {
-    tables: {
-      user: {
-        name: 'user',
-        columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        foreignKeys: [],
-        indexes: [],
-      },
-    },
-    dependencies: [],
-  };
-  const result = planner.plan({
-    contract,
-    schema,
-    policy: INIT_ADDITIVE_POLICY,
-    frameworkComponents: options?.frameworkComponents ?? [],
-  });
-  if (result.kind !== 'success') throw new Error('expected planner success');
-  const op = result.plan.operations.find((o) => o.id === `column.user.${columnName}`);
-  if (!op) throw new Error(`operation column.user.${columnName} not found`);
-  return op;
+    buildUserTableSchemaWithoutEmail(),
+    options,
+  );
+  return getRequiredOperation(operations, `column.user.${columnName}`);
 }
 
 function createPlannerControlHookComponent(
@@ -480,6 +568,60 @@ function createPlannerControlHookComponent(
       },
     },
   } as TargetBoundComponentDescriptor<'sql', 'postgres'>;
+}
+
+function planUserTableOperations(
+  userTable: StorageTable,
+  schemaUserTable: SqlSchemaIR['tables'][string],
+  options?: {
+    frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
+    extraContractTables?: SqlContract<SqlStorage>['storage']['tables'];
+    extraSchemaTables?: SqlSchemaIR['tables'];
+  },
+) {
+  const planner = createPostgresMigrationPlanner();
+  const contract = createTestContract({
+    storage: {
+      tables: {
+        ...(options?.extraContractTables ?? {}),
+        user: userTable,
+      },
+    },
+  });
+  const schema: SqlSchemaIR = {
+    tables: {
+      ...(options?.extraSchemaTables ?? {}),
+      user: schemaUserTable,
+    },
+    dependencies: [],
+  };
+  const result = planner.plan({
+    contract,
+    schema,
+    policy: INIT_ADDITIVE_POLICY,
+    frameworkComponents: options?.frameworkComponents ?? [],
+  });
+  if (result.kind !== 'success') throw new Error('expected planner success');
+  return result.plan.operations;
+}
+
+function getRequiredOperation(operations: ReturnType<typeof planUserTableOperations>, id: string) {
+  const operation = operations.find((candidate) => candidate.id === id);
+  if (!operation) {
+    throw new Error(`operation ${id} not found`);
+  }
+  return operation;
+}
+
+function buildUserTableSchemaWithoutEmail(): SqlSchemaIR['tables'][string] {
+  return {
+    name: 'user',
+    columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    foreignKeys: [],
+    indexes: [],
+  };
 }
 
 function buildPostTableSchema(): SqlSchemaIR['tables'][string] {
