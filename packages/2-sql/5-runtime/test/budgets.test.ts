@@ -333,6 +333,23 @@ describe('budgets plugin', () => {
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
           category: 'BUDGET',
+          details: expect.objectContaining({ source: 'ast' }),
+        });
+      },
+      timeouts.default,
+    );
+
+    it(
+      'throws for unbounded SelectAst without table refs',
+      async () => {
+        const ast = SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]);
+        const plan = createPlan({ ast });
+        const plugin = budgets({ maxRows: 50 });
+        const ctx = createPluginContext();
+
+        await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+          details: expect.objectContaining({ source: 'ast' }),
         });
       },
       timeouts.default,
@@ -407,6 +424,7 @@ describe('budgets plugin', () => {
 
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
+          details: expect.objectContaining({ source: 'ast' }),
         });
       },
       timeouts.default,
