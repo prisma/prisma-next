@@ -3,8 +3,6 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type BoundWhereExpr,
   ListLiteralExpr,
-  ParamRef,
-  SelectAst,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { CompiledQuery } from 'kysely';
@@ -29,7 +27,7 @@ export function buildKyselyWhereExpr<Row>(
   options: BuildKyselyPlanOptions = {},
 ): ToWhereExpr {
   const plan = buildKyselyPlan(contract, compiledQuery, options);
-  if (!(plan.ast instanceof SelectAst) || !plan.ast.where) {
+  if (plan.ast.kind !== 'select' || !plan.ast.where) {
     throw new Error('whereExpr(...) requires a select query with a where clause');
   }
 
@@ -97,7 +95,7 @@ function remapParamIndexes(
     listLiteral: (list) =>
       new ListLiteralExpr(
         list.values.map((value) => {
-          if (!(value instanceof ParamRef)) {
+          if (value.kind !== 'param-ref') {
             return value;
           }
           const newIndex = remap.get(value.index);

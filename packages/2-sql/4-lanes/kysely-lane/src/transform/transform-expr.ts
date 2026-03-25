@@ -3,7 +3,7 @@ import type { BinaryOp, JoinOnExpr, WhereExpr } from '@prisma-next/sql-relationa
 import {
   AndExpr,
   BinaryExpr,
-  ColumnRef,
+  type ColumnRef,
   EqColJoinOn,
   ListLiteralExpr,
   LiteralExpr,
@@ -252,10 +252,10 @@ export function transformJoinOn(
   }
 
   if (
-    expr instanceof BinaryExpr &&
+    expr.kind === 'binary' &&
     expr.op === 'eq' &&
-    expr.left instanceof ColumnRef &&
-    expr.right instanceof ColumnRef
+    expr.left.kind === 'column-ref' &&
+    expr.right.kind === 'column-ref'
   ) {
     return EqColJoinOn.of(expr.left, expr.right);
   }

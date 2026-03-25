@@ -9,7 +9,7 @@
  */
 import type { PlanRefs } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { ColumnRef, type QueryAst, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { QueryAst } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { DeleteQueryNode, InsertQueryNode, SelectQueryNode, UpdateQueryNode } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
@@ -77,17 +77,17 @@ export function transformKyselyToPnAst(
 
   let projection: Record<string, string> | undefined;
   let projectionTypes: Record<string, string> | undefined;
-  if (ast instanceof SelectAst) {
+  if (ast.kind === 'select') {
     projection = Object.fromEntries(
       ast.projection.map((projected) => [
         projected.alias,
-        projected.expr instanceof ColumnRef ? projected.expr.column : projected.alias,
+        projected.expr.kind === 'column-ref' ? projected.expr.column : projected.alias,
       ]),
     );
 
     projectionTypes = {};
     for (const projected of ast.projection) {
-      if (projected.expr instanceof ColumnRef) {
+      if (projected.expr.kind === 'column-ref') {
         const column =
           ctx.contract.storage.tables[projected.expr.table]?.columns[projected.expr.column];
         if (column) {
@@ -105,8 +105,8 @@ export function transformKyselyToPnAst(
       'projectionTypes',
       projectionTypes && Object.keys(projectionTypes).length > 0 ? projectionTypes : undefined,
     ),
-    ...ifDefined('selectAllIntent', ast instanceof SelectAst ? ast.selectAllIntent : undefined),
-    ...ifDefined('limit', ast instanceof SelectAst ? ast.limit : undefined),
+    ...ifDefined('selectAllIntent', ast.kind === 'select' ? ast.selectAllIntent : undefined),
+    ...ifDefined('limit', ast.kind === 'select' ? ast.limit : undefined),
   };
 
   return { ast, metaAdditions };
@@ -159,17 +159,17 @@ export function transformKyselyToPnAstCollectingParams(
 
   let projection: Record<string, string> | undefined;
   let projectionTypes: Record<string, string> | undefined;
-  if (ast instanceof SelectAst) {
+  if (ast.kind === 'select') {
     projection = Object.fromEntries(
       ast.projection.map((projected) => [
         projected.alias,
-        projected.expr instanceof ColumnRef ? projected.expr.column : projected.alias,
+        projected.expr.kind === 'column-ref' ? projected.expr.column : projected.alias,
       ]),
     );
 
     projectionTypes = {};
     for (const projected of ast.projection) {
-      if (projected.expr instanceof ColumnRef) {
+      if (projected.expr.kind === 'column-ref') {
         const column =
           ctx.contract.storage.tables[projected.expr.table]?.columns[projected.expr.column];
         if (column) {
@@ -187,8 +187,8 @@ export function transformKyselyToPnAstCollectingParams(
       'projectionTypes',
       projectionTypes && Object.keys(projectionTypes).length > 0 ? projectionTypes : undefined,
     ),
-    ...ifDefined('selectAllIntent', ast instanceof SelectAst ? ast.selectAllIntent : undefined),
-    ...ifDefined('limit', ast instanceof SelectAst ? ast.limit : undefined),
+    ...ifDefined('selectAllIntent', ast.kind === 'select' ? ast.selectAllIntent : undefined),
+    ...ifDefined('limit', ast.kind === 'select' ? ast.limit : undefined),
   };
 
   return { ast, params: ctx.params, metaAdditions };
