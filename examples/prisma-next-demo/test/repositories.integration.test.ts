@@ -398,6 +398,9 @@ describe('ORM client integration examples', () => {
             seededUserIds.admin,
           ]);
           expect(users.map((user) => user.kind)).toEqual(['admin', 'admin']);
+          // TODO(TML-2120): IncludeRelationValue incorrectly omits included relations
+          // from the result type, requiring this manual type assertion. Remove once
+          // the ORM client's include type inference is fixed.
           type UserWithPosts = (typeof users)[number] & {
             posts: Array<{ id: string }>;
           };
