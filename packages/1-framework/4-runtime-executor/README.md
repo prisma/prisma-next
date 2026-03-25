@@ -77,8 +77,6 @@ const core = createRuntimeCore({
 - `computeSqlFingerprint` - SQL fingerprint computation
 - `parseContractMarkerRow` - Marker parsing utilities
 
-**Note:** The `lints` and `budgets` plugins have been migrated to the SQL domain. Import them from `@prisma-next/sql-runtime` instead.
-
 ## Testing
 
 Includes a mock-family smoke test (`test/mock-family.test.ts`) that proves runtime-executor can work without SQL dependencies.
