@@ -170,8 +170,8 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
     }
   }
 }
-d;
-escribe('ORM client integration examples', () => {
+
+describe('ORM client integration examples', () => {
   it(
     'ormClientGetUsers returns limited rows',
     async () => {
