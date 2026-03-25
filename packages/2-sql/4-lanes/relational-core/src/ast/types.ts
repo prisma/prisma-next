@@ -194,10 +194,6 @@ function mergeRefsInto(
   }
 }
 
-// Node dispatch relies solely on instanceof. If multiple copies of this package
-// end up in node_modules (hoisting issues, misaligned workspace versions), instanceof
-// checks fail silently. Consider adding a structural brand (kind tag / Symbol.hasInstance)
-// if this becomes a problem.
 export abstract class AstNode {
   abstract readonly kind: string;
 

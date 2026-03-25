@@ -30,7 +30,7 @@ function collectParamIndexes(expr: WhereExpr): number[] {
     combine: (a, b) => [...a, ...b],
     paramRef: (param) => [param.index],
     listLiteral: (list) =>
-      list.values.flatMap((value) => (value instanceof ParamRef ? [value.index] : [])),
+      list.values.flatMap((value) => (value.kind === 'param-ref' ? [value.index] : [])),
   });
 }
 

@@ -1,4 +1,4 @@
-import { DoNothingConflictAction, InsertAst } from '@prisma-next/sql-relational-core/ast';
+import { DoNothingConflictAction, type InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
@@ -12,7 +12,7 @@ import {
 import { seedUsers } from './runtime-helpers';
 
 function isInsertAst(ast: unknown): ast is InsertAst {
-  return ast instanceof InsertAst;
+  return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'insert';
 }
 
 describe('integration/upsert', () => {
