@@ -1,10 +1,9 @@
 import {
-  AggregateExpr,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
   ParamRef,
-  SelectAst,
+  type SelectAst,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -15,7 +14,7 @@ describe('SQL ORM collections with rich AST plans', () => {
     const { collection } = createCollectionFor('User');
 
     const direct = collection.where(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)));
-    expect(direct.state.filters[0]?.expr).toBeInstanceOf(BinaryExpr);
+    expect(direct.state.filters[0]?.expr?.kind).toBe('binary');
     expect(direct.state.filters[0]?.params).toEqual([1]);
 
     const bound = collection.where({
@@ -36,7 +35,7 @@ describe('SQL ORM collections with rich AST plans', () => {
     expect(row).toMatchObject({ id: 1, name: 'Alice' });
 
     const plan = runtime.executions[0]?.plan;
-    expect(plan?.ast).toBeInstanceOf(SelectAst);
+    expect(plan?.ast?.kind).toBe('select');
     expect((plan?.ast as SelectAst).limit).toBe(1);
     expect(plan?.meta.annotations).toEqual({ limit: 1 });
   });
@@ -56,9 +55,9 @@ describe('SQL ORM collections with rich AST plans', () => {
     expect(rows).toEqual([{ userId: 1, postCount: 2, totalViews: 30 }]);
 
     const plan = runtime.executions[0]?.plan;
-    expect(plan?.ast).toBeInstanceOf(SelectAst);
+    expect(plan?.ast?.kind).toBe('select');
     const ast = plan?.ast as SelectAst;
-    expect(ast.having).toBeInstanceOf(BinaryExpr);
-    expect((ast.having as BinaryExpr).left).toBeInstanceOf(AggregateExpr);
+    expect(ast!.having!.kind).toBe('binary');
+    expect((ast!.having as BinaryExpr).left.kind).toBe('aggregate');
   });
 });

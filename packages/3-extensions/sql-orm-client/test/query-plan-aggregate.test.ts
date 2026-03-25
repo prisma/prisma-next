@@ -124,7 +124,7 @@ describe('query plan aggregate', () => {
       ]),
     );
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.groupBy).toEqual([ColumnRef.of('posts', 'user_id')]);
     expect(ast.having).toEqual(
@@ -143,7 +143,7 @@ describe('query plan aggregate', () => {
       totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' },
     });
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.where).toEqual(filteredViews.expr);
     expect(plan.params).toEqual([100]);

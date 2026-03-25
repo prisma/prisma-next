@@ -3,13 +3,12 @@ import {
   BinaryExpr,
   type BoundWhereExpr,
   ColumnRef,
-  DerivedTableSource,
-  JoinAst,
+  type DerivedTableSource,
   ListLiteralExpr,
   OrExpr,
   ParamRef,
   type SelectAst,
-  SubqueryExpr,
+  type SubqueryExpr,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -57,11 +56,11 @@ function expectSelectAst(ast: unknown): asserts ast is SelectAst {
 }
 
 function expectSubqueryExpr(expr: unknown): asserts expr is SubqueryExpr {
-  expect(expr).toBeInstanceOf(SubqueryExpr);
+  expect((expr as { kind: string }).kind).toBe('subquery');
 }
 
 function expectDerivedTableSource(source: unknown): asserts source is DerivedTableSource {
-  expect(source).toBeInstanceOf(DerivedTableSource);
+  expect((source as { kind: string }).kind).toBe('derived-table-source');
 }
 
 describe('compileSelectWithIncludeStrategy', () => {
@@ -97,7 +96,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     const childRowsSource = postsProjection.expr.query.from;
     expectDerivedTableSource(childRowsSource);
 
-    expect(childRowsSource.query.where).toBeInstanceOf(AndExpr);
+    expect(childRowsSource.query.where.kind).toBe('and');
     expect(childRowsSource.query.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
@@ -204,7 +203,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     expectSelectAst(plan.ast);
 
     const join = plan.ast.joins?.[0];
-    expect(join).toBeInstanceOf(JoinAst);
+    expect(join?.kind).toBe('join');
     expect(join?.lateral).toBe(true);
     expectDerivedTableSource(join?.source);
 

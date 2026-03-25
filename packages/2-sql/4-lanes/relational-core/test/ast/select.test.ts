@@ -70,7 +70,7 @@ describe('ast/select', () => {
       .withWhere(ExistsExpr.exists(subquery));
 
     expect(selectAst.projection[0]?.expr).toEqual(lowerExpr(col('user', 'email')));
-    expect(selectAst.where).toBeInstanceOf(ExistsExpr);
+    expect(selectAst.where.kind).toBe('exists');
     expect((selectAst.where as ExistsExpr).subquery).toEqual(subquery);
   });
 

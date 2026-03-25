@@ -7,11 +7,9 @@ import {
   DefaultValueExpr,
   DeleteAst,
   DerivedTableSource,
-  DoNothingConflictAction,
-  DoUpdateSetConflictAction,
   EqColJoinOn,
   ExistsExpr,
-  Expression,
+  type Expression,
   InsertAst,
   InsertOnConflict,
   JoinAst,
@@ -25,12 +23,10 @@ import {
   OrExpr,
   ParamRef,
   ProjectionItem,
-  QueryAst,
   SelectAst,
   SubqueryExpr,
   TableSource,
   UpdateAst,
-  WhereExpr,
 } from '../../src/exports/ast';
 
 const stringReturn = { kind: 'builtin', type: 'string' } as const;
@@ -58,32 +54,32 @@ describe('rich SQL AST', () => {
     const literal = LiteralExpr.of('alice');
     const binary = BinaryExpr.eq(column, param);
 
-    expect(select).toBeInstanceOf(QueryAst);
-    expect(insert).toBeInstanceOf(QueryAst);
-    expect(update).toBeInstanceOf(QueryAst);
-    expect(del).toBeInstanceOf(QueryAst);
-    expect(column).toBeInstanceOf(Expression);
-    expect(SubqueryExpr.of(select)).toBeInstanceOf(Expression);
-    expect(lowerEmail(column, param, literal)).toBeInstanceOf(Expression);
-    expect(AggregateExpr.sum(column)).toBeInstanceOf(Expression);
-    expect(JsonObjectExpr.fromEntries([JsonObjectExpr.entry('id', column)])).toBeInstanceOf(
-      Expression,
+    expect(select.kind).toBe('select');
+    expect(insert.kind).toBe('insert');
+    expect(update.kind).toBe('update');
+    expect(del.kind).toBe('delete');
+    expect(column.kind).toBe('column-ref');
+    expect(SubqueryExpr.of(select).kind).toBe('subquery');
+    expect(lowerEmail(column, param, literal).kind).toBe('operation');
+    expect(AggregateExpr.sum(column).kind).toBe('aggregate');
+    expect(JsonObjectExpr.fromEntries([JsonObjectExpr.entry('id', column)]).kind).toBe(
+      'json-object',
     );
-    expect(JsonArrayAggExpr.of(column)).toBeInstanceOf(Expression);
-    expect(binary).toBeInstanceOf(WhereExpr);
-    expect(AndExpr.of([binary])).toBeInstanceOf(WhereExpr);
-    expect(OrExpr.of([binary])).toBeInstanceOf(WhereExpr);
-    expect(ExistsExpr.exists(select)).toBeInstanceOf(WhereExpr);
-    expect(NullCheckExpr.isNull(column)).toBeInstanceOf(WhereExpr);
-    expect(EqColJoinOn.of(column, ColumnRef.of('post', 'userId'))).toBeInstanceOf(EqColJoinOn);
-    expect(JoinAst.left(TableSource.named('post'), binary)).toBeInstanceOf(JoinAst);
-    expect(ProjectionItem.of('id', column)).toBeInstanceOf(ProjectionItem);
-    expect(OrderByItem.asc(column)).toBeInstanceOf(OrderByItem);
-    expect(InsertOnConflict.on([column]).action).toBeInstanceOf(DoNothingConflictAction);
-    expect(InsertOnConflict.on([column]).doUpdateSet({ id: param }).action).toBeInstanceOf(
-      DoUpdateSetConflictAction,
+    expect(JsonArrayAggExpr.of(column).kind).toBe('json-array-agg');
+    expect(binary.kind).toBe('binary');
+    expect(AndExpr.of([binary]).kind).toBe('and');
+    expect(OrExpr.of([binary]).kind).toBe('or');
+    expect(ExistsExpr.exists(select).kind).toBe('exists');
+    expect(NullCheckExpr.isNull(column).kind).toBe('null-check');
+    expect(EqColJoinOn.of(column, ColumnRef.of('post', 'userId')).kind).toBe('eq-col-join-on');
+    expect(JoinAst.left(TableSource.named('post'), binary).kind).toBe('join');
+    expect(ProjectionItem.of('id', column).kind).toBe('projection-item');
+    expect(OrderByItem.asc(column).kind).toBe('order-by-item');
+    expect(InsertOnConflict.on([column]).action.kind).toBe('do-nothing');
+    expect(InsertOnConflict.on([column]).doUpdateSet({ id: param }).action.kind).toBe(
+      'do-update-set',
     );
-    expect(new DefaultValueExpr()).toBeInstanceOf(DefaultValueExpr);
+    expect(new DefaultValueExpr().kind).toBe('default-value');
   });
 
   it('supports fluent immutable query construction', () => {
@@ -159,7 +155,7 @@ describe('rich SQL AST', () => {
     expect(rewritten.from).toEqual(TableSource.named('member'));
     expect(rewritten.limit).toBe(99);
     expect(rewritten.projection[0]?.expr).toEqual(ColumnRef.of('member', 'id'));
-    expect(rewritten.projection[1]?.expr).toBeInstanceOf(OperationExpr);
+    expect(rewritten.projection[1]?.expr?.kind).toBe('operation');
     expect((rewritten.projection[1]?.expr as OperationExpr).args[0]).toEqual(
       ParamRef.of(10, 'email'),
     );

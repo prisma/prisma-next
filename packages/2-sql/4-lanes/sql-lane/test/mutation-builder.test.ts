@@ -1,11 +1,5 @@
-import {
-  BinaryExpr,
-  ColumnRef,
-  DeleteAst,
-  InsertAst,
-  ParamRef,
-  UpdateAst,
-} from '@prisma-next/sql-relational-core/ast';
+import type { DeleteAst, InsertAst, UpdateAst } from '@prisma-next/sql-relational-core/ast';
+import { BinaryExpr, ColumnRef, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { describe, expect, it } from 'vitest';
@@ -27,7 +21,7 @@ describe('mutation builders', () => {
       .returning(tables.user.columns.id, tables.user.columns.email)
       .build({ params: { email: 'test@example.com', createdAt: new Date('2024-01-01') } });
 
-    expect(plan.ast).toBeInstanceOf(InsertAst);
+    expect(plan.ast.kind).toBe('insert');
     const ast = plan.ast as InsertAst;
     expect(ast.rows[0]).toMatchObject({
       email: ParamRef.of(1, 'email'),
@@ -48,7 +42,7 @@ describe('mutation builders', () => {
       .returning(tables.user.columns.id, tables.user.columns.email)
       .build({ params: { userId: 1 } });
 
-    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
+    expect(updatePlan.ast.kind).toBe('update');
     expect((updatePlan.ast as UpdateAst).where).toEqual(
       BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(2, 'userId')),
     );
@@ -56,7 +50,7 @@ describe('mutation builders', () => {
       ColumnRef.of('user', 'id'),
       ColumnRef.of('user', 'email'),
     ]);
-    expect(deletePlan.ast).toBeInstanceOf(DeleteAst);
+    expect(deletePlan.ast.kind).toBe('delete');
     expect((deletePlan.ast as DeleteAst).returning).toEqual([
       ColumnRef.of('user', 'id'),
       ColumnRef.of('user', 'email'),
@@ -116,7 +110,7 @@ describe('mutation builders', () => {
       })
       .build({ params: { createdAt: new Date('2024-01-01T00:00:00.000Z') } });
 
-    expect(insertPlan.ast).toBeInstanceOf(InsertAst);
+    expect(insertPlan.ast.kind).toBe('insert');
     expect(insertPlan.params).toHaveLength(2);
     expect((insertPlan.ast as InsertAst).rows[0]).toMatchObject({
       createdAt: ParamRef.of(1, 'createdAt'),
@@ -134,7 +128,7 @@ describe('mutation builders', () => {
       .where(defaultTables.user.columns.id.eq(param('userId')))
       .build({ params: { newEmail: 'updated@example.com', userId: 1 } });
 
-    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
+    expect(updatePlan.ast.kind).toBe('update');
     expect(updatePlan.params).toHaveLength(3);
     expect((updatePlan.ast as UpdateAst).set).toMatchObject({
       email: ParamRef.of(1, 'newEmail'),

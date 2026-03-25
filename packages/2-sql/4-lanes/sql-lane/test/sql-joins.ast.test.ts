@@ -12,7 +12,7 @@ describe('Join AST types', () => {
   it('defines eq-column join predicates as rich objects', () => {
     const onExpr = EqColJoinOn.of(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId'));
 
-    expect(onExpr).toBeInstanceOf(EqColJoinOn);
+    expect(onExpr.kind).toBe('eq-col-join-on');
     expect(onExpr.left).toEqual(ColumnRef.of('user', 'id'));
     expect(onExpr.right).toEqual(ColumnRef.of('post', 'userId'));
   });
@@ -23,10 +23,10 @@ describe('Join AST types', () => {
       EqColJoinOn.of(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId')),
     );
 
-    expect(joinAst).toBeInstanceOf(JoinAst);
+    expect(joinAst.kind).toBe('join');
     expect(joinAst.joinType).toBe('inner');
     expect(joinAst.source).toEqual(TableSource.named('post'));
-    expect(joinAst.on).toBeInstanceOf(EqColJoinOn);
+    expect(joinAst.on.kind).toBe('eq-col-join-on');
   });
 
   it('allows selects with and without joins', () => {

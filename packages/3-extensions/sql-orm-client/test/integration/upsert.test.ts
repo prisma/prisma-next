@@ -1,4 +1,4 @@
-import { DoNothingConflictAction, type InsertAst } from '@prisma-next/sql-relational-core/ast';
+import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
@@ -132,7 +132,7 @@ describe('integration/upsert', () => {
         if (!isInsertAst(insertPlanAst)) {
           throw new Error('Expected first empty-update upsert execution to emit an insert AST');
         }
-        expect(insertPlanAst.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+        expect(insertPlanAst.onConflict?.action?.kind).toBe('do-nothing');
 
         runtime.resetExecutions();
         const existing = await users.upsert({
@@ -151,7 +151,7 @@ describe('integration/upsert', () => {
         if (!isInsertAst(conflictPlanAst)) {
           throw new Error('Expected second empty-update upsert execution to emit an insert AST');
         }
-        expect(conflictPlanAst.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+        expect(conflictPlanAst.onConflict?.action?.kind).toBe('do-nothing');
 
         expect(await users.first({ id: 1 })).toEqual({
           id: 1,

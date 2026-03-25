@@ -3,7 +3,6 @@ import {
   ColumnRef,
   type DerivedTableSource,
   type JsonArrayAggExpr,
-  JsonObjectExpr,
   OrderByItem,
   type SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -499,7 +498,7 @@ describe('integration/include', () => {
         const includeAggregateProjection = postsProjection.expr.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
-        expect(includeAggregateProjection.expr.expr).toBeInstanceOf(JsonObjectExpr);
+        expect(includeAggregateProjection.expr.expr.kind).toBe('json-object');
       });
     },
     timeouts.spinUpPpgDev,

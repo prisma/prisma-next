@@ -1,7 +1,6 @@
 import {
   ColumnRef,
   EqColJoinOn,
-  JoinAst,
   ProjectionItem,
   type SelectAst,
   TableSource,
@@ -33,7 +32,7 @@ describe('SQL join builder', () => {
       .build();
 
     const join = (plan.ast as SelectAst).joins?.[0];
-    expect(join).toBeInstanceOf(JoinAst);
+    expect(join?.kind).toBe('join');
     expect(join?.joinType).toBe(expectedJoinType);
     expect(join?.source).toEqual(TableSource.named('post'));
     expect(join?.on).toEqual(

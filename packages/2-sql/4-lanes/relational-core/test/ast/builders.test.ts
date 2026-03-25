@@ -3,8 +3,6 @@ import {
   BinaryExpr,
   DefaultValueExpr,
   DeleteAst,
-  DoNothingConflictAction,
-  DoUpdateSetConflictAction,
   InsertAst,
   InsertOnConflict,
   OrderByItem,
@@ -51,7 +49,7 @@ describe('ast/builders', () => {
       .withReturning([col('user', 'id')]);
 
     expect(ast.onConflict?.columns).toEqual([col('user', 'id')]);
-    expect(ast.onConflict?.action).toBeInstanceOf(DoUpdateSetConflictAction);
+    expect(ast.onConflict?.action?.kind).toBe('do-update-set');
     expect(ast.returning).toEqual([col('user', 'id')]);
   });
 
@@ -72,7 +70,7 @@ describe('ast/builders', () => {
       },
     ]);
 
-    expect(conflictAst.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+    expect(conflictAst.onConflict?.action?.kind).toBe('do-nothing');
     expect(rowAst.rows).toEqual([
       {
         id: param(1, 'id'),

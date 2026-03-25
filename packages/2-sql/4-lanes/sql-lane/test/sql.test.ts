@@ -1,11 +1,11 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
+import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
   ColumnRef,
   OrderByItem,
   ParamRef,
   ProjectionItem,
-  SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -32,7 +32,7 @@ describe('sql DSL builder', () => {
       .limit(5)
       .build({ params: { userId: 42 } });
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.projection).toEqual([
       ProjectionItem.of('id', ColumnRef.of('user', 'id')),

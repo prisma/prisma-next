@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   AggregateExpr,
-  ColumnRef,
   JsonArrayAggExpr,
   JsonObjectExpr,
   LiteralExpr,
   OperationExpr,
   OrderByItem,
-  ParamRef,
-  TableSource,
 } from '../../src/exports/ast';
 import { col, lit, lowerExpr, param, stringReturn, table } from './test-helpers';
 
@@ -17,9 +14,9 @@ describe('ast/common', () => {
     const source = table('user', 'u');
     const column = col('user', 'id');
 
-    expect(source).toBeInstanceOf(TableSource);
+    expect(source.kind).toBe('table-source');
     expect(source).toMatchObject({ name: 'user', alias: 'u' });
-    expect(column).toBeInstanceOf(ColumnRef);
+    expect(column.kind).toBe('column-ref');
     expect(column).toMatchObject({ table: 'user', column: 'id' });
   });
 
@@ -27,7 +24,7 @@ describe('ast/common', () => {
     const original = param(1, 'userId');
     const shifted = original.withIndex(4);
 
-    expect(original).toBeInstanceOf(ParamRef);
+    expect(original.kind).toBe('param-ref');
     expect(original).toMatchObject({ index: 1, name: 'userId' });
     expect(shifted).toEqual(param(4, 'userId'));
     expect(shifted).not.toBe(original);
@@ -49,7 +46,7 @@ describe('ast/common', () => {
     });
     const lowered = lowerExpr(col('user', 'email'));
 
-    expect(explicit).toBeInstanceOf(OperationExpr);
+    expect(explicit.kind).toBe('operation');
     expect(explicit).toMatchObject({ method: 'concat', args: [param(0, 'suffix')] });
     expect(explicit.baseColumnRef()).toEqual(col('user', 'email'));
     expect(lowered.lowering).toEqual({
