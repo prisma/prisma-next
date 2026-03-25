@@ -1,17 +1,17 @@
 export type {
   AfterExecuteResult,
-  BudgetsOptions,
   Log,
   Plugin,
   PluginContext,
 } from '@prisma-next/runtime-executor';
-export { budgets } from '@prisma-next/runtime-executor';
 export {
   extractCodecIds,
   validateCodecRegistryCompleteness,
   validateContractCodecMappings,
 } from '../codecs/validation';
 export { lowerSqlPlan } from '../lower-sql-plan';
+export type { BudgetsOptions } from '../plugins/budgets';
+export { budgets } from '../plugins/budgets';
 export type { LintsOptions } from '../plugins/lints';
 export { lints } from '../plugins/lints';
 export type {

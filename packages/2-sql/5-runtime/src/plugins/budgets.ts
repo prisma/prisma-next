@@ -1,5 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { AfterExecuteResult, Plugin, PluginContext } from './types';
+import type { AfterExecuteResult, Plugin, PluginContext } from '@prisma-next/runtime-executor';
 
 export interface BudgetsOptions {
   readonly maxRows?: number;
