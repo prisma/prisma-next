@@ -1,10 +1,5 @@
 # Testing Guide
 
-**Last Updated:** 2025-01-27
-**Purpose:** Guide for writing maintainable, readable tests in Prisma Next
-
----
-
 ## Testing Philosophy
 
 Our testing approach is guided by four core principles:
