@@ -5,12 +5,10 @@ export function createColumnParamDescriptor(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   columnName: string,
-  index: number,
-): ParamDescriptor {
+): Omit<ParamDescriptor, 'index'> {
   const columnMeta = contract.storage.tables[tableName]?.columns[columnName];
 
   return {
-    index,
     name: columnName,
     source: 'dsl',
     ...(columnMeta

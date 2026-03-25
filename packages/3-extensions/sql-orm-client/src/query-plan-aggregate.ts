@@ -112,7 +112,18 @@ export function compileAggregate(
     ast = ast.withWhere(where.expr);
   }
 
-  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
+  const collectedParams = ast.collectParamRefs();
+  return buildOrmQueryPlan(
+    contract,
+    ast,
+    collectedParams.map((p) => p.value),
+    collectedParams.map((p) => ({
+      name: p.name,
+      source: 'dsl' as const,
+      ...(p.codecId ? { codecId: p.codecId } : {}),
+      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
+    })),
+  );
 }
 
 export function compileGroupedAggregate(
@@ -151,5 +162,16 @@ export function compileGroupedAggregate(
     ast = ast.withHaving(validateGroupedHavingExpr(havingExpr));
   }
 
-  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
+  const collectedParams = ast.collectParamRefs();
+  return buildOrmQueryPlan(
+    contract,
+    ast,
+    collectedParams.map((p) => p.value),
+    collectedParams.map((p) => ({
+      name: p.name,
+      source: 'dsl' as const,
+      ...(p.codecId ? { codecId: p.codecId } : {}),
+      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
+    })),
+  );
 }

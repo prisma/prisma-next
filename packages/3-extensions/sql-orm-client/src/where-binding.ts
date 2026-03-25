@@ -1,4 +1,3 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
@@ -22,60 +21,46 @@ import {
   ProjectionItem,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { createColumnParamDescriptor } from './param-descriptors';
-
-interface BindState {
-  readonly params: unknown[];
-  readonly paramDescriptors: ParamDescriptor[];
-}
 
 export function bindWhereExpr(
   contract: SqlContract<SqlStorage>,
   expr: AnyWhereExpr,
 ): BoundWhereExpr {
-  const state: BindState = {
-    params: [],
-    paramDescriptors: [],
-  };
-
   return {
-    expr: bindWhereExprNode(contract, expr, state),
-    params: state.params,
-    paramDescriptors: state.paramDescriptors,
+    expr: bindWhereExprNode(contract, expr),
   };
 }
 
 function bindWhereExprNode(
   contract: SqlContract<SqlStorage>,
   expr: AnyWhereExpr,
-  state: BindState,
 ): AnyWhereExpr {
   return expr.accept<AnyWhereExpr>({
     binary(expr) {
-      const left = bindExpression(contract, expr.left, state);
+      const left = bindExpression(contract, expr.left);
       const bindingColumn = left.kind === 'column-ref' ? left : undefined;
 
       return new BinaryExpr(
         expr.op,
         left,
-        bindComparable(contract, expr.right, bindingColumn, state),
+        bindComparable(contract, expr.right, bindingColumn),
       );
     },
     and(expr) {
-      return AndExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part, state)));
+      return AndExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part)));
     },
     or(expr) {
-      return OrExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part, state)));
+      return OrExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part)));
     },
     exists(expr) {
       return expr.notExists
-        ? ExistsExpr.notExists(bindSelectAst(contract, expr.subquery, state))
-        : ExistsExpr.exists(bindSelectAst(contract, expr.subquery, state));
+        ? ExistsExpr.notExists(bindSelectAst(contract, expr.subquery))
+        : ExistsExpr.exists(bindSelectAst(contract, expr.subquery));
     },
     nullCheck(expr) {
       return expr.isNull
-        ? NullCheckExpr.isNull(bindExpression(contract, expr.expr, state))
-        : NullCheckExpr.isNotNull(bindExpression(contract, expr.expr, state));
+        ? NullCheckExpr.isNull(bindExpression(contract, expr.expr))
+        : NullCheckExpr.isNotNull(bindExpression(contract, expr.expr));
     },
   });
 }
@@ -84,84 +69,79 @@ function bindComparable(
   contract: SqlContract<SqlStorage>,
   comparable: AnySqlComparable,
   bindingColumn: ColumnRef | undefined,
-  state: BindState,
 ): AnySqlComparable {
   if (comparable.kind === 'param-ref' || bindingColumn === undefined) {
     return comparable.kind === 'param-ref'
       ? comparable
       : comparable.kind === 'literal' || comparable.kind === 'list-literal'
         ? comparable
-        : bindExpression(contract, comparable, state);
+        : bindExpression(contract, comparable);
   }
 
   if (comparable.kind === 'literal') {
-    return createParamRef(contract, bindingColumn, comparable.value, state);
+    return createParamRef(contract, bindingColumn, comparable.value);
   }
 
   if (comparable.kind === 'list-literal') {
     return ListLiteralExpr.of(
       comparable.values.map((value) =>
         value.kind === 'literal'
-          ? createParamRef(contract, bindingColumn, value.value, state)
+          ? createParamRef(contract, bindingColumn, value.value)
           : value,
       ),
     );
   }
 
-  return bindExpression(contract, comparable, state);
+  return bindExpression(contract, comparable);
 }
 
 function createParamRef(
   contract: SqlContract<SqlStorage>,
   columnRef: ColumnRef,
   value: unknown,
-  state: BindState,
 ): ParamRef {
-  const index = state.params.push(value);
-  state.paramDescriptors.push(
-    createColumnParamDescriptor(contract, columnRef.table, columnRef.column, index),
-  );
-  return ParamRef.of(index, columnRef.column);
+  const columnMeta = contract.storage.tables[columnRef.table]?.columns[columnRef.column];
+  return ParamRef.of(value, {
+    name: columnRef.column,
+    codecId: columnMeta?.codecId,
+    nativeType: columnMeta?.nativeType,
+  });
 }
 
 function createExpressionBinder(
   contract: SqlContract<SqlStorage>,
-  state: BindState,
 ): ExpressionRewriter {
   return {
-    select: (ast) => bindSelectAst(contract, ast, state),
+    select: (ast) => bindSelectAst(contract, ast),
   };
 }
 
 function bindExpression(
   contract: SqlContract<SqlStorage>,
   expr: AnyExpression,
-  state: BindState,
 ): AnyExpression {
-  return expr.rewrite(createExpressionBinder(contract, state));
+  return expr.rewrite(createExpressionBinder(contract));
 }
 
 function bindProjectionExpr(
   contract: SqlContract<SqlStorage>,
   expr: ProjectionExpr,
-  state: BindState,
 ): ProjectionExpr {
-  return expr.kind === 'literal' ? expr : bindExpression(contract, expr, state);
+  return expr.kind === 'literal' ? expr : bindExpression(contract, expr);
 }
 
 function bindOrderByItem(
   contract: SqlContract<SqlStorage>,
   orderItem: OrderByItem,
-  state: BindState,
 ): OrderByItem {
-  return new OrderByItem(bindExpression(contract, orderItem.expr, state), orderItem.dir);
+  return new OrderByItem(bindExpression(contract, orderItem.expr), orderItem.dir);
 }
 
-function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst, state: BindState): JoinAst {
+function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst): JoinAst {
   return new JoinAst(
     join.joinType,
-    bindFromSource(contract, join.source, state),
-    join.on.kind === 'eq-col-join-on' ? join.on : bindWhereExprNode(contract, join.on, state),
+    bindFromSource(contract, join.source),
+    join.on.kind === 'eq-col-join-on' ? join.on : bindWhereExprNode(contract, join.on),
     join.lateral,
   );
 }
@@ -169,14 +149,13 @@ function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst, state: BindS
 function bindFromSource(
   contract: SqlContract<SqlStorage>,
   source: AnyFromSource,
-  state: BindState,
 ): AnyFromSource {
   const node = source;
   switch (node.kind) {
     case 'table-source':
       return node;
     case 'derived-table-source':
-      return DerivedTableSource.as(node.alias, bindSelectAst(contract, node.query, state));
+      return DerivedTableSource.as(node.alias, bindSelectAst(contract, node.query));
     // v8 ignore next 4
     default:
       throw new Error(
@@ -188,21 +167,20 @@ function bindFromSource(
 function bindSelectAst(
   contract: SqlContract<SqlStorage>,
   ast: SelectAst,
-  state: BindState,
 ): SelectAst {
   return new SelectAst({
-    from: bindFromSource(contract, ast.from, state),
-    joins: ast.joins?.map((join) => bindJoin(contract, join, state)),
+    from: bindFromSource(contract, ast.from),
+    joins: ast.joins?.map((join) => bindJoin(contract, join)),
     projection: ast.projection.map(
       (projection) =>
-        new ProjectionItem(projection.alias, bindProjectionExpr(contract, projection.expr, state)),
+        new ProjectionItem(projection.alias, bindProjectionExpr(contract, projection.expr)),
     ),
-    where: ast.where ? bindWhereExprNode(contract, ast.where, state) : undefined,
-    orderBy: ast.orderBy?.map((orderItem) => bindOrderByItem(contract, orderItem, state)),
+    where: ast.where ? bindWhereExprNode(contract, ast.where) : undefined,
+    orderBy: ast.orderBy?.map((orderItem) => bindOrderByItem(contract, orderItem)),
     distinct: ast.distinct,
-    distinctOn: ast.distinctOn?.map((expr) => bindExpression(contract, expr, state)),
-    groupBy: ast.groupBy?.map((expr) => bindExpression(contract, expr, state)),
-    having: ast.having ? bindWhereExprNode(contract, ast.having, state) : undefined,
+    distinctOn: ast.distinctOn?.map((expr) => bindExpression(contract, expr)),
+    groupBy: ast.groupBy?.map((expr) => bindExpression(contract, expr)),
+    having: ast.having ? bindWhereExprNode(contract, ast.having) : undefined,
     limit: ast.limit,
     offset: ast.offset,
     selectAllIntent: ast.selectAllIntent,
