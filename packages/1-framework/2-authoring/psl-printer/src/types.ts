@@ -1,4 +1,5 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { DefaultMappingOptions } from './default-mapping';
 
 /**
  * Result of resolving a native database type to a PSL type.
@@ -28,6 +29,7 @@ export interface PslTypeMap {
 export interface PslPrinterOptions {
   readonly typeMap: PslTypeMap;
   readonly header?: string;
+  readonly defaultMapping?: DefaultMappingOptions;
 }
 
 /**

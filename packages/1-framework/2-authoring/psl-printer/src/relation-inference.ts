@@ -1,5 +1,6 @@
-import type { SqlForeignKeyIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
 import { deriveBackRelationFieldName, deriveRelationFieldName, pluralize } from './name-transforms';
+import type { PslPrintableSqlTable } from './schema-validation';
 import type { RelationField } from './types';
 
 /**
@@ -35,7 +36,7 @@ export type InferredRelations = {
  * 5. Handles self-referencing FKs
  */
 export function inferRelations(
-  tables: Record<string, SqlTableIR>,
+  tables: Record<string, PslPrintableSqlTable>,
   modelNameMap: ReadonlyMap<string, string>,
 ): InferredRelations {
   const relationsByTable = new Map<string, RelationField[]>();
@@ -129,7 +130,7 @@ export function inferRelations(
  * - The FK columns exactly match the table's PK columns, OR
  * - A single FK column has a unique constraint on it
  */
-function detectOneToOne(fk: SqlForeignKeyIR, table: SqlTableIR): boolean {
+function detectOneToOne(fk: SqlForeignKeyIR, table: PslPrintableSqlTable): boolean {
   // FK columns == PK columns → 1:1
   if (table.primaryKey) {
     const pkCols = [...table.primaryKey.columns].sort();

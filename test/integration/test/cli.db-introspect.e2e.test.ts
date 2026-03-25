@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
+import { createContractInferCommand } from '@prisma-next/cli/commands/contract-infer';
+import { createDbSchemaCommand } from '@prisma-next/cli/commands/db-schema';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import stripAnsi from 'strip-ansi';
@@ -42,7 +43,7 @@ function normalizeOutput(stripped: string): string {
 }
 
 withTempDir(({ createTempDir }) => {
-  describe('db introspect command (e2e)', () => {
+  describe('live schema CLI commands (e2e)', () => {
     let consoleOutput: string[] = [];
     let consoleErrors: string[] = [];
     let cleanupMocks: () => void;
@@ -58,136 +59,9 @@ withTempDir(({ createTempDir }) => {
       cleanupMocks();
     });
 
-    describe('default write', () => {
+    describe('db schema', () => {
       it(
-        'default: writes PSL file to output/schema.prisma',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            await withClient(connectionString, async (client) => {
-              await client.query(`
-                CREATE TABLE IF NOT EXISTS "user" (
-                  id SERIAL PRIMARY KEY,
-                  email TEXT NOT NULL,
-                  name TEXT
-                )
-              `);
-            });
-
-            const testSetup = setupTestDirectoryFromFixtures(
-              createTempDir,
-              fixtureSubdir,
-              'prisma-next.config.with-db.ts',
-              { '{{DB_URL}}': connectionString },
-            );
-            const configPath = testSetup.configPath;
-
-            const command = createDbIntrospectCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--no-color']);
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            const pslPath = join(testSetup.testDir, 'output/schema.prisma');
-            expect(existsSync(pslPath)).toBe(true);
-
-            const pslContent = readFileSync(pslPath, 'utf-8');
-            expect(pslContent).toContain('// This file was introspected from the database.');
-            expect(pslContent).toContain('model User');
-            expect(pslContent).toContain('@id');
-
-            const stderrOutput = consoleErrors.join('\n');
-            expect(stripAnsi(stderrOutput)).toContain('Schema written to');
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-
-      it(
-        '--output overrides the resolved path',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            await withClient(connectionString, async (client) => {
-              await client.query(`
-                CREATE TABLE IF NOT EXISTS "item" (
-                  id SERIAL PRIMARY KEY,
-                  name TEXT NOT NULL
-                )
-              `);
-            });
-
-            const testSetup = setupTestDirectoryFromFixtures(
-              createTempDir,
-              fixtureSubdir,
-              'prisma-next.config.with-db.ts',
-              { '{{DB_URL}}': connectionString },
-            );
-            const configPath = testSetup.configPath;
-            const customOutputPath = 'prisma/my-schema.prisma';
-
-            const command = createDbIntrospectCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(command, [
-                '--config',
-                configPath,
-                '--output',
-                customOutputPath,
-                '--no-color',
-              ]);
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            const pslPath = join(testSetup.testDir, customOutputPath);
-            expect(existsSync(pslPath)).toBe(true);
-
-            const pslContent = readFileSync(pslPath, 'utf-8');
-            expect(pslContent).toContain('model Item');
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-
-      it(
-        'empty database produces valid header-only PSL file',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            const testSetup = setupTestDirectoryFromFixtures(
-              createTempDir,
-              fixtureSubdir,
-              'prisma-next.config.with-db.ts',
-              { '{{DB_URL}}': connectionString },
-            );
-            const configPath = testSetup.configPath;
-
-            const command = createDbIntrospectCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--no-color']);
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            const pslPath = join(testSetup.testDir, 'output/schema.prisma');
-            expect(existsSync(pslPath)).toBe(true);
-
-            const pslContent = readFileSync(pslPath, 'utf-8');
-            expect(pslContent).toContain('// This file was introspected from the database.');
-            expect(pslContent).not.toContain('model');
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-    });
-
-    describe('dry-run', () => {
-      it(
-        '--dry-run: outputs tree structure without writing file',
+        'prints the live schema tree without writing files',
         async () => {
           await withDevDatabase(async ({ connectionString }) => {
             await withClient(connectionString, async (client) => {
@@ -216,23 +90,20 @@ withTempDir(({ createTempDir }) => {
               'prisma-next.config.with-db.ts',
               { '{{DB_URL}}': connectionString },
             );
-            const configPath = testSetup.configPath;
 
-            const command = createDbIntrospectCommand();
+            const command = createDbSchemaCommand();
             const originalCwd = process.cwd();
             try {
               process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--dry-run', '--no-color']);
+              await executeCommand(command, ['--config', testSetup.configPath, '--no-color']);
             } finally {
               process.chdir(originalCwd);
             }
 
-            const pslPath = join(testSetup.testDir, 'output/schema.prisma');
-            expect(existsSync(pslPath)).toBe(false);
+            expect(existsSync(join(testSetup.testDir, 'output/contract.prisma'))).toBe(false);
 
             const output = consoleOutput.join('\n');
-            const stripped = stripAnsi(output);
-            const normalized = normalizeOutput(stripped);
+            const normalized = normalizeOutput(stripAnsi(output));
             expect(normalized).toMatchSnapshot();
           });
         },
@@ -240,7 +111,7 @@ withTempDir(({ createTempDir }) => {
       );
 
       it(
-        '--json --dry-run outputs raw SqlSchemaIR without writing',
+        '--json prints raw schema output without writing files',
         async () => {
           await withDevDatabase(async ({ connectionString }) => {
             await withClient(connectionString, async (client) => {
@@ -257,45 +128,80 @@ withTempDir(({ createTempDir }) => {
               'prisma-next.config.with-db.ts',
               { '{{DB_URL}}': connectionString },
             );
-            const configPath = testSetup.configPath;
 
-            const command = createDbIntrospectCommand();
+            const command = createDbSchemaCommand();
             const originalCwd = process.cwd();
             try {
               process.chdir(testSetup.testDir);
               await executeCommand(command, [
                 '--config',
-                configPath,
+                testSetup.configPath,
                 '--json',
-                '--dry-run',
                 '--no-color',
               ]);
             } finally {
               process.chdir(originalCwd);
             }
 
-            const pslPath = join(testSetup.testDir, 'output/schema.prisma');
-            expect(existsSync(pslPath)).toBe(false);
+            expect(existsSync(join(testSetup.testDir, 'output/contract.prisma'))).toBe(false);
 
             const output = stdoutOnly(consoleOutput, consoleErrors).join('\n');
             const jsonOutput = JSON.parse(output);
             expect(jsonOutput).toMatchObject({
+              ok: true,
+              summary: 'Schema read successfully',
               schema: expect.any(Object),
             });
-            expect(jsonOutput).toEqual(
-              expect.not.objectContaining({
-                psl: expect.anything(),
-              }),
-            );
           });
         },
         timeouts.spinUpPpgDev,
       );
     });
 
-    describe('json', () => {
+    describe('contract infer', () => {
       it(
-        '--json includes psl.path when file was written',
+        'writes a full PSL snapshot to output/contract.prisma',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            await withClient(connectionString, async (client) => {
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS "user" (
+                  id SERIAL PRIMARY KEY,
+                  email TEXT NOT NULL,
+                  name TEXT
+                )
+              `);
+            });
+
+            const testSetup = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+
+            const command = createContractInferCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testSetup.testDir);
+              await executeCommand(command, ['--config', testSetup.configPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            const pslPath = join(testSetup.testDir, 'output/contract.prisma');
+            expect(existsSync(pslPath)).toBe(true);
+            expect(readFileSync(pslPath, 'utf-8')).toMatchSnapshot();
+
+            const stderrOutput = stripAnsi(consoleErrors.join('\n'));
+            expect(stderrOutput).toContain('Contract written to output/contract.prisma');
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+
+      it(
+        '--json includes the inferred PSL path',
         async () => {
           await withDevDatabase(async ({ connectionString }) => {
             await withClient(connectionString, async (client) => {
@@ -313,13 +219,17 @@ withTempDir(({ createTempDir }) => {
               'prisma-next.config.with-db.ts',
               { '{{DB_URL}}': connectionString },
             );
-            const configPath = testSetup.configPath;
 
-            const command = createDbIntrospectCommand();
+            const command = createContractInferCommand();
             const originalCwd = process.cwd();
             try {
               process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--json', '--no-color']);
+              await executeCommand(command, [
+                '--config',
+                testSetup.configPath,
+                '--json',
+                '--no-color',
+              ]);
             } finally {
               process.chdir(originalCwd);
             }
@@ -327,105 +237,10 @@ withTempDir(({ createTempDir }) => {
             const output = stdoutOnly(consoleOutput, consoleErrors).join('\n');
             const jsonOutput = JSON.parse(output);
             expect(jsonOutput).toMatchObject({
-              psl: { path: 'output/schema.prisma' },
+              ok: true,
+              summary: 'Contract inferred successfully',
+              psl: { path: 'output/contract.prisma' },
             });
-
-            const normalized = {
-              ...jsonOutput,
-              meta: {
-                ...jsonOutput.meta,
-                dbUrl: jsonOutput.meta?.dbUrl
-                  ? jsonOutput.meta.dbUrl.replace(/127\.0\.0\.1:\d+/, '127.0.0.1:XXXXX')
-                  : jsonOutput.meta?.dbUrl,
-              },
-              timings: {
-                ...jsonOutput.timings,
-                total: 0,
-              },
-            };
-
-            expect(normalized).toMatchSnapshot();
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-    });
-
-    describe('overwrite', () => {
-      it(
-        'overwrite warning when target file exists',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            await withClient(connectionString, async (client) => {
-              await client.query(`
-                CREATE TABLE IF NOT EXISTS "item" (
-                  id SERIAL PRIMARY KEY
-                )
-              `);
-            });
-
-            const testSetup = setupTestDirectoryFromFixtures(
-              createTempDir,
-              fixtureSubdir,
-              'prisma-next.config.with-db.ts',
-              { '{{DB_URL}}': connectionString },
-            );
-            const configPath = testSetup.configPath;
-
-            const command = createDbIntrospectCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--no-color']);
-              consoleOutput.length = 0;
-              consoleErrors.length = 0;
-              await executeCommand(command, ['--config', configPath, '--no-color']);
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            const stderrOutput = consoleErrors.map((s) => stripAnsi(s)).join('\n');
-            expect(stderrOutput).toContain('Overwriting existing file');
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-
-      it(
-        '--quiet suppresses overwrite warning',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            await withClient(connectionString, async (client) => {
-              await client.query(`
-                CREATE TABLE IF NOT EXISTS "item" (
-                  id SERIAL PRIMARY KEY
-                )
-              `);
-            });
-
-            const testSetup = setupTestDirectoryFromFixtures(
-              createTempDir,
-              fixtureSubdir,
-              'prisma-next.config.with-db.ts',
-              { '{{DB_URL}}': connectionString },
-            );
-            const configPath = testSetup.configPath;
-
-            const command = createDbIntrospectCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testSetup.testDir);
-              await executeCommand(command, ['--config', configPath, '--no-color']);
-              consoleOutput.length = 0;
-              consoleErrors.length = 0;
-              await executeCommand(command, ['--config', configPath, '--quiet', '--no-color']);
-            } finally {
-              process.chdir(originalCwd);
-            }
-
-            const stderrOutput = consoleErrors.map((s) => stripAnsi(s)).join('\n');
-            expect(stderrOutput).not.toContain('Overwriting existing file');
-            expect(stderrOutput).not.toContain('Schema written to');
           });
         },
         timeouts.spinUpPpgDev,

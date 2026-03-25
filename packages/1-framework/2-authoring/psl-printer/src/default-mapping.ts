@@ -1,15 +1,18 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 
-const FUNCTION_DEFAULT_ATTRIBUTES: Readonly<Record<string, string>> = {
+const DEFAULT_FUNCTION_ATTRIBUTES: Readonly<Record<string, string>> = {
   'autoincrement()': '@default(autoincrement())',
   'now()': '@default(now())',
-  'gen_random_uuid()': '@default(dbgenerated("gen_random_uuid()"))',
 };
 
 type TaggedBigInt = {
   readonly $type: 'bigint';
   readonly value: string;
 };
+
+export interface DefaultMappingOptions {
+  readonly functionAttributes?: Readonly<Record<string, string>>;
+}
 
 /**
  * Result of mapping a ColumnDefault to a PSL @default expression.
@@ -20,12 +23,17 @@ export type DefaultMappingResult = { readonly attribute: string } | { readonly c
  * Maps a normalized ColumnDefault to a PSL @default(...) attribute string,
  * or a comment for unrecognized expressions.
  */
-export function mapDefault(columnDefault: ColumnDefault): DefaultMappingResult {
+export function mapDefault(
+  columnDefault: ColumnDefault,
+  options?: DefaultMappingOptions,
+): DefaultMappingResult {
   switch (columnDefault.kind) {
     case 'literal':
       return { attribute: `@default(${formatLiteralValue(columnDefault.value)})` };
     case 'function': {
-      const attribute = FUNCTION_DEFAULT_ATTRIBUTES[columnDefault.expression];
+      const attribute =
+        options?.functionAttributes?.[columnDefault.expression] ??
+        DEFAULT_FUNCTION_ATTRIBUTES[columnDefault.expression];
       return attribute ? { attribute } : { comment: `// Raw default: ${columnDefault.expression}` };
     }
   }

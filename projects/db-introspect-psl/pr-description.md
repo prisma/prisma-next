@@ -1,14 +1,20 @@
 # Summary
 
-`prisma-next db introspect` now writes a `schema.prisma` file by default instead of printing the tree view. This PR adds the PSL printer (`SqlSchemaIR -> string`), keeps `--json` behavior intact, and moves the tree preview behind `--dry-run`.
+This branch replaces the old public `db introspect` workflow with two commands:
+
+- `prisma-next db schema` for read-only live schema inspection
+- `prisma-next contract infer` for writing `contract.prisma`
+
+It also lands the PSL printer refactor needed for brownfield round-trips, including shared schema validation, injected Postgres default mapping, and updated integration journeys.
 
 # Scope Clarifications
 
-- The printer emits `enum` blocks for Postgres enums discovered in introspection.
-- Enum member mapping is intentionally out of scope for this PR.
-- Concretely: if a database enum label is not already a PSL-safe identifier, the printer normalizes it to a valid PSL enum member name instead of preserving the original label via enum member `@map`.
-- That means introspection is lossy for enum labels that need normalization. This is a deliberate scope cut for now, not an omitted follow-up inside this PR.
+- `db schema` is inspection-only and never writes files
+- `contract infer` performs the PSL write step and stops before `contract emit`
+- enum member `@map` preservation remains out of scope
+- the brownfield flow is explicit:
+  `contract infer` -> `contract emit` -> `db sign`
 
 # Why
 
-The core brownfield adoption goal is to get teams from an existing database to a usable `schema.prisma` file in one command. Supporting full enum member mapping would add extra surface area and validation work that is not required to land the PSL printer and CLI default-behavior change in this branch.
+The old plan mixed two different actions into one public command: previewing a live schema and materializing a PSL contract. Splitting those actions makes the CLI clearer, keeps inspection side-effect free, and still gives brownfield users a direct path from an existing database to a usable `contract.prisma`.

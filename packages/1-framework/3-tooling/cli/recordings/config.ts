@@ -227,7 +227,7 @@ export const config: RecordingsConfig = {
         {
           ordinal: '08',
           slug: 'db-introspect',
-          command: 'prisma-next db introspect',
+          command: 'prisma-next db schema',
           description: 'Inspect the live database schema tree',
           dbState: 'initialized with user(id, email)',
           sleepAfterEnter: '10s',
@@ -325,8 +325,8 @@ export const config: RecordingsConfig = {
         {
           ordinal: '03',
           slug: 'db-introspect-empty',
-          command: 'prisma-next db introspect',
-          description: 'Introspect shows empty schema',
+          command: 'prisma-next db schema',
+          description: 'Schema inspection shows an empty database',
           dbState: 'empty database',
           sleepAfterEnter: '10s',
         },
@@ -416,8 +416,8 @@ export const config: RecordingsConfig = {
         {
           ordinal: '03',
           slug: 'db-introspect-diverged',
-          command: 'prisma-next db introspect',
-          description: 'Introspect shows schema without email column',
+          command: 'prisma-next db schema',
+          description: 'Schema inspection shows the missing email column',
           dbState: 'user table has only id column',
           sleepAfterEnter: '10s',
         },

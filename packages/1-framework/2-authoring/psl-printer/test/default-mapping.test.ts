@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mapDefault } from '../src/default-mapping';
+import { createPostgresDefaultMapping } from '../src/postgres-default-mapping';
 
 describe('mapDefault', () => {
   it('maps autoincrement()', () => {
@@ -14,8 +15,13 @@ describe('mapDefault', () => {
     });
   });
 
-  it('maps gen_random_uuid() to dbgenerated storage default', () => {
-    expect(mapDefault({ kind: 'function', expression: 'gen_random_uuid()' })).toEqual({
+  it('maps gen_random_uuid() when Postgres mapping is injected', () => {
+    expect(
+      mapDefault(
+        { kind: 'function', expression: 'gen_random_uuid()' },
+        createPostgresDefaultMapping(),
+      ),
+    ).toEqual({
       attribute: '@default(dbgenerated("gen_random_uuid()"))',
     });
   });
@@ -65,6 +71,12 @@ describe('mapDefault', () => {
   it('unrecognized function becomes comment', () => {
     expect(mapDefault({ kind: 'function', expression: 'custom_func()' })).toEqual({
       comment: '// Raw default: custom_func()',
+    });
+  });
+
+  it('treats Postgres-specific functions as raw defaults without injected mapping', () => {
+    expect(mapDefault({ kind: 'function', expression: 'gen_random_uuid()' })).toEqual({
+      comment: '// Raw default: gen_random_uuid()',
     });
   });
 

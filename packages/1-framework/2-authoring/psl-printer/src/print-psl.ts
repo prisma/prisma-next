@@ -1,10 +1,10 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
-import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { mapDefault } from './default-mapping';
 import { toEnumName, toFieldName, toModelName, toNamedTypeName } from './name-transforms';
 import { extractEnumDefinitions, extractEnumTypeNames } from './postgres-type-map';
 import { parseRawDefault } from './raw-default-parser';
 import { inferRelations } from './relation-inference';
+import type { PslPrintableSqlSchemaIR, PslPrintableSqlTable } from './schema-validation';
 import type {
   PrinterField,
   PrinterModel,
@@ -56,8 +56,8 @@ const ENUM_MEMBER_RESERVED_WORDS = new Set([
  * @param options - Printer configuration (type map, header)
  * @returns A valid PSL string
  */
-export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): string {
-  const { typeMap, header } = options;
+export function printPsl(schemaIR: PslPrintableSqlSchemaIR, options: PslPrinterOptions): string {
+  const { typeMap, header, defaultMapping } = options;
   const headerComment = header ?? DEFAULT_HEADER;
 
   // Extract enum info from annotations
@@ -89,10 +89,7 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
   const { relationsByTable } = inferRelations(schemaIR.tables, modelNameMap);
 
   // Collect named types for the types block
-  const namedTypes: NamedTypeRegistry = {
-    entriesByKey: new Map<string, PrinterNamedType>(),
-    usedNames: new Set<string>(),
-  };
+  const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, enumNameMap);
 
   // Process tables into models
   const models: PrinterModel[] = [];
@@ -103,6 +100,7 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
       enumNameMap,
       fieldNamesByTable,
       namedTypes,
+      defaultMapping,
       relationsByTable.get(table.name) ?? [],
     );
     models.push(model);
@@ -152,11 +150,12 @@ export function printPsl(schemaIR: SqlSchemaIR, options: PslPrinterOptions): str
  * Processes a SQL table into a PrinterModel.
  */
 function processTable(
-  table: SqlTableIR,
+  table: PslPrintableSqlTable,
   typeMap: PslPrinterOptions['typeMap'],
   enumNameMap: ReadonlyMap<string, string>,
   fieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>,
   namedTypes: NamedTypeRegistry,
+  defaultMapping: PslPrinterOptions['defaultMapping'],
   relationFields: readonly RelationField[],
 ): PrinterModel {
   const { name: modelName, map: mapName } = toModelName(table.name);
@@ -215,7 +214,7 @@ function processTable(
 
     // Handle parameterized types → named type in types block
     if (resolution.typeParams && !enumPslName) {
-      typeName = registerNamedType(namedTypes, column.name, resolution);
+      typeName = resolveNamedTypeName(namedTypes, resolution);
     }
 
     // Build attributes
@@ -230,7 +229,7 @@ function processTable(
     if (column.default !== undefined) {
       const parsed = parseDefaultIfNeeded(column.default);
       if (parsed) {
-        const result = mapDefault(parsed);
+        const result = mapDefault(parsed, defaultMapping);
         if ('attribute' in result) {
           attributes.push(result.attribute);
         } else {
@@ -418,7 +417,7 @@ function formatModelConstraintAttribute(
 }
 
 function buildFieldNamesByTable(
-  tables: Record<string, SqlTableIR>,
+  tables: Record<string, PslPrintableSqlTable>,
 ): ReadonlyMap<string, TableColumnFieldNameMap> {
   const fieldNamesByTable = new Map<string, TableColumnFieldNameMap>();
 
@@ -536,36 +535,104 @@ function assertNoCrossKindNameCollisions(
   }
 }
 
-function registerNamedType(
+function seedNamedTypeRegistry(
+  schemaIR: PslPrintableSqlSchemaIR,
+  typeMap: PslPrinterOptions['typeMap'],
+  enumNameMap: ReadonlyMap<string, string>,
+): NamedTypeRegistry {
+  const seeds = new Map<
+    string,
+    {
+      readonly baseType: string;
+      readonly desiredName: string;
+    }
+  >();
+
+  for (const tableName of Object.keys(schemaIR.tables).sort()) {
+    const table = schemaIR.tables[tableName];
+    if (!table) {
+      continue;
+    }
+
+    for (const columnName of Object.keys(table.columns).sort()) {
+      const column = table.columns[columnName];
+      if (!column) {
+        continue;
+      }
+
+      const resolution = typeMap.resolve(column.nativeType, table.annotations);
+      if (
+        'unsupported' in resolution ||
+        enumNameMap.has(column.nativeType) ||
+        !resolution.typeParams
+      ) {
+        continue;
+      }
+
+      const signatureKey = createNamedTypeSignatureKey(resolution);
+      if (!seeds.has(signatureKey)) {
+        seeds.set(signatureKey, {
+          baseType: resolution.pslType,
+          desiredName: toNamedTypeName(column.name),
+        });
+      }
+    }
+  }
+
+  const registry: NamedTypeRegistry = {
+    entriesByKey: new Map<string, PrinterNamedType>(),
+    usedNames: new Set<string>(),
+  };
+
+  const sortedSeeds = [...seeds.entries()].sort((left, right) => {
+    const desiredNameComparison = left[1].desiredName.localeCompare(right[1].desiredName);
+    if (desiredNameComparison !== 0) {
+      return desiredNameComparison;
+    }
+    return left[0].localeCompare(right[0]);
+  });
+
+  for (const [signatureKey, seed] of sortedSeeds) {
+    const name = createUniqueFieldName(seed.desiredName, registry.usedNames);
+    registry.entriesByKey.set(signatureKey, {
+      name,
+      baseType: seed.baseType,
+    });
+    registry.usedNames.add(name);
+  }
+
+  return registry;
+}
+
+function resolveNamedTypeName(
   registry: NamedTypeRegistry,
-  columnName: string,
   resolution: {
     readonly pslType: string;
     readonly nativeType: string;
     readonly typeParams?: Record<string, unknown>;
   },
 ): string {
-  const desiredName = toNamedTypeName(columnName);
-  const key = JSON.stringify({
-    desiredName,
-    baseType: resolution.pslType,
-    nativeType: resolution.nativeType,
-    typeParams: resolution.typeParams,
-  });
-
+  const key = createNamedTypeSignatureKey(resolution);
   const existing = registry.entriesByKey.get(key);
   if (existing) {
     return existing.name;
   }
 
-  const name = createUniqueFieldName(desiredName, registry.usedNames);
-  const entry = {
-    name,
+  throw new Error(
+    `Named type registry was not seeded for parameterized type "${resolution.nativeType}"`,
+  );
+}
+
+function createNamedTypeSignatureKey(resolution: {
+  readonly pslType: string;
+  readonly nativeType: string;
+  readonly typeParams?: Record<string, unknown>;
+}): string {
+  return JSON.stringify({
     baseType: resolution.pslType,
-  } satisfies PrinterNamedType;
-  registry.entriesByKey.set(key, entry);
-  registry.usedNames.add(name);
-  return name;
+    nativeType: resolution.nativeType,
+    typeParams: resolution.typeParams ?? null,
+  });
 }
 
 function isNormalizedEnumMemberReservedWord(value: string): boolean {
@@ -603,7 +670,7 @@ function createNormalizedEnumMemberBaseName(value: string): string {
  */
 function topologicalSort(
   models: PrinterModel[],
-  tables: Record<string, SqlTableIR>,
+  tables: Record<string, PslPrintableSqlTable>,
   modelNameMap: ReadonlyMap<string, string>,
 ): PrinterModel[] {
   const modelByName = new Map<string, PrinterModel>();

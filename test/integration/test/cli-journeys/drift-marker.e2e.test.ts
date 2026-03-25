@@ -23,7 +23,7 @@ import {
   type JourneyContext,
   runContractEmit,
   runDbInit,
-  runDbIntrospect,
+  runDbSchema,
   runDbSign,
   runDbUpdate,
   runDbVerify,
@@ -41,7 +41,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'verify fails → verify --schema-only fails → introspect empty → init recovers → verify passes',
+      'verify fails → verify --schema-only fails → schema empty → init recovers → verify passes',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -60,9 +60,9 @@ withTempDir(({ createTempDir }) => {
         const schemaVerifyFail = await runDbVerify(ctx, ['--schema-only']);
         expect(schemaVerifyFail.exitCode, 'K.02: db verify --schema-only fails').toBe(1);
 
-        // K.03: db introspect (empty schema)
-        const introspect = await runDbIntrospect(ctx);
-        expect(introspect.exitCode, 'K.03: db introspect').toBe(0);
+        // K.03: db schema (empty schema)
+        const schema = await runDbSchema(ctx);
+        expect(schema.exitCode, 'K.03: db schema').toBe(0);
 
         // K.04: db init (recovery)
         const init = await runDbInit(ctx);

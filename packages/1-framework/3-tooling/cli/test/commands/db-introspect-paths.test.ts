@@ -1,26 +1,26 @@
 import { resolve } from 'pathe';
 import { describe, expect, it } from 'vitest';
-import { resolveDbIntrospectOutputPath } from '../../src/commands/db-introspect-paths';
+import { resolveContractInferOutputPath } from '../../src/commands/contract-infer-paths';
 
-describe('resolveDbIntrospectOutputPath', () => {
+describe('resolveContractInferOutputPath', () => {
   it('uses explicit output when provided', () => {
     expect(
-      resolveDbIntrospectOutputPath(
-        { output: './prisma/custom-schema.prisma' },
+      resolveContractInferOutputPath(
+        { output: './prisma/custom-contract.prisma' },
         './output/contract.json',
       ),
-    ).toBe(resolve(process.cwd(), './prisma/custom-schema.prisma'));
+    ).toBe(resolve(process.cwd(), './prisma/custom-contract.prisma'));
   });
 
-  it('writes schema.prisma alongside the configured contract output', () => {
-    expect(resolveDbIntrospectOutputPath({}, './output/contract.json')).toBe(
-      resolve(process.cwd(), './output/schema.prisma'),
+  it('writes contract.prisma alongside the configured contract output', () => {
+    expect(resolveContractInferOutputPath({}, './output/contract.json')).toBe(
+      resolve(process.cwd(), './output/contract.prisma'),
     );
   });
 
-  it('falls back to schema.prisma in cwd', () => {
-    expect(resolveDbIntrospectOutputPath({}, undefined)).toBe(
-      resolve(process.cwd(), 'schema.prisma'),
+  it('falls back to contract.prisma in cwd', () => {
+    expect(resolveContractInferOutputPath({}, undefined)).toBe(
+      resolve(process.cwd(), 'contract.prisma'),
     );
   });
 });

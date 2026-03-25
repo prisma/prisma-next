@@ -129,9 +129,10 @@ function formatMultilineDescription(options: {
 function getCommandDocsUrl(commandPath: string): string | undefined {
   const docsMap: Record<string, string> = {
     'contract emit': 'https://pris.ly/contract-emit',
+    'contract infer': 'https://pris.ly/contract-infer',
+    'db schema': 'https://pris.ly/db-schema',
     'db verify': 'https://pris.ly/db-verify',
     'db update': 'https://pris.ly/db-update',
-    'db introspect': 'https://pris.ly/db-introspect',
     'migration plan': 'https://pris.ly/migration-plan',
     'migration apply': 'https://pris.ly/migration-apply',
     'migration show': 'https://pris.ly/migration-show',

@@ -72,9 +72,9 @@
       "types": "./dist/commands/db-update.d.mts",
       "import": "./dist/commands/db-update.mjs"
     },
-    "./commands/db-introspect": {
-      "types": "./dist/commands/db-introspect.d.mts",
-      "import": "./dist/commands/db-introspect.mjs"
+    "./commands/db-schema": {
+      "types": "./dist/commands/db-schema.d.mts",
+      "import": "./dist/commands/db-schema.mjs"
     },
     "./commands/db-sign": {
       "types": "./dist/commands/db-sign.d.mts",
@@ -87,6 +87,10 @@
     "./commands/contract-emit": {
       "types": "./dist/commands/contract-emit.d.mts",
       "import": "./dist/commands/contract-emit.mjs"
+    },
+    "./commands/contract-infer": {
+      "types": "./dist/commands/contract-infer.d.mts",
+      "import": "./dist/commands/contract-infer.mjs"
     },
     "./commands/migration-plan": {
       "types": "./dist/commands/migration-plan.d.mts",
