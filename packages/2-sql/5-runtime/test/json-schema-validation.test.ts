@@ -338,7 +338,7 @@ describe('JSON Schema validator registry', () => {
 describe('JSON Schema encoding validation', () => {
   const codecRegistry = createTestCodecRegistry();
 
-  it('passes valid JSON values', () => {
+  it('encodes JSON values via codec', () => {
     const plan = createTestPlan({
       params: [{ name: 'Alice' }],
       meta: {
@@ -347,110 +347,37 @@ describe('JSON Schema encoding validation', () => {
         lane: 'dsl',
         paramDescriptors: [
           {
-            index: 0,
             codecId: 'pg/jsonb@1',
             source: 'dsl' as const,
-            refs: { table: 'user', column: 'metadata' },
           },
         ],
       },
     });
 
-    const result = encodeParams(plan, codecRegistry, createMetadataValidatorRegistry());
+    const result = encodeParams(plan, codecRegistry);
     expect(result[0]).toBe('{"name":"Alice"}');
   });
 
-  it('throws RUNTIME.JSON_SCHEMA_VALIDATION_FAILED for invalid JSON values', () => {
+  it('returns null for null values', () => {
     const descriptor: ParamDescriptor = {
-      index: 0,
       codecId: 'pg/jsonb@1',
       source: 'dsl',
-      refs: { table: 'user', column: 'metadata' },
-    };
-
-    const plan = createTestPlan({
-      params: [{ age: 30 }],
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [descriptor],
-      },
-    });
-
-    expect(() =>
-      encodeParam({ age: 30 }, descriptor, plan, codecRegistry, createMetadataValidatorRegistry()),
-    ).toThrow(
-      expect.objectContaining({
-        code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-        category: 'RUNTIME',
-        severity: 'error',
-        details: expect.objectContaining({
-          table: 'user',
-          column: 'metadata',
-          direction: 'encode',
-          codecId: 'pg/jsonb@1',
-        }),
-      }),
-    );
-  });
-
-  it('skips validation for params without refs', () => {
-    const descriptor: ParamDescriptor = {
-      index: 0,
-      codecId: 'pg/jsonb@1',
-      source: 'dsl',
-    };
-
-    const plan = createTestPlan({
-      params: [{ invalid: true }],
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [descriptor],
-      },
-    });
-
-    const result = encodeParam(
-      { invalid: true },
-      descriptor,
-      plan,
-      codecRegistry,
-      createMetadataValidatorRegistry(),
-    );
-    expect(result).toBe('{"invalid":true}');
-  });
-
-  it('skips validation for null values', () => {
-    const descriptor: ParamDescriptor = {
-      index: 0,
-      codecId: 'pg/jsonb@1',
-      source: 'dsl',
-      refs: { table: 'user', column: 'metadata' },
     };
 
     const plan = createTestPlan();
-    const result = encodeParam(
-      null,
-      descriptor,
-      plan,
-      codecRegistry,
-      createMetadataValidatorRegistry(),
-    );
+    const result = encodeParam(null, descriptor, 0, plan, codecRegistry);
     expect(result).toBeNull();
   });
 
-  it('skips validation when no registry is provided', () => {
+  it('encodes when descriptor has name', () => {
     const descriptor: ParamDescriptor = {
-      index: 0,
+      name: 'metadata',
       codecId: 'pg/jsonb@1',
       source: 'dsl',
-      refs: { table: 'user', column: 'metadata' },
     };
 
     const plan = createTestPlan();
-    const result = encodeParam({ age: 30 }, descriptor, plan, codecRegistry);
+    const result = encodeParam({ age: 30 }, descriptor, 0, plan, codecRegistry);
     expect(result).toBe('{"age":30}');
   });
 });

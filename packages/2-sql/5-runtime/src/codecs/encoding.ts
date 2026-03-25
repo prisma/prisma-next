@@ -1,20 +1,18 @@
 import type { ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
-import { validateJsonValue } from './json-schema-validation';
 
 function resolveParamCodec(
   paramDescriptor: ParamDescriptor,
   plan: ExecutionPlan,
   registry: CodecRegistry,
 ): Codec | null {
-  const paramName = paramDescriptor.name ?? `param_${paramDescriptor.index ?? 0}`;
-
-  const planCodecId = plan.meta.annotations?.codecs?.[paramName] as string | undefined;
-  if (planCodecId) {
-    const codec = registry.get(planCodecId);
-    if (codec) {
-      return codec;
+  if (paramDescriptor.name) {
+    const planCodecId = plan.meta.annotations?.codecs?.[paramDescriptor.name] as string | undefined;
+    if (planCodecId) {
+      const codec = registry.get(planCodecId);
+      if (codec) {
+        return codec;
+      }
     }
   }
 
@@ -31,18 +29,12 @@ function resolveParamCodec(
 export function encodeParam(
   value: unknown,
   paramDescriptor: ParamDescriptor,
+  paramIndex: number,
   plan: ExecutionPlan,
   registry: CodecRegistry,
-  jsonValidators?: JsonSchemaValidatorRegistry,
 ): unknown {
   if (value === null || value === undefined) {
     return null;
-  }
-
-  // Validate JSON value against schema before encoding
-  if (jsonValidators && paramDescriptor.refs) {
-    const { table, column } = paramDescriptor.refs;
-    validateJsonValue(jsonValidators, table, column, value, 'encode', paramDescriptor.codecId);
   }
 
   const codec = resolveParamCodec(paramDescriptor, plan, registry);
@@ -54,8 +46,9 @@ export function encodeParam(
     try {
       return codec.encode(value);
     } catch (error) {
+      const label = paramDescriptor.name ?? `param[${paramIndex}]`;
       throw new Error(
-        `Failed to encode parameter ${paramDescriptor.name ?? paramDescriptor.index}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to encode parameter ${label}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -63,11 +56,7 @@ export function encodeParam(
   return value;
 }
 
-export function encodeParams(
-  plan: ExecutionPlan,
-  registry: CodecRegistry,
-  jsonValidators?: JsonSchemaValidatorRegistry,
-): readonly unknown[] {
+export function encodeParams(plan: ExecutionPlan, registry: CodecRegistry): readonly unknown[] {
   if (plan.params.length === 0) {
     return plan.params;
   }
@@ -79,7 +68,7 @@ export function encodeParams(
     const paramDescriptor = plan.meta.paramDescriptors[i];
 
     if (paramDescriptor) {
-      encoded.push(encodeParam(paramValue, paramDescriptor, plan, registry, jsonValidators));
+      encoded.push(encodeParam(paramValue, paramDescriptor, i, plan, registry));
     } else {
       encoded.push(paramValue);
     }

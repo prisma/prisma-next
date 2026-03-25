@@ -178,11 +178,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     const iterator = async function* (
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
-      const encodedParams = encodeParams(
-        executablePlan,
-        self.codecRegistry,
-        self.jsonSchemaValidators,
-      );
+      const encodedParams = encodeParams(executablePlan, self.codecRegistry);
       const planWithEncodedParams: ExecutionPlan<Row> = {
         ...executablePlan,
         params: encodedParams,
