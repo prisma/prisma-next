@@ -1,6 +1,8 @@
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
+import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -124,6 +126,8 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
 });
 
 describe('NOT NULL column without default uses temporary default', () => {
+  const qualifiedUserTable = '"public"."user"';
+
   it('emits 2-step execute (add with temp default, drop default) for NOT NULL text column', () => {
     const addCol = planAddColumn('name', {
       nativeType: 'text',
@@ -132,15 +136,14 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     // No empty-table precheck
-    expect(addCol.precheck.map((p) => p.description)).not.toContainEqual(
-      expect.stringContaining('empty'),
+    expect(addCol.precheck.map((p) => p.sql)).not.toContain(
+      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
     );
 
-    // 2-step execute: add with temporary default, then drop default
-    expect(addCol.execute).toHaveLength(2);
-    expect(addCol.execute[0]!.sql).toContain("DEFAULT ''");
-    expect(addCol.execute[0]!.sql).toContain('NOT NULL');
-    expect(addCol.execute[1]!.sql).toContain('DROP DEFAULT');
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "name" text DEFAULT '' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "name" DROP DEFAULT`,
+    ]);
 
     // Postcheck includes verification that temporary default was removed
     expect(addCol.postcheck.map((p) => p.description)).toContainEqual(
@@ -155,10 +158,107 @@ describe('NOT NULL column without default uses temporary default', () => {
       nullable: false,
     });
 
-    expect(addCol.execute).toHaveLength(2);
-    expect(addCol.execute[0]!.sql).toContain('DEFAULT 0');
-    expect(addCol.execute[0]!.sql).toContain('NOT NULL');
-    expect(addCol.execute[1]!.sql).toContain('DROP DEFAULT');
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "age" int4 DEFAULT 0 NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "age" DROP DEFAULT`,
+    ]);
+  });
+
+  it('uses length-aware temporary defaults for fixed-length bit columns', () => {
+    const addCol = planAddColumn(
+      'flags',
+      {
+        nativeType: 'bit',
+        codecId: 'pg/bit@1',
+        nullable: false,
+        typeParams: { length: 4 },
+      },
+      {
+        frameworkComponents: [
+          createPlannerControlHookComponent('pg/bit@1', {
+            expandNativeType: ({ nativeType, typeParams }) =>
+              `${nativeType}(${String(typeParams?.['length'])})`,
+          }),
+        ],
+      },
+    );
+
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "flags" bit(4) DEFAULT B'0000' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "flags" DROP DEFAULT`,
+    ]);
+  });
+
+  it('uses empty-array temporary defaults for NOT NULL array columns', () => {
+    const addCol = planAddColumn('tags', {
+      nativeType: 'text[]',
+      codecId: 'pg/text-array@1',
+      nullable: false,
+    });
+
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "tags" text[] DEFAULT '{}' NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "tags" DROP DEFAULT`,
+    ]);
+  });
+
+  it('uses built-in temporary defaults for NOT NULL tsvector columns', () => {
+    const addCol = planAddColumn('searchDocument', {
+      nativeType: 'tsvector',
+      codecId: 'pg/tsvector@1',
+      nullable: false,
+    });
+
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "searchDocument" tsvector DEFAULT ''::tsvector NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "searchDocument" DROP DEFAULT`,
+    ]);
+  });
+
+  it('uses codec hook temporary defaults for parameterized pgvector columns', () => {
+    const addCol = planAddColumn(
+      'embedding',
+      {
+        nativeType: 'vector',
+        codecId: 'pg/vector@1',
+        nullable: false,
+        typeParams: { length: 3 },
+      },
+      { frameworkComponents: [pgvectorDescriptor] },
+    );
+
+    expect(addCol.precheck.map((p) => p.sql)).not.toContain(
+      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+    );
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT '[0,0,0]'::vector NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "embedding" DROP DEFAULT`,
+    ]);
+  });
+
+  it('uses the empty-table fallback when a codec hook declines a temporary default', () => {
+    const addCol = planAddColumn(
+      'name',
+      {
+        nativeType: 'text',
+        codecId: 'pg/text@1',
+        nullable: false,
+      },
+      {
+        frameworkComponents: [
+          createPlannerControlHookComponent('pg/text@1', {
+            resolveTemporaryDefaultLiteral: () => null,
+          }),
+        ],
+      },
+    );
+
+    expect(addCol.precheck.map((p) => p.sql)).toContain(
+      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+    );
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "name" text NOT NULL`,
+    ]);
   });
 
   it('skips temporary default for nullable columns', () => {
@@ -168,9 +268,9 @@ describe('NOT NULL column without default uses temporary default', () => {
       nullable: true,
     });
 
-    expect(addCol.execute).toHaveLength(1);
-    expect(addCol.execute[0]!.sql).not.toContain('DEFAULT');
-    expect(addCol.execute[0]!.sql).not.toContain('NOT NULL');
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "bio" text`,
+    ]);
   });
 
   it('skips temporary default for NOT NULL columns with explicit default', () => {
@@ -181,51 +281,59 @@ describe('NOT NULL column without default uses temporary default', () => {
       default: { kind: 'literal', value: true },
     });
 
-    // Single execute step (explicit default, no temporary default needed)
-    expect(addCol.execute).toHaveLength(1);
-    expect(addCol.execute[0]!.sql).toContain('DEFAULT true');
-    expect(addCol.execute[0]!.sql).toContain('NOT NULL');
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "active" bool DEFAULT true NOT NULL`,
+    ]);
   });
 });
 
-describe('buildTypeZeroDefaultLiteral', () => {
+describe('buildTypeZeroDefaultLiteral (built-in fallback)', () => {
   it.each([
-    ['text', "''"],
-    ['character', "''"],
-    ['character varying', "''"],
-    ['int2', '0'],
-    ['int4', '0'],
-    ['int8', '0'],
-    ['integer', '0'],
-    ['bigint', '0'],
-    ['smallint', '0'],
-    ['float4', '0'],
-    ['float8', '0'],
-    ['real', '0'],
-    ['double precision', '0'],
-    ['numeric', '0'],
-    ['decimal', '0'],
-    ['bool', 'false'],
-    ['boolean', 'false'],
-    ['uuid', "'00000000-0000-0000-0000-000000000000'"],
-    ['json', "'{}'::jsonb"],
-    ['jsonb', "'{}'::jsonb"],
-    ['date', "'epoch'"],
-    ['timestamp', "'epoch'"],
-    ['timestamptz', "'epoch'"],
-    ['time', "'00:00:00'"],
-    ['timetz', "'00:00:00'"],
-    ['interval', "'0'"],
-    ['bit', "B'0'"],
-    ['bit varying', "B''"],
-  ] as const)('returns %s → %s', (nativeType, expected) => {
-    expect(buildTypeZeroDefaultLiteral(nativeType)).toBe(expected);
+    ['text', undefined, "''"],
+    ['character', undefined, "''"],
+    ['bpchar', undefined, "''"],
+    ['character varying', undefined, "''"],
+    ['varchar', undefined, "''"],
+    ['int2', undefined, '0'],
+    ['int4', undefined, '0'],
+    ['int8', undefined, '0'],
+    ['integer', undefined, '0'],
+    ['bigint', undefined, '0'],
+    ['smallint', undefined, '0'],
+    ['float4', undefined, '0'],
+    ['float8', undefined, '0'],
+    ['real', undefined, '0'],
+    ['double precision', undefined, '0'],
+    ['numeric', undefined, '0'],
+    ['decimal', undefined, '0'],
+    ['bool', undefined, 'false'],
+    ['boolean', undefined, 'false'],
+    ['uuid', undefined, "'00000000-0000-0000-0000-000000000000'"],
+    ['json', undefined, "'{}'::jsonb"],
+    ['jsonb', undefined, "'{}'::jsonb"],
+    ['date', undefined, "'epoch'"],
+    ['timestamp', undefined, "'epoch'"],
+    ['timestamptz', undefined, "'epoch'"],
+    ['time', undefined, "'00:00:00'"],
+    ['timetz', undefined, "'00:00:00'"],
+    ['interval', undefined, "'0'"],
+    ['bytea', undefined, "''::bytea"],
+    ['tsvector', undefined, "''::tsvector"],
+    ['bit', undefined, "B'0'"],
+    ['bit', { length: 4 }, "B'0000'"],
+    ['bit varying', undefined, "B''"],
+    ['varbit', undefined, "B''"],
+    ['int4[]', undefined, "'{}'"],
+    ['text[]', undefined, "'{}'"],
+  ] as const)('returns %s with %j → %s', (nativeType, typeParams, expected) => {
+    expect(buildTypeZeroDefaultLiteral(nativeType, typeParams)).toBe(expected);
   });
 
   it('returns null for unknown types (enum, array, extension)', () => {
     expect(buildTypeZeroDefaultLiteral('my_enum')).toBeNull();
-    expect(buildTypeZeroDefaultLiteral('int4[]')).toBeNull();
-    expect(buildTypeZeroDefaultLiteral('tsvector')).toBeNull();
+    expect(buildTypeZeroDefaultLiteral('tsquery')).toBeNull();
+    expect(buildTypeZeroDefaultLiteral('vector')).toBeNull();
+    expect(buildTypeZeroDefaultLiteral('bit', { length: 0 })).toBeNull();
   });
 });
 
@@ -303,7 +411,11 @@ function planAddColumn(
     nativeType: string;
     codecId: string;
     nullable: boolean;
+    typeParams?: Record<string, unknown>;
     default?: { kind: 'literal'; value: ColumnDefaultLiteralInputValue };
+  },
+  options?: {
+    frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
   },
 ) {
   const planner = createPostgresMigrationPlanner();
@@ -340,12 +452,34 @@ function planAddColumn(
     contract,
     schema,
     policy: INIT_ADDITIVE_POLICY,
-    frameworkComponents: [],
+    frameworkComponents: options?.frameworkComponents ?? [],
   });
   if (result.kind !== 'success') throw new Error('expected planner success');
   const op = result.plan.operations.find((o) => o.id === `column.user.${columnName}`);
   if (!op) throw new Error(`operation column.user.${columnName} not found`);
   return op;
+}
+
+function createPlannerControlHookComponent(
+  codecId: string,
+  hooks: CodecControlHooks,
+): TargetBoundComponentDescriptor<'sql', 'postgres'> {
+  return {
+    kind: 'extension',
+    id: `test-hooks-${codecId}`,
+    familyId: 'sql',
+    targetId: 'postgres',
+    version: '0.0.0-test',
+    operationSignatures: () => [],
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
+    types: {
+      codecTypes: {
+        controlPlaneHooks: {
+          [codecId]: hooks,
+        },
+      },
+    },
+  } as TargetBoundComponentDescriptor<'sql', 'postgres'>;
 }
 
 function buildPostTableSchema(): SqlSchemaIR['tables'][string] {

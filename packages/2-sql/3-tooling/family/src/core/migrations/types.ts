@@ -164,6 +164,16 @@ export interface ExpandNativeTypeInput {
   readonly typeParams?: Record<string, unknown>;
 }
 
+/**
+ * Input for resolving a temporary SQL literal used to backfill existing rows when
+ * adding a NOT NULL column without an explicit default.
+ */
+export interface ResolveTemporaryDefaultLiteralInput {
+  readonly nativeType: string;
+  readonly codecId?: string;
+  readonly typeParams?: Record<string, unknown>;
+}
+
 export interface CodecControlHooks<TTargetDetails = unknown> {
   planTypeOperations?: (options: {
     readonly typeName: string;
@@ -194,6 +204,18 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    * Returns the expanded type string, or the original nativeType if no expansion is needed.
    */
   expandNativeType?: (input: ExpandNativeTypeInput) => string;
+  /**
+   * Resolves a temporary SQL literal for safely adding a NOT NULL column without an explicit
+   * default to a non-empty table.
+   *
+   * Return semantics:
+   * - string: use this literal
+   * - null: explicitly no safe temporary default is known; fall back to another strategy
+   * - undefined: no opinion; planner may use built-in fallbacks
+   */
+  resolveTemporaryDefaultLiteral?: (
+    input: ResolveTemporaryDefaultLiteralInput,
+  ) => string | null | undefined;
 }
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>

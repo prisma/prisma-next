@@ -7,6 +7,18 @@ import { pgvectorOperationSignature, pgvectorPackMeta } from '../core/descriptor
 
 const PGVECTOR_CODEC_ID = 'pg/vector@1' as const;
 
+function buildZeroVectorTemporaryDefaultLiteral(
+  typeParams: Record<string, unknown> | undefined,
+): string | null {
+  const length = typeParams?.['length'];
+  if (typeof length !== 'number' || !Number.isInteger(length) || length <= 0) {
+    return null;
+  }
+
+  const zeroVector = `[${new Array(length).fill('0').join(',')}]`;
+  return `'${zeroVector}'::vector`;
+}
+
 const vectorControlPlaneHooks: CodecControlHooks = {
   expandNativeType: ({ nativeType, typeParams }) => {
     const length = typeParams?.['length'];
@@ -15,6 +27,8 @@ const vectorControlPlaneHooks: CodecControlHooks = {
     }
     return nativeType;
   },
+  resolveTemporaryDefaultLiteral: ({ typeParams }) =>
+    buildZeroVectorTemporaryDefaultLiteral(typeParams),
 };
 
 const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {

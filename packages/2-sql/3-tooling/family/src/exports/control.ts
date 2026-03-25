@@ -47,6 +47,7 @@ export type {
   CreateSqlMigrationPlanOptions,
   ExpandNativeTypeInput,
   PslScalarTypeDescriptor,
+  ResolveTemporaryDefaultLiteralInput,
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
   SqlControlStaticContributions,

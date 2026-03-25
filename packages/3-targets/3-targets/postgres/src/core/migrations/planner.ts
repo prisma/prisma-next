@@ -343,87 +343,70 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     column: StorageColumn,
     codecHooks: Map<string, CodecControlHooks>,
   ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    const qualified = qualifyTableName(schema, tableName);
     const notNull = column.nullable === false;
     const hasDefault = column.default !== undefined;
-    // For NOT NULL columns without an explicit default, use a temporary type-appropriate
-    // zero default so PostgreSQL can add the column to non-empty tables. The temporary
-    // default is dropped immediately after the column is added, leaving the column as
-    // NOT NULL with no default (matching the contract intent).
+    // Planner logic decides whether this column needs the coordinated multi-step
+    // strategy. The strategy recipe itself is built by a dedicated helper.
     const needsTemporaryDefault = notNull && !hasDefault;
     const temporaryDefault = needsTemporaryDefault
-      ? buildTypeZeroDefaultLiteral(column.nativeType)
+      ? resolveTemporaryDefaultLiteral(column, codecHooks)
       : null;
-    const requiresEmptyTableCheck = needsTemporaryDefault && temporaryDefault === null;
-    const precheck = [
-      {
-        description: `ensure column "${columnName}" is missing`,
-        sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
-      },
-      ...(requiresEmptyTableCheck
-        ? [
-            {
-              description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
-              sql: tableIsEmptyCheck(qualified),
-            },
-          ]
-        : []),
-    ];
-    const execute = [
-      {
-        description: `add column "${columnName}"`,
-        sql: buildAddColumnSql(qualified, columnName, column, codecHooks, temporaryDefault),
-      },
-      // Drop the temporary default so future inserts must provide an explicit value.
-      ...(temporaryDefault
-        ? [
-            {
-              description: `drop temporary default from column "${columnName}"`,
-              sql: `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
-            },
-          ]
-        : []),
-    ];
-    const postcheck = [
-      {
-        description: `verify column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
-      },
-      ...(notNull
-        ? [
-            {
-              description: `verify column "${columnName}" is NOT NULL`,
-              sql: columnNullabilityCheck({
-                schema,
-                table: tableName,
-                column: columnName,
-                nullable: false,
-              }),
-            },
-          ]
-        : []),
-      ...(temporaryDefault
-        ? [
-            {
-              description: `verify column "${columnName}" has no default after temporary default removal`,
-              sql: columnHasNoDefaultCheck({ schema, table: tableName, column: columnName }),
-            },
-          ]
-        : []),
-    ];
 
+    if (needsTemporaryDefault && temporaryDefault !== null) {
+      return buildAddNotNullColumnWithTemporaryDefaultOperation({
+        schema,
+        tableName,
+        columnName,
+        column,
+        codecHooks,
+        temporaryDefault,
+      });
+    }
+
+    const qualified = qualifyTableName(schema, tableName);
+    const requiresEmptyTableCheck = needsTemporaryDefault && temporaryDefault === null;
     return {
-      id: `column.${tableName}.${columnName}`,
-      label: `Add column ${columnName} to ${tableName}`,
-      summary: `Adds column ${columnName} to table ${tableName}`,
+      ...buildAddColumnOperationIdentity(schema, tableName, columnName),
       operationClass: 'additive',
-      target: {
-        id: 'postgres',
-        details: this.buildTargetDetails('table', tableName, schema),
-      },
-      precheck,
-      execute,
-      postcheck,
+      precheck: [
+        {
+          description: `ensure column "${columnName}" is missing`,
+          sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
+        },
+        ...(requiresEmptyTableCheck
+          ? [
+              {
+                description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
+                sql: tableIsEmptyCheck(qualified),
+              },
+            ]
+          : []),
+      ],
+      execute: [
+        {
+          description: `add column "${columnName}"`,
+          sql: buildAddColumnSql(qualified, columnName, column, codecHooks),
+        },
+      ],
+      postcheck: [
+        {
+          description: `verify column "${columnName}" exists`,
+          sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
+        },
+        ...(notNull
+          ? [
+              {
+                description: `verify column "${columnName}" is NOT NULL`,
+                sql: columnNullabilityCheck({
+                  schema,
+                  table: tableName,
+                  column: columnName,
+                  nullable: false,
+                }),
+              },
+            ]
+          : []),
+      ],
     };
   }
 
@@ -717,6 +700,77 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     const verifyResult = verifySqlSchema(verifyOptions);
     return verifyResult.schema.issues;
   }
+}
+
+function buildAddColumnOperationIdentity(
+  schema: string,
+  tableName: string,
+  columnName: string,
+): Pick<
+  SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
+  'id' | 'label' | 'summary' | 'target'
+> {
+  return {
+    id: `column.${tableName}.${columnName}`,
+    label: `Add column ${columnName} to ${tableName}`,
+    summary: `Adds column ${columnName} to table ${tableName}`,
+    target: {
+      id: 'postgres',
+      details: buildTargetDetails('table', tableName, schema),
+    },
+  };
+}
+
+function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
+  readonly schema: string;
+  readonly tableName: string;
+  readonly columnName: string;
+  readonly column: StorageColumn;
+  readonly codecHooks: Map<string, CodecControlHooks>;
+  readonly temporaryDefault: string;
+}): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  const { schema, tableName, columnName, column, codecHooks, temporaryDefault } = options;
+  const qualified = qualifyTableName(schema, tableName);
+
+  return {
+    ...buildAddColumnOperationIdentity(schema, tableName, columnName),
+    operationClass: 'additive',
+    precheck: [
+      {
+        description: `ensure column "${columnName}" is missing`,
+        sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
+      },
+    ],
+    execute: [
+      {
+        description: `add column "${columnName}"`,
+        sql: buildAddColumnSql(qualified, columnName, column, codecHooks, temporaryDefault),
+      },
+      {
+        description: `drop temporary default from column "${columnName}"`,
+        sql: `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
+      },
+    ],
+    postcheck: [
+      {
+        description: `verify column "${columnName}" exists`,
+        sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
+      },
+      {
+        description: `verify column "${columnName}" is NOT NULL`,
+        sql: columnNullabilityCheck({
+          schema,
+          table: tableName,
+          column: columnName,
+          nullable: false,
+        }),
+      },
+      {
+        description: `verify column "${columnName}" has no default after temporary default removal`,
+        sql: columnHasNoDefaultCheck({ schema, table: tableName, column: columnName }),
+      },
+    ],
+  };
 }
 
 function sortDependencies(
@@ -1013,22 +1067,51 @@ function columnHasNoDefaultCheck(opts: { schema: string; table: string; column: 
 )`;
 }
 
+function resolveTemporaryDefaultLiteral(
+  column: StorageColumn,
+  codecHooks: Map<string, CodecControlHooks>,
+): string | null {
+  if (column.codecId) {
+    const hookDefault = codecHooks.get(column.codecId)?.resolveTemporaryDefaultLiteral?.({
+      nativeType: column.nativeType,
+      codecId: column.codecId,
+      ...ifDefined('typeParams', column.typeParams),
+    });
+    if (hookDefault !== undefined) {
+      return hookDefault;
+    }
+  }
+
+  return buildTypeZeroDefaultLiteral(column.nativeType, column.typeParams);
+}
+
 /**
- * Returns a type-appropriate zero-value SQL literal for the given PostgreSQL native type.
- * Used as a temporary DEFAULT when adding a NOT NULL column without an explicit default
- * to a potentially non-empty table. Existing rows permanently receive this zero value.
+ * Returns a built-in type-appropriate zero-value SQL literal for the given PostgreSQL native type.
+ * This is the planner's fallback when no codec hook provides a more specific temporary default.
  *
- * Returns null for unrecognized types (e.g. enums, arrays, extensions), which causes
+ * Returns null for unrecognized types (for example enums and extension-owned types without a
+ * hook), which causes
  * the planner to fall back to the empty-table precheck.
  *
  * @internal Exported for testing only.
  */
-export function buildTypeZeroDefaultLiteral(nativeType: string): string | null {
-  switch (nativeType.toLowerCase()) {
+export function buildTypeZeroDefaultLiteral(
+  nativeType: string,
+  typeParams?: Record<string, unknown>,
+): string | null {
+  const normalizedNativeType = normalizeTemporaryDefaultNativeType(nativeType);
+
+  if (normalizedNativeType.endsWith('[]')) {
+    return "'{}'";
+  }
+
+  switch (normalizedNativeType) {
     // String types
     case 'text':
     case 'character':
+    case 'bpchar':
     case 'character varying':
+    case 'varchar':
       return "''";
 
     // Numeric types (integer, float, decimal)
@@ -1080,15 +1163,37 @@ export function buildTypeZeroDefaultLiteral(nativeType: string): string | null {
     case 'interval':
       return "'0'";
 
+    // Binary / text search types
+    case 'bytea':
+      return "''::bytea";
+    case 'tsvector':
+      return "''::tsvector";
+
     // Bit types
     case 'bit':
-      return "B'0'";
+      return buildBitZeroDefaultLiteral(typeParams);
     case 'bit varying':
+    case 'varbit':
       return "B''";
 
     default:
       return null;
   }
+}
+
+function normalizeTemporaryDefaultNativeType(nativeType: string): string {
+  return nativeType.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function buildBitZeroDefaultLiteral(typeParams?: Record<string, unknown>): string | null {
+  const length = typeParams?.['length'];
+  if (length === undefined) {
+    return "B'0'";
+  }
+  if (typeof length !== 'number' || !Number.isInteger(length) || length <= 0) {
+    return null;
+  }
+  return `B'${'0'.repeat(length)}'`;
 }
 
 function buildAddColumnSql(
