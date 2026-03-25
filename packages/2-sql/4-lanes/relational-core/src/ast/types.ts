@@ -1609,6 +1609,24 @@ export const whereExprKinds: ReadonlySet<string> = new Set<WhereExpr['kind']>([
   'null-check',
 ]);
 
+export function isQueryAst(value: unknown): value is AnyQueryAst {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    queryAstKinds.has((value as { kind: string }).kind)
+  );
+}
+
+export function isWhereExpr(value: unknown): value is AnyWhereExpr {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    whereExprKinds.has((value as { kind: string }).kind)
+  );
+}
+
 export interface BoundWhereExpr {
   readonly expr: WhereExpr;
   readonly params: readonly unknown[];

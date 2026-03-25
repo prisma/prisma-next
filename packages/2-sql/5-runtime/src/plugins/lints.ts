@@ -5,19 +5,10 @@ import {
   type AnyFromSource,
   type AnyQueryAst,
   type FromSource,
+  isQueryAst,
   type QueryAst,
-  queryAstKinds,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
-
-function isSqlQueryAst(ast: unknown): ast is AnyQueryAst {
-  return (
-    typeof ast === 'object' &&
-    ast !== null &&
-    'kind' in ast &&
-    queryAstKinds.has((ast as { kind: string }).kind)
-  );
-}
 
 export interface LintsOptions {
   readonly severities?: {
@@ -170,7 +161,7 @@ export function lints<TContract = unknown, TAdapter = unknown, TDriver = unknown
     name: 'lints',
 
     async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
-      if (isSqlQueryAst(plan.ast)) {
+      if (isQueryAst(plan.ast)) {
         const findings = evaluateAstLints(plan.ast);
 
         for (const lint of findings) {
