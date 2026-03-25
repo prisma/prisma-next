@@ -21,7 +21,7 @@ import {
   unwrapSelectionNode,
   unwrapWhereNode,
 } from './kysely-ast-types';
-import { addParamDescriptor, nextParamIndex, type TransformContext } from './transform-context';
+import { nextParamIndex, type TransformContext } from './transform-context';
 import { transformJoinOn, transformOrderByItem, transformWhereExpr } from './transform-expr';
 import { resolveColumnRef, resolveTable, transformTableRef } from './transform-validate';
 
@@ -218,9 +218,7 @@ export function transformSelect(node: SelectQueryNode, ctx: TransformContext): S
       limit = node.limit.limit.value;
     } else {
       const limitParamIndex = nextParamIndex(ctx);
-      addParamDescriptor(ctx, {});
       const value = ctx.parameters ? ctx.parameters[limitParamIndex - 1] : node.limit.limit.value;
-      ctx.params.push(value);
       limit = typeof value === 'number' ? value : undefined;
     }
   }

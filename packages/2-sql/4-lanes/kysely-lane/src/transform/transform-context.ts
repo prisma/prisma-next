@@ -18,8 +18,6 @@ export interface TransformContext {
   contract: SqlContract<SqlStorage>;
   parameters: readonly unknown[] | undefined;
   paramIndex: number;
-  params: unknown[];
-  paramDescriptors: ParamDescriptor[];
   refsTables: Set<string>;
   refsColumns: Map<string, { table: string; column: string }>;
   tableAliases: Map<string, string>;
@@ -34,8 +32,6 @@ export function createContext(
     contract,
     parameters,
     paramIndex: 0,
-    params: [],
-    paramDescriptors: [],
     refsTables: new Set(),
     refsColumns: new Map(),
     tableAliases: new Map(),
@@ -44,15 +40,4 @@ export function createContext(
 
 export function nextParamIndex(ctx: TransformContext): number {
   return ++ctx.paramIndex;
-}
-
-export function addParamDescriptor(
-  ctx: TransformContext,
-  descriptor: Omit<ParamDescriptor, 'index' | 'source'>,
-): void {
-  ctx.paramDescriptors.push({
-    ...descriptor,
-    index: ctx.paramIndex,
-    source: 'lane',
-  });
 }
