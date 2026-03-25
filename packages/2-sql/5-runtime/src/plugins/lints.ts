@@ -1,19 +1,23 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { Plugin, PluginContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
-import {
-  DeleteAst,
-  DerivedTableSource,
-  type FromSource,
+import type {
+  AnyFromSource,
+  AnyQueryAst,
+  FromSource,
   QueryAst,
-  SelectAst,
-  TableSource,
-  UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 
-function isSqlQueryAst(ast: unknown): ast is QueryAst {
-  return ast instanceof QueryAst;
+const queryAstKinds = new Set<string>(['select', 'insert', 'update', 'delete']);
+
+function isSqlQueryAst(ast: unknown): ast is AnyQueryAst {
+  return (
+    typeof ast === 'object' &&
+    ast !== null &&
+    'kind' in ast &&
+    queryAstKinds.has((ast as { kind: string }).kind)
+  );
 }
 
 export interface LintsOptions {
@@ -55,61 +59,68 @@ function lintError(code: string, message: string, details?: Record<string, unkno
 }
 
 function getFromSourceTableDetail(source: FromSource): string | undefined {
-  if (source instanceof TableSource) {
-    return source.name;
+  const node = source as AnyFromSource;
+  switch (node.kind) {
+    case 'table-source':
+      return node.name;
+    case 'derived-table-source':
+      return node.alias;
+    default:
+      return undefined;
   }
-  if (source instanceof DerivedTableSource) {
-    return source.alias;
-  }
-  return undefined;
 }
 
-function evaluateAstLints(ast: QueryAst): LintFinding[] {
+function evaluateAstLints(ast: AnyQueryAst): LintFinding[] {
   const findings: LintFinding[] = [];
 
-  if (ast instanceof DeleteAst) {
-    if (ast.where === undefined) {
-      findings.push({
-        code: 'LINT.DELETE_WITHOUT_WHERE',
-        severity: 'error',
-        message:
-          'DELETE without WHERE clause blocks execution to prevent accidental full-table deletion',
-        details: { table: ast.table.name },
-      });
-    }
-  }
+  switch (ast.kind) {
+    case 'delete':
+      if (ast.where === undefined) {
+        findings.push({
+          code: 'LINT.DELETE_WITHOUT_WHERE',
+          severity: 'error',
+          message:
+            'DELETE without WHERE clause blocks execution to prevent accidental full-table deletion',
+          details: { table: ast.table.name },
+        });
+      }
+      break;
 
-  if (ast instanceof UpdateAst) {
-    if (ast.where === undefined) {
-      findings.push({
-        code: 'LINT.UPDATE_WITHOUT_WHERE',
-        severity: 'error',
-        message:
-          'UPDATE without WHERE clause blocks execution to prevent accidental full-table update',
-        details: { table: ast.table.name },
-      });
-    }
-  }
+    case 'update':
+      if (ast.where === undefined) {
+        findings.push({
+          code: 'LINT.UPDATE_WITHOUT_WHERE',
+          severity: 'error',
+          message:
+            'UPDATE without WHERE clause blocks execution to prevent accidental full-table update',
+          details: { table: ast.table.name },
+        });
+      }
+      break;
 
-  if (ast instanceof SelectAst) {
-    if (ast.limit === undefined) {
-      const table = getFromSourceTableDetail(ast.from);
-      findings.push({
-        code: 'LINT.NO_LIMIT',
-        severity: 'warn',
-        message: 'Unbounded SELECT may return large result sets',
-        ...ifDefined('details', table !== undefined ? { table } : undefined),
-      });
-    }
-    if (ast.selectAllIntent !== undefined) {
-      const table = ast.selectAllIntent.table;
-      findings.push({
-        code: 'LINT.SELECT_STAR',
-        severity: 'warn',
-        message: 'Query selects all columns via selectAll intent',
-        ...ifDefined('details', table !== undefined ? { table } : undefined),
-      });
-    }
+    case 'select':
+      if (ast.limit === undefined) {
+        const table = getFromSourceTableDetail(ast.from);
+        findings.push({
+          code: 'LINT.NO_LIMIT',
+          severity: 'warn',
+          message: 'Unbounded SELECT may return large result sets',
+          ...ifDefined('details', table !== undefined ? { table } : undefined),
+        });
+      }
+      if (ast.selectAllIntent !== undefined) {
+        const table = ast.selectAllIntent.table;
+        findings.push({
+          code: 'LINT.SELECT_STAR',
+          severity: 'warn',
+          message: 'Query selects all columns via selectAll intent',
+          ...ifDefined('details', table !== undefined ? { table } : undefined),
+        });
+      }
+      break;
+
+    case 'insert':
+      break;
   }
 
   return findings;
