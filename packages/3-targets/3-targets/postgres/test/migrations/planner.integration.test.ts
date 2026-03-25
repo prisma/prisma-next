@@ -106,6 +106,48 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
     ]);
   });
 
+  it(
+    'plans the empty-table fallback for a dropped NOT NULL unique column on a non-empty table',
+    { timeout: testTimeout },
+    async () => {
+      await driver!.query('create table "user" (id uuid primary key)');
+      await driver!.query(`INSERT INTO "user" ("id") VALUES
+        ('00000000-0000-0000-0000-000000000001'),
+        ('00000000-0000-0000-0000-000000000002')`);
+
+      const schema = await introspectSchema(driver!);
+      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+
+      const planResult = planner.plan({
+        contract,
+        schema,
+        policy: INIT_ADDITIVE_POLICY,
+        frameworkComponents,
+      });
+
+      expect(planResult.kind).toBe('success');
+      if (planResult.kind !== 'success') {
+        throw new Error('expected planner success for constrained fallback case');
+      }
+
+      const addEmailOperation = planResult.plan.operations.find(
+        (op) => op.id === 'column.user.email',
+      );
+      expect(addEmailOperation).toBeDefined();
+      expect(addEmailOperation?.precheck.map((step) => step.sql)).toContain(
+        'SELECT NOT EXISTS (SELECT 1 FROM "public"."user" LIMIT 1)',
+      );
+      expect(addEmailOperation?.execute.map((step) => step.sql)).toEqual([
+        'ALTER TABLE "public"."user" ADD COLUMN "email" text NOT NULL',
+      ]);
+      expect(planResult.plan.operations.map((op) => op.id)).toEqual([
+        'column.user.email',
+        'unique.user.user_email_key',
+        'index.user.user_email_idx',
+      ]);
+    },
+  );
+
   it('fails with conflicts for incompatible schemas', { timeout: testTimeout }, async () => {
     await driver!.query('create table "user" (id uuid primary key, email uuid not null)');
     const schema = await introspectSchema(driver!);
