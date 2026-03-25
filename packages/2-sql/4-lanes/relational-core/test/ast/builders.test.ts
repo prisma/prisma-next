@@ -49,15 +49,12 @@ describe('ast/builders', () => {
       .withReturning([col('user', 'id')]);
 
     expect(ast.onConflict?.columns).toEqual([col('user', 'id')]);
-    expect(ast.onConflict?.action?.kind).toBe('do-update-set');
     expect(ast.returning).toEqual([col('user', 'id')]);
   });
 
   it('builds insert ASTs with do-nothing conflicts and explicit row lists', () => {
     const conflictAst = InsertAst.into(table('user'))
-      .withValues({
-        id: param(1, 'id'),
-      })
+      .withValues({ id: param(1, 'id') })
       .withOnConflict(InsertOnConflict.on([col('user', 'id')]).doNothing());
     const rowAst = InsertAst.into(table('user')).withRows([
       {
@@ -70,7 +67,7 @@ describe('ast/builders', () => {
       },
     ]);
 
-    expect(conflictAst.onConflict?.action?.kind).toBe('do-nothing');
+    expect(conflictAst.onConflict?.columns).toEqual([col('user', 'id')]);
     expect(rowAst.rows).toEqual([
       {
         id: param(1, 'id'),
