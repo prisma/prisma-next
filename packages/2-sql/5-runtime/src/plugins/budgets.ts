@@ -126,7 +126,7 @@ function estimateRowsFromAst(
   ast: SelectAst,
   tableRows: Record<string, number>,
   defaultTableRows: number,
-  refs: { tables?: string[] } | undefined,
+  refs: { tables?: readonly string[] } | undefined,
 ): number | null {
   if (hasAggregateWithoutGroupBy(ast)) {
     return 1;
