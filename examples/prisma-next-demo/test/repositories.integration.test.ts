@@ -432,6 +432,8 @@ describe('ORM client integration examples', () => {
             seededPostIds.newer,
           ]);
           expect(posts.every((post) => 'embedding' in post === false)).toBe(true);
+          // TODO(TML-2120): non-null assert works around IncludeRelationValue
+          // incorrectly marking the included to-one relation as nullable.
           expect(posts.map((post) => post.user!.id)).toEqual([
             seededUserIds.adminTwo,
             seededUserIds.adminTwo,
