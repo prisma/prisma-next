@@ -21,14 +21,22 @@ describe('createPostgresTypeMap', () => {
     expect(typeMap.resolve('jsonb')).toEqual({ pslType: 'Json', nativeType: 'jsonb' });
     expect(typeMap.resolve('bytea')).toEqual({ pslType: 'Bytes', nativeType: 'bytea' });
     expect(typeMap.resolve('int8')).toEqual({ pslType: 'BigInt', nativeType: 'int8' });
-    expect(typeMap.resolve('uuid')).toEqual({ pslType: 'String', nativeType: 'uuid' });
+    expect(typeMap.resolve('uuid')).toEqual({
+      pslType: 'String',
+      nativeType: 'uuid',
+      nativeTypeAttribute: { name: 'db.Uuid' },
+    });
   });
 
   it('maps alias types', () => {
     expect(typeMap.resolve('integer')).toEqual({ pslType: 'Int', nativeType: 'integer' });
     expect(typeMap.resolve('boolean')).toEqual({ pslType: 'Boolean', nativeType: 'boolean' });
     expect(typeMap.resolve('bigint')).toEqual({ pslType: 'BigInt', nativeType: 'bigint' });
-    expect(typeMap.resolve('real')).toEqual({ pslType: 'Float', nativeType: 'real' });
+    expect(typeMap.resolve('real')).toEqual({
+      pslType: 'Float',
+      nativeType: 'real',
+      nativeTypeAttribute: { name: 'db.Real' },
+    });
     expect(typeMap.resolve('double precision')).toEqual({
       pslType: 'Float',
       nativeType: 'double precision',
@@ -41,6 +49,7 @@ describe('createPostgresTypeMap', () => {
       pslType: 'String',
       nativeType: 'character varying(255)',
       typeParams: { baseType: 'character varying', params: '255' },
+      nativeTypeAttribute: { name: 'db.VarChar', args: ['255'] },
     });
   });
 
@@ -50,14 +59,44 @@ describe('createPostgresTypeMap', () => {
       pslType: 'String',
       nativeType: 'character(20)',
       typeParams: { baseType: 'character', params: '20' },
+      nativeTypeAttribute: { name: 'db.Char', args: ['20'] },
     });
   });
 
-  it('marks bare varchar as a named-type candidate', () => {
+  it('preserves bare varchar via a native type attribute', () => {
     expect(typeMap.resolve('varchar')).toEqual({
       pslType: 'String',
       nativeType: 'varchar',
-      typeParams: { baseType: 'varchar' },
+      nativeTypeAttribute: { name: 'db.VarChar' },
+    });
+  });
+
+  it('preserves non-default timestamp, date, time, json, and integer types', () => {
+    expect(typeMap.resolve('timestamp')).toEqual({
+      pslType: 'DateTime',
+      nativeType: 'timestamp',
+      nativeTypeAttribute: { name: 'db.Timestamp' },
+    });
+    expect(typeMap.resolve('time(3)')).toEqual({
+      pslType: 'DateTime',
+      nativeType: 'time(3)',
+      typeParams: { baseType: 'time', params: '3' },
+      nativeTypeAttribute: { name: 'db.Time', args: ['3'] },
+    });
+    expect(typeMap.resolve('date')).toEqual({
+      pslType: 'DateTime',
+      nativeType: 'date',
+      nativeTypeAttribute: { name: 'db.Date' },
+    });
+    expect(typeMap.resolve('json')).toEqual({
+      pslType: 'Json',
+      nativeType: 'json',
+      nativeTypeAttribute: { name: 'db.Json' },
+    });
+    expect(typeMap.resolve('int2')).toEqual({
+      pslType: 'Int',
+      nativeType: 'int2',
+      nativeTypeAttribute: { name: 'db.SmallInt' },
     });
   });
 

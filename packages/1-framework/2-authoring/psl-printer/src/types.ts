@@ -4,11 +4,17 @@ import type { DefaultMappingOptions } from './default-mapping';
 /**
  * Result of resolving a native database type to a PSL type.
  */
+export type PslNativeTypeAttribute = {
+  readonly name: string;
+  readonly args?: readonly string[];
+};
+
 export type PslTypeResolution =
   | {
       readonly pslType: string;
       readonly nativeType: string;
       readonly typeParams?: Record<string, unknown>;
+      readonly nativeTypeAttribute?: PslNativeTypeAttribute;
     }
   | {
       readonly unsupported: true;
@@ -80,6 +86,7 @@ export type PrinterEnum = {
 export type PrinterNamedType = {
   readonly name: string;
   readonly baseType: string;
+  readonly attributes: readonly string[];
 };
 
 /**

@@ -1,4 +1,4 @@
-import type { PslTypeMap, PslTypeResolution } from './types';
+import type { PslNativeTypeAttribute, PslTypeMap, PslTypeResolution } from './types';
 
 /**
  * Reverse mapping from Postgres native types to PSL scalar types.
@@ -37,14 +37,48 @@ const POSTGRES_TO_PSL: Record<string, string> = {
 };
 
 /**
- * Parameterized types that need a `types` block entry.
- * Maps the base Postgres type name to the PSL base scalar.
+ * Native types that require explicit `@db.*` preservation because the provider's
+ * default scalar descriptors would otherwise collapse them to a different storage type.
  */
-const PARAMETERIZED_TYPES: Record<string, string> = {
-  'character varying': 'String',
-  character: 'String',
-  char: 'String',
-  varchar: 'String',
+const PRESERVED_NATIVE_TYPES: Record<
+  string,
+  { readonly pslType: string; readonly attributeName: string }
+> = {
+  'character varying': { pslType: 'String', attributeName: 'db.VarChar' },
+  character: { pslType: 'String', attributeName: 'db.Char' },
+  char: { pslType: 'String', attributeName: 'db.Char' },
+  varchar: { pslType: 'String', attributeName: 'db.VarChar' },
+  uuid: { pslType: 'String', attributeName: 'db.Uuid' },
+  int2: { pslType: 'Int', attributeName: 'db.SmallInt' },
+  smallint: { pslType: 'Int', attributeName: 'db.SmallInt' },
+  float4: { pslType: 'Float', attributeName: 'db.Real' },
+  real: { pslType: 'Float', attributeName: 'db.Real' },
+  timestamp: { pslType: 'DateTime', attributeName: 'db.Timestamp' },
+  'timestamp without time zone': { pslType: 'DateTime', attributeName: 'db.Timestamp' },
+  date: { pslType: 'DateTime', attributeName: 'db.Date' },
+  time: { pslType: 'DateTime', attributeName: 'db.Time' },
+  'time without time zone': { pslType: 'DateTime', attributeName: 'db.Time' },
+  timetz: { pslType: 'DateTime', attributeName: 'db.Timetz' },
+  'time with time zone': { pslType: 'DateTime', attributeName: 'db.Timetz' },
+  json: { pslType: 'Json', attributeName: 'db.Json' },
+};
+
+/**
+ * Parameterized Postgres types that also need explicit `@db.*` preservation.
+ */
+const PARAMETERIZED_NATIVE_TYPES: Record<
+  string,
+  { readonly pslType: string; readonly attributeName: string }
+> = {
+  'character varying': { pslType: 'String', attributeName: 'db.VarChar' },
+  character: { pslType: 'String', attributeName: 'db.Char' },
+  char: { pslType: 'String', attributeName: 'db.Char' },
+  varchar: { pslType: 'String', attributeName: 'db.VarChar' },
+  numeric: { pslType: 'Decimal', attributeName: 'db.Numeric' },
+  timestamp: { pslType: 'DateTime', attributeName: 'db.Timestamp' },
+  timestamptz: { pslType: 'DateTime', attributeName: 'db.Timestamptz' },
+  time: { pslType: 'DateTime', attributeName: 'db.Time' },
+  timetz: { pslType: 'DateTime', attributeName: 'db.Timetz' },
 };
 
 /**
@@ -63,6 +97,27 @@ function getOwnMappingValue(map: Record<string, string>, key: string): string | 
   return Object.hasOwn(map, key) ? map[key] : undefined;
 }
 
+function getOwnRecordValue<T>(map: Record<string, T>, key: string): T | undefined {
+  return Object.hasOwn(map, key) ? map[key] : undefined;
+}
+
+function createNativeTypeAttribute(
+  name: string,
+  args?: readonly string[],
+): PslNativeTypeAttribute | undefined {
+  if (!args || args.length === 0) {
+    return { name };
+  }
+  return { name, args };
+}
+
+function splitTypeParameterList(params: string): readonly string[] {
+  return params
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
 /**
  * Creates a Postgres-specific type map for the PSL printer.
  *
@@ -76,29 +131,31 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
         return { pslType: nativeType, nativeType };
       }
 
-      // Check for parameterized types (e.g., "character varying(255)")
+      // Check for parameterized types first so we keep precision/scale/length.
       const paramMatch = nativeType.match(PARAMETERIZED_TYPE_PATTERN);
       if (paramMatch) {
         const [, baseType = nativeType, params = ''] = paramMatch;
-        const pslBase =
-          getOwnMappingValue(PARAMETERIZED_TYPES, baseType) ??
-          getOwnMappingValue(POSTGRES_TO_PSL, baseType);
-        if (pslBase) {
+        const template = getOwnRecordValue(PARAMETERIZED_NATIVE_TYPES, baseType);
+        if (template) {
           return {
-            pslType: pslBase,
+            pslType: template.pslType,
             nativeType,
             typeParams: { baseType, params },
+            nativeTypeAttribute: createNativeTypeAttribute(
+              template.attributeName,
+              splitTypeParameterList(params),
+            ),
           };
         }
       }
 
-      // Check for non-parameterized types that still need types block entries
-      const parameterizedScalar = getOwnMappingValue(PARAMETERIZED_TYPES, nativeType);
-      if (parameterizedScalar) {
+      // Non-parameterized native types that still need explicit preservation.
+      const preservedType = getOwnRecordValue(PRESERVED_NATIVE_TYPES, nativeType);
+      if (preservedType) {
         return {
-          pslType: parameterizedScalar,
+          pslType: preservedType.pslType,
           nativeType,
-          typeParams: { baseType: nativeType },
+          nativeTypeAttribute: createNativeTypeAttribute(preservedType.attributeName),
         };
       }
 

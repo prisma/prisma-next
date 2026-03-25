@@ -9,6 +9,7 @@ import type {
   PrinterField,
   PrinterModel,
   PrinterNamedType,
+  PslNativeTypeAttribute,
   PslPrinterOptions,
   RelationField,
 } from './types';
@@ -224,8 +225,8 @@ function processTable(
       typeName = enumPslName;
     }
 
-    // Handle parameterized types → named type in types block
-    if (resolution.typeParams && !enumPslName) {
+    // Preserve non-default native storage shapes via named types.
+    if (resolution.nativeTypeAttribute && !enumPslName) {
       typeName = resolveNamedTypeName(namedTypes, resolution);
     }
 
@@ -575,6 +576,7 @@ function seedNamedTypeRegistry(
     {
       readonly baseType: string;
       readonly desiredName: string;
+      readonly attributes: readonly string[];
     }
   >();
 
@@ -594,7 +596,7 @@ function seedNamedTypeRegistry(
       if (
         'unsupported' in resolution ||
         enumNameMap.has(column.nativeType) ||
-        !resolution.typeParams
+        !resolution.nativeTypeAttribute
       ) {
         continue;
       }
@@ -604,6 +606,7 @@ function seedNamedTypeRegistry(
         seeds.set(signatureKey, {
           baseType: resolution.pslType,
           desiredName: toNamedTypeName(column.name),
+          attributes: [renderNativeTypeAttribute(resolution.nativeTypeAttribute)],
         });
       }
     }
@@ -627,6 +630,7 @@ function seedNamedTypeRegistry(
     registry.entriesByKey.set(signatureKey, {
       name,
       baseType: seed.baseType,
+      attributes: seed.attributes,
     });
     registry.usedNames.add(name);
   }
@@ -640,6 +644,7 @@ function resolveNamedTypeName(
     readonly pslType: string;
     readonly nativeType: string;
     readonly typeParams?: Record<string, unknown>;
+    readonly nativeTypeAttribute?: PslNativeTypeAttribute;
   },
 ): string {
   const key = createNamedTypeSignatureKey(resolution);
@@ -648,20 +653,23 @@ function resolveNamedTypeName(
     return existing.name;
   }
 
-  throw new Error(
-    `Named type registry was not seeded for parameterized type "${resolution.nativeType}"`,
-  );
+  throw new Error(`Named type registry was not seeded for native type "${resolution.nativeType}"`);
 }
 
 function createNamedTypeSignatureKey(resolution: {
   readonly pslType: string;
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown>;
+  readonly nativeTypeAttribute?: PslNativeTypeAttribute;
 }): string {
   return JSON.stringify({
     baseType: resolution.pslType,
-    nativeType: resolution.nativeType,
-    typeParams: resolution.typeParams ?? null,
+    nativeTypeAttribute: resolution.nativeTypeAttribute
+      ? {
+          name: resolution.nativeTypeAttribute.name,
+          args: resolution.nativeTypeAttribute.args ?? null,
+        }
+      : null,
   });
 }
 
@@ -768,10 +776,18 @@ function topologicalSort(
 function serializeTypesBlock(namedTypes: readonly PrinterNamedType[]): string {
   const lines = ['types {'];
   for (const nt of namedTypes) {
-    lines.push(`  ${nt.name} = ${nt.baseType}`);
+    const attrStr = nt.attributes.length > 0 ? ` ${nt.attributes.join(' ')}` : '';
+    lines.push(`  ${nt.name} = ${nt.baseType}${attrStr}`);
   }
   lines.push('}');
   return lines.join('\n');
+}
+
+function renderNativeTypeAttribute(attribute: PslNativeTypeAttribute): string {
+  if (!attribute.args || attribute.args.length === 0) {
+    return `@${attribute.name}`;
+  }
+  return `@${attribute.name}(${attribute.args.join(', ')})`;
 }
 
 /**

@@ -99,8 +99,8 @@ describe('printPsl', () => {
       "// This file was introspected from the database. Do not edit manually.
 
       types {
-        Email = String
-        Phone = String
+        Email = String @db.VarChar(255)
+        Phone = String @db.Char(20)
       }
 
       model Contact {
@@ -157,8 +157,8 @@ describe('printPsl', () => {
       "// This file was introspected from the database. Do not edit manually.
 
       types {
-        Value = Decimal
-        Value2 = String
+        Value = Decimal @db.Numeric(10, 2)
+        Value2 = String @db.VarChar(255)
       }
 
       model Price {
@@ -222,7 +222,7 @@ describe('printPsl', () => {
       "// This file was introspected from the database. Do not edit manually.
 
       types {
-        Email = String
+        Email = String @db.VarChar(255)
       }
 
       model Account {
@@ -299,9 +299,9 @@ describe('printPsl', () => {
       "// This file was introspected from the database. Do not edit manually.
 
       types {
-        Role2 = String
-        String2 = String
-        User2 = String
+        Role2 = String @db.VarChar(32)
+        String2 = String @db.VarChar(64)
+        User2 = String @db.VarChar(255)
       }
 
       enum Role {
@@ -392,10 +392,80 @@ describe('printPsl', () => {
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
+      types {
+        Id = String @db.Uuid
+      }
+
       model Item {
-        id String @id @default(dbgenerated("gen_random_uuid()"))
+        id Id @id @default(dbgenerated("gen_random_uuid()"))
 
         @@map("item")
+      }
+      "
+    `);
+  });
+
+  it('preserves non-default native types through named type attributes', () => {
+    const schemaIR: SqlSchemaIR = {
+      tables: {
+        schedule: {
+          name: 'schedule',
+          columns: {
+            id: { name: 'id', nativeType: 'uuid', nullable: false, default: undefined },
+            booked_on: {
+              name: 'booked_on',
+              nativeType: 'date',
+              nullable: false,
+              default: undefined,
+            },
+            slot: {
+              name: 'slot',
+              nativeType: 'time(3)',
+              nullable: false,
+              default: undefined,
+            },
+            rating: {
+              name: 'rating',
+              nativeType: 'int2',
+              nullable: false,
+              default: undefined,
+            },
+            payload: {
+              name: 'payload',
+              nativeType: 'json',
+              nullable: false,
+              default: undefined,
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      dependencies: [],
+    };
+
+    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    expect(result).toMatchInlineSnapshot(`
+      "// This file was introspected from the database. Do not edit manually.
+
+      types {
+        BookedOn = DateTime @db.Date
+        Id = String @db.Uuid
+        Payload = Json @db.Json
+        Rating = Int @db.SmallInt
+        Slot = DateTime @db.Time(3)
+      }
+
+      model Schedule {
+        id       Id       @id
+        bookedOn BookedOn @map("booked_on")
+        slot     Slot
+        rating   Rating
+        payload  Payload
+
+        @@map("schedule")
       }
       "
     `);

@@ -264,6 +264,90 @@ model Post {
     });
   });
 
+  it('lowers preserved native type named types into storage descriptors', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Id = String @db.Uuid
+  Slug = String @db.VarChar(191)
+  Rating = Int @db.SmallInt
+  HappenedAt = DateTime @db.Time(3)
+  PublishDay = DateTime @db.Date
+  Payload = Json @db.Json
+  Amount = Decimal @db.Numeric(10, 2)
+}
+
+model Event {
+  id Id @id
+  slug Slug
+  rating Rating
+  happenedAt HappenedAt
+  publishDay PublishDay
+  payload Payload
+  amount Amount
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      types: {
+        Id: { codecId: 'pg/text@1', nativeType: 'uuid' },
+        Slug: {
+          codecId: 'sql/varchar@1',
+          nativeType: 'character varying',
+          typeParams: { length: 191 },
+        },
+        Rating: { codecId: 'pg/int2@1', nativeType: 'int2' },
+        HappenedAt: {
+          codecId: 'pg/time@1',
+          nativeType: 'time',
+          typeParams: { precision: 3 },
+        },
+        PublishDay: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
+        Payload: { codecId: 'pg/json@1', nativeType: 'json' },
+        Amount: {
+          codecId: 'pg/numeric@1',
+          nativeType: 'numeric',
+          typeParams: { precision: 10, scale: 2 },
+        },
+      },
+      tables: {
+        event: {
+          columns: {
+            id: { codecId: 'pg/text@1', nativeType: 'uuid' },
+            slug: {
+              codecId: 'sql/varchar@1',
+              nativeType: 'character varying',
+              typeParams: { length: 191 },
+            },
+            rating: { codecId: 'pg/int2@1', nativeType: 'int2' },
+            happenedAt: {
+              codecId: 'pg/time@1',
+              nativeType: 'time',
+              typeParams: { precision: 3 },
+            },
+            publishDay: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
+            payload: { codecId: 'pg/json@1', nativeType: 'json' },
+            amount: {
+              codecId: 'pg/numeric@1',
+              nativeType: 'numeric',
+              typeParams: { precision: 10, scale: 2 },
+            },
+          },
+          primaryKey: { columns: ['id'] },
+        },
+      },
+    });
+  });
+
   it('returns diagnostics for unsupported referential action tokens', () => {
     const document = parsePslDocument({
       schema: `model User {
