@@ -1029,7 +1029,7 @@ export class JoinAst extends AstNode {
     return new JoinAst(
       this.joinType,
       this.source.rewrite(rewriter),
-      this.on.kind === 'eq-col-join-on' ? this.on.rewrite(rewriter) : this.on.rewrite(rewriter),
+      this.on.rewrite(rewriter),
       this.lateral,
     );
   }
