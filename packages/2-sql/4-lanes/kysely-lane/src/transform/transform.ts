@@ -113,7 +113,7 @@ export function transformKyselyToPnAst(
 export function transformKyselyToPnAstCollectingParams(
   contract: SqlContract<SqlStorage>,
   query: unknown,
-): TransformResultWithParams {
+): TransformResult {
   if (!isTransformableRootNode(query)) {
     const nodeKind =
       query && typeof query === 'object' && 'kind' in query

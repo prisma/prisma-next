@@ -47,6 +47,26 @@ import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
 import { buildProjectionState } from './projection';
 
+function deriveParamsFromAst(ast: {
+  collectParamRefs(): Array<{
+    value: unknown;
+    name?: string;
+    codecId?: string;
+    nativeType?: string;
+  }>;
+}) {
+  const collected = ast.collectParamRefs();
+  return {
+    paramValues: collected.map((p) => p.value),
+    paramDescriptors: collected.map((p) => ({
+      name: p.name,
+      source: 'dsl' as const,
+      ...(p.codecId ? { codecId: p.codecId } : {}),
+      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
+    })),
+  };
+}
+
 export class SelectBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   Row = unknown,
@@ -352,14 +372,7 @@ export class SelectBuilderImpl<
       ast = ast.withLimit(this.state.limit);
     }
 
-    const collectedParams = ast.collectParamRefs();
-    const paramValues = collectedParams.map((p) => p.value);
-    const paramDescriptors = collectedParams.map((p) => ({
-      name: p.name,
-      source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
-    }));
+    const { paramValues, paramDescriptors } = deriveParamsFromAst(ast);
 
     const planMeta = buildMeta({
       contract: this.contract,

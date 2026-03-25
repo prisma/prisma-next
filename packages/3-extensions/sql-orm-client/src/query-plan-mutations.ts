@@ -11,7 +11,7 @@ import {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { buildOrmQueryPlan, resolveTableColumns } from './query-plan-meta';
+import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { combineWhereFilters } from './where-utils';
 
 function buildReturningColumns(
@@ -94,19 +94,6 @@ function normalizeInsertRows(
   });
 
   return { rows: normalizedRows };
-}
-
-function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
-  const collectedParams = ast.collectParamRefs();
-  return {
-    params: collectedParams.map((p) => p.value),
-    paramDescriptors: collectedParams.map((p) => ({
-      name: p.name,
-      source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
-    })),
-  };
 }
 
 export function compileInsertReturning(

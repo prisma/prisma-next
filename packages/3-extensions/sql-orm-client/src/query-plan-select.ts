@@ -22,7 +22,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { buildOrmQueryPlan, resolveTableColumns } from './query-plan-meta';
+import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr, OrderExpr } from './types';
 import { bindWhereExpr } from './where-binding';
 import { combineWhereFilters } from './where-utils';
@@ -284,8 +284,11 @@ function buildLateralIncludeArtifacts(
   readonly join: JoinAst;
   readonly projection: ProjectionItem;
 } {
-  const { childRows, childProjection, rowsAlias, aggregateOrderBy } =
-    buildIncludeChildRowsSelect(contract, parentTableName, include);
+  const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
+    contract,
+    parentTableName,
+    include,
+  );
   const lateralAlias = `${include.relationName}_lateral`;
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
     childProjection.map((item) =>
@@ -318,8 +321,11 @@ function buildCorrelatedIncludeProjection(
 ): {
   readonly projection: ProjectionItem;
 } {
-  const { childRows, childProjection, rowsAlias, aggregateOrderBy } =
-    buildIncludeChildRowsSelect(contract, parentTableName, include);
+  const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
+    contract,
+    parentTableName,
+    include,
+  );
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
     childProjection.map((item) =>
       JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
@@ -382,19 +388,6 @@ function buildSelectAst(
   }
 
   return { ast };
-}
-
-function deriveParamsFromAst(ast: { collectParamRefs(): import('@prisma-next/sql-relational-core/ast').ParamRef[] }) {
-  const collectedParams = ast.collectParamRefs();
-  return {
-    params: collectedParams.map((p) => p.value),
-    paramDescriptors: collectedParams.map((p) => ({
-      name: p.name,
-      source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
-    })),
-  };
 }
 
 export function compileSelect(

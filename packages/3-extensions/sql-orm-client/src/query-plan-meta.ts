@@ -1,7 +1,23 @@
 import type { ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
+import type { AnyQueryAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+
+export function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }): {
+  params: unknown[];
+  paramDescriptors: ParamDescriptor[];
+} {
+  const collectedParams = ast.collectParamRefs();
+  return {
+    params: collectedParams.map((p) => p.value),
+    paramDescriptors: collectedParams.map((p) => ({
+      name: p.name,
+      source: 'dsl' as const,
+      ...(p.codecId ? { codecId: p.codecId } : {}),
+      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
+    })),
+  };
+}
 
 export function resolveTableColumns(
   contract: SqlContract<SqlStorage>,

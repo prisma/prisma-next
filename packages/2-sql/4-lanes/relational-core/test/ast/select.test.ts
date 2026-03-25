@@ -126,4 +126,33 @@ describe('ast/select', () => {
 
     expect(selectAst.collectParamRefs()).toEqual([]);
   });
+
+  it('collectParamRefs traverses in deterministic clause order: from, where, having, joins', () => {
+    const fromParam = param('from_val', 'from_p');
+    const whereParam = param('where_val', 'where_p');
+    const havingParam = param('having_val', 'having_p');
+    const joinParam = param('join_val', 'join_p');
+
+    const subquery = SelectAst.from(table('post'))
+      .addProjection('id', col('post', 'id'))
+      .withWhere(BinaryExpr.eq(col('post', 'id'), fromParam));
+
+    const joinSubquery = SelectAst.from(table('comment'))
+      .addProjection('id', col('comment', 'id'))
+      .withWhere(BinaryExpr.eq(col('comment', 'postId'), joinParam));
+
+    const ast = SelectAst.from(DerivedTableSource.as('sub', subquery))
+      .addProjection('id', col('sub', 'id'))
+      .withWhere(BinaryExpr.eq(col('sub', 'id'), whereParam))
+      .withHaving(BinaryExpr.gt(col('sub', 'id'), havingParam))
+      .withGroupBy([col('sub', 'id')])
+      .withJoins([
+        JoinAst.left(
+          DerivedTableSource.as('comments', joinSubquery),
+          EqColJoinOn.of(col('sub', 'id'), col('comments', 'id')),
+        ),
+      ]);
+
+    expect(ast.collectParamRefs()).toEqual([fromParam, whereParam, havingParam, joinParam]);
+  });
 });

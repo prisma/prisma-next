@@ -15,7 +15,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { buildOrmQueryPlan } from './query-plan-meta';
+import { buildOrmQueryPlan, deriveParamsFromAst } from './query-plan-meta';
 import type { AggregateSelector } from './types';
 import { combineWhereFilters } from './where-utils';
 
@@ -112,18 +112,8 @@ export function compileAggregate(
     ast = ast.withWhere(where.expr);
   }
 
-  const collectedParams = ast.collectParamRefs();
-  return buildOrmQueryPlan(
-    contract,
-    ast,
-    collectedParams.map((p) => p.value),
-    collectedParams.map((p) => ({
-      name: p.name,
-      source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
-    })),
-  );
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
 export function compileGroupedAggregate(
@@ -162,16 +152,6 @@ export function compileGroupedAggregate(
     ast = ast.withHaving(validateGroupedHavingExpr(havingExpr));
   }
 
-  const collectedParams = ast.collectParamRefs();
-  return buildOrmQueryPlan(
-    contract,
-    ast,
-    collectedParams.map((p) => p.value),
-    collectedParams.map((p) => ({
-      name: p.name,
-      source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
-    })),
-  );
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }

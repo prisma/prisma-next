@@ -25,7 +25,7 @@ import {
 } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
 import { isOperationNode, parseOrderByDirection } from './kysely-ast-types';
-import { nextParamIndex, type TransformContext } from './transform-context';
+import { advanceParamCursor, type TransformContext } from './transform-context';
 import { resolveColumnRef } from './transform-validate';
 
 function resolveParamOptions(ctx: TransformContext, refs?: { table: string; column: string }) {
@@ -48,13 +48,13 @@ export function transformValue(
     if (ctx.parameters) {
       const nextCompiledParam = ctx.parameters[ctx.paramIndex];
       if (ctx.paramIndex < ctx.parameters.length && Object.is(nextCompiledParam, node)) {
-        nextParamIndex(ctx);
+        advanceParamCursor(ctx);
         return ParamRef.of(node, options);
       }
       return LiteralExpr.of(node);
     }
 
-    nextParamIndex(ctx);
+    advanceParamCursor(ctx);
     return ParamRef.of(node, options);
   }
 
@@ -62,7 +62,7 @@ export function transformValue(
     if (node.immediate === true) {
       return LiteralExpr.of(node.value);
     }
-    nextParamIndex(ctx);
+    advanceParamCursor(ctx);
     return ParamRef.of(node.value, options);
   }
 

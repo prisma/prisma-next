@@ -32,6 +32,19 @@ import type { ProjectionState } from '../utils/state';
 import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
 
+function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
+  const collected = ast.collectParamRefs();
+  return {
+    paramValues: collected.map((p) => p.value),
+    paramDescriptors: collected.map((p) => ({
+      name: p.name,
+      source: 'dsl' as const,
+      ...(p.codecId ? { codecId: p.codecId } : {}),
+      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
+    })),
+  };
+}
+
 export interface InsertBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
@@ -170,14 +183,7 @@ export class InsertBuilderImpl<
       ast = ast.withReturning(returning);
     }
 
-    const collectedParams = ast.collectParamRefs();
-    const paramValues = collectedParams.map((p) => p.value);
-    const paramDescriptors = collectedParams.map((p) => ({
-      name: p.name,
-      source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
-    }));
+    const { paramValues, paramDescriptors } = deriveParamsFromAst(ast);
 
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
@@ -327,11 +333,7 @@ export class UpdateBuilderImpl<
       });
     }
 
-    const whereResult = buildWhereExpr(
-      this.contract,
-      this.wherePredicate,
-      paramsMap,
-    );
+    const whereResult = buildWhereExpr(this.contract, this.wherePredicate, paramsMap);
     const whereExpr = whereResult.expr;
     if (!whereExpr) {
       errorFailedToBuildWhereClause();
@@ -351,14 +353,7 @@ export class UpdateBuilderImpl<
       ast = ast.withReturning(returning);
     }
 
-    const collectedParams = ast.collectParamRefs();
-    const paramValues = collectedParams.map((p) => p.value);
-    const paramDescriptors = collectedParams.map((p) => ({
-      name: p.name,
-      source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
-    }));
+    const { paramValues, paramDescriptors } = deriveParamsFromAst(ast);
 
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
@@ -457,11 +452,7 @@ export class DeleteBuilderImpl<
       errorUnknownTable(this.table.name);
     }
 
-    const whereResult = buildWhereExpr(
-      this.contract,
-      this.wherePredicate,
-      paramsMap,
-    );
+    const whereResult = buildWhereExpr(this.contract, this.wherePredicate, paramsMap);
     const whereExpr = whereResult.expr;
     if (!whereExpr) {
       errorFailedToBuildWhereClause();
@@ -481,14 +472,7 @@ export class DeleteBuilderImpl<
       ast = ast.withReturning(returning);
     }
 
-    const collectedParams = ast.collectParamRefs();
-    const paramValues = collectedParams.map((p) => p.value);
-    const paramDescriptors = collectedParams.map((p) => ({
-      name: p.name,
-      source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
-    }));
+    const { paramValues, paramDescriptors } = deriveParamsFromAst(ast);
 
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {

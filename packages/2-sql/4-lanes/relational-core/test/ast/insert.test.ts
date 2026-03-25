@@ -102,4 +102,17 @@ describe('ast/insert', () => {
 
     expect(insertAst.collectParamRefs()).toEqual([rowId]);
   });
+
+  it('collectParamRefs preserves row-major order across multiple rows', () => {
+    const r1Id = param('u1', 'id');
+    const r1Email = param('a@b.com', 'email');
+    const r2Id = param('u2', 'id');
+    const r2Email = param('c@d.com', 'email');
+    const insertAst = InsertAst.into(table('user')).withRows([
+      { id: r1Id, email: r1Email },
+      { id: r2Id, email: r2Email },
+    ]);
+
+    expect(insertAst.collectParamRefs()).toEqual([r1Id, r1Email, r2Id, r2Email]);
+  });
 });

@@ -38,6 +38,6 @@ export function createContext(
   };
 }
 
-export function nextParamIndex(ctx: TransformContext): number {
+export function advanceParamCursor(ctx: TransformContext): number {
   return ++ctx.paramIndex;
 }
