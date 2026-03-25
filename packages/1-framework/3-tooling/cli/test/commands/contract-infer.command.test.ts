@@ -141,6 +141,22 @@ describe('createContractInferCommand', () => {
     expect(stderrOutput).toContain('Contract written to output/contract.prisma');
   });
 
+  it('writes the default inferred PSL next to the config file when --config points to a nested project', async () => {
+    process.chdir(testDir);
+
+    await executeCommand(createContractInferCommand(), [
+      '--config',
+      'apps/web/prisma-next.config.ts',
+      '--no-color',
+    ]);
+
+    expect(existsSync(join(testDir, 'apps/web/output/contract.prisma'))).toBe(true);
+    expect(existsSync(join(testDir, 'output/contract.prisma'))).toBe(false);
+    expect(consoleErrors.join('\n')).toContain(
+      'Contract written to apps/web/output/contract.prisma',
+    );
+  });
+
   it('suppresses overwrite warnings and success output in quiet mode', async () => {
     process.chdir(testDir);
 
