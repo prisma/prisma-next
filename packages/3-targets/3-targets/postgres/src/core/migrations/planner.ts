@@ -358,7 +358,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     readonly tableName: string;
     readonly table: StorageTable;
     readonly schemaTable: SqlSchemaIR['tables'][string];
-    readonly schemaLookup?: SchemaTableLookup;
+    readonly schemaLookup: SchemaTableLookup | undefined;
     readonly columnName: string;
     readonly column: StorageColumn;
     readonly codecHooks: Map<string, CodecControlHooks>;
@@ -755,7 +755,7 @@ function buildAddColumnOperationIdentity(
 function canUseSharedTemporaryDefaultStrategy(options: {
   readonly table: StorageTable;
   readonly schemaTable: SqlSchemaIR['tables'][string];
-  readonly schemaLookup?: SchemaTableLookup;
+  readonly schemaLookup: SchemaTableLookup | undefined;
   readonly columnName: string;
 }): boolean {
   const { table, schemaTable, schemaLookup, columnName } = options;
