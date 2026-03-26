@@ -66,7 +66,7 @@ describe('buildWhereExpr', () => {
     const columnResult = buildWhereExpr(contract, userColumns.id.eq(userColumns.id), {});
 
     expect(opResult.expr).toEqual(
-      BinaryExpr.eq(operation, ParamRef.of('test', { name: 'value', codecId: 'pg/text@1' })),
+      BinaryExpr.eq(operation, ParamRef.of('test', { name: 'value', codecId: 'pg/vector@1' })),
     );
     expect(columnResult.expr).toEqual(
       BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'id')),

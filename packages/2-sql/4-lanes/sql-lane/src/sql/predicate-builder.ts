@@ -9,6 +9,7 @@ import type {
 import {
   BinaryExpr,
   NullCheckExpr as NullCheckExprNode,
+  OperationExpr,
   ParamRef as ParamRefNode,
 } from '@prisma-next/sql-relational-core/ast';
 import type {
@@ -94,6 +95,8 @@ export function buildWhereExpr(
     }
 
     codecId = columnMeta.codecId;
+  } else if (leftExpr instanceof OperationExpr) {
+    codecId = leftExpr.returns.kind === 'typeId' ? leftExpr.returns.type : leftExpr.forTypeId;
   }
 
   if (isParamPlaceholder(where.right)) {

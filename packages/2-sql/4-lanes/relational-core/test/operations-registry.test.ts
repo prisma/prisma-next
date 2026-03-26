@@ -540,7 +540,7 @@ describe('operations-registry', () => {
     }).toThrow('Operation cosineDistance expects 1 arguments, got 2');
   });
 
-  it('throws error for invalid param argument', () => {
+  it('accepts raw values for param-kind arguments', () => {
     const signature: SqlOperationSignature = {
       forTypeId: 'pg/vector@1',
       method: 'cosineDistance',
@@ -568,9 +568,8 @@ describe('operations-registry', () => {
       cosineDistance: (arg: unknown) => unknown;
     };
 
-    expect(() => {
-      vectorColumn.cosineDistance('not a param' as unknown);
-    }).toThrow('Argument 0 must be a parameter placeholder');
+    const result = vectorColumn.cosineDistance([1, 2, 3]);
+    expect(result).toHaveProperty('kind', 'expression');
   });
 
   it('throws error for invalid column builder argument', () => {

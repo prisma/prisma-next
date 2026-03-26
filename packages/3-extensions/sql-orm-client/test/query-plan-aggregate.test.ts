@@ -179,7 +179,6 @@ describe('query plan aggregate', () => {
         name: 'views',
         source: 'dsl',
         codecId: 'pg/int4@1',
-        nativeType: 'int4',
       },
     ]);
   });

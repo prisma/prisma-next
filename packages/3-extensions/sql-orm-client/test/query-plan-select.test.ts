@@ -24,14 +24,13 @@ function dslDescriptor(table: string, column: string) {
   const columnMeta = (
     baseContract.storage.tables as Record<
       string,
-      { columns: Record<string, { codecId: string; nativeType: string; nullable: boolean }> }
+      { columns: Record<string, { codecId: string; nullable: boolean }> }
     >
   )[table]!.columns[column]!;
   return {
     name: column,
     source: 'dsl' as const,
     codecId: columnMeta.codecId,
-    nativeType: columnMeta.nativeType,
   };
 }
 
