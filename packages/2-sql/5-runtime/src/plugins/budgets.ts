@@ -17,10 +17,10 @@ export interface BudgetsOptions {
 }
 
 interface DriverWithExplain {
-  explain?(
-    sql: string,
-    params: unknown[],
-  ): Promise<{ rows: ReadonlyArray<Record<string, unknown>> }>;
+  explain?(request: {
+    sql: string;
+    params: readonly unknown[];
+  }): Promise<{ rows: ReadonlyArray<Record<string, unknown>> }>;
 }
 
 async function computeEstimatedRows(
@@ -32,7 +32,7 @@ async function computeEstimatedRows(
   }
 
   try {
-    const result = await driver.explain(plan.sql, [...plan.params]);
+    const result = await driver.explain({ sql: plan.sql, params: plan.params });
     return extractEstimatedRows(result.rows);
   } catch {
     return undefined;
@@ -196,14 +196,13 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
   const rowSeverity = options?.severities?.rowCount ?? 'error';
   const latencySeverity = options?.severities?.latency ?? 'warn';
 
-  let observedRows = 0;
+  const observedRowsByPlan = new WeakMap<ExecutionPlan, { count: number }>();
 
   return Object.freeze({
     name: 'budgets',
 
     async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
-      observedRows = 0;
-      void ctx.now();
+      observedRowsByPlan.set(plan, { count: 0 });
 
       if (plan.ast instanceof SelectAst) {
         return evaluateSelectAst(plan, plan.ast, ctx);
@@ -218,17 +217,16 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
 
     async onRow(
       _row: Record<string, unknown>,
-      _plan: ExecutionPlan,
+      plan: ExecutionPlan,
       _ctx: PluginContext<TContract, TAdapter, TDriver>,
     ) {
-      void _row;
-      void _plan;
-      void _ctx;
-      observedRows += 1;
-      if (observedRows > maxRows) {
+      const state = observedRowsByPlan.get(plan);
+      if (!state) return;
+      state.count += 1;
+      if (state.count > maxRows) {
         throw budgetError('BUDGET.ROWS_EXCEEDED', 'Observed row count exceeds budget', {
           source: 'observed',
-          observedRows,
+          observedRows: state.count,
           maxRows,
         });
       }
@@ -241,7 +239,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     ) {
       const latencyMs = result.latencyMs;
       if (latencyMs > maxLatencyMs) {
-        const shouldBlock = latencySeverity === 'error' && ctx.mode === 'strict';
+        const shouldBlock = latencySeverity === 'error' || ctx.mode === 'strict';
         emitBudgetViolation(
           budgetError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
             latencyMs,
