@@ -194,7 +194,6 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
   const tableRows = options?.tableRows ?? {};
   const maxLatencyMs = options?.maxLatencyMs ?? 1_000;
   const rowSeverity = options?.severities?.rowCount ?? 'error';
-  const latencySeverity = options?.severities?.latency ?? 'warn';
 
   const observedRowsByPlan = new WeakMap<ExecutionPlan, { count: number }>();
 
@@ -238,7 +237,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     ) {
       const latencyMs = result.latencyMs;
       if (latencyMs > maxLatencyMs) {
-        const shouldBlock = latencySeverity === 'error' || ctx.mode === 'strict';
+        const shouldBlock = ctx.mode === 'strict';
         emitBudgetViolation(
           budgetError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
             latencyMs,
