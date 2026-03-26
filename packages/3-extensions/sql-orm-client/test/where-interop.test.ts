@@ -1,7 +1,6 @@
 import {
   AndExpr,
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
   EqColJoinOn,
   ExistsExpr,
@@ -25,11 +24,7 @@ const param = (value: unknown, name?: string, codecId = 'pg/text@1') =>
   name !== undefined ? ParamRef.of(value, { name, codecId }) : ParamRef.of(value, { codecId });
 const literal = (value: unknown) => LiteralExpr.of(value);
 
-function bound(expr: WhereExpr): BoundWhereExpr {
-  return { expr };
-}
-
-function toWhereExpr(expr: BoundWhereExpr): ToWhereExpr {
+function toWhereExpr(expr: WhereExpr): ToWhereExpr {
   return {
     toWhereExpr: () => expr,
   };
@@ -54,12 +49,10 @@ describe('where interop', () => {
   it('normalizes ToWhereExpr to expr only', () => {
     const expr = BinaryExpr.eq(col('users', 'name'), param('Alice', 'name'));
     const arg = {
-      toWhereExpr: () => ({
-        expr,
-      }),
+      toWhereExpr: () => expr,
     } satisfies ToWhereExpr;
 
-    expect(normalizeWhereArg(arg)).toEqual(bound(expr));
+    expect(normalizeWhereArg(arg)).toEqual(expr);
   });
 
   it('preserves nested and/or expressions across exists subqueries', () => {
@@ -75,23 +68,23 @@ describe('where interop', () => {
       ]),
     ]);
 
-    expect(normalizeWhereArg(toWhereExpr(bound(expr)))).toEqual(bound(expr));
+    expect(normalizeWhereArg(toWhereExpr(expr))).toEqual(expr);
   });
 
   it('accepts bare WhereExpr with ParamRef when no contract is provided', () => {
     const expr = BinaryExpr.eq(col('users', 'id'), param(1, 'id'));
-    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
+    expect(normalizeWhereArg(expr)).toEqual(expr);
   });
 
   it('accepts bare param-free where expressions and comparables', () => {
     const expr = BinaryExpr.eq(col('users', 'kind'), literal('admin'));
-    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
+    expect(normalizeWhereArg(expr)).toEqual(expr);
 
     const opExpr = BinaryExpr.eq(
       col('users', 'email'),
       op(col('users', 'email'), [col('users', 'id'), literal('x')]),
     );
-    expect(normalizeWhereArg(opExpr)).toEqual(bound(opExpr));
+    expect(normalizeWhereArg(opExpr)).toEqual(opExpr);
   });
 
   it('accepts bare exists with join predicates and list literals when param-free', () => {
@@ -113,12 +106,12 @@ describe('where interop', () => {
         ),
     );
 
-    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
+    expect(normalizeWhereArg(expr)).toEqual(expr);
   });
 
   it('accepts bare null checks whose operation args contain ParamRef', () => {
     const expr = NullCheckExpr.isNotNull(op(col('users', 'email'), [param('x', 'email')]));
-    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
+    expect(normalizeWhereArg(expr)).toEqual(expr);
   });
 
   it('preserves params inside operations, list literals, and null checks', () => {
@@ -130,11 +123,11 @@ describe('where interop', () => {
       BinaryExpr.in(col('users', 'id'), ListLiteralExpr.of([param('u1', 'first'), literal('u2')])),
     ]);
 
-    expect(normalizeWhereArg(toWhereExpr(bound(expr)))).toEqual(bound(expr));
+    expect(normalizeWhereArg(toWhereExpr(expr))).toEqual(expr);
 
     const nullCheck = NullCheckExpr.isNotNull(
       op(col('users', 'email'), [col('users', 'email'), param('needle', 'needle'), literal('x')]),
     );
-    expect(normalizeWhereArg(toWhereExpr(bound(nullCheck)))).toEqual(bound(nullCheck));
+    expect(normalizeWhereArg(toWhereExpr(nullCheck))).toEqual(nullCheck);
   });
 });

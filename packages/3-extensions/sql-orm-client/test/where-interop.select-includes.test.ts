@@ -1,6 +1,5 @@
 import {
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
   DerivedTableSource,
   ExistsExpr,
@@ -25,11 +24,7 @@ const param = (value: unknown, name?: string, codecId = 'pg/text@1') =>
   name !== undefined ? ParamRef.of(value, { name, codecId }) : ParamRef.of(value, { codecId });
 const literal = (value: unknown) => LiteralExpr.of(value);
 
-function bound(expr: WhereExpr): BoundWhereExpr {
-  return { expr };
-}
-
-function toWhereExpr(expr: BoundWhereExpr): ToWhereExpr {
+function toWhereExpr(expr: WhereExpr): ToWhereExpr {
   return {
     toWhereExpr: () => expr,
   };
@@ -78,8 +73,8 @@ describe('where interop select/source branches', () => {
         ),
       ]);
 
-    expect(normalizeWhereArg(toWhereExpr(bound(ExistsExpr.exists(select))))).toEqual(
-      bound(ExistsExpr.exists(select)),
+    expect(normalizeWhereArg(toWhereExpr(ExistsExpr.exists(select)))).toEqual(
+      ExistsExpr.exists(select),
     );
   });
 
@@ -88,7 +83,7 @@ describe('where interop select/source branches', () => {
       op(col('users', 'email'), [col('users', 'email'), param('needle', 'needle'), literal('x')]),
     );
 
-    expect(normalizeWhereArg(toWhereExpr(bound(expr)))).toEqual(bound(expr));
+    expect(normalizeWhereArg(toWhereExpr(expr))).toEqual(expr);
   });
 
   it('accepts bare exists expressions with params in derived branches', () => {
@@ -103,7 +98,7 @@ describe('where interop select/source branches', () => {
       ).withProjection([ProjectionItem.of('id', col('users_src', 'id'))]),
     );
 
-    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
+    expect(normalizeWhereArg(expr)).toEqual(expr);
   });
 
   it('accepts bare exists with literal and subquery projections when param-free', () => {
@@ -124,7 +119,7 @@ describe('where interop select/source branches', () => {
         .withOrderBy([OrderByItem.asc(col('users', 'id'))]),
     );
 
-    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
+    expect(normalizeWhereArg(expr)).toEqual(expr);
   });
 
   it('accepts bare exists with params in top-level and nested subqueries', () => {
@@ -143,6 +138,6 @@ describe('where interop select/source branches', () => {
         .withOrderBy([OrderByItem.asc(op(col('users', 'id'), [param(1, 'top')]))]),
     );
 
-    expect(normalizeWhereArg(expr)).toEqual(bound(expr));
+    expect(normalizeWhereArg(expr)).toEqual(expr);
   });
 });

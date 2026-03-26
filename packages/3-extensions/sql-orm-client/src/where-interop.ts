@@ -1,10 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  AnyWhereExpr,
-  BoundWhereExpr,
-  ToWhereExpr,
-  WhereArg,
-} from '@prisma-next/sql-relational-core/ast';
+import type { ToWhereExpr, WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { bindWhereExpr } from './where-binding';
 
 interface NormalizeWhereArgOptions {
@@ -13,18 +8,15 @@ interface NormalizeWhereArgOptions {
 
 export function normalizeWhereArg(arg: undefined): undefined;
 export function normalizeWhereArg(arg: undefined, options: NormalizeWhereArgOptions): undefined;
-export function normalizeWhereArg(
-  arg: WhereArg,
-  options?: NormalizeWhereArgOptions,
-): BoundWhereExpr;
+export function normalizeWhereArg(arg: WhereArg, options?: NormalizeWhereArgOptions): WhereExpr;
 export function normalizeWhereArg(
   arg: WhereArg | undefined,
   options?: NormalizeWhereArgOptions,
-): BoundWhereExpr | undefined;
+): WhereExpr | undefined;
 export function normalizeWhereArg(
   arg: WhereArg | undefined,
   options?: NormalizeWhereArgOptions,
-): BoundWhereExpr | undefined {
+): WhereExpr | undefined {
   if (arg === undefined) {
     return undefined;
   }
@@ -35,14 +27,13 @@ export function normalizeWhereArg(
   }
 
   if (isToWhereExpr(arg)) {
-    const bound = arg.toWhereExpr();
-    return { expr: bound.expr };
+    return arg.toWhereExpr();
   }
 
   if (options?.contract) {
     return bindWhereExpr(options.contract, arg);
   }
-  return { expr: arg };
+  return arg;
 }
 
 function isToWhereExpr(arg: WhereArg): arg is ToWhereExpr {

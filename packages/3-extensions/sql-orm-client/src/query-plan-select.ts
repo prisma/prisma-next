@@ -5,7 +5,6 @@ import {
   type AstRewriter,
   BinaryExpr,
   type BinaryOp,
-  type BoundWhereExpr,
   ColumnRef,
   DerivedTableSource,
   EqColJoinOn,
@@ -25,7 +24,7 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr, OrderExpr } from './types';
 import { bindWhereExpr } from './where-binding';
-import { combineWhereFilters } from './where-utils';
+import { combineWhereExprs } from './where-utils';
 
 type CursorOrderEntry = OrderExpr & {
   readonly value: unknown;
@@ -151,27 +150,23 @@ function buildStateWhere(
   options?: {
     readonly filterTableName?: string;
   },
-): BoundWhereExpr | undefined {
+): WhereExpr | undefined {
   const filterTableName = options?.filterTableName;
   const cursorTableName = filterTableName ?? tableName;
   const cursorWhere = buildCursorWhere(cursorTableName, state.orderBy, state.cursor);
   const remappedFilters =
     filterTableName && filterTableName !== tableName
-      ? state.filters.map((filter) => ({
-          ...filter,
-          expr: filter.expr.rewrite(createTableRefRemapper(filterTableName, tableName)),
-        }))
+      ? state.filters.map((filter) =>
+          filter.rewrite(createTableRefRemapper(filterTableName, tableName)),
+        )
       : state.filters;
   const boundCursorWhere = cursorWhere ? bindWhereExpr(contract, cursorWhere) : undefined;
   const remappedCursorWhere =
     boundCursorWhere && filterTableName && filterTableName !== tableName
-      ? {
-          ...boundCursorWhere,
-          expr: boundCursorWhere.expr.rewrite(createTableRefRemapper(filterTableName, tableName)),
-        }
+      ? boundCursorWhere.rewrite(createTableRefRemapper(filterTableName, tableName))
       : boundCursorWhere;
   const filters = remappedCursorWhere ? [...remappedFilters, remappedCursorWhere] : remappedFilters;
-  return combineWhereFilters(filters);
+  return combineWhereExprs(filters);
 }
 
 function buildIncludeOrderArtifacts(
@@ -245,7 +240,7 @@ function buildIncludeChildRowsSelect(
     ColumnRef.of(childTableRef, include.fkColumn),
     ColumnRef.of(parentTableName, include.parentPkColumn),
   );
-  const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere.expr]) : joinExpr;
+  const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
 
   let childRows = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
     .withProjection([...childProjection, ...hiddenOrderProjection])
@@ -352,7 +347,7 @@ function buildSelectAst(
   options: {
     readonly joins?: ReadonlyArray<JoinAst>;
     readonly includeProjection?: ReadonlyArray<ProjectionItem>;
-    readonly where?: BoundWhereExpr;
+    readonly where?: WhereExpr;
   } = {},
 ): {
   readonly ast: SelectAst;
@@ -364,7 +359,7 @@ function buildSelectAst(
 
   let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
   if (orderBy) {
     ast = ast.withOrderBy(orderBy);

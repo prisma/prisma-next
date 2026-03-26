@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { all, and, not, or } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
 import { normalizeWhereArg } from '../src/where-interop';
-import { combineWhereFilters, createBoundWhereExpr } from '../src/where-utils';
+import { combineWhereExprs } from '../src/where-utils';
 import { getTestContract } from './helpers';
 
 function collectParamValues(expr: WhereExpr): unknown[] {
@@ -57,29 +57,26 @@ describe('SQL ORM rich AST filters', () => {
   it('normalizes, combines, and negates bound filters', () => {
     const normalized = normalizeWhereArg(
       {
-        toWhereExpr: () => ({
-          expr: BinaryExpr.eq(
+        toWhereExpr: () =>
+          BinaryExpr.eq(
             ColumnRef.of('users', 'id'),
             ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
           ),
-        }),
       },
       { contract },
     );
 
-    expect(normalized?.expr).toBeInstanceOf(BinaryExpr);
-    expect(collectParamValues(normalized!.expr as BinaryExpr)).toEqual([1]);
+    expect(normalized).toBeInstanceOf(BinaryExpr);
+    expect(collectParamValues(normalized! as BinaryExpr)).toEqual([1]);
 
-    const combined = combineWhereFilters([
-      createBoundWhereExpr(BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice'))),
-      createBoundWhereExpr(
-        BinaryExpr.eq(
-          ColumnRef.of('users', 'id'),
-          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
-        ),
+    const combined = combineWhereExprs([
+      BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+      BinaryExpr.eq(
+        ColumnRef.of('users', 'id'),
+        ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
       ),
     ]);
-    expect(combined?.expr).toBeInstanceOf(AndExpr);
+    expect(combined).toBeInstanceOf(AndExpr);
 
     expect(not(NullCheckExpr.isNull(ColumnRef.of('users', 'email')))).toEqual(
       NullCheckExpr.isNotNull(ColumnRef.of('users', 'email')),

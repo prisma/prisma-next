@@ -1,7 +1,6 @@
 import {
   AndExpr,
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
   LiteralExpr,
   NullCheckExpr,
@@ -16,10 +15,6 @@ import {
   createCollectionFor,
   createReturningCollectionFor,
 } from './collection-fixtures';
-
-function bound(expr: BoundWhereExpr['expr']): BoundWhereExpr {
-  return { expr };
-}
 
 describe('Collection', () => {
   describe('chain methods', () => {
@@ -54,21 +49,18 @@ describe('Collection', () => {
       const filtered = collection.where(
         (_user) =>
           ({
-            toWhereExpr: () => ({
-              expr: BinaryExpr.eq(
+            toWhereExpr: () =>
+              BinaryExpr.eq(
                 ColumnRef.of('users', 'name'),
                 ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
               ),
-            }),
           }) satisfies ToWhereExpr,
       );
 
       expect(filtered.state.filters).toEqual([
-        bound(
-          BinaryExpr.eq(
-            ColumnRef.of('users', 'name'),
-            ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
-          ),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
         ),
       ]);
 
@@ -79,11 +71,9 @@ describe('Collection', () => {
         ),
       );
       expect(bare.state.filters).toEqual([
-        bound(
-          BinaryExpr.eq(
-            ColumnRef.of('users', 'id'),
-            ParamRef.of(7, { name: 'id', codecId: 'pg/int4@1' }),
-          ),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(7, { name: 'id', codecId: 'pg/int4@1' }),
         ),
       ]);
     });

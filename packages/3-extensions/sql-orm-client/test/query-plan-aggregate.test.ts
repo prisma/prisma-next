@@ -2,7 +2,6 @@ import {
   AggregateExpr,
   AndExpr,
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
   ExistsExpr,
   ListLiteralExpr,
@@ -20,12 +19,10 @@ import { bindWhereExpr } from '../src/where-binding';
 import { baseContract } from './collection-fixtures';
 
 describe('query plan aggregate', () => {
-  const filteredViews: BoundWhereExpr = {
-    expr: bindWhereExpr(
-      baseContract,
-      BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
-    ).expr,
-  };
+  const filteredViews = bindWhereExpr(
+    baseContract,
+    BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+  );
 
   it('rejects empty aggregate specs and selectors without required fields', () => {
     expect(() => compileAggregate(baseContract, 'posts', [], {})).toThrow(

@@ -4,7 +4,6 @@ import {
   type AnyWhereExpr,
   BinaryExpr,
   type BinaryOp,
-  type BoundWhereExpr,
   ColumnRef,
   LiteralExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -21,11 +20,11 @@ import type {
   HavingBuilder,
   HavingComparisonMethods,
 } from './types';
-import { combinePlainWhereExprs } from './where-utils';
+import { combineWhereExprs } from './where-utils';
 
 interface GroupedCollectionInit {
   readonly tableName: string;
-  readonly baseFilters: readonly BoundWhereExpr[];
+  readonly baseFilters: readonly WhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
   readonly havingFilters: readonly AnyWhereExpr[];
@@ -44,7 +43,7 @@ export class GroupedCollection<
   readonly ctx: CollectionContext<TContract>;
   readonly modelName: ModelName;
   readonly tableName: string;
-  readonly baseFilters: readonly BoundWhereExpr[];
+  readonly baseFilters: readonly WhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
   readonly havingFilters: readonly AnyWhereExpr[];
@@ -101,7 +100,7 @@ export class GroupedCollection<
       this.baseFilters,
       this.groupByColumns,
       aggregateSpec,
-      combinePlainWhereExprs(this.havingFilters),
+      combineWhereExprs(this.havingFilters),
     );
     const rows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,

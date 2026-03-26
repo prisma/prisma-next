@@ -29,8 +29,8 @@ describe('bindWhereExpr', () => {
     const expr = BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('alice@test.com'));
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr).toBeInstanceOf(BinaryExpr);
-    const binary = bound.expr as BinaryExpr;
+    expect(bound).toBeInstanceOf(BinaryExpr);
+    const binary = bound as BinaryExpr;
     expect(binary.right).toBeInstanceOf(ParamRef);
     expect((binary.right as ParamRef).value).toBe('alice@test.com');
   });
@@ -42,7 +42,7 @@ describe('bindWhereExpr', () => {
     ]);
     const bound = bindWhereExpr(contract, expr);
 
-    const and = bound.expr as AndExpr;
+    const and = bound as AndExpr;
     expect((and.exprs[0] as BinaryExpr).right).toMatchObject({ value: 'a@test.com' });
     expect((and.exprs[1] as BinaryExpr).right).toMatchObject({ value: 'Alice' });
   });
@@ -54,7 +54,7 @@ describe('bindWhereExpr', () => {
     ]);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr).toBeInstanceOf(OrExpr);
+    expect(bound).toBeInstanceOf(OrExpr);
   });
 
   it('binds EXISTS subquery expressions', () => {
@@ -64,8 +64,8 @@ describe('bindWhereExpr', () => {
     const expr = ExistsExpr.exists(subquery);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr).toBeInstanceOf(ExistsExpr);
-    expect((bound.expr as ExistsExpr).notExists).toBe(false);
+    expect(bound).toBeInstanceOf(ExistsExpr);
+    expect((bound as ExistsExpr).notExists).toBe(false);
   });
 
   it('binds NOT EXISTS subquery expressions', () => {
@@ -75,24 +75,24 @@ describe('bindWhereExpr', () => {
     const expr = ExistsExpr.notExists(subquery);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr).toBeInstanceOf(ExistsExpr);
-    expect((bound.expr as ExistsExpr).notExists).toBe(true);
+    expect(bound).toBeInstanceOf(ExistsExpr);
+    expect((bound as ExistsExpr).notExists).toBe(true);
   });
 
   it('binds IS NULL null-check expressions', () => {
     const expr = NullCheckExpr.isNull(ColumnRef.of('users', 'email'));
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr).toBeInstanceOf(NullCheckExpr);
-    expect((bound.expr as NullCheckExpr).isNull).toBe(true);
+    expect(bound).toBeInstanceOf(NullCheckExpr);
+    expect((bound as NullCheckExpr).isNull).toBe(true);
   });
 
   it('binds IS NOT NULL null-check expressions', () => {
     const expr = NullCheckExpr.isNotNull(ColumnRef.of('users', 'email'));
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr).toBeInstanceOf(NullCheckExpr);
-    expect((bound.expr as NullCheckExpr).isNull).toBe(false);
+    expect(bound).toBeInstanceOf(NullCheckExpr);
+    expect((bound as NullCheckExpr).isNull).toBe(false);
   });
 
   it('binds IN with list literal values to parameterized refs', () => {
@@ -102,7 +102,7 @@ describe('bindWhereExpr', () => {
     );
     const bound = bindWhereExpr(contract, expr);
 
-    const binary = bound.expr as BinaryExpr;
+    const binary = bound as BinaryExpr;
     expect(binary.right).toBeInstanceOf(ListLiteralExpr);
     const list = binary.right as ListLiteralExpr;
     expect(list.values[0]).toBeInstanceOf(ParamRef);
@@ -118,7 +118,7 @@ describe('bindWhereExpr', () => {
     );
     const bound = bindWhereExpr(contract, expr);
 
-    const binary = bound.expr as BinaryExpr;
+    const binary = bound as BinaryExpr;
     expect(binary.right).toBeInstanceOf(ParamRef);
     expect((binary.right as ParamRef).value).toBe(42);
   });
@@ -146,7 +146,7 @@ describe('bindWhereExpr', () => {
     const expr = ExistsExpr.exists(main);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr).toBeInstanceOf(ExistsExpr);
+    expect(bound).toBeInstanceOf(ExistsExpr);
   });
 
   it('handles binary expression with non-column left side and literal right', () => {
@@ -156,7 +156,7 @@ describe('bindWhereExpr', () => {
     const expr = BinaryExpr.gt(SubqueryExpr.of(subquery), LiteralExpr.of(0));
     const bound = bindWhereExpr(contract, expr);
 
-    const binary = bound.expr as BinaryExpr;
+    const binary = bound as BinaryExpr;
     expect(binary.right).toBeInstanceOf(LiteralExpr);
   });
 
@@ -167,7 +167,7 @@ describe('bindWhereExpr', () => {
     const expr = BinaryExpr.gt(SubqueryExpr.of(subquery), ColumnRef.of('users', 'id'));
     const bound = bindWhereExpr(contract, expr);
 
-    const binary = bound.expr as BinaryExpr;
+    const binary = bound as BinaryExpr;
     expect(binary.right).toBeInstanceOf(ColumnRef);
   });
 
@@ -189,7 +189,7 @@ describe('bindWhereExpr', () => {
     const expr = ExistsExpr.exists(subquery);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr).toBeInstanceOf(ExistsExpr);
+    expect(bound).toBeInstanceOf(ExistsExpr);
   });
 
   it('passes through ParamRef values inside ListLiteralExpr without rebinding', () => {
@@ -202,7 +202,7 @@ describe('bindWhereExpr', () => {
     );
     const bound = bindWhereExpr(contract, expr);
 
-    const binary = bound.expr as BinaryExpr;
+    const binary = bound as BinaryExpr;
     const list = binary.right as ListLiteralExpr;
     expect(list.values[0]).toBeInstanceOf(ParamRef);
     expect((list.values[0] as ParamRef).value).toBe(99);

@@ -1,6 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
-  type BoundWhereExpr,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
@@ -9,10 +8,11 @@ import {
   ParamRef,
   TableSource,
   UpdateAst,
+  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
-import { combineWhereFilters } from './where-utils';
+import { combineWhereExprs } from './where-utils';
 
 function buildReturningColumns(
   contract: SqlContract<SqlStorage>,
@@ -153,16 +153,16 @@ export function compileUpdateReturning(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly WhereExpr[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   const { assignments } = toParamAssignments(contract, tableName, setValues);
   let ast = UpdateAst.table(TableSource.named(tableName))
     .withSet(assignments)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
   const { params, paramDescriptors } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
@@ -172,13 +172,13 @@ export function compileUpdateCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly WhereExpr[],
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   const { assignments } = toParamAssignments(contract, tableName, setValues);
   let ast = UpdateAst.table(TableSource.named(tableName)).withSet(assignments);
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
   const { params, paramDescriptors } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
@@ -187,15 +187,15 @@ export function compileUpdateCount(
 export function compileDeleteReturning(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly WhereExpr[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   let ast = DeleteAst.from(TableSource.named(tableName)).withReturning(
     buildReturningColumns(contract, tableName, returningColumns),
   );
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
   const { params, paramDescriptors } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
@@ -204,12 +204,12 @@ export function compileDeleteReturning(
 export function compileDeleteCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly WhereExpr[],
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   let ast = DeleteAst.from(TableSource.named(tableName));
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
   const { params, paramDescriptors } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);

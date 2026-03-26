@@ -25,15 +25,11 @@ import {
 import { baseContract, createCollectionFor } from './collection-fixtures';
 
 function boundParam(expr: BinaryExpr): {
-  toWhereExpr(): {
-    expr: BinaryExpr;
-  };
+  toWhereExpr(): BinaryExpr;
 } {
   return {
     toWhereExpr() {
-      return {
-        expr,
-      };
+      return expr;
     },
   };
 }
@@ -109,11 +105,7 @@ describe('SQL ORM rich AST query plans', () => {
       baseContract,
       'users',
       { email: 'b@example.com' },
-      [
-        {
-          expr: BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)),
-        },
-      ],
+      [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
       ['id'],
     );
     expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
@@ -122,11 +114,7 @@ describe('SQL ORM rich AST query plans', () => {
     const deletePlan = compileDeleteReturning(
       baseContract,
       'users',
-      [
-        {
-          expr: BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)),
-        },
-      ],
+      [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
       ['id'],
     );
     expect(deletePlan.ast).toBeInstanceOf(DeleteAst);

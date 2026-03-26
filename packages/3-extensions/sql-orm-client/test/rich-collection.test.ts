@@ -16,21 +16,19 @@ describe('SQL ORM collections with rich AST plans', () => {
     const { collection } = createCollectionFor('User');
 
     const direct = collection.where(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)));
-    expect(direct.state.filters[0]?.expr).toBeInstanceOf(BinaryExpr);
+    expect(direct.state.filters[0]).toBeInstanceOf(BinaryExpr);
     expect(
-      bindWhereExpr(baseContract, BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)))
-        .expr,
-    ).toEqual(direct.state.filters[0]?.expr);
+      bindWhereExpr(baseContract, BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
+    ).toEqual(direct.state.filters[0]);
 
     const bound = collection.where({
-      toWhereExpr: () => ({
-        expr: BinaryExpr.eq(
+      toWhereExpr: () =>
+        BinaryExpr.eq(
           ColumnRef.of('users', 'email'),
           ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
         ),
-      }),
     } satisfies ToWhereExpr);
-    expect(bound.state.filters[0]?.expr).toEqual(
+    expect(bound.state.filters[0]).toEqual(
       BinaryExpr.eq(
         ColumnRef.of('users', 'email'),
         ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
