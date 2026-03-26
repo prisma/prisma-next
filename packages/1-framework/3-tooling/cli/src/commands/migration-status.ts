@@ -150,34 +150,57 @@ function summarizeOps(ops: readonly MigrationPlanOperation[]): {
 function deriveEdgeStatuses(
   graph: MigrationGraph,
   targetHash: string,
+  contractHash: string,
   markerHash: string | undefined,
   mode: 'online' | 'offline',
 ): EdgeStatus[] {
-  if (mode === 'offline' || markerHash === undefined) return [];
+  if (mode === 'offline') return [];
 
   const edgeKey = (e: MigrationChainEntry) => `${e.from}\0${e.to}`;
 
-  const appliedPath = findPath(graph, EMPTY_CONTRACT_HASH, markerHash);
-  const appliedKeys = new Set(appliedPath?.map(edgeKey) ?? []);
+  // No marker = empty DB — treat root as the marker (nothing applied, everything pending)
+  const effectiveMarker = markerHash ?? EMPTY_CONTRACT_HASH;
 
-  const pendingPath = findPath(graph, markerHash, targetHash);
+  const appliedPath =
+    markerHash !== undefined ? findPath(graph, EMPTY_CONTRACT_HASH, markerHash) : null;
+
+  const pendingPath = findPath(graph, effectiveMarker, targetHash);
   const targetPath = findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
 
   const statuses: EdgeStatus[] = [];
+  const assignedKeys = new Set<string>();
 
   // Applied edges (root → marker)
   if (appliedPath) {
     for (const e of appliedPath) {
+      assignedKeys.add(edgeKey(e));
       statuses.push({ dirName: e.dirName, status: 'applied' });
     }
   }
 
-  // Pending edges (marker → target) — only when marker can reach target
-  const pendingKeys = new Set<string>();
+  // Pending edges (marker → target)
   if (pendingPath) {
     for (const e of pendingPath) {
-      pendingKeys.add(edgeKey(e));
+      assignedKeys.add(edgeKey(e));
       statuses.push({ dirName: e.dirName, status: 'pending' });
+    }
+  }
+
+  // Pending edges beyond the target: target → contract (when target is a ref
+  // and the contract is reachable from it)
+  if (
+    contractHash !== EMPTY_CONTRACT_HASH &&
+    contractHash !== targetHash &&
+    graph.nodes.has(contractHash)
+  ) {
+    const beyondTarget = findPath(graph, targetHash, contractHash);
+    if (beyondTarget) {
+      for (const e of beyondTarget) {
+        if (!assignedKeys.has(edgeKey(e))) {
+          assignedKeys.add(edgeKey(e));
+          statuses.push({ dirName: e.dirName, status: 'pending' });
+        }
+      }
     }
   }
 
@@ -189,7 +212,7 @@ function deriveEdgeStatuses(
   //     will continue through the other)
   if (targetPath) {
     for (const e of targetPath) {
-      if (!appliedKeys.has(edgeKey(e)) && !pendingKeys.has(edgeKey(e))) {
+      if (!assignedKeys.has(edgeKey(e))) {
         statuses.push({ dirName: e.dirName, status: 'diverged' });
       }
     }
@@ -408,7 +431,7 @@ async function executeMigrationStatusCommand(
       diagnostics.push({
         code: 'CONTRACT.AHEAD',
         severity: 'warn',
-        message: 'Contract has changed since the last migration was planned',
+        message: 'No migration exists for the current contract',
         hints: [
           "Run 'prisma-next migration plan' to generate a migration for the current contract",
         ],
@@ -439,13 +462,26 @@ async function executeMigrationStatusCommand(
       diagnostics.push({
         code: 'MIGRATION.DIVERGED',
         severity: 'warn',
-        message: 'Migration graph has diverged — multiple branches with no default target',
+        message: 'There are multiple valid migration paths — you must select a target',
         hints: [
-          "Use '--ref <name>' to select a branch",
+          "Use '--ref <name>' to select a target",
           "Or 'prisma-next migration ref set <name> <hash>' to create one",
         ],
       });
     }
+  }
+
+  // Contract diagnostic — emitted once, before any early return.
+  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== targetHash) {
+    const hasAnyMigrationForContract = graph.nodes.has(contractHash);
+    diagnostics.push({
+      code: 'CONTRACT.AHEAD',
+      severity: 'warn',
+      message: hasAnyMigrationForContract
+        ? 'Contract has changed since the last migration was planned'
+        : 'No migration exists for the current contract',
+      hints: ["Run 'prisma-next migration plan' to generate a migration for the current contract"],
+    });
   }
 
   let markerHash: string | undefined;
@@ -502,11 +538,11 @@ async function executeMigrationStatusCommand(
 
   const entries = buildMigrationEntries(chain, attested, mode, markerHash);
 
-  const markerInChain = markerHash === undefined || chain.some((e) => e.to === markerHash);
+  const markerInGraph = markerHash === undefined || graph.nodes.has(markerHash);
 
   let summary: string;
   if (mode === 'online') {
-    if (!markerInChain) {
+    if (!markerInGraph) {
       summary = `Database marker does not match any migration — was the database managed with 'db update'?`;
     } else if (activeRefHash && markerHash !== undefined) {
       summary = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
@@ -525,18 +561,9 @@ async function executeMigrationStatusCommand(
     summary = `${entries.length} migration(s) on disk`;
   }
 
-  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== targetHash && !activeRefHash) {
-    diagnostics.push({
-      code: 'CONTRACT.AHEAD',
-      severity: 'warn',
-      message: 'Contract has changed since the last migration was planned',
-      hints: ["Run 'prisma-next migration plan' to generate a migration for the current contract"],
-    });
-  }
-
   if (mode === 'online') {
     const pendingCount = entries.filter((e) => e.status === 'pending').length;
-    if (!markerInChain) {
+    if (!markerInGraph) {
       // Tailor guidance based on where the contract sits relative to the graph:
       // - marker == contract: DB was managed with db update, just need to plan a migration.
       // - contract is in the graph: migrations exist for the contract, DB drifted.
@@ -670,6 +697,7 @@ export function createMigrationStatusCommand(): Command {
                 ? deriveEdgeStatuses(
                     statusResult.graph,
                     statusResult.targetHash,
+                    statusResult.contractHash,
                     statusResult.markerHash,
                     statusResult.mode,
                   )
@@ -687,9 +715,11 @@ export function createMigrationStatusCommand(): Command {
                 : extractRelevantSubgraph(renderInput.graph, renderInput.relevantPaths);
             const graphOutput = graphRenderer.render(graphToRender, renderOptions);
             ui.log(graphOutput);
-            ui.log('');
+            if (statusResult.mode === 'online') {
+              ui.log(formatLegend(colorize));
+            }
           }
-
+          ui.log('');
           ui.log(formatStatusSummary(statusResult, colorize));
         }
       });
@@ -698,6 +728,16 @@ export function createMigrationStatusCommand(): Command {
     });
 
   return command;
+}
+
+function formatLegend(colorize: boolean): string {
+  const c = (fn: (s: string) => string, s: string) => (colorize ? fn(s) : s);
+  const parts = [
+    `${c(cyan, '✓')} applied`,
+    `${c(yellow, '⧗')} pending`,
+    `${c(magenta, '✗')} diverged`,
+  ];
+  return c(dim, parts.join('  '));
 }
 
 function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): string {
@@ -716,9 +756,6 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
     } else {
       lines.push(`${c(yellow, '⧗')} ${result.summary}`);
     }
-    const legendParts = [`${c(cyan, '✓')} applied`, `${c(yellow, '⧗')} pending`];
-    if (hasDiverged) legendParts.push(`${c(magenta, '✗')} diverged`);
-    lines.push(c(dim, legendParts.join('  ')));
   } else {
     lines.push(result.summary);
   }
@@ -748,5 +785,5 @@ function summarizeRefDistance(
   const pathFromRef = findPath(graph, refHash, markerHash);
   if (pathFromRef) return `${pathFromRef.length} edge(s) ahead of ref "${refName}"`;
 
-  return `No path between marker and ref "${refName}" target`;
+  return `No path between database marker and ref "${refName}" target`;
 }

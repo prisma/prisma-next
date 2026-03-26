@@ -105,6 +105,7 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
   for (const [, entries] of graph.forwardChain) {
     for (const entry of entries) {
       const status = statusByDirName.get(entry.dirName);
+      // TOODO: can't this be a typed lookup map
       const icon =
         status === 'applied'
           ? ' ✓'
@@ -145,23 +146,39 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
     }
   }
 
+  // 1. Path to the DB marker
   if (mode === 'online' && markerHash) {
     addPathFromRoot(markerHash);
-    if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== markerHash) {
-      const markerReachesContract = findPath(graph, markerHash, contractHash);
-      if (markerReachesContract) {
-        // DB can reach contract — show root→db→contract as one continuous path
-        addPathBetween(markerHash, contractHash);
+  }
+
+  // 2. Path to the ref
+  if (activeRefHash && activeRefHash !== markerHash) {
+    addPathFromRoot(activeRefHash);
+  }
+
+  // 3. Path to the contract — prefer continuing from marker or ref rather
+  //    than an independent root→contract (which BFS may route through an
+  //    unrelated branch).
+  if (contractHash !== EMPTY_CONTRACT_HASH) {
+    const from = markerHash ?? activeRefHash;
+    if (from && from !== contractHash) {
+      const reachesContract = findPath(graph, from, contractHash);
+      if (reachesContract) {
+        addPathBetween(from, contractHash);
+      } else if (activeRefHash && activeRefHash !== from) {
+        // Marker couldn't reach contract — try the ref
+        const refReaches = findPath(graph, activeRefHash, contractHash);
+        if (refReaches) {
+          addPathBetween(activeRefHash, contractHash);
+        } else {
+          addPathFromRoot(contractHash);
+        }
       } else {
-        // DB is on a different branch — show both independently
         addPathFromRoot(contractHash);
       }
+    } else if (contractHash !== (markerHash ?? activeRefHash)) {
+      addPathFromRoot(contractHash);
     }
-  } else if (contractHash !== EMPTY_CONTRACT_HASH) {
-    addPathFromRoot(contractHash);
-  }
-  if (activeRefHash && activeRefHash !== contractHash && activeRefHash !== markerHash) {
-    addPathFromRoot(activeRefHash);
   }
 
   // Fall back: if no paths were found, try the tip of the forward chain.

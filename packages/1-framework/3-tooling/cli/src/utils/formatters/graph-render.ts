@@ -1173,7 +1173,8 @@ function layoutAndRender(graph: RenderGraph, options: GraphRenderOptions, elided
 
     grid.stampText(pos.x, pos.y, '○', nodeColor);
     grid.stampText(pos.x + 1, pos.y, ' ');
-    grid.stampText(pos.x + 2, pos.y, node.id, isSpineNode ? bold : dim);
+    const hasMarkers = node.markers && node.markers.length > 0;
+    grid.stampText(pos.x + 2, pos.y, node.id, isSpineNode || hasMarkers ? bold : dim);
 
     const tags = buildInlineTags(node.markers ?? [], colors);
     if (tags.length > 0) {
@@ -1205,7 +1206,17 @@ function layoutAndRender(graph: RenderGraph, options: GraphRenderOptions, elided
   // --- Detached nodes ---
   const detachedNodes = graph.nodes.filter((n) => n.style === 'detached');
   if (detachedNodes.length > 0) {
-    const spineX = nodePos.get(options.spineTarget)?.x ?? nodePos.values().next().value?.x ?? 0;
+    // Align detached nodes with the bottom-most node in the graph so the
+    // dashed connector visually continues from the last rendered node.
+    let bottomNodeX = nodePos.values().next().value?.x ?? 0;
+    let bottomNodeY = -1;
+    for (const [, pos] of nodePos) {
+      if (pos.y > bottomNodeY) {
+        bottomNodeY = pos.y;
+        bottomNodeX = pos.x;
+      }
+    }
+    const spineX = bottomNodeX;
     let bottomY = grid.getMaxY() + 1;
 
     for (const node of detachedNodes) {
