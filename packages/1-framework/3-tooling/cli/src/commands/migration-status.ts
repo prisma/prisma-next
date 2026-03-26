@@ -33,6 +33,7 @@ import {
 } from '../utils/command-helpers';
 import {
   type EdgeStatus,
+  type EdgeStatusKind,
   migrationGraphToRenderInput,
 } from '../utils/formatters/graph-migration-mapper';
 import {
@@ -64,9 +65,7 @@ export interface MigrationStatusEntry {
   readonly operationCount: number;
   readonly operationSummary: string;
   readonly hasDestructive: boolean;
-  // TODO: we use this type in multiple places, maybe +/- 'unknown'
-  // would it be good to extract it into a separate type? and then maybe use ?/undefined for unknown
-  readonly status: 'applied' | 'pending' | 'diverged' | 'unknown';
+  readonly status: EdgeStatusKind | 'unknown';
 }
 
 export type { StatusDiagnostic, StatusRef } from '../utils/migration-types';
@@ -832,10 +831,10 @@ function summarizeRefDistance(
   if (markerHash === refHash) return `At ref "${refName}" target`;
 
   const pathToRef = findPath(graph, markerHash, refHash);
-  if (pathToRef) return `${pathToRef.length} edge(s) behind ref "${refName}"`;
+  if (pathToRef) return `${pathToRef.length} migration(s) behind ref "${refName}"`;
 
   const pathFromRef = findPath(graph, refHash, markerHash);
-  if (pathFromRef) return `${pathFromRef.length} edge(s) ahead of ref "${refName}"`;
+  if (pathFromRef) return `${pathFromRef.length} migration(s) ahead of ref "${refName}"`;
 
   return `No path between database marker and ref "${refName}" target`;
 }

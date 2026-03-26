@@ -15,6 +15,14 @@ import {
   RenderGraph,
 } from './graph-types';
 
+export type EdgeStatusKind = 'applied' | 'pending' | 'diverged';
+
+const STATUS_ICON: Record<EdgeStatusKind, string> = {
+  applied: ' ✓',
+  pending: ' ⧗',
+  diverged: ' ✗',
+};
+
 /** Shorten a contract hash for display: strip sha256: prefix, take 7 chars. */
 function shortHash(hash: string): string {
   const stripped = hash.startsWith('sha256:') ? hash.slice(7) : hash;
@@ -28,7 +36,7 @@ function toShortId(hash: string): string {
 /** Minimal per-edge status from the CLI's status result. */
 export interface EdgeStatus {
   readonly dirName: string;
-  readonly status: 'applied' | 'pending' | 'diverged';
+  readonly status: EdgeStatusKind;
 }
 
 export interface MigrationGraphInput {
@@ -110,15 +118,7 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
   for (const [, entries] of graph.forwardChain) {
     for (const entry of entries) {
       const status = statusByDirName.get(entry.dirName);
-      // TOODO: can't this be a typed lookup map
-      const icon =
-        status === 'applied'
-          ? ' ✓'
-          : status === 'pending'
-            ? ' ⧗'
-            : status === 'diverged'
-              ? ' ✗'
-              : '';
+      const icon = status ? STATUS_ICON[status] : '';
       const label = `${entry.dirName}${icon}`;
 
       edgeList.push({
