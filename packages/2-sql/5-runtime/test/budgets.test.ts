@@ -182,6 +182,33 @@ describe('budgets plugin', () => {
       },
       timeouts.default,
     );
+
+    it(
+      'tracks row counts independently per execution plan',
+      async () => {
+        const plugin = budgets({ maxRows: 2 });
+        const planA = createPlan({ sql: 'INSERT INTO "user" (id) VALUES ($1)' });
+        const planB = createPlan({ sql: 'INSERT INTO "user" (id) VALUES ($2)' });
+        const ctxA = createPluginContext();
+        const ctxB = createPluginContext();
+
+        await plugin.beforeExecute?.(planA, ctxA);
+        await plugin.beforeExecute?.(planB, ctxB);
+
+        await plugin.onRow?.({}, planA, ctxA);
+        await plugin.onRow?.({}, planB, ctxB);
+        await plugin.onRow?.({}, planA, ctxA);
+        await plugin.onRow?.({}, planB, ctxB);
+
+        await expect(plugin.onRow?.({}, planA, ctxA)).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+        });
+        await expect(plugin.onRow?.({}, planB, ctxB)).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+        });
+      },
+      timeouts.default,
+    );
   });
 
   describe('latency budget (afterExecute)', () => {
@@ -205,6 +232,22 @@ describe('budgets plugin', () => {
       'throws when latency exceeds budget in strict mode with error severity',
       async () => {
         const plugin = budgets({ maxLatencyMs: 100, severities: { latency: 'error' } });
+        const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
+        const ctx = createPluginContext({ mode: 'strict' });
+        const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
+
+        await expect(plugin.afterExecute?.(plan, result, ctx)).rejects.toMatchObject({
+          code: 'BUDGET.TIME_EXCEEDED',
+          category: 'BUDGET',
+        });
+      },
+      timeouts.default,
+    );
+
+    it(
+      'throws when latency exceeds budget in strict mode even with warn severity',
+      async () => {
+        const plugin = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
         const ctx = createPluginContext({ mode: 'strict' });
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
@@ -243,6 +286,7 @@ describe('budgets plugin', () => {
         };
         const plan = createPlan({
           sql: 'SELECT id FROM "user" LIMIT 100',
+          params: ['a', 'b'],
           meta: { annotations: { limit: 100 } },
         });
         const plugin = budgets({ maxRows: 10_000, explain: { enabled: true } });
@@ -251,6 +295,10 @@ describe('budgets plugin', () => {
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
           details: expect.objectContaining({ source: 'explain' }),
+        });
+        expect(explainDriver.explain).toHaveBeenCalledWith({
+          sql: plan.sql,
+          params: plan.params,
         });
       },
       timeouts.default,
