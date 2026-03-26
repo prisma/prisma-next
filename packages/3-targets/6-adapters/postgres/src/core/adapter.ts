@@ -5,7 +5,9 @@ import {
   type AnyExpression,
   type AnyFromSource,
   type AnyInsertOnConflictAction,
+  type AnyOperationArg,
   type AnyQueryAst,
+  type AnySqlComparable,
   type BinaryExpr,
   type CodecParamsDescriptor,
   type ColumnRef,
@@ -301,29 +303,32 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
     leftExpr.kind === 'operation' || leftExpr.kind === 'subquery' ? `(${left})` : left;
   const leftCol = leftExpr.kind === 'column-ref' ? (leftExpr as ColumnRef) : undefined;
 
-  const rightExpr = expr.right;
+  const rightNode = expr.right as AnySqlComparable;
   let right: string;
-  switch (rightExpr.kind) {
+  switch (rightNode.kind) {
     case 'list-literal':
-      right = renderListLiteral(
-        rightExpr as ListLiteralExpr,
-        contract,
-        leftCol?.table,
-        leftCol?.column,
-      );
+      right = renderListLiteral(rightNode, contract, leftCol?.table, leftCol?.column);
       break;
     case 'literal':
-      right = renderLiteral(rightExpr as LiteralExpr);
+      right = renderLiteral(rightNode);
       break;
     case 'column-ref':
-      right = renderColumn(rightExpr as ColumnRef);
+      right = renderColumn(rightNode);
       break;
     case 'param-ref':
-      right = renderParam(rightExpr as ParamRef, contract, leftCol?.table, leftCol?.column);
+      right = renderParam(rightNode, contract, leftCol?.table, leftCol?.column);
       break;
-    default:
-      right = renderExpr(rightExpr as Expression, contract);
+    case 'subquery':
+    case 'operation':
+    case 'aggregate':
+    case 'json-object':
+    case 'json-array-agg':
+      right = renderExpr(rightNode, contract);
       break;
+    default: {
+      const _exhaustive: never = rightNode;
+      throw new Error(`Unsupported comparable kind: ${(_exhaustive as { kind: string }).kind}`);
+    }
   }
 
   const operatorMap: Record<BinaryExpr['op'], string> = {
@@ -479,13 +484,25 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
   const self = renderExpr(expr.self, contract);
   const isVectorOperation = expr.forTypeId === VECTOR_CODEC_ID;
   const args = expr.args.map((arg) => {
-    switch (arg.kind) {
+    const node = arg as AnyOperationArg;
+    switch (node.kind) {
       case 'param-ref':
-        return isVectorOperation ? `$${arg.index}::vector` : renderParam(arg, contract);
+        return isVectorOperation ? `$${node.index}::vector` : renderParam(node, contract);
       case 'literal':
-        return renderLiteral(arg);
-      default:
-        return renderExpr(arg, contract);
+        return renderLiteral(node);
+      case 'column-ref':
+      case 'subquery':
+      case 'operation':
+      case 'aggregate':
+      case 'json-object':
+      case 'json-array-agg':
+        return renderExpr(node, contract);
+      default: {
+        const _exhaustive: never = node;
+        throw new Error(
+          `Unsupported operation arg kind: ${(_exhaustive as { kind: string }).kind}`,
+        );
+      }
     }
   });
 

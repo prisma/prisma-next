@@ -2,6 +2,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   AndExpr,
+  type AnySqlComparable,
   BinaryExpr,
   type BoundWhereExpr,
   ColumnRef,
@@ -35,18 +36,30 @@ function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>
 // not parameterized binding. ParamRef is rejected because the ORM's grouped
 // collection API always produces literal comparisons for having() predicates.
 function validateGroupedComparable(value: SqlComparable): SqlComparable {
-  switch (value.kind) {
+  const node = value as AnySqlComparable;
+  switch (node.kind) {
     case 'param-ref':
       throw new Error('ParamRef is not supported in grouped having expressions');
     case 'literal':
-      return value;
+      return node;
     case 'list-literal':
-      if (value.values.some((entry) => entry.kind === 'param-ref')) {
+      if (node.values.some((entry) => entry.kind === 'param-ref')) {
         throw new Error('ParamRef is not supported in grouped having expressions');
       }
-      return value;
-    default:
-      return value;
+      return node;
+    case 'column-ref':
+    case 'subquery':
+    case 'operation':
+    case 'aggregate':
+    case 'json-object':
+    case 'json-array-agg':
+      return node;
+    default: {
+      const _exhaustive: never = node;
+      throw new Error(
+        `Unsupported comparable kind in grouped having: ${(_exhaustive as { kind: string }).kind}`,
+      );
+    }
   }
 }
 

@@ -98,31 +98,50 @@ function combineAll<T>(folder: ExpressionFolder<T>, thunks: Array<() => T>): T {
 }
 
 function rewriteComparable(value: SqlComparable, rewriter: ExpressionRewriter): SqlComparable {
-  switch (value.kind) {
+  const node = value as AnySqlComparable;
+  switch (node.kind) {
     case 'param-ref':
-      return rewriter.paramRef ? rewriter.paramRef(value) : value;
+      return rewriter.paramRef ? rewriter.paramRef(node) : node;
     case 'literal':
-      return rewriter.literal ? rewriter.literal(value) : value;
+      return rewriter.literal ? rewriter.literal(node) : node;
     case 'list-literal':
       if (rewriter.listLiteral) {
-        return rewriter.listLiteral(value);
+        return rewriter.listLiteral(node);
       }
-      return value.rewrite(rewriter);
-    default:
-      return value.rewrite(rewriter);
+      return node.rewrite(rewriter);
+    case 'column-ref':
+    case 'subquery':
+    case 'operation':
+    case 'aggregate':
+    case 'json-object':
+    case 'json-array-agg':
+      return node.rewrite(rewriter);
+    default: {
+      const _exhaustive: never = node;
+      throw new Error(`Unsupported comparable kind: ${(_exhaustive as { kind: string }).kind}`);
+    }
   }
 }
 
 function foldComparable<T>(value: SqlComparable, folder: ExpressionFolder<T>): T {
-  switch (value.kind) {
+  const node = value as AnySqlComparable;
+  switch (node.kind) {
     case 'param-ref':
-      return folder.paramRef ? folder.paramRef(value) : folder.empty;
+      return folder.paramRef ? folder.paramRef(node) : folder.empty;
     case 'literal':
-      return folder.literal ? folder.literal(value) : folder.empty;
+      return folder.literal ? folder.literal(node) : folder.empty;
     case 'list-literal':
-      return value.fold(folder);
-    default:
-      return value.fold(folder);
+    case 'column-ref':
+    case 'subquery':
+    case 'operation':
+    case 'aggregate':
+    case 'json-object':
+    case 'json-array-agg':
+      return node.fold(folder);
+    default: {
+      const _exhaustive: never = node;
+      throw new Error(`Unsupported comparable kind: ${(_exhaustive as { kind: string }).kind}`);
+    }
   }
 }
 
@@ -1595,6 +1614,9 @@ export type AnyExpression =
   | JsonArrayAggExpr;
 export type AnyWhereExpr = BinaryExpr | AndExpr | OrExpr | ExistsExpr | NullCheckExpr;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
+export type AnySqlComparable = AnyExpression | ParamRef | LiteralExpr | ListLiteralExpr;
+export type AnyInsertValue = ColumnRef | ParamRef | DefaultValueExpr;
+export type AnyOperationArg = AnyExpression | ParamRef | LiteralExpr;
 
 export const queryAstKinds: ReadonlySet<string> = new Set<QueryAst['kind']>([
   'select',

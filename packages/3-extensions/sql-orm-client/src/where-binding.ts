@@ -175,8 +175,10 @@ function bindFromSource(
       return node;
     case 'derived-table-source':
       return DerivedTableSource.as(node.alias, bindSelectAst(contract, node.query, state));
-    default:
-      return source;
+    default: {
+      const _exhaustive: never = node;
+      throw new Error(`Unsupported source kind: ${(_exhaustive as { kind: string }).kind}`);
+    }
   }
 }
 
