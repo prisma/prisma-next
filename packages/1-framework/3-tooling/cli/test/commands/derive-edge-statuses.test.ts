@@ -29,18 +29,16 @@ function buildGraph(entries: MigrationChainEntry[]): MigrationGraph {
 const ROOT = EMPTY_CONTRACT_HASH;
 
 describe('deriveEdgeStatuses', () => {
-  // Verifies the early return: offline mode has no DB connection,
-  // so no status can be determined.
+  // No DB connection means we can't know what's applied.
   it('returns empty array in offline mode', () => {
     const graph = buildGraph([entry(ROOT, 'A', 'm1')]);
     expect(deriveEdgeStatuses(graph, 'A', 'A', 'A', 'offline')).toEqual([]);
   });
 
-  // ROOT → A → B → C
-  // marker=A, target=C, contract=C
+  // The most common scenario: user has applied some migrations and
+  // has more waiting. The marker splits the chain into applied/pending.
   //
-  // Exercises the core split: edges before the marker are applied,
-  // edges after are pending. No branching, so nothing is unreachable.
+  // ROOT → A → B → C, marker=A, target=C
   describe('linear chain — marker mid-chain', () => {
     const graph = buildGraph([
       entry(ROOT, 'A', 'm1'),
@@ -66,12 +64,10 @@ describe('deriveEdgeStatuses', () => {
     });
   });
 
-  // ROOT → A → B
-  // marker=undefined, target=B, contract=B
+  // Fresh database — no migrations ever applied. Everything is pending.
+  // This uses the effectiveMarker fallback (ROOT) since markerHash is undefined.
   //
-  // When the DB is empty, markerHash is undefined. The function uses
-  // effectiveMarker = ROOT (so pendingPath = ROOT→B), and appliedPath
-  // is explicitly null (no marker means nothing was applied).
+  // ROOT → A → B, marker=undefined, target=B
   describe('empty DB — marker undefined', () => {
     const graph = buildGraph([entry(ROOT, 'A', 'm1'), entry('A', 'B', 'm2')]);
 
@@ -84,29 +80,9 @@ describe('deriveEdgeStatuses', () => {
     });
   });
 
-  // ROOT → A → B
-  // marker=ROOT, target=B, contract=B
+  // Database is fully up to date — nothing to apply.
   //
-  // Different code path from undefined marker: appliedPath is ROOT→ROOT
-  // (zero-length, no edges), pendingPath is ROOT→B. Should produce the
-  // same result as undefined marker — all pending, nothing applied.
-  describe('empty DB — marker equals root', () => {
-    const graph = buildGraph([entry(ROOT, 'A', 'm1'), entry('A', 'B', 'm2')]);
-
-    it('marks all edges as pending (same as undefined marker)', () => {
-      const result = deriveEdgeStatuses(graph, 'B', 'B', ROOT, 'online');
-      expect(result).toEqual([
-        { dirName: 'm1', status: 'pending' },
-        { dirName: 'm2', status: 'pending' },
-      ]);
-    });
-  });
-
-  // ROOT → A → B
-  // marker=B, target=B, contract=B
-  //
-  // All migrations have been applied. appliedPath covers ROOT→A→B,
-  // pendingPath is B→B (zero-length). Verifies the "up to date" state.
+  // ROOT → A → B, marker=B, target=B
   describe('fully applied — marker at target', () => {
     const graph = buildGraph([entry(ROOT, 'A', 'm1'), entry('A', 'B', 'm2')]);
 
@@ -119,16 +95,12 @@ describe('deriveEdgeStatuses', () => {
     });
   });
 
+  // The DB went down one branch but the target is on another.
+  // `apply` cannot reach the target without first switching branches,
+  // so those edges are unreachable.
+  //
   // ROOT → A ─┬→ B (marker)
   //            └→ C → D (target)
-  // marker=B, target=D, contract=D
-  //
-  // The marker is on a different branch than the target. apply cannot
-  // reach the target without first moving the DB to this branch.
-  // - ROOT→A→B is the appliedPath
-  // - pendingPath from B→D is null (no path between branches)
-  // - targetPath ROOT→A→C→D has m1 (already applied via assignedKeys),
-  //   m3 and m4 are unreachable
   describe('branching — marker on different branch', () => {
     const graph = buildGraph([
       entry(ROOT, 'A', 'm1'),
@@ -155,16 +127,14 @@ describe('deriveEdgeStatuses', () => {
     });
   });
 
+  // Diamond: two routes from A to D. BFS picks one for pending, the
+  // other is never traversed. The shared prefix (ROOT→A) must not be
+  // double-counted — assignedKeys prevents an edge from being labeled
+  // both applied and unreachable.
+  //
   // ROOT → A ─┬→ B ─┐
   //            └→ C ─┘→ D
-  // marker=A, target=D, contract=D
-  //
-  // Diamond topology: two paths from A to D. pendingPath picks one
-  // route (say A→B→D). targetPath (ROOT→A→...→D) may pick a different
-  // route. The assignedKeys set prevents m1 (ROOT→A) from being
-  // double-counted as both applied and unreachable. Edges on the
-  // unchosen branch of the diamond get marked unreachable.
-  describe('diamond — deduplication via assignedKeys', () => {
+  describe('diamond — shared edges not double-counted', () => {
     const graph = buildGraph([
       entry(ROOT, 'A', 'm1'),
       entry('A', 'B', 'm2'),
@@ -173,43 +143,31 @@ describe('deriveEdgeStatuses', () => {
       entry('C', 'D', 'm5'),
     ]);
 
-    it('does not double-count shared edges', () => {
+    it('labels the shared edge exactly once', () => {
       const result = deriveEdgeStatuses(graph, 'D', 'D', 'A', 'online');
-
-      // m1 must appear exactly once (applied), never as unreachable
       const m1 = result.filter((e) => e.dirName === 'm1');
       expect(m1).toEqual([{ dirName: 'm1', status: 'applied' }]);
 
-      // All edges accounted for — no dirName appears twice
       const dirNames = result.map((e) => e.dirName);
       expect(dirNames.length).toBe(new Set(dirNames).size);
     });
 
-    // targetPath (ROOT→D) uses BFS which picks the same route as
-    // pendingPath. The unchosen branch is never visited by any path
-    // computation, so it gets no status at all (not even unreachable).
-    // This is correct: unreachable means "on a path to the target but
-    // not reachable from the marker." Edges on neither path are simply
-    // unlabeled and rendered unstyled.
-    it('leaves the unchosen diamond branch unlabeled', () => {
+    // BFS picks a single route to D for both pendingPath and targetPath,
+    // so the other branch is never visited — it gets no label at all.
+    // This is intentional: unlabeled edges render unstyled in the graph.
+    it('leaves the unchosen branch unlabeled', () => {
       const result = deriveEdgeStatuses(graph, 'D', 'D', 'A', 'online');
-      const labeled = new Set(result.map((e) => e.dirName));
-
-      // One A→D route is pending (2 edges), the other has no status
       const pending = result.filter((e) => e.status === 'pending');
       expect(pending.length).toBe(2);
-
-      // Exactly 3 edges labeled: m1 (applied) + 2 pending
-      expect(labeled.size).toBe(3);
+      expect(result.length).toBe(3); // 1 applied + 2 pending
     });
   });
 
-  // ROOT → A → B(ref/target) → C(contract)
-  // marker=A, target=B, contract=C
+  // When --ref targets a node before the contract, migrations between
+  // the ref and contract are still pending — the user needs them applied
+  // to reach the contract state.
   //
-  // When --ref points to a node before the contract, the target is the
-  // ref but the contract is further along. The "beyondTarget" logic
-  // (target→contract) marks those extra edges as pending too.
+  // ROOT → A → B(ref/target) → C(contract), marker=A
   describe('ref target with contract beyond', () => {
     const graph = buildGraph([
       entry(ROOT, 'A', 'm1'),
@@ -227,13 +185,28 @@ describe('deriveEdgeStatuses', () => {
     });
   });
 
-  // ROOT → A → B(target)
-  // marker=A, target=B, contract='off-graph-contract'
+  // No contract has been emitted yet (contractHash is the empty sentinel).
+  // The beyondTarget logic is skipped entirely — there's nothing beyond
+  // the target to check. Only the normal applied/pending split applies.
   //
-  // The contract hash is not a node in the graph (user changed the
-  // contract but hasn't planned a migration yet). The beyondTarget
-  // check requires graph.nodes.has(contractHash), which fails —
-  // no extra edges are added.
+  // ROOT → A → B(target), contract=ROOT (empty), marker=A
+  describe('no contract emitted — empty contract hash', () => {
+    const graph = buildGraph([entry(ROOT, 'A', 'm1'), entry('A', 'B', 'm2')]);
+
+    it('does not attempt beyondTarget extension', () => {
+      const result = deriveEdgeStatuses(graph, 'B', ROOT, 'A', 'online');
+      expect(result).toEqual([
+        { dirName: 'm1', status: 'applied' },
+        { dirName: 'm2', status: 'pending' },
+      ]);
+    });
+  });
+
+  // User changed the contract but hasn't planned a migration yet.
+  // The contract hash doesn't exist in the graph, so the beyondTarget
+  // logic has nothing to extend — only the normal applied/pending split applies.
+  //
+  // ROOT → A → B(target), contract='off-graph-contract', marker=A
   describe('contract not in graph', () => {
     const graph = buildGraph([entry(ROOT, 'A', 'm1'), entry('A', 'B', 'm2')]);
 

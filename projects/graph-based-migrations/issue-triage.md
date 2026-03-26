@@ -224,3 +224,22 @@ This allows phantom dependencies to accumulate (see: "Phantom `@prisma-next/cli`
 **Suggested fix:** Add a companion script (~100-150 lines) that reads each package's `package.json`, resolves workspace deps to their module group via `architecture.config.json`, and applies the same upward/cross-domain/plane rules. Wire it into `pnpm lint:deps` alongside the existing depcruiser call. No new dependencies needed — just `fs`, `path`, and JSON reading.
 
 ---
+
+## `migration status --ref` places detached contract node on wrong branch
+
+**Discovered:** 2026-03-25 | **Severity:** medium | **Type:** rendering limitation + diagnostic gap
+
+**Observed:** When `migration status --ref staging` is used and the contract is reachable from a different branch (e.g. prod) but not from staging, the detached `◇ contract` node renders below the bottom-most node in the graph (prod's leaf). The user expects it below the staging node, since that's the branch they're looking at — the visual implies the contract is "after prod" rather than "not yet planned from staging."
+
+With `--graph`, this is worse: the contract node sits below prod's branch while staging's branch has no visual indication that a migration to the contract is missing.
+
+**Root cause:** The detached node placement always aligns with the bottom-most rendered node's X-coordinate. There is no mechanism to anchor a detached node to a specific branch. Anchoring to a mid-graph node would require:
+- A phantom edge from the target branch to the detached node so Dagre positions it correctly
+- Collision avoidance with other branches that extend below the anchor point
+- Updated dashed-line connector logic to handle horizontal offsets
+
+**Related diagnostic gap:** When the contract is in the graph but not reachable from `targetHash` (the active ref), no `CONTRACT.AHEAD` diagnostic fires — that diagnostic only checks `!graph.nodes.has(contractHash)`. The user gets no indication that their chosen ref can't reach the contract. This should fire a diagnostic like "Contract is not reachable from ref — run `migration plan --from <ref>` to plan a migration."
+
+**Scope:** Graph renderer (`graph-render.ts` detached node placement) + CLI diagnostics (`migration-status.ts` CONTRACT.AHEAD condition).
+
+---
