@@ -39,7 +39,7 @@ function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
     paramDescriptors: collected.map((p) => ({
       ...(p.name !== undefined && { name: p.name }),
       source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
+      codecId: p.codecId,
     })),
   };
 }
@@ -139,15 +139,14 @@ export class InsertBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      const columnMeta = contractTable.columns[columnName];
-      const codecId = columnMeta?.codecId;
-      if (paramName && codecId) {
-        paramCodecs[paramName] = codecId;
+      const columnMeta = contractTable.columns[columnName]!;
+      if (paramName && columnMeta.codecId) {
+        paramCodecs[paramName] = columnMeta.codecId;
       }
 
       values[columnName] = ParamRef.of(value, {
         name: paramName,
-        codecId,
+        codecId: columnMeta.codecId,
       });
     }
 
@@ -297,15 +296,14 @@ export class UpdateBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      const columnMeta = contractTable.columns[columnName];
-      const codecId = columnMeta?.codecId;
-      if (paramName && codecId) {
-        paramCodecs[paramName] = codecId;
+      const columnMeta = contractTable.columns[columnName]!;
+      if (paramName && columnMeta.codecId) {
+        paramCodecs[paramName] = columnMeta.codecId;
       }
 
       set[columnName] = ParamRef.of(value, {
         name: paramName,
-        codecId,
+        codecId: columnMeta.codecId,
       });
     }
 

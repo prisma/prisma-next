@@ -69,7 +69,7 @@ describe('query plan aggregate', () => {
         { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
         BinaryExpr.gte(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ParamRef.of(1, { name: 'views' }),
+          ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' }),
         ),
       ),
     ).toThrow('ParamRef is not supported in grouped having expressions');
@@ -83,7 +83,7 @@ describe('query plan aggregate', () => {
         { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
         BinaryExpr.in(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ListLiteralExpr.of([ParamRef.of(1, { name: 'views' })]),
+          ListLiteralExpr.of([ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' })]),
         ),
       ),
     ).toThrow('ParamRef is not supported in grouped having expressions');

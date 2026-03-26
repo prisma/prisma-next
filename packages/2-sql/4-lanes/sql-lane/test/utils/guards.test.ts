@@ -96,6 +96,6 @@ describe('guards', () => {
     expect(isColumnBuilder({ kind: 'operation' })).toBe(false);
     expect(isExpressionBuilder({ kind: 'column' })).toBe(false);
     expect(isExpressionSource(LiteralExpr.of('x'))).toBe(false);
-    expect(isValueSource(ParamRef.of('val1', { name: 'id' }))).toBe(false);
+    expect(isValueSource(ParamRef.of('val1', { name: 'id', codecId: 'pg/text@1' }))).toBe(false);
   });
 });

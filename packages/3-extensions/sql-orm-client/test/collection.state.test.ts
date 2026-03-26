@@ -57,21 +57,34 @@ describe('Collection', () => {
             toWhereExpr: () => ({
               expr: BinaryExpr.eq(
                 ColumnRef.of('users', 'name'),
-                ParamRef.of('Alice', { name: 'name' }),
+                ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
               ),
             }),
           }) satisfies ToWhereExpr,
       );
 
       expect(filtered.state.filters).toEqual([
-        bound(BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of('Alice', { name: 'name' }))),
+        bound(
+          BinaryExpr.eq(
+            ColumnRef.of('users', 'name'),
+            ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+          ),
+        ),
       ]);
 
       const bare = collection.where((_user) =>
-        BinaryExpr.eq(ColumnRef.of('users', 'id'), ParamRef.of(7, { name: 'id' })),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(7, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
       );
       expect(bare.state.filters).toEqual([
-        bound(BinaryExpr.eq(ColumnRef.of('users', 'id'), ParamRef.of(7, { name: 'id' }))),
+        bound(
+          BinaryExpr.eq(
+            ColumnRef.of('users', 'id'),
+            ParamRef.of(7, { name: 'id', codecId: 'pg/int4@1' }),
+          ),
+        ),
       ]);
     });
 

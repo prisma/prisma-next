@@ -37,11 +37,11 @@ function toParamAssignments(
   const assignments: Record<string, ParamRef> = {};
 
   for (const [column, value] of Object.entries(values)) {
-    const columnMeta = contract.storage.tables[tableName]?.columns[column];
-    assignments[column] = ParamRef.of(value, {
-      name: column,
-      ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
-    });
+    const codecId = contract.storage.tables[tableName]?.columns[column]?.codecId;
+    if (!codecId) {
+      throw new Error(`Unknown column "${column}" in table "${tableName}"`);
+    }
+    assignments[column] = ParamRef.of(value, { name: column, codecId });
   }
 
   return { assignments };
@@ -79,11 +79,11 @@ function normalizeInsertRows(
     const normalizedRow: Record<string, ParamRef | DefaultValueExpr> = {};
     for (const column of orderedColumns) {
       if (Object.hasOwn(row, column)) {
-        const columnMeta = contract.storage.tables[tableName]?.columns[column];
-        normalizedRow[column] = ParamRef.of(row[column], {
-          name: column,
-          ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
-        });
+        const codecId = contract.storage.tables[tableName]?.columns[column]?.codecId;
+        if (!codecId) {
+          throw new Error(`Unknown column "${column}" in table "${tableName}"`);
+        }
+        normalizedRow[column] = ParamRef.of(row[column], { name: column, codecId });
         continue;
       }
       normalizedRow[column] = new DefaultValueExpr();

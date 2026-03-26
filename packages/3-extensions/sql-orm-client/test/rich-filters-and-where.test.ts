@@ -58,7 +58,10 @@ describe('SQL ORM rich AST filters', () => {
     const normalized = normalizeWhereArg(
       {
         toWhereExpr: () => ({
-          expr: BinaryExpr.eq(ColumnRef.of('users', 'id'), ParamRef.of(1, { name: 'id' })),
+          expr: BinaryExpr.eq(
+            ColumnRef.of('users', 'id'),
+            ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ),
         }),
       },
       { contract },
@@ -70,7 +73,10 @@ describe('SQL ORM rich AST filters', () => {
     const combined = combineWhereFilters([
       createBoundWhereExpr(BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice'))),
       createBoundWhereExpr(
-        BinaryExpr.eq(ColumnRef.of('users', 'id'), ParamRef.of(1, { name: 'id' })),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
       ),
     ]);
     expect(combined?.expr).toBeInstanceOf(AndExpr);

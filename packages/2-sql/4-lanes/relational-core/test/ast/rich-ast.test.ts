@@ -51,7 +51,7 @@ describe('rich SQL AST', () => {
     const update = UpdateAst.table(table);
     const del = DeleteAst.from(table);
     const column = ColumnRef.of('user', 'id');
-    const param = ParamRef.of(0, { name: 'id' });
+    const param = ParamRef.of(0, { name: 'id', codecId: 'pg/int4@1' });
     const literal = LiteralExpr.of('alice');
     const binary = BinaryExpr.eq(column, param);
 
@@ -85,7 +85,10 @@ describe('rich SQL AST', () => {
 
   it('supports fluent immutable query construction', () => {
     const base = SelectAst.from(TableSource.named('user'));
-    const where = BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { name: 'id' }));
+    const where = BinaryExpr.eq(
+      ColumnRef.of('user', 'id'),
+      ParamRef.of(0, { name: 'id', codecId: 'pg/int4@1' }),
+    );
 
     const next = base
       .addProjection('id', ColumnRef.of('user', 'id'))
@@ -120,7 +123,10 @@ describe('rich SQL AST', () => {
       .addProjection('id', ColumnRef.of('user', 'id'))
       .addProjection(
         'email',
-        lowerEmail(ColumnRef.of('user', 'email'), ParamRef.of(0, { name: 'email' })),
+        lowerEmail(
+          ColumnRef.of('user', 'email'),
+          ParamRef.of(0, { name: 'email', codecId: 'pg/text@1' }),
+        ),
       )
       .withJoins([
         JoinAst.left(
@@ -131,7 +137,10 @@ describe('rich SQL AST', () => {
       ])
       .withWhere(
         AndExpr.of([
-          BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, { name: 'id' })),
+          BinaryExpr.eq(
+            ColumnRef.of('user', 'id'),
+            ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ),
           ExistsExpr.exists(
             SelectAst.from(TableSource.named('comment'))
               .addProjection('id', ColumnRef.of('comment', 'id'))
@@ -161,7 +170,7 @@ describe('rich SQL AST', () => {
     expect(rewritten.projection[0]?.expr).toEqual(ColumnRef.of('member', 'id'));
     expect(rewritten.projection[1]?.expr?.kind).toBe('operation');
     expect((rewritten.projection[1]?.expr as OperationExpr).args[0]).toEqual(
-      ParamRef.of(10, { name: 'email' }),
+      ParamRef.of(10, { name: 'email', codecId: 'pg/text@1' }),
     );
     expect(rewritten.joins?.[0]?.on).toEqual(
       EqColJoinOn.of(
@@ -176,12 +185,12 @@ describe('rich SQL AST', () => {
 
   it('folds, collects column refs, and exposes base column refs', () => {
     const email = ColumnRef.of('user', 'email');
-    const op = lowerEmail(email, ParamRef.of(3, { name: 'needle' }));
+    const op = lowerEmail(email, ParamRef.of(3, { name: 'needle', codecId: 'pg/text@1' }));
     const where = AndExpr.of([
       BinaryExpr.eq(op, LiteralExpr.of('alice@example.com')),
       BinaryExpr.in(
         ColumnRef.of('user', 'status'),
-        ListLiteralExpr.of([ParamRef.of(4), LiteralExpr.of('active')]),
+        ListLiteralExpr.of([ParamRef.of(4, { codecId: 'pg/text@1' }), LiteralExpr.of('active')]),
       ),
     ]);
 
@@ -213,17 +222,17 @@ describe('rich SQL AST', () => {
   });
 
   it('negates where expressions through not()', () => {
-    expect(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0)).not()).toEqual(
-      BinaryExpr.neq(ColumnRef.of('user', 'id'), ParamRef.of(0)),
-    );
+    expect(
+      BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })).not(),
+    ).toEqual(BinaryExpr.neq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })));
     expect(
       AndExpr.of([
-        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0)),
+        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
         NullCheckExpr.isNull(ColumnRef.of('user', 'deletedAt')),
       ]).not(),
     ).toEqual(
       OrExpr.of([
-        BinaryExpr.neq(ColumnRef.of('user', 'id'), ParamRef.of(0)),
+        BinaryExpr.neq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
         NullCheckExpr.isNotNull(ColumnRef.of('user', 'deletedAt')),
       ]),
     );
@@ -268,7 +277,7 @@ describe('rich SQL AST', () => {
     const insert = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(0, { name: 'id' }),
+          id: ParamRef.of(0, { name: 'id', codecId: 'pg/int4@1' }),
           managerId: ColumnRef.of('account', 'managerId'),
           nickname: new DefaultValueExpr(),
         },
@@ -276,7 +285,7 @@ describe('rich SQL AST', () => {
       .withOnConflict(
         InsertOnConflict.on([ColumnRef.of('user', 'email')]).doUpdateSet({
           email: ColumnRef.of('excluded', 'email'),
-          managerId: ParamRef.of(1, { name: 'managerId' }),
+          managerId: ParamRef.of(1, { name: 'managerId', codecId: 'pg/int4@1' }),
         }),
       )
       .withReturning([ColumnRef.of('user', 'id')]);
@@ -284,9 +293,14 @@ describe('rich SQL AST', () => {
     const update = UpdateAst.table(TableSource.named('user'))
       .withSet({
         managerId: ColumnRef.of('account', 'managerId'),
-        nickname: ParamRef.of(0, { name: 'nickname' }),
+        nickname: ParamRef.of(0, { name: 'nickname', codecId: 'pg/text@1' }),
       })
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, { name: 'id' })))
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'email')]);
 
     const del = DeleteAst.from(TableSource.named('user'))

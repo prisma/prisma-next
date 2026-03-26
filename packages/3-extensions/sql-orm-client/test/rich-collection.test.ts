@@ -26,14 +26,14 @@ describe('SQL ORM collections with rich AST plans', () => {
       toWhereExpr: () => ({
         expr: BinaryExpr.eq(
           ColumnRef.of('users', 'email'),
-          ParamRef.of('a@example.com', { name: 'email' }),
+          ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
         ),
       }),
     } satisfies ToWhereExpr);
     expect(bound.state.filters[0]?.expr).toEqual(
       BinaryExpr.eq(
         ColumnRef.of('users', 'email'),
-        ParamRef.of('a@example.com', { name: 'email' }),
+        ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
       ),
     );
   });

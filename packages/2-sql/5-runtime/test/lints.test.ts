@@ -73,7 +73,7 @@ describe('lints plugin', () => {
     async () => {
       const plan = createPlan({
         ast: UpdateAst.table(userTable).withSet({
-          email: ParamRef.of('new@example.com', { name: 'email' }),
+          email: ParamRef.of('new@example.com', { name: 'email', codecId: 'pg/text@1' }),
         }),
       });
       const plugin = lints();
@@ -139,13 +139,15 @@ describe('lints plugin', () => {
       const selectPlan = createPlan({
         ast: SelectAst.from(userTable)
           .withProjection([ProjectionItem.of('id', idCol)])
-          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(42)))
+          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(42, { codecId: 'pg/int4@1' })))
           .withLimit(10),
       });
       const updatePlan = createPlan({
         ast: UpdateAst.table(userTable)
-          .withSet({ email: ParamRef.of('new@example.com', { name: 'email' }) })
-          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(1, { name: 'id' }))),
+          .withSet({
+            email: ParamRef.of('new@example.com', { name: 'email', codecId: 'pg/text@1' }),
+          })
+          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }))),
       });
       const plugin = lints();
       const ctx = createPluginContext();

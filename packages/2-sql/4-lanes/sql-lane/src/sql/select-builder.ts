@@ -51,7 +51,7 @@ function deriveParamsFromAst(ast: {
   collectParamRefs(): Array<{
     value: unknown;
     name: string | undefined;
-    codecId: string | undefined;
+    codecId: string;
   }>;
 }) {
   const collected = ast.collectParamRefs();
@@ -60,7 +60,7 @@ function deriveParamsFromAst(ast: {
     paramDescriptors: collected.map((p) => ({
       ...(p.name !== undefined && { name: p.name }),
       source: 'dsl' as const,
-      ...(p.codecId ? { codecId: p.codecId } : {}),
+      codecId: p.codecId,
     })),
   };
 }

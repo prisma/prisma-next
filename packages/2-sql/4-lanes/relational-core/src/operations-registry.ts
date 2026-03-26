@@ -17,9 +17,8 @@ import type {
   ColumnBuilder,
   ExpressionBuilder,
   OperationTypes,
-  ParamPlaceholder,
+  ValueSource,
 } from './types';
-import { isParamPlaceholder } from './utils/guards';
 
 /**
  * Type guard to check if a value is an ExpressionSource (has toExpr method).
@@ -75,10 +74,7 @@ function executeOperation(
     }
 
     if (argSpec.kind === 'param') {
-      if (!isParamPlaceholder(arg)) {
-        throw planInvalid(`Argument ${i} must be a parameter placeholder`);
-      }
-      operationArgs.push(ParamRef.of(undefined, { name: arg.name }));
+      operationArgs.push(ParamRef.of(arg, { name: `arg_${i}`, codecId: columnMeta.codecId }));
     } else if (argSpec.kind === 'typeId') {
       // Accept ExpressionSource (ColumnBuilder or ExpressionBuilder)
       if (!isExpressionSource(arg)) {
@@ -112,7 +108,7 @@ function executeOperation(
 
   const createComparisonMethod =
     (op: BinaryOp) =>
-    (value: ParamPlaceholder | ExpressionSource): AnyBinaryBuilder =>
+    (value: ValueSource): AnyBinaryBuilder =>
       Object.freeze({
         kind: 'binary' as const,
         op,

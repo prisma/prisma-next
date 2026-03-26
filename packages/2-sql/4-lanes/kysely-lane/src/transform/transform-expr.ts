@@ -28,13 +28,19 @@ import { isOperationNode, parseOrderByDirection } from './kysely-ast-types';
 import { advanceParamCursor, type TransformContext } from './transform-context';
 import { resolveColumnRef } from './transform-validate';
 
-function resolveParamOptions(ctx: TransformContext, refs?: { table: string; column: string }) {
+function resolveParamOptions(
+  ctx: TransformContext,
+  refs?: { table: string; column: string },
+): { codecId: string } {
   const colDef = refs ? ctx.contract.storage.tables[refs.table]?.columns[refs.column] : undefined;
-  const codecId =
-    colDef?.codecId !== undefined && colDef.codecId !== '' ? colDef.codecId : undefined;
-  return {
-    ...(codecId !== undefined && { codecId }),
-  };
+  if (!colDef?.codecId) {
+    throw new KyselyTransformError(
+      `Cannot resolve codecId for parameter${refs ? ` (${refs.table}.${refs.column})` : ''}`,
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { nodeKind: 'value' },
+    );
+  }
+  return { codecId: colDef.codecId };
 }
 
 export function transformValue(

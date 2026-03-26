@@ -95,7 +95,12 @@ describe('Operation lowering', () => {
   it('lowers operations in where and orderBy clauses', () => {
     const ast = SelectAst.from(TableSource.named('user'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
-      .withWhere(BinaryExpr.eq(distanceExpr(), ParamRef.of(0.5, { name: 'threshold' })))
+      .withWhere(
+        BinaryExpr.eq(
+          distanceExpr(),
+          ParamRef.of(0.5, { name: 'threshold', codecId: 'pg/float8@1' }),
+        ),
+      )
       .withOrderBy([OrderByItem.asc(distanceExpr())]);
 
     const lowered = adapter.lower(ast, { contract });

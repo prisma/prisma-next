@@ -100,11 +100,11 @@ function createParamRef(
   columnRef: ColumnRef,
   value: unknown,
 ): ParamRef {
-  const columnMeta = contract.storage.tables[columnRef.table]?.columns[columnRef.column];
-  return ParamRef.of(value, {
-    name: columnRef.column,
-    ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
-  });
+  const codecId = contract.storage.tables[columnRef.table]?.columns[columnRef.column]?.codecId;
+  if (!codecId) {
+    throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
+  }
+  return ParamRef.of(value, { name: columnRef.column, codecId });
 }
 
 function createExpressionBinder(

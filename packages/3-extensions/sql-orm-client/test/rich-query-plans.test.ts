@@ -44,13 +44,19 @@ describe('SQL ORM rich AST query plans', () => {
     const state = collection
       .where(() =>
         boundParam(
-          BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of('Alice', { name: 'name' })),
+          BinaryExpr.eq(
+            ColumnRef.of('users', 'name'),
+            ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+          ),
         ),
       )
       .include('posts', (posts) =>
         posts.where(() =>
           boundParam(
-            BinaryExpr.gte(ColumnRef.of('posts', 'views'), ParamRef.of(100, { name: 'views' })),
+            BinaryExpr.gte(
+              ColumnRef.of('posts', 'views'),
+              ParamRef.of(100, { name: 'views', codecId: 'pg/int4@1' }),
+            ),
           ),
         ),
       )

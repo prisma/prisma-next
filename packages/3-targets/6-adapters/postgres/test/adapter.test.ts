@@ -99,10 +99,13 @@ describe('Postgres adapter', () => {
     const insertAst = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(1, { name: 'id' }),
-          email: ParamRef.of('a@example.com', { name: 'email' }),
+          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
         },
-        { id: ParamRef.of(2, { name: 'id2' }), email: new DefaultValueExpr() },
+        {
+          id: ParamRef.of(2, { name: 'id2', codecId: 'pg/int4@1' }),
+          email: new DefaultValueExpr(),
+        },
       ])
       .withOnConflict(
         InsertOnConflict.on([ColumnRef.of('user', 'email')]).doUpdateSet({
@@ -111,11 +114,21 @@ describe('Postgres adapter', () => {
       )
       .withReturning([ColumnRef.of('user', 'id')]);
     const updateAst = UpdateAst.table(TableSource.named('user'))
-      .withSet({ email: ParamRef.of('b@example.com', { name: 'email' }) })
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, { name: 'id' })))
+      .withSet({ email: ParamRef.of('b@example.com', { name: 'email', codecId: 'pg/text@1' }) })
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'email')]);
     const deleteAst = DeleteAst.from(TableSource.named('user'))
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, { name: 'id' })))
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'id')]);
 
     expect(adapter.lower(insertAst, { contract }).body.sql).toContain(

@@ -21,8 +21,8 @@ import { describe, expect, it } from 'vitest';
 import { normalizeWhereArg } from '../src/where-interop';
 
 const col = (table: string, column: string) => ColumnRef.of(table, column);
-const param = (value: unknown, name?: string) =>
-  name !== undefined ? ParamRef.of(value, { name }) : ParamRef.of(value);
+const param = (value: unknown, name?: string, codecId = 'pg/text@1') =>
+  name !== undefined ? ParamRef.of(value, { name, codecId }) : ParamRef.of(value, { codecId });
 const literal = (value: unknown) => LiteralExpr.of(value);
 
 function bound(expr: WhereExpr): BoundWhereExpr {

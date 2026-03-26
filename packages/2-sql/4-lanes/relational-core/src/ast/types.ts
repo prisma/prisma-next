@@ -381,27 +381,27 @@ export class ParamRef extends AstNode {
   readonly kind = 'param-ref' as const;
   readonly value: unknown;
   readonly name: string | undefined;
-  readonly codecId: string | undefined;
+  readonly codecId: string;
 
   constructor(
     value: unknown,
-    options?: {
+    options: {
       name?: string;
-      codecId?: string;
+      codecId: string;
     },
   ) {
     super();
     this.value = value;
-    this.name = options?.name;
-    this.codecId = options?.codecId;
+    this.name = options.name;
+    this.codecId = options.codecId;
     this.freeze();
   }
 
   static of(
     value: unknown,
-    options?: {
+    options: {
       name?: string;
-      codecId?: string;
+      codecId: string;
     },
   ): ParamRef {
     return new ParamRef(value, options);

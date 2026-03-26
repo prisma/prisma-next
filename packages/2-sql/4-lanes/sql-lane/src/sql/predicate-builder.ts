@@ -1,3 +1,4 @@
+import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
   AnyExpression,
@@ -105,9 +106,12 @@ export function buildWhereExpr(
 
     const value = paramsMap[paramName];
 
+    if (!codecId) {
+      throw planInvalid(`Cannot determine codecId for parameter '${paramName}'`);
+    }
     rightExpr = ParamRefNode.of(value, {
       name: paramName,
-      ...(codecId !== undefined && { codecId }),
+      codecId,
     });
   } else if (isColumnBuilder(where.right) || isExpressionBuilder(where.right)) {
     rightExpr = where.right.toExpr();

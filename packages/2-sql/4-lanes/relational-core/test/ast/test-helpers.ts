@@ -18,15 +18,15 @@ export function col(tableName: string, column: string): ColumnRef {
   return ColumnRef.of(tableName, column);
 }
 
-export function param(value: unknown, name?: string): ParamRef {
-  return name !== undefined ? ParamRef.of(value, { name }) : ParamRef.of(value);
+export function param(value: unknown, name?: string, codecId = 'pg/text@1'): ParamRef {
+  return ParamRef.of(value, { ...(name !== undefined && { name }), codecId });
 }
 
 export function shiftParamRef(delta: number): (expr: ParamRef) => ParamRef {
   return (expr: ParamRef) =>
     ParamRef.of(typeof expr.value === 'number' ? (expr.value as number) + delta : expr.value, {
       ...(expr.name !== undefined && { name: expr.name }),
-      ...(expr.codecId !== undefined && { codecId: expr.codecId }),
+      codecId: expr.codecId,
     });
 }
 

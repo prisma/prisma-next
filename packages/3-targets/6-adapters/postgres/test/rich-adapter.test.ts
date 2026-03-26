@@ -97,7 +97,12 @@ describe('Postgres rich AST lowering', () => {
       .withJoins([
         JoinAst.left(DerivedTableSource.as('posts_lateral', aggregateQuery), AndExpr.true(), true),
       ])
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, { name: 'userId' })))
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withOrderBy([OrderByItem.desc(ColumnRef.of('user', 'createdAt'))])
       .withLimit(10)
       .withOffset(5);
@@ -158,11 +163,11 @@ describe('Postgres rich AST lowering', () => {
     const insertAst = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(1, { name: 'id' }),
-          email: ParamRef.of('a@example.com', { name: 'email' }),
+          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
         },
         {
-          id: ParamRef.of(2, { name: 'id' }),
+          id: ParamRef.of(2, { name: 'id', codecId: 'pg/int4@1' }),
           email: new DefaultValueExpr(),
         },
       ])
@@ -181,8 +186,13 @@ describe('Postgres rich AST lowering', () => {
     expect(insertSql).toContain('RETURNING "user"."id", "user"."email"');
 
     const updateAst = UpdateAst.table(TableSource.named('user'))
-      .withSet({ email: ParamRef.of('b@example.com', { name: 'email' }) })
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, { name: 'id' })))
+      .withSet({ email: ParamRef.of('b@example.com', { name: 'email', codecId: 'pg/text@1' }) })
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'id')]);
     const updateSql = adapter.lower(updateAst, { contract }).body.sql;
     expect(updateSql).toBe(
@@ -190,7 +200,12 @@ describe('Postgres rich AST lowering', () => {
     );
 
     const deleteAst = DeleteAst.from(TableSource.named('user'))
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, { name: 'id' })))
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'id')]);
     const deleteSql = adapter.lower(deleteAst, { contract }).body.sql;
     expect(deleteSql).toBe('DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id"');

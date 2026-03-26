@@ -112,7 +112,10 @@ describe('bindWhereExpr', () => {
   });
 
   it('preserves ParamRef on the right side without rebinding', () => {
-    const expr = BinaryExpr.eq(ColumnRef.of('users', 'id'), ParamRef.of(42, { name: 'id' }));
+    const expr = BinaryExpr.eq(
+      ColumnRef.of('users', 'id'),
+      ParamRef.of(42, { name: 'id', codecId: 'pg/int4@1' }),
+    );
     const bound = bindWhereExpr(contract, expr);
 
     const binary = bound.expr as BinaryExpr;
@@ -192,7 +195,10 @@ describe('bindWhereExpr', () => {
   it('passes through ParamRef values inside ListLiteralExpr without rebinding', () => {
     const expr = BinaryExpr.in(
       ColumnRef.of('users', 'id'),
-      ListLiteralExpr.of([ParamRef.of(99, { name: 'id' }), LiteralExpr.of(42)]),
+      ListLiteralExpr.of([
+        ParamRef.of(99, { name: 'id', codecId: 'pg/int4@1' }),
+        LiteralExpr.of(42),
+      ]),
     );
     const bound = bindWhereExpr(contract, expr);
 

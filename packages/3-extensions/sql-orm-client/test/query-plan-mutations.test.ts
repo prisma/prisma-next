@@ -32,7 +32,7 @@ function usersColParam(
   const columnMeta = columns?.[column];
   return ParamRef.of(value, {
     name: column,
-    ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
+    codecId: columnMeta?.codecId ?? 'unknown',
   });
 }
 

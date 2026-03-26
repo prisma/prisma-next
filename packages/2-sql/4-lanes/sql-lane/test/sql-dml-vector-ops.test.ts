@@ -114,13 +114,13 @@ describe('delete with vector operations', () => {
       vectorColumn as unknown as {
         cosineDistance: (arg: unknown) => { eq: (value: unknown) => unknown };
       }
-    ).cosineDistance(param('other'));
+    ).cosineDistance([1, 2, 3]);
     const binary = distance.eq(param('threshold')) as BinaryBuilder;
 
     const plan = sql({ context: contextWithOps })
       .delete(userTableWithOps)
       .where(binary)
-      .build({ params: { other: [1, 2, 3], threshold: 0.5 } });
+      .build({ params: { threshold: 0.5 } });
 
     expect(plan.ast.kind).toBe('delete');
     const ast = plan.ast as DeleteAst;
@@ -131,7 +131,7 @@ describe('delete with vector operations', () => {
     expect(where.left.kind).toBe('operation');
     const left = where.left as OperationExpr;
     expect(left.method).toBe('cosineDistance');
-    expect(left.args).toEqual([ParamRef.of(undefined, { name: 'other' })]);
+    expect(left.args).toEqual([ParamRef.of([1, 2, 3], { name: 'arg_0', codecId: 'pg/vector@1' })]);
     expect(plan.params).toContain(0.5);
   });
 });
