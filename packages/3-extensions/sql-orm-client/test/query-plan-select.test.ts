@@ -67,7 +67,7 @@ describe('compileSelectWithIncludeStrategy', () => {
       bindWhereExpr(
         baseContract,
         BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
-      ).expr,
+      ),
     );
 
     const postsProjection = plan.ast.projection.find((item) => item.alias === 'posts');
@@ -83,7 +83,7 @@ describe('compileSelectWithIncludeStrategy', () => {
         bindWhereExpr(
           baseContract,
           BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
-        ).expr,
+        ),
       ]),
     );
   });
@@ -111,15 +111,15 @@ describe('compileSelectWithIncludeStrategy', () => {
     const gtName = bindWhereExpr(
       baseContract,
       BinaryExpr.gt(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
-    ).expr;
+    );
     const eqName = bindWhereExpr(
       baseContract,
       BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
-    ).expr;
+    );
     const ltId = bindWhereExpr(
       baseContract,
       BinaryExpr.lt(ColumnRef.of('users', 'id'), LiteralExpr.of(7)),
-    ).expr;
+    );
 
     expect(plan.ast.where).toEqual(OrExpr.of([gtName, AndExpr.of([eqName, ltId])]));
     expect(plan.ast.distinctOn).toEqual([ColumnRef.of('users', 'email')]);
@@ -136,8 +136,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(plan.params).toEqual([9]);
     expect(plan.meta.paramDescriptors).toEqual([dslDescriptor('users', 'id')]);
     expect(plan.ast.where).toEqual(
-      bindWhereExpr(baseContract, BinaryExpr.gt(ColumnRef.of('users', 'id'), LiteralExpr.of(9)))
-        .expr,
+      bindWhereExpr(baseContract, BinaryExpr.gt(ColumnRef.of('users', 'id'), LiteralExpr.of(9))),
     );
 
     const invalidState = {
@@ -168,11 +167,11 @@ describe('compileSelectWithIncludeStrategy', () => {
     const inWhere = bindWhereExpr(
       baseContract,
       BinaryExpr.in(ColumnRef.of('posts', 'user_id'), ListLiteralExpr.fromValues([1, 2])),
-    ).expr;
+    );
     const titleWhere = bindWhereExpr(
       baseContract,
       BinaryExpr.eq(ColumnRef.of('posts', 'title'), LiteralExpr.of('Hello')),
-    ).expr;
+    );
 
     expect(plan.ast.where).toEqual(AndExpr.of([inWhere, titleWhere]));
     expect(plan.ast.limit).toBeUndefined();

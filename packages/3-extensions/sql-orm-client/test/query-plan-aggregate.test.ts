@@ -172,7 +172,7 @@ describe('query plan aggregate', () => {
 
     expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
-    expect(ast.where).toEqual(filteredViews.expr);
+    expect(ast.where).toEqual(filteredViews);
     expect(plan.params).toEqual([100]);
     expect(plan.meta.paramDescriptors).toEqual([
       {
