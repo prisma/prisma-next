@@ -65,7 +65,7 @@ export function transformKyselyToPnAst(
 
   const collectedParams = ast.collectParamRefs();
   const paramDescriptors = collectedParams.map((p, index) => ({
-    name: p.name,
+    ...(p.name !== undefined && { name: p.name }),
     source: 'lane' as const,
     index: index + 1,
     ...(p.codecId ? { codecId: p.codecId } : {}),
@@ -152,7 +152,7 @@ export function transformKyselyToPnAstCollectingParams(
 
   const collectedParams = ast.collectParamRefs();
   const paramDescriptors = collectedParams.map((p, index) => ({
-    name: p.name,
+    ...(p.name !== undefined && { name: p.name }),
     source: 'lane' as const,
     index: index + 1,
     ...(p.codecId ? { codecId: p.codecId } : {}),

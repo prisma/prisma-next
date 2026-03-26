@@ -86,7 +86,7 @@ describe('buildIncludeJoinArtifact', () => {
       childLimit: 10,
     };
 
-    const artifact = buildIncludeJoinArtifact(includeState, contract, { userId: 42 }, [], []);
+    const artifact = buildIncludeJoinArtifact(includeState, contract, { userId: 42 });
 
     expect(artifact.join).toBeInstanceOf(JoinAst);
     expect(artifact.join.lateral).toBe(true);

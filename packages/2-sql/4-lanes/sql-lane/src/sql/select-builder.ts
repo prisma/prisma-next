@@ -50,16 +50,16 @@ import { buildProjectionState } from './projection';
 function deriveParamsFromAst(ast: {
   collectParamRefs(): Array<{
     value: unknown;
-    name?: string;
-    codecId?: string;
-    nativeType?: string;
+    name: string | undefined;
+    codecId: string | undefined;
+    nativeType: string | undefined;
   }>;
 }) {
   const collected = ast.collectParamRefs();
   return {
     paramValues: collected.map((p) => p.value),
     paramDescriptors: collected.map((p) => ({
-      name: p.name,
+      ...(p.name !== undefined && { name: p.name }),
       source: 'dsl' as const,
       ...(p.codecId ? { codecId: p.codecId } : {}),
       ...(p.nativeType ? { nativeType: p.nativeType } : {}),

@@ -236,11 +236,7 @@ export function buildIncludeJoinArtifact(
 ): IncludeJoinArtifact {
   let childWhere: AnyWhereExpr | undefined;
   if (include.childWhere) {
-    const whereResult = buildWhereExpr(
-      contract,
-      include.childWhere,
-      paramsMap,
-    );
+    const whereResult = buildWhereExpr(contract, include.childWhere, paramsMap);
     childWhere = whereResult.expr;
   }
 

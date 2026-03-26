@@ -120,17 +120,15 @@ class PostgresAdapterImpl
     const collectedParamRefs = ast.collectParamRefs();
     const paramIndexMap: ParamIndexMap = new Map();
     const params: unknown[] = [];
-    for (const ref of collectedParamRefs) {
-      if (paramIndexMap.has(ref)) {
-        continue;
-      }
-      paramIndexMap.set(ref, params.length + 1);
+    for (let i = 0; i < collectedParamRefs.length; i++) {
+      const ref = collectedParamRefs[i]!;
+      paramIndexMap.set(ref, i + 1);
       params.push(ref.value);
     }
 
     let sql: string;
-    const node = ast;
 
+    const node = ast;
     switch (node.kind) {
       case 'select':
         sql = renderSelect(node, context.contract, paramIndexMap);
@@ -260,7 +258,11 @@ function assertScalarSubquery(query: SelectAst): void {
   }
 }
 
-function renderSubqueryExpr(expr: SubqueryExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderSubqueryExpr(
+  expr: SubqueryExpr,
+  contract?: PostgresContract,
+  pim?: ParamIndexMap,
+): string {
   assertScalarSubquery(expr.query);
   return `(${renderSelect(expr.query, contract, pim)})`;
 }
@@ -293,10 +295,16 @@ function renderWhere(expr: AnyWhereExpr, contract?: PostgresContract, pim?: Para
   });
 }
 
-function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderNullCheck(
+  expr: NullCheckExpr,
+  contract?: PostgresContract,
+  pim?: ParamIndexMap,
+): string {
   const rendered = renderExpr(expr.expr, contract, pim);
   const renderedExpr =
-    expr.expr.kind === 'operation' || expr.expr.kind === 'subquery' ? `(${rendered})` : rendered;
+    expr.expr.kind === 'operation' || expr.expr.kind === 'subquery'
+      ? `(${rendered})`
+      : rendered;
   return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
 }
 
@@ -360,17 +368,12 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract, pim?: Param
   return `${leftRendered} ${operatorMap[expr.op]} ${right}`;
 }
 
-function renderListLiteral(
-  expr: ListLiteralExpr,
-  pim?: ParamIndexMap,
-): string {
+function renderListLiteral(expr: ListLiteralExpr, pim?: ParamIndexMap): string {
   if (expr.values.length === 0) {
     return '(NULL)';
   }
   const values = expr.values
-    .map((v) =>
-      v.kind === 'param-ref' ? renderParamRef(v, pim) : renderLiteral(v),
-    )
+    .map((v) => (v.kind === 'param-ref' ? renderParamRef(v, pim) : renderLiteral(v)))
     .join(', ');
   return `(${values})`;
 }
@@ -382,7 +385,11 @@ function renderColumn(ref: ColumnRef): string {
   return `${quoteIdentifier(ref.table)}.${quoteIdentifier(ref.column)}`;
 }
 
-function renderAggregateExpr(expr: AggregateExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderAggregateExpr(
+  expr: AggregateExpr,
+  contract?: PostgresContract,
+  pim?: ParamIndexMap,
+): string {
   const fn = expr.fn.toUpperCase();
   if (!expr.expr) {
     return `${fn}(*)`;
@@ -390,7 +397,11 @@ function renderAggregateExpr(expr: AggregateExpr, contract?: PostgresContract, p
   return `${fn}(${renderExpr(expr.expr, contract, pim)})`;
 }
 
-function renderJsonObjectExpr(expr: JsonObjectExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderJsonObjectExpr(
+  expr: JsonObjectExpr,
+  contract?: PostgresContract,
+  pim?: ParamIndexMap,
+): string {
   const args = expr.entries
     .flatMap((entry): [string, string] => {
       const key = `'${escapeLiteral(entry.key)}'`;
@@ -413,7 +424,11 @@ function renderOrderByItems(
     .join(', ');
 }
 
-function renderJsonArrayAggExpr(expr: JsonArrayAggExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderJsonArrayAggExpr(
+  expr: JsonArrayAggExpr,
+  contract?: PostgresContract,
+  pim?: ParamIndexMap,
+): string {
   const aggregateOrderBy =
     expr.orderBy && expr.orderBy.length > 0
       ? ` ORDER BY ${renderOrderByItems(expr.orderBy, contract, pim)}`
@@ -485,7 +500,11 @@ function renderLiteral(expr: LiteralExpr): string {
   return `'${escapeLiteral(json)}'`;
 }
 
-function renderOperation(expr: OperationExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderOperation(
+  expr: OperationExpr,
+  contract?: PostgresContract,
+  pim?: ParamIndexMap,
+): string {
   const self = renderExpr(expr.self, contract, pim);
   const args = expr.args.map((arg) => {
     const node = arg;
@@ -611,9 +630,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim?: ParamInd
     const columns = columnOrder.map((column) => quoteIdentifier(column));
     const values = rows
       .map((row) => {
-        const renderedRow = columnOrder.map((column) =>
-          renderInsertValue(row[column], pim),
-        );
+        const renderedRow = columnOrder.map((column) => renderInsertValue(row[column], pim));
         return `(${renderedRow.join(', ')})`;
       })
       .join(', ');

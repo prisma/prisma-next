@@ -30,10 +30,13 @@ import { resolveColumnRef } from './transform-validate';
 
 function resolveParamOptions(ctx: TransformContext, refs?: { table: string; column: string }) {
   const colDef = refs ? ctx.contract.storage.tables[refs.table]?.columns[refs.column] : undefined;
+  const codecId =
+    colDef?.codecId !== undefined && colDef.codecId !== '' ? colDef.codecId : undefined;
+  const nativeType =
+    colDef?.nativeType !== undefined && colDef.nativeType !== '' ? colDef.nativeType : undefined;
   return {
-    codecId: colDef?.codecId !== undefined && colDef.codecId !== '' ? colDef.codecId : undefined,
-    nativeType:
-      colDef?.nativeType !== undefined && colDef.nativeType !== '' ? colDef.nativeType : undefined,
+    ...(codecId !== undefined && { codecId }),
+    ...(nativeType !== undefined && { nativeType }),
   };
 }
 

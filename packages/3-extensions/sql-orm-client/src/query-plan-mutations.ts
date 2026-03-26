@@ -40,8 +40,8 @@ function toParamAssignments(
     const columnMeta = contract.storage.tables[tableName]?.columns[column];
     assignments[column] = ParamRef.of(value, {
       name: column,
-      codecId: columnMeta?.codecId,
-      nativeType: columnMeta?.nativeType,
+      ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
+      ...(columnMeta?.nativeType !== undefined && { nativeType: columnMeta.nativeType }),
     });
   }
 
@@ -83,8 +83,8 @@ function normalizeInsertRows(
         const columnMeta = contract.storage.tables[tableName]?.columns[column];
         normalizedRow[column] = ParamRef.of(row[column], {
           name: column,
-          codecId: columnMeta?.codecId,
-          nativeType: columnMeta?.nativeType,
+          ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
+          ...(columnMeta?.nativeType !== undefined && { nativeType: columnMeta.nativeType }),
         });
         continue;
       }

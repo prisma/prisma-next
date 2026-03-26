@@ -115,8 +115,8 @@ export function buildWhereExpr(
 
     rightExpr = ParamRefNode.of(value, {
       name: paramName,
-      codecId,
-      nativeType,
+      ...(codecId !== undefined && { codecId }),
+      ...(nativeType !== undefined && { nativeType }),
     });
   } else if (isColumnBuilder(where.right) || isExpressionBuilder(where.right)) {
     rightExpr = where.right.toExpr();

@@ -104,7 +104,6 @@ function createParamRef(
   return ParamRef.of(value, {
     name: columnRef.column,
     codecId: columnMeta?.codecId,
-    nativeType: columnMeta?.nativeType,
   });
 }
 

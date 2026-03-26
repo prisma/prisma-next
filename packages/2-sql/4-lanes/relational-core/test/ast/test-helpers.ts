@@ -25,9 +25,9 @@ export function param(value: unknown, name?: string): ParamRef {
 export function shiftParamRef(delta: number): (expr: ParamRef) => ParamRef {
   return (expr: ParamRef) =>
     ParamRef.of(typeof expr.value === 'number' ? (expr.value as number) + delta : expr.value, {
-      name: expr.name,
-      codecId: expr.codecId,
-      nativeType: expr.nativeType,
+      ...(expr.name !== undefined && { name: expr.name }),
+      ...(expr.codecId !== undefined && { codecId: expr.codecId }),
+      ...(expr.nativeType !== undefined && { nativeType: expr.nativeType }),
     });
 }
 
