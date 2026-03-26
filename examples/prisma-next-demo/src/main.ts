@@ -69,6 +69,7 @@ import { ormClientGetUserInsights } from './orm-client/get-user-insights';
 import { ormClientGetUserKindBreakdown } from './orm-client/get-user-kind-breakdown';
 import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { ormClientGetUsers } from './orm-client/get-users';
+import { ormClientGetUsersBackwardCursor } from './orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
 import { ormClientGetUsersViaWhereArg } from './orm-client/get-users-via-wherearg';
 import { ormClientUpsertUser } from './orm-client/upsert-user';
@@ -78,7 +79,6 @@ import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
 import { getUsersWithPosts } from './queries/get-users-with-posts';
-import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination';
 import { similaritySearch } from './queries/similarity-search';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
@@ -252,7 +252,7 @@ async function main() {
       const [cursorStr, limitStr] = args;
       const cursor = cursorStr ?? null;
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-      const users = await ormGetUsersByIdCursor(cursor, limit, runtime);
+      const users = await ormClientGetUsersByIdCursor(cursor, limit, runtime);
 
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'users-paginate-back') {
@@ -262,7 +262,7 @@ async function main() {
         process.exit(1);
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-      const users = await ormGetUsersBackward(cursorStr, limit, runtime);
+      const users = await ormClientGetUsersBackwardCursor(cursorStr, limit, runtime);
 
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'budget-violation') {
