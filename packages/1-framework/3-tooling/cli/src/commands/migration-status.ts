@@ -95,17 +95,10 @@ export interface MigrationStatusResult {
   readonly diagnostics: readonly StatusDiagnostic[];
   readonly graph?: MigrationGraph;
   readonly bundles?: readonly MigrationBundle[];
+  readonly edgeStatuses?: readonly EdgeStatus[];
   readonly activeRefHash?: string;
   readonly activeRefName?: string;
   readonly diverged?: boolean;
-}
-
-function hasKnownStatus(entry: MigrationStatusEntry): entry is MigrationStatusEntry & EdgeStatus {
-  return entry.status === 'applied' || entry.status === 'pending' || entry.status === 'unreachable';
-}
-
-function knownStatuses(migrations: readonly MigrationStatusEntry[]): EdgeStatus[] {
-  return migrations.filter(hasKnownStatus);
 }
 
 function summarizeOps(ops: readonly MigrationPlanOperation[]): {
@@ -589,6 +582,10 @@ async function executeMigrationStatusCommand(
   }
 
   const entries = buildMigrationEntries(chain, attested, mode, markerHash);
+  const edgeStatuses = deriveEdgeStatuses(graph, targetHash, contractHash, markerHash, mode);
+
+  const pendingCount = edgeStatuses.filter((e) => e.status === 'pending').length;
+  const appliedCount = edgeStatuses.filter((e) => e.status === 'applied').length;
 
   let summary: string;
   if (mode === 'online') {
@@ -596,23 +593,18 @@ async function executeMigrationStatusCommand(
       summary = 'Database matches the current contract — run migration plan to create a migration';
     } else if (activeRefHash && markerHash !== undefined) {
       summary = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
+    } else if (pendingCount === 0) {
+      summary = `Database is up to date (${appliedCount} migration${appliedCount !== 1 ? 's' : ''} applied)`;
+    } else if (markerHash === undefined) {
+      summary = `${pendingCount} pending migration(s) — database has no marker`;
     } else {
-      const pendingCount = entries.filter((e) => e.status === 'pending').length;
-      const appliedCount = entries.filter((e) => e.status === 'applied').length;
-      if (pendingCount === 0) {
-        summary = `Database is up to date (${appliedCount} migration${appliedCount !== 1 ? 's' : ''} applied)`;
-      } else if (markerHash === undefined) {
-        summary = `${pendingCount} pending migration(s) — database has no marker`;
-      } else {
-        summary = `${pendingCount} pending migration(s) — run 'prisma-next migration apply' to apply`;
-      }
+      summary = `${pendingCount} pending migration(s) — run 'prisma-next migration apply' to apply`;
     }
   } else {
     summary = `${entries.length} migration(s) on disk`;
   }
 
   if (mode === 'online') {
-    const pendingCount = entries.filter((e) => e.status === 'pending').length;
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       diagnostics.push({
         code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
@@ -661,6 +653,7 @@ async function executeMigrationStatusCommand(
     ...ifDefined('pathDecision', pathDecision),
     graph,
     bundles: attested,
+    edgeStatuses,
     ...ifDefined('activeRefHash', activeRefHash),
     ...ifDefined('activeRefName', activeRefName),
   };
@@ -699,6 +692,7 @@ export function createMigrationStatusCommand(): Command {
           const {
             graph: _g,
             bundles: _b,
+            edgeStatuses: _es,
             activeRefHash: _arh,
             activeRefName: _arn,
             diverged: _d,
@@ -723,15 +717,7 @@ export function createMigrationStatusCommand(): Command {
               refs: statusResult.refs,
               activeRefHash: statusResult.activeRefHash,
               activeRefName: statusResult.activeRefName,
-              edgeStatuses: statusResult.graph
-                ? deriveEdgeStatuses(
-                    statusResult.graph,
-                    statusResult.targetHash,
-                    statusResult.contractHash,
-                    statusResult.markerHash,
-                    statusResult.mode,
-                  )
-                : knownStatuses(statusResult.migrations),
+              edgeStatuses: statusResult.edgeStatuses,
             });
 
             const graphToRender =
