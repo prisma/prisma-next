@@ -43,8 +43,14 @@ describe('bindWhereExpr', () => {
     const bound = bindWhereExpr(contract, expr);
 
     const and = bound as AndExpr;
-    expect((and.exprs[0] as BinaryExpr).right).toMatchObject({ value: 'a@test.com' });
-    expect((and.exprs[1] as BinaryExpr).right).toMatchObject({ value: 'Alice' });
+    const andRight0 = (and.exprs[0] as BinaryExpr).right;
+    const andRight1 = (and.exprs[1] as BinaryExpr).right;
+    expect(andRight0).toBeInstanceOf(ParamRef);
+    expect(andRight1).toBeInstanceOf(ParamRef);
+    expect([(andRight0 as ParamRef).value, (andRight1 as ParamRef).value]).toEqual([
+      'a@test.com',
+      'Alice',
+    ]);
   });
 
   it('binds OR expressions recursively', () => {
@@ -55,6 +61,15 @@ describe('bindWhereExpr', () => {
     const bound = bindWhereExpr(contract, expr);
 
     expect(bound).toBeInstanceOf(OrExpr);
+    const or = bound as OrExpr;
+    const orRight0 = (or.exprs[0] as BinaryExpr).right;
+    const orRight1 = (or.exprs[1] as BinaryExpr).right;
+    expect(orRight0).toBeInstanceOf(ParamRef);
+    expect(orRight1).toBeInstanceOf(ParamRef);
+    expect([(orRight0 as ParamRef).value, (orRight1 as ParamRef).value]).toEqual([
+      'a@test.com',
+      'b@test.com',
+    ]);
   });
 
   it('binds EXISTS subquery expressions', () => {
@@ -105,10 +120,8 @@ describe('bindWhereExpr', () => {
     const binary = bound as BinaryExpr;
     expect(binary.right).toBeInstanceOf(ListLiteralExpr);
     const list = binary.right as ListLiteralExpr;
-    expect(list.values[0]).toBeInstanceOf(ParamRef);
-    expect((list.values[0] as ParamRef).value).toBe(1);
-    expect(list.values[1]).toBeInstanceOf(ParamRef);
-    expect((list.values[1] as ParamRef).value).toBe(2);
+    expect(list.values).toMatchObject([expect.any(ParamRef), expect.any(ParamRef)]);
+    expect(list.values).toMatchObject([{ value: 1 }, { value: 2 }]);
   });
 
   it('preserves ParamRef on the right side without rebinding', () => {
@@ -204,9 +217,7 @@ describe('bindWhereExpr', () => {
 
     const binary = bound as BinaryExpr;
     const list = binary.right as ListLiteralExpr;
-    expect(list.values[0]).toBeInstanceOf(ParamRef);
-    expect((list.values[0] as ParamRef).value).toBe(99);
-    expect(list.values[1]).toBeInstanceOf(ParamRef);
-    expect((list.values[1] as ParamRef).value).toBe(42);
+    expect(list.values).toMatchObject([expect.any(ParamRef), expect.any(ParamRef)]);
+    expect(list.values).toMatchObject([{ value: 99 }, { value: 42 }]);
   });
 });
