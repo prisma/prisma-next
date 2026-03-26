@@ -239,7 +239,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     ) {
       const latencyMs = result.latencyMs;
       if (latencyMs > maxLatencyMs) {
-        const shouldBlock = latencySeverity === 'error' || ctx.mode === 'strict';
+        const shouldBlock = latencySeverity === 'error' && ctx.mode === 'strict';
         emitBudgetViolation(
           budgetError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
             latencyMs,
