@@ -118,7 +118,7 @@ for await (const row of runtime.execute(plan)) {
 
 ### Plugins
 
-- `budgets` - Re-exported from `@prisma-next/runtime-executor` (target-neutral)
+- `budgets` - **AST-first budget plugin** (canonical in SQL domain), inspects `plan.ast` when present for row estimation
 - `lints` - **AST-first lint plugin** (canonical in SQL domain), inspects `plan.ast` when present
 - `BudgetsOptions`, `LintsOptions` - Plugin option types
 - `Plugin`, `PluginContext` - Plugin interface types (from runtime-executor)

@@ -93,8 +93,7 @@ function formatReadMoreLine(options: {
   readonly useColor: boolean;
   readonly formatDimText: (text: string) => string;
 }): string {
-  const labelPadded =
-    'Read more' + ' '.repeat(Math.max(0, options.maxLabelWidth - 'Read more'.length));
+  const labelPadded = `Read more${' '.repeat(Math.max(0, options.maxLabelWidth - 'Read more'.length))}`;
   const valueColored = options.useColor ? blue(options.url) : options.url;
   return `${options.formatDimText('│')} ${labelPadded}  ${valueColored}`;
 }
