@@ -474,8 +474,10 @@ async function executeMigrationStatusCommand(
     }
   }
 
-  // Contract diagnostic — fires when no migration produces the current contract hash.
-  if (contractHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(contractHash)) {
+  // Contract diagnostic — fires when no migration produces the current contract hash
+  // and we have a resolved target. When the graph is diverged (targetHash undefined),
+  // the MIGRATION.DIVERGED diagnostic already tells the user to select a target first.
+  if (targetHash && contractHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(contractHash)) {
     diagnostics.push({
       code: 'CONTRACT.AHEAD',
       severity: 'warn',
@@ -794,7 +796,6 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
   const lines: string[] = [];
 
   const hasUnknown = result.migrations.some((e) => e.status === 'unknown');
-  const hasUnreachable = result.migrations.some((e) => e.status === 'unreachable');
   const pendingCount = result.migrations.filter((e) => e.status === 'pending').length;
 
   const hasWarnings = result.diagnostics?.some((d) => d.severity === 'warn') ?? false;
@@ -802,7 +803,7 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
   if (result.mode === 'online') {
     if (hasUnknown || hasWarnings) {
       lines.push(`${c(yellow, '⚠')} ${result.summary}`);
-    } else if (pendingCount === 0 && !hasUnreachable) {
+    } else if (pendingCount === 0) {
       lines.push(`${c(green, '✔')} ${result.summary}`);
     } else {
       lines.push(`${c(yellow, '⧗')} ${result.summary}`);
