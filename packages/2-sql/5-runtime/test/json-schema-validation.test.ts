@@ -364,8 +364,7 @@ describe('JSON Schema encoding validation', () => {
       source: 'dsl',
     };
 
-    const plan = createTestPlan();
-    const result = encodeParam(null, descriptor, 0, plan, codecRegistry);
+    const result = encodeParam(null, descriptor, 0, codecRegistry);
     expect(result).toBeNull();
   });
 
@@ -376,8 +375,7 @@ describe('JSON Schema encoding validation', () => {
       source: 'dsl',
     };
 
-    const plan = createTestPlan();
-    const result = encodeParam({ age: 30 }, descriptor, 0, plan, codecRegistry);
+    const result = encodeParam({ age: 30 }, descriptor, 0, codecRegistry);
     expect(result).toBe('{"age":30}');
   });
 });

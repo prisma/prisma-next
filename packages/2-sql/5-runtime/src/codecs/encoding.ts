@@ -3,19 +3,8 @@ import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast'
 
 function resolveParamCodec(
   paramDescriptor: ParamDescriptor,
-  plan: ExecutionPlan,
   registry: CodecRegistry,
 ): Codec | null {
-  if (paramDescriptor.name) {
-    const planCodecId = plan.meta.annotations?.codecs?.[paramDescriptor.name] as string | undefined;
-    if (planCodecId) {
-      const codec = registry.get(planCodecId);
-      if (codec) {
-        return codec;
-      }
-    }
-  }
-
   if (paramDescriptor.codecId) {
     const codec = registry.get(paramDescriptor.codecId);
     if (codec) {
@@ -30,14 +19,13 @@ export function encodeParam(
   value: unknown,
   paramDescriptor: ParamDescriptor,
   paramIndex: number,
-  plan: ExecutionPlan,
   registry: CodecRegistry,
 ): unknown {
   if (value === null || value === undefined) {
     return null;
   }
 
-  const codec = resolveParamCodec(paramDescriptor, plan, registry);
+  const codec = resolveParamCodec(paramDescriptor, registry);
   if (!codec) {
     return value;
   }
@@ -68,7 +56,7 @@ export function encodeParams(plan: ExecutionPlan, registry: CodecRegistry): read
     const paramDescriptor = plan.meta.paramDescriptors[i];
 
     if (paramDescriptor) {
-      encoded.push(encodeParam(paramValue, paramDescriptor, i, plan, registry));
+      encoded.push(encodeParam(paramValue, paramDescriptor, i, registry));
     } else {
       encoded.push(paramValue);
     }
