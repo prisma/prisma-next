@@ -75,7 +75,7 @@ Replace the existing `formatMigrationStatusOutput` pipeline with the new rendere
 - [x] Wire applied/pending/diverged status icons (`✓`/`⧗`/`✗`) and `colorHint` edge coloring via mapper
 - [x] Implement `formatLegend` — always shows all three statuses (`✓ applied  ⧗ pending  ✗ diverged`) right after the graph
 - [x] Add summary line and diagnostics after the legend
-- [x] Implement contract diagnostic: "No migration exists for the current contract" / "Contract has changed since the last migration was planned" — fires regardless of ref
+- [x] Implement contract diagnostic: fires when contract hash is not in the graph (no planned migration produces it). Does not fire when `--ref` points elsewhere but a migration for the contract exists
 - [x] Implement diverged graph diagnostic: "There are multiple valid migration paths — you must select a target"
 - [x] Replace `findLeaf` with contract-hash-first target resolution (contract hash → single leaf fallback → diverged full graph)
 - [x] Add `--limit N` and `--all` flags to CLI (default limit 10)
@@ -90,6 +90,10 @@ Replace the existing `formatMigrationStatusOutput` pipeline with the new rendere
 - [x] Move shared test graphs from `scratchpad-graphs.ts` to `test/utils/formatters/test-graphs.ts`
 - [x] Delete all scratchpad files (`scratchpad.ts`, `scratchpad-dagre.ts`, `scratchpad-edge-centric.ts`)
 - [x] Delete `render-fixture.ts` — fixture testing done through CLI directly with switched migration dirs
+- [x] Add `dagreOptions` to `GraphRenderOptions` for caller-controlled dagre layout params
+- [x] Add `isLinearGraph()` — detect single-chain graphs, pass `ranksep: 1` for compact linear output
+- [x] Delete `graph-layout.ts` and dead types (`BranchTree`, `LayoutNode`, `LayoutEdge`, `GraphLayout`)
+- [x] Fix `CONTRACT.AHEAD` diagnostic: only fire when contract hash is not in graph (not when `--ref` differs)
 
 **Remaining (deferred):**
 
@@ -123,6 +127,7 @@ Files removed during development:
 - `cli/src/utils/formatters/render-elements.ts` — `RenderEl` tree (unused)
 - `cli/src/utils/formatters/graph-renderers.ts` — renderer registry
 - `cli/src/utils/formatters/graph-renderer-types.ts` — `GraphRenderer` interface (moved into `graph-render.ts`)
+- `cli/src/utils/formatters/graph-layout.ts` — pre-Dagre hand-rolled layout engine (dead code)
 
 ## Test Coverage
 

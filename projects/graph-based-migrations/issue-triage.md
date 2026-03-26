@@ -181,6 +181,31 @@ These are also architecture violations: adapters/targets/extensions should not d
 
 ---
 
+## `deriveEdgeStatuses` uses graph path instead of ledger for applied status
+
+**Discovered:** 2026-03-26 | **Severity:** high | **Type:** bug — incorrect status display
+
+**Observed:** After running `db update` (which pushes the contract to the DB and writes the marker, but does not write ledger entries), `migration status` shows all edges from root to the marker as `✓ applied` even though no migrations were actually executed.
+
+**Root cause:** `deriveEdgeStatuses` computes applied edges via `findPath(root → markerHash)` — a structural graph query. It assumes every edge on the path to the marker was applied via `migration apply`. The marker only says "the DB schema is at this hash"; the *ledger* records which migrations were actually run. After `db update`, the marker moves but the ledger is empty (or unchanged), so the assumption is wrong.
+
+**Core issue:** There is no `readLedger()` API on `ControlClient`. The CLI can read the marker (`readMarker()`) but has no way to read the list of actually-applied migrations from the ledger table.
+
+**Required fix:**
+1. Add `readLedger()` (or equivalent) to `ControlClient` — returns the list of migration IDs recorded in the ledger table.
+2. Pass ledger entries into `deriveEdgeStatuses` and mark only those edges as `applied`.
+3. Edges on the path to the marker that are not in the ledger need distinct treatment (possibly no status, or a new status indicating the DB is at this state but not via `migration apply`).
+
+**Scope:** Control plane + CLI. Not a graph renderer issue.
+
+**Affected code:**
+- `cli/src/commands/migration-status.ts` — `deriveEdgeStatuses`
+- `cli/src/control-api/client.ts` — needs `readLedger()` method
+- `cli/src/control-api/types.ts` — `ControlClient` interface
+- Underlying family/target control plane — needs to expose ledger reads
+
+---
+
 ## `lint:deps` does not validate `package.json` dependency declarations against architecture rules
 
 **Discovered:** 2026-03-25 | **Severity:** medium | **Type:** tooling gap

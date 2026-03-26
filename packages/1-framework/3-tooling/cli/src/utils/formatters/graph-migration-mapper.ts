@@ -93,9 +93,14 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
 
   // Detached contract node (not in graph)
   if (contractHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(contractHash)) {
+    const detachedMarkers: NodeMarker[] = [];
+    if (mode === 'online' && markerHash === contractHash) {
+      detachedMarkers.push({ kind: 'db' });
+    }
+    detachedMarkers.push({ kind: 'contract', planned: false });
     nodeList.push({
       id: shortHash(contractHash),
-      markers: [{ kind: 'contract', planned: false }],
+      markers: detachedMarkers,
       style: 'detached',
     });
   }

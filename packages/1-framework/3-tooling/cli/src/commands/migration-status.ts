@@ -509,6 +509,53 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  // Marker exists but is not in the migration graph and doesn't match the
+  // contract hash. The DB is at an unknown state relative to the graph.
+  // Bail out early with a clear diagnostic instead of rendering a confusing
+  // graph with no statuses.
+  //
+  // When marker === contract (both off-graph), the DB matches the current
+  // contract — proceed normally; the detached contract node will carry both
+  // the db and contract markers.
+  if (
+    mode === 'online' &&
+    markerHash !== undefined &&
+    !graph.nodes.has(markerHash) &&
+    markerHash !== contractHash
+  ) {
+    const hints: string[] = [];
+    if (graph.nodes.has(contractHash)) {
+      hints.push(
+        "Run 'prisma-next db sign' to overwrite the marker if the database already matches the contract",
+        "Run 'prisma-next contract infer' to make your contract match the database",
+        "Run 'prisma-next db verify' to inspect the database state",
+      );
+    } else {
+      hints.push(
+        "Run 'prisma-next contract infer' to make your contract match the database",
+        "Run 'prisma-next db verify' to inspect the database state",
+      );
+    }
+    diagnostics.push({
+      code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
+      severity: 'warn',
+      message:
+        'Database was updated outside the migration system (marker does not match any migration)',
+      hints,
+    });
+    return ok({
+      ok: true,
+      mode,
+      migrations: [],
+      targetHash: EMPTY_CONTRACT_HASH,
+      contractHash,
+      summary: `${attested.length} migration(s) on disk`,
+      diagnostics,
+      markerHash,
+      ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
+    });
+  }
+
   if (!targetHash) {
     return ok({
       ok: true,
@@ -539,12 +586,22 @@ async function executeMigrationStatusCommand(
 
   const entries = buildMigrationEntries(chain, attested, mode, markerHash);
 
-  const markerInGraph = markerHash === undefined || graph.nodes.has(markerHash);
+  // Marker is "accounted for" if it's in the graph, or if it matches the
+  // contract (shown on the detached contract node). The early return above
+  // handles the case where the marker is truly unknown.
+  const markerAccountedFor =
+    markerHash === undefined || graph.nodes.has(markerHash) || markerHash === contractHash;
 
   let summary: string;
   if (mode === 'online') {
-    if (!markerInGraph) {
-      summary = `Database marker does not match any migration — was the database managed with 'db update'?`;
+    if (!markerAccountedFor) {
+      summary = 'Database marker does not match any migration';
+    } else if (
+      markerHash !== undefined &&
+      !graph.nodes.has(markerHash) &&
+      markerHash === contractHash
+    ) {
+      summary = 'Database matches the current contract — run migration plan to create a migration';
     } else if (activeRefHash && markerHash !== undefined) {
       summary = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
     } else {
@@ -564,35 +621,26 @@ async function executeMigrationStatusCommand(
 
   if (mode === 'online') {
     const pendingCount = entries.filter((e) => e.status === 'pending').length;
-    if (!markerInGraph) {
-      // Tailor guidance based on where the contract sits relative to the graph:
-      // - marker == contract: DB was managed with db update, just need to plan a migration.
-      // - contract is in the graph: migrations exist for the contract, DB drifted.
-      //   Suggest db sign if they want to force-align, or db verify to inspect.
-      // - neither: both DB and contract are outside the graph, needs investigation.
-      const hints: string[] = [];
-      if (markerHash === contractHash) {
-        hints.push(
-          'The contract matches the database marker but no migration exists for this contract',
-          "Run 'prisma-next migration plan' to generate a migration for the current contract",
-        );
-      } else if (graph.nodes.has(contractHash)) {
-        hints.push(
-          'The database marker is not in the migration graph, but migrations exist for the current contract',
-          "Run 'prisma-next db sign' to overwrite the marker if the database already matches the contract",
-          "Run 'prisma-next db verify' to inspect the database state",
-        );
-      } else {
-        hints.push(
-          'Neither the database marker nor the contract appear in the migration graph',
-          "Run 'prisma-next db verify' to inspect the database state",
-        );
-      }
+    if (!markerAccountedFor) {
       diagnostics.push({
-        code: 'MIGRATION.MARKER_DIVERGED',
+        code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
         severity: 'warn',
-        message: 'Database marker does not match any migration in the chain',
-        hints,
+        message: 'Database marker does not match any migration',
+        hints: ["Run 'prisma-next db verify' to inspect the database state"],
+      });
+    } else if (
+      markerHash !== undefined &&
+      !graph.nodes.has(markerHash) &&
+      markerHash === contractHash
+    ) {
+      diagnostics.push({
+        code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
+        severity: 'info',
+        message:
+          'Database matches the current contract but was updated directly (not via migration apply)',
+        hints: [
+          "Run 'prisma-next migration plan' to generate a migration for the current contract",
+        ],
       });
     } else if (pendingCount > 0) {
       diagnostics.push({
@@ -750,8 +798,10 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
   const hasDiverged = result.migrations.some((e) => e.status === 'diverged');
   const pendingCount = result.migrations.filter((e) => e.status === 'pending').length;
 
+  const hasWarnings = result.diagnostics?.some((d) => d.severity === 'warn') ?? false;
+
   if (result.mode === 'online') {
-    if (hasUnknown) {
+    if (hasUnknown || hasWarnings) {
       lines.push(`${c(yellow, '⚠')} ${result.summary}`);
     } else if (pendingCount === 0 && !hasDiverged) {
       lines.push(`${c(green, '✔')} ${result.summary}`);

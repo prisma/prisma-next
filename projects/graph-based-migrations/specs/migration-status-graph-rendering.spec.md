@@ -121,11 +121,12 @@ The detached node aligns with the bottom-most node in the rendered graph.
 
 ## Contract Diagnostic
 
-When the contract hash doesn't match the target, a `CONTRACT.AHEAD` diagnostic is emitted:
-- **No migration exists for the contract**: "No migration exists for the current contract"
-- **Contract has changed since last plan**: "Contract has changed since the last migration was planned"
+A `CONTRACT.AHEAD` diagnostic is emitted when the contract hash is not a node in the migration graph — meaning no migration has been planned that produces the current contract state.
 
-This fires regardless of whether a ref is active — the user should always know when the contract is ahead.
+- **No migrations at all**: "No migration exists for the current contract" (fires when `attested.length === 0`)
+- **Migrations exist but none produce the contract**: "Contract has changed since the last migration was planned"
+
+This does **not** fire when a migration for the contract exists but the target (e.g. a `--ref`) points elsewhere — that's a different branch, not a stale contract.
 
 # Renderer Architecture
 
@@ -176,6 +177,12 @@ interface GraphRenderOptions {
   readonly rootId?: string;
   readonly colorize?: boolean;
   readonly limit?: number;
+  readonly dagreOptions?: {
+    readonly ranksep?: number;
+    readonly nodesep?: number;
+    readonly marginx?: number;
+    readonly marginy?: number;
+  };
 }
 ```
 
@@ -284,7 +291,7 @@ MigrationStatusResult (from executeMigrationStatusCommand)
 
 16. **Legend**: Always shows all three statuses (`✓ applied  ⧗ pending  ✗ diverged`) right after the graph in online mode.
 
-17. **Diagnostics**: Contract-ahead diagnostic fires when the contract doesn't match the target, regardless of ref. Marker-not-in-graph diagnostic fires when DB was managed externally.
+17. **Diagnostics**: Contract-ahead diagnostic fires when the contract hash is not in the graph (no planned migration produces it). Marker-not-in-graph diagnostic fires when DB was managed externally.
 
 ## Non-Functional Requirements
 
@@ -340,9 +347,9 @@ MigrationStatusResult (from executeMigrationStatusCommand)
 - [ ] Legend always shows all three statuses right after the graph
 
 ### Diagnostics
-- [ ] "No migration exists for the current contract" fires when contract has no migration
-- [ ] "Contract has changed since the last migration was planned" fires when contract moved
-- [ ] Both diagnostics fire regardless of whether a ref is active
+- [ ] "No migration exists for the current contract" fires when no migrations exist and contract is non-empty
+- [ ] "Contract has changed since the last migration was planned" fires when migrations exist but contract hash is not in the graph
+- [ ] Neither contract diagnostic fires when a migration for the contract exists (even if `--ref` points elsewhere)
 - [ ] "There are multiple valid migration paths" fires for divergent graph with no default target
 - [ ] Marker-not-in-graph diagnostic fires when DB marker is not in the migration graph
 
@@ -447,7 +454,7 @@ No analytics events — CLI command, no telemetry.
 
 18. **`colorHint` for domain-agnostic edge coloring**: The renderer applies `colorHint` in preference to role-based coloring (spine/branch/backward).
 
-19. **Contract diagnostic always fires**: The `CONTRACT.AHEAD` diagnostic fires whenever the contract doesn't match the target, regardless of whether a ref is active.
+19. **Contract diagnostic fires when contract is not in graph**: The `CONTRACT.AHEAD` diagnostic fires when the contract hash is not a node in the migration graph (no planned migration produces it). It does not fire when a migration for the contract exists but the target points elsewhere (e.g. `--ref` on a different branch).
 
 20. **Detached node alignment**: Detached contract nodes align with the bottom-most node in the rendered graph, not the spine target.
 
