@@ -30,12 +30,12 @@ import { resolveColumnRef } from './transform-validate';
 
 function resolveParamOptions(
   ctx: TransformContext,
-  refs?: { table: string; column: string },
+  refs: { table: string; column: string },
 ): { codecId: string } {
-  const colDef = refs ? ctx.contract.storage.tables[refs.table]?.columns[refs.column] : undefined;
+  const colDef = ctx.contract.storage.tables[refs.table]?.columns[refs.column];
   if (!colDef?.codecId) {
     throw new KyselyTransformError(
-      `Cannot resolve codecId for parameter${refs ? ` (${refs.table}.${refs.column})` : ''}`,
+      `Cannot resolve codecId for parameter (${refs.table}.${refs.column})`,
       KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
       { nodeKind: 'value' },
     );
@@ -46,7 +46,7 @@ function resolveParamOptions(
 export function transformValue(
   node: unknown,
   ctx: TransformContext,
-  refs?: { table: string; column: string },
+  refs: { table: string; column: string },
 ): ParamRef | LiteralExpr {
   const options = resolveParamOptions(ctx, refs);
 
