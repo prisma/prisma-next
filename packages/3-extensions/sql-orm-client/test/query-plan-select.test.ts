@@ -56,10 +56,12 @@ function expectSelectAst(ast: unknown): asserts ast is SelectAst {
 }
 
 function expectSubqueryExpr(expr: unknown): asserts expr is SubqueryExpr {
+  expect(expr).toBeDefined();
   expect((expr as { kind: string }).kind).toBe('subquery');
 }
 
 function expectDerivedTableSource(source: unknown): asserts source is DerivedTableSource {
+  expect(source).toBeDefined();
   expect((source as { kind: string }).kind).toBe('derived-table-source');
 }
 

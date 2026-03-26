@@ -54,28 +54,32 @@ describe('rich SQL AST', () => {
     const literal = LiteralExpr.of('alice');
     const binary = BinaryExpr.eq(column, param);
 
-    expect(select).toBeDefined();
-    expect(insert).toBeDefined();
-    expect(update).toBeDefined();
-    expect(del).toBeDefined();
-    expect(column).toBeDefined();
-    expect(SubqueryExpr.of(select)).toBeDefined();
-    expect(lowerEmail(column, param, literal)).toBeDefined();
-    expect(AggregateExpr.sum(column)).toBeDefined();
-    expect(JsonObjectExpr.fromEntries([JsonObjectExpr.entry('id', column)])).toBeDefined();
-    expect(JsonArrayAggExpr.of(column)).toBeDefined();
-    expect(binary).toBeDefined();
-    expect(AndExpr.of([binary])).toBeDefined();
-    expect(OrExpr.of([binary])).toBeDefined();
-    expect(ExistsExpr.exists(select)).toBeDefined();
-    expect(NullCheckExpr.isNull(column)).toBeDefined();
-    expect(EqColJoinOn.of(column, ColumnRef.of('post', 'userId'))).toBeDefined();
-    expect(JoinAst.left(TableSource.named('post'), binary)).toBeDefined();
-    expect(ProjectionItem.of('id', column)).toBeDefined();
-    expect(OrderByItem.asc(column)).toBeDefined();
-    expect(InsertOnConflict.on([column]).action).toBeDefined();
-    expect(InsertOnConflict.on([column]).doUpdateSet({ id: param }).action).toBeDefined();
-    expect(new DefaultValueExpr()).toBeDefined();
+    expect(select.kind).toBe('select');
+    expect(insert.kind).toBe('insert');
+    expect(update.kind).toBe('update');
+    expect(del.kind).toBe('delete');
+    expect(column.kind).toBe('column-ref');
+    expect(SubqueryExpr.of(select).kind).toBe('subquery');
+    expect(lowerEmail(column, param, literal).kind).toBe('operation');
+    expect(AggregateExpr.sum(column).kind).toBe('aggregate');
+    expect(JsonObjectExpr.fromEntries([JsonObjectExpr.entry('id', column)]).kind).toBe(
+      'json-object',
+    );
+    expect(JsonArrayAggExpr.of(column).kind).toBe('json-array-agg');
+    expect(binary.kind).toBe('binary');
+    expect(AndExpr.of([binary]).kind).toBe('and');
+    expect(OrExpr.of([binary]).kind).toBe('or');
+    expect(ExistsExpr.exists(select).kind).toBe('exists');
+    expect(NullCheckExpr.isNull(column).kind).toBe('null-check');
+    expect(EqColJoinOn.of(column, ColumnRef.of('post', 'userId')).kind).toBe('eq-col-join-on');
+    expect(JoinAst.left(TableSource.named('post'), binary).kind).toBe('join');
+    expect(ProjectionItem.of('id', column).kind).toBe('projection-item');
+    expect(OrderByItem.asc(column).kind).toBe('order-by-item');
+    expect(InsertOnConflict.on([column]).action.kind).toBe('do-nothing');
+    expect(InsertOnConflict.on([column]).doUpdateSet({ id: param }).action.kind).toBe(
+      'do-update-set',
+    );
+    expect(new DefaultValueExpr().kind).toBe('default-value');
   });
 
   it('supports fluent immutable query construction', () => {

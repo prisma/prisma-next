@@ -77,6 +77,6 @@ describe('ast/insert', () => {
       .withValues({ id: param(0, 'id') })
       .withOnConflict(InsertOnConflict.on([col('user', 'id')]).doNothing());
 
-    expect(insertAst.onConflict?.action).toBeDefined();
+    expect(insertAst.onConflict?.action?.kind).toBe('do-nothing');
   });
 });
