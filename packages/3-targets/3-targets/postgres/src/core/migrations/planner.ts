@@ -371,7 +371,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     // strategy. The strategy recipe itself is built by a dedicated helper.
     const needsTemporaryDefault = notNull && !hasDefault;
     const temporaryDefault = needsTemporaryDefault
-      ? resolveTemporaryDefaultLiteral(column, codecHooks)
+      ? resolveIdentityValue(column, codecHooks)
       : null;
     const canUseSharedTemporaryDefault =
       needsTemporaryDefault &&
@@ -1133,12 +1133,17 @@ function columnHasNoDefaultCheck(opts: { schema: string; table: string; column: 
 )`;
 }
 
-function resolveTemporaryDefaultLiteral(
+/**
+ * Resolves the identity value (monoid neutral element) as a SQL literal for a column's type.
+ * Checks codec hooks first (extensions can provide type-specific identity values),
+ * then falls back to the built-in map.
+ */
+function resolveIdentityValue(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
 ): string | null {
   if (column.codecId) {
-    const hookDefault = codecHooks.get(column.codecId)?.resolveTemporaryDefaultLiteral?.({
+    const hookDefault = codecHooks.get(column.codecId)?.resolveIdentityValue?.({
       nativeType: column.nativeType,
       codecId: column.codecId,
       ...ifDefined('typeParams', column.typeParams),
@@ -1148,24 +1153,25 @@ function resolveTemporaryDefaultLiteral(
     }
   }
 
-  return buildTypeZeroDefaultLiteral(column.nativeType, column.typeParams);
+  return buildBuiltinIdentityValue(column.nativeType, column.typeParams);
 }
 
 /**
- * Returns a built-in type-appropriate zero-value SQL literal for the given PostgreSQL native type.
- * This is the planner's fallback when no codec hook provides a more specific temporary default.
+ * Returns the built-in identity value (monoid neutral element) as a SQL literal for the given
+ * PostgreSQL native type — e.g. 0 for integers, '' for text, false for booleans.
+ *
+ * This is the planner's fallback when no codec hook provides a type-specific identity value.
  *
  * Returns null for unrecognized types (for example enums and extension-owned types without a
- * hook), which causes
- * the planner to fall back to the empty-table precheck.
+ * hook), which causes the planner to fall back to the empty-table precheck.
  *
  * @internal Exported for testing only.
  */
-export function buildTypeZeroDefaultLiteral(
+export function buildBuiltinIdentityValue(
   nativeType: string,
   typeParams?: Record<string, unknown>,
 ): string | null {
-  const normalizedNativeType = normalizeTemporaryDefaultNativeType(nativeType);
+  const normalizedNativeType = normalizeIdentityValueNativeType(nativeType);
 
   if (normalizedNativeType.endsWith('[]')) {
     return "'{}'";
@@ -1238,7 +1244,7 @@ export function buildTypeZeroDefaultLiteral(
 
     // Bit types
     case 'bit':
-      return buildBitZeroDefaultLiteral(typeParams);
+      return buildBitIdentityValue(typeParams);
     case 'bit varying':
     case 'varbit':
       return "B''";
@@ -1248,11 +1254,11 @@ export function buildTypeZeroDefaultLiteral(
   }
 }
 
-function normalizeTemporaryDefaultNativeType(nativeType: string): string {
+function normalizeIdentityValueNativeType(nativeType: string): string {
   return nativeType.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-function buildBitZeroDefaultLiteral(typeParams?: Record<string, unknown>): string | null {
+function buildBitIdentityValue(typeParams?: Record<string, unknown>): string | null {
   const length = typeParams?.['length'];
   if (length === undefined) {
     return "B'0'";

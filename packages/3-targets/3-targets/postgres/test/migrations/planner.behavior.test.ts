@@ -7,7 +7,7 @@ import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-con
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import {
-  buildTypeZeroDefaultLiteral,
+  buildBuiltinIdentityValue,
   createPostgresMigrationPlanner,
 } from '../../src/core/migrations/planner';
 
@@ -260,7 +260,7 @@ describe('NOT NULL column without default uses temporary default', () => {
       {
         frameworkComponents: [
           createPlannerControlHookComponent('pg/text@1', {
-            resolveTemporaryDefaultLiteral: () => null,
+            resolveIdentityValue: () => null,
           }),
         ],
       },
@@ -413,7 +413,7 @@ describe('NOT NULL column without default uses temporary default', () => {
   });
 });
 
-describe('buildTypeZeroDefaultLiteral (built-in fallback)', () => {
+describe('buildBuiltinIdentityValue (built-in fallback)', () => {
   it.each([
     ['text', undefined, "''"],
     ['character', undefined, "''"],
@@ -454,14 +454,14 @@ describe('buildTypeZeroDefaultLiteral (built-in fallback)', () => {
     ['int4[]', undefined, "'{}'"],
     ['text[]', undefined, "'{}'"],
   ] as const)('returns %s with %j → %s', (nativeType, typeParams, expected) => {
-    expect(buildTypeZeroDefaultLiteral(nativeType, typeParams)).toBe(expected);
+    expect(buildBuiltinIdentityValue(nativeType, typeParams)).toBe(expected);
   });
 
   it('returns null for unknown types (enum, array, extension)', () => {
-    expect(buildTypeZeroDefaultLiteral('my_enum')).toBeNull();
-    expect(buildTypeZeroDefaultLiteral('tsquery')).toBeNull();
-    expect(buildTypeZeroDefaultLiteral('vector')).toBeNull();
-    expect(buildTypeZeroDefaultLiteral('bit', { length: 0 })).toBeNull();
+    expect(buildBuiltinIdentityValue('my_enum')).toBeNull();
+    expect(buildBuiltinIdentityValue('tsquery')).toBeNull();
+    expect(buildBuiltinIdentityValue('vector')).toBeNull();
+    expect(buildBuiltinIdentityValue('bit', { length: 0 })).toBeNull();
   });
 });
 

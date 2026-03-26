@@ -165,10 +165,13 @@ export interface ExpandNativeTypeInput {
 }
 
 /**
- * Input for resolving a temporary SQL literal used to backfill existing rows when
+ * Input for resolving an identity-value SQL literal used to backfill existing rows when
  * adding a NOT NULL column without an explicit default.
+ *
+ * "Identity value" in the algebraic (monoid) sense: the neutral element for the type
+ * (0 for numbers, '' for strings, false for booleans, etc.).
  */
-export interface ResolveTemporaryDefaultLiteralInput {
+export interface ResolveIdentityValueInput {
   readonly nativeType: string;
   readonly codecId?: string;
   readonly typeParams?: Record<string, unknown>;
@@ -205,17 +208,15 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    */
   expandNativeType?: (input: ExpandNativeTypeInput) => string;
   /**
-   * Resolves a temporary SQL literal for safely adding a NOT NULL column without an explicit
-   * default to a non-empty table.
+   * Resolves the identity value (monoid neutral element) as a SQL literal for safely adding
+   * a NOT NULL column without an explicit default to a non-empty table.
    *
    * Return semantics:
    * - string: use this literal
-   * - null: explicitly no safe temporary default is known; fall back to another strategy
+   * - null: explicitly no safe identity value is known; fall back to another strategy
    * - undefined: no opinion; planner may use built-in fallbacks
    */
-  resolveTemporaryDefaultLiteral?: (
-    input: ResolveTemporaryDefaultLiteralInput,
-  ) => string | null | undefined;
+  resolveIdentityValue?: (input: ResolveIdentityValueInput) => string | null | undefined;
 }
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
