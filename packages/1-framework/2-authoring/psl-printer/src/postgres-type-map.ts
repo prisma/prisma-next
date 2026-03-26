@@ -101,14 +101,8 @@ function getOwnRecordValue<T>(map: Record<string, T>, key: string): T | undefine
   return Object.hasOwn(map, key) ? map[key] : undefined;
 }
 
-function createNativeTypeAttribute(
-  name: string,
-  args?: readonly string[],
-): PslNativeTypeAttribute | undefined {
-  if (!args || args.length === 0) {
-    return { name };
-  }
-  return { name, args };
+function createNativeTypeAttribute(name: string, args?: readonly string[]): PslNativeTypeAttribute {
+  return args && args.length > 0 ? { name, args } : { name };
 }
 
 function splitTypeParameterList(params: string): readonly string[] {
@@ -137,15 +131,14 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
         const [, baseType = nativeType, params = ''] = paramMatch;
         const template = getOwnRecordValue(PARAMETERIZED_NATIVE_TYPES, baseType);
         if (template) {
-          const nativeTypeAttribute = createNativeTypeAttribute(
-            template.attributeName,
-            splitTypeParameterList(params),
-          );
           return {
             pslType: template.pslType,
             nativeType,
             typeParams: { baseType, params },
-            ...(nativeTypeAttribute ? { nativeTypeAttribute } : {}),
+            nativeTypeAttribute: createNativeTypeAttribute(
+              template.attributeName,
+              splitTypeParameterList(params),
+            ),
           };
         }
       }
@@ -153,11 +146,10 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
       // Non-parameterized native types that still need explicit preservation.
       const preservedType = getOwnRecordValue(PRESERVED_NATIVE_TYPES, nativeType);
       if (preservedType) {
-        const nativeTypeAttribute = createNativeTypeAttribute(preservedType.attributeName);
         return {
           pslType: preservedType.pslType,
           nativeType,
-          ...(nativeTypeAttribute ? { nativeTypeAttribute } : {}),
+          nativeTypeAttribute: createNativeTypeAttribute(preservedType.attributeName),
         };
       }
 
