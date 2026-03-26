@@ -105,7 +105,10 @@ function isToWhereExprInput(value: unknown): value is ToWhereExpr {
 }
 
 function isWhereDirectInput(value: unknown): value is WhereDirectInput {
-  return isWhereExpr(value) || isToWhereExprInput(value);
+  return (
+    (isWhereExpr(value) && typeof (value as { accept?: unknown }).accept === 'function') ||
+    isToWhereExprInput(value)
+  );
 }
 
 export class Collection<
