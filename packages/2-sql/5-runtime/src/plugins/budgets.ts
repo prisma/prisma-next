@@ -127,9 +127,9 @@ function estimateRowsFromAst(
   tableRows: Record<string, number>,
   defaultTableRows: number,
   refs: { tables?: readonly string[] } | undefined,
-  hasAggregateWithoutGroup?: boolean,
+  hasAggregateWithoutGroup: boolean,
 ): number | null {
-  if (hasAggregateWithoutGroup ?? hasAggregateWithoutGroupBy(ast)) {
+  if (hasAggregateWithoutGroup) {
     return 1;
   }
 
@@ -241,20 +241,15 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     ) {
       const latencyMs = result.latencyMs;
       if (latencyMs > maxLatencyMs) {
-        const error = budgetError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
-          latencyMs,
-          maxLatencyMs,
-        });
-
         const shouldBlock = latencySeverity === 'error' && ctx.mode === 'strict';
-        if (shouldBlock) {
-          throw error;
-        }
-        ctx.log.warn({
-          code: error.code,
-          message: error.message,
-          details: error.details,
-        });
+        emitBudgetViolation(
+          budgetError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
+            latencyMs,
+            maxLatencyMs,
+          }),
+          shouldBlock,
+          ctx as PluginContext<unknown, unknown, unknown>,
+        );
       }
     },
   });
