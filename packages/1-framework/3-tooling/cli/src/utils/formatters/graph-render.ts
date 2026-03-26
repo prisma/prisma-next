@@ -95,7 +95,7 @@ interface GraphColors {
   backward: ColorFn;
   applied: ColorFn;
   pending: ColorFn;
-  diverged: ColorFn;
+  unreachable: ColorFn;
   node: ColorFn;
   label: ColorFn;
   marker: ColorFn;
@@ -115,7 +115,7 @@ function buildColors(colorize: boolean): GraphColors {
     backward: c(magenta),
     applied: c(cyan),
     pending: c(yellow),
-    diverged: c(magenta),
+    unreachable: c(magenta),
     node: c(cyan),
     label: c(dim),
     marker: c(bold),
@@ -127,7 +127,7 @@ function buildColors(colorize: boolean): GraphColors {
 function resolveHintColor(hint: GraphEdge['colorHint'], colors: GraphColors): ColorFn | undefined {
   if (hint === 'applied') return colors.applied;
   if (hint === 'pending') return colors.pending;
-  if (hint === 'diverged') return colors.diverged;
+  if (hint === 'unreachable') return colors.unreachable;
   return undefined;
 }
 

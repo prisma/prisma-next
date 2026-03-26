@@ -2,7 +2,7 @@
 
 ## Summary
 
-Redesign `migration status` to answer "what would `migration apply` do?" by default (relevant subgraph view), with `--graph` for the full migration graph. The renderer uses Dagre for layout, CVD-safe colors, icon-only status with three states (applied/pending/diverged), truncation with marker-aware expansion, and user-friendly language (no graph jargon in output).
+Redesign `migration status` to answer "what would `migration apply` do?" by default (relevant subgraph view), with `--graph` for the full migration graph. The renderer uses Dagre for layout, CVD-safe colors, icon-only status with three states (applied/pending/unreachable), truncation with marker-aware expansion, and user-friendly language (no graph jargon in output).
 
 **Spec:** `projects/graph-based-migrations/specs/migration-status-graph-rendering.spec.md`
 
@@ -25,7 +25,7 @@ Define the `GraphRenderer` interface and implement the Dagre-based renderer. No 
 - [x] Define `GraphRenderer` interface in `cli/src/utils/formatters/graph-render.ts` — single `render(graph, options)` method
 - [x] Implement Dagre layout + ASCII render pipeline, implementing `GraphRenderer`
 - [x] Structure internals as composable functions: `layoutAndRender()`, `extractSubgraph()`, `extractRelevantSubgraph()`
-- [x] Apply CVD-safe color palette (cyan=applied, yellow=pending, magenta=diverged/rollback, bold white=markers, dim=branches)
+- [x] Apply CVD-safe color palette (cyan=applied, yellow=pending, magenta=unreachable/rollback, bold white=markers, dim=branches)
 - [x] Implement marker rendering: `◆ db`, `◆ contract`, ref names inline on node rows
 - [x] Implement icon-only status on edges (`✓`/`⧗`/`✗`), no words
 - [x] Implement detached contract node with dashed connector (`┊` → `◇`) aligned to bottom-most node
@@ -61,7 +61,7 @@ Add truncation logic for long graphs. Both views support `--limit` / `--all` tru
 
 Replace the existing `formatMigrationStatusOutput` pipeline with the new renderer. Wire edge status derivation, relevant path computation, and diagnostics. Add `--graph` flag.
 
-**Deliverable:** `migration status` uses the new renderer. `--graph` shows full graph. Default shows relevant subgraph (multi-path union). Three-state edge status (applied/pending/diverged). Legend and diagnostics.
+**Deliverable:** `migration status` uses the new renderer. `--graph` shows full graph. Default shows relevant subgraph (multi-path union). Three-state edge status (applied/pending/unreachable). Legend and diagnostics.
 
 **Tasks:**
 
@@ -71,12 +71,12 @@ Replace the existing `formatMigrationStatusOutput` pipeline with the new rendere
 - [x] Unify renderer API: single `render(graph, options)` method; caller controls filtering via `extractRelevantSubgraph` (default) or full graph (`--graph`)
 - [x] Implement `extractRelevantSubgraph(graph, paths)` — union of multiple paths into a subgraph
 - [x] Refactor `executeMigrationStatusCommand`: default view extracts relevant subgraph, `--graph` passes full graph; both use `graphRenderer.render()`
-- [x] Implement `deriveEdgeStatuses`: applied (root→marker), pending (marker→target, target→contract), diverged (root→target minus applied/pending), empty DB (root as effective marker)
-- [x] Wire applied/pending/diverged status icons (`✓`/`⧗`/`✗`) and `colorHint` edge coloring via mapper
-- [x] Implement `formatLegend` — always shows all three statuses (`✓ applied  ⧗ pending  ✗ diverged`) right after the graph
+- [x] Implement `deriveEdgeStatuses`: applied (root→marker), pending (marker→target, target→contract), unreachable (root→target minus applied/pending), empty DB (root as effective marker)
+- [x] Wire applied/pending/unreachable status icons (`✓`/`⧗`/`✗`) and `colorHint` edge coloring via mapper
+- [x] Implement `formatLegend` — always shows all three statuses (`✓ applied  ⧗ pending  ✗ unreachable`) right after the graph
 - [x] Add summary line and diagnostics after the legend
 - [x] Implement contract diagnostic: fires when contract hash is not in the graph (no planned migration produces it). Does not fire when `--ref` points elsewhere but a migration for the contract exists
-- [x] Implement diverged graph diagnostic: "There are multiple valid migration paths — you must select a target"
+- [x] Implement diverged-graph diagnostic: "There are multiple valid migration paths — you must select a target"
 - [x] Replace `findLeaf` with contract-hash-first target resolution (contract hash → single leaf fallback → diverged full graph)
 - [x] Add `--limit N` and `--all` flags to CLI (default limit 10)
 - [x] Update `--json` output to strip internal fields before serialization
@@ -144,7 +144,7 @@ Files removed during development:
 | Rollback cycle visually distinct | Snapshot | M1 | ✅ |
 | Deterministic output | Unit | M1 | ✅ |
 | Icons only (`✓`/`⧗`/`✗`) | Snapshot | M1, M3 | ✅ |
-| Edge status: applied/pending/diverged | Unit | M3 | ✅ |
+| Edge status: applied/pending/unreachable | Unit | M3 | ✅ |
 | Legend always shows all three statuses | Unit + Manual | M3 | ✅ |
 | CVD-safe colors | Snapshot | M1 | ✅ |
 | Shape/icon conveys meaning without color | Snapshot | M1 | ✅ |

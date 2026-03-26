@@ -30,9 +30,9 @@ export interface GraphEdge {
    *
    * - `'applied'` — cyan (CVD-safe: completed/done)
    * - `'pending'` — yellow (CVD-safe: waiting/upcoming)
-   * - `'diverged'` — magenta (CVD-safe: DB on a different branch)
+   * - `'unreachable'` — magenta (CVD-safe: DB on a different branch)
    */
-  readonly colorHint?: 'applied' | 'pending' | 'diverged';
+  readonly colorHint?: 'applied' | 'pending' | 'unreachable';
 }
 
 /**

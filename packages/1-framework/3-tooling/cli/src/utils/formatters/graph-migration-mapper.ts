@@ -15,12 +15,12 @@ import {
   RenderGraph,
 } from './graph-types';
 
-export type EdgeStatusKind = 'applied' | 'pending' | 'diverged';
+export type EdgeStatusKind = 'applied' | 'pending' | 'unreachable';
 
 const STATUS_ICON: Record<EdgeStatusKind, string> = {
   applied: ' ✓',
   pending: ' ⧗',
-  diverged: ' ✗',
+  unreachable: ' ✗',
 };
 
 /** Shorten a contract hash for display: strip sha256: prefix, take 7 chars. */

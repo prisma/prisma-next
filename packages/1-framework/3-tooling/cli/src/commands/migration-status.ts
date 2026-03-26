@@ -101,7 +101,7 @@ export interface MigrationStatusResult {
 }
 
 function hasKnownStatus(entry: MigrationStatusEntry): entry is MigrationStatusEntry & EdgeStatus {
-  return entry.status === 'applied' || entry.status === 'pending' || entry.status === 'diverged';
+  return entry.status === 'applied' || entry.status === 'pending' || entry.status === 'unreachable';
 }
 
 function knownStatuses(migrations: readonly MigrationStatusEntry[]): EdgeStatus[] {
@@ -143,7 +143,7 @@ function summarizeOps(ops: readonly MigrationPlanOperation[]): {
  * - **applied**: edge is on the path from root to the DB marker
  * - **pending**: edge is on the path from the DB marker to the target
  *   (and the marker is reachable from root, i.e. it's on the same branch)
- * - **diverged**: edge is on the path from root to the target but the DB
+ * - **unreachable**: edge is on the path from root to the target but the DB
  *   marker is on a different branch — `apply` can't reach these edges
  *   without the DB first moving to this branch
  *
@@ -207,7 +207,7 @@ function deriveEdgeStatuses(
     }
   }
 
-  // Diverged edges: on the path from root to the target but neither applied
+  // Unreachable edges: on the path from root to the target but neither applied
   // nor pending. This covers two cases:
   //  1. Marker can't reach target at all (different branch entirely)
   //  2. Marker reaches target via a different route, leaving some root→target
@@ -216,7 +216,7 @@ function deriveEdgeStatuses(
   if (targetPath) {
     for (const e of targetPath) {
       if (!assignedKeys.has(edgeKey(e))) {
-        statuses.push({ dirName: e.dirName, status: 'diverged' });
+        statuses.push({ dirName: e.dirName, status: 'unreachable' });
       }
     }
   }
@@ -784,7 +784,7 @@ function formatLegend(colorize: boolean): string {
   const parts = [
     `${c(cyan, '✓')} applied`,
     `${c(yellow, '⧗')} pending`,
-    `${c(magenta, '✗')} diverged`,
+    `${c(magenta, '✗')} unreachable`,
   ];
   return c(dim, parts.join('  '));
 }
@@ -794,7 +794,7 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
   const lines: string[] = [];
 
   const hasUnknown = result.migrations.some((e) => e.status === 'unknown');
-  const hasDiverged = result.migrations.some((e) => e.status === 'diverged');
+  const hasUnreachable = result.migrations.some((e) => e.status === 'unreachable');
   const pendingCount = result.migrations.filter((e) => e.status === 'pending').length;
 
   const hasWarnings = result.diagnostics?.some((d) => d.severity === 'warn') ?? false;
@@ -802,7 +802,7 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
   if (result.mode === 'online') {
     if (hasUnknown || hasWarnings) {
       lines.push(`${c(yellow, '⚠')} ${result.summary}`);
-    } else if (pendingCount === 0 && !hasDiverged) {
+    } else if (pendingCount === 0 && !hasUnreachable) {
       lines.push(`${c(green, '✔')} ${result.summary}`);
     } else {
       lines.push(`${c(yellow, '⧗')} ${result.summary}`);

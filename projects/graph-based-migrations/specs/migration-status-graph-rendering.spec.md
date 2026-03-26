@@ -181,7 +181,7 @@ interface GraphEdge {
   readonly from: string;
   readonly to: string;
   readonly label?: string;
-  readonly colorHint?: 'applied' | 'pending' | 'diverged';
+  readonly colorHint?: 'applied' | 'pending' | 'unreachable';
 }
 
 interface GraphRenderOptions {
@@ -198,7 +198,7 @@ interface GraphRenderOptions {
 }
 ```
 
-`colorHint` is a domain-agnostic visual hint: the renderer maps `'applied'` → cyan, `'pending'` → yellow, `'diverged'` → magenta (overriding the default role-based edge coloring). The renderer has no knowledge of migration status — it just colors by hint.
+`colorHint` is a domain-agnostic visual hint: the renderer maps `'applied'` → cyan, `'pending'` → yellow, `'unreachable'` → magenta (overriding the default role-based edge coloring). The renderer has no knowledge of migration status — it just colors by hint.
 
 ## Migration-specific mapping layer
 
@@ -208,15 +208,15 @@ interface GraphRenderOptions {
 - `mode: 'online' | 'offline'` — whether we have DB connectivity
 - `markerHash?: string` — DB marker position (from ledger)
 - `contractHash: string` — current contract hash
-- `edgeStatuses?: EdgeStatus[]` — per-edge applied/pending/diverged status
+- `edgeStatuses?: EdgeStatus[]` — per-edge applied/pending/unreachable status
 - `refs?, activeRefHash?, activeRefName?` — ref context
 
 The mapper:
 
 1. **Computes relevant paths** with continuity-aware routing: prefers marker→contract and ref→contract over independent root→contract (which BFS may route through an unrelated branch).
 2. **Resolves spine target** (for edge coloring and detached node alignment).
-3. **Bakes status icons into edge labels**: `✓` for applied, `⧗` for pending, `✗` for diverged (from `edgeStatuses`).
-4. **Sets `colorHint`** on edges: applied → cyan, pending → yellow, diverged → magenta.
+3. **Bakes status icons into edge labels**: `✓` for applied, `⧗` for pending, `✗` for unreachable (from `edgeStatuses`).
+4. **Sets `colorHint`** on edges: applied → cyan, pending → yellow, unreachable → magenta.
 5. **Attaches markers** to nodes: DB, contract, refs.
 
 The mapper does not derive edge status itself — it receives pre-computed `edgeStatuses` from the command layer's `deriveEdgeStatuses`.
@@ -245,7 +245,7 @@ MigrationStatusResult (from executeMigrationStatusCommand)
          │
          ▼
   deriveEdgeStatuses(graph, targetHash, contractHash, markerHash, mode)
-    → EdgeStatus[]  (applied/pending/diverged)
+    → EdgeStatus[]  (applied/pending/unreachable)
          │
          ▼
   migrationGraphToRenderInput({
@@ -299,9 +299,9 @@ MigrationStatusResult (from executeMigrationStatusCommand)
 
 14. **Truncation**: Both views truncate long graphs by default (N=10). `--limit N` overrides. `--all` disables. Marker-aware expansion: effective length = `max(limit, distance from earliest relevant marker to target)`.
 
-15. **Edge status**: Applied (`✓` cyan), pending (`⧗` yellow), diverged (`✗` magenta). Derived by `deriveEdgeStatuses` in the command layer. Empty DB treats root as effective marker — all edges to target are pending.
+15. **Edge status**: Applied (`✓` cyan), pending (`⧗` yellow), unreachable (`✗` magenta). Derived by `deriveEdgeStatuses` in the command layer. Empty DB treats root as effective marker — all edges to target are pending.
 
-16. **Legend**: Always shows all three statuses (`✓ applied  ⧗ pending  ✗ diverged`) right after the graph in online mode.
+16. **Legend**: Always shows all three statuses (`✓ applied  ⧗ pending  ✗ unreachable`) right after the graph in online mode.
 
 17. **Diagnostics**: Contract-ahead diagnostic fires when the contract hash is not in the graph (no planned migration produces it). Marker-not-in-graph diagnostic fires when DB was managed externally.
 
@@ -353,7 +353,7 @@ MigrationStatusResult (from executeMigrationStatusCommand)
 - [ ] Long graph truncates to last N nodes from target with subgraph rendering
 
 ### Status labeling
-- [ ] Online mode: applied edges show `✓`, pending edges show `⧗`, diverged edges show `✗`
+- [ ] Online mode: applied edges show `✓`, pending edges show `⧗`, unreachable edges show `✗`
 - [ ] Empty DB (no marker): all edges to target are `⧗` pending
 - [ ] Offline mode: no status icons on any edge
 - [ ] Legend always shows all three statuses right after the graph
@@ -445,7 +445,7 @@ No analytics events — CLI command, no telemetry.
 
 12. **Inline markers**: Markers (`◆ db`, `◆ contract`, ref names) stay inline on the node row.
 
-13. **Icons only for status, no words**: Edge status uses `✓` (applied), `⧗` (pending), `✗` (diverged). Legend at the bottom always shows all three.
+13. **Icons only for status, no words**: Edge status uses `✓` (applied), `⧗` (pending), `✗` (unreachable). Legend at the bottom always shows all three.
 
 14. **CVD-safe color palette**:
 
@@ -454,11 +454,11 @@ No analytics events — CLI command, no telemetry.
 | Applied edge/icon (`✓`) | Cyan | Visible to all CVD types |
 | Pending edge/icon (`⧗`) | Yellow | High contrast on dark bg, CVD-safe |
 | Diverged edge/icon (`✗`) | Magenta | Distinct from cyan/yellow, CVD-safe |
-| Backward/rollback edge | Magenta | Same as diverged — visually distinct |
+| Backward/rollback edge | Magenta | Same as unreachable — visually distinct |
 | DB/Contract markers | Bold/bright white | Stands out without relying on hue |
 | Branch pipes | Dim | Visual structure, not information |
 
-15. **Edge status derivation via `deriveEdgeStatuses`**: A dedicated function in the command layer computes per-edge status using path analysis. It handles: applied (root→marker), pending (marker→target, target→contract), diverged (root→target minus applied/pending), and empty DB (root as effective marker).
+15. **Edge status derivation via `deriveEdgeStatuses`**: A dedicated function in the command layer computes per-edge status using path analysis. It handles: applied (root→marker), pending (marker→target, target→contract), unreachable (root→target minus applied/pending), and empty DB (root as effective marker).
 
 16. **`RenderGraph` as the single graph representation**: Built once at the mapping boundary, passed immutably through the pipeline.
 
