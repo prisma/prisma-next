@@ -475,15 +475,12 @@ async function executeMigrationStatusCommand(
     }
   }
 
-  // Contract diagnostic — emitted once, before any early return.
-  if (contractHash !== EMPTY_CONTRACT_HASH && contractHash !== targetHash) {
-    const hasAnyMigrationForContract = graph.nodes.has(contractHash);
+  // Contract diagnostic — fires when no migration produces the current contract hash.
+  if (contractHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(contractHash)) {
     diagnostics.push({
       code: 'CONTRACT.AHEAD',
       severity: 'warn',
-      message: hasAnyMigrationForContract
-        ? 'Contract has changed since the last migration was planned'
-        : 'No migration exists for the current contract',
+      message: 'Contract has changed since the last migration was planned',
       hints: ["Run 'prisma-next migration plan' to generate a migration for the current contract"],
     });
   }
