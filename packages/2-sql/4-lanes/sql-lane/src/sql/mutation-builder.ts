@@ -33,7 +33,7 @@ import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
 
 function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
-  const collected = ast.collectParamRefs();
+  const collected = [...new Set(ast.collectParamRefs())];
   return {
     paramValues: collected.map((p) => p.value),
     paramDescriptors: collected.map((p) => ({

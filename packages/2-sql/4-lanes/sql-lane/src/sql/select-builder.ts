@@ -54,7 +54,7 @@ function deriveParamsFromAst(ast: {
     codecId: string;
   }>;
 }) {
-  const collected = ast.collectParamRefs();
+  const collected = [...new Set(ast.collectParamRefs())];
   return {
     paramValues: collected.map((p) => p.value),
     paramDescriptors: collected.map((p) => ({

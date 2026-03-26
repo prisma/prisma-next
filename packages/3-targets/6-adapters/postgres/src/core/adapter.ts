@@ -120,8 +120,11 @@ class PostgresAdapterImpl
     const collectedParamRefs = ast.collectParamRefs();
     const paramIndexMap: ParamIndexMap = new Map();
     const params: unknown[] = [];
-    for (const [i, ref] of collectedParamRefs.entries()) {
-      paramIndexMap.set(ref, i + 1);
+    for (const ref of collectedParamRefs) {
+      if (paramIndexMap.has(ref)) {
+        continue;
+      }
+      paramIndexMap.set(ref, params.length + 1);
       params.push(ref.value);
     }
 

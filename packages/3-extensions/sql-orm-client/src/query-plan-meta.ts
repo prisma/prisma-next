@@ -7,7 +7,7 @@ export function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }): {
   params: unknown[];
   paramDescriptors: ParamDescriptor[];
 } {
-  const collectedParams = ast.collectParamRefs();
+  const collectedParams = [...new Set(ast.collectParamRefs())];
   return {
     params: collectedParams.map((p) => p.value),
     paramDescriptors: collectedParams.map((p) => ({
