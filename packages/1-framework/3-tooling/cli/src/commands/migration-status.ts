@@ -15,7 +15,7 @@ import type {
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { cyan, dim, green, magenta, yellow } from 'colorette';
+import { cyan, dim, magenta, yellow } from 'colorette';
 import { Command } from 'commander';
 
 import { loadConfig } from '../config-loader';
@@ -142,8 +142,9 @@ function summarizeOps(ops: readonly MigrationPlanOperation[]): {
  *
  * Returns statuses only for edges that have a known status (skips offline
  * and edges not on any relevant path).
+ *
+ * @internal Exported for testing only.
  */
-/** @internal Exported for testing only. */
 export function deriveEdgeStatuses(
   graph: MigrationGraph,
   targetHash: string,
@@ -678,7 +679,7 @@ export function createMigrationStatusCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--ref <name>', 'Target ref name from migrations/refs.json')
     .option('--graph', 'Show the full migration graph with all branches')
-    .option('--limit <n>', 'Maximum number of migrations to display (default: show all)')
+    .option('--limit <n>', 'Maximum number of migrations to display (default: 10)')
     .option('--all', 'Show full history (disables truncation)')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
@@ -770,7 +771,7 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
     if (hasUnknown || hasWarnings) {
       lines.push(`${c(yellow, '⚠')} ${result.summary}`);
     } else if (pendingCount === 0) {
-      lines.push(`${c(green, '✔')} ${result.summary}`);
+      lines.push(`${c(cyan, '✔')} ${result.summary}`);
     } else {
       lines.push(`${c(yellow, '⧗')} ${result.summary}`);
     }

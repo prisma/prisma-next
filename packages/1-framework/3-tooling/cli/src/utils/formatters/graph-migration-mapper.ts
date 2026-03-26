@@ -161,27 +161,30 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
     addPathFromRoot(activeRefHash);
   }
 
-  // 3. Path to the contract — prefer continuing from marker or ref rather
-  //    than an independent root→contract (which BFS may route through an
-  //    unrelated branch).
+  // 3. Path(s) to the contract — prefer continuing from marker and/or ref
+  //    rather than an independent root→contract (which BFS may route through
+  //    an unrelated branch). When both marker and ref exist, try both paths
+  //    so that the diamond (two branches converging at the contract) is visible.
   if (contractHash !== EMPTY_CONTRACT_HASH) {
-    const from = markerHash ?? activeRefHash;
-    if (from && from !== contractHash) {
-      const reachesContract = findPath(graph, from, contractHash);
-      if (reachesContract) {
-        addPathBetween(from, contractHash);
-      } else if (activeRefHash && activeRefHash !== from) {
-        // Marker couldn't reach contract — try the ref
-        const refReaches = findPath(graph, activeRefHash, contractHash);
-        if (refReaches) {
-          addPathBetween(activeRefHash, contractHash);
-        } else {
-          addPathFromRoot(contractHash);
-        }
-      } else {
-        addPathFromRoot(contractHash);
+    let contractReached = false;
+
+    if (markerHash && markerHash !== contractHash) {
+      const markerReaches = findPath(graph, markerHash, contractHash);
+      if (markerReaches) {
+        addPathBetween(markerHash, contractHash);
+        contractReached = true;
       }
-    } else if (contractHash !== (markerHash ?? activeRefHash)) {
+    }
+
+    if (activeRefHash && activeRefHash !== markerHash && activeRefHash !== contractHash) {
+      const refReaches = findPath(graph, activeRefHash, contractHash);
+      if (refReaches) {
+        addPathBetween(activeRefHash, contractHash);
+        contractReached = true;
+      }
+    }
+
+    if (!contractReached && contractHash !== (markerHash ?? activeRefHash)) {
       addPathFromRoot(contractHash);
     }
   }
