@@ -47,7 +47,7 @@ function expectDerivedTableSource(source: unknown): asserts source is DerivedTab
 }
 
 describe('compileSelectWithIncludeStrategy', () => {
-  it('orders include filter params after top-level params in collectParamRefs', () => {
+  it('collects params in AST traversal order (includes before top-level)', () => {
     const { collection } = createCollection();
     const state = collection
       .where((user) => user.name.eq('Alice'))
