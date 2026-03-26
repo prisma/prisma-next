@@ -1,7 +1,7 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import { mapDefault } from './default-mapping';
 import { toEnumName, toFieldName, toModelName, toNamedTypeName } from './name-transforms';
-import { extractEnumDefinitions, extractEnumTypeNames } from './postgres-type-map';
+import { extractEnumInfo } from './postgres-type-map';
 import { parseRawDefault } from './raw-default-parser';
 import { inferRelations } from './relation-inference';
 import type {
@@ -76,9 +76,10 @@ export function printPsl(schemaIR: PslPrintableSqlSchemaIR, options: PslPrinterO
   const { typeMap, header, defaultMapping } = options;
   const headerComment = header ?? DEFAULT_HEADER;
 
-  // Extract enum info from annotations
-  const enumTypeNames = extractEnumTypeNames(schemaIR.annotations);
-  const enumDefinitions = extractEnumDefinitions(schemaIR.annotations);
+  // Extract enum info from annotations (single traversal)
+  const { typeNames: enumTypeNames, definitions: enumDefinitions } = extractEnumInfo(
+    schemaIR.annotations,
+  );
 
   // Build model name mapping (db table name → PSL model name)
   const modelNames = buildTopLevelNameMap(

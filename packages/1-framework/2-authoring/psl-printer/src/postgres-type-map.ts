@@ -168,26 +168,44 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
   };
 }
 
+export type EnumInfo = {
+  readonly typeNames: ReadonlySet<string>;
+  readonly definitions: ReadonlyMap<string, readonly string[]>;
+};
+
 /**
- * Extracts enum type names from the SqlSchemaIR annotations.
+ * Extracts enum type names and definitions from SqlSchemaIR annotations
+ * in a single traversal.
  */
-export function extractEnumTypeNames(annotations?: Record<string, unknown>): ReadonlySet<string> {
+export function extractEnumInfo(annotations?: Record<string, unknown>): EnumInfo {
   const pgAnnotations = annotations?.['pg'] as Record<string, unknown> | undefined;
   const storageTypes = pgAnnotations?.['storageTypes'] as
     | Record<string, { codecId: string; nativeType: string; typeParams?: Record<string, unknown> }>
     | undefined;
 
-  if (!storageTypes) {
-    return new Set();
-  }
+  const typeNames = new Set<string>();
+  const definitions = new Map<string, readonly string[]>();
 
-  const enumNames = new Set<string>();
-  for (const [key, typeInstance] of Object.entries(storageTypes)) {
-    if (typeInstance.codecId === ENUM_CODEC_ID) {
-      enumNames.add(key);
+  if (storageTypes) {
+    for (const [key, typeInstance] of Object.entries(storageTypes)) {
+      if (typeInstance.codecId === ENUM_CODEC_ID) {
+        typeNames.add(key);
+        const values = typeInstance.typeParams?.['values'];
+        if (Array.isArray(values)) {
+          definitions.set(key, values as string[]);
+        }
+      }
     }
   }
-  return enumNames;
+
+  return { typeNames, definitions };
+}
+
+/**
+ * Extracts enum type names from the SqlSchemaIR annotations.
+ */
+export function extractEnumTypeNames(annotations?: Record<string, unknown>): ReadonlySet<string> {
+  return extractEnumInfo(annotations).typeNames;
 }
 
 /**
@@ -196,23 +214,5 @@ export function extractEnumTypeNames(annotations?: Record<string, unknown>): Rea
 export function extractEnumDefinitions(
   annotations?: Record<string, unknown>,
 ): ReadonlyMap<string, readonly string[]> {
-  const pgAnnotations = annotations?.['pg'] as Record<string, unknown> | undefined;
-  const storageTypes = pgAnnotations?.['storageTypes'] as
-    | Record<string, { codecId: string; nativeType: string; typeParams?: Record<string, unknown> }>
-    | undefined;
-
-  const enums = new Map<string, readonly string[]>();
-  if (!storageTypes) {
-    return enums;
-  }
-
-  for (const [key, typeInstance] of Object.entries(storageTypes)) {
-    if (typeInstance.codecId === ENUM_CODEC_ID) {
-      const values = typeInstance.typeParams?.['values'];
-      if (Array.isArray(values)) {
-        enums.set(key, values as string[]);
-      }
-    }
-  }
-  return enums;
+  return extractEnumInfo(annotations).definitions;
 }
