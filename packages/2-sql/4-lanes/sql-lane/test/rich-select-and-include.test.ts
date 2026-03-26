@@ -53,7 +53,7 @@ describe('sql lane rich select and include ASTs', () => {
       })
       .orderBy(tables.user.columns.email.desc())
       .limit(5)
-      .build({ params: { userId: 'u1' } });
+      .build({ params: { userId: 1 } });
 
     expect(plan.ast).toBeInstanceOf(SelectAst);
     const ast = plan.ast as SelectAst;
@@ -66,7 +66,7 @@ describe('sql lane rich select and include ASTs', () => {
     expect(ast.orderBy?.[0]?.expr).toEqual(ColumnRef.of('user', 'email'));
     expect(ast.where).toBeInstanceOf(BinaryExpr);
     expect((ast.where as BinaryExpr).right).toEqual(
-      ParamRef.of('u1', { name: 'userId', codecId: 'pg/int4@1' }),
+      ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1' }),
     );
   });
 
