@@ -129,7 +129,8 @@ export class InsertBuilderImpl<
 
     const values: Record<string, ColumnRef | ParamRef> = {};
     for (const [columnName, placeholder] of Object.entries(this.values)) {
-      if (!contractTable.columns[columnName]) {
+      const columnMeta = contractTable.columns[columnName];
+      if (!columnMeta) {
         errorUnknownColumn(columnName, this.table.name);
       }
 
@@ -139,7 +140,6 @@ export class InsertBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      const columnMeta = contractTable.columns[columnName]!;
       if (paramName && columnMeta.codecId) {
         paramCodecs[paramName] = columnMeta.codecId;
       }
@@ -286,7 +286,8 @@ export class UpdateBuilderImpl<
 
     const set: Record<string, ColumnRef | ParamRef> = {};
     for (const [columnName, placeholder] of Object.entries(this.set)) {
-      if (!contractTable.columns[columnName]) {
+      const columnMeta = contractTable.columns[columnName];
+      if (!columnMeta) {
         errorUnknownColumn(columnName, this.table.name);
       }
 
@@ -296,7 +297,6 @@ export class UpdateBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      const columnMeta = contractTable.columns[columnName]!;
       if (paramName && columnMeta.codecId) {
         paramCodecs[paramName] = columnMeta.codecId;
       }
