@@ -100,7 +100,6 @@ Replace the existing `formatMigrationStatusOutput` pipeline with the new rendere
 - [ ] Implement off-spine marker diagnostics: warn if DB or contract markers are not on the rendered path
 - [ ] Audit all CLI output and error messages for graph jargon — replace with migration-domain language (deferred to separate PR)
 - [ ] Integration/journey tests for `migration status` (deferred to follow-up)
-- [ ] Reduce vertical spacing for the linear graph if possible
 - [ ] `migration plan` needs optional `--db` support so `--from` defaults to the DB marker when online (see spec)
 
 ### Milestone 4: Close-out
@@ -154,6 +153,8 @@ Files removed during development:
 | `extractRelevantSubgraph` multi-path union | Unit | M3 | ✅ |
 | Existing tests updated | Unit | M3 | ✅ |
 | 35+ topology snapshot tests | Snapshot | M1 | ✅ |
+| `deriveEdgeStatuses` unit tests | Unit | M3 | ✅ |
+| `isLinearGraph` unit tests | Unit | M1 | ✅ |
 | No graph jargon in CLI output | Manual audit | M3 | Deferred |
 | JSON uses migration-domain language | Integration | M3 | Deferred |
 | Integration/journey tests | Integration | Follow-up | Deferred |

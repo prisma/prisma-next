@@ -68,7 +68,7 @@ Edge status is derived by `deriveEdgeStatuses` in the command layer using path a
 
 - **Applied** (`✓`, cyan): The edge is on the path from `∅` to the DB marker. These migrations are recorded in the ledger.
 - **Pending** (`⧗`, yellow): The edge is on the path from the DB marker (or root, if empty DB) to the target, or from the target to the contract (when the target is a ref and the contract is reachable beyond it). These are migrations `migration apply` would execute.
-- **Diverged** (`✗`, magenta): The edge is on the path from root to the target but is neither applied nor pending. This happens when the DB marker is on a different branch than the target — `apply` can't reach these edges without the DB first moving to this branch.
+- **Unreachable** (`✗`, magenta): The edge is on the path from root to the target but is neither applied nor pending. This happens when the DB marker is on a different branch than the target — `apply` can't reach these edges without the DB first moving to this branch.
 - **No status** (no icon, dim): Everything else — branch edges not on any relevant path. They exist in the graph but are not on the user's apply path.
 
 Special cases:
@@ -127,6 +127,8 @@ A `CONTRACT.AHEAD` diagnostic is emitted when the contract hash is not a node in
 - **Migrations exist but none produce the contract**: "Contract has changed since the last migration was planned"
 
 This does **not** fire when a migration for the contract exists but the target (e.g. a `--ref`) points elsewhere — that's a different branch, not a stale contract.
+
+**Known gap:** When `--ref staging` is used and the contract is in the graph but only reachable from a different branch (e.g. prod), no diagnostic fires. The user sees the contract on prod's branch with no indication that staging can't reach it. The fix requires both a new diagnostic ("contract is not reachable from ref") and a rendering change to anchor the detached contract node to the chosen ref's branch rather than the bottom-most node. See issue triage: "migration status --ref places detached contract node on wrong branch."
 
 ## Marker Not In Graph (early bail-out)
 
@@ -453,7 +455,7 @@ No analytics events — CLI command, no telemetry.
 |---|---|---|
 | Applied edge/icon (`✓`) | Cyan | Visible to all CVD types |
 | Pending edge/icon (`⧗`) | Yellow | High contrast on dark bg, CVD-safe |
-| Diverged edge/icon (`✗`) | Magenta | Distinct from cyan/yellow, CVD-safe |
+| Unreachable edge/icon (`✗`) | Magenta | Distinct from cyan/yellow, CVD-safe |
 | Backward/rollback edge | Magenta | Same as unreachable — visually distinct |
 | DB/Contract markers | Bold/bright white | Stands out without relying on hue |
 | Branch pipes | Dim | Visual structure, not information |
