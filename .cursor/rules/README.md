@@ -106,6 +106,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/research-comparisons-need-axes.mdc` — Comparisons must state the shared axis (knob/invariant/trade-off)
 - `.cursor/rules/walkthrough-additive-changes.mdc` — Walkthrough wording: phrase additive changes as additions (avoid “no X → Y”)
 - `.cursor/rules/review-scope-overrides.mdc` — When writing review artifacts, honor user-specified base branches
+- `.cursor/rules/cursor-markdown-file-links.mdc` — Path-only repo-relative links in review markdown (Cursor does not resolve `:line` in link targets)
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.
 - Keep `alwaysApply` minimal—default to scoped rules with `globs` in frontmatter.
