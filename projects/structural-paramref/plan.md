@@ -123,10 +123,37 @@ Validated by: new test passes, docs are current, `projects/structural-paramref/`
 | DML collectParamRefs ordering | Unit | 2.2 | New test |
 | All existing tests pass | Suite | 1.18, 2.4 | `pnpm test:packages` |
 
+### Milestone 3: Code review feedback (F09–F12)
+
+Address blocking review findings from the second review round.
+
+**Tasks:**
+
+- [ ] **3.1 — F12: Remove `annotations.codecs` lookup from encoding**
+  In `resolveParamCodec` ([packages/2-sql/5-runtime/src/codecs/encoding.ts](packages/2-sql/5-runtime/src/codecs/encoding.ts)), remove the `plan.meta.annotations?.codecs?.[paramDescriptor.name]` lookup (lines 9–16). This lookup matches param names against projection aliases — a different namespace — and takes priority over the correct `paramDescriptor.codecId`. With `codecId` reliably set on every `ParamDescriptor`, this coincidence-based lookup is redundant. Keep only the `paramDescriptor.codecId` path. Update tests if any assert on this lookup path.
+
+- [ ] **3.2 — F10: Remove `nativeType` from `ParamRef`**
+  Remove `nativeType` from `ParamRef` constructor options, class fields, and `ParamRef.of()`. Remove all `nativeType` spreading from producers: `predicate-builder.ts`, `mutation-builder.ts`, `where-binding.ts`, `query-plan-mutations.ts`, `query-plan-meta.ts`, `transform-expr.ts`, `transform.ts`, `test-helpers.ts`. Remove from `deriveParamsFromAst` (all copies). Remove from `ParamDescriptor` producers. Update tests that assert on `nativeType`.
+
+- [ ] **3.3 — F11: Make `codecId` required on `ParamRef`; fix operations sentinel**
+  1. In `createOperationExprBuilder` ([operations-registry.ts L78–82](packages/2-sql/4-lanes/relational-core/src/operations-registry.ts)): change param-kind arg handling to accept raw values instead of requiring `ParamPlaceholder`. Create `ParamRef.of(arg, { name: argSpec.name ?? arg_${i}, codecId: columnMeta.codecId })`. The `isParamPlaceholder` check is removed for this arg kind. Update `OperationArgs` type mapping for `param`-kind args from `ParamPlaceholder` to `unknown`.
+  2. Make `codecId` required on `ParamRef`: change constructor options and `of()` signature so `codecId` is required `string`, not optional. Update `ParamRef` class field from `string | undefined` to `string`.
+  3. Remove conditional spreading patterns (`...(p.codecId ? { codecId: p.codecId } : {})`) from all `deriveParamsFromAst` helpers — replace with direct `codecId: p.codecId`.
+  4. Update tests in `operations-registry.test.ts`, `column-builder-operations.test.ts`, `schema.test.ts`, test helpers.
+
+- [ ] **3.4 — F09: Eliminate `BoundWhereExpr`**
+  1. Delete `BoundWhereExpr` interface from `relational-core/src/ast/types.ts` (L1589–1591).
+  2. Change `ToWhereExpr.toWhereExpr()` return type from `BoundWhereExpr` to `WhereExpr`.
+  3. Delete `createBoundWhereExpr`, `isBoundWhereExpr`, `ensureBoundWhereExpr`, `combineWhereFilters` from `where-utils.ts`. Keep `combinePlainWhereExprs` (rename to `combineWhereExprs`).
+  4. Update all consumers: change `BoundWhereExpr` to `WhereExpr`, remove `.expr` unwrapping. Key files: `mutation-executor.ts`, `collection.ts`, `grouped-collection.ts`, `query-plan-select.ts`, `query-plan-mutations.ts`, `query-plan-aggregate.ts`, `where-binding.ts`, `where-interop.ts`, `model-accessor.ts`.
+  5. Update `exports/ast.ts` barrel to remove `BoundWhereExpr` export.
+  6. Update tests: `where-utils.test.ts`, `where-binding.test.ts`, `where-interop.test.ts`, and any test importing `BoundWhereExpr` or `createBoundWhereExpr`.
+
+- [ ] **3.5 — Verify and push**
+  Run typecheck, tests, formatter. Fix any issues. Commit and push.
+
 ## Open Items
 
-- **`OperationExpr` param unification** (from spec OQ 1): Operation args that are `ParamRef` use a sentinel value (`index: 0` today, `value: undefined` after this change). A follow-up ticket should consider unifying operation param binding with the structural approach.
-
-- **`BoundWhereExpr` elimination vs wrapper** (from spec OQ 2): Default assumption is to eliminate. If elimination causes excessive churn at the `ToWhereExpr` boundary, a thin `{ expr: WhereExpr }` wrapper can be kept. Decision finalizes during task 1.7.
-
 - **Coordination with TML-2096** (instanceof elimination): If TML-2096 lands first or concurrently, the `ParamRef` class shape change here should adopt the structural brand pattern. If this lands first, TML-2096 can add brands to the already-modified `ParamRef`.
+
+- **`types.ts` split (F08)**: Deferred to [TML-2173](https://linear.app/prisma-company/issue/TML-2173). The 1,600-line `types.ts` should be split into focused modules, but this is orthogonal to the structural paramref change.
