@@ -3,6 +3,7 @@ import {
   extractRelevantSubgraph,
   extractSubgraph,
   graphRenderer,
+  isLinearGraph,
   truncateGraph,
 } from '../../../src/utils/formatters/graph-render';
 import { RenderGraph } from '../../../src/utils/formatters/graph-types';
@@ -310,5 +311,47 @@ describe('render with truncation', () => {
     expect(output).not.toContain('⋮');
     expect(output).toContain('S01');
     expect(output).toContain('S14');
+  });
+});
+
+describe('isLinearGraph', () => {
+  it('returns true for a single node', () => {
+    const g = new RenderGraph([{ id: 'A' }], []);
+    expect(isLinearGraph(g)).toBe(true);
+  });
+
+  it('returns true for a linear chain', () => {
+    const g = new RenderGraph(
+      [{ id: 'A' }, { id: 'B' }, { id: 'C' }],
+      [
+        { from: 'A', to: 'B' },
+        { from: 'B', to: 'C' },
+      ],
+    );
+    expect(isLinearGraph(g)).toBe(true);
+  });
+
+  it('returns false for a graph with one branch', () => {
+    const g = new RenderGraph(
+      [{ id: 'A' }, { id: 'B' }, { id: 'C' }],
+      [
+        { from: 'A', to: 'B' },
+        { from: 'A', to: 'C' },
+      ],
+    );
+    expect(isLinearGraph(g)).toBe(false);
+  });
+
+  it('ignores detached nodes', () => {
+    const g = new RenderGraph(
+      [{ id: 'A' }, { id: 'B' }, { id: 'C', style: 'detached' }],
+      [{ from: 'A', to: 'B' }],
+    );
+    expect(isLinearGraph(g)).toBe(true);
+  });
+
+  it('returns true for an empty graph', () => {
+    const g = new RenderGraph([], []);
+    expect(isLinearGraph(g)).toBe(true);
   });
 });

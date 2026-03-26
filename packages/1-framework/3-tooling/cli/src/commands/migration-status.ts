@@ -150,7 +150,8 @@ function summarizeOps(ops: readonly MigrationPlanOperation[]): {
  * Returns statuses only for edges that have a known status (skips offline
  * and edges not on any relevant path).
  */
-function deriveEdgeStatuses(
+/** @internal Exported for testing only. */
+export function deriveEdgeStatuses(
   graph: MigrationGraph,
   targetHash: string,
   contractHash: string,
@@ -528,11 +529,13 @@ async function executeMigrationStatusCommand(
     if (graph.nodes.has(contractHash)) {
       hints.push(
         "Run 'prisma-next db sign' to overwrite the marker if the database already matches the contract",
+        "Run 'prisma-next db update' to push the current contract to the database",
         "Run 'prisma-next contract infer' to make your contract match the database",
         "Run 'prisma-next db verify' to inspect the database state",
       );
     } else {
       hints.push(
+        "Run 'prisma-next db update' to push the current contract to the database",
         "Run 'prisma-next contract infer' to make your contract match the database",
         "Run 'prisma-next db verify' to inspect the database state",
       );

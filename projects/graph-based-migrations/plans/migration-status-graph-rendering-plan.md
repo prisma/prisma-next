@@ -163,3 +163,4 @@ Files removed during development:
 - **JSON output exact field names**: Conceptual shape agreed. Exact structure finalized during close-out.
 - **Summary line for `--graph` mode**: Default summary ("N pending — run apply") works. Graph summary TBD — possibly "N migrations across K branches, M pending on apply path."
 - **Performance with large graphs**: Dagre performance with 1000+ nodes is untested. If perf issues arise, consider pre-filtering before layout.
+- **Clean up `test-graphs.ts`**: The test graph fixtures grew organically and could use a review pass — remove redundant topologies, improve naming, ensure each graph has a clear purpose.
