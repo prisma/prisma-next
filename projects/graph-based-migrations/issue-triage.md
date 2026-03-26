@@ -121,6 +121,30 @@ This allows phantom dependencies to accumulate (see: "Phantom `@prisma-next/cli`
 
 ---
 
+## `lastEdge` fallback in `migrationGraphToRenderInput` relies on Map insertion order
+
+**Discovered:** 2026-03-25 | **Severity:** low | **Type:** code quality
+
+**Observed:** When `relevantPaths` is empty and `spineTargetHash` can't be derived from `activeRefHash` or `contractHash`, the mapper falls back to `[...graph.forwardChain.values()].flat().pop()`. This relies on `Map` insertion order to pick the "last" edge, which is deterministic but not explicitly topological.
+
+**When it fires:** The only realistic scenario is: migrations exist on disk, contract is unreadable (`CONTRACT.UNREADABLE`), no `--ref`, and the graph is diverged. In this case the result has `diverged: true`, so `relevantPaths` is ignored (full graph is rendered) and `spineTargetHash` only affects edge coloring — making the impact minimal.
+
+**Resolution:** Rather than hardening this fallback, the root cause is that `migration status` should treat an unreadable contract as a hard error (or early return without `graph`) when migrations exist. If the user has migrations on disk but we can't read their contract, we can't give meaningful status — they need to fix the contract first. Making `CONTRACT.UNREADABLE` a hard error eliminates this fallback's only trigger.
+
+---
+
+## `MigrationStatusResult` conflates internal and public shapes
+
+**Discovered:** 2026-03-25 | **Severity:** medium | **Type:** code quality / API hygiene
+
+**Observed:** `MigrationStatusResult` is used both as the return type of `executeMigrationStatusCommand` (consumed by the CLI formatter) and as the `--json` output shape (consumed by users/agents). Internal fields (`graph`, `bundles`, `activeRefHash`, `activeRefName`, `diverged`) are needed by the formatter but should not be in the JSON output. The `--json` handler manually destructures and discards them.
+
+**Problem:** This is an opt-out model — new internal fields leak into JSON output unless someone remembers to strip them. The compiler provides no safety here.
+
+**Suggested fix:** Separate the types. The command should return an internal result type, and a dedicated function or explicit construction should produce the public JSON shape. The public shape is defined once and built explicitly, not derived by stripping fields from a larger type.
+
+---
+
 ## `migration status --ref` places detached contract node on wrong branch
 
 **Discovered:** 2026-03-25 | **Severity:** medium | **Type:** rendering limitation + diagnostic gap

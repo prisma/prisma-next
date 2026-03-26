@@ -17,7 +17,7 @@ function nodes(...ids: string[]): GraphNode[] {
   return ids.map((id) => ({ id }));
 }
 
-function node(id: string, markers?: NodeMarker[], style?: 'detached'): GraphNode {
+function node(id: string, markers?: NodeMarker[], style?: GraphNode['style']): GraphNode {
   return { id, markers, style };
 }
 

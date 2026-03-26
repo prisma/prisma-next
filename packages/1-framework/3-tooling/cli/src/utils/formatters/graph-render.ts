@@ -482,42 +482,46 @@ function prepareRawPoints(src: Point, dagrePoints: Point[], tgt: Point): Point[]
   return deduped;
 }
 
-/** Return the indices of points that form a diagonal with their predecessor. */
-function findDiagonalIndices(points: Point[]): number[] {
-  const indices: number[] = [];
+function countDiagonals(points: Point[]): number {
+  let count = 0;
   for (let i = 1; i < points.length; i++) {
     const prev = points[i - 1]!;
     const curr = points[i]!;
-    if (prev.x !== curr.x && prev.y !== curr.y) indices.push(i);
+    if (prev.x !== curr.x && prev.y !== curr.y) count++;
   }
-  return indices;
+  return count;
+}
+
+type BendDirection = 'horizontal-first' | 'vertical-first';
+
+/**
+ * Decode a bitmask into an array of bend directions.
+ *
+ * Each bit selects how one diagonal is converted to an orthogonal corner:
+ * 0 → horizontal-first, 1 → vertical-first. Used by {@link selectBestVariant}
+ * to enumerate all 2^N combinations.
+ */
+function bitsToBends(bits: number, count: number): BendDirection[] {
+  const bends: BendDirection[] = [];
+  for (let k = 0; k < count; k++) {
+    bends.push((bits >> k) & 1 ? 'vertical-first' : 'horizontal-first');
+  }
+  return bends;
 }
 
 /**
- * Build one polyline variant by resolving each diagonal with the given choice.
+ * Build one polyline variant by resolving each diagonal with the given bend direction.
  *
- * For each diagonal index `i`, `choices[i]` selects the resolution:
- * - `0` → horizontal-first: insert `(curr.x, prev.y)` before `curr`
- * - `1` → vertical-first: insert `(prev.x, curr.y)` before `curr`
- *
- * The result is deduplicated to remove any zero-length segments created
- * when an inserted bend coincides with an adjacent point.
- *
- * Choices are {@link BEND.hFirst} or {@link BEND.vFirst}, matching the
- * bit values (0 and 1) used by the enumeration in
- * {@link selectBestVariant}.
+ * Diagonals are detected inline: when the last emitted point and the next
+ * input point differ in both x and y, the segment is diagonal and is
+ * resolved using the next value from `bends`. The result is deduplicated
+ * to remove zero-length segments created when a bend coincides with an
+ * adjacent point.
  */
-const BEND = {
-  hFirst: 0,
-  vFirst: 1,
-} as const;
-
-function buildVariant(points: Point[], diagonalIndices: number[], choices: number[]): Point[] {
+function buildVariant(points: Point[], bends: BendDirection[]): Point[] {
   if (points.length < 2) return points;
 
-  const diagonalSet = new Set(diagonalIndices);
-  let choiceIdx = 0;
-
+  let bendIdx = 0;
   const result: Point[] = [points[0]!];
   for (let i = 1; i < points.length; i++) {
     const prev = result[result.length - 1]!;
@@ -525,15 +529,13 @@ function buildVariant(points: Point[], diagonalIndices: number[], choices: numbe
 
     if (prev.x === curr.x || prev.y === curr.y) {
       result.push(curr);
-    } else if (diagonalSet.has(i)) {
-      const choice = choices[choiceIdx++] ?? BEND.hFirst;
-      if (choice === BEND.hFirst) {
+    } else {
+      const bend = bends[bendIdx++] ?? 'horizontal-first';
+      if (bend === 'horizontal-first') {
         result.push({ x: curr.x, y: prev.y });
       } else {
         result.push({ x: prev.x, y: curr.y });
       }
-      result.push(curr);
-    } else {
       result.push(curr);
     }
   }
@@ -780,22 +782,26 @@ function selectBestVariant(
   grid: CharGrid,
 ): PolyWithLabel {
   const rawPoints = prepareRawPoints(src, dagrePoints, tgt);
-  const diags = findDiagonalIndices(rawPoints);
+  const diagCount = countDiagonals(rawPoints);
 
-  if (diags.length === 0) {
-    const poly = buildVariant(rawPoints, [], []);
+  if (diagCount === 0) {
+    const poly = buildVariant(rawPoints, []);
     const labelPos = label ? findLabelPlacement(poly, label, grid, src.y) : undefined;
     return { poly, labelPos };
   }
 
-  const numVariants = 1 << diags.length;
+  // Each diagonal must be converted to an orthogonal corner — either
+  // horizontal-first or vertical-first. With N diagonals that's 2^N
+  // combinations, enumerated via bitmask: we count from 0 to 2^N - 1,
+  // and every number represents a different combination of bend directions.
+  const numVariants = 1 << diagCount;
   let bestPoly: Point[] | null = null;
   let bestLabel: Point | undefined;
   let bestScore = Number.POSITIVE_INFINITY;
 
   for (let bits = 0; bits < numVariants; bits++) {
-    const choices = diags.map((_, k) => (bits >> k) & 1);
-    const poly = buildVariant(rawPoints, diags, choices);
+    const bends = bitsToBends(bits, diagCount);
+    const poly = buildVariant(rawPoints, bends);
 
     const corners = countCorners(poly);
     const len = polyLength(poly);
@@ -812,13 +818,7 @@ function selectBestVariant(
   }
 
   return {
-    poly:
-      bestPoly ??
-      buildVariant(
-        rawPoints,
-        diags,
-        diags.map(() => 0),
-      ),
+    poly: bestPoly ?? buildVariant(rawPoints, bitsToBends(0, diagCount)),
     labelPos: bestLabel,
   };
 }
