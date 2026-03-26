@@ -19,7 +19,6 @@ Both views share the same renderer — the only difference is what graph is pass
 - `cli/src/utils/formatters/graph-render.ts` — Dagre-based graph renderer (includes `GraphRenderer` interface)
 - `cli/src/utils/formatters/graph-migration-mapper.ts` — migration-to-graph mapper (relevant paths, markers, status icons)
 - `cli/src/utils/formatters/graph-types.ts` — `RenderGraph`, `GraphNode`, `GraphEdge`, `GraphRenderOptions`
-- `cli/src/utils/formatters/graph-layout.ts` — label placement and orthogonal polyline resolution
 - `migration-tools/src/dag.ts` — `findPath`, `findPathWithDecision`
 - `cli/src/utils/formatters/migrations.ts` — `formatMigrationStatusOutput` removed; `resolveDisplayChain` and `buildMigrationEntries` are now private to `migration-status.ts`
 
@@ -397,7 +396,6 @@ No analytics events — CLI command, no telemetry.
 - `cli/src/utils/formatters/graph-types.ts` — `GraphNode`, `GraphEdge`, `RenderGraph`, `GraphRenderOptions`
 - `cli/src/utils/formatters/graph-migration-mapper.ts` — `migrationGraphToRenderInput`, `EdgeStatus`
 - `cli/src/utils/formatters/graph-render.ts` — `GraphRenderer` interface, `graphRenderer`, `extractRelevantSubgraph`, `truncateGraph`
-- `cli/src/utils/formatters/graph-layout.ts` — label placement and orthogonal polyline builder
 - `cli/test/utils/formatters/test-graphs.ts` — shared test graph definitions (35+ topologies)
 - `cli/test/utils/formatters/graph-render.test.ts` — renderer unit and snapshot tests
 - `migration/src/dag.ts` — `reconstructGraph`, `findPath`, `findPathWithDecision`

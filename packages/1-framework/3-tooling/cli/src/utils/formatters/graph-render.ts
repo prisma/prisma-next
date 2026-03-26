@@ -1001,7 +1001,8 @@ function layoutAndRender(graph: RenderGraph, options: GraphRenderOptions, elided
   const spineEdgeKeys = findSpineEdges(graph, rootId, options.spineTarget);
 
   const g = new dagre.graphlib.Graph({ multigraph: true });
-  g.setGraph({ rankdir: 'TB', ranksep: 4, nodesep: 6, marginx: 2, marginy: 1 });
+  const dagreDefaults = { ranksep: 4, nodesep: 6, marginx: 2, marginy: 1 };
+  g.setGraph({ rankdir: 'TB', ...dagreDefaults, ...options.dagreOptions });
   g.setDefaultEdgeLabel(() => ({}));
 
   for (const node of layoutNodes) {
@@ -1305,3 +1306,12 @@ export interface GraphRenderer {
 export const graphRenderer: GraphRenderer = {
   render,
 };
+
+/** True if the graph is a single linear chain (no branching), ignoring detached nodes. */
+export function isLinearGraph(graph: RenderGraph): boolean {
+  for (const node of graph.nodes) {
+    if (node.style === 'detached') continue;
+    if (graph.outgoing(node.id).length > 1) return false;
+  }
+  return true;
+}

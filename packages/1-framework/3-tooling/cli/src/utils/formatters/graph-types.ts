@@ -97,56 +97,18 @@ export interface GraphRenderOptions {
    * The effective limit expands to include any DB or contract markers on the spine.
    */
   readonly limit?: number | undefined;
-}
-
-// ---------------------------------------------------------------------------
-// Internal layout types — produced by pass 1, consumed by pass 2
-// ---------------------------------------------------------------------------
-
-/** Recursive branch structure built during layout. */
-export interface BranchTree {
-  /** Node id where this branch leaves its parent (spine or parent branch) */
-  readonly forkNode: string;
-  /** Trunk edges unique to this branch (not repeated from parent) */
-  readonly edges: readonly GraphEdge[];
-  /** If the branch reconnects to an ancestor node going backward in depth (cycle/rollback) */
-  readonly backwardEdge?: GraphEdge | undefined;
-  /** If the branch reconnects to an ancestor node going forward in depth (diamond merge) */
-  readonly mergeEdge?: GraphEdge | undefined;
-  /** Nested branches off this branch's trunk */
-  readonly subBranches: readonly BranchTree[];
-  /** Deepest leaf depth in this entire subtree (for column sorting) */
-  readonly maxLeafDepth: number;
-}
-
-/** A node with its assigned position in the layout grid. */
-export interface LayoutNode {
-  readonly id: string;
-  readonly depth: number;
-  readonly column: number;
-}
-
-/** An edge with its assigned column and direction. */
-export interface LayoutEdge {
-  readonly from: string;
-  readonly to: string;
-  readonly column: number;
-  readonly direction: 'forward' | 'backward' | 'merge';
-  readonly edge: GraphEdge;
-}
-
-/** Minimum width demand for a column. */
-export interface ColumnDemand {
-  readonly column: number;
-  readonly minWidth: number;
-}
-
-/** Complete layout output from pass 1. */
-export interface GraphLayout {
-  readonly nodes: readonly LayoutNode[];
-  readonly edges: readonly LayoutEdge[];
-  readonly columns: readonly ColumnDemand[];
-  readonly maxDepth: number;
-  readonly spineColumn: number;
-  readonly totalColumns: number;
+  /**
+   * Override dagre layout parameters. Merged over defaults:
+   * `{ ranksep: 4, nodesep: 6, marginx: 2, marginy: 1 }`.
+   *
+   * When `ranksep` is ≤ 1, labels are placed inline on the arrowhead row
+   * instead of in a separate label-placement pass (there isn't enough
+   * vertical space for a dedicated label row).
+   */
+  readonly dagreOptions?: {
+    readonly ranksep?: number;
+    readonly nodesep?: number;
+    readonly marginx?: number;
+    readonly marginy?: number;
+  };
 }

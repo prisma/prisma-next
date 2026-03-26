@@ -35,7 +35,11 @@ import {
   type EdgeStatus,
   migrationGraphToRenderInput,
 } from '../utils/formatters/graph-migration-mapper';
-import { extractRelevantSubgraph, graphRenderer } from '../utils/formatters/graph-render';
+import {
+  extractRelevantSubgraph,
+  graphRenderer,
+  isLinearGraph,
+} from '../utils/formatters/graph-render';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
@@ -704,15 +708,16 @@ export function createMigrationStatusCommand(): Command {
                 : knownStatuses(statusResult.migrations),
             });
 
-            const renderOptions = {
-              ...renderInput.options,
-              colorize,
-              ...ifDefined('limit', limit),
-            };
             const graphToRender =
               options.graph || statusResult.diverged
                 ? renderInput.graph
                 : extractRelevantSubgraph(renderInput.graph, renderInput.relevantPaths);
+            const renderOptions = {
+              ...renderInput.options,
+              colorize,
+              ...ifDefined('limit', limit),
+              ...(isLinearGraph(graphToRender) ? { dagreOptions: { ranksep: 1 } } : {}),
+            };
             const graphOutput = graphRenderer.render(graphToRender, renderOptions);
             ui.log(graphOutput);
             if (statusResult.mode === 'online') {
