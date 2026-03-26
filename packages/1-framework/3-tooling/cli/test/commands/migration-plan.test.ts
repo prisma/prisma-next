@@ -271,6 +271,120 @@ describe('--from hash lookup', () => {
     const found = packages.find((p) => p.manifest.to === 'sha256:nonexistent');
     expect(found).toBeUndefined();
   });
+
+  it('matches by prefix without sha256: scheme', async () => {
+    const tempDir = await createTempDir('prefix-no-scheme');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    const contract = createTestContract();
+    const manifest: MigrationManifest = {
+      from: EMPTY_CONTRACT_HASH,
+      to: 'sha256:abcdef1234567890',
+      migrationId: null,
+      kind: 'regular',
+      fromContract: null,
+      toContract: contract,
+      hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
+      labels: [],
+      createdAt: new Date().toISOString(),
+    };
+    const dirName = formatMigrationDirName(new Date(), 'test');
+    const packageDir = join(migrationsDir, dirName);
+    await writeMigrationPackage(packageDir, manifest, []);
+    await attestMigration(packageDir);
+
+    const packages = await readMigrationsDir(migrationsDir);
+
+    // Prefix "abcdef" (without sha256:) finds the migration with to="sha256:abcdef1234567890"
+    const prefixWithScheme = 'sha256:abcdef';
+    const found = packages.find((p) => p.manifest.to.startsWith(prefixWithScheme));
+    expect(found).toBeDefined();
+    expect(found!.manifest.to).toBe('sha256:abcdef1234567890');
+    expect(found!.manifest.toContract).toEqual(contract);
+  });
+
+  it('matches by prefix with sha256: scheme', async () => {
+    const tempDir = await createTempDir('prefix-with-scheme');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    const contract = createTestContract();
+    const manifest: MigrationManifest = {
+      from: EMPTY_CONTRACT_HASH,
+      to: 'sha256:abcdef1234567890',
+      migrationId: null,
+      kind: 'regular',
+      fromContract: null,
+      toContract: contract,
+      hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
+      labels: [],
+      createdAt: new Date().toISOString(),
+    };
+    const dirName = formatMigrationDirName(new Date(), 'test');
+    const packageDir = join(migrationsDir, dirName);
+    await writeMigrationPackage(packageDir, manifest, []);
+    await attestMigration(packageDir);
+
+    const packages = await readMigrationsDir(migrationsDir);
+
+    // Prefix "sha256:abcdef" (with scheme) also works
+    const needle = 'sha256:abcdef';
+    const found = packages.find((p) => p.manifest.to.startsWith(needle));
+    expect(found).toBeDefined();
+    expect(found!.manifest.to).toBe('sha256:abcdef1234567890');
+  });
+
+  it('rejects ambiguous prefix matching multiple migrations', async () => {
+    const tempDir = await createTempDir('prefix-ambiguous');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    const contractA = createTestContract();
+    const contractB = createTestContract();
+
+    // Two migrations whose `to` hashes share a prefix
+    const dir1 = formatMigrationDirName(new Date(2026, 0, 1), 'first');
+    await writeMigrationPackage(
+      join(migrationsDir, dir1),
+      {
+        from: EMPTY_CONTRACT_HASH,
+        to: 'sha256:abc111',
+        migrationId: null,
+        kind: 'regular',
+        fromContract: null,
+        toContract: contractA,
+        hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
+        labels: [],
+        createdAt: new Date().toISOString(),
+      },
+      [],
+    );
+    await attestMigration(join(migrationsDir, dir1));
+
+    const dir2 = formatMigrationDirName(new Date(2026, 0, 2), 'second');
+    await writeMigrationPackage(
+      join(migrationsDir, dir2),
+      {
+        from: 'sha256:abc111',
+        to: 'sha256:abc222',
+        migrationId: null,
+        kind: 'regular',
+        fromContract: contractA,
+        toContract: contractB,
+        hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
+        labels: [],
+        createdAt: new Date().toISOString(),
+      },
+      [],
+    );
+    await attestMigration(join(migrationsDir, dir2));
+
+    const packages = await readMigrationsDir(migrationsDir);
+    const prefix = 'sha256:abc';
+    const candidates = packages.filter((p) => p.manifest.to.startsWith(prefix));
+    expect(candidates).toHaveLength(2);
+  });
 });
 
 describe('MigrationToolsError mapping', () => {

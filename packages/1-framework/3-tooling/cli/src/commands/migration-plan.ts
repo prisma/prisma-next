@@ -163,16 +163,31 @@ async function executeMigrationPlanCommand(
     const { bundles, graph } = await loadMigrationBundles(migrationsDir);
 
     if (options.from) {
-      fromHash = options.from;
-      const sourceBundle = bundles.find((p) => p.manifest.to === fromHash);
+      const needle = options.from;
+      // Try exact match first, then prefix match (with or without sha256: scheme)
+      let sourceBundle = bundles.find((p) => p.manifest.to === needle);
       if (!sourceBundle) {
-        return notOk(
-          errorRuntime('Starting contract not found', {
-            why: `No migration with to="${fromHash}" exists in ${migrationsRelative}`,
-            fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration leaf.',
-          }),
-        );
+        const prefixWithScheme = needle.startsWith('sha256:') ? needle : `sha256:${needle}`;
+        const candidates = bundles.filter((p) => p.manifest.to.startsWith(prefixWithScheme));
+        if (candidates.length === 1) {
+          sourceBundle = candidates[0]!;
+        } else if (candidates.length > 1) {
+          return notOk(
+            errorRuntime('Multiple matching migrations found', {
+              why: `Prefix "${needle}" matches ${candidates.length} migrations in ${migrationsRelative}`,
+              fix: 'Provide a longer prefix to disambiguate, or omit --from to use the latest migration leaf.',
+            }),
+          );
+        } else {
+          return notOk(
+            errorRuntime('Starting contract not found', {
+              why: `No migration with to hash matching "${needle}" exists in ${migrationsRelative}`,
+              fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration leaf.',
+            }),
+          );
+        }
       }
+      fromHash = sourceBundle.manifest.to;
       fromContract = sourceBundle.manifest.toContract;
     } else {
       const latestMigration = findLatestMigration(graph);

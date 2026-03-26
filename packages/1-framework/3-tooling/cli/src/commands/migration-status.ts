@@ -1,6 +1,10 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
-import { findLeaf, findPath, findPathWithDecision } from '@prisma-next/migration-tools/dag';
+import {
+  findPath,
+  findPathWithDecision,
+  findReachableLeaves,
+} from '@prisma-next/migration-tools/dag';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
   AttestedMigrationBundle,
@@ -11,6 +15,7 @@ import type {
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { cyan, dim, green, magenta, yellow } from 'colorette';
 import { Command } from 'commander';
 
 import { loadConfig } from '../config-loader';
@@ -26,7 +31,11 @@ import {
   setCommandExamples,
   toPathDecisionResult,
 } from '../utils/command-helpers';
-import { formatMigrationStatusOutput } from '../utils/formatters/migrations';
+import {
+  type EdgeStatus,
+  migrationGraphToRenderInput,
+} from '../utils/formatters/graph-migration-mapper';
+import { extractRelevantSubgraph, graphRenderer } from '../utils/formatters/graph-render';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
@@ -38,6 +47,9 @@ interface MigrationStatusOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly ref?: string;
+  readonly graph?: boolean;
+  readonly limit?: string;
+  readonly all?: boolean;
 }
 
 export interface MigrationStatusEntry {
@@ -48,7 +60,9 @@ export interface MigrationStatusEntry {
   readonly operationCount: number;
   readonly operationSummary: string;
   readonly hasDestructive: boolean;
-  readonly status: 'applied' | 'pending' | 'unknown';
+  // TODO: we use this type in multiple places, maybe +/- 'unknown'
+  // would it be good to extract it into a separate type? and then maybe use ?/undefined for unknown
+  readonly status: 'applied' | 'pending' | 'diverged' | 'unknown';
 }
 
 export type { StatusDiagnostic, StatusRef } from '../utils/migration-types';
@@ -76,6 +90,19 @@ export interface MigrationStatusResult {
   };
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
+  readonly graph?: MigrationGraph;
+  readonly bundles?: readonly MigrationBundle[];
+  readonly activeRefHash?: string;
+  readonly activeRefName?: string;
+  readonly diverged?: boolean;
+}
+
+function hasKnownStatus(entry: MigrationStatusEntry): entry is MigrationStatusEntry & EdgeStatus {
+  return entry.status === 'applied' || entry.status === 'pending' || entry.status === 'diverged';
+}
+
+function knownStatuses(migrations: readonly MigrationStatusEntry[]): EdgeStatus[] {
+  return migrations.filter(hasKnownStatus);
 }
 
 function summarizeOps(ops: readonly MigrationPlanOperation[]): {
@@ -108,10 +135,74 @@ function summarizeOps(ops: readonly MigrationPlanOperation[]): {
 }
 
 /**
+ * Derive per-edge status across the full graph using path analysis.
+ *
+ * - **applied**: edge is on the path from root to the DB marker
+ * - **pending**: edge is on the path from the DB marker to the target
+ *   (and the marker is reachable from root, i.e. it's on the same branch)
+ * - **diverged**: edge is on the path from root to the target but the DB
+ *   marker is on a different branch — `apply` can't reach these edges
+ *   without the DB first moving to this branch
+ *
+ * Returns statuses only for edges that have a known status (skips offline
+ * and edges not on any relevant path).
+ */
+function deriveEdgeStatuses(
+  graph: MigrationGraph,
+  targetHash: string,
+  markerHash: string | undefined,
+  mode: 'online' | 'offline',
+): EdgeStatus[] {
+  if (mode === 'offline' || markerHash === undefined) return [];
+
+  const edgeKey = (e: MigrationChainEntry) => `${e.from}\0${e.to}`;
+
+  const appliedPath = findPath(graph, EMPTY_CONTRACT_HASH, markerHash);
+  const appliedKeys = new Set(appliedPath?.map(edgeKey) ?? []);
+
+  const pendingPath = findPath(graph, markerHash, targetHash);
+  const targetPath = findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
+
+  const statuses: EdgeStatus[] = [];
+
+  // Applied edges (root → marker)
+  if (appliedPath) {
+    for (const e of appliedPath) {
+      statuses.push({ dirName: e.dirName, status: 'applied' });
+    }
+  }
+
+  // Pending edges (marker → target) — only when marker can reach target
+  const pendingKeys = new Set<string>();
+  if (pendingPath) {
+    for (const e of pendingPath) {
+      pendingKeys.add(edgeKey(e));
+      statuses.push({ dirName: e.dirName, status: 'pending' });
+    }
+  }
+
+  // Diverged edges: on the path from root to the target but neither applied
+  // nor pending. This covers two cases:
+  //  1. Marker can't reach target at all (different branch entirely)
+  //  2. Marker reaches target via a different route, leaving some root→target
+  //     edges orphaned (e.g. a fork where one branch was applied and apply
+  //     will continue through the other)
+  if (targetPath) {
+    for (const e of targetPath) {
+      if (!appliedKeys.has(edgeKey(e)) && !pendingKeys.has(edgeKey(e))) {
+        statuses.push({ dirName: e.dirName, status: 'diverged' });
+      }
+    }
+  }
+
+  return statuses;
+}
+
+/**
  * @param mode    — 'online' if we connected to the database, 'offline' otherwise
  * @param markerHash — the marker hash from the database, or undefined if no marker row / offline
  */
-export function buildMigrationEntries(
+function buildMigrationEntries(
   chain: readonly MigrationChainEntry[],
   packages: readonly MigrationBundle[],
   mode: 'online' | 'offline',
@@ -172,7 +263,7 @@ export function buildMigrationEntries(
  * that bypasses the marker entirely (e.g. in a diamond graph), causing the
  * marker to appear "diverged" when it isn't.
  */
-export function resolveDisplayChain(
+function resolveDisplayChain(
   graph: MigrationGraph,
   targetHash: string,
   markerHash: string | undefined,
@@ -334,16 +425,27 @@ async function executeMigrationStatusCommand(
     });
   }
 
-  let targetHash: string;
-  try {
-    targetHash = activeRefHash ?? findLeaf(graph);
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, { why: error.why, fix: error.fix, meta: { code: error.code } }),
-      );
+  let targetHash: string | undefined;
+
+  if (activeRefHash) {
+    targetHash = activeRefHash;
+  } else if (graph.nodes.has(contractHash)) {
+    targetHash = contractHash;
+  } else {
+    const leaves = findReachableLeaves(graph, EMPTY_CONTRACT_HASH);
+    if (leaves.length === 1) {
+      targetHash = leaves[0];
+    } else {
+      diagnostics.push({
+        code: 'MIGRATION.DIVERGED',
+        severity: 'warn',
+        message: 'Migration graph has diverged — multiple branches with no default target',
+        hints: [
+          "Use '--ref <name>' to select a branch",
+          "Or 'prisma-next migration ref set <name> <hash>' to create one",
+        ],
+      });
     }
-    throw error;
   }
 
   let markerHash: string | undefined;
@@ -368,6 +470,23 @@ async function executeMigrationStatusCommand(
     } finally {
       await client.close();
     }
+  }
+
+  if (!targetHash) {
+    return ok({
+      ok: true,
+      mode,
+      migrations: [],
+      targetHash: EMPTY_CONTRACT_HASH,
+      contractHash,
+      summary: `${attested.length} migration(s) on disk`,
+      diagnostics,
+      ...ifDefined('markerHash', markerHash),
+      ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
+      graph,
+      bundles: attested,
+      diverged: true,
+    });
   }
 
   const chain = resolveDisplayChain(graph, targetHash, markerHash);
@@ -483,6 +602,10 @@ async function executeMigrationStatusCommand(
     ...ifDefined('markerHash', markerHash),
     ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
     ...ifDefined('pathDecision', pathDecision),
+    graph,
+    bundles: attested,
+    ...ifDefined('activeRefHash', activeRefHash),
+    ...ifDefined('activeRefName', activeRefName),
   };
   return ok(result);
 }
@@ -504,6 +627,9 @@ export function createMigrationStatusCommand(): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--ref <name>', 'Target ref name from migrations/refs.json')
+    .option('--graph', 'Show the full migration graph with all branches')
+    .option('--limit <n>', 'Maximum number of migrations to display (default: show all)')
+    .option('--all', 'Show full history (disables truncation)')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
 
@@ -513,9 +639,58 @@ export function createMigrationStatusCommand(): Command {
 
       const exitCode = handleResult(result, flags, ui, (statusResult) => {
         if (flags.json) {
-          ui.output(JSON.stringify(statusResult, null, 2));
+          const {
+            graph: _g,
+            bundles: _b,
+            activeRefHash: _arh,
+            activeRefName: _arn,
+            diverged: _d,
+            ...jsonResult
+          } = statusResult;
+          ui.output(JSON.stringify(jsonResult, null, 2));
         } else if (!flags.quiet) {
-          ui.log(formatMigrationStatusOutput(statusResult, flags));
+          const colorize = flags.color !== false;
+
+          if (statusResult.graph) {
+            const DEFAULT_LIMIT = 10;
+            const limit = options.all
+              ? undefined
+              : options.limit
+                ? Number.parseInt(options.limit, 10)
+                : DEFAULT_LIMIT;
+            const renderInput = migrationGraphToRenderInput({
+              graph: statusResult.graph,
+              mode: statusResult.mode,
+              markerHash: statusResult.markerHash,
+              contractHash: statusResult.contractHash,
+              refs: statusResult.refs,
+              activeRefHash: statusResult.activeRefHash,
+              activeRefName: statusResult.activeRefName,
+              edgeStatuses: statusResult.graph
+                ? deriveEdgeStatuses(
+                    statusResult.graph,
+                    statusResult.targetHash,
+                    statusResult.markerHash,
+                    statusResult.mode,
+                  )
+                : knownStatuses(statusResult.migrations),
+            });
+
+            const renderOptions = {
+              ...renderInput.options,
+              colorize,
+              ...ifDefined('limit', limit),
+            };
+            const graphToRender =
+              options.graph || statusResult.diverged
+                ? renderInput.graph
+                : extractRelevantSubgraph(renderInput.graph, renderInput.relevantPaths);
+            const graphOutput = graphRenderer.render(graphToRender, renderOptions);
+            ui.log(graphOutput);
+            ui.log('');
+          }
+
+          ui.log(formatStatusSummary(statusResult, colorize));
         }
       });
 
@@ -523,6 +698,40 @@ export function createMigrationStatusCommand(): Command {
     });
 
   return command;
+}
+
+function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): string {
+  const c = (fn: (s: string) => string, s: string) => (colorize ? fn(s) : s);
+  const lines: string[] = [];
+
+  const hasUnknown = result.migrations.some((e) => e.status === 'unknown');
+  const hasDiverged = result.migrations.some((e) => e.status === 'diverged');
+  const pendingCount = result.migrations.filter((e) => e.status === 'pending').length;
+
+  if (result.mode === 'online') {
+    if (hasUnknown) {
+      lines.push(`${c(yellow, '⚠')} ${result.summary}`);
+    } else if (pendingCount === 0 && !hasDiverged) {
+      lines.push(`${c(green, '✔')} ${result.summary}`);
+    } else {
+      lines.push(`${c(yellow, '⧗')} ${result.summary}`);
+    }
+    const legendParts = [`${c(cyan, '✓')} applied`, `${c(yellow, '⧗')} pending`];
+    if (hasDiverged) legendParts.push(`${c(magenta, '✗')} diverged`);
+    lines.push(c(dim, legendParts.join('  ')));
+  } else {
+    lines.push(result.summary);
+  }
+
+  const warnings = result.diagnostics?.filter((d) => d.severity === 'warn') ?? [];
+  for (const diag of warnings) {
+    lines.push(`${c(yellow, '⚠')} ${diag.message}`);
+    for (const hint of diag.hints) {
+      lines.push(`  ${c(dim, hint)}`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 function summarizeRefDistance(
