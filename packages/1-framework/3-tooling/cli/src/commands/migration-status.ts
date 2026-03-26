@@ -590,21 +590,9 @@ async function executeMigrationStatusCommand(
 
   const entries = buildMigrationEntries(chain, attested, mode, markerHash);
 
-  // Marker is "accounted for" if it's in the graph, or if it matches the
-  // contract (shown on the detached contract node). The early return above
-  // handles the case where the marker is truly unknown.
-  const markerAccountedFor =
-    markerHash === undefined || graph.nodes.has(markerHash) || markerHash === contractHash;
-
   let summary: string;
   if (mode === 'online') {
-    if (!markerAccountedFor) {
-      summary = 'Database marker does not match any migration';
-    } else if (
-      markerHash !== undefined &&
-      !graph.nodes.has(markerHash) &&
-      markerHash === contractHash
-    ) {
+    if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       summary = 'Database matches the current contract — run migration plan to create a migration';
     } else if (activeRefHash && markerHash !== undefined) {
       summary = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
@@ -625,18 +613,7 @@ async function executeMigrationStatusCommand(
 
   if (mode === 'online') {
     const pendingCount = entries.filter((e) => e.status === 'pending').length;
-    if (!markerAccountedFor) {
-      diagnostics.push({
-        code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
-        severity: 'warn',
-        message: 'Database marker does not match any migration',
-        hints: ["Run 'prisma-next db verify' to inspect the database state"],
-      });
-    } else if (
-      markerHash !== undefined &&
-      !graph.nodes.has(markerHash) &&
-      markerHash === contractHash
-    ) {
+    if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       diagnostics.push({
         code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
         severity: 'info',
