@@ -4,7 +4,11 @@ import { toEnumName, toFieldName, toModelName, toNamedTypeName } from './name-tr
 import { extractEnumDefinitions, extractEnumTypeNames } from './postgres-type-map';
 import { parseRawDefault } from './raw-default-parser';
 import { inferRelations } from './relation-inference';
-import type { PslPrintableSqlSchemaIR, PslPrintableSqlTable } from './schema-validation';
+import type {
+  PrintableSqlColumnDefault,
+  PslPrintableSqlSchemaIR,
+  PslPrintableSqlTable,
+} from './schema-validation';
 import type {
   PrinterField,
   PrinterModel,
@@ -380,34 +384,11 @@ function processTable(
   };
 }
 
-/**
- * Parses a default value into a ColumnDefault.
- * Handles both pre-normalized ColumnDefault objects and raw string expressions.
- */
-function isColumnDefault(value: unknown): value is ColumnDefault {
-  if (typeof value !== 'object' || value === null || !Object.hasOwn(value, 'kind')) {
-    return false;
-  }
-
-  const kind = Reflect.get(value, 'kind');
-  if (kind === 'literal') {
-    return Object.hasOwn(value, 'value');
-  }
-  if (kind === 'function') {
-    return typeof Reflect.get(value, 'expression') === 'string';
-  }
-
-  return false;
-}
-
-function parseDefaultIfNeeded(value: unknown, nativeType?: string): ColumnDefault | undefined {
-  if (isColumnDefault(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    return parseRawDefault(value, nativeType);
-  }
-  return undefined;
+function parseDefaultIfNeeded(
+  value: PrintableSqlColumnDefault,
+  nativeType?: string,
+): ColumnDefault | undefined {
+  return typeof value === 'string' ? parseRawDefault(value, nativeType) : value;
 }
 
 function formatFieldConstraintAttribute(

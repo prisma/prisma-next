@@ -521,35 +521,6 @@ describe('printPsl', () => {
     `);
   });
 
-  it('ignores unsupported default shapes that are neither strings nor normalized defaults', () => {
-    const schemaIR: SqlSchemaIR = {
-      tables: {
-        settings: {
-          name: 'settings',
-          columns: {
-            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
-            flags: {
-              name: 'flags',
-              nativeType: 'text',
-              nullable: false,
-              default: { unsupported: true } as unknown as string,
-            },
-          },
-          primaryKey: { columns: ['id'] },
-          foreignKeys: [],
-          uniques: [],
-          indexes: [],
-        },
-      },
-      dependencies: [],
-    };
-
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
-    expect(result).toContain('flags String');
-    expect(result).not.toContain('@default(');
-    expect(result).not.toContain('// Raw default:');
-  });
-
   it('preserves raw bigint defaults without precision loss', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
