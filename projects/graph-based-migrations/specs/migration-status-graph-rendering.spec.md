@@ -128,6 +128,18 @@ A `CONTRACT.AHEAD` diagnostic is emitted when the contract hash is not a node in
 
 This does **not** fire when a migration for the contract exists but the target (e.g. a `--ref`) points elsewhere — that's a different branch, not a stale contract.
 
+## Marker Not In Graph (early bail-out)
+
+When the DB marker exists but its hash is not a node in the migration graph **and** differs from the contract hash, `migration status` bails out early — no graph is rendered, only a diagnostic with actionable hints.
+
+**Why bail out?** The marker being off-graph means the DB was updated outside the migration system (typically via `db update`). In this state, no edge in the graph can be reliably marked as applied (the ledger isn't consulted — see triaged issue), and there is no meaningful "apply path" to show the user. Rendering a full graph with no statuses and misleading diagnostics is worse than a clear error.
+
+**Recovery hints** vary by scenario:
+- Contract is in the graph → suggest `db sign` (align marker to contract) or `db verify`
+- Contract is also off-graph → suggest `contract infer` (align contract to DB) or `db verify`
+
+**Exception — marker equals contract hash:** When the marker matches the contract but neither is in the graph, the DB and contract are in sync (the user did `db update` with the current contract). In this case, proceed normally — the detached contract node renders with both `◆ db` and `◇ contract` markers, and the diagnostic guides the user to run `migration plan`.
+
 # Renderer Architecture
 
 ## Single renderer
@@ -457,6 +469,8 @@ No analytics events — CLI command, no telemetry.
 19. **Contract diagnostic fires when contract is not in graph**: The `CONTRACT.AHEAD` diagnostic fires when the contract hash is not a node in the migration graph (no planned migration produces it). It does not fire when a migration for the contract exists but the target points elsewhere (e.g. `--ref` on a different branch).
 
 20. **Detached node alignment**: Detached contract nodes align with the bottom-most node in the rendered graph, not the spine target.
+
+21. **Marker not in graph → early bail-out**: When the DB marker is off-graph and differs from the contract, skip graph rendering entirely and show a diagnostic. We can't provide a useful apply path because no edge can be reliably marked as applied. When marker equals contract (both off-graph), proceed normally — the detached node shows both markers and the user is guided to `migration plan`.
 
 # Open Questions
 
