@@ -41,7 +41,7 @@ describe('sql DSL builder', () => {
     expect(ast.where).toEqual(
       BinaryExpr.eq(
         ColumnRef.of('user', 'id'),
-        ParamRef.of(42, { name: 'userId', codecId: 'pg/int4@1', nativeType: 'int4' }),
+        ParamRef.of(42, { name: 'userId', codecId: 'pg/int4@1' }),
       ),
     );
     expect(ast.orderBy).toEqual([OrderByItem.desc(ColumnRef.of('user', 'createdAt'))]);
@@ -66,7 +66,6 @@ describe('sql DSL builder', () => {
       {
         name: 'userId',
         codecId: 'pg/int4@1',
-        nativeType: 'int4',
         source: 'dsl',
       },
     ]);

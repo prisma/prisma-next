@@ -32,13 +32,11 @@ describe('ast/common', () => {
     const withCodec = ParamRef.of('test', {
       name: 'field',
       codecId: 'pg/text@1',
-      nativeType: 'text',
     });
     expect(withCodec).toMatchObject({
       value: 'test',
       name: 'field',
       codecId: 'pg/text@1',
-      nativeType: 'text',
     });
   });
 

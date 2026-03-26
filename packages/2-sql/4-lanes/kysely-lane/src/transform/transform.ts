@@ -69,7 +69,6 @@ export function transformKyselyToPnAst(
     source: 'lane' as const,
     index: index + 1,
     ...(p.codecId ? { codecId: p.codecId } : {}),
-    ...(p.nativeType ? { nativeType: p.nativeType } : {}),
   }));
 
   let projection: Record<string, string> | undefined;
@@ -156,7 +155,6 @@ export function transformKyselyToPnAstCollectingParams(
     source: 'lane' as const,
     index: index + 1,
     ...(p.codecId ? { codecId: p.codecId } : {}),
-    ...(p.nativeType ? { nativeType: p.nativeType } : {}),
   }));
 
   let projection: Record<string, string> | undefined;

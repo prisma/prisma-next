@@ -23,26 +23,23 @@ function expectInsertBatchAst(
 
   expect(ast.rows).toEqual([
     {
-      id: ParamRef.of(rows[0]!.id, { name: 'id', codecId: 'pg/int4@1', nativeType: 'int4' }),
-      name: ParamRef.of(rows[0]!.name, { name: 'name', codecId: 'pg/text@1', nativeType: 'text' }),
+      id: ParamRef.of(rows[0]!.id, { name: 'id', codecId: 'pg/int4@1' }),
+      name: ParamRef.of(rows[0]!.name, { name: 'name', codecId: 'pg/text@1' }),
       email: ParamRef.of(rows[0]!.email, {
         name: 'email',
         codecId: 'pg/text@1',
-        nativeType: 'text',
       }),
       invited_by_id: ParamRef.of(rows[0]!.invitedById ?? null, {
         name: 'invited_by_id',
         codecId: 'pg/int4@1',
-        nativeType: 'int4',
       }),
     },
     {
-      id: ParamRef.of(rows[1]!.id, { name: 'id', codecId: 'pg/int4@1', nativeType: 'int4' }),
-      name: ParamRef.of(rows[1]!.name, { name: 'name', codecId: 'pg/text@1', nativeType: 'text' }),
+      id: ParamRef.of(rows[1]!.id, { name: 'id', codecId: 'pg/int4@1' }),
+      name: ParamRef.of(rows[1]!.name, { name: 'name', codecId: 'pg/text@1' }),
       email: ParamRef.of(rows[1]!.email, {
         name: 'email',
         codecId: 'pg/text@1',
-        nativeType: 'text',
       }),
       invited_by_id:
         rows[1]!.invitedById === undefined
@@ -50,7 +47,6 @@ function expectInsertBatchAst(
           : ParamRef.of(rows[1]!.invitedById, {
               name: 'invited_by_id',
               codecId: 'pg/int4@1',
-              nativeType: 'int4',
             }),
     },
   ]);

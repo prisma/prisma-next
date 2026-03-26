@@ -52,7 +52,6 @@ function deriveParamsFromAst(ast: {
     value: unknown;
     name: string | undefined;
     codecId: string | undefined;
-    nativeType: string | undefined;
   }>;
 }) {
   const collected = ast.collectParamRefs();
@@ -62,7 +61,6 @@ function deriveParamsFromAst(ast: {
       ...(p.name !== undefined && { name: p.name }),
       source: 'dsl' as const,
       ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
     })),
   };
 }

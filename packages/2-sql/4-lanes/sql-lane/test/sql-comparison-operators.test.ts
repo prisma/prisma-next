@@ -43,7 +43,7 @@ describe('sql comparison operators', () => {
       new BinaryExpr(
         op,
         ColumnRef.of('user', 'id'),
-        ParamRef.of(paramValue, { name: paramName, codecId: 'pg/int4@1', nativeType: 'int4' }),
+        ParamRef.of(paramValue, { name: paramName, codecId: 'pg/int4@1' }),
       ),
     );
   });

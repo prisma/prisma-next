@@ -66,7 +66,7 @@ describe('sql lane rich select and include ASTs', () => {
     expect(ast.orderBy?.[0]?.expr).toEqual(ColumnRef.of('user', 'email'));
     expect(ast.where).toBeInstanceOf(BinaryExpr);
     expect((ast.where as BinaryExpr).right).toEqual(
-      ParamRef.of('u1', { name: 'userId', codecId: 'pg/int4@1', nativeType: 'int4' }),
+      ParamRef.of('u1', { name: 'userId', codecId: 'pg/int4@1' }),
     );
   });
 

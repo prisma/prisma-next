@@ -14,7 +14,6 @@ export function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }): {
       ...(p.name !== undefined && { name: p.name }),
       source: 'dsl' as const,
       ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
     })),
   };
 }

@@ -27,13 +27,12 @@ function usersColParam(
   value: unknown,
 ): ParamRef {
   const columns = contract.storage.tables.users?.columns as
-    | Record<string, { codecId?: string; nativeType?: string }>
+    | Record<string, { codecId?: string }>
     | undefined;
   const columnMeta = columns?.[column];
   return ParamRef.of(value, {
     name: column,
     ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
-    ...(columnMeta?.nativeType !== undefined && { nativeType: columnMeta.nativeType }),
   });
 }
 

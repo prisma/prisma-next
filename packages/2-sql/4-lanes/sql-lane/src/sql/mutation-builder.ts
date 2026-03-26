@@ -40,7 +40,6 @@ function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
       ...(p.name !== undefined && { name: p.name }),
       source: 'dsl' as const,
       ...(p.codecId ? { codecId: p.codecId } : {}),
-      ...(p.nativeType ? { nativeType: p.nativeType } : {}),
     })),
   };
 }
@@ -149,7 +148,6 @@ export class InsertBuilderImpl<
       values[columnName] = ParamRef.of(value, {
         name: paramName,
         codecId,
-        nativeType: columnMeta?.nativeType,
       });
     }
 
@@ -169,7 +167,6 @@ export class InsertBuilderImpl<
       values[defaultValue.column] = ParamRef.of(defaultValue.value, {
         name: defaultValue.column,
         codecId: columnMeta.codecId,
-        nativeType: columnMeta.nativeType,
       });
     }
 
@@ -309,7 +306,6 @@ export class UpdateBuilderImpl<
       set[columnName] = ParamRef.of(value, {
         name: paramName,
         codecId,
-        nativeType: columnMeta?.nativeType,
       });
     }
 
@@ -329,7 +325,6 @@ export class UpdateBuilderImpl<
       set[defaultValue.column] = ParamRef.of(defaultValue.value, {
         name: defaultValue.column,
         codecId: columnMeta.codecId,
-        nativeType: columnMeta.nativeType,
       });
     }
 

@@ -102,7 +102,7 @@ describe('buildIncludeJoinArtifact', () => {
         BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'id')),
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(42, { name: 'userId', codecId: 'pg/int4@1', nativeType: 'int4' }),
+          ParamRef.of(42, { name: 'userId', codecId: 'pg/int4@1' }),
         ),
       ]),
     );

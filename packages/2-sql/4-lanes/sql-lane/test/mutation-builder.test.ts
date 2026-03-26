@@ -27,12 +27,10 @@ describe('mutation builders', () => {
       email: ParamRef.of('test@example.com', {
         name: 'email',
         codecId: 'pg/text@1',
-        nativeType: 'text',
       }),
       createdAt: ParamRef.of(new Date('2024-01-01'), {
         name: 'createdAt',
         codecId: 'pg/timestamptz@1',
-        nativeType: 'timestamptz',
       }),
     });
     expect(ast.returning).toEqual([ColumnRef.of('user', 'id'), ColumnRef.of('user', 'email')]);
@@ -54,7 +52,7 @@ describe('mutation builders', () => {
     expect((updatePlan.ast as UpdateAst).where).toEqual(
       BinaryExpr.eq(
         ColumnRef.of('user', 'id'),
-        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1', nativeType: 'int4' }),
+        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1' }),
       ),
     );
     expect((updatePlan.ast as UpdateAst).returning).toEqual([
@@ -127,12 +125,10 @@ describe('mutation builders', () => {
       createdAt: ParamRef.of(new Date('2024-01-01T00:00:00.000Z'), {
         name: 'createdAt',
         codecId: 'pg/timestamptz@1',
-        nativeType: 'timestamptz',
       }),
       email: ParamRef.of(insertPlan.params[1], {
         name: 'email',
         codecId: 'pg/text@1',
-        nativeType: 'text',
       }),
     });
     expect(typeof insertPlan.params[1]).toBe('string');
@@ -153,18 +149,16 @@ describe('mutation builders', () => {
       email: ParamRef.of('updated@example.com', {
         name: 'newEmail',
         codecId: 'pg/text@1',
-        nativeType: 'text',
       }),
       deletedAt: ParamRef.of(updatePlan.params[1], {
         name: 'deletedAt',
         codecId: 'pg/timestamptz@1',
-        nativeType: 'timestamptz',
       }),
     });
     expect((updatePlan.ast as UpdateAst).where).toEqual(
       BinaryExpr.eq(
         ColumnRef.of('user', 'id'),
-        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1', nativeType: 'int4' }),
+        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1' }),
       ),
     );
     expect(typeof updatePlan.params[1]).toBe('string');

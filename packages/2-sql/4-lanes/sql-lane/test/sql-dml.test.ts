@@ -25,12 +25,10 @@ describe('DML builders', () => {
       email: ParamRef.of('test@example.com', {
         name: 'email',
         codecId: 'pg/text@1',
-        nativeType: 'text',
       }),
       createdAt: ParamRef.of(new Date('2024-01-01'), {
         name: 'createdAt',
         codecId: 'pg/timestamptz@1',
-        nativeType: 'timestamptz',
       }),
     });
     expect(plan.meta.annotations).toMatchObject({
@@ -53,7 +51,7 @@ describe('DML builders', () => {
     expect((updatePlan.ast as UpdateAst).where).toEqual(
       BinaryExpr.eq(
         ColumnRef.of('user', 'id'),
-        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1', nativeType: 'int4' }),
+        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1' }),
       ),
     );
     expect(updatePlan.meta.annotations).toMatchObject({ hasWhere: true });
@@ -62,7 +60,7 @@ describe('DML builders', () => {
     expect((deletePlan.ast as DeleteAst).where).toEqual(
       BinaryExpr.eq(
         ColumnRef.of('user', 'id'),
-        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1', nativeType: 'int4' }),
+        ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1' }),
       ),
     );
     expect(deletePlan.meta.annotations).toMatchObject({ hasWhere: true });

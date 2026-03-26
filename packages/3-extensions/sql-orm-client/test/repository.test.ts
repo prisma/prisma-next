@@ -40,7 +40,6 @@ describe('Collection construction', () => {
         ParamRef.of(1000, {
           name: 'views',
           codecId: 'pg/int4@1',
-          nativeType: 'int4',
         }),
       ),
     });

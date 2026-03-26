@@ -105,18 +105,9 @@ export function buildWhereExpr(
 
     const value = paramsMap[paramName];
 
-    let nativeType: string | undefined;
-    if (leftExpr.kind === 'column-ref') {
-      const { table, column } = leftExpr;
-      const contractTable = contract.storage.tables[table];
-      const columnMeta = contractTable?.columns[column];
-      nativeType = columnMeta?.nativeType;
-    }
-
     rightExpr = ParamRefNode.of(value, {
       name: paramName,
       ...(codecId !== undefined && { codecId }),
-      ...(nativeType !== undefined && { nativeType }),
     });
   } else if (isColumnBuilder(where.right) || isExpressionBuilder(where.right)) {
     rightExpr = where.right.toExpr();

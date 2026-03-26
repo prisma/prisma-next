@@ -41,7 +41,6 @@ function toParamAssignments(
     assignments[column] = ParamRef.of(value, {
       name: column,
       ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
-      ...(columnMeta?.nativeType !== undefined && { nativeType: columnMeta.nativeType }),
     });
   }
 
@@ -84,7 +83,6 @@ function normalizeInsertRows(
         normalizedRow[column] = ParamRef.of(row[column], {
           name: column,
           ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
-          ...(columnMeta?.nativeType !== undefined && { nativeType: columnMeta.nativeType }),
         });
         continue;
       }

@@ -32,11 +32,8 @@ function resolveParamOptions(ctx: TransformContext, refs?: { table: string; colu
   const colDef = refs ? ctx.contract.storage.tables[refs.table]?.columns[refs.column] : undefined;
   const codecId =
     colDef?.codecId !== undefined && colDef.codecId !== '' ? colDef.codecId : undefined;
-  const nativeType =
-    colDef?.nativeType !== undefined && colDef.nativeType !== '' ? colDef.nativeType : undefined;
   return {
     ...(codecId !== undefined && { codecId }),
-    ...(nativeType !== undefined && { nativeType }),
   };
 }
 

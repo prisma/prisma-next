@@ -103,7 +103,7 @@ function createParamRef(
   const columnMeta = contract.storage.tables[columnRef.table]?.columns[columnRef.column];
   return ParamRef.of(value, {
     name: columnRef.column,
-    codecId: columnMeta?.codecId,
+    ...(columnMeta?.codecId !== undefined && { codecId: columnMeta.codecId }),
   });
 }
 

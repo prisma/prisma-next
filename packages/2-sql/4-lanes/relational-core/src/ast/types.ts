@@ -382,21 +382,18 @@ export class ParamRef extends AstNode {
   readonly value: unknown;
   readonly name: string | undefined;
   readonly codecId: string | undefined;
-  readonly nativeType: string | undefined;
 
   constructor(
     value: unknown,
     options?: {
       name?: string;
       codecId?: string;
-      nativeType?: string;
     },
   ) {
     super();
     this.value = value;
     this.name = options?.name;
     this.codecId = options?.codecId;
-    this.nativeType = options?.nativeType;
     this.freeze();
   }
 
@@ -405,7 +402,6 @@ export class ParamRef extends AstNode {
     options?: {
       name?: string;
       codecId?: string;
-      nativeType?: string;
     },
   ): ParamRef {
     return new ParamRef(value, options);

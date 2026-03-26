@@ -82,7 +82,7 @@ describe('SQL builder includeMany', () => {
         BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('post', 'userId')),
         BinaryExpr.eq(
           ColumnRef.of('post', 'title'),
-          ParamRef.of('Test', { name: 'title', codecId: 'pg/text@1', nativeType: 'text' }),
+          ParamRef.of('Test', { name: 'title', codecId: 'pg/text@1' }),
         ),
       ]),
     );

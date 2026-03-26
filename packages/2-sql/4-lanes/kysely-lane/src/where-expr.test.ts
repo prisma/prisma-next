@@ -72,9 +72,7 @@ describe('buildKyselyWhereExpr', () => {
     const whereArg = buildKyselyWhereExpr(contract, createSelectWithWhereCompiledQuery());
     const bound = whereArg.toWhereExpr();
     expect(bound.expr).toBeInstanceOf(BinaryExpr);
-    expect((bound.expr as BinaryExpr).right).toEqual(
-      ParamRef.of('admin', { codecId: 'string', nativeType: 'text' }),
-    );
+    expect((bound.expr as BinaryExpr).right).toEqual(ParamRef.of('admin', { codecId: 'string' }));
   });
 
   it('throws when select query has no where clause', () => {
