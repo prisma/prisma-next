@@ -1,4 +1,5 @@
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
+import type { QueryOperationDescriptor } from '@prisma-next/sql-relational-core/query-operations';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
 
@@ -19,6 +20,23 @@ export const pgvectorOperationSignature: SqlOperationSignature = {
   forTypeId: pgvectorTypeId,
   ...cosineDistanceOperation,
 };
+
+export const pgvectorQueryOperations: readonly QueryOperationDescriptor[] = [
+  {
+    method: 'cosineDistance',
+    args: [
+      { codecId: pgvectorTypeId, nullable: false },
+      { codecId: pgvectorTypeId, nullable: false },
+    ],
+    returns: { codecId: 'pg/float8@1', nullable: false },
+    lowering: {
+      targetFamily: 'sql',
+      strategy: 'function',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL lowering template
+      template: '1 - (${self} <=> ${arg0})',
+    },
+  },
+];
 
 export const pgvectorPackMeta = {
   kind: 'extension',

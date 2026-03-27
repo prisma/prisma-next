@@ -7,7 +7,7 @@ import {
   DoUpdateSetConflictAction,
   InsertAst,
   InsertOnConflict,
-  ListLiteralExpr,
+  ListExpression,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -156,7 +156,7 @@ describe('buildKyselyPlan', () => {
         projection: userSelectAllProjection,
         where: BinaryExpr.in(
           ColumnRef.of('user', 'id'),
-          ListLiteralExpr.of([
+          ListExpression.of([
             ParamRef.of('a', { codecId: 'pg/text@1' }),
             ParamRef.of('b', { codecId: 'pg/text@1' }),
             ParamRef.of('c', { codecId: 'pg/text@1' }),

@@ -7,7 +7,7 @@ import {
   EqColJoinOn,
   ExistsExpr,
   JoinAst,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   NullCheckExpr,
   OrderByItem,
@@ -127,13 +127,13 @@ describe('bindWhereExpr', () => {
   it('binds IN with list literal values to parameterized refs', () => {
     const expr = BinaryExpr.in(
       ColumnRef.of('users', 'id'),
-      ListLiteralExpr.of([LiteralExpr.of(1), LiteralExpr.of(2)]),
+      ListExpression.of([LiteralExpr.of(1), LiteralExpr.of(2)]),
     );
     const bound = bindWhereExpr(contract, expr);
 
     const binary = bound as BinaryExpr;
-    expect(binary.right.kind).toBe('list-literal');
-    const list = binary.right as ListLiteralExpr;
+    expect(binary.right.kind).toBe('list');
+    const list = binary.right as ListExpression;
     expect(list.values).toMatchObject([{ kind: 'param-ref' }, { kind: 'param-ref' }]);
     expect(list.values).toMatchObject([
       { value: 1, codecId: 'pg/int4@1' },
@@ -219,16 +219,16 @@ describe('bindWhereExpr', () => {
     expect(bound.kind).toBe('exists');
   });
 
-  it('passes through ParamRef values inside ListLiteralExpr without rebinding', () => {
+  it('passes through ParamRef values inside ListExpression without rebinding', () => {
     const existing = ParamRef.of(99, { name: 'id', codecId: 'pg/int4@1' });
     const expr = BinaryExpr.in(
       ColumnRef.of('users', 'id'),
-      ListLiteralExpr.of([existing, LiteralExpr.of(42)]),
+      ListExpression.of([existing, LiteralExpr.of(42)]),
     );
     const bound = bindWhereExpr(contract, expr);
 
     const binary = bound as BinaryExpr;
-    const list = binary.right as ListLiteralExpr;
+    const list = binary.right as ListExpression;
     expect(list.values).toMatchObject([{ kind: 'param-ref' }, { kind: 'param-ref' }]);
     expect(list.values[0]).toBe(existing);
     expect(list.values).toMatchObject([{ value: 99 }, { value: 42 }]);

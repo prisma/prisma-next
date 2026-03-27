@@ -5,7 +5,6 @@ import {
   type AnyExpression,
   type AnyFromSource,
   type AnyQueryAst,
-  type AnyWhereExpr,
   type BinaryExpr,
   type CodecParamsDescriptor,
   type ColumnRef,
@@ -17,7 +16,7 @@ import {
   type JoinOnExpr,
   type JsonArrayAggExpr,
   type JsonObjectExpr,
-  type ListLiteralExpr,
+  type ListExpression,
   LiteralExpr,
   type LowererContext,
   type NullCheckExpr,
@@ -273,32 +272,8 @@ function renderSubqueryExpr(
   return `(${renderSelect(expr.query, contract, pim)})`;
 }
 
-function renderWhere(expr: AnyWhereExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
-  return expr.accept<string>({
-    exists(expr) {
-      const notKeyword = expr.notExists ? 'NOT ' : '';
-      const subquery = renderSelect(expr.subquery, contract, pim);
-      return `${notKeyword}EXISTS (${subquery})`;
-    },
-    nullCheck(expr) {
-      return renderNullCheck(expr, contract, pim);
-    },
-    and(expr) {
-      if (expr.exprs.length === 0) {
-        return 'TRUE';
-      }
-      return `(${expr.exprs.map((part) => renderWhere(part, contract, pim)).join(' AND ')})`;
-    },
-    or(expr) {
-      if (expr.exprs.length === 0) {
-        return 'FALSE';
-      }
-      return `(${expr.exprs.map((part) => renderWhere(part, contract, pim)).join(' OR ')})`;
-    },
-    binary(expr) {
-      return renderBinary(expr, contract, pim);
-    },
-  });
+function renderWhere(expr: AnyExpression, contract?: PostgresContract, pim?: ParamIndexMap): string {
+  return renderExpr(expr, contract, pim);
 }
 
 function renderNullCheck(
@@ -313,7 +288,7 @@ function renderNullCheck(
 }
 
 function renderBinary(expr: BinaryExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
-  if (expr.right.kind === 'list-literal' && expr.right.values.length === 0) {
+  if (expr.right.kind === 'list' && expr.right.values.length === 0) {
     if (expr.op === 'in') {
       return 'FALSE';
     }
@@ -330,7 +305,7 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract, pim?: Param
   const rightNode = expr.right;
   let right: string;
   switch (rightNode.kind) {
-    case 'list-literal':
+    case 'list':
       right = renderListLiteral(rightNode, pim);
       break;
     case 'literal':
@@ -342,18 +317,9 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract, pim?: Param
     case 'param-ref':
       right = renderParamRef(rightNode, pim);
       break;
-    case 'subquery':
-    case 'operation':
-    case 'aggregate':
-    case 'json-object':
-    case 'json-array-agg':
+    default:
       right = renderExpr(rightNode, contract, pim);
       break;
-    // v8 ignore next 4
-    default:
-      throw new Error(
-        `Unsupported comparable kind: ${(rightNode satisfies never as { kind: string }).kind}`,
-      );
   }
 
   const operatorMap: Record<BinaryExpr['op'], string> = {
@@ -372,7 +338,7 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract, pim?: Param
   return `${leftRendered} ${operatorMap[expr.op]} ${right}`;
 }
 
-function renderListLiteral(expr: ListLiteralExpr, pim?: ParamIndexMap): string {
+function renderListLiteral(expr: ListExpression, pim?: ParamIndexMap): string {
   if (expr.values.length === 0) {
     return '(NULL)';
   }
@@ -449,6 +415,8 @@ function renderExpr(expr: AnyExpression, contract?: PostgresContract, pim?: Para
   switch (node.kind) {
     case 'column-ref':
       return renderColumn(node);
+    case 'identifier-ref':
+      return quoteIdentifier(node.name);
     case 'operation':
       return renderOperation(node, contract, pim);
     case 'subquery':
@@ -459,6 +427,33 @@ function renderExpr(expr: AnyExpression, contract?: PostgresContract, pim?: Para
       return renderJsonObjectExpr(node, contract, pim);
     case 'json-array-agg':
       return renderJsonArrayAggExpr(node, contract, pim);
+    case 'binary':
+      return renderBinary(node, contract, pim);
+    case 'and':
+      if (node.exprs.length === 0) {
+        return 'TRUE';
+      }
+      return `(${node.exprs.map((part) => renderExpr(part, contract, pim)).join(' AND ')})`;
+    case 'or':
+      if (node.exprs.length === 0) {
+        return 'FALSE';
+      }
+      return `(${node.exprs.map((part) => renderExpr(part, contract, pim)).join(' OR ')})`;
+    case 'exists': {
+      const notKeyword = node.notExists ? 'NOT ' : '';
+      const subquery = renderSelect(node.subquery, contract, pim);
+      return `${notKeyword}EXISTS (${subquery})`;
+    }
+    case 'null-check':
+      return renderNullCheck(node, contract, pim);
+    case 'not':
+      return `NOT (${renderExpr(node.expr, contract, pim)})`;
+    case 'param-ref':
+      return renderParamRef(node, pim);
+    case 'literal':
+      return renderLiteral(node);
+    case 'list':
+      return renderListLiteral(node, pim);
     // v8 ignore next 4
     default:
       throw new Error(
@@ -511,32 +506,13 @@ function renderOperation(
 ): string {
   const self = renderExpr(expr.self, contract, pim);
   const args = expr.args.map((arg) => {
-    const node = arg;
-    switch (node.kind) {
-      case 'param-ref':
-        return renderParamRef(node, pim);
-      case 'literal':
-        return renderLiteral(node);
-      case 'column-ref':
-      case 'subquery':
-      case 'operation':
-      case 'aggregate':
-      case 'json-object':
-      case 'json-array-agg':
-        return renderExpr(node, contract, pim);
-      // v8 ignore next 4
-      default: {
-        throw new Error(
-          `Unsupported operation arg kind: ${(node satisfies never as { kind: string }).kind}`,
-        );
-      }
-    }
+    return renderExpr(arg, contract, pim);
   });
 
   let result = expr.lowering.template;
-  result = result.replace(/\$\{self\}/g, self);
+  result = result.replace(/\{\{self\}\}/g, self);
   for (let i = 0; i < args.length; i++) {
-    result = result.replace(new RegExp(`\\$\\{arg${i}\\}`, 'g'), args[i] ?? '');
+    result = result.replace(new RegExp(`\\{\\{arg${i}\\}\\}`, 'g'), args[i] ?? '');
   }
 
   return result;

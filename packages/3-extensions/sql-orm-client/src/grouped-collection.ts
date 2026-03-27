@@ -1,7 +1,7 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
-  type AnyWhereExpr,
+  type AnyExpression,
   BinaryExpr,
   type BinaryOp,
   ColumnRef,
@@ -27,7 +27,7 @@ interface GroupedCollectionInit {
   readonly baseFilters: readonly AnyWhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
-  readonly havingFilters: readonly AnyWhereExpr[];
+  readonly havingFilters: readonly AnyExpression[];
 }
 
 type GroupByFieldName<
@@ -46,7 +46,7 @@ export class GroupedCollection<
   readonly baseFilters: readonly AnyWhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
-  readonly havingFilters: readonly AnyWhereExpr[];
+  readonly havingFilters: readonly AnyExpression[];
 
   constructor(
     ctx: CollectionContext<TContract>,
@@ -63,7 +63,7 @@ export class GroupedCollection<
   }
 
   having(
-    predicate: (having: HavingBuilder<TContract, ModelName>) => AnyWhereExpr,
+    predicate: (having: HavingBuilder<TContract, ModelName>) => AnyExpression,
   ): GroupedCollection<TContract, ModelName, GroupFields> {
     const havingExpr = predicate(
       createHavingBuilder(this.ctx.contract, this.modelName, this.tableName),
@@ -153,7 +153,7 @@ function createHavingBuilder<TContract extends SqlContract<SqlStorage>, ModelNam
 function createHavingComparisonMethods<T extends number | null>(
   metric: AggregateExpr,
 ): HavingComparisonMethods<T> {
-  const buildBinaryExpr = (op: BinaryOp, value: unknown): AnyWhereExpr =>
+  const buildBinaryExpr = (op: BinaryOp, value: unknown): AnyExpression =>
     new BinaryExpr(op, metric, LiteralExpr.of(value));
 
   return {

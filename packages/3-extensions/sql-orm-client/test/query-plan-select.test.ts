@@ -3,7 +3,7 @@ import {
   BinaryExpr,
   ColumnRef,
   DerivedTableSource,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   OrExpr,
   type SelectAst,
@@ -164,7 +164,7 @@ describe('compileSelectWithIncludeStrategy', () => {
 
     const inWhere = bindWhereExpr(
       baseContract,
-      BinaryExpr.in(ColumnRef.of('posts', 'user_id'), ListLiteralExpr.fromValues([1, 2])),
+      BinaryExpr.in(ColumnRef.of('posts', 'user_id'), ListExpression.fromValues([1, 2])),
     );
     const titleWhere = bindWhereExpr(
       baseContract,

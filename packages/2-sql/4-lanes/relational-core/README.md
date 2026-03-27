@@ -93,7 +93,7 @@ flowchart TD
 
 ### AST Surface (`ast/*` via `exports/ast.ts`)
 - Query roots: `SelectAst`, `InsertAst`, `UpdateAst`, `DeleteAst`
-- Expressions: `ColumnRef`, `ParamRef`, `LiteralExpr`, `OperationExpr`, `ListLiteralExpr`
+- Expressions: `ColumnRef`, `ParamRef`, `LiteralExpr`, `OperationExpr`, `ListExpression`
 - Predicates: `BinaryExpr` (ops: `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `like`, `ilike`, `in`, `notIn`), `AndExpr`, `OrExpr`, `ExistsExpr`, `NullCheckExpr`
 - Lane-agnostic filter interop: `WhereArg` and `ToWhereExpr` for passing filter payloads without lane-specific types
 - Joins: `JoinAst`, `JoinOnExpr` (eqCol or WhereExpr)

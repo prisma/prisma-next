@@ -1,11 +1,11 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
-  type AnyWhereExpr,
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   NullCheckExpr,
   ProjectionItem,
@@ -38,7 +38,7 @@ interface RelationMeta {
 }
 
 type RelationPredicateInput<TContract extends SqlContract<SqlStorage>, ModelName extends string> =
-  | ((model: ModelAccessor<TContract, ModelName>) => AnyWhereExpr)
+  | ((model: ModelAccessor<TContract, ModelName>) => AnyExpression)
   | Record<string, unknown>;
 
 /**
@@ -86,7 +86,7 @@ function createScalarFieldAccessor(
         new BinaryExpr(
           op,
           left,
-          ListLiteralExpr.fromValues(values),
+          ListExpression.fromValues(values),
         )) as ComparisonMethods<unknown>[typeof op];
       continue;
     }
@@ -157,7 +157,7 @@ function buildExistsExpr<TContract extends SqlContract<SqlStorage>>(
     readonly mode: 'some' | 'every' | 'none';
     readonly predicate: RelationPredicateInput<TContract, string> | undefined;
   },
-): AnyWhereExpr {
+): AnyExpression {
   const joinWhere = buildJoinWhere(parentTableName, relatedTableName, relation);
   const childWhere = toRelationWhereExpr(contract, relatedModelName, options.predicate);
 
@@ -193,7 +193,7 @@ function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
   relatedModelName: string,
   predicate: RelationPredicateInput<TContract, string> | undefined,
-): AnyWhereExpr | undefined {
+): AnyExpression | undefined {
   if (!predicate) {
     return undefined;
   }
@@ -204,7 +204,7 @@ function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
     return predicate(accessor);
   }
 
-  const exprs: AnyWhereExpr[] = [];
+  const exprs: AnyExpression[] = [];
   for (const [fieldName, value] of Object.entries(predicate)) {
     if (value === undefined) {
       continue;
@@ -234,11 +234,11 @@ function buildJoinWhere(
   parentTableName: string,
   childTableName: string,
   relation: RelationMeta,
-): AnyWhereExpr {
+): AnyExpression {
   const parentCols = relation.on?.parentCols ?? [];
   const childCols = relation.on?.childCols ?? [];
 
-  const joinExprs: AnyWhereExpr[] = [];
+  const joinExprs: AnyExpression[] = [];
   const count = Math.min(parentCols.length, childCols.length);
 
   for (let i = 0; i < count; i++) {

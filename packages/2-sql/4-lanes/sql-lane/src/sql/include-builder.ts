@@ -1,7 +1,7 @@
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
-  type AnyWhereExpr,
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   DerivedTableSource,
@@ -234,7 +234,7 @@ export function buildIncludeJoinArtifact(
   contract: SqlContract<SqlStorage>,
   paramsMap: Record<string, unknown>,
 ): IncludeJoinArtifact {
-  let childWhere: AnyWhereExpr | undefined;
+  let childWhere: AnyExpression | undefined;
   if (include.childWhere) {
     const whereResult = buildWhereExpr(contract, include.childWhere, paramsMap);
     childWhere = whereResult.expr;
