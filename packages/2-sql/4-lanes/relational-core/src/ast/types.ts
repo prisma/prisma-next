@@ -66,6 +66,59 @@ export type JsonObjectEntry = {
   readonly value: ProjectionExpr;
 };
 
+export type AnyOperationArg = Expression | ParamRef | LiteralExpr;
+export type AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst;
+export type AnyExpression = Expression;
+export type AnyWhereExpr = WhereExpr;
+export type AnySqlComparable = SqlComparable;
+export type AnyFromSource = FromSource;
+
+const queryAstKinds: ReadonlySet<string> = new Set(['select', 'insert', 'update', 'delete']);
+
+export function isQueryAst(value: unknown): value is AnyQueryAst {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    queryAstKinds.has((value as { kind: string }).kind)
+  );
+}
+
+const expressionKinds: ReadonlySet<string> = new Set([
+  'column-ref',
+  'subquery',
+  'operation',
+  'aggregate',
+  'json-object',
+  'json-array-agg',
+]);
+
+export function isExpression(value: unknown): value is AnyExpression {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    expressionKinds.has((value as { kind: string }).kind)
+  );
+}
+
+const whereExprKinds: ReadonlySet<string> = new Set([
+  'binary',
+  'and',
+  'or',
+  'exists',
+  'null-check',
+]);
+
+export function isWhereExpr(value: unknown): value is AnyWhereExpr {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    whereExprKinds.has((value as { kind: string }).kind)
+  );
+}
+
 function frozenArrayCopy<T>(values: readonly T[]): ReadonlyArray<T> {
   return Object.freeze([...values]);
 }
@@ -205,6 +258,7 @@ export abstract class AstNode {
 }
 
 export abstract class QueryAst extends AstNode {
+  abstract readonly kind: 'select' | 'insert' | 'update' | 'delete';
   abstract collectRefs(): PlanRefs;
   abstract collectParamRefs(): ParamRef[];
 
@@ -215,11 +269,19 @@ export abstract class QueryAst extends AstNode {
 }
 
 export abstract class FromSource extends AstNode {
+  abstract readonly kind: 'table-source' | 'derived-table-source';
   abstract collectRefs(): PlanRefs;
   abstract rewrite(rewriter: AstRewriter): FromSource;
 }
 
 export abstract class Expression extends AstNode implements ExpressionSource {
+  abstract readonly kind:
+    | 'column-ref'
+    | 'subquery'
+    | 'operation'
+    | 'aggregate'
+    | 'json-object'
+    | 'json-array-agg';
   abstract rewrite(rewriter: ExpressionRewriter): Expression;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
 
@@ -241,6 +303,7 @@ export abstract class Expression extends AstNode implements ExpressionSource {
 }
 
 export abstract class WhereExpr extends AstNode {
+  abstract readonly kind: 'binary' | 'and' | 'or' | 'exists' | 'null-check';
   abstract accept<R>(visitor: WhereExprVisitor<R>): R;
   abstract rewrite(rewriter: ExpressionRewriter): WhereExpr;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
@@ -256,6 +319,7 @@ export abstract class WhereExpr extends AstNode {
 }
 
 export class TableSource extends FromSource {
+  readonly kind = 'table-source' as const;
   readonly name: string;
   readonly alias: string | undefined;
 
@@ -288,6 +352,7 @@ export interface TableRef {
 }
 
 export class DerivedTableSource extends FromSource {
+  readonly kind = 'derived-table-source' as const;
   readonly alias: string;
   readonly query: SelectAst;
 
@@ -315,6 +380,7 @@ export class DerivedTableSource extends FromSource {
 }
 
 export class ColumnRef extends Expression {
+  readonly kind = 'column-ref' as const;
   readonly table: string;
   readonly column: string;
 
@@ -343,6 +409,7 @@ export class ColumnRef extends Expression {
 }
 
 export class ParamRef extends AstNode {
+  readonly kind = 'param-ref' as const;
   readonly value: unknown;
   readonly name: string | undefined;
   readonly codecId: string;
@@ -373,6 +440,7 @@ export class ParamRef extends AstNode {
 }
 
 export class DefaultValueExpr extends AstNode {
+  readonly kind = 'default-value' as const;
   constructor() {
     super();
     this.freeze();
@@ -380,6 +448,7 @@ export class DefaultValueExpr extends AstNode {
 }
 
 export class LiteralExpr extends AstNode {
+  readonly kind = 'literal' as const;
   readonly value: unknown;
 
   constructor(value: unknown) {
@@ -394,6 +463,7 @@ export class LiteralExpr extends AstNode {
 }
 
 export class SubqueryExpr extends Expression {
+  readonly kind = 'subquery' as const;
   readonly query: SelectAst;
 
   constructor(query: SelectAst) {
@@ -417,6 +487,7 @@ export class SubqueryExpr extends Expression {
 }
 
 export class OperationExpr extends Expression {
+  readonly kind = 'operation' as const;
   readonly method: string;
   readonly forTypeId: string;
   readonly self: Expression;
@@ -490,6 +561,7 @@ export class OperationExpr extends Expression {
 }
 
 export class AggregateExpr extends Expression {
+  readonly kind = 'aggregate' as const;
   readonly fn: AggregateFn;
   readonly expr: Expression | undefined;
 
@@ -533,6 +605,7 @@ export class AggregateExpr extends Expression {
 }
 
 export class JsonObjectExpr extends Expression {
+  readonly kind = 'json-object' as const;
   readonly entries: ReadonlyArray<JsonObjectEntry>;
 
   constructor(entries: ReadonlyArray<JsonObjectEntry>) {
@@ -582,6 +655,7 @@ export class JsonObjectExpr extends Expression {
 }
 
 export class OrderByItem extends AstNode {
+  readonly kind = 'order-by-item' as const;
   readonly expr: Expression;
   readonly dir: Direction;
 
@@ -606,6 +680,7 @@ export class OrderByItem extends AstNode {
 }
 
 export class JsonArrayAggExpr extends Expression {
+  readonly kind = 'json-array-agg' as const;
   readonly expr: Expression;
   readonly onEmpty: 'null' | 'emptyArray';
   readonly orderBy: ReadonlyArray<OrderByItem> | undefined;
@@ -647,6 +722,7 @@ export class JsonArrayAggExpr extends Expression {
 }
 
 export class ListLiteralExpr extends AstNode {
+  readonly kind = 'list-literal' as const;
   readonly values: ReadonlyArray<ParamRef | LiteralExpr>;
 
   constructor(values: ReadonlyArray<ParamRef | LiteralExpr>) {
@@ -699,6 +775,7 @@ export class ListLiteralExpr extends AstNode {
 }
 
 export class BinaryExpr extends WhereExpr {
+  readonly kind = 'binary' as const;
   readonly op: BinaryOp;
   readonly left: Expression;
   readonly right: SqlComparable;
@@ -804,6 +881,7 @@ function negateBinaryOp(op: BinaryOp): BinaryOp {
 }
 
 export class AndExpr extends WhereExpr {
+  readonly kind = 'and' as const;
   readonly exprs: ReadonlyArray<WhereExpr>;
 
   constructor(exprs: ReadonlyArray<WhereExpr>) {
@@ -841,6 +919,7 @@ export class AndExpr extends WhereExpr {
 }
 
 export class OrExpr extends WhereExpr {
+  readonly kind = 'or' as const;
   readonly exprs: ReadonlyArray<WhereExpr>;
 
   constructor(exprs: ReadonlyArray<WhereExpr>) {
@@ -878,6 +957,7 @@ export class OrExpr extends WhereExpr {
 }
 
 export class ExistsExpr extends WhereExpr {
+  readonly kind = 'exists' as const;
   readonly notExists: boolean;
   readonly subquery: SelectAst;
 
@@ -914,6 +994,7 @@ export class ExistsExpr extends WhereExpr {
 }
 
 export class NullCheckExpr extends WhereExpr {
+  readonly kind = 'null-check' as const;
   readonly expr: Expression;
   readonly isNull: boolean;
 
@@ -950,6 +1031,7 @@ export class NullCheckExpr extends WhereExpr {
 }
 
 export class EqColJoinOn extends AstNode {
+  readonly kind = 'eq-col-join-on' as const;
   readonly left: ColumnRef;
   readonly right: ColumnRef;
 
@@ -970,6 +1052,7 @@ export class EqColJoinOn extends AstNode {
 }
 
 export class JoinAst extends AstNode {
+  readonly kind = 'join' as const;
   readonly joinType: 'inner' | 'left' | 'right' | 'full';
   readonly source: FromSource;
   readonly lateral: boolean;
@@ -1016,6 +1099,7 @@ export class JoinAst extends AstNode {
 }
 
 export class ProjectionItem extends AstNode {
+  readonly kind = 'projection-item' as const;
   readonly alias: string;
   readonly expr: ProjectionExpr;
 
@@ -1047,6 +1131,7 @@ export interface SelectAstOptions {
 }
 
 export class SelectAst extends QueryAst {
+  readonly kind = 'select' as const;
   readonly from: FromSource;
   readonly joins: ReadonlyArray<JoinAst> | undefined;
   readonly projection: ReadonlyArray<ProjectionItem>;
@@ -1317,9 +1402,12 @@ export class SelectAst extends QueryAst {
   }
 }
 
-export abstract class InsertOnConflictAction extends AstNode {}
+export abstract class InsertOnConflictAction extends AstNode {
+  abstract readonly kind: 'do-nothing' | 'do-update-set';
+}
 
 export class DoNothingConflictAction extends InsertOnConflictAction {
+  readonly kind = 'do-nothing' as const;
   constructor() {
     super();
     this.freeze();
@@ -1327,6 +1415,7 @@ export class DoNothingConflictAction extends InsertOnConflictAction {
 }
 
 export class DoUpdateSetConflictAction extends InsertOnConflictAction {
+  readonly kind = 'do-update-set' as const;
   readonly set: Readonly<Record<string, ColumnRef | ParamRef>>;
 
   constructor(set: Readonly<Record<string, ColumnRef | ParamRef>>) {
@@ -1337,6 +1426,7 @@ export class DoUpdateSetConflictAction extends InsertOnConflictAction {
 }
 
 export class InsertOnConflict extends AstNode {
+  readonly kind = 'insert-on-conflict' as const;
   readonly columns: ReadonlyArray<ColumnRef>;
   readonly action: InsertOnConflictAction;
 
@@ -1361,6 +1451,7 @@ export class InsertOnConflict extends AstNode {
 }
 
 export class InsertAst extends QueryAst {
+  readonly kind = 'insert' as const;
   readonly table: TableSource;
   readonly rows: ReadonlyArray<Readonly<Record<string, InsertValue>>>;
   readonly onConflict: InsertOnConflict | undefined;
@@ -1469,6 +1560,7 @@ export class InsertAst extends QueryAst {
 }
 
 export class UpdateAst extends QueryAst {
+  readonly kind = 'update' as const;
   readonly table: TableSource;
   readonly set: Readonly<Record<string, ColumnRef | ParamRef>>;
   readonly where: WhereExpr | undefined;
@@ -1538,6 +1630,7 @@ export class UpdateAst extends QueryAst {
 }
 
 export class DeleteAst extends QueryAst {
+  readonly kind = 'delete' as const;
   readonly table: TableSource;
   readonly where: WhereExpr | undefined;
   readonly returning: ReadonlyArray<ColumnRef> | undefined;

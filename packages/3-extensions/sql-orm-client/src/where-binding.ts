@@ -2,16 +2,14 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   BinaryExpr,
-  ColumnRef,
+  type ColumnRef,
   DerivedTableSource,
-  EqColJoinOn,
   ExistsExpr,
   type Expression,
   type ExpressionRewriter,
   type FromSource,
   JoinAst,
   ListLiteralExpr,
-  LiteralExpr,
   NullCheckExpr,
   OrderByItem,
   OrExpr,
@@ -20,7 +18,6 @@ import {
   ProjectionItem,
   SelectAst,
   type SqlComparable,
-  TableSource,
   type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 
@@ -32,7 +29,7 @@ function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: WhereExpr): 
   return expr.accept<WhereExpr>({
     binary(expr) {
       const left = bindExpression(contract, expr.left);
-      const bindingColumn = left instanceof ColumnRef ? left : undefined;
+      const bindingColumn = left.kind === 'column-ref' ? (left as ColumnRef) : undefined;
 
       return new BinaryExpr(expr.op, left, bindComparable(contract, expr.right, bindingColumn));
     },
@@ -60,22 +57,22 @@ function bindComparable(
   comparable: SqlComparable,
   bindingColumn: ColumnRef | undefined,
 ): SqlComparable {
-  if (comparable instanceof ParamRef || bindingColumn === undefined) {
-    return comparable instanceof ParamRef
+  if (comparable.kind === 'param-ref' || bindingColumn === undefined) {
+    return comparable.kind === 'param-ref'
       ? comparable
-      : comparable instanceof LiteralExpr || comparable instanceof ListLiteralExpr
+      : comparable.kind === 'literal' || comparable.kind === 'list-literal'
         ? comparable
         : bindExpression(contract, comparable);
   }
 
-  if (comparable instanceof LiteralExpr) {
+  if (comparable.kind === 'literal') {
     return createParamRef(contract, bindingColumn, comparable.value);
   }
 
-  if (comparable instanceof ListLiteralExpr) {
+  if (comparable.kind === 'list-literal') {
     return ListLiteralExpr.of(
       comparable.values.map((value) =>
-        value instanceof LiteralExpr ? createParamRef(contract, bindingColumn, value.value) : value,
+        value.kind === 'literal' ? createParamRef(contract, bindingColumn, value.value) : value,
       ),
     );
   }
@@ -109,7 +106,7 @@ function bindProjectionExpr(
   contract: SqlContract<SqlStorage>,
   expr: ProjectionExpr,
 ): ProjectionExpr {
-  return expr instanceof LiteralExpr ? expr : bindExpression(contract, expr);
+  return expr.kind === 'literal' ? expr : bindExpression(contract, expr);
 }
 
 function bindOrderByItem(contract: SqlContract<SqlStorage>, orderItem: OrderByItem): OrderByItem {
@@ -120,17 +117,18 @@ function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst): JoinAst {
   return new JoinAst(
     join.joinType,
     bindFromSource(contract, join.source),
-    join.on instanceof EqColJoinOn ? join.on : bindWhereExprNode(contract, join.on),
+    join.on.kind === 'eq-col-join-on' ? join.on : bindWhereExprNode(contract, join.on),
     join.lateral,
   );
 }
 
 function bindFromSource(contract: SqlContract<SqlStorage>, source: FromSource): FromSource {
-  if (source instanceof TableSource) {
+  if (source.kind === 'table-source') {
     return source;
   }
-  if (source instanceof DerivedTableSource) {
-    return DerivedTableSource.as(source.alias, bindSelectAst(contract, source.query));
+  if (source.kind === 'derived-table-source') {
+    const derived = source as DerivedTableSource;
+    return DerivedTableSource.as(derived.alias, bindSelectAst(contract, derived.query));
   }
 
   return source;

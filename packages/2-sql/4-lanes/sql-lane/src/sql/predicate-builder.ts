@@ -5,11 +5,12 @@ import type {
   AnySqlComparable,
   AnyWhereExpr,
   NullCheckExpr,
+  OperationExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
+  isExpression,
   NullCheckExpr as NullCheckExprNode,
-  OperationExpr,
   ParamRef as ParamRefNode,
 } from '@prisma-next/sql-relational-core/ast';
 import type {
@@ -82,6 +83,10 @@ export function buildWhereExpr(
 
   leftExpr = where.left;
 
+  if (!isExpression(leftExpr)) {
+    errorFailedToBuildWhereClause();
+  }
+
   if (leftExpr.kind === 'column-ref') {
     const { table, column } = leftExpr;
     const contractTable = contract.storage.tables[table];
@@ -95,8 +100,9 @@ export function buildWhereExpr(
     }
 
     codecId = columnMeta.codecId;
-  } else if (leftExpr instanceof OperationExpr) {
-    codecId = leftExpr.returns.kind === 'typeId' ? leftExpr.returns.type : leftExpr.forTypeId;
+  } else if (leftExpr.kind === 'operation') {
+    const opExpr = leftExpr as OperationExpr;
+    codecId = opExpr.returns.kind === 'typeId' ? opExpr.returns.type : opExpr.forTypeId;
   }
 
   if (isParamPlaceholder(where.right)) {
