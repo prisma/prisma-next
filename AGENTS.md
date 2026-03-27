@@ -30,11 +30,36 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 ## Golden Rules
 
 - **Node.js version**: Use the shell's Node. Do not run nvm/fnm or any version switcher. Source of truth is root `package.json` `engines.node`. If the shell's version is wrong or commands fail, report that the shell is misconfigured and the user should configure their environment to satisfy `engines.node`.
-- Use pnpm and local scripts (not ad‑hoc `tsc`, `jest`): `.cursor/rules/use-correct-tools.mdc`
+- Use `pnpm` not `npm`!
+- The source of truth for the required Node version is the root `package.json` `engines.node` field.
+- Never use `npx`
+- If the shell's `node -v` does not satisfy that, or Node/pnpm commands fail due to version, report:
+  "Your shell is misconfigured for this repo. Configure your environment so that `node`
+  resolves to a version that satisfies the root package.json engines.node (e.g. set your
+  default Node in your version manager, or use Volta)."
+- We use turborepo to build, generally. `pnpm build` scripts are available in each package which delegate to turborepo
+- If you change exported types in a workspace package consumed by other packages/examples, run that package's `pnpm build` to refresh `dist/*.d.mts` declarations before validating downstream TypeScript usage.
+- When you want to typecheck, use the local `pnpm typecheck` scripts instead of writing `tsc` commands from scratch
+- When you want to test, use the local `pnpm test` scripts. For coverage, use `pnpm test:coverage` (all packages) or `pnpm coverage:packages` (packages only, excludes examples)
+- Use arktype instead of zod
+- Never add file extensions to imports in TypeScript
+- Don't add comments if avoidable, prefer code which expresses its intent
+- Don't add exports for backwards compatibility unless requested to do so
+- Always write tests before creating or modifying implementation
+- Do not reexport things from one file in another, except in the `exports/` folders
 - Don't branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`
 - Keep tests concise; omit "should": `.cursor/rules/omit-should-in-tests.mdc`
 - Keep docs current (READMEs, rules, links): `.cursor/rules/doc-maintenance.mdc`
 - Prefer links to canonical docs over long comments
+
+## Typesafety rules
+- Never use `any` type
+- Never use `@ts-expect-error` outside of negative type tests
+- Never use `@ts-nocheck`
+- Never suppress biome lints
+- Try to minimize type casts. Instead, prefer explic types that would make type casts unnecesarry. If type cast is unavoidable, try to minimize it's scope — never cast
+  entire object/class when casting one property would suffice.
+- `as unknown as SomeOtherType` type cast should be used only as a last resort and should allways be accompanied by the comment explaining why is it necessary.
 
 ## Common Commands
 
