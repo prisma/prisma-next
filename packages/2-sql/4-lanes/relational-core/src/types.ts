@@ -490,11 +490,7 @@ type OperationArgs<Args extends ReadonlyArray<ArgSpec>> = Args extends readonly 
 
 type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
   ? AnyExpressionSource
-  : Arg extends { kind: 'param' }
-    ? unknown
-    : Arg extends { kind: 'literal' }
-      ? unknown
-      : never;
+  : unknown;
 
 /**
  * Maps operation return spec to return type.
