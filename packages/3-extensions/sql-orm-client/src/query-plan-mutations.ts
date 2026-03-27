@@ -36,8 +36,13 @@ function toParamAssignments(
 } {
   const assignments: Record<string, ParamRef> = {};
 
+  const table = contract.storage.tables[tableName];
+  if (!table) {
+    throw new Error(`Unknown table "${tableName}"`);
+  }
+
   for (const [column, value] of Object.entries(values)) {
-    const codecId = contract.storage.tables[tableName]?.columns[column]?.codecId;
+    const codecId = table.columns[column]?.codecId;
     if (!codecId) {
       throw new Error(`Unknown column "${column}" in table "${tableName}"`);
     }
