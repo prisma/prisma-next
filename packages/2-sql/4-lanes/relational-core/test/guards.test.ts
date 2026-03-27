@@ -55,8 +55,7 @@ describe('utils/guards', () => {
       self: ColumnRef.of('user', 'email'),
       args: [],
       returns: { kind: 'builtin', type: 'string' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'lower(${self})',
+      template: 'lower({{self}})',
     });
     const builder = expressionBuilder(expr);
 
@@ -74,8 +73,7 @@ describe('utils/guards', () => {
       self: ColumnRef.of('user', 'email'),
       args: [],
       returns: { kind: 'builtin', type: 'string' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'lower(${self})',
+      template: 'lower({{self}})',
     });
     const builder = expressionBuilder(expr);
 

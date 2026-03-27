@@ -113,8 +113,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -155,8 +154,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -259,8 +257,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -318,8 +315,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -428,8 +424,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -459,8 +454,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -512,8 +506,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -549,8 +542,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -581,8 +573,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -614,8 +605,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
 
@@ -674,8 +664,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
 
@@ -687,8 +676,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} * ${arg0}',
+        template: '{{self}} * {{arg0}}',
       },
     };
 
@@ -751,8 +739,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
 
@@ -765,8 +752,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'special(${self}, ${arg0})',
+        template: 'special({{self}}, {{arg0}})',
       },
     };
 
@@ -834,8 +820,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
 
@@ -848,8 +833,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'special(${self}, ${arg0})',
+        template: 'special({{self}}, {{arg0}})',
       },
     };
 
@@ -921,8 +905,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
 
@@ -982,8 +965,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
 
@@ -1055,8 +1037,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
 
@@ -1133,8 +1114,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
 
@@ -1266,8 +1246,7 @@ describe('operations-registry', () => {
                 lowering: {
                   targetFamily: 'sql',
                   strategy: 'infix',
-                  // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-                  template: '${self} + ${arg0}',
+                  template: '{{self}} + {{arg0}}',
                 },
               },
             ],
@@ -1407,8 +1386,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'broken(${self}, ${arg0})',
+        template: 'broken({{self}}, {{arg0}})',
       },
     } as unknown as SqlOperationSignature;
 
@@ -1554,8 +1532,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -1590,8 +1567,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
 
@@ -1641,8 +1617,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'cast_unregistered(${self}, ${arg0})',
+        template: 'cast_unregistered({{self}}, {{arg0}})',
       },
     };
 
@@ -1693,8 +1668,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} + ${arg0}',
+        template: '{{self}} + {{arg0}}',
       },
     };
     const gatedSignature: SqlOperationSignature = {
@@ -1706,8 +1680,7 @@ describe('operations-registry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'special(${self}, ${arg0})',
+        template: 'special({{self}}, {{arg0}})',
       },
     };
 

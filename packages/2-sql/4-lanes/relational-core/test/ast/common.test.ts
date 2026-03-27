@@ -44,8 +44,7 @@ describe('ast/common', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-        template: '${self} || ${arg0}',
+        template: '{{self}} || {{arg0}}',
       },
     });
     const lowered = lowerExpr(col('user', 'email'));
@@ -59,8 +58,7 @@ describe('ast/common', () => {
     expect(lowered.lowering).toEqual({
       targetFamily: 'sql',
       strategy: 'function',
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'lower(${self})',
+      template: 'lower({{self}})',
     });
   });
 
