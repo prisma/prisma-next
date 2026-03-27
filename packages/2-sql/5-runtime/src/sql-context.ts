@@ -17,10 +17,10 @@ import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type {
   Adapter,
+  AnyQueryAst,
   CodecParamsDescriptor,
   CodecRegistry,
   LoweredStatement,
-  QueryAst,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -115,7 +115,7 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
   'sql',
   TTargetId
 > &
-  Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+  Adapter<AnyQueryAst, SqlContract<SqlStorage>, LoweredStatement>;
 
 /**
  * NOTE: Binding type is intentionally erased to unknown at this shared runtime layer.

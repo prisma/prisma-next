@@ -4,7 +4,6 @@ import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
 import {
   type AnyFromSource,
   type AnyQueryAst,
-  type FromSource,
   isQueryAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -47,15 +46,14 @@ function lintError(code: string, message: string, details?: Record<string, unkno
   });
 }
 
-function getFromSourceTableDetail(source: FromSource): string | undefined {
-  const node = source as AnyFromSource;
-  switch (node.kind) {
+function getFromSourceTableDetail(source: AnyFromSource): string | undefined {
+  switch (source.kind) {
     case 'table-source':
-      return node.name;
+      return source.name;
     case 'derived-table-source':
-      return node.alias;
+      return source.alias;
     default: {
-      const _exhaustive: never = node;
+      const _exhaustive: never = source;
       throw new Error(`Unsupported source kind: ${(_exhaustive as { kind: string }).kind}`);
     }
   }
