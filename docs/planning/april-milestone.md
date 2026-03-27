@@ -12,10 +12,7 @@ See [roadmap.md](roadmap.md) for how this milestone fits into the broader timeli
 
 We have five weeks. The goal for each workstream is to **validate the architecture** — prove that the design decisions hold under real conditions. It is not to polish the experience for users. That's May.
 
-Each workstream below has:
-
-- **Validation questions**: what architectural assumption are we testing?
-- **Stop condition**: the minimum result that answers those questions. Everything beyond this is deferred.
+Each workstream below has a priority-ordered queue of **validation points** (VP). Each validation point identifies an architectural assumption to test, describes a user story that would prove it, lists the concrete tasks to get there, and defines a **stop condition** — the minimum result that answers the question. Everything beyond the stop condition is deferred. Work proceeds top-down: finish or explicitly stop VP1 before starting VP2.
 
 The team's instinct is to perfect. The constraint is: prove the architecture works first, then we polish.
 
@@ -25,75 +22,136 @@ The team's instinct is to perfect. The constraint is: prove the architecture wor
 
 ### 1. Migration system
 
-**People**: Saevar, Alberto
+**People**: Saevar
 
 The migration system uses a graph-based data structure for migration history. This is architecturally powerful but unfamiliar to every user coming from linear migration systems (Rails, Django, Prisma ORM, etc.).
 
-**Validation questions**:
-
-- Can the graph model handle common workflows? Linear development, feature branches that diverge and merge, rollback. Not "is the UX beautiful" — just "does the model express these cases without breaking?"
-- Can users inject custom steps? Data migrations and manual SQL. Does the graph model have a slot for user-authored nodes?
-- **Can the graph model accommodate data migrations?** This is the highest-risk question. The entire migration graph is built on the assumption that any migration from contract state A to contract state B is functionally equivalent to any other A→B migration — the destination is a contract hash, and any route that reaches it is valid. Data migrations break this assumption. Two databases at the same contract hash can have meaningfully different data. The graph's routing model must be extended to define "done" as "contract hash H reached **and** required data invariants satisfied." We have a theoretical model for this ([data-migrations.md](0-references/data-migrations.md), [data-migrations-solutions.md](0-references/data-migrations-solutions.md)) but it is entirely unproven. Prisma ORM had no data migration support, so we have no prior art of our own to lean on.
-- Can a non-expert understand the state of their migrations? The CLI visualization question — "can they tell what's happened and what needs to happen," not "is the output pretty."
-
-**Stop condition**: A demo scenario where two developers branch, each add migrations, merge, and resolve the conflict. One migration includes a manual SQL step. **One migration includes a data transformation with a postcondition invariant check**, and the system correctly treats "contract hash reached + invariant satisfied" as the definition of "done" (not just "contract hash reached"). The graph handles all of this and the CLI can show the state. Planner coverage for every schema change, ergonomic rebase/squash commands, polished output formatting — all May.
-
-**Active work**:
-
-- **Planner extensions**: Extending the migration planner to handle more schema change cases.
-- **Conflict resolution**: When migration history diverges (e.g. two branches add migrations), the system must detect and resolve conflicts.
-- **Git-style CLI visualization**: Visual representation of migration graph state, diffs, and history in the CLI.
-
-**Not yet started**:
-
-- **Data migrations**: Users need to transform data as part of a migration (e.g. split a `name` column into `firstName` + `lastName`). This is the biggest architectural risk in the migration system. The current graph operations assume any A→B route is equivalent — data migrations break that assumption. Our theoretical model treats data migrations as guarded transitions with postcondition invariants, and extends "desired state" from a contract hash to "contract hash + required data invariants." This model is documented but unproven. Key open decisions: co-located vs. independent data migrations (Model A vs. B), routing policy when multiple invariant-satisfying routes exist, and the concrete format of environment refs. See [data-migrations.md](0-references/data-migrations.md) and [data-migrations-solutions.md](0-references/data-migrations-solutions.md).
-- **Manual migration escape hatch**: Users need to write raw SQL migration steps when the planner can't express what they need. This is table-stakes; every migration system has one.
-- **Ergonomic graph operations**: The graph-based history needs CLI commands with a similar level of ergonomics to git. Users need to be able to inspect, rebase, squash, and manipulate their migration history without understanding the underlying graph theory. If common workflows (branching, merging, rolling back) aren't intuitive, the graph model becomes a liability rather than an advantage.
+**Already validated**: Branch, diverge, merge, and conflict resolution — the graph model's core value proposition for team workflows is implemented and working.
 
 **Key risks**:
 
-- **Data migrations are the highest architectural risk.** The graph model's core invariant (route equivalence) breaks when data matters. If we can't extend routing to handle data invariants, the graph model may need fundamental rework — and we'd rather discover that now than after stabilizing the API.
-- The graph-based model is our biggest UX bet. If common use cases (linear development, feature branches, team collaboration) aren't dead simple, the power of the graph is irrelevant.
+- **Data migrations are the highest architectural risk.** The graph model's core invariant (route equivalence) breaks when data matters. If we can't extend routing to handle data invariants, the graph model may need fundamental rework — and we'd rather discover that now than after stabilizing the API. We have a theoretical model ([data-migrations.md](0-references/data-migrations.md), [data-migrations-solutions.md](0-references/data-migrations-solutions.md)) but it is entirely unproven. Prisma ORM had no data migration support, so we have no prior art to lean on.
+- The graph-based model is our biggest UX bet. If common use cases aren't dead simple, the power of the graph is irrelevant.
+
+#### Priority queue
+
+**VP1: Data migrations work in the graph model** *(highest risk)*
+
+The entire migration graph is built on the assumption that any migration from contract state A to contract state B is functionally equivalent to any other A→B migration. Data migrations break this assumption — two databases at the same contract hash can have meaningfully different data. The routing model must be extended to define "done" as "contract hash H reached **and** required data invariants satisfied."
+
+User story: I can define a migration that includes a data transformation (e.g. split `name` into `firstName` + `lastName`). I can apply that migration on my local database and a production database. If there are two paths to the destination contract, I have a simple way to ensure that my CD pipeline for production chooses the path that includes my invariant. `plan`, `apply`, and `status` all operate in a way which is aware of the invariant.
+
+Tasks:
+
+1. **Design the data migration representation** — what does a data migration node look like in the graph? What does the runner execute? How is the postcondition checked? Decide between Model A (co-located with structural migrations) and Model B (independent). Key open decisions: routing policy when multiple invariant-satisfying routes exist, and the concrete format of environment refs. Output: a concrete type definition and a sketch of the runner changes, not a document. See [data-migrations.md](0-references/data-migrations.md) and [data-migrations-solutions.md](0-references/data-migrations-solutions.md) for the theoretical model.
+2. **Implement a data migration end-to-end** — a migration that splits `name` into `firstName` + `lastName`, with a postcondition invariant. `plan`, `apply`, and `status` all understand "done = hash + invariant satisfied."
+3. **Invariant-aware routing** — create a graph with two paths to the same contract hash, only one of which includes the data migration. The system selects the path that satisfies the required invariant. The user has a way to declare which invariants are required for a given environment.
+
+Stop condition: A graph with two paths to the same contract hash. One path includes a data migration (split `name` → `firstName` + `lastName`) with a postcondition invariant. `plan` selects the invariant-satisfying path for an environment that requires it. `apply` executes it. `status` reports "done" only when both the contract hash and the invariant are satisfied. Then stop — routing optimizations, invariant composition, and ref UX are May.
+
+**VP2: Users can author migrations by hand** *(table-stakes)*
+
+Manual SQL and data migrations both require this. Every migration system has an escape hatch where the user writes the migration themselves.
+
+User story: I run a command like `migration new <from> <to>`, and the system scaffolds a migration file for me — pre-populated with the source and destination contract hashes and any boilerplate. I fill in the migration logic (raw SQL, data transformation, or both). The system integrates my hand-authored migration into the graph as a first-class node. I don't create files manually or write raw JSON.
+
+Tasks:
+
+1. **Design the manual authoring surface** — a TypeScript file (e.g. `migration.ts`) where the user uses utility functions to describe the migration, producing a migration data structure when executed. Structural migrations (raw DDL) and data migrations may have different authoring shapes — decide whether they share a surface or not.
+2. **Scaffold command** — a CLI command (e.g. `migration new <from> <to>`) that creates the migration file with the correct graph coordinates already filled in. The user shouldn't have to know how to describe "from this contract state to that contract state" — the CLI resolves hashes and generates the skeleton. This is how systems like Active Record work: you never create migration files by hand.
+3. **Implement manual SQL migration** — user writes a `.ts` file with raw SQL, it becomes a node in the graph, the runner executes it.
+
+Stop condition: A user runs `migration new`, gets a scaffolded `.ts` file, writes raw SQL in it, and the runner executes it as a first-class graph node. Then stop — polish of the authoring API, documentation, and support for exotic migration shapes are May.
+
+**VP3: The graph scales with large contracts** *(quick pass/fail)*
+
+Every migration node encodes the full contract content. For projects with large contracts, this could cause performance and storage problems.
+
+Tasks:
+
+1. **Generate a 100+ model contract, create a series of migrations, measure** — graph operation time, migration history size on disk, plan/diff time. Pass/fail.
+
+Stop condition: Numbers in hand. If acceptable, move on. If not, file an issue with the measurements and move on — optimization is May.
+
+**Deferred (May)**:
+
+- Ergonomic graph operations (rebase, squash, etc.)
+- Polished CLI visualization
+- Planner coverage for every schema change case
+- Refs UX validation (depends on data migration model existing first)
+- Will users understand "refs"? (UX question — refs need to exist before we can test comprehension)
 
 ---
 
 ### 2. Contract authoring (PSL + TypeScript DSL)
 
-**People:** Will, Alberto
+**People:** Alberto
 
 Users describe their domain model — which becomes the contract — in one of two ways: PSL (Prisma Schema Language) or a TypeScript DSL. Both need significant work.
 
-**Validation questions**:
-
-- Can both PSL and TS express the same contract using shared type constructors and field presets provided by families, targets, and extension packs? This is the [ADR 170](../../architecture%20docs/adrs/ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md) question. Type constructors and field presets are the interface through which extensions contribute to the authoring surface — if an extension pack author wants to add `pgvector.Vector(1536)` as a type that works in both PSL and TS, ADR 170's registry is the mechanism they build against.
-- Can the language server load a Prisma Next config and not reject valid syntax?
-
-**Stop condition**: A contract authored in both PSL and TS, using at least one family-provided type constructor (e.g. `sql.String(length: 35)`) and at least one extension-provided namespaced type constructor (e.g. `pgvector.Vector(1536)`), emitting identical contracts. The language server doesn't red-squiggle valid PSL. The full vocabulary of helpers, parameterized type polish, and preset coverage are May.
-
-**Deferred**: PSL grammar extensibility by extensions (e.g. extensions contributing new top-level concepts like views alongside models). The PSL grammar is expected to remain closed for extension; extensions contribute first-class concepts through the existing grammar, not by extending it. We believe the architecture supports adding this later if needed.
-
-**Active work**:
-
-- **PSL — parameterized types**: Extending PSL with support for parameterized/generic types.
-- **PSL — field presets**: Default field configurations that reduce boilerplate.
-- **PSL — historical pain points**: Addressing known PSL limitations and community complaints from Prisma ORM.
-- **TypeScript authoring DSL** (new, Alberto): A new DSL that matches PSL's expressiveness. The current TS authoring surface was a proof-of-concept that mirrors the contract JSON structure directly — extremely verbose, repetitive, and unpleasant to write. The new DSL replaces it entirely.
-- **Type constructors and field presets** ([ADR 170](../../architecture%20docs/adrs/ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md)): Shared registry for families, targets, and extension packs to provide authoring helpers. Both PSL and TS lower through the same helper definitions. This is the extension contribution interface for the authoring layer.
-
-**Not yet started**:
-
-- **Language server update**: The VS Code extension's language server is coupled to Prisma 7's version of PSL. It needs to load `prisma-next.config.ts`, use it to interpret PSL, and support new features.
-
 **Key risks**:
 
-- The language server is a DX-critical path. If PSL has new features but the VS Code extension doesn't understand them, users get red squiggles on valid code. This erodes trust fast.
 - The TS authoring DSL needs to be genuinely pleasant to use — if it feels like writing JSON with extra steps, users will avoid it and we lose the "author in TypeScript" selling point.
+- The language server is a DX-critical path. If PSL has new features but the VS Code extension doesn't understand them, users get red squiggles on valid code. This erodes trust fast — but the architecture for fixing this is well understood.
+
+#### Priority queue
+
+**VP1: Symmetric authoring surfaces from shared composition**
+
+Both PSL and TS must present DSLs that are derived from the same framework composition data sources — families, targets, and extension packs contribute type constructors and field presets via the [ADR 170](../../architecture%20docs/adrs/ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md) registry, and both surfaces lower through these shared definitions. The two surfaces should be symmetrical in capability — what's expressible in one is broadly expressible in the other — but idiomatically different in each language.
+
+User story: I author the same contract in PSL and in TS. Both use a family-provided type constructor (e.g. `sql.String(length: 35)`) and an extension-provided namespaced type constructor (e.g. `pgvector.Vector(1536)`). Both emit identical contracts.
+
+Tasks:
+
+1. **ADR 170 type constructors and field presets** — implement the shared registry that families, targets, and extension packs use to contribute authoring helpers. Both PSL and TS lower through these definitions.
+2. **PSL surface** — parameterized types, field presets, historical pain points. These are the PSL-side changes needed to consume ADR 170 definitions.
+3. **TS DSL surface** — the new DSL that replaces the existing proof-of-concept. Must consume the same ADR 170 definitions as PSL.
+4. **Parity test** — author a representative contract in both PSL and TS using at least one family-provided and one extension-provided type constructor. Verify identical contract output.
+
+Stop condition: A contract authored in both PSL and TS, using at least one family-provided type constructor (e.g. `sql.String(length: 35)`) and at least one extension-provided namespaced type constructor (e.g. `pgvector.Vector(1536)`), emitting identical contracts. Then stop — full vocabulary of helpers, preset coverage, and parameterized type polish are May.
+
+**VP2: TS DSL achieves comparable terseness to PSL**
+
+The current TS authoring surface mirrors the contract JSON structure — extremely verbose, repetitive, and roughly 3–5x longer than the equivalent PSL. The new DSL must close this gap substantially. This is a concrete, measurable proof that the DSL design works, not a UX polish question.
+
+User story: I author a representative contract (multiple models, relations, at least one extension type) in both PSL and the new TS DSL. The TS version is in the same ballpark of length as the PSL version.
+
+Tasks:
+
+1. **Implement the new TS DSL** — (overlaps with VP1 task 3).
+2. **Terseness comparison** — take a representative contract, author it in both PSL and TS, compare line counts. Pass/fail.
+
+Stop condition: The TS version of a representative contract is in the same ballpark of length as the PSL version. Then stop — DSL ergonomics, API naming, and syntactic sugar are May.
+
+**VP3: Invisible contract emission in at least one major framework**
+
+The contract emit step — producing `contract.json` and `contract.d.ts` — must be triggered automatically by the dev server and build tool. The developer never runs a manual command. This was a massive pain point for Prisma ORM (`prisma generate`), and Prisma Next's pure TypeScript architecture makes transparent build tool plugins feasible. A Vite plugin PoC already exists in this repo.
+
+User story: I modify my PSL or TS contract definition, save the file, and my dev server automatically re-emits the contract. My types update. I never run a generate command.
+
+Tasks:
+
+1. **End-to-end validation in one framework** — pick a Vite-based framework or Next.js. Modify a contract definition, verify the dev server re-emits and types update without manual intervention.
+2. **HMR state mismatch** — validate that `globalThis`-cached runtime instances don't hold stale contracts after re-emission (see [framework integration analysis](0-references/framework-integration-analysis.md#unsolved-interaction-hmr-re-emit-and-runtime-state)).
+
+Stop condition: Modify a contract definition in a running dev server, see the contract re-emitted and types updated without running a manual command. HMR doesn't leave the runtime holding a stale contract. Then stop — plugins for other build tools (Webpack, Turbopack, esbuild) and production build integration are May.
+
+**Tasks (not validation points)**:
+
+- **Language server update**: The VS Code extension's language server is coupled to Prisma 7's version of PSL. It needs to load `prisma-next.config.ts`, use it to interpret PSL, and support new features. The architecture is well understood; this is mechanical work. Eventually we want to rewrite it to not depend on the existing Rust implementation, building a Prisma 7 parser as well.
+
+**Deferred (May)**:
+
+- PSL grammar extensibility by extensions (e.g. extensions contributing new top-level concepts like views alongside models). The PSL grammar is expected to remain closed for extension; extensions contribute first-class concepts through the existing grammar, not by extending it.
+- Full vocabulary of helpers, parameterized type polish, and preset coverage.
+- Language server rewrite away from Rust dependency.
 
 ---
 
 ### 3. Runtime pipeline (ORM, query builders, middleware, framework integration)
 
-**People**: Alexey, Serhii, Will
+**People**: Alexey
 
 The ORM client, SQL DSL, middleware pipeline, and runtime together form the execution path from query to result. Multiple architectural assumptions along this path are untested under real-world conditions.
 
@@ -128,30 +186,23 @@ The ORM client, SQL DSL, middleware pipeline, and runtime together form the exec
 
 ### 4. MongoDB PoC — validate the extension ecosystem boundary
 
-**People**: Will
+**People**: Will, Serhii (after SQLite)
 
 **Status**: Planning complete, implementation not started
 
-**Validation question**: Can a single extension consume both SQL and document contracts? This is the family abstraction test.
+**Why this blocks the milestone**: We plan to invite community authors to build extensions. Our [community generator analysis](0-references/community-generator-migration-analysis.md) shows 31 of 33 use cases are family-agnostic — but every interface an extension would consume today is SQL-specific. Stabilizing these interfaces without validating a second family risks ecosystem fragmentation and breaking changes. See the [roadmap rationale](roadmap.md#april-ready-for-external-contributions) for the full argument.
 
-**Stop condition**: A `DocumentContract`, a document execution context, and one consumer library working against both families. The moment that works, stop. Don't build a real MongoDB driver.
+**Validation questions**:
 
-**Why this blocks the milestone**: We plan to invite community authors to build extensions. Our [community generator analysis](community-generator-migration-analysis.md) shows 31 of 33 use cases are family-agnostic — but every interface an extension would consume today is SQL-specific. Stabilizing these interfaces without validating a second family risks ecosystem fragmentation and breaking changes. See the [roadmap rationale](roadmap.md#april-ready-for-external-contributions) for the full argument.
-
-**Deliverables**:
-
-- `DocumentContract` type populated from a real schema (PSL or TS authoring)
-- Document execution context that a consumer library can accept
-- At least one consumer library example working against both SQL and document contracts
-- Handoff-ready scaffold for the MongoDB team to extend
-
-**Detailed plan**: [mongo-poc-plan.md](mongo-target/mongo-poc-plan.md)
-
-**Key questions to answer**:
-
+- Can a single extension consume both SQL and document contracts? This is the family abstraction test — the core question of whether the extension ecosystem can be family-agnostic.
 - Is `ContractBase` sufficient as the family-agnostic surface, or does it need to evolve?
 - How do extensions detect and traverse different contract families?
 - How should extensions declare which targets/families they support?
+- Can both PSL and TS authoring produce a document contract? This tests whether the authoring layer is family-agnostic too, not just the extension consumption layer.
+
+**Stop condition**: One consumer library (e.g. a trivial validator or schema-to-JSON-Schema tool) that works against both a SQL contract and a document contract, without family-specific code. The moment that works, stop. Don't build a real MongoDB driver — the architecture is validated.
+
+**Detailed plan**: [mongo-poc-plan.md](mongo-target/mongo-poc-plan.md)
 
 ---
 
@@ -161,7 +212,7 @@ The ORM client, SQL DSL, middleware pipeline, and runtime together form the exec
 
 **Status**: Not started
 
-**Why it matters**: Multiple systems have Postgres implementation details baked in (Kysely lane, migration planning, etc.). Supporting a second SQL target forces us to decouple target-specific assumptions from the core, which is a prerequisite for contributors building new SQL targets. SQLite also unlocks the path to Cloudflare D1 (SQLite-at-the-edge), which is a strategic target for edge framework support (see [framework integration analysis](framework-integration-analysis.md)).
+**Why it matters**: Multiple systems have Postgres implementation details baked in (Kysely lane, migration planning, etc.). Supporting a second SQL target forces us to decouple target-specific assumptions from the core, which is a prerequisite for contributors building new SQL targets. SQLite also unlocks the path to Cloudflare D1 (SQLite-at-the-edge), which is a strategic target for edge framework support (see [framework integration analysis](0-references/framework-integration-analysis.md)).
 
 **Validation questions**:
 
@@ -171,7 +222,7 @@ The ORM client, SQL DSL, middleware pipeline, and runtime together form the exec
 - **SQL generation**: Does the ORM and SQL DSL generate SQLite-compatible SQL? Different identifier quoting, no `RETURNING` on older SQLite, different function names, different type affinity system.
 - **Type system / codecs**: SQLite has no strict type system (type affinity, no enums, limited date support). Do the codecs handle this, or do they assume Postgres types?
 - **Capability gating**: Does the capability system correctly gate features that SQLite doesn't support (e.g., server-side cursors, specific join types, `RETURNING`)? Features that degrade gracefully on SQLite should degrade; features that can't work should fail with a clear error.
-- **D1 extensibility**: Is the adapter architecture layered such that a Cloudflare D1 adapter can build on top of the SQLite foundation? D1 is HTTP-based and runs inside Workers — the SQLite adapter shouldn't bake in assumptions that prevent this.
+- **D1 extensibility (optional)**: Is the adapter architecture layered such that a Cloudflare D1 adapter can build on top of the SQLite foundation? D1 is HTTP-based and runs inside Workers — the SQLite adapter shouldn't bake in assumptions that prevent this.
 
 **Stop condition**: A contract authored, emitted, migrated, and queried against SQLite end-to-end. Specifically: emit a contract for a SQLite target, plan and apply a migration, then run `db.users.all()` and get correct rows back. The adapter can be rough. The point is that every layer of the stack — emit, migrate, generate SQL, execute, decode results — works without Postgres assumptions. Where it doesn't, we've found the coupling points.
 
@@ -191,7 +242,7 @@ Scaffolded extension that provides a new database primitive. Demonstrates that t
 
 ### Community outreach
 
-Reaching out to potential contributors: authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations (see [community-generator-migration-analysis.md](community-generator-migration-analysis.md)). Depends on stable interfaces and contributor documentation. Can't meaningfully start until the core workstreams have landed.
+Reaching out to potential contributors: authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations (see [community-generator-migration-analysis.md](0-references/community-generator-migration-analysis.md)). Depends on stable interfaces and contributor documentation. Can't meaningfully start until the core workstreams have landed.
 
 ---
 
@@ -219,34 +270,12 @@ ADR 170 (type constructors) → PSL + TS parity ──→ Extensions contribute 
 - **Migration system** is largely independent — it has its own design validation path.
 - **Community outreach** depends on stable interfaces and contributor docs; it's the last thing that can start.
 
-## Five-week timeline
+## Scheduling
 
-### Week 1: Mar 31–Apr 4
-
-
-
-### Week 2: Apr 7–11
-
-
-
-### Week 3: Apr 14–18
-
-
-
-### Week 4: Apr 21–25
-
-
-
-### Week 5: Apr 28–May 2
-
-
-
----
+Five weeks remain (Mar 31 – May 2, with an offsite in Week 3). Rather than a fixed weekly timeline, each workstream has a priority-ordered task queue. Work proceeds top-down: finish or explicitly stop VP1 before starting VP2.
 
 ## Open questions
 
-- What is the priority order across the five workstreams? How do we sequence work given the team we have?
-- For migrations: what is the minimum viable set of graph operations that makes the UX acceptable for common workflows?
 - For the language server: is updating the existing Prisma 7 language server feasible, or does it need a rewrite?
 - Is the ParadeDB PoC dependent on the MongoDB PoC (both validate extension interfaces), or can they proceed in parallel?
 
