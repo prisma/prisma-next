@@ -2,6 +2,7 @@ import type { ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyQueryAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 export function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }): {
   params: unknown[];
@@ -11,9 +12,9 @@ export function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }): {
   return {
     params: collectedParams.map((p) => p.value),
     paramDescriptors: collectedParams.map((p) => ({
-      ...(p.name !== undefined && { name: p.name }),
+      ...ifDefined('name', p.name),
+      ...ifDefined('codecId', p.codecId),
       source: 'dsl' as const,
-      ...(p.codecId !== undefined && { codecId: p.codecId }),
     })),
   };
 }
