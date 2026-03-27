@@ -117,6 +117,7 @@ function rewriteComparable(
     case 'json-object':
     case 'json-array-agg':
       return value.rewrite(rewriter);
+    // v8 ignore next 4
     default: {
       const _exhaustive: never = value;
       throw new Error(`Unsupported comparable kind: ${(_exhaustive as { kind: string }).kind}`);
@@ -138,6 +139,7 @@ function foldComparable<T>(value: AnySqlComparable, folder: ExpressionFolder<T>)
     case 'json-object':
     case 'json-array-agg':
       return value.fold(folder);
+    // v8 ignore next 4
     default: {
       const _exhaustive: never = value;
       throw new Error(`Unsupported comparable kind: ${(_exhaustive as { kind: string }).kind}`);

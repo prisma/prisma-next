@@ -52,6 +52,7 @@ function getFromSourceTableDetail(source: AnyFromSource): string | undefined {
       return source.name;
     case 'derived-table-source':
       return source.alias;
+    // v8 ignore next 4
     default: {
       const _exhaustive: never = source;
       throw new Error(`Unsupported source kind: ${(_exhaustive as { kind: string }).kind}`);
@@ -111,6 +112,7 @@ function evaluateAstLints(ast: AnyQueryAst): LintFinding[] {
     case 'insert':
       break;
 
+    // v8 ignore next 4
     default: {
       const _exhaustive: never = ast;
       throw new Error(`Unsupported AST kind: ${(_exhaustive as { kind: string }).kind}`);

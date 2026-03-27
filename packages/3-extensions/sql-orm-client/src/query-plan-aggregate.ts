@@ -52,6 +52,7 @@ function validateGroupedComparable(value: AnySqlComparable): AnySqlComparable {
     case 'json-object':
     case 'json-array-agg':
       return value;
+    // v8 ignore next 6
     default: {
       const _exhaustive: never = value;
       throw new Error(

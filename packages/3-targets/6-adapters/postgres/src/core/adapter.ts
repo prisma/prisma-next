@@ -132,6 +132,7 @@ class PostgresAdapterImpl
       case 'delete':
         sql = renderDelete(node, context.contract);
         break;
+      // v8 ignore next 4
       default: {
         const _exhaustive: never = node;
         throw new Error(`Unsupported AST node kind: ${(_exhaustive as { kind: string }).kind}`);
@@ -231,6 +232,7 @@ function renderSource(source: AnyFromSource, contract?: PostgresContract): strin
     }
     case 'derived-table-source':
       return `(${renderSelect(node.query, contract)}) AS ${quoteIdentifier(node.alias)}`;
+    // v8 ignore next 4
     default: {
       const _exhaustive: never = node;
       throw new Error(`Unsupported source node kind: ${(_exhaustive as { kind: string }).kind}`);
@@ -322,6 +324,7 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
     case 'json-array-agg':
       right = renderExpr(rightNode, contract);
       break;
+    // v8 ignore next 4
     default: {
       const _exhaustive: never = rightNode;
       throw new Error(`Unsupported comparable kind: ${(_exhaustive as { kind: string }).kind}`);
@@ -425,6 +428,7 @@ function renderExpr(expr: AnyExpression, contract?: PostgresContract): string {
       return renderJsonObjectExpr(node, contract);
     case 'json-array-agg':
       return renderJsonArrayAggExpr(node, contract);
+    // v8 ignore next 6
     default: {
       const _exhaustive: never = node;
       throw new Error(
@@ -494,6 +498,7 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
       case 'json-object':
       case 'json-array-agg':
         return renderExpr(node, contract);
+      // v8 ignore next 6
       default: {
         const _exhaustive: never = node;
         throw new Error(
@@ -575,6 +580,7 @@ function renderInsertValue(
     }
     case 'column-ref':
       return renderColumn(value);
+    // v8 ignore next 6
     default: {
       const _exhaustive: never = value;
       throw new Error(
@@ -645,6 +651,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
             });
             return ` ON CONFLICT (${conflictColumns.join(', ')}) DO UPDATE SET ${updates.join(', ')}`;
           }
+          // v8 ignore next 6
           default: {
             const _exhaustive: never = action;
             throw new Error(
@@ -676,6 +683,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
       case 'column-ref':
         value = renderColumn(val);
         break;
+      // v8 ignore next 6
       default: {
         const _exhaustive: never = val;
         throw new Error(

@@ -8,6 +8,7 @@ import {
   ListLiteralExpr,
   LiteralExpr,
   NullCheckExpr,
+  OrExpr,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -136,6 +137,30 @@ describe('query plan aggregate', () => {
         NullCheckExpr.isNotNull(AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
       ]),
     );
+  });
+
+  it('keeps grouped aggregate HAVING with OR expressions', () => {
+    const plan = compileGroupedAggregate(
+      baseContract,
+      'posts',
+      [],
+      ['user_id'],
+      {
+        postCount: { kind: 'aggregate', fn: 'count' },
+        totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' },
+      },
+      OrExpr.of([
+        BinaryExpr.gte(
+          AggregateExpr.sum(ColumnRef.of('posts', 'views')),
+          ColumnRef.of('posts', 'views'),
+        ),
+        BinaryExpr.gte(AggregateExpr.count(), LiteralExpr.of(5)),
+      ]),
+    );
+
+    expect(plan.ast.kind).toBe('select');
+    const ast = plan.ast as SelectAst;
+    expect(ast.having).toBeInstanceOf(OrExpr);
   });
 
   it('keeps aggregate filters and params when lowering plain aggregate queries', () => {
