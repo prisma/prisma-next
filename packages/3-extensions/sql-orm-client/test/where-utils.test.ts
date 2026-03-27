@@ -7,7 +7,7 @@ describe('where utils', () => {
     const a = BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1));
     const b = BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('x'));
     const combined = combineWhereExprs([a, b]);
-    expect(combined).toBeInstanceOf(AndExpr);
+    expect(combined?.kind).toBe('and');
   });
 
   it('returns the original expression when only one filter is provided', () => {
