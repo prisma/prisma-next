@@ -105,7 +105,7 @@ User story: I author the same contract in PSL and in TS. Both use a family-provi
 Tasks:
 
 1. **ADR 170 type constructors and field presets** — implement the shared registry that families, targets, and extension packs use to contribute authoring helpers. Both PSL and TS lower through these definitions.
-2. **PSL surface** — parameterized types, field presets, historical pain points. These are the PSL-side changes needed to consume ADR 170 definitions.
+2. **PSL surface** — parameterized types and field presets. The PSL-side changes needed to consume ADR 170 definitions.
 3. **TS DSL surface** — the new DSL that replaces the existing proof-of-concept. Must consume the same ADR 170 definitions as PSL.
 4. **Parity test** — author a representative contract in both PSL and TS using at least one family-provided and one extension-provided type constructor. Verify identical contract output.
 
@@ -155,36 +155,73 @@ Stop condition: Modify a contract definition in a running dev server, see the co
 
 The ORM client, SQL DSL, middleware pipeline, and runtime together form the execution path from query to result. Multiple architectural assumptions along this path are untested under real-world conditions.
 
-**Validation questions**:
-
-- **Transactions**: Can the ORM open a transaction, execute two mutations, and commit/rollback?
-- **ORM + SQL DSL transaction interop**: Can a user open a transaction via the ORM client and execute SQL DSL queries within it? The SQL DSL is the escape hatch for the ORM — users will drop into it mid-transaction when they hit something the ORM can't express. If the two query surfaces can't share a transaction, the escape hatch is broken.
-- **SQL DSL as escape hatch**: Can a user express a query in the SQL DSL that the ORM can't, and execute it?
-- **Extension-contributed operations (ORM)**: When pg_vector is added, does the ORM client surface its operations?
-- **Extension-contributed operations (SQL DSL)**: When pg_vector is added, does the SQL DSL surface its query operations?
-- **Middleware request rewriting**: Can a middleware short-circuit execution and serve a result without hitting the database? Currently middlewares are observers only. A caching middleware forces the architecture to support interception, short-circuiting, and result injection — which validates that the middleware interface can support the full range of use cases (rate limiting, access control, query rewriting), not just observability.
-- **RSC concurrency safety**: Does the ORM client and runtime work correctly when multiple React Server Components query in parallel through a shared instance? The runtime has mutable state (`verified`, `startupVerified`), the ORM has a lazily-populated Collection cache — both are exposed by RSC's concurrent rendering model. (See [framework integration analysis, Hard problem 2](framework-integration-analysis.md#hard-problem-2-concurrent-statefulness-under-rsc).)
-
-**Stop condition**: A script that (1) opens a transaction, does two ORM mutations, commits; (2) within that same transaction, executes a SQL DSL query alongside ORM operations; (3) executes a standalone SQL DSL query the ORM can't express; (4) uses an extension-contributed operation via both the ORM and SQL DSL; (5) runs a caching middleware that short-circuits a repeated query. Plus a Next.js App Router page with 5 parallel Server Components querying through a shared runtime — it either works or we've found the concurrency issues and know what to fix. Full middleware API design, RSC pool sizing guidance, edge runtime validation — all May.
-
-**Active work**:
-
-- **SQL Query DSL** (new): A new SQL query builder that will replace the current SQL Query plan and the Kysely plan. This becomes the escape hatch for the ORM client.
-- **ORM client maturation**: The ORM client has most of its core functionality, but is missing key components:
-  - **Transactions**: No transaction support yet.
-  - **Extension-contributed operations**: The ORM client doesn't respond when an extension like pg_vector is added. It needs to read the operations registry, incorporate custom data types, and surface extension-contributed query methods.
-
-**Not yet started**:
-
-- **SQL DSL pack extensibility**: Extension packs like pgvector need to contribute query operations to the SQL DSL, not just the ORM.
-- **Caching middleware**: A middleware that computes cache keys from the query AST, short-circuits execution for cache hits, and serves cached results. Forces the middleware interface to support request rewriting, not just observation.
-- **RSC concurrency PoC**: A Next.js App Router page with parallel Server Components querying through a shared Prisma Next runtime. Validates runtime state safety and ORM Collection cache behavior under concurrent access.
-
 **Key risk**: The ORM client and SQL DSL together form the primary user-facing query surface. If transactions aren't supported, extensions can't surface their operations, or the runtime breaks under RSC concurrency, users can't build real applications.
+
+#### Priority queue
+
+**VP1: Transactions and SQL DSL as escape hatch**
+
+The ORM must support transactions, and the SQL DSL must interoperate with the ORM within a transaction. The SQL DSL is the escape hatch for the ORM — users will drop into it mid-transaction when they hit something the ORM can't express. If the two query surfaces can't share a transaction, the escape hatch is broken.
+
+User story: I open a transaction via the ORM client, execute two mutations, then drop into the SQL DSL to run a query the ORM can't express — all within the same transaction. I commit, and all three operations are atomic. I can also use the SQL DSL standalone for queries the ORM doesn't support.
+
+Tasks:
+
+1. **ORM transaction support** — open a transaction, execute two ORM mutations, commit/rollback.
+2. **SQL DSL standalone query** — express and execute a query in the SQL DSL that the ORM can't.
+3. **ORM + SQL DSL transaction interop** — within an ORM-opened transaction, execute a SQL DSL query. Both surfaces share the same connection and transaction context.
+
+Stop condition: A script that opens a transaction, does two ORM mutations, executes a SQL DSL query within the same transaction, and commits. Plus a standalone SQL DSL query. Then stop — transaction isolation levels, savepoints, and nested transactions are May.
+
+**VP2: Extension-contributed operations flow through both query surfaces**
+
+When an extension pack like pgvector is added, its operations must surface in both the ORM client and the SQL DSL. This is the query-side counterpart of ADR 170 — extensions must flow from contract authoring through to the query surface. The codec trait system ([PR #247](https://github.com/prisma/prisma-next/pull/247)) gates operators by codec-declared semantic traits (`equality`, `order`, `numeric`, `textual`, `boolean`); this gating must apply equally to both query surfaces, not just the ORM. Currently the operator-to-trait mapping lives in `sql-orm-client` and needs to be shared.
+
+User story: I add pgvector to my contract. Both `db.posts.where(...)` (ORM) and `db.sql.from(posts).where(...)` (SQL DSL) surface pgvector's operations. Both surfaces gate available operators based on codec traits — a `vector` field gets similarity search but not `like()`.
+
+Tasks:
+
+1. **ORM extension-contributed operations** — when pgvector is added, the ORM client reads the operations registry and surfaces extension-contributed query methods.
+2. **SQL DSL pack extensibility** — pgvector contributes query operations to the SQL DSL.
+3. **Shared operator-trait mapping** — move the operator-to-trait mapping from `sql-orm-client` to `relational-core` so both query surfaces use the same trait gating (follow-up from PR #247).
+
+Stop condition: An extension-contributed operation (e.g. pgvector similarity search) is usable via both the ORM and SQL DSL. Trait gating works on both surfaces — a `bool` field rejects `gt()` on both. Then stop — full extension operation API design and discovery ergonomics are May.
+
+**VP3: RSC concurrency safety**
+
+The runtime has mutable state (`verified`, `startupVerified`), the ORM has a lazily-populated Collection cache — both are exposed by React Server Components' concurrent rendering model, where multiple components query in parallel through a shared instance. (See [framework integration analysis, Hard problem 2](0-references/framework-integration-analysis.md#hard-problem-2-concurrent-statefulness-under-rsc).)
+
+User story: I have a Next.js App Router page with 5 parallel Server Components, each querying through a shared Prisma Next runtime. They all return correct results without race conditions, stale state, or connection pool exhaustion.
+
+Tasks:
+
+1. **RSC concurrency PoC** — a Next.js App Router page with parallel Server Components querying through a shared runtime. Observe whether runtime state, Collection caching, and connection pooling behave correctly.
+2. **Identify and document issues** — if there are concurrency problems, document what they are and what needs to change. If it works, document why.
+
+Stop condition: The PoC either works or we've identified the specific concurrency issues and know what to fix. Then stop — pool sizing guidance, edge runtime validation, and production-ready concurrency guarantees are May.
+
+**VP4: Middleware supports request rewriting**
+
+Currently middlewares are observers only. A caching middleware forces the architecture to support interception, short-circuiting, and result injection — validating that the middleware interface can support the full range of use cases (rate limiting, access control, query rewriting), not just observability.
+
+User story: I add a caching middleware that computes a cache key from the query AST. On a cache hit, it short-circuits execution and serves the cached result without hitting the database. On a miss, it lets the query through and caches the result.
+
+Tasks:
+
+1. **Caching middleware** — implement a middleware that computes cache keys from the query AST, short-circuits for hits, caches misses. Forces the middleware interface to support interception and result injection.
+
+Stop condition: A repeated query is served from cache without hitting the database. The middleware interface supports short-circuiting and result injection. Then stop — cache invalidation strategies, TTL, and middleware composition are May.
+
+**Deferred (May)**:
+
+- Full middleware API design and composition model
+- RSC pool sizing guidance
+- Edge runtime validation
+- Transaction isolation levels, savepoints, nested transactions
 
 ---
 
-### 4. MongoDB PoC — validate the extension ecosystem boundary
+### 4. MongoDB PoC — validate the second database family
 
 **People**: Will, Serhii (after SQLite)
 
@@ -192,15 +229,40 @@ The ORM client, SQL DSL, middleware pipeline, and runtime together form the exec
 
 **Why this blocks the milestone**: We plan to invite community authors to build extensions. Our [community generator analysis](0-references/community-generator-migration-analysis.md) shows 31 of 33 use cases are family-agnostic — but every interface an extension would consume today is SQL-specific. Stabilizing these interfaces without validating a second family risks ecosystem fragmentation and breaking changes. See the [roadmap rationale](roadmap.md#april-ready-for-external-contributions) for the full argument.
 
-**Validation questions**:
+**Key risks**:
 
-- Can a single extension consume both SQL and document contracts? This is the family abstraction test — the core question of whether the extension ecosystem can be family-agnostic.
-- Is `ContractBase` sufficient as the family-agnostic surface, or does it need to evolve?
-- How do extensions detect and traverse different contract families?
-- How should extensions declare which targets/families they support?
-- Can both PSL and TS authoring produce a document contract? This tests whether the authoring layer is family-agnostic too, not just the extension consumption layer.
+- The ORM client and SQL DSL are both coupled directly to SQL. The SQL DSL is useless for Mongo. The ORM client's interface (`findMany`, `create`, `where`) is conceptually family-agnostic, but its implementation (query compilation into SQL AST) is deeply SQL-coupled. We need a document ORM implementation — but without a shared interface, the two implementations will diverge and users lose consistency across families.
+- The runtime execution plan shape (`ExecutionPlan` with `sql: string`) may need to generalize to accommodate non-SQL queries.
+- We don't yet know where the deepest coupling points are. This workstream is exploratory — the task breakdown will evolve as we discover what breaks.
 
-**Stop condition**: One consumer library (e.g. a trivial validator or schema-to-JSON-Schema tool) that works against both a SQL contract and a document contract, without family-specific code. The moment that works, stop. Don't build a real MongoDB driver — the architecture is validated.
+#### Priority queue
+
+**VP1: The architecture accommodates a second database family**
+
+This is proven by building a vertical slice through the stack for a document database (MongoDB). Unlike the SQLite workstream, this tests family abstraction (SQL vs document), not target abstraction (Postgres vs SQLite within SQL). Every layer of the stack is under test.
+
+Layers under test:
+
+- **Contract surface**: Can a consumer library traverse models and fields of both SQL and document contracts without family-specific code?
+- **Contract authoring**: Can TS authoring produce a document contract? Common parts (models, fields, relations) should be shared; storage-specific parts (collections, embedded documents, ObjectId) are family-specific.
+- **Contract emit**: Can the emitter produce a valid document contract with correct types?
+- **Type system / codecs**: Do BSON codecs work through the same codec registry and trait system?
+- **Runtime execution**: Can the runtime execute a non-SQL query plan? Does the middleware pipeline handle it?
+- **ORM client**: Does a document ORM client satisfy a shared interface with the SQL ORM client — conventional behaviors (`findMany`, `create`, `where`, etc.) are consistent — while compiling to Mongo-native queries? The shared interface is the guard against the two family implementations diverging. The goal is a Mongo-native experience, not a "swap target" portability story.
+
+Not applicable in April: migration planner/runner (Mongo is schemaless in the DDL sense), SQL generation, query escape hatch DSL (deferred — the ORM is the only query surface for documents in April). Note: document databases still need data-level schema evolution (renaming fields, restructuring nested documents, splitting collections). If the data invariant model from workstream 1 works well, it may become the foundation for document schema evolution — that's a cross-workstream connection worth tracking.
+
+User story: I author a document contract in TS, emit it, and query a MongoDB database through the Prisma Next runtime and ORM. A consumer library (e.g. a validator or schema-to-JSON-Schema tool) works against both my SQL contract and my document contract without family-specific code.
+
+Tasks (sequential discovery phases — each phase may reveal changes needed before the next can proceed):
+
+1. **Contract surface + authoring** — define a document contract type, author it in TS. Does the contract structure generalize? Do authoring surfaces handle family-specific storage concepts (collections, embedded documents, ObjectId)?
+2. **Emit** — emit the document contract (`contract.json` + `contract.d.ts`). Does the emitter generalize beyond SQL?
+3. **Runtime execution** — execute a Mongo query through the runtime. Does the execution plan generalize? Does middleware work with non-SQL plans?
+4. **ORM client + shared interface** — build a document ORM client that satisfies a shared interface with the SQL ORM client. Does query compilation abstract cleanly, or is SQL AST baked in too deep?
+5. **Cross-family consumer library** — the final proof. A consumer library that works against both SQL and document contracts without family-specific code.
+
+Stop condition: A consumer library works against both a SQL and a document contract without family-specific code, backed by a real vertical slice (not just types) where the document contract was authored, emitted, and queried through the runtime and ORM. Both ORM clients satisfy a shared interface. Then stop — production-quality MongoDB driver, aggregation pipeline DSL, comprehensive codec coverage, and Mongo-native query ergonomics are all later.
 
 **Detailed plan**: [mongo-poc-plan.md](mongo-target/mongo-poc-plan.md)
 
@@ -214,17 +276,42 @@ The ORM client, SQL DSL, middleware pipeline, and runtime together form the exec
 
 **Why it matters**: Multiple systems have Postgres implementation details baked in (Kysely lane, migration planning, etc.). Supporting a second SQL target forces us to decouple target-specific assumptions from the core, which is a prerequisite for contributors building new SQL targets. SQLite also unlocks the path to Cloudflare D1 (SQLite-at-the-edge), which is a strategic target for edge framework support (see [framework integration analysis](0-references/framework-integration-analysis.md)).
 
-**Validation questions**:
+**Key risk**: Postgres-specific assumptions may be deeply embedded across many layers. The value of this workstream is discovering every coupling point in one pass — each layer's assumptions are exposed by the next layer downstream.
 
-- **Contract authoring**: When the target is changed from Postgres to SQLite, do both PSL and TS authoring surfaces respond correctly? Available types, defaults, and capabilities should change to reflect what SQLite supports — e.g. no enums, different native types, different default generators. The type constructors and field presets (ADR 170) provided by the SQLite target should replace those from Postgres.
-- **Contract emit**: Can the emitter produce a valid contract for a SQLite target? Are there Postgres-specific assumptions in the contract structure (native types, capabilities, storage details)?
-- **Migration planner + runner**: Can the planner generate SQLite-compatible DDL and apply it? Postgres-specific DDL syntax (`SERIAL`, `ALTER TABLE ... ADD COLUMN ... DEFAULT`, enum types, etc.) won't work on SQLite. This is where target-specific coupling in the migration system will surface.
+#### Priority queue
+
+**VP1: End-to-end vertical slice — author, emit, migrate, query SQLite**
+
+This is a single forcing function that tests every layer of the stack against a second SQL target. The layers under test:
+
+- **Contract authoring**: When the target is SQLite, do PSL and TS authoring surfaces present SQLite-appropriate types, defaults, and capabilities (e.g. no enums, different native types, different default generators)? ADR 170 type constructors from the SQLite target should replace those from Postgres.
+- **Contract emit**: Can the emitter produce a valid contract for a SQLite target, without Postgres-specific assumptions in native types, capabilities, or storage details?
+- **Migration planner + runner**: Can the planner generate SQLite-compatible DDL? Postgres-specific syntax (`SERIAL`, `ALTER TABLE ... ADD COLUMN ... DEFAULT`, enum types) won't work.
 - **SQL generation**: Does the ORM and SQL DSL generate SQLite-compatible SQL? Different identifier quoting, no `RETURNING` on older SQLite, different function names, different type affinity system.
 - **Type system / codecs**: SQLite has no strict type system (type affinity, no enums, limited date support). Do the codecs handle this, or do they assume Postgres types?
-- **Capability gating**: Does the capability system correctly gate features that SQLite doesn't support (e.g., server-side cursors, specific join types, `RETURNING`)? Features that degrade gracefully on SQLite should degrade; features that can't work should fail with a clear error.
-- **D1 extensibility (optional)**: Is the adapter architecture layered such that a Cloudflare D1 adapter can build on top of the SQLite foundation? D1 is HTTP-based and runs inside Workers — the SQLite adapter shouldn't bake in assumptions that prevent this.
+- **Capability gating**: Does the capability system correctly gate features SQLite doesn't support (e.g. server-side cursors, `RETURNING`)? Features that can't work should fail with a clear error.
 
-**Stop condition**: A contract authored, emitted, migrated, and queried against SQLite end-to-end. Specifically: emit a contract for a SQLite target, plan and apply a migration, then run `db.users.all()` and get correct rows back. The adapter can be rough. The point is that every layer of the stack — emit, migrate, generate SQL, execute, decode results — works without Postgres assumptions. Where it doesn't, we've found the coupling points.
+User story: I author a contract targeting SQLite, emit it, plan and apply a migration to create the tables, then run `db.users.all()` and get correct rows back.
+
+Tasks:
+
+1. **SQLite target package** — target definition with SQLite-appropriate type constructors, codecs, capabilities, and DDL generation.
+2. **SQLite adapter** — driver that connects to SQLite (e.g. via `better-sqlite3`), executes queries, and decodes results.
+3. **End-to-end test** — author a contract, emit, migrate, query. Fix every Postgres coupling point encountered along the way.
+
+Stop condition: A contract authored, emitted, migrated, and queried against SQLite end-to-end. The adapter can be rough. The point is that every layer — emit, migrate, generate SQL, execute, decode results — works without Postgres assumptions. Where it doesn't, we've found and fixed (or documented) the coupling points. Then stop — SQLite feature parity, performance, and production readiness are May.
+
+**VP2: D1 extensibility** *(optional, architectural check)*
+
+Cloudflare D1 is SQLite-at-the-edge, accessed via HTTP inside Workers. If the SQLite adapter bakes in assumptions that prevent an HTTP-based D1 adapter from layering on top (e.g. native bindings, local filesystem), the path to edge framework support is blocked.
+
+User story: I can look at the SQLite adapter's interface and confirm that a D1 adapter could implement the same interface using Cloudflare's HTTP-based D1 API, without forking the SQLite target.
+
+Tasks:
+
+1. **Architectural review** — inspect the adapter interface for assumptions that prevent HTTP-based adapters. Document whether D1 can layer on top or what would need to change.
+
+Stop condition: A written assessment of whether D1 can layer on the SQLite foundation. No implementation required — just confirmation that the door is open or identification of what blocks it.
 
 ---
 
