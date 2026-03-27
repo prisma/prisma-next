@@ -1,4 +1,4 @@
-import { DefaultValueExpr, InsertAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import { DefaultValueExpr, type InsertAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   createReturningUsersCollection,
@@ -7,13 +7,14 @@ import {
   withCollectionRuntime,
 } from './helpers';
 
-function expectInsertBatchAst(ast: unknown): asserts ast is InsertAst {
-  expect(ast).toBeInstanceOf(InsertAst);
-  if (!(ast instanceof InsertAst)) {
-    throw new Error('Expected execution to emit an insert AST');
-  }
+function isInsertAst(ast: unknown): ast is InsertAst {
+  return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'insert';
+}
 
-  expect(ast.rows).toEqual([
+function expectInsertBatchAst(ast: unknown): asserts ast is InsertAst {
+  expect(isInsertAst(ast)).toBe(true);
+
+  expect((ast as InsertAst).rows).toEqual([
     {
       id: ParamRef.of(1, 'id'),
       name: ParamRef.of(2, 'name'),

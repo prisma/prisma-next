@@ -1,9 +1,9 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { BinaryOp, JoinOnExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyWhereExpr, BinaryOp, JoinOnExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
   BinaryExpr,
-  ColumnRef,
+  type ColumnRef,
   EqColJoinOn,
   ListLiteralExpr,
   LiteralExpr,
@@ -113,7 +113,7 @@ function flattenLogical(
   logicalKind: 'and' | 'or',
   ctx: TransformContext,
   defaultTable: string | undefined,
-  out: WhereExpr[],
+  out: AnyWhereExpr[],
 ): void {
   const current = ParensNode.is(node) ? node.node : node;
   if (logicalKind === 'and' && AndNode.is(current)) {
@@ -159,7 +159,7 @@ export function transformWhereExpr(
   node: unknown,
   ctx: TransformContext,
   defaultTable?: string,
-): WhereExpr | undefined {
+): AnyWhereExpr | undefined {
   if (!node) {
     return undefined;
   }
@@ -173,7 +173,7 @@ export function transformWhereExpr(
   }
 
   if (AndNode.is(node)) {
-    const exprs: WhereExpr[] = [];
+    const exprs: AnyWhereExpr[] = [];
     flattenLogical(node, 'and', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];
@@ -181,7 +181,7 @@ export function transformWhereExpr(
   }
 
   if (OrNode.is(node)) {
-    const exprs: WhereExpr[] = [];
+    const exprs: AnyWhereExpr[] = [];
     flattenLogical(node, 'or', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];
@@ -252,10 +252,10 @@ export function transformJoinOn(
   }
 
   if (
-    expr instanceof BinaryExpr &&
+    expr.kind === 'binary' &&
     expr.op === 'eq' &&
-    expr.left instanceof ColumnRef &&
-    expr.right instanceof ColumnRef
+    expr.left.kind === 'column-ref' &&
+    expr.right.kind === 'column-ref'
   ) {
     return EqColJoinOn.of(expr.left, expr.right);
   }

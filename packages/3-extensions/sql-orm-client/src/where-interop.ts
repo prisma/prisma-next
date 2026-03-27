@@ -1,9 +1,9 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
+  AnyWhereExpr,
   BoundWhereExpr,
   ToWhereExpr,
   WhereArg,
-  WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { bindWhereExpr } from './where-binding';
 
@@ -109,7 +109,7 @@ function assertBoundPayload(bound: BoundWhereExpr): void {
   }
 }
 
-function assertBareWhereExprIsParamFree(expr: WhereExpr): void {
+function assertBareWhereExprIsParamFree(expr: AnyWhereExpr): void {
   if (whereExprContainsParamRef(expr)) {
     throw new Error(
       'Bare WhereExpr cannot contain ParamRef. Use ToWhereExpr.toWhereExpr() for bound parameter payloads.',
@@ -117,10 +117,10 @@ function assertBareWhereExprIsParamFree(expr: WhereExpr): void {
   }
 }
 
-function whereExprContainsParamRef(expr: WhereExpr): boolean {
+function whereExprContainsParamRef(expr: AnyWhereExpr): boolean {
   return expr.collectParamRefs().length > 0;
 }
 
-function collectParamRefIndexes(expr: WhereExpr): number[] {
+function collectParamRefIndexes(expr: AnyWhereExpr): number[] {
   return expr.collectParamRefs().map((paramRef) => paramRef.index);
 }

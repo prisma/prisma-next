@@ -1,11 +1,9 @@
+import type { DeleteAst, SelectAst, UpdateAst } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
   ColumnRef,
-  type DeleteAst,
   NullCheckExpr,
   ParamRef,
-  SelectAst,
-  type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -40,7 +38,7 @@ describe('sql comparison operators', () => {
       .where(id[method](param(paramName)))
       .build({ params: { [paramName]: paramValue } });
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     expect((plan.ast as SelectAst).where).toEqual(
       new BinaryExpr(op, ColumnRef.of('user', 'id'), ParamRef.of(1, paramName)),
     );

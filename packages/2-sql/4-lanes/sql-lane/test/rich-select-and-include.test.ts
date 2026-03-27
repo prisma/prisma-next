@@ -2,15 +2,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import {
+import type {
   BinaryExpr,
-  ColumnRef,
   DerivedTableSource,
-  JoinAst,
-  JsonArrayAggExpr,
-  ParamRef,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { ColumnRef, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -55,7 +52,7 @@ describe('sql lane rich select and include ASTs', () => {
       .limit(5)
       .build({ params: { userId: 'u1' } });
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.projection.map((item) => item.alias)).toEqual(['user_id', 'user_email']);
     expect(plan.meta.projection).toEqual({
@@ -64,7 +61,7 @@ describe('sql lane rich select and include ASTs', () => {
     });
     expect(plan.meta.annotations).toMatchObject({ limit: 5 });
     expect(ast.orderBy?.[0]?.expr).toEqual(ColumnRef.of('user', 'email'));
-    expect(ast.where).toBeInstanceOf(BinaryExpr);
+    expect(ast.where!.kind).toBe('binary');
     expect((ast.where as BinaryExpr).right).toEqual(ParamRef.of(1, 'userId'));
   });
 
@@ -94,16 +91,16 @@ describe('sql lane rich select and include ASTs', () => {
       })
       .build();
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
-    expect(ast.joins?.[0]).toBeInstanceOf(JoinAst);
+    expect(ast.joins?.[0]?.kind).toBe('join');
     expect(ast.projection[1]?.expr).toEqual(ColumnRef.of('posts_lateral', 'posts'));
 
     const aggregateSource = ast.joins?.[0]?.source;
-    expect(aggregateSource).toBeInstanceOf(DerivedTableSource);
+    expect(aggregateSource?.kind).toBe('derived-table-source');
     const aggregateSelect = (aggregateSource as DerivedTableSource).query;
-    expect(aggregateSelect.projection[0]?.expr).toBeInstanceOf(JsonArrayAggExpr);
-    expect(aggregateSelect.from).toBeInstanceOf(DerivedTableSource);
+    expect(aggregateSelect.projection[0]?.expr?.kind).toBe('json-array-agg');
+    expect(aggregateSelect.from.kind).toBe('derived-table-source');
     expect((aggregateSelect.from as DerivedTableSource).query.limit).toBe(2);
     expect(plan.meta.refs?.tables).toContain('post');
   });

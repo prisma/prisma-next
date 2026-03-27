@@ -119,9 +119,9 @@ describe('createModelAccessor', () => {
       post['comments']!.some((comment) => comment['body']!.like('%urgent%')),
     ) as ExistsExpr;
 
-    expect(expr.subquery.where).toBeInstanceOf(AndExpr);
-    const where = expr.subquery.where as AndExpr;
-    expect(where.exprs[1]).toBeInstanceOf(ExistsExpr);
+    expect(expr.subquery.where!.kind).toBe('and');
+    const where = expr.subquery.where! as AndExpr;
+    expect(where.exprs[1]!.kind).toBe('exists');
   });
 
   it('keeps proxy symbol access undefined and relation shorthand maps null and undefined', () => {

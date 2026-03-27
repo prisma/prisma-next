@@ -1,11 +1,5 @@
-import {
-  BinaryExpr,
-  ColumnRef,
-  DeleteAst,
-  InsertAst,
-  ParamRef,
-  UpdateAst,
-} from '@prisma-next/sql-relational-core/ast';
+import type { DeleteAst, InsertAst, UpdateAst } from '@prisma-next/sql-relational-core/ast';
+import { BinaryExpr, ColumnRef, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { describe, expect, it } from 'vitest';
@@ -26,7 +20,7 @@ describe('DML builders', () => {
       })
       .build({ params: { email: 'test@example.com', createdAt: new Date('2024-01-01') } });
 
-    expect(plan.ast).toBeInstanceOf(InsertAst);
+    expect(plan.ast.kind).toBe('insert');
     expect((plan.ast as InsertAst).rows[0]).toEqual({
       email: ParamRef.of(1, 'email'),
       createdAt: ParamRef.of(2, 'createdAt'),
@@ -47,13 +41,13 @@ describe('DML builders', () => {
       .where(tables.user.columns.id.eq(param('userId')))
       .build({ params: { userId: 1 } });
 
-    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
+    expect(updatePlan.ast.kind).toBe('update');
     expect((updatePlan.ast as UpdateAst).where).toEqual(
       BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(2, 'userId')),
     );
     expect(updatePlan.meta.annotations).toMatchObject({ hasWhere: true });
 
-    expect(deletePlan.ast).toBeInstanceOf(DeleteAst);
+    expect(deletePlan.ast.kind).toBe('delete');
     expect((deletePlan.ast as DeleteAst).where).toEqual(
       BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'userId')),
     );

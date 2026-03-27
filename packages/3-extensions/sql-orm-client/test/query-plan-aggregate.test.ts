@@ -8,6 +8,7 @@ import {
   ListLiteralExpr,
   LiteralExpr,
   NullCheckExpr,
+  OrExpr,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -124,7 +125,7 @@ describe('query plan aggregate', () => {
       ]),
     );
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.groupBy).toEqual([ColumnRef.of('posts', 'user_id')]);
     expect(ast.having).toEqual(
@@ -138,12 +139,36 @@ describe('query plan aggregate', () => {
     );
   });
 
+  it('keeps grouped aggregate HAVING with OR expressions', () => {
+    const plan = compileGroupedAggregate(
+      baseContract,
+      'posts',
+      [],
+      ['user_id'],
+      {
+        postCount: { kind: 'aggregate', fn: 'count' },
+        totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' },
+      },
+      OrExpr.of([
+        BinaryExpr.gte(
+          AggregateExpr.sum(ColumnRef.of('posts', 'views')),
+          ColumnRef.of('posts', 'views'),
+        ),
+        BinaryExpr.gte(AggregateExpr.count(), LiteralExpr.of(5)),
+      ]),
+    );
+
+    expect(plan.ast.kind).toBe('select');
+    const ast = plan.ast as SelectAst;
+    expect(ast.having).toBeInstanceOf(OrExpr);
+  });
+
   it('keeps aggregate filters and params when lowering plain aggregate queries', () => {
     const plan = compileAggregate(baseContract, 'posts', [filteredViews], {
       totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' },
     });
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.where).toEqual(filteredViews.expr);
     expect(plan.params).toEqual([100]);

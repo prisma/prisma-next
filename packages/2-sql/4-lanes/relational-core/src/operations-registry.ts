@@ -4,8 +4,8 @@ import { planInvalid } from '@prisma-next/plan';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
+  type AnyOperationArg,
   type BinaryOp,
-  type Expression,
   type ExpressionSource,
   LiteralExpr,
   OperationExpr,
@@ -64,10 +64,9 @@ function executeOperation(
     );
   }
 
-  // Get the Expression from the self builder using toExpr()
-  const selfExpr: Expression = selfBuilder.toExpr();
+  const selfExpr = selfBuilder.toExpr();
 
-  const operationArgs: Array<Expression | ParamRef | LiteralExpr> = [];
+  const operationArgs: AnyOperationArg[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     const argSpec = signature.args[i];

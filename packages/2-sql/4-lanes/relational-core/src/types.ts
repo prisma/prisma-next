@@ -7,14 +7,14 @@ import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type {
+  AnyExpression,
+  AnyQueryAst,
   BinaryOp,
   ColumnRef,
   Direction,
-  Expression,
   ExpressionSource,
   OperationExpr,
   ParamRef,
-  QueryAst,
 } from './ast/types';
 import type { SqlQueryPlan } from './plan';
 import type { ExecutionContext } from './query-lane-context';
@@ -38,7 +38,7 @@ export interface OrderBuilder<
   _JsType = unknown,
 > {
   readonly kind: 'order';
-  readonly expr: Expression;
+  readonly expr: AnyExpression;
   readonly dir: Direction;
 }
 
@@ -103,7 +103,7 @@ export interface BinaryBuilder<
 > {
   readonly kind: 'binary';
   readonly op: BinaryOp;
-  readonly left: Expression;
+  readonly left: AnyExpression;
   readonly right: ValueSource;
 }
 
@@ -117,7 +117,7 @@ export interface NullCheckBuilder<
   _JsType = unknown,
 > {
   readonly kind: 'nullCheck';
-  readonly expr: Expression;
+  readonly expr: AnyExpression;
   readonly isNull: boolean;
 }
 
@@ -688,10 +688,10 @@ export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>
     : false;
 
 /**
- * SQL-specific Plan type that refines the ast field to use QueryAst.
+ * SQL-specific Plan type that refines the ast field to use AnyQueryAst.
  * This is the type used by SQL query builders.
  */
-export type SqlPlan<Row = unknown> = ExecutionPlan<Row, QueryAst>;
+export type SqlPlan<Row = unknown> = ExecutionPlan<Row, AnyQueryAst>;
 
 /**
  * Helper types for extracting contract structure.

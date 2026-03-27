@@ -1,6 +1,7 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
+  type AnyWhereExpr,
   type AstRewriter,
   BinaryExpr,
   type BinaryOp,
@@ -19,7 +20,6 @@ import {
   SelectAst,
   SubqueryExpr,
   TableSource,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, resolveTableColumns } from './query-plan-meta';
@@ -58,7 +58,7 @@ function toOrderBy(
   );
 }
 
-function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): WhereExpr {
+function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): AnyWhereExpr {
   const comparator: BinaryOp = entry.direction === 'asc' ? 'gt' : 'lt';
   return new BinaryExpr(
     comparator,
@@ -70,9 +70,9 @@ function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): WhereEx
 function buildLexicographicCursorWhere(
   tableName: string,
   entries: readonly CursorOrderEntry[],
-): WhereExpr {
-  const branches = entries.map((entry, index): WhereExpr => {
-    const branchExprs: WhereExpr[] = [];
+): AnyWhereExpr {
+  const branches = entries.map((entry, index): AnyWhereExpr => {
+    const branchExprs: AnyWhereExpr[] = [];
 
     for (const prefixEntry of entries.slice(0, index)) {
       branchExprs.push(
@@ -85,14 +85,14 @@ function buildLexicographicCursorWhere(
 
     branchExprs.push(createBoundaryExpr(tableName, entry));
     if (branchExprs.length === 1) {
-      return branchExprs[0] as WhereExpr;
+      return branchExprs[0] as AnyWhereExpr;
     }
 
     return AndExpr.of(branchExprs);
   });
 
   if (branches.length === 1) {
-    return branches[0] as WhereExpr;
+    return branches[0] as AnyWhereExpr;
   }
 
   return OrExpr.of(branches);
@@ -102,7 +102,7 @@ function buildCursorWhere(
   tableName: string,
   orderBy: readonly OrderExpr[] | undefined,
   cursor: Readonly<Record<string, unknown>> | undefined,
-): WhereExpr | undefined {
+): AnyWhereExpr | undefined {
   if (!cursor || !orderBy || orderBy.length === 0) {
     return undefined;
   }
@@ -432,7 +432,7 @@ export function compileRelationSelect(
   parentPks: readonly unknown[],
   nestedState: CollectionState,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const inFilter: WhereExpr = BinaryExpr.in(
+  const inFilter: AnyWhereExpr = BinaryExpr.in(
     ColumnRef.of(relatedTableName, fkColumn),
     ListLiteralExpr.fromValues(parentPks),
   );

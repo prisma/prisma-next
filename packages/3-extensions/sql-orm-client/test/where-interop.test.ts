@@ -1,5 +1,6 @@
 import {
   AndExpr,
+  type AnyWhereExpr,
   BinaryExpr,
   type BoundWhereExpr,
   ColumnRef,
@@ -15,7 +16,6 @@ import {
   SelectAst,
   TableSource,
   type ToWhereExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { normalizeWhereArg } from '../src/where-interop';
@@ -26,7 +26,7 @@ const literal = (value: unknown) => LiteralExpr.of(value);
 const descriptor = (index: number) => ({ source: 'lane' as const, index });
 
 function bound(
-  expr: WhereExpr,
+  expr: AnyWhereExpr,
   params: readonly unknown[] = [],
   paramDescriptors = params.map((_, index) => descriptor(index + 1)),
 ): BoundWhereExpr {
@@ -136,7 +136,7 @@ describe('where interop', () => {
   });
 
   it('rejects wrapped unsupported where nodes', () => {
-    const bad = { kind: 'unsupported' } as unknown as WhereExpr;
+    const bad = { kind: 'unsupported' } as unknown as AnyWhereExpr;
 
     expect(() =>
       normalizeWhereArg(

@@ -1,13 +1,10 @@
 import {
   ColumnRef,
-  DefaultValueExpr,
-  DeleteAst,
-  DoNothingConflictAction,
-  DoUpdateSetConflictAction,
+  type DeleteAst,
+  type DoUpdateSetConflictAction,
   type InsertAst,
-  InsertAst as InsertAstClass,
   ParamRef,
-  UpdateAst,
+  type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
@@ -21,7 +18,7 @@ import { withReturningCapability } from './collection-fixtures';
 import { getTestContract } from './helpers';
 
 function assertInsertAst(ast: unknown): asserts ast is InsertAst {
-  expect(ast).toBeInstanceOf(InsertAstClass);
+  expect((ast as { kind: string }).kind).toBe('insert');
 }
 
 describe('query plan mutations', () => {
@@ -53,7 +50,7 @@ describe('query plan mutations', () => {
       name: ParamRef.of(2, 'name'),
       email: ParamRef.of(3, 'email'),
     });
-    expect(plan.ast.rows[0]?.['invited_by_id']).toBeInstanceOf(DefaultValueExpr);
+    expect(plan.ast.rows[0]?.['invited_by_id']?.kind).toBe('default-value');
     expect(plan.ast.rows[1]).toEqual({
       id: ParamRef.of(4, 'id'),
       name: ParamRef.of(5, 'name'),
@@ -89,7 +86,7 @@ describe('query plan mutations', () => {
     );
 
     assertInsertAst(plan.ast);
-    expect(plan.ast.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+    expect(plan.ast.onConflict?.action?.kind).toBe('do-nothing');
     expect(plan.params).toEqual([10, 'Alice', 'alice@example.com']);
     expect(plan.ast.returning).toEqual(
       Object.keys(contract.storage.tables.users.columns).map((column) =>
@@ -124,7 +121,7 @@ describe('query plan mutations', () => {
     );
 
     assertInsertAst(plan.ast);
-    expect(plan.ast.onConflict?.action).toBeInstanceOf(DoUpdateSetConflictAction);
+    expect(plan.ast.onConflict?.action?.kind).toBe('do-update-set');
     const action = plan.ast.onConflict?.action as DoUpdateSetConflictAction;
     expect(action.set).toEqual({ name: ParamRef.of(4, 'name') });
     expect(plan.params).toEqual([10, 'Alice', 'alice@example.com', 'Updated Alice']);
@@ -134,12 +131,12 @@ describe('query plan mutations', () => {
     const contract = getTestContract();
 
     const updatePlan = compileUpdateCount(contract, 'users', { name: 'Alice' }, []);
-    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
+    expect(updatePlan.ast.kind).toBe('update');
     expect((updatePlan.ast as UpdateAst).where).toBeUndefined();
     expect(updatePlan.params).toEqual(['Alice']);
 
     const deletePlan = compileDeleteCount(contract, 'users', []);
-    expect(deletePlan.ast).toBeInstanceOf(DeleteAst);
+    expect(deletePlan.ast.kind).toBe('delete');
     expect((deletePlan.ast as DeleteAst).where).toBeUndefined();
     expect(deletePlan.params).toEqual([]);
   });

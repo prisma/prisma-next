@@ -2,19 +2,17 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   AndExpr,
+  type AnyExpression,
+  type AnySqlComparable,
+  type AnyWhereExpr,
   BinaryExpr,
   type BoundWhereExpr,
   ColumnRef,
-  type Expression,
-  ListLiteralExpr,
-  LiteralExpr,
   NullCheckExpr,
   OrExpr,
-  ParamRef,
   ProjectionItem,
   SelectAst,
   TableSource,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan } from './query-plan-meta';
@@ -36,37 +34,42 @@ function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>
 // ORM HAVING filters use literal binding (values inlined at plan-build time),
 // not parameterized binding. ParamRef is rejected because the ORM's grouped
 // collection API always produces literal comparisons for having() predicates.
-function validateGroupedComparable(
-  value: Expression | ParamRef | LiteralExpr | ListLiteralExpr,
-): Expression | LiteralExpr | ListLiteralExpr {
-  if (value instanceof ParamRef) {
-    throw new Error('ParamRef is not supported in grouped having expressions');
-  }
-
-  if (value instanceof LiteralExpr) {
-    return value;
-  }
-
-  if (value instanceof ListLiteralExpr) {
-    if (value.values.some((entry) => entry instanceof ParamRef)) {
+function validateGroupedComparable(value: AnySqlComparable): AnySqlComparable {
+  switch (value.kind) {
+    case 'param-ref':
       throw new Error('ParamRef is not supported in grouped having expressions');
-    }
-    return value;
+    case 'literal':
+      return value;
+    case 'list-literal':
+      if (value.values.some((entry) => entry.kind === 'param-ref')) {
+        throw new Error('ParamRef is not supported in grouped having expressions');
+      }
+      return value;
+    case 'column-ref':
+    case 'subquery':
+    case 'operation':
+    case 'aggregate':
+    case 'json-object':
+    case 'json-array-agg':
+      return value;
+    // v8 ignore next 4
+    default:
+      throw new Error(
+        `Unsupported comparable kind in grouped having: ${(value satisfies never as { kind: string }).kind}`,
+      );
   }
-
-  return value;
 }
 
-function validateGroupedMetricExpr(expr: Expression): AggregateExpr {
-  if (!(expr instanceof AggregateExpr)) {
+function validateGroupedMetricExpr(expr: AnyExpression): AggregateExpr {
+  if (expr.kind !== 'aggregate') {
     throw new Error('groupBy().having() only supports aggregate metric expressions');
   }
 
   return expr;
 }
 
-function validateGroupedHavingExpr(expr: WhereExpr): WhereExpr {
-  return expr.accept<WhereExpr>({
+function validateGroupedHavingExpr(expr: AnyWhereExpr): AnyWhereExpr {
+  return expr.accept<AnyWhereExpr>({
     and(expr) {
       return AndExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
     },
@@ -118,7 +121,7 @@ export function compileGroupedAggregate(
   filters: readonly BoundWhereExpr[],
   groupByColumns: readonly string[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
-  havingExpr: WhereExpr | undefined,
+  havingExpr: AnyWhereExpr | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   if (groupByColumns.length === 0) {
     throw new Error('groupBy() requires at least one field');

@@ -1,6 +1,6 @@
 import {
+  type AnyOperationArg,
   ColumnRef,
-  type Expression,
   LiteralExpr,
   OperationExpr,
   ParamRef,
@@ -26,10 +26,7 @@ export function lit(value: unknown): LiteralExpr {
   return LiteralExpr.of(value);
 }
 
-export function lowerExpr(
-  column: ColumnRef,
-  ...args: Array<Expression | ParamRef | LiteralExpr>
-): OperationExpr {
+export function lowerExpr(column: ColumnRef, ...args: Array<AnyOperationArg>): OperationExpr {
   return OperationExpr.function({
     method: 'lower',
     forTypeId: 'pg/text@1',

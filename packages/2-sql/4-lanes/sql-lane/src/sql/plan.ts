@@ -1,5 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import { compact, type Expression } from '@prisma-next/sql-relational-core/ast';
+import { type AnyExpression, compact } from '@prisma-next/sql-relational-core/ast';
 import type { AnyExpressionSource } from '@prisma-next/sql-relational-core/types';
 import {
   isColumnBuilder,
@@ -38,7 +38,7 @@ function collectRefsFromExpressionSource(
  * Extracts column references from an Expression (AST node).
  */
 function collectRefsFromExpression(
-  expr: Expression,
+  expr: AnyExpression,
   refsColumns: Map<string, { table: string; column: string }>,
 ): void {
   for (const ref of expr.collectColumnRefs()) {

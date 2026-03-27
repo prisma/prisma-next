@@ -2,18 +2,18 @@ import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
+  type AnyExpression,
+  type AnyFromSource,
+  type AnySqlComparable,
+  type AnyWhereExpr,
   BinaryExpr,
   type BoundWhereExpr,
-  ColumnRef,
+  type ColumnRef,
   DerivedTableSource,
-  EqColJoinOn,
   ExistsExpr,
-  type Expression,
   type ExpressionRewriter,
-  type FromSource,
   JoinAst,
   ListLiteralExpr,
-  LiteralExpr,
   NullCheckExpr,
   OrderByItem,
   OrExpr,
@@ -21,9 +21,6 @@ import {
   type ProjectionExpr,
   ProjectionItem,
   SelectAst,
-  type SqlComparable,
-  TableSource,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createColumnParamDescriptor } from './param-descriptors';
 
@@ -32,7 +29,10 @@ interface BindState {
   readonly paramDescriptors: ParamDescriptor[];
 }
 
-export function bindWhereExpr(contract: SqlContract<SqlStorage>, expr: WhereExpr): BoundWhereExpr {
+export function bindWhereExpr(
+  contract: SqlContract<SqlStorage>,
+  expr: AnyWhereExpr,
+): BoundWhereExpr {
   const state: BindState = {
     params: [],
     paramDescriptors: [],
@@ -47,13 +47,13 @@ export function bindWhereExpr(contract: SqlContract<SqlStorage>, expr: WhereExpr
 
 function bindWhereExprNode(
   contract: SqlContract<SqlStorage>,
-  expr: WhereExpr,
+  expr: AnyWhereExpr,
   state: BindState,
-): WhereExpr {
-  return expr.accept<WhereExpr>({
+): AnyWhereExpr {
+  return expr.accept<AnyWhereExpr>({
     binary(expr) {
       const left = bindExpression(contract, expr.left, state);
-      const bindingColumn = left instanceof ColumnRef ? left : undefined;
+      const bindingColumn = left.kind === 'column-ref' ? left : undefined;
 
       return new BinaryExpr(
         expr.op,
@@ -82,26 +82,26 @@ function bindWhereExprNode(
 
 function bindComparable(
   contract: SqlContract<SqlStorage>,
-  comparable: SqlComparable,
+  comparable: AnySqlComparable,
   bindingColumn: ColumnRef | undefined,
   state: BindState,
-): SqlComparable {
-  if (comparable instanceof ParamRef || bindingColumn === undefined) {
-    return comparable instanceof ParamRef
+): AnySqlComparable {
+  if (comparable.kind === 'param-ref' || bindingColumn === undefined) {
+    return comparable.kind === 'param-ref'
       ? comparable
-      : comparable instanceof LiteralExpr || comparable instanceof ListLiteralExpr
+      : comparable.kind === 'literal' || comparable.kind === 'list-literal'
         ? comparable
         : bindExpression(contract, comparable, state);
   }
 
-  if (comparable instanceof LiteralExpr) {
+  if (comparable.kind === 'literal') {
     return createParamRef(contract, bindingColumn, comparable.value, state);
   }
 
-  if (comparable instanceof ListLiteralExpr) {
+  if (comparable.kind === 'list-literal') {
     return ListLiteralExpr.of(
       comparable.values.map((value) =>
-        value instanceof LiteralExpr
+        value.kind === 'literal'
           ? createParamRef(contract, bindingColumn, value.value, state)
           : value,
       ),
@@ -135,9 +135,9 @@ function createExpressionBinder(
 
 function bindExpression(
   contract: SqlContract<SqlStorage>,
-  expr: Expression,
+  expr: AnyExpression,
   state: BindState,
-): Expression {
+): AnyExpression {
   return expr.rewrite(createExpressionBinder(contract, state));
 }
 
@@ -146,7 +146,7 @@ function bindProjectionExpr(
   expr: ProjectionExpr,
   state: BindState,
 ): ProjectionExpr {
-  return expr instanceof LiteralExpr ? expr : bindExpression(contract, expr, state);
+  return expr.kind === 'literal' ? expr : bindExpression(contract, expr, state);
 }
 
 function bindOrderByItem(
@@ -161,24 +161,28 @@ function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst, state: BindS
   return new JoinAst(
     join.joinType,
     bindFromSource(contract, join.source, state),
-    join.on instanceof EqColJoinOn ? join.on : bindWhereExprNode(contract, join.on, state),
+    join.on.kind === 'eq-col-join-on' ? join.on : bindWhereExprNode(contract, join.on, state),
     join.lateral,
   );
 }
 
 function bindFromSource(
   contract: SqlContract<SqlStorage>,
-  source: FromSource,
+  source: AnyFromSource,
   state: BindState,
-): FromSource {
-  if (source instanceof TableSource) {
-    return source;
+): AnyFromSource {
+  const node = source;
+  switch (node.kind) {
+    case 'table-source':
+      return node;
+    case 'derived-table-source':
+      return DerivedTableSource.as(node.alias, bindSelectAst(contract, node.query, state));
+    // v8 ignore next 4
+    default:
+      throw new Error(
+        `Unsupported source kind: ${(node satisfies never as { kind: string }).kind}`,
+      );
   }
-  if (source instanceof DerivedTableSource) {
-    return DerivedTableSource.as(source.alias, bindSelectAst(contract, source.query, state));
-  }
-
-  return source;
 }
 
 function bindSelectAst(

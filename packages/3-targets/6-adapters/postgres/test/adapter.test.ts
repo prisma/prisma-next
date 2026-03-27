@@ -2,6 +2,7 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   AggregateExpr,
   AndExpr,
+  type AnyQueryAst,
   BinaryExpr,
   ColumnRef,
   DefaultValueExpr,
@@ -17,7 +18,6 @@ import {
   OrExpr,
   ParamRef,
   ProjectionItem,
-  QueryAst,
   SelectAst,
   SubqueryExpr,
   TableSource,
@@ -64,11 +64,7 @@ const contract = validateContract<PostgresContract>({
   mappings: {},
 });
 
-class UnsupportedAst extends QueryAst {
-  override collectRefs() {
-    return { tables: [], columns: [] };
-  }
-}
+const unsupportedAst = { kind: 'unsupported' } as unknown as AnyQueryAst;
 
 describe('Postgres adapter', () => {
   const adapter = createPostgresAdapter();
@@ -133,8 +129,8 @@ describe('Postgres adapter', () => {
   });
 
   it('throws on unsupported AST nodes and invalid insert rows', () => {
-    expect(() => adapter.lower(new UnsupportedAst(), { contract, params: [] })).toThrow(
-      'Unsupported AST node: UnsupportedAst',
+    expect(() => adapter.lower(unsupportedAst, { contract, params: [] })).toThrow(
+      'Unsupported AST node',
     );
     expect(() =>
       adapter.lower(InsertAst.into(TableSource.named('user')).withRows([]), {

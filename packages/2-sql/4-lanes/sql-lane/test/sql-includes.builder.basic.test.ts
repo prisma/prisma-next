@@ -2,9 +2,8 @@ import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
-  DerivedTableSource,
-  JoinAst,
-  JsonArrayAggExpr,
+  type DerivedTableSource,
+  type JsonArrayAggExpr,
   type JsonObjectExpr,
   ParamRef,
   type SelectAst,
@@ -39,16 +38,16 @@ describe('SQL builder includeMany', () => {
     const includeJoin = ast.joins?.find(
       (join) =>
         join.lateral &&
-        join.source instanceof DerivedTableSource &&
+        join.source.kind === 'derived-table-source' &&
         join.source.alias === 'post_lateral',
     );
 
-    expect(includeJoin).toBeInstanceOf(JoinAst);
+    expect(includeJoin?.kind).toBe('join');
     expect(ast.projection.find((item) => item.alias === 'post')?.expr).toEqual(
       ColumnRef.of('post_lateral', 'post'),
     );
     const includeProjection = (includeJoin?.source as DerivedTableSource).query.projection[0];
-    expect(includeProjection?.expr).toBeInstanceOf(JsonArrayAggExpr);
+    expect(includeProjection?.expr.kind).toBe('json-array-agg');
   });
 
   it('builds includeMany with custom aliases and child where clauses', () => {
@@ -72,7 +71,7 @@ describe('SQL builder includeMany', () => {
     const includeJoin = (plan.ast as SelectAst).joins?.find(
       (join) =>
         join.lateral &&
-        join.source instanceof DerivedTableSource &&
+        join.source.kind === 'derived-table-source' &&
         join.source.alias === 'posts_lateral',
     );
     const rowsQuery = ((includeJoin?.source as DerivedTableSource).query.from as DerivedTableSource)

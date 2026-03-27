@@ -1,5 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { BoundWhereExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyWhereExpr, BoundWhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { BinaryExpr, ColumnRef, LiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import { resolveModelTableName, resolvePrimaryKeyColumn } from './collection-contract';
 import {
@@ -87,7 +87,7 @@ export async function executeNestedUpdateMutation(options: {
   contract: SqlContract<SqlStorage>;
   runtime: RuntimeQueryable;
   modelName: string;
-  filters: readonly (BoundWhereExpr | WhereExpr)[];
+  filters: readonly (BoundWhereExpr | AnyWhereExpr)[];
   data: MutationUpdateInput<SqlContract<SqlStorage>, string>;
 }): Promise<Record<string, unknown> | null> {
   return withMutationScope(options.runtime, async (scope) =>
@@ -542,8 +542,8 @@ function readParentColumnValues(
 function buildChildJoinWhere(
   relation: RelationDefinition,
   childValues: Map<string, unknown>,
-): WhereExpr {
-  const exprs: WhereExpr[] = [];
+): AnyWhereExpr {
+  const exprs: AnyWhereExpr[] = [];
 
   for (const [childColumn, parentValue] of childValues.entries()) {
     exprs.push(

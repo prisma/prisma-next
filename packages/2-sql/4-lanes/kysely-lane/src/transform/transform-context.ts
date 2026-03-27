@@ -1,9 +1,9 @@
 import type { ParamDescriptor, PlanRefs } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { QueryAst } from '@prisma-next/sql-relational-core/ast';
+import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
 
 export interface TransformResult {
-  readonly ast: QueryAst;
+  readonly ast: AnyQueryAst;
   readonly metaAdditions: {
     readonly refs: PlanRefs;
     readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
