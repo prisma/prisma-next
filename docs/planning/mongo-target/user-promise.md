@@ -4,6 +4,8 @@ What does Prisma Next offer a MongoDB user, and why would they choose it over th
 
 See also: [design-questions.md](design-questions.md), [mongodb-primitives-reference.md](mongodb-primitives-reference.md)
 
+**External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) and a [user journey narrative](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) that informed this document.
+
 ---
 
 ## Who is the user?
@@ -77,6 +79,14 @@ The distinction between embedded and referenced is a **data modeling decision** 
 - **Type derivation**: The contract produces TypeScript types for every model. The ORM client, query filters, and mutation inputs are all derived from these types. If a field is `String`, the filter for that field accepts `string`. If it's `ObjectId`, the filter accepts `ObjectId`.
 - **Schema validation**: PN can optionally push `$jsonSchema` validation rules to MongoDB, giving database-level enforcement of the contract's type expectations. Even without server-side validation, the contract serves as documentation and the basis for runtime validation.
 - **Cross-family consistency**: A consumer library (a validator, a GraphQL schema generator, a visualization tool) can accept any PN contract — SQL or document — and traverse its models and relations without family-specific code.
+
+#### Bringing structure to existing databases (introspection)
+
+Many MongoDB users have existing databases with no formal schema. The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team describes a developer introspecting an existing database and hitting friction: plural collection names, manually defining every relationship, and polymorphic fields falling back to untyped `Json`.
+
+PN should offer introspection that generates a contract from an existing MongoDB database — sampling documents to infer field types, detecting embedded subdocuments, and normalizing collection names to model names. Relationships can't be fully inferred (MongoDB has no foreign keys), but conventions (fields ending in `Id`, arrays of `ObjectId`) can suggest candidates. The generated contract is a starting point that the user refines, not a finished artifact.
+
+This is out of scope for the PoC but is table-stakes for real Mongo adoption. See [design question #11](design-questions.md#11-introspection-generating-a-contract-from-an-existing-database).
 
 ---
 
@@ -194,6 +204,18 @@ const results = await runtime.execute({
 
 A type-safe aggregation pipeline builder (the Mongo equivalent of the SQL DSL) is a future goal, not a PoC deliverable. The raw escape hatch validates that the runtime can handle non-SQL query shapes.
 
+#### MongoDB-specific capabilities via extension packs
+
+PN's extension pack architecture (the same system that delivers pgvector for Postgres) enables MongoDB-specific capabilities without bloating the core ORM. The [MongoDB team's feature priority list](references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) identifies several candidates:
+
+- **Vector Search** (`$vectorSearch`) — contributes a vector field type, similarity search operators, and vector search index definitions. Analogous to pgvector for Postgres.
+- **Atlas Search** (`$search`) — full-text search via MongoDB Atlas. Contributes search index definitions and search query operators.
+- **Geospatial** (`$near`, `$geoWithin`, `2dsphere` indexes) — contributes GeoJSON field types, geospatial query operators, and geospatial index types.
+
+These are delivered as extension packs that the user adds to their configuration, just as a Postgres user adds pgvector. The ORM and query surfaces then expose the contributed types and operations with full type safety.
+
+This is out of scope for the PoC but is a key part of the longer-term Mongo-native story. See [design question #12](design-questions.md#12-mongodb-specific-extension-packs).
+
 ---
 
 ### 3. PN provides guardrails that MongoDB doesn't
@@ -239,6 +261,7 @@ Clarity about what's out of scope is as important as the promises:
 - **Portability between SQL and Mongo.** The shared ORM interface means the *patterns* are consistent, but a SQL contract and a Mongo contract are not interchangeable. You can't swap your Postgres database for MongoDB by changing a config line. The domain model transfers; the storage strategy and query capabilities do not.
 - **Full MongoDB feature coverage.** PN covers the common CRUD and relation patterns. Advanced features (sharding configuration, capped collections, GridFS, time-series collections) are out of scope for the ORM client. Users who need these use the raw driver through PN's escape hatch.
 - **Hiding that it's MongoDB.** PN is mongo-native, not mongo-agnostic. Embedded documents, `ObjectId`, array operations, and aggregation pipelines are all concepts the user will encounter. PN makes them type-safe and ergonomic, not invisible.
+- **Field-level encryption management.** MongoDB's CSFLE and Queryable Encryption are driver-level concerns. PN can pass encryption configuration through to the MongoDB driver, but it doesn't implement encryption itself. This is a future adapter-level capability, not an ORM concern. See [design question #13](design-questions.md#13-client-side-field-level-encryption-csfle-and-queryable-encryption).
 
 ---
 
@@ -251,7 +274,11 @@ Clarity about what's out of scope is as important as the promises:
 | Type safety (mutations) | None | Partial | Generated types | Full (including Mongo operators) |
 | Referential integrity | None | Manual (middleware hooks) | None | Configurable (cascade, restrict, setNull) |
 | Embedded documents | Native | Native | Not supported | Native (first-class in contract) |
+| Polymorphism / unions | Native (untyped) | Discriminator plugin | Json fallback | Planned (discriminated unions in contract) |
 | Schema validation | Manual $jsonSchema | Plugin-based | None | Built-in (write + configurable read) |
 | Aggregation pipelines | Untyped arrays | Untyped arrays | Not exposed | Raw escape hatch (typed DSL later) |
+| Vector / Atlas Search | Raw pipeline stages | Raw pipeline stages | Raw queries | Extension packs (planned) |
+| Change streams | Native | Native | Not supported | Planned (async iterable model) |
+| Introspection | N/A | N/A | db pull (limited) | Planned (type inference + convention) |
 | Cross-family support | N/A | N/A | SQL + Mongo (separate) | SQL + Mongo (shared interface) |
 | Plugin/middleware ecosystem | None | Mongoose plugins | Limited | Full (shared with SQL) |
