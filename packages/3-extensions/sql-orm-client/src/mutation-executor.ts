@@ -3,7 +3,6 @@ import {
   type AnyExpression,
   type AnyWhereExpr,
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
   LiteralExpr,
 } from '@prisma-next/sql-relational-core/ast';

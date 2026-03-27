@@ -6,8 +6,7 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
-import type { AnyWhereExpr } from '@prisma-next/sql-relational-core/ast';
-import type { AnyExpression, BoundWhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyExpression, AnyWhereExpr } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { RowSelection } from './collection-internal-types';
