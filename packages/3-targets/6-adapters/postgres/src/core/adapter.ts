@@ -234,7 +234,11 @@ function renderDistinctPrefix(
   return '';
 }
 
-function renderSource(source: AnyFromSource, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderSource(
+  source: AnyFromSource,
+  contract?: PostgresContract,
+  pim?: ParamIndexMap,
+): string {
   const node = source;
   switch (node.kind) {
     case 'table-source': {
@@ -304,9 +308,7 @@ function renderNullCheck(
 ): string {
   const rendered = renderExpr(expr.expr, contract, pim);
   const renderedExpr =
-    expr.expr.kind === 'operation' || expr.expr.kind === 'subquery'
-      ? `(${rendered})`
-      : rendered;
+    expr.expr.kind === 'operation' || expr.expr.kind === 'subquery' ? `(${rendered})` : rendered;
   return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
 }
 
@@ -582,10 +584,7 @@ function getInsertColumnOrder(
   return Object.keys(contract.storage.tables[tableName]?.columns ?? {});
 }
 
-function renderInsertValue(
-  value: InsertValue | undefined,
-  pim?: ParamIndexMap,
-): string {
+function renderInsertValue(value: InsertValue | undefined, pim?: ParamIndexMap): string {
   if (!value || value.kind === 'default-value') {
     return 'DEFAULT';
   }
