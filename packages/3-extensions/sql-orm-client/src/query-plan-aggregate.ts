@@ -52,13 +52,11 @@ function validateGroupedComparable(value: AnySqlComparable): AnySqlComparable {
     case 'json-object':
     case 'json-array-agg':
       return value;
-    // v8 ignore next 6
-    default: {
-      const _exhaustive: never = value;
+    // v8 ignore next 4
+    default:
       throw new Error(
-        `Unsupported comparable kind in grouped having: ${(_exhaustive as { kind: string }).kind}`,
+        `Unsupported comparable kind in grouped having: ${(value satisfies never as { kind: string }).kind}`,
       );
-    }
   }
 }
 

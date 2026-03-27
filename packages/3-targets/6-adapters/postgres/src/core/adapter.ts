@@ -133,10 +133,10 @@ class PostgresAdapterImpl
         sql = renderDelete(node, context.contract);
         break;
       // v8 ignore next 4
-      default: {
-        const _exhaustive: never = node;
-        throw new Error(`Unsupported AST node kind: ${(_exhaustive as { kind: string }).kind}`);
-      }
+      default:
+        throw new Error(
+          `Unsupported AST node kind: ${(node satisfies never as { kind: string }).kind}`,
+        );
     }
 
     return Object.freeze({
@@ -233,10 +233,10 @@ function renderSource(source: AnyFromSource, contract?: PostgresContract): strin
     case 'derived-table-source':
       return `(${renderSelect(node.query, contract)}) AS ${quoteIdentifier(node.alias)}`;
     // v8 ignore next 4
-    default: {
-      const _exhaustive: never = node;
-      throw new Error(`Unsupported source node kind: ${(_exhaustive as { kind: string }).kind}`);
-    }
+    default:
+      throw new Error(
+        `Unsupported source node kind: ${(node satisfies never as { kind: string }).kind}`,
+      );
   }
 }
 
@@ -325,10 +325,10 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
       right = renderExpr(rightNode, contract);
       break;
     // v8 ignore next 4
-    default: {
-      const _exhaustive: never = rightNode;
-      throw new Error(`Unsupported comparable kind: ${(_exhaustive as { kind: string }).kind}`);
-    }
+    default:
+      throw new Error(
+        `Unsupported comparable kind: ${(rightNode satisfies never as { kind: string }).kind}`,
+      );
   }
 
   const operatorMap: Record<BinaryExpr['op'], string> = {
@@ -428,13 +428,11 @@ function renderExpr(expr: AnyExpression, contract?: PostgresContract): string {
       return renderJsonObjectExpr(node, contract);
     case 'json-array-agg':
       return renderJsonArrayAggExpr(node, contract);
-    // v8 ignore next 6
-    default: {
-      const _exhaustive: never = node;
+    // v8 ignore next 4
+    default:
       throw new Error(
-        `Unsupported expression node kind: ${(_exhaustive as { kind: string }).kind}`,
+        `Unsupported expression node kind: ${(node satisfies never as { kind: string }).kind}`,
       );
-    }
   }
 }
 
@@ -498,11 +496,10 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
       case 'json-object':
       case 'json-array-agg':
         return renderExpr(node, contract);
-      // v8 ignore next 6
+      // v8 ignore next 4
       default: {
-        const _exhaustive: never = node;
         throw new Error(
-          `Unsupported operation arg kind: ${(_exhaustive as { kind: string }).kind}`,
+          `Unsupported operation arg kind: ${(node satisfies never as { kind: string }).kind}`,
         );
       }
     }
@@ -580,13 +577,11 @@ function renderInsertValue(
     }
     case 'column-ref':
       return renderColumn(value);
-    // v8 ignore next 6
-    default: {
-      const _exhaustive: never = value;
+    // v8 ignore next 4
+    default:
       throw new Error(
-        `Unsupported value node in INSERT: ${(_exhaustive as { kind: string }).kind}`,
+        `Unsupported value node in INSERT: ${(value satisfies never as { kind: string }).kind}`,
       );
-    }
   }
 }
 
@@ -651,13 +646,11 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
             });
             return ` ON CONFLICT (${conflictColumns.join(', ')}) DO UPDATE SET ${updates.join(', ')}`;
           }
-          // v8 ignore next 6
-          default: {
-            const _exhaustive: never = action;
+          // v8 ignore next 4
+          default:
             throw new Error(
-              `Unsupported onConflict action: ${(_exhaustive as { kind: string }).kind}`,
+              `Unsupported onConflict action: ${(action satisfies never as { kind: string }).kind}`,
             );
-          }
         }
       })()
     : '';
@@ -683,13 +676,11 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
       case 'column-ref':
         value = renderColumn(val);
         break;
-      // v8 ignore next 6
-      default: {
-        const _exhaustive: never = val;
+      // v8 ignore next 4
+      default:
         throw new Error(
-          `Unsupported value node in UPDATE: ${(_exhaustive as { kind: string }).kind}`,
+          `Unsupported value node in UPDATE: ${(val satisfies never as { kind: string }).kind}`,
         );
-      }
     }
     return `${column} = ${value}`;
   });
