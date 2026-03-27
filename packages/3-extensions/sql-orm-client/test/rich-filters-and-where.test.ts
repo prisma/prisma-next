@@ -1,5 +1,6 @@
 import {
   AndExpr,
+  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
@@ -9,7 +10,6 @@ import {
   ParamRef,
   SelectAst,
   TableSource,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or } from '../src/filters';
@@ -18,7 +18,7 @@ import { normalizeWhereArg } from '../src/where-interop';
 import { combineWhereExprs } from '../src/where-utils';
 import { getTestContract } from './helpers';
 
-function collectParamValues(expr: WhereExpr): unknown[] {
+function collectParamValues(expr: AnyWhereExpr): unknown[] {
   return expr.fold<unknown[]>({
     empty: [],
     combine: (a, b) => [...a, ...b],
@@ -57,11 +57,12 @@ describe('SQL ORM rich AST filters', () => {
   it('normalizes, combines, and negates bound filters', () => {
     const normalized = normalizeWhereArg(
       {
-        toWhereExpr: () =>
-          BinaryExpr.eq(
+        toWhereExpr: () => ({
+          expr: BinaryExpr.eq(
             ColumnRef.of('users', 'id'),
             ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
           ),
+        }),
       },
       { contract },
     );

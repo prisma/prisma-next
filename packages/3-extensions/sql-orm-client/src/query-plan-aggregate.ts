@@ -94,7 +94,7 @@ function validateGroupedHavingExpr(expr: AnyWhereExpr): AnyWhereExpr {
 export function compileAggregate(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly WhereExpr[],
+  filters: readonly AnyWhereExpr[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
 ): SqlQueryPlan<Record<string, unknown>> {
   const entries = Object.entries(aggregateSpec);
@@ -118,7 +118,7 @@ export function compileAggregate(
 export function compileGroupedAggregate(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly WhereExpr[],
+  filters: readonly AnyWhereExpr[],
   groupByColumns: readonly string[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
   havingExpr: AnyWhereExpr | undefined,

@@ -2,6 +2,7 @@ import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-co
 import {
   createJoinOnBuilder,
   OrderByItem,
+  type ParamRef,
   ProjectionItem,
   SelectAst,
   type TableRef,
@@ -47,20 +48,14 @@ import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
 import { buildProjectionState } from './projection';
 
-function deriveParamsFromAst(ast: {
-  collectParamRefs(): Array<{
-    value: unknown;
-    name: string | undefined;
-    codecId: string;
-  }>;
-}) {
+function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
   const collected = [...new Set(ast.collectParamRefs())];
   return {
     paramValues: collected.map((p) => p.value),
     paramDescriptors: collected.map((p) => ({
       ...(p.name !== undefined && { name: p.name }),
       source: 'dsl' as const,
-      codecId: p.codecId,
+      ...(p.codecId !== undefined && { codecId: p.codecId }),
     })),
   };
 }

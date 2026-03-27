@@ -1,5 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
+  type AnyWhereExpr,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
@@ -8,7 +9,6 @@ import {
   ParamRef,
   TableSource,
   UpdateAst,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
@@ -158,7 +158,7 @@ export function compileUpdateReturning(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly WhereExpr[],
+  filters: readonly AnyWhereExpr[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
@@ -177,7 +177,7 @@ export function compileUpdateCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly WhereExpr[],
+  filters: readonly AnyWhereExpr[],
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
   const { assignments } = toParamAssignments(contract, tableName, setValues);
@@ -192,7 +192,7 @@ export function compileUpdateCount(
 export function compileDeleteReturning(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly WhereExpr[],
+  filters: readonly AnyWhereExpr[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
@@ -209,7 +209,7 @@ export function compileDeleteReturning(
 export function compileDeleteCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly WhereExpr[],
+  filters: readonly AnyWhereExpr[],
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
   let ast = DeleteAst.from(TableSource.named(tableName));

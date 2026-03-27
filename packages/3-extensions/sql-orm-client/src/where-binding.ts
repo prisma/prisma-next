@@ -1,13 +1,15 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
+  type AnyExpression,
+  type AnyFromSource,
+  type AnySqlComparable,
+  type AnyWhereExpr,
   BinaryExpr,
   type ColumnRef,
   DerivedTableSource,
   ExistsExpr,
-  type Expression,
   type ExpressionRewriter,
-  type FromSource,
   JoinAst,
   ListLiteralExpr,
   NullCheckExpr,
@@ -17,16 +19,14 @@ import {
   type ProjectionExpr,
   ProjectionItem,
   SelectAst,
-  type SqlComparable,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 
-export function bindWhereExpr(contract: SqlContract<SqlStorage>, expr: WhereExpr): WhereExpr {
+export function bindWhereExpr(contract: SqlContract<SqlStorage>, expr: AnyWhereExpr): AnyWhereExpr {
   return bindWhereExprNode(contract, expr);
 }
 
-function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: WhereExpr): WhereExpr {
-  return expr.accept<WhereExpr>({
+function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: AnyWhereExpr): AnyWhereExpr {
+  return expr.accept<AnyWhereExpr>({
     binary(expr) {
       const left = bindExpression(contract, expr.left);
       const bindingColumn = left.kind === 'column-ref' ? (left as ColumnRef) : undefined;
@@ -54,9 +54,9 @@ function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: WhereExpr): 
 
 function bindComparable(
   contract: SqlContract<SqlStorage>,
-  comparable: SqlComparable,
+  comparable: AnySqlComparable,
   bindingColumn: ColumnRef | undefined,
-): SqlComparable {
+): AnySqlComparable {
   if (comparable.kind === 'param-ref' || bindingColumn === undefined) {
     return comparable.kind === 'param-ref'
       ? comparable
@@ -98,7 +98,7 @@ function createExpressionBinder(contract: SqlContract<SqlStorage>): ExpressionRe
   };
 }
 
-function bindExpression(contract: SqlContract<SqlStorage>, expr: Expression): Expression {
+function bindExpression(contract: SqlContract<SqlStorage>, expr: AnyExpression): AnyExpression {
   return expr.rewrite(createExpressionBinder(contract));
 }
 
@@ -122,7 +122,7 @@ function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst): JoinAst {
   );
 }
 
-function bindFromSource(contract: SqlContract<SqlStorage>, source: FromSource): FromSource {
+function bindFromSource(contract: SqlContract<SqlStorage>, source: AnyFromSource): AnyFromSource {
   if (source.kind === 'table-source') {
     return source;
   }

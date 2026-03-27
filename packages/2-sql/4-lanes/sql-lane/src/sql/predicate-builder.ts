@@ -9,7 +9,6 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
-  isExpression,
   NullCheckExpr as NullCheckExprNode,
   ParamRef as ParamRefNode,
 } from '@prisma-next/sql-relational-core/ast';
@@ -82,10 +81,6 @@ export function buildWhereExpr(
   let paramName: string;
 
   leftExpr = where.left;
-
-  if (!isExpression(leftExpr)) {
-    errorFailedToBuildWhereClause();
-  }
 
   if (leftExpr.kind === 'column-ref') {
     const { table, column } = leftExpr;

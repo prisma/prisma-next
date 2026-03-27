@@ -1,6 +1,6 @@
-import { AndExpr, type WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import { AndExpr, type AnyWhereExpr } from '@prisma-next/sql-relational-core/ast';
 
-export function combineWhereExprs(filters: readonly WhereExpr[]): WhereExpr | undefined {
+export function combineWhereExprs(filters: readonly AnyWhereExpr[]): AnyWhereExpr | undefined {
   if (filters.length === 0) {
     return undefined;
   }

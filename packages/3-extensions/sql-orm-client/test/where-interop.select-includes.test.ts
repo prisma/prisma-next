@@ -1,4 +1,5 @@
 import {
+  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   DerivedTableSource,
@@ -14,7 +15,6 @@ import {
   SubqueryExpr,
   TableSource,
   type ToWhereExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { normalizeWhereArg } from '../src/where-interop';
@@ -24,9 +24,9 @@ const param = (value: unknown, name?: string, codecId = 'pg/text@1') =>
   name !== undefined ? ParamRef.of(value, { name, codecId }) : ParamRef.of(value, { codecId });
 const literal = (value: unknown) => LiteralExpr.of(value);
 
-function toWhereExpr(expr: WhereExpr): ToWhereExpr {
+function toWhereExpr(expr: AnyWhereExpr): ToWhereExpr {
   return {
-    toWhereExpr: () => expr,
+    toWhereExpr: () => ({ expr }),
   };
 }
 

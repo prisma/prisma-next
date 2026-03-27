@@ -22,11 +22,12 @@ describe('SQL ORM collections with rich AST plans', () => {
     ).toEqual(direct.state.filters[0]);
 
     const bound = collection.where({
-      toWhereExpr: () =>
-        BinaryExpr.eq(
+      toWhereExpr: () => ({
+        expr: BinaryExpr.eq(
           ColumnRef.of('users', 'email'),
           ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
         ),
+      }),
     } satisfies ToWhereExpr);
     expect(bound.state.filters[0]).toEqual(
       BinaryExpr.eq(

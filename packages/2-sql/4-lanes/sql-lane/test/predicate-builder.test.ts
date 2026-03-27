@@ -20,20 +20,7 @@ describe('buildWhereExpr', () => {
   const tables = schema<Contract>(context).tables;
   const userColumns = tables.user.columns;
 
-  it('rejects invalid left and right operands', () => {
-    expect(() =>
-      buildWhereExpr(
-        contract,
-        {
-          kind: 'binary',
-          op: 'eq',
-          left: { kind: 'invalid' } as never,
-          right: param('userId'),
-        } as never,
-        { userId: 1 },
-      ),
-    ).toThrow('Failed to build WHERE clause');
-
+  it('rejects invalid right operand', () => {
     expect(() =>
       buildWhereExpr(
         contract,

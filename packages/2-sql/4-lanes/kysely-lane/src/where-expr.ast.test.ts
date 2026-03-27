@@ -144,8 +144,8 @@ describe('buildKyselyWhereExpr nested AST traversal', () => {
       parameters: [],
     } as CompiledQuery<unknown>).toWhereExpr();
 
-    expect(bound).toBeInstanceOf(ExistsExpr);
-    const exists = bound as ExistsExpr;
+    expect(bound.expr).toBeInstanceOf(ExistsExpr);
+    const exists = bound.expr as ExistsExpr;
     const subquery = exists.subquery;
     expect(subquery.from).toBeInstanceOf(DerivedTableSource);
     expect(((subquery.from as DerivedTableSource).query.where as BinaryExpr).right).toEqual(

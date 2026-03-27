@@ -2,7 +2,7 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   AggregateExpr,
   AndExpr,
-  AnyQueryAst,
+  type AnyQueryAst,
   BinaryExpr,
   ColumnRef,
   DefaultValueExpr,

@@ -1,5 +1,6 @@
 import {
   AndExpr,
+  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   EqColJoinOn,
@@ -14,7 +15,6 @@ import {
   SelectAst,
   TableSource,
   type ToWhereExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { normalizeWhereArg } from '../src/where-interop';
@@ -24,9 +24,9 @@ const param = (value: unknown, name?: string, codecId = 'pg/text@1') =>
   name !== undefined ? ParamRef.of(value, { name, codecId }) : ParamRef.of(value, { codecId });
 const literal = (value: unknown) => LiteralExpr.of(value);
 
-function toWhereExpr(expr: WhereExpr): ToWhereExpr {
+function toWhereExpr(expr: AnyWhereExpr): ToWhereExpr {
   return {
-    toWhereExpr: () => expr,
+    toWhereExpr: () => ({ expr }),
   };
 }
 
@@ -49,7 +49,7 @@ describe('where interop', () => {
   it('normalizes ToWhereExpr to expr only', () => {
     const expr = BinaryExpr.eq(col('users', 'name'), param('Alice', 'name'));
     const arg = {
-      toWhereExpr: () => expr,
+      toWhereExpr: () => ({ expr }),
     } satisfies ToWhereExpr;
 
     expect(normalizeWhereArg(arg)).toEqual(expr);

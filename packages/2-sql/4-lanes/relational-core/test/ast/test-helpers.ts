@@ -26,7 +26,7 @@ export function shiftParamRef(delta: number): (expr: ParamRef) => ParamRef {
   return (expr: ParamRef) =>
     ParamRef.of(typeof expr.value === 'number' ? (expr.value as number) + delta : expr.value, {
       ...(expr.name !== undefined && { name: expr.name }),
-      codecId: expr.codecId,
+      ...(expr.codecId !== undefined && { codecId: expr.codecId }),
     });
 }
 

@@ -11,6 +11,7 @@ import {
   ParamRef,
   SelectAst,
   SubqueryExpr,
+  type ToWhereExpr,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -24,13 +25,9 @@ import {
 } from '../src/query-plan';
 import { baseContract, createCollectionFor } from './collection-fixtures';
 
-function boundParam(expr: BinaryExpr): {
-  toWhereExpr(): BinaryExpr;
-} {
+function boundParam(expr: BinaryExpr): ToWhereExpr {
   return {
-    toWhereExpr() {
-      return expr;
-    },
+    toWhereExpr: () => ({ expr }),
   };
 }
 

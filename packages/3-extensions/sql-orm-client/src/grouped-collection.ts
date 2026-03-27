@@ -24,7 +24,7 @@ import { combineWhereExprs } from './where-utils';
 
 interface GroupedCollectionInit {
   readonly tableName: string;
-  readonly baseFilters: readonly WhereExpr[];
+  readonly baseFilters: readonly AnyWhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
   readonly havingFilters: readonly AnyWhereExpr[];
@@ -43,7 +43,7 @@ export class GroupedCollection<
   readonly ctx: CollectionContext<TContract>;
   readonly modelName: ModelName;
   readonly tableName: string;
-  readonly baseFilters: readonly WhereExpr[];
+  readonly baseFilters: readonly AnyWhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
   readonly havingFilters: readonly AnyWhereExpr[];

@@ -1,9 +1,9 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
+  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { resolveModelTableName, resolvePrimaryKeyColumn } from './collection-contract';
 import {
@@ -90,7 +90,7 @@ export async function executeNestedUpdateMutation(options: {
   contract: SqlContract<SqlStorage>;
   runtime: RuntimeQueryable;
   modelName: string;
-  filters: readonly WhereExpr[];
+  filters: readonly AnyWhereExpr[];
   data: MutationUpdateInput<SqlContract<SqlStorage>, string>;
 }): Promise<Record<string, unknown> | null> {
   return withMutationScope(options.runtime, async (scope) =>
@@ -198,7 +198,7 @@ async function updateFirstGraph(
   scope: RuntimeScope,
   contract: SqlContract<SqlStorage>,
   modelName: string,
-  filters: readonly WhereExpr[],
+  filters: readonly AnyWhereExpr[],
   input: MutationUpdateInput<SqlContract<SqlStorage>, string>,
 ): Promise<Record<string, unknown> | null> {
   const existingRow = await findFirstByFilters(scope, contract, modelName, filters);
@@ -539,8 +539,8 @@ function readParentColumnValues(
 function buildChildJoinWhere(
   relation: RelationDefinition,
   childValues: Map<string, unknown>,
-): WhereExpr {
-  const exprs: WhereExpr[] = [];
+): AnyWhereExpr {
+  const exprs: AnyWhereExpr[] = [];
 
   for (const [childColumn, parentValue] of childValues.entries()) {
     exprs.push(
@@ -614,7 +614,7 @@ async function findFirstByFilters(
   scope: RuntimeScope,
   contract: SqlContract<SqlStorage>,
   modelName: string,
-  filters: readonly WhereExpr[],
+  filters: readonly AnyWhereExpr[],
 ): Promise<Record<string, unknown> | null> {
   const tableName = resolveModelTableName(contract, modelName);
   const state: CollectionState = {
@@ -638,7 +638,7 @@ async function executeUpdateCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly WhereExpr[],
+  filters: readonly AnyWhereExpr[],
 ): Promise<void> {
   const compiled = compileUpdateCount(contract, tableName, setValues, filters);
   await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
