@@ -100,20 +100,21 @@ The ORM client, SQL DSL, middleware pipeline, and runtime together form the exec
 **Validation questions**:
 
 - **Transactions**: Can the ORM open a transaction, execute two mutations, and commit/rollback?
+- **ORM + SQL DSL transaction interop**: Can a user open a transaction via the ORM client and execute SQL DSL queries within it? The SQL DSL is the escape hatch for the ORM — users will drop into it mid-transaction when they hit something the ORM can't express. If the two query surfaces can't share a transaction, the escape hatch is broken.
 - **SQL DSL as escape hatch**: Can a user express a query in the SQL DSL that the ORM can't, and execute it?
 - **Extension-contributed operations (ORM)**: When pg_vector is added, does the ORM client surface its operations?
 - **Extension-contributed operations (SQL DSL)**: When pg_vector is added, does the SQL DSL surface its query operations?
 - **Middleware request rewriting**: Can a middleware short-circuit execution and serve a result without hitting the database? Currently middlewares are observers only. A caching middleware forces the architecture to support interception, short-circuiting, and result injection — which validates that the middleware interface can support the full range of use cases (rate limiting, access control, query rewriting), not just observability.
 - **RSC concurrency safety**: Does the ORM client and runtime work correctly when multiple React Server Components query in parallel through a shared instance? The runtime has mutable state (`verified`, `startupVerified`), the ORM has a lazily-populated Collection cache — both are exposed by RSC's concurrent rendering model. (See [framework integration analysis, Hard problem 2](framework-integration-analysis.md#hard-problem-2-concurrent-statefulness-under-rsc).)
 
-**Stop condition**: A script that (1) opens a transaction, does two ORM mutations, commits; (2) executes a SQL DSL query the ORM can't express; (3) uses an extension-contributed operation via both the ORM and SQL DSL; (4) runs a caching middleware that short-circuits a repeated query. Plus a Next.js App Router page with 5 parallel Server Components querying through a shared runtime — it either works or we've found the concurrency issues and know what to fix. Full middleware API design, RSC pool sizing guidance, edge runtime validation — all May.
+**Stop condition**: A script that (1) opens a transaction, does two ORM mutations, commits; (2) within that same transaction, executes a SQL DSL query alongside ORM operations; (3) executes a standalone SQL DSL query the ORM can't express; (4) uses an extension-contributed operation via both the ORM and SQL DSL; (5) runs a caching middleware that short-circuits a repeated query. Plus a Next.js App Router page with 5 parallel Server Components querying through a shared runtime — it either works or we've found the concurrency issues and know what to fix. Full middleware API design, RSC pool sizing guidance, edge runtime validation — all May.
 
 **Active work**:
 
 - **SQL Query DSL** (new): A new SQL query builder that will replace the current SQL Query plan and the Kysely plan. This becomes the escape hatch for the ORM client.
 - **ORM client maturation**: The ORM client has most of its core functionality, but is missing key components:
-    - **Transactions**: No transaction support yet.
-    - **Extension-contributed operations**: The ORM client doesn't respond when an extension like pg_vector is added. It needs to read the operations registry, incorporate custom data types, and surface extension-contributed query methods.
+  - **Transactions**: No transaction support yet.
+  - **Extension-contributed operations**: The ORM client doesn't respond when an extension like pg_vector is added. It needs to read the operations registry, incorporate custom data types, and surface extension-contributed query methods.
 
 **Not yet started**:
 
@@ -220,25 +221,25 @@ ADR 170 (type constructors) → PSL + TS parity ──→ Extensions contribute 
 
 ## Five-week timeline
 
-### Week 1: Mar 24–28
+### Week 1: Mar 31–Apr 4
 
-<!-- TODO -->
 
-### Week 2: Mar 31–Apr 4
 
-<!-- TODO -->
+### Week 2: Apr 7–11
 
-### Week 3: Apr 7–11
 
-<!-- TODO -->
 
-### Week 4: Apr 14–18
+### Week 3: Apr 14–18
 
-<!-- TODO -->
 
-### Week 5: Apr 21–25
 
-<!-- TODO -->
+### Week 4: Apr 21–25
+
+
+
+### Week 5: Apr 28–May 2
+
+
 
 ---
 
@@ -248,3 +249,4 @@ ADR 170 (type constructors) → PSL + TS parity ──→ Extensions contribute 
 - For migrations: what is the minimum viable set of graph operations that makes the UX acceptable for common workflows?
 - For the language server: is updating the existing Prisma 7 language server feasible, or does it need a rewrite?
 - Is the ParadeDB PoC dependent on the MongoDB PoC (both validate extension interfaces), or can they proceed in parallel?
+
