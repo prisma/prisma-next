@@ -8,7 +8,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { buildColumnTypeSql } from './planner';
+import { buildColumnTypeSql } from './planner-ddl-builders';
 import {
   columnExistsCheck,
   columnNullabilityCheck,
