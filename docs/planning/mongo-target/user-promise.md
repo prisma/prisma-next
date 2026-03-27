@@ -243,6 +243,23 @@ PN validates data at the application layer:
 - **On reads (configurable)**: In strict mode, PN validates that data returned from MongoDB matches the contract. Documents that don't match produce an error. In permissive mode, mismatches produce a warning through the runtime's diagnostic channel. This is important for users migrating from untyped Mongo usage — their existing data may not match the contract.
 - **Server-side validation (optional)**: PN can push `$jsonSchema` rules to MongoDB collections, adding database-level enforcement that applies even to writes that bypass PN.
 
+#### Schema evolution via data invariants
+
+In SQL, schema evolution is split cleanly: structural migrations change the DDL (add a column, change a type), and data migrations transform content (populate the new column). In MongoDB, **that distinction collapses**. There's no DDL — collections don't have enforced schemas. "Adding a field" means updating documents to include it. "Splitting `name` into `firstName` + `lastName`" is a data migration. "Moving data from embedded to referenced" is a data migration. In Mongo, schema evolution IS data migration.
+
+The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team confirms this is a pain point: "The lack of an automated data migration feature for this common MongoDB evolution made him feel disappointed."
+
+PN's data invariant model — being built for the SQL migration workstream (see [data-migrations.md](../0-references/data-migrations.md), [data-migrations-solutions.md](../0-references/data-migrations-solutions.md)) — is a natural foundation for Mongo schema evolution. The model treats data migrations as guarded transitions with machine-checkable postconditions:
+
+- **"Done"** = the contract describes v2 + the invariant "all documents migrated to v2" holds
+- **Postcondition check** = a Mongo query: `db.users.countDocuments({ schemaVersion: { $ne: 2 } }) === 0`
+- **Transformation** = a Mongo update: `db.users.updateMany({ schemaVersion: 1 }, [{ $set: { firstName: ... } }])`
+- **Idempotent** by construction — only touches documents that still need it
+
+This gives Mongo users something no other ODM provides: managed, verifiable schema evolution with the same invariant-based model PN uses for SQL, but expressed entirely as data transforms rather than DDL + data transforms.
+
+This is out of scope for the PoC but is a cross-workstream connection worth tracking. See [design question #14](design-questions.md#14-schema-evolution-as-data-migration-cross-workstream).
+
 #### Runtime guardrails
 
 The same plugin pipeline that works for SQL works for Mongo:
@@ -279,6 +296,7 @@ Clarity about what's out of scope is as important as the promises:
 | Aggregation pipelines | Untyped arrays | Untyped arrays | Not exposed | Raw escape hatch (typed DSL later) |
 | Vector / Atlas Search | Raw pipeline stages | Raw pipeline stages | Raw queries | Extension packs (planned) |
 | Change streams | Native | Native | Not supported | Planned (async iterable model) |
+| Schema evolution | N/A (manual scripts) | Manual (middleware) | No Mongo migrations | Data invariant model (planned) |
 | Introspection | N/A | N/A | db pull (limited) | Planned (type inference + convention) |
 | Cross-family support | N/A | N/A | SQL + Mongo (separate) | SQL + Mongo (shared interface) |
 | Plugin/middleware ecosystem | None | Mongoose plugins | Limited | Full (shared with SQL) |

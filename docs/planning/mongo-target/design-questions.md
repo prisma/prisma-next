@@ -273,3 +273,26 @@ The MongoDB team rates this as **Medium priority**. It's a driver-level concern 
 - **ORM-level**: Ensuring that encrypted fields participate correctly in queries (QE allows equality queries on encrypted data; CSFLE does not).
 
 For the PoC: Out of scope. This is a production-readiness concern, not an architecture validation concern. But worth noting because it has no SQL equivalent — SQL databases handle encryption at the storage layer (TDE) or connection layer (TLS), not at the field level.
+
+---
+
+## 14. Schema evolution as data migration *(cross-workstream)*
+
+In SQL, schema evolution has two parts: structural migrations (DDL changes) and data migrations (content transforms). In MongoDB, **that distinction collapses**. There is no DDL — collections don't have enforced schemas. Adding a field, splitting a field, or changing a storage strategy (embedded → referenced) are all pure data transforms. In Mongo, schema evolution IS data migration.
+
+**The question**: Does the data invariant model from the migration workstream (see [data-migrations.md](../0-references/data-migrations.md), [data-migrations-solutions.md](../0-references/data-migrations-solutions.md)) serve as the foundation for MongoDB schema evolution?
+
+The fit is strong:
+- **"Done" = contract hash + invariants.** For Mongo, the contract hash captures the expected document shape, and the invariant captures "all documents conform to that shape." This is exactly the data invariant model's definition of desired state.
+- **Postcondition = a Mongo query.** "All users migrated to v2" is checkable: `db.users.countDocuments({ schemaVersion: { $ne: 2 } }) === 0`. This satisfies the invariant model's requirement for machine-checkable postconditions.
+- **Transformation = a Mongo update.** `db.users.updateMany({ schemaVersion: 1 }, [{ $set: { firstName: { $first: { $split: ["$name", " "] } } } }])`. This is idempotent by construction — it only touches documents that still need it.
+- **Schema versioning pattern is native.** Mongo developers already use `schemaVersion` fields and lazy migration (see [mongo-idioms.md](mongo-idioms.md#schema-versioning)). The invariant model formalizes what they already do informally.
+
+The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team explicitly calls out the lack of automated data migrations as a disappointment — the developer had to manually write a migration script to move data from embedded to referenced.
+
+Sub-questions:
+- **Structural vs. data migration for Mongo**: In the migration workstream's graph model, Mongo "migrations" are almost exclusively data migrations (no DDL). Does the graph model still make sense when there's no structural migration? Or is the invariant model sufficient on its own?
+- **Compatibility checks**: The data migration solutions doc describes schema-based compatibility checks ("is the database schema compatible with the migration's requirements?"). For Mongo, this becomes "does the collection have the fields the migration expects?" — which is a document-sampling question, not a DDL introspection.
+- **Runner integration**: The migration runner needs to execute Mongo update commands, not SQL. Does the runner use the same adapter interface the ORM uses, or does it need its own execution path?
+
+For the PoC: Out of scope for the Mongo workstream, but the april-milestone doc already notes the cross-workstream connection: "If the data invariant model from workstream 1 works well, it may become the foundation for document schema evolution." The Mongo workstream should validate that the invariant model's assumptions hold for a schemaless database — the main risk is that "postcondition = query" becomes expensive when you have to sample documents rather than inspect DDL.
