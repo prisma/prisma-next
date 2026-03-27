@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AggregateExpr,
   AndExpr,
+  type AnyOperationArg,
   BinaryExpr,
   ColumnRef,
   DefaultValueExpr,
@@ -9,7 +10,6 @@ import {
   DerivedTableSource,
   EqColJoinOn,
   ExistsExpr,
-  type Expression,
   InsertAst,
   InsertOnConflict,
   JoinAst,
@@ -30,7 +30,7 @@ import {
 } from '../../src/exports/ast';
 
 const stringReturn = { kind: 'builtin', type: 'string' } as const;
-function lowerEmail(column: ColumnRef, ...args: Array<Expression | ParamRef | LiteralExpr>) {
+function lowerEmail(column: ColumnRef, ...args: Array<AnyOperationArg>) {
   return OperationExpr.function({
     method: 'lower',
     forTypeId: 'pg/text@1',
