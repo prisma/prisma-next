@@ -25,6 +25,7 @@ import type {
   UnaryBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import { isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { ProjectionInput } from '../types/internal';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {
@@ -47,7 +48,6 @@ import { buildJoinAst } from './join-builder';
 import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
 import { buildProjectionState } from './projection';
-import { ifDefined } from '@prisma-next/utils/defined';
 
 function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
   const collected = [...new Set(ast.collectParamRefs())];

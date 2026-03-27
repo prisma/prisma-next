@@ -5,7 +5,6 @@ import type {
   AnySqlComparable,
   AnyWhereExpr,
   NullCheckExpr,
-  OperationExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,

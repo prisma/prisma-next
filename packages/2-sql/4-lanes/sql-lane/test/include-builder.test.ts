@@ -2,9 +2,7 @@ import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
-  DerivedTableSource,
-  JoinAst,
-  JsonArrayAggExpr,
+  type DerivedTableSource,
   ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';

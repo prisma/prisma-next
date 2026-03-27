@@ -1,6 +1,6 @@
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { BinaryExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import { type BinaryExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import {
   type CompiledQuery,
   DummyDriver,

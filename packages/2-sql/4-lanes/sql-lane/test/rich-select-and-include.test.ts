@@ -5,9 +5,8 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   BinaryExpr,
   ColumnRef,
-  DerivedTableSource,
+  type DerivedTableSource,
   JoinAst,
-  JsonArrayAggExpr,
   ParamRef,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
