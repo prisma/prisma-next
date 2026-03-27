@@ -5,12 +5,12 @@ import type { Db } from '../types/db';
 import type { BuilderContext } from './builder-base';
 import { TableProxyImpl } from './table-proxy-impl';
 
-export interface CreateDbOptions<C extends SqlContract<SqlStorage>> {
+export interface SqlOptions<C extends SqlContract<SqlStorage>> {
   readonly context: ExecutionContext<C>;
   readonly runtime: Runtime;
 }
 
-export function createDb<C extends SqlContract<SqlStorage>>(options: CreateDbOptions<C>): Db<C> {
+export function sql<C extends SqlContract<SqlStorage>>(options: SqlOptions<C>): Db<C> {
   const { context, runtime } = options;
   const ctx: BuilderContext = {
     capabilities: context.contract.capabilities,

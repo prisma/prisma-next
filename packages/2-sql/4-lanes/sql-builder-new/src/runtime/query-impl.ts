@@ -71,18 +71,12 @@ abstract class QueryBase<
     },
   );
 
-  limit(countOrExpr: unknown): this {
-    if (typeof countOrExpr === 'number') {
-      return this.clone(cloneState(this.state, { limit: countOrExpr }));
-    }
-    throw new Error('Expression-based limit not yet supported');
+  limit(count: number): this {
+    return this.clone(cloneState(this.state, { limit: count }));
   }
 
-  offset(countOrExpr: unknown): this {
-    if (typeof countOrExpr === 'number') {
-      return this.clone(cloneState(this.state, { offset: countOrExpr }));
-    }
-    throw new Error('Expression-based offset not yet supported');
+  offset(count: number): this {
+    return this.clone(cloneState(this.state, { offset: count }));
   }
 
   distinct(): this {

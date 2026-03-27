@@ -10,7 +10,7 @@ Type-safe builder interfaces validated via `expectTypeOf` tests in `test/playgro
 
 ### Runtime
 
-- **`createDb({ context, runtime })`** — factory returning `Db<Contract>` with table proxies
+- **`sql({ context, runtime })`** — factory returning `Db<Contract>` with table proxies
 - **`TableProxy`** — `.select()`, `.as()`, all join methods, lateral joins
 - **`SelectQuery`** — `.select()`, `.where()`, `.orderBy()`, `.groupBy()`, `.limit()`, `.offset()`, `.distinct()`, `.distinctOn()`, `.as()`, `.first()`, `.firstOrThrow()`, `.all()`
 - **`GroupedQuery`** — `.groupBy()`, `.having()`, `.orderBy()`, `.limit()`, `.offset()`, `.distinct()`, `.distinctOn()`, `.as()`, `.first()`, `.firstOrThrow()`, `.all()`
@@ -27,7 +27,7 @@ Type-safe builder interfaces validated via `expectTypeOf` tests in `test/playgro
 - **ORDER BY** (with direction, nulls first/last)
 - **GROUP BY**
 - **HAVING**
-- **LIMIT / OFFSET** (number or expression)
+- **LIMIT / OFFSET** (numeric literals only)
 - **Subqueries as join sources** (via `.as()`)
 - **Self-joins** (via `.as()`)
 - **Aggregate functions**: `count`, `sum`, `avg`, `min`, `max`
@@ -61,6 +61,10 @@ Type-safe builder interfaces validated via `expectTypeOf` tests in `test/playgro
 - **VALUES** as a row source
 - **USING** join condition (shorthand for equi-join on same-named columns)
 - **generate_series()** and other set-returning functions as FROM sources
+
+### Pagination
+
+- **Expression-based LIMIT / OFFSET** (currently only numeric literals; expressions and parameter placeholders are not supported)
 
 ### Expressions & operators
 

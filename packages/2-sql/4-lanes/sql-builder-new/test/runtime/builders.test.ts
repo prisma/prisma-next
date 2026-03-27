@@ -12,7 +12,7 @@ import {
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { describe, expect, it } from 'vitest';
-import { createDb } from '../../src/runtime/create-db';
+import { sql } from '../../src/runtime/sql';
 import { contract as contractJson } from '../fixtures/contract';
 import type { Contract } from '../fixtures/generated/contract';
 
@@ -33,7 +33,7 @@ const stubBase = {
 };
 
 function db() {
-  return createDb({
+  return sql({
     context: { ...stubBase, contract: sqlContract } as unknown as ExecutionContext<
       typeof sqlContract
     >,
@@ -46,7 +46,7 @@ function dbNoCapabilities() {
     ...contractJson,
     capabilities: { sql: {}, postgres: {} },
   });
-  return createDb({
+  return sql({
     context: { ...stubBase, contract: noLateralContract } as unknown as ExecutionContext<
       typeof noLateralContract
     >,
@@ -66,7 +66,7 @@ function getAst(builder: { buildAst(): SelectAst }): SelectAst {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('createDb', () => {
+describe('sql', () => {
   it('exposes table proxies for all tables in contract', () => {
     const d = db();
     expect(d.users).toBeDefined();
