@@ -1,4 +1,3 @@
-
 import type { AnyExpression, BinaryOp, JoinOnExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,

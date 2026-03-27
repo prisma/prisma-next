@@ -3,7 +3,6 @@ import {
   AndExpr,
   type AnyExpression,
   type AnyFromSource,
-  type AnyWhereExpr,
   BinaryExpr,
   type ColumnRef,
   DerivedTableSource,
@@ -21,12 +20,15 @@ import {
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
 
-export function bindWhereExpr(contract: SqlContract<SqlStorage>, expr: AnyWhereExpr): AnyWhereExpr {
+export function bindWhereExpr(
+  contract: SqlContract<SqlStorage>,
+  expr: AnyExpression,
+): AnyExpression {
   return bindWhereExprNode(contract, expr);
 }
 
-function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: AnyWhereExpr): AnyWhereExpr {
-  return expr.accept<AnyWhereExpr>({
+function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: AnyExpression): AnyExpression {
+  return expr.accept<AnyExpression>({
     columnRef(expr) {
       return bindExpression(contract, expr);
     },

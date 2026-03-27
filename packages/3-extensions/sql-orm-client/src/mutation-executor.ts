@@ -1,7 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
-  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
@@ -91,7 +90,7 @@ export async function executeNestedUpdateMutation(options: {
   contract: SqlContract<SqlStorage>;
   runtime: RuntimeQueryable;
   modelName: string;
-  filters: readonly AnyWhereExpr[];
+  filters: readonly AnyExpression[];
   data: MutationUpdateInput<SqlContract<SqlStorage>, string>;
 }): Promise<Record<string, unknown> | null> {
   return withMutationScope(options.runtime, async (scope) =>
@@ -199,7 +198,7 @@ async function updateFirstGraph(
   scope: RuntimeScope,
   contract: SqlContract<SqlStorage>,
   modelName: string,
-  filters: readonly AnyWhereExpr[],
+  filters: readonly AnyExpression[],
   input: MutationUpdateInput<SqlContract<SqlStorage>, string>,
 ): Promise<Record<string, unknown> | null> {
   const existingRow = await findFirstByFilters(scope, contract, modelName, filters);
@@ -615,7 +614,7 @@ async function findFirstByFilters(
   scope: RuntimeScope,
   contract: SqlContract<SqlStorage>,
   modelName: string,
-  filters: readonly AnyWhereExpr[],
+  filters: readonly AnyExpression[],
 ): Promise<Record<string, unknown> | null> {
   const tableName = resolveModelTableName(contract, modelName);
   const state: CollectionState = {
@@ -639,7 +638,7 @@ async function executeUpdateCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly AnyWhereExpr[],
+  filters: readonly AnyExpression[],
 ): Promise<void> {
   const compiled = compileUpdateCount(contract, tableName, setValues, filters);
   await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();

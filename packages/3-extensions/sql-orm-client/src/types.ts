@@ -6,7 +6,7 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
-import type { AnyExpression, AnyWhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyExpression } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { RowSelection } from './collection-internal-types';
@@ -66,7 +66,7 @@ export interface IncludeExpr {
 // ---------------------------------------------------------------------------
 
 export interface CollectionState {
-  readonly filters: readonly AnyWhereExpr[];
+  readonly filters: readonly AnyExpression[];
   readonly includes: readonly IncludeExpr[];
   readonly orderBy: readonly OrderExpr[] | undefined;
   readonly cursor: Readonly<Record<string, unknown>> | undefined;
