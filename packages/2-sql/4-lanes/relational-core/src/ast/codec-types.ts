@@ -364,12 +364,16 @@ class CodecDefBuilderImpl<
     this._codecs = codecs;
 
     // Populate CodecTypes from codecs
-    const codecTypes: Record<string, { readonly input: unknown; readonly output: unknown }> = {};
+    const codecTypes: Record<
+      string,
+      { readonly input: unknown; readonly output: unknown; readonly traits: unknown }
+    > = {};
     for (const [, codecImpl] of Object.entries(this._codecs)) {
       const codecImplTyped = codecImpl as Codec<string>;
       codecTypes[codecImplTyped.id] = {
         input: undefined as unknown as CodecInput<typeof codecImplTyped>,
         output: undefined as unknown as CodecOutput<typeof codecImplTyped>,
+        traits: undefined as unknown as CodecTraits<typeof codecImplTyped>,
       };
     }
     this.CodecTypes = codecTypes as ExtractCodecTypes<ScalarNames>;

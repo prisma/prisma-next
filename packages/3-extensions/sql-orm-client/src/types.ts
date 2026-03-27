@@ -7,15 +7,15 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
 import type { AnyWhereExpr } from '@prisma-next/sql-relational-core/ast';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import {
   BinaryExpr,
   type CodecTrait,
   type ColumnRef,
-  LiteralExpr,
   ListLiteralExpr,
+  LiteralExpr,
   NullCheckExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { RowSelection } from './collection-internal-types';
@@ -193,6 +193,9 @@ function bin(op: BinaryExpr['op'], column: ColumnRef, right: BinaryExpr['right']
   return new BinaryExpr(op, column, right);
 }
 
+// never[] is intentional: factories have heterogeneous signatures (value: unknown,
+// values: readonly unknown[], pattern: string, etc.) but are only called through
+// the typed ComparisonMethodFns interface, never through this type directly.
 type MethodFactory = (column: ColumnRef) => (...args: never[]) => unknown;
 
 type ComparisonMethodMeta = {

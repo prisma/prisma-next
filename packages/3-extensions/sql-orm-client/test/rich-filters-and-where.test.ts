@@ -12,7 +12,7 @@ import { all, and, not, or } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
 import { normalizeWhereArg } from '../src/where-interop';
 import { combineWhereExprs } from '../src/where-utils';
-import { getTestContract } from './helpers';
+import { getTestContext } from './helpers';
 
 function collectParamValues(expr: AnyWhereExpr): unknown[] {
   return expr.fold<unknown[]>({
@@ -25,10 +25,10 @@ function collectParamValues(expr: AnyWhereExpr): unknown[] {
 }
 
 describe('SQL ORM rich AST filters', () => {
-  const contract = getTestContract();
+  const context = getTestContext();
 
   it('builds scalar and relation filters as AST instances', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
     const expr = and(
       user['name']!.eq('Alice'),
       user['posts']!.some((post) => post['views']!.gt(10)),
