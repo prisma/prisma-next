@@ -1,7 +1,6 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
-  type BoundWhereExpr,
+  type AnyWhereExpr,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
@@ -12,9 +11,8 @@ import {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { createColumnParamDescriptor } from './param-descriptors';
-import { buildOrmQueryPlan, resolveTableColumns } from './query-plan-meta';
-import { combineWhereFilters, offsetBoundWhereExpr } from './where-utils';
+import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
+import { combineWhereExprs } from './where-utils';
 
 function buildReturningColumns(
   contract: SqlContract<SqlStorage>,
@@ -33,47 +31,33 @@ function toParamAssignments(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   values: Record<string, unknown>,
-  startIndex = 1,
 ): {
   readonly assignments: Record<string, ParamRef>;
-  readonly params: readonly unknown[];
-  readonly paramDescriptors: readonly ParamDescriptor[];
 } {
   const assignments: Record<string, ParamRef> = {};
-  const params: unknown[] = [];
-  const paramDescriptors: ParamDescriptor[] = [];
-  let index = startIndex;
 
-  for (const [column, value] of Object.entries(values)) {
-    assignments[column] = ParamRef.of(index, column);
-    params.push(value);
-    paramDescriptors.push(createColumnParamDescriptor(contract, tableName, column, index));
-    index += 1;
+  const table = contract.storage.tables[tableName];
+  if (!table) {
+    throw new Error(`Unknown table "${tableName}"`);
   }
 
-  return {
-    assignments,
-    params,
-    paramDescriptors,
-  };
+  for (const [column, value] of Object.entries(values)) {
+    const codecId = table.columns[column]?.codecId;
+    if (!codecId) {
+      throw new Error(`Unknown column "${column}" in table "${tableName}"`);
+    }
+    assignments[column] = ParamRef.of(value, { name: column, codecId });
+  }
+
+  return { assignments };
 }
 
-/**
- * Converts sparse user-provided rows into a uniform shape for multi-row INSERT.
- *
- * Collects the union of all column names across every row to produce a stable
- * column list. Present values become `ParamRef`s (1-based, appended to a flat
- * params array); missing columns are filled with `DefaultValueExpr` so they
- * lower to `DEFAULT` in SQL.
- */
 function normalizeInsertRows(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   rows: readonly Record<string, unknown>[],
 ): {
   readonly rows: ReadonlyArray<Record<string, ParamRef | DefaultValueExpr>>;
-  readonly params: readonly unknown[];
-  readonly paramDescriptors: readonly ParamDescriptor[];
 } {
   if (rows.length === 0) {
     throw new Error('normalizeInsertRows requires at least one row');
@@ -92,9 +76,6 @@ function normalizeInsertRows(
     }
   }
 
-  const params: unknown[] = [];
-  const paramDescriptors: ParamDescriptor[] = [];
-  let index = 1;
   const normalizedRows = rows.map((row) => {
     if (orderedColumns.length === 0) {
       return {};
@@ -103,10 +84,15 @@ function normalizeInsertRows(
     const normalizedRow: Record<string, ParamRef | DefaultValueExpr> = {};
     for (const column of orderedColumns) {
       if (Object.hasOwn(row, column)) {
-        normalizedRow[column] = ParamRef.of(index, column);
-        params.push(row[column]);
-        paramDescriptors.push(createColumnParamDescriptor(contract, tableName, column, index));
-        index += 1;
+        const table = contract.storage.tables[tableName];
+        if (!table) {
+          throw new Error(`Unknown table "${tableName}"`);
+        }
+        const codecId = table?.columns[column]?.codecId;
+        if (!codecId) {
+          throw new Error(`Unknown column "${column}" in table "${tableName}"`);
+        }
+        normalizedRow[column] = ParamRef.of(row[column], { name: column, codecId });
         continue;
       }
       normalizedRow[column] = new DefaultValueExpr();
@@ -114,11 +100,7 @@ function normalizeInsertRows(
     return normalizedRow;
   });
 
-  return {
-    rows: normalizedRows,
-    params,
-    paramDescriptors,
-  };
+  return { rows: normalizedRows };
 }
 
 export function compileInsertReturning(
@@ -127,14 +109,11 @@ export function compileInsertReturning(
   rows: readonly Record<string, unknown>[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const {
-    rows: normalizedRows,
-    params,
-    paramDescriptors,
-  } = normalizeInsertRows(contract, tableName, rows);
+  const { rows: normalizedRows } = normalizeInsertRows(contract, tableName, rows);
   const ast = InsertAst.into(TableSource.named(tableName))
     .withRows(normalizedRows)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
@@ -143,12 +122,9 @@ export function compileInsertCount(
   tableName: string,
   rows: readonly Record<string, unknown>[],
 ): SqlQueryPlan<Record<string, unknown>> {
-  const {
-    rows: normalizedRows,
-    params,
-    paramDescriptors,
-  } = normalizeInsertRows(contract, tableName, rows);
+  const { rows: normalizedRows } = normalizeInsertRows(contract, tableName, rows);
   const ast = InsertAst.into(TableSource.named(tableName)).withRows(normalizedRows);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
@@ -163,7 +139,7 @@ export function compileUpsertReturning(
   const createAssignments = toParamAssignments(contract, tableName, createValues);
   const hasUpdateValues = Object.keys(updateValues).length > 0;
   const updateAssignments = hasUpdateValues
-    ? toParamAssignments(contract, tableName, updateValues, createAssignments.params.length + 1)
+    ? toParamAssignments(contract, tableName, updateValues)
     : undefined;
   const onConflict = updateAssignments
     ? InsertOnConflict.on(
@@ -178,96 +154,72 @@ export function compileUpsertReturning(
     .withOnConflict(onConflict)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
 
-  return buildOrmQueryPlan(
-    contract,
-    ast,
-    updateAssignments
-      ? [...createAssignments.params, ...updateAssignments.params]
-      : createAssignments.params,
-    updateAssignments
-      ? [...createAssignments.paramDescriptors, ...updateAssignments.paramDescriptors]
-      : createAssignments.paramDescriptors,
-  );
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
 export function compileUpdateReturning(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyWhereExpr[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereFilters(filters);
-  const { assignments, params, paramDescriptors } = toParamAssignments(
-    contract,
-    tableName,
-    setValues,
-  );
+  const where = combineWhereExprs(filters);
+  const { assignments } = toParamAssignments(contract, tableName, setValues);
   let ast = UpdateAst.table(TableSource.named(tableName))
     .withSet(assignments)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
-  const shiftedWhere = where ? offsetBoundWhereExpr(where, params.length) : undefined;
-  if (shiftedWhere) {
-    ast = ast.withWhere(shiftedWhere.expr);
+  if (where) {
+    ast = ast.withWhere(where);
   }
-  return buildOrmQueryPlan(
-    contract,
-    ast,
-    shiftedWhere ? [...params, ...shiftedWhere.params] : params,
-    shiftedWhere ? [...paramDescriptors, ...shiftedWhere.paramDescriptors] : paramDescriptors,
-  );
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
 export function compileUpdateCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyWhereExpr[],
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereFilters(filters);
-  const { assignments, params, paramDescriptors } = toParamAssignments(
-    contract,
-    tableName,
-    setValues,
-  );
+  const where = combineWhereExprs(filters);
+  const { assignments } = toParamAssignments(contract, tableName, setValues);
   let ast = UpdateAst.table(TableSource.named(tableName)).withSet(assignments);
-  const shiftedWhere = where ? offsetBoundWhereExpr(where, params.length) : undefined;
-  if (shiftedWhere) {
-    ast = ast.withWhere(shiftedWhere.expr);
+  if (where) {
+    ast = ast.withWhere(where);
   }
-  return buildOrmQueryPlan(
-    contract,
-    ast,
-    shiftedWhere ? [...params, ...shiftedWhere.params] : params,
-    shiftedWhere ? [...paramDescriptors, ...shiftedWhere.paramDescriptors] : paramDescriptors,
-  );
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
 export function compileDeleteReturning(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyWhereExpr[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   let ast = DeleteAst.from(TableSource.named(tableName)).withReturning(
     buildReturningColumns(contract, tableName, returningColumns),
   );
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
-  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
 export function compileDeleteCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyWhereExpr[],
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   let ast = DeleteAst.from(TableSource.named(tableName));
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
-  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }

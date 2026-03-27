@@ -22,38 +22,22 @@ import {
 } from '../src/query-plan';
 import { baseContract, createCollectionFor } from './collection-fixtures';
 
-function boundParam(
-  expr: BinaryExpr,
-  value: unknown,
-  index = 1,
-): {
-  toWhereExpr(): {
-    expr: BinaryExpr;
-    params: unknown[];
-    paramDescriptors: [{ index: number; source: 'dsl' }];
-  };
-} {
-  return {
-    toWhereExpr() {
-      return {
-        expr,
-        params: [value],
-        paramDescriptors: [{ index, source: 'dsl' }],
-      };
-    },
-  };
-}
-
 describe('SQL ORM rich AST query plans', () => {
   it('compiles include plans with AST classes and limit annotations', () => {
     const { collection } = createCollectionFor('User');
     const state = collection
       .where(() =>
-        boundParam(BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')), 'Alice'),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+        ),
       )
       .include('posts', (posts) =>
         posts.where(() =>
-          boundParam(BinaryExpr.gte(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'views')), 100),
+          BinaryExpr.gte(
+            ColumnRef.of('posts', 'views'),
+            ParamRef.of(100, { name: 'views', codecId: 'pg/int4@1' }),
+          ),
         ),
       )
       .take(5).state;
@@ -61,22 +45,22 @@ describe('SQL ORM rich AST query plans', () => {
     const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
 
     expect(plan.ast.kind).toBe('select');
-    expect(plan.params).toEqual(['Alice', 100]);
+    expect(plan.params).toEqual([100, 'Alice']);
     expect(plan.meta.annotations).toEqual({ limit: 5 });
 
     const ast = plan.ast as SelectAst;
-    expect(ast.where!.kind).toBe('binary');
+    expect(ast.where?.kind).toBe('binary');
 
     const postsProjection = ast.projection.find((item) => item.alias === 'posts');
-    expect(postsProjection?.expr?.kind).toBe('subquery');
+    expect(postsProjection?.expr.kind).toBe('subquery');
     const aggregateQuery = (postsProjection?.expr as SubqueryExpr).query;
     expect(aggregateQuery.from.kind).toBe('derived-table-source');
 
     const rowsQuery = (aggregateQuery.from as DerivedTableSource).query;
-    expect(rowsQuery.where!.kind).toBe('and');
+    expect(rowsQuery.where?.kind).toBe('and');
     const childFilter = (rowsQuery.where as AndExpr).exprs[1] as BinaryExpr;
     expect(childFilter.right.kind).toBe('param-ref');
-    expect((childFilter.right as ParamRef).index).toBe(2);
+    expect((childFilter.right as ParamRef).value).toBe(100);
   });
 
   it('compiles insert, upsert, update, delete, and grouped aggregate plans with rich nodes', () => {
@@ -97,34 +81,22 @@ describe('SQL ORM rich AST query plans', () => {
       ['id'],
     );
     expect(upsertPlan.ast.kind).toBe('insert');
-    expect((upsertPlan.ast as InsertAst).onConflict?.action?.kind).toBe('do-update-set');
+    expect((upsertPlan.ast as InsertAst).onConflict?.action.kind).toBe('do-update-set');
 
     const updatePlan = compileUpdateReturning(
       baseContract,
       'users',
       { email: 'b@example.com' },
-      [
-        {
-          expr: BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)),
-          params: [],
-          paramDescriptors: [],
-        },
-      ],
+      [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
       ['id'],
     );
     expect(updatePlan.ast.kind).toBe('update');
-    expect((updatePlan.ast as UpdateAst).where!.kind).toBe('binary');
+    expect((updatePlan.ast as UpdateAst).where?.kind).toBe('binary');
 
     const deletePlan = compileDeleteReturning(
       baseContract,
       'users',
-      [
-        {
-          expr: BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)),
-          params: [],
-          paramDescriptors: [],
-        },
-      ],
+      [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
       ['id'],
     );
     expect(deletePlan.ast.kind).toBe('delete');
@@ -143,6 +115,6 @@ describe('SQL ORM rich AST query plans', () => {
     expect(groupedPlan.ast.kind).toBe('select');
     const groupedAst = groupedPlan.ast as SelectAst;
     expect(groupedAst.groupBy).toEqual([ColumnRef.of('posts', 'user_id')]);
-    expect(groupedAst.having!.kind).toBe('binary');
+    expect(groupedAst.having?.kind).toBe('binary');
   });
 });

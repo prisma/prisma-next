@@ -476,7 +476,7 @@ type OperationMethods<
 /**
  * Maps operation argument specs to TypeScript argument types.
  * - typeId args: ColumnBuilder (accepts base columns or operation results)
- * - param args: ParamPlaceholder
+ * - param args: unknown (raw value; converted to ParamRef at operation build time)
  * - literal args: unknown (could be more specific in future)
  */
 type OperationArgs<Args extends ReadonlyArray<ArgSpec>> = Args extends readonly [
@@ -490,11 +490,7 @@ type OperationArgs<Args extends ReadonlyArray<ArgSpec>> = Args extends readonly 
 
 type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
   ? AnyExpressionSource
-  : Arg extends { kind: 'param' }
-    ? ParamPlaceholder
-    : Arg extends { kind: 'literal' }
-      ? unknown
-      : never;
+  : unknown;
 
 /**
  * Maps operation return spec to return type.

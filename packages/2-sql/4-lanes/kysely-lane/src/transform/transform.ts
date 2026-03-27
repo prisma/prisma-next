@@ -20,10 +20,6 @@ import { transformSelect } from './transform-select';
 
 export type { TransformResult };
 
-export interface TransformResultWithParams extends TransformResult {
-  readonly params: readonly unknown[];
-}
-
 export function transformKyselyToPnAst(
   contract: SqlContract<SqlStorage>,
   query: unknown,
@@ -65,9 +61,12 @@ export function transformKyselyToPnAst(
 
   const refs = ast.collectRefs();
 
-  const paramDescriptors = ctx.paramDescriptors.map((descriptor, index) => ({
-    ...descriptor,
+  const collectedParams = ast.collectParamRefs();
+  const paramDescriptors = collectedParams.map((p, index) => ({
+    ...(p.name !== undefined && { name: p.name }),
+    source: 'lane' as const,
     index: index + 1,
+    ...(p.codecId !== undefined && { codecId: p.codecId }),
   }));
 
   let projection: Record<string, string> | undefined;
@@ -111,7 +110,7 @@ export function transformKyselyToPnAst(
 export function transformKyselyToPnAstCollectingParams(
   contract: SqlContract<SqlStorage>,
   query: unknown,
-): TransformResultWithParams {
+): TransformResult {
   if (!isTransformableRootNode(query)) {
     const nodeKind =
       query && typeof query === 'object' && 'kind' in query
@@ -148,9 +147,12 @@ export function transformKyselyToPnAstCollectingParams(
 
   const refs = ast.collectRefs();
 
-  const paramDescriptors = ctx.paramDescriptors.map((descriptor, index) => ({
-    ...descriptor,
+  const collectedParams = ast.collectParamRefs();
+  const paramDescriptors = collectedParams.map((p, index) => ({
+    ...(p.name !== undefined && { name: p.name }),
+    source: 'lane' as const,
     index: index + 1,
+    ...(p.codecId !== undefined && { codecId: p.codecId }),
   }));
 
   let projection: Record<string, string> | undefined;
@@ -188,5 +190,5 @@ export function transformKyselyToPnAstCollectingParams(
     ...ifDefined('limit', select?.limit),
   };
 
-  return { ast, params: ctx.params, metaAdditions };
+  return { ast, metaAdditions };
 }

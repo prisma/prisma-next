@@ -1,8 +1,8 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import {
   createJoinOnBuilder,
   OrderByItem,
+  type ParamRef,
   ProjectionItem,
   SelectAst,
   type TableRef,
@@ -25,6 +25,7 @@ import type {
   UnaryBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import { isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { ProjectionInput } from '../types/internal';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {
@@ -47,6 +48,18 @@ import { buildJoinAst } from './join-builder';
 import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
 import { buildProjectionState } from './projection';
+
+function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
+  const collected = [...new Set(ast.collectParamRefs())];
+  return {
+    paramValues: collected.map((p) => p.value),
+    paramDescriptors: collected.map((p) => ({
+      ...ifDefined('name', p.name),
+      source: 'dsl' as const,
+      ...ifDefined('codecId', p.codecId),
+    })),
+  };
+}
 
 export class SelectBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
@@ -294,18 +307,10 @@ export class SelectBuilderImpl<
       errorUnknownTable(table.name);
     }
 
-    const paramDescriptors: ParamDescriptor[] = [];
-    const paramValues: unknown[] = [];
-    const paramCodecs: Record<string, string> = {};
-
     const whereResult = this.state.where
-      ? buildWhereExpr(this.contract, this.state.where, paramsMap, paramDescriptors, paramValues)
+      ? buildWhereExpr(this.contract, this.state.where, paramsMap)
       : undefined;
     const whereExpr = whereResult?.expr;
-
-    if (whereResult?.codecId && whereResult.paramName) {
-      paramCodecs[whereResult.paramName] = whereResult.codecId;
-    }
 
     const orderByClause = this.state.orderBy
       ? (() => {
@@ -317,7 +322,7 @@ export class SelectBuilderImpl<
     const joins = this.state.joins?.map((join) => buildJoinAst(join)) ?? [];
     const includeArtifacts =
       this.state.includes?.map((include) =>
-        buildIncludeJoinArtifact(include, this.contract, paramsMap, paramDescriptors, paramValues),
+        buildIncludeJoinArtifact(include, this.contract, paramsMap),
       ) ?? [];
     const includeProjectionByAlias = new Map(
       includeArtifacts.map((artifact) => [artifact.projection.alias, artifact.projection]),
@@ -355,6 +360,8 @@ export class SelectBuilderImpl<
       ast = ast.withLimit(this.state.limit);
     }
 
+    const { paramValues, paramDescriptors } = deriveParamsFromAst(ast);
+
     const planMeta = buildMeta({
       contract: this.contract,
       table,
@@ -362,7 +369,6 @@ export class SelectBuilderImpl<
       joins: this.state.joins,
       includes: this.state.includes,
       paramDescriptors,
-      paramCodecs,
       where: this.state.where,
       orderBy: this.state.orderBy,
       limit: this.state.limit,
@@ -375,8 +381,7 @@ export class SelectBuilderImpl<
       where?: BinaryBuilder | UnaryBuilder;
       orderBy?: AnyOrderBuilder;
       limit?: number;
-      paramDescriptors: ParamDescriptor[];
-      paramCodecs?: Record<string, string>;
+      paramDescriptors: typeof paramDescriptors;
     });
 
     const queryPlan: SqlQueryPlan<Row> = Object.freeze({

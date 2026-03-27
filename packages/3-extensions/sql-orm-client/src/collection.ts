@@ -91,7 +91,6 @@ import type {
 } from './types';
 import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
-import { createBoundWhereExpr } from './where-utils';
 
 type WhereDirectInput = WhereArg;
 
@@ -915,7 +914,7 @@ export class Collection<
 
     const resultState: CollectionState = {
       ...emptyState(),
-      filters: [createBoundWhereExpr(whereExpr)],
+      filters: [whereExpr],
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       limit: 1,

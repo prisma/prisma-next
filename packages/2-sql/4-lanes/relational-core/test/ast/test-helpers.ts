@@ -1,3 +1,4 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type AnyOperationArg,
   ColumnRef,
@@ -18,8 +19,16 @@ export function col(tableName: string, column: string): ColumnRef {
   return ColumnRef.of(tableName, column);
 }
 
-export function param(index: number, name?: string): ParamRef {
-  return ParamRef.of(index, name);
+export function param(value: unknown, name?: string, codecId = 'pg/text@1'): ParamRef {
+  return ParamRef.of(value, { ...ifDefined('name', name), codecId });
+}
+
+export function shiftParamRef(delta: number): (expr: ParamRef) => ParamRef {
+  return (expr: ParamRef) =>
+    ParamRef.of(typeof expr.value === 'number' ? expr.value + delta : expr.value, {
+      ...ifDefined('name', expr.name),
+      ...ifDefined('codecId', expr.codecId),
+    });
 }
 
 export function lit(value: unknown): LiteralExpr {

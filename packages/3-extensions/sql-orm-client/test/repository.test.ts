@@ -34,20 +34,14 @@ describe('Collection construction', () => {
     const collection = new PostCollection({ contract, runtime }, 'Post');
     const scoped = collection.popular();
     expect(scoped.state.filters).toHaveLength(1);
-    expect(scoped.state.filters[0]).toEqual({
-      expr: BinaryExpr.gt(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'views')),
-      params: [1000],
-      paramDescriptors: [
-        {
-          index: 1,
+    expect(scoped.state.filters[0]).toEqual(
+      BinaryExpr.gt(
+        ColumnRef.of('posts', 'views'),
+        ParamRef.of(1000, {
           name: 'views',
-          source: 'dsl',
           codecId: 'pg/int4@1',
-          nativeType: 'int4',
-          nullable: false,
-          refs: { table: 'posts', column: 'views' },
-        },
-      ],
-    });
+        }),
+      ),
+    );
   });
 });

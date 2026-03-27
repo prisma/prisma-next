@@ -115,7 +115,6 @@ describe('buildMeta', () => {
       where: userColumns.id.eq(param('userId')),
       orderBy: userColumns.id.asc(),
       paramDescriptors: [],
-      paramCodecs: { userId: 'pg/int4@1' },
     });
 
     expect(meta.projection).toEqual({ id: 'user.id', posts: 'include:posts' });
@@ -123,7 +122,6 @@ describe('buildMeta', () => {
     expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
     expect(meta.annotations?.codecs).toEqual({
       id: 'pg/int4@1',
-      userId: 'pg/int4@1',
     });
   });
 

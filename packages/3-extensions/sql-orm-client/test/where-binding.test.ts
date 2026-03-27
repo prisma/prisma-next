@@ -29,11 +29,12 @@ describe('bindWhereExpr', () => {
     const expr = BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('alice@test.com'));
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.params).toEqual(['alice@test.com']);
-    expect(bound.paramDescriptors).toHaveLength(1);
-    expect(bound.expr.kind).toBe('binary');
-    const binary = bound.expr as BinaryExpr;
+    expect(bound.kind).toBe('binary');
+    const binary = bound as BinaryExpr;
     expect(binary.right.kind).toBe('param-ref');
+    const ref = binary.right as ParamRef;
+    expect(ref.value).toBe('alice@test.com');
+    expect(ref.codecId).toBe('pg/text@1');
   });
 
   it('binds AND expressions recursively', () => {
@@ -43,8 +44,17 @@ describe('bindWhereExpr', () => {
     ]);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.params).toEqual(['a@test.com', 'Alice']);
-    expect(bound.paramDescriptors).toHaveLength(2);
+    const and = bound as AndExpr;
+    const andRight0 = (and.exprs[0] as BinaryExpr).right;
+    const andRight1 = (and.exprs[1] as BinaryExpr).right;
+    expect(andRight0.kind).toBe('param-ref');
+    expect(andRight1.kind).toBe('param-ref');
+    expect([(andRight0 as ParamRef).value, (andRight1 as ParamRef).value]).toEqual([
+      'a@test.com',
+      'Alice',
+    ]);
+    expect((andRight0 as ParamRef).codecId).toBe('pg/text@1');
+    expect((andRight1 as ParamRef).codecId).toBe('pg/text@1');
   });
 
   it('binds OR expressions recursively', () => {
@@ -54,19 +64,37 @@ describe('bindWhereExpr', () => {
     ]);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.params).toEqual(['a@test.com', 'b@test.com']);
-    expect(bound.expr.kind).toBe('or');
+    expect(bound.kind).toBe('or');
+    const or = bound as OrExpr;
+    const orRight0 = (or.exprs[0] as BinaryExpr).right;
+    const orRight1 = (or.exprs[1] as BinaryExpr).right;
+    expect(orRight0.kind).toBe('param-ref');
+    expect(orRight1.kind).toBe('param-ref');
+    expect([(orRight0 as ParamRef).value, (orRight1 as ParamRef).value]).toEqual([
+      'a@test.com',
+      'b@test.com',
+    ]);
   });
 
-  it('binds EXISTS subquery expressions', () => {
+  it('binds EXISTS subquery expressions and rebinds inner literals', () => {
     const subquery = SelectAst.from(TableSource.named('posts'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('posts', 'id'))])
-      .withWhere(BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')));
+      .withWhere(
+        AndExpr.of([
+          BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+          BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+        ]),
+      );
     const expr = ExistsExpr.exists(subquery);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr.kind).toBe('exists');
-    expect((bound.expr as ExistsExpr).notExists).toBe(false);
+    expect(bound.kind).toBe('exists');
+    expect((bound as ExistsExpr).notExists).toBe(false);
+    const innerWhere = ((bound as ExistsExpr).subquery as SelectAst).where as AndExpr;
+    const viewsRight = (innerWhere.exprs[1] as BinaryExpr).right;
+    expect(viewsRight.kind).toBe('param-ref');
+    expect((viewsRight as ParamRef).value).toBe(100);
+    expect((viewsRight as ParamRef).codecId).toBe('pg/int4@1');
   });
 
   it('binds NOT EXISTS subquery expressions', () => {
@@ -76,24 +104,24 @@ describe('bindWhereExpr', () => {
     const expr = ExistsExpr.notExists(subquery);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr.kind).toBe('exists');
-    expect((bound.expr as ExistsExpr).notExists).toBe(true);
+    expect(bound.kind).toBe('exists');
+    expect((bound as ExistsExpr).notExists).toBe(true);
   });
 
   it('binds IS NULL null-check expressions', () => {
     const expr = NullCheckExpr.isNull(ColumnRef.of('users', 'email'));
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr.kind).toBe('null-check');
-    expect((bound.expr as NullCheckExpr).isNull).toBe(true);
+    expect(bound.kind).toBe('null-check');
+    expect((bound as NullCheckExpr).isNull).toBe(true);
   });
 
   it('binds IS NOT NULL null-check expressions', () => {
     const expr = NullCheckExpr.isNotNull(ColumnRef.of('users', 'email'));
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr.kind).toBe('null-check');
-    expect((bound.expr as NullCheckExpr).isNull).toBe(false);
+    expect(bound.kind).toBe('null-check');
+    expect((bound as NullCheckExpr).isNull).toBe(false);
   });
 
   it('binds IN with list literal values to parameterized refs', () => {
@@ -103,22 +131,23 @@ describe('bindWhereExpr', () => {
     );
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.params).toEqual([1, 2]);
-    const binary = bound.expr as BinaryExpr;
+    const binary = bound as BinaryExpr;
     expect(binary.right.kind).toBe('list-literal');
     const list = binary.right as ListLiteralExpr;
-    expect(list.values[0]!.kind).toBe('param-ref');
-    expect(list.values[1]!.kind).toBe('param-ref');
+    expect(list.values).toMatchObject([{ kind: 'param-ref' }, { kind: 'param-ref' }]);
+    expect(list.values).toMatchObject([
+      { value: 1, codecId: 'pg/int4@1' },
+      { value: 2, codecId: 'pg/int4@1' },
+    ]);
   });
 
   it('preserves ParamRef on the right side without rebinding', () => {
-    const expr = BinaryExpr.eq(ColumnRef.of('users', 'id'), ParamRef.of(1, 'id'));
+    const existing = ParamRef.of(42, { name: 'id', codecId: 'pg/int4@1' });
+    const expr = BinaryExpr.eq(ColumnRef.of('users', 'id'), existing);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.params).toEqual([]);
-    const binary = bound.expr as BinaryExpr;
-    expect(binary.right.kind).toBe('param-ref');
-    expect((binary.right as ParamRef).index).toBe(1);
+    const binary = bound as BinaryExpr;
+    expect(binary.right).toBe(existing);
   });
 
   it('binds subquery within a select that has joins, orderBy, and derived sources', () => {
@@ -144,7 +173,7 @@ describe('bindWhereExpr', () => {
     const expr = ExistsExpr.exists(main);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr.kind).toBe('exists');
+    expect(bound.kind).toBe('exists');
   });
 
   it('handles binary expression with non-column left side and literal right', () => {
@@ -154,8 +183,7 @@ describe('bindWhereExpr', () => {
     const expr = BinaryExpr.gt(SubqueryExpr.of(subquery), LiteralExpr.of(0));
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.params).toEqual([]);
-    const binary = bound.expr as BinaryExpr;
+    const binary = bound as BinaryExpr;
     expect(binary.right.kind).toBe('literal');
   });
 
@@ -166,8 +194,7 @@ describe('bindWhereExpr', () => {
     const expr = BinaryExpr.gt(SubqueryExpr.of(subquery), ColumnRef.of('users', 'id'));
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.params).toEqual([]);
-    const binary = bound.expr as BinaryExpr;
+    const binary = bound as BinaryExpr;
     expect(binary.right.kind).toBe('column-ref');
   });
 
@@ -189,22 +216,21 @@ describe('bindWhereExpr', () => {
     const expr = ExistsExpr.exists(subquery);
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.expr.kind).toBe('exists');
+    expect(bound.kind).toBe('exists');
   });
 
   it('passes through ParamRef values inside ListLiteralExpr without rebinding', () => {
+    const existing = ParamRef.of(99, { name: 'id', codecId: 'pg/int4@1' });
     const expr = BinaryExpr.in(
       ColumnRef.of('users', 'id'),
-      ListLiteralExpr.of([ParamRef.of(1, 'id'), LiteralExpr.of(42)]),
+      ListLiteralExpr.of([existing, LiteralExpr.of(42)]),
     );
     const bound = bindWhereExpr(contract, expr);
 
-    expect(bound.params).toEqual([42]);
-    const binary = bound.expr as BinaryExpr;
+    const binary = bound as BinaryExpr;
     const list = binary.right as ListLiteralExpr;
-    expect(list.values[0]!.kind).toBe('param-ref');
-    expect((list.values[0]! as ParamRef).index).toBe(1);
-    expect(list.values[1]!.kind).toBe('param-ref');
-    expect((list.values[1]! as ParamRef).index).toBe(1);
+    expect(list.values).toMatchObject([{ kind: 'param-ref' }, { kind: 'param-ref' }]);
+    expect(list.values[0]).toBe(existing);
+    expect(list.values).toMatchObject([{ value: 99 }, { value: 42 }]);
   });
 });

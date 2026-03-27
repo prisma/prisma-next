@@ -1,4 +1,4 @@
-import type { ParamDescriptor, PlanRefs } from '@prisma-next/contract/types';
+import type { PlanRefs } from '@prisma-next/contract/types';
 import type { ReturnSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
@@ -225,6 +225,7 @@ abstract class AstNode {
 
 abstract class QueryAst extends AstNode {
   abstract collectRefs(): PlanRefs;
+  abstract collectParamRefs(): ParamRef[];
 
   collectColumnRefs(): ColumnRef[] {
     const refs = this.collectRefs().columns ?? [];
@@ -258,12 +259,12 @@ abstract class Expression extends AstNode implements ExpressionSource {
   }
 }
 
-abstract class WhereExpr extends AstNode {
+abstract class WhereExpr extends AstNode implements ToWhereExpr {
   abstract accept<R>(visitor: WhereExprVisitor<R>): R;
   abstract rewrite(rewriter: ExpressionRewriter): AnyWhereExpr;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
   abstract not(): AnyWhereExpr;
-  abstract toUnboundWhereExpr(): AnyWhereExpr;
+  abstract toWhereExpr(): AnyWhereExpr;
 
   collectColumnRefs(): ColumnRef[] {
     return collectColumnRefsWith(this);
@@ -378,24 +379,32 @@ export class ColumnRef extends Expression {
 
 export class ParamRef extends AstNode {
   readonly kind = 'param-ref' as const;
-  // 1-based index matching PostgreSQL's $1, $2, ... convention.
-  // The corresponding value lives at params[index - 1] in the bound params array.
-  readonly index: number;
+  readonly value: unknown;
   readonly name: string | undefined;
+  readonly codecId: string | undefined;
 
-  constructor(index: number, name?: string) {
+  constructor(
+    value: unknown,
+    options?: {
+      name?: string;
+      codecId?: string;
+    },
+  ) {
     super();
-    this.index = index;
-    this.name = name;
+    this.value = value;
+    this.name = options?.name;
+    this.codecId = options?.codecId;
     this.freeze();
   }
 
-  static of(index: number, name?: string): ParamRef {
-    return new ParamRef(index, name);
-  }
-
-  withIndex(index: number): ParamRef {
-    return new ParamRef(index, this.name);
+  static of(
+    value: unknown,
+    options?: {
+      name?: string;
+      codecId?: string;
+    },
+  ): ParamRef {
+    return new ParamRef(value, options);
   }
 }
 
@@ -832,7 +841,7 @@ export class BinaryExpr extends WhereExpr {
     return new BinaryExpr(negateBinaryOp(this.op), this.left, this.right);
   }
 
-  override toUnboundWhereExpr(): AnyWhereExpr {
+  override toWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
@@ -902,7 +911,7 @@ export class AndExpr extends WhereExpr {
     return new OrExpr(this.exprs.map((expr) => expr.not()));
   }
 
-  override toUnboundWhereExpr(): AnyWhereExpr {
+  override toWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
@@ -944,7 +953,7 @@ export class OrExpr extends WhereExpr {
     return new AndExpr(this.exprs.map((expr) => expr.not()));
   }
 
-  override toUnboundWhereExpr(): AnyWhereExpr {
+  override toWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
@@ -985,7 +994,7 @@ export class ExistsExpr extends WhereExpr {
     return new ExistsExpr(this.subquery, !this.notExists);
   }
 
-  override toUnboundWhereExpr(): AnyWhereExpr {
+  override toWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
@@ -1026,7 +1035,7 @@ export class NullCheckExpr extends WhereExpr {
     return new NullCheckExpr(this.expr, !this.isNull);
   }
 
-  override toUnboundWhereExpr(): AnyWhereExpr {
+  override toWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
@@ -1520,6 +1529,25 @@ export class InsertAst extends QueryAst {
     );
   }
 
+  override collectParamRefs(): ParamRef[] {
+    const refs: ParamRef[] = [];
+    for (const row of this.rows) {
+      for (const value of Object.values(row)) {
+        if (value.kind === 'param-ref') {
+          refs.push(value);
+        }
+      }
+    }
+    if (this.onConflict?.action.kind === 'do-update-set') {
+      for (const value of Object.values(this.onConflict.action.set)) {
+        if (value.kind === 'param-ref') {
+          refs.push(value);
+        }
+      }
+    }
+    return refs;
+  }
+
   override collectRefs(): PlanRefs {
     const tables = new Set<string>([this.table.name]);
     const columns = new Map<string, { table: string; column: string }>();
@@ -1600,6 +1628,19 @@ export class UpdateAst extends QueryAst {
     return new UpdateAst(this.table, this.set, this.where, returning);
   }
 
+  override collectParamRefs(): ParamRef[] {
+    const refs: ParamRef[] = [];
+    for (const value of Object.values(this.set)) {
+      if (value.kind === 'param-ref') {
+        refs.push(value);
+      }
+    }
+    if (this.where) {
+      refs.push(...this.where.collectParamRefs());
+    }
+    return refs;
+  }
+
   override collectRefs(): PlanRefs {
     const tables = new Set<string>([this.table.name]);
     const columns = new Map<string, { table: string; column: string }>();
@@ -1650,6 +1691,10 @@ export class DeleteAst extends QueryAst {
 
   withReturning(returning: ReadonlyArray<ColumnRef> | undefined): DeleteAst {
     return new DeleteAst(this.table, this.where, returning);
+  }
+
+  override collectParamRefs(): ParamRef[] {
+    return this.where?.collectParamRefs() ?? [];
   }
 
   override collectRefs(): PlanRefs {
@@ -1719,14 +1764,8 @@ export function isWhereExpr(value: unknown): value is AnyWhereExpr {
   );
 }
 
-export interface BoundWhereExpr {
-  readonly expr: AnyWhereExpr;
-  readonly params: readonly unknown[];
-  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
-}
-
 export interface ToWhereExpr {
-  toWhereExpr(): BoundWhereExpr;
+  toWhereExpr(): AnyWhereExpr;
 }
 
 export interface LoweredStatement {

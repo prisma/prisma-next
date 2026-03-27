@@ -6,7 +6,6 @@ import {
   type AnySqlComparable,
   type AnyWhereExpr,
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
   NullCheckExpr,
   OrExpr,
@@ -15,9 +14,9 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { buildOrmQueryPlan } from './query-plan-meta';
+import { buildOrmQueryPlan, deriveParamsFromAst } from './query-plan-meta';
 import type { AggregateSelector } from './types';
-import { combineWhereFilters } from './where-utils';
+import { combineWhereExprs } from './where-utils';
 
 function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>): AggregateExpr {
   if (selector.fn === 'count') {
@@ -95,7 +94,7 @@ function validateGroupedHavingExpr(expr: AnyWhereExpr): AnyWhereExpr {
 export function compileAggregate(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyWhereExpr[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
 ): SqlQueryPlan<Record<string, unknown>> {
   const entries = Object.entries(aggregateSpec);
@@ -107,18 +106,19 @@ export function compileAggregate(
     ProjectionItem.of(alias, toAggregateExpr(tableName, selector)),
   );
   let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
 
-  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
 export function compileGroupedAggregate(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyWhereExpr[],
   groupByColumns: readonly string[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
   havingExpr: AnyWhereExpr | undefined,
@@ -142,14 +142,15 @@ export function compileGroupedAggregate(
   let ast = SelectAst.from(TableSource.named(tableName))
     .withProjection(projection)
     .withGroupBy(groupByColumns.map((column) => ColumnRef.of(tableName, column)));
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
 
   if (havingExpr) {
     ast = ast.withHaving(validateGroupedHavingExpr(havingExpr));
   }
 
-  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }

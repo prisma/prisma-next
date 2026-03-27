@@ -1,4 +1,3 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
@@ -234,18 +233,10 @@ export function buildIncludeJoinArtifact(
   include: IncludeState,
   contract: SqlContract<SqlStorage>,
   paramsMap: Record<string, unknown>,
-  paramDescriptors: ParamDescriptor[],
-  paramValues: unknown[],
 ): IncludeJoinArtifact {
   let childWhere: AnyWhereExpr | undefined;
   if (include.childWhere) {
-    const whereResult = buildWhereExpr(
-      contract,
-      include.childWhere,
-      paramsMap,
-      paramDescriptors,
-      paramValues,
-    );
+    const whereResult = buildWhereExpr(contract, include.childWhere, paramsMap);
     childWhere = whereResult.expr;
   }
 

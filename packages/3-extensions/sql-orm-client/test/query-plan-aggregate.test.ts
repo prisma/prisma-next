@@ -2,7 +2,6 @@ import {
   AggregateExpr,
   AndExpr,
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
   ExistsExpr,
   ListLiteralExpr,
@@ -16,14 +15,14 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { compileAggregate, compileGroupedAggregate } from '../src/query-plan';
+import { bindWhereExpr } from '../src/where-binding';
 import { baseContract } from './collection-fixtures';
 
 describe('query plan aggregate', () => {
-  const filteredViews: BoundWhereExpr = {
-    expr: BinaryExpr.gte(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'minViews')),
-    params: [100],
-    paramDescriptors: [{ index: 1, source: 'dsl' }],
-  };
+  const filteredViews = bindWhereExpr(
+    baseContract,
+    BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+  );
 
   it('rejects empty aggregate specs and selectors without required fields', () => {
     expect(() => compileAggregate(baseContract, 'posts', [], {})).toThrow(
@@ -65,7 +64,10 @@ describe('query plan aggregate', () => {
         [],
         ['user_id'],
         { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
-        BinaryExpr.gte(AggregateExpr.sum(ColumnRef.of('posts', 'views')), ParamRef.of(1, 'views')),
+        BinaryExpr.gte(
+          AggregateExpr.sum(ColumnRef.of('posts', 'views')),
+          ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' }),
+        ),
       ),
     ).toThrow('ParamRef is not supported in grouped having expressions');
 
@@ -78,7 +80,7 @@ describe('query plan aggregate', () => {
         { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
         BinaryExpr.in(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ListLiteralExpr.of([ParamRef.of(1, 'views')]),
+          ListLiteralExpr.of([ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' })]),
         ),
       ),
     ).toThrow('ParamRef is not supported in grouped having expressions');
@@ -170,8 +172,14 @@ describe('query plan aggregate', () => {
 
     expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
-    expect(ast.where).toEqual(filteredViews.expr);
+    expect(ast.where).toEqual(filteredViews);
     expect(plan.params).toEqual([100]);
-    expect(plan.meta.paramDescriptors).toEqual([{ index: 1, source: 'dsl' }]);
+    expect(plan.meta.paramDescriptors).toEqual([
+      {
+        name: 'views',
+        source: 'dsl',
+        codecId: 'pg/int4@1',
+      },
+    ]);
   });
 });

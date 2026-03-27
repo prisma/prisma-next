@@ -46,7 +46,7 @@ describe('Operation lowering', () => {
       method: 'cosineDistance',
       forTypeId: 'pg/vector@1',
       self: ColumnRef.of('user', 'vector'),
-      args: [ParamRef.of(1, 'other')],
+      args: [ParamRef.of([1, 2, 3], { name: 'other', codecId: 'pg/vector@1' })],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
@@ -63,7 +63,7 @@ describe('Operation lowering', () => {
       ProjectionItem.of('distance', distanceExpr()),
     ]);
 
-    const lowered = adapter.lower(ast, { contract, params: [[1, 2, 3]] });
+    const lowered = adapter.lower(ast, { contract });
     expect(lowered.body.sql).toContain('"user"."vector" <=> $1::vector');
     expect(lowered.body.sql).toContain('AS "distance"');
   });
@@ -73,7 +73,11 @@ describe('Operation lowering', () => {
       method: 'cosineSimilarity',
       forTypeId: 'pg/vector@1',
       self: ColumnRef.of('user', 'vector'),
-      args: [ColumnRef.of('user', 'otherVector'), ParamRef.of(1, 'param'), LiteralExpr.of(42)],
+      args: [
+        ColumnRef.of('user', 'otherVector'),
+        ParamRef.of([1, 2, 3], { name: 'param', codecId: 'pg/vector@1' }),
+        LiteralExpr.of(42),
+      ],
       returns: { kind: 'builtin', type: 'number' },
       // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
       template: 'cosine_similarity(${self}, ${arg0}, ${arg1}, ${arg2})',
@@ -82,7 +86,7 @@ describe('Operation lowering', () => {
       ProjectionItem.of('similarity', operationExpr),
     ]);
 
-    const lowered = adapter.lower(ast, { contract, params: [[1, 2, 3]] });
+    const lowered = adapter.lower(ast, { contract });
     expect(lowered.body.sql).toContain(
       'cosine_similarity("user"."vector", "user"."otherVector", $1::vector, 42)',
     );
@@ -91,13 +95,18 @@ describe('Operation lowering', () => {
   it('lowers operations in where and orderBy clauses', () => {
     const ast = SelectAst.from(TableSource.named('user'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
-      .withWhere(BinaryExpr.eq(distanceExpr(), ParamRef.of(2, 'threshold')))
+      .withWhere(
+        BinaryExpr.eq(
+          distanceExpr(),
+          ParamRef.of(0.5, { name: 'threshold', codecId: 'pg/float8@1' }),
+        ),
+      )
       .withOrderBy([OrderByItem.asc(distanceExpr())]);
 
-    const lowered = adapter.lower(ast, { contract, params: [[1, 2, 3], 0.5] });
+    const lowered = adapter.lower(ast, { contract });
 
     expect(lowered.body.sql).toContain('WHERE ("user"."vector" <=> $1::vector) = $2');
-    expect(lowered.body.sql).toContain('ORDER BY "user"."vector" <=> $1::vector ASC');
+    expect(lowered.body.sql).toContain('ORDER BY "user"."vector" <=> $3::vector ASC');
   });
 
   it('lowers operations with literal arguments', () => {

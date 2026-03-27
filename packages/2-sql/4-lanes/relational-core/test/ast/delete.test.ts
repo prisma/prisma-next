@@ -27,4 +27,18 @@ describe('ast/delete', () => {
         .withReturning([col('post', 'id')]).returning,
     ).toEqual([col('post', 'id')]);
   });
+
+  it('collectParamRefs returns where params', () => {
+    const whereParam = param(42, 'userId');
+    const deleteAst = DeleteAst.from(table('user')).withWhere(
+      BinaryExpr.eq(col('user', 'id'), whereParam),
+    );
+
+    expect(deleteAst.collectParamRefs()).toEqual([whereParam]);
+  });
+
+  it('collectParamRefs returns empty array without where', () => {
+    const deleteAst = DeleteAst.from(table('user'));
+    expect(deleteAst.collectParamRefs()).toEqual([]);
+  });
 });

@@ -1,4 +1,3 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
@@ -68,28 +67,30 @@ const contract: SqlContract<SqlStorage> = {
   mappings: {},
 };
 
-function createDescriptor(index: number, name: string): ParamDescriptor {
-  return {
-    index,
-    name,
-    source: 'lane',
-  };
-}
-
 function createNestedWhereAst(): SelectAst {
   const derivedUsers = SelectAst.from(TableSource.named('user'))
     .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
-    .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'kind'), ParamRef.of(4, 'kind')));
+    .withWhere(
+      BinaryExpr.eq(
+        ColumnRef.of('user', 'kind'),
+        ParamRef.of('admin', { name: 'kind', codecId: 'pg/text@1' }),
+      ),
+    );
 
   const derivedPosts = SelectAst.from(TableSource.named('post'))
     .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
-    .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'title'), ParamRef.of(5, 'title')));
+    .withWhere(
+      BinaryExpr.eq(
+        ColumnRef.of('post', 'title'),
+        ParamRef.of('Hello', { name: 'title', codecId: 'pg/text@1' }),
+      ),
+    );
 
   const orderedTitleExpr = OperationExpr.function({
     method: 'lower',
     forTypeId: 'pg/text@1',
     self: ColumnRef.of('matching_posts', 'title'),
-    args: [ParamRef.of(6, 'fallback')],
+    args: [ParamRef.of('untitled', { name: 'fallback', codecId: 'pg/text@1' })],
     returns: { kind: 'builtin', type: 'string' },
     // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
     template: 'lower(${self}, ${arg0})',
@@ -99,7 +100,10 @@ function createNestedWhereAst(): SelectAst {
     .withJoins([
       JoinAst.left(
         DerivedTableSource.as('matching_posts', derivedPosts),
-        BinaryExpr.eq(ColumnRef.of('matching_posts', 'userId'), ParamRef.of(2, 'userId')),
+        BinaryExpr.eq(
+          ColumnRef.of('matching_posts', 'userId'),
+          ParamRef.of('join-user-id', { name: 'userId', codecId: 'pg/uuid@1' }),
+        ),
       ),
     ])
     .withProjection([
@@ -114,7 +118,12 @@ function createNestedWhereAst(): SelectAst {
         ),
       ),
     ])
-    .withHaving(BinaryExpr.gt(AggregateExpr.count(), ParamRef.of(3, 'minCount')))
+    .withHaving(
+      BinaryExpr.gt(
+        AggregateExpr.count(),
+        ParamRef.of(1, { name: 'minCount', codecId: 'pg/int4@1' }),
+      ),
+    )
     .withOrderBy([OrderByItem.asc(orderedTitleExpr)]);
 
   return SelectAst.from(TableSource.named('user'))
@@ -123,24 +132,9 @@ function createNestedWhereAst(): SelectAst {
 }
 
 describe('buildKyselyWhereExpr nested AST traversal', () => {
-  it('collects and remaps params across nested rich ASTs', () => {
+  it('preserves nested rich AST param refs on the where expression', () => {
     vi.mocked(buildKyselyPlan).mockReturnValue({
       ast: createNestedWhereAst(),
-      params: ['unused', 'join-user-id', 1, 'admin', 'Hello', 'untitled'],
-      meta: {
-        target: 'postgres',
-        targetFamily: 'sql',
-        storageHash: coreHash('sha256:test'),
-        lane: 'kysely',
-        paramDescriptors: [
-          createDescriptor(1, 'unused'),
-          createDescriptor(2, 'userId'),
-          createDescriptor(3, 'minCount'),
-          createDescriptor(4, 'kind'),
-          createDescriptor(5, 'title'),
-          createDescriptor(6, 'fallback'),
-        ],
-      },
     } as never);
 
     const bound = buildKyselyWhereExpr(contract, {
@@ -150,30 +144,31 @@ describe('buildKyselyWhereExpr nested AST traversal', () => {
       parameters: [],
     } as CompiledQuery<unknown>).toWhereExpr();
 
-    expect(bound.params).toEqual(['join-user-id', 1, 'admin', 'Hello', 'untitled']);
-    expect(bound.paramDescriptors.map((descriptor) => descriptor.index)).toEqual([1, 2, 3, 4, 5]);
-
-    expect(bound.expr).toBeInstanceOf(ExistsExpr);
-    const exists = bound.expr as ExistsExpr;
+    expect(bound).toBeInstanceOf(ExistsExpr);
+    const exists = bound as ExistsExpr;
     const subquery = exists.subquery;
-    expect(subquery.from.kind).toEqual('derived-table-source');
+    expect(subquery.from.kind).toBe('derived-table-source');
     expect(((subquery.from as DerivedTableSource).query.where as BinaryExpr).right).toEqual(
-      ParamRef.of(3, 'kind'),
+      ParamRef.of('admin', { name: 'kind', codecId: 'pg/text@1' }),
     );
 
     const join = subquery.joins?.[0];
-    expect(join?.source.kind).toEqual('derived-table-source');
-    expect((join?.on as BinaryExpr).right).toEqual(ParamRef.of(1, 'userId'));
+    expect(join?.source.kind).toBe('derived-table-source');
+    expect((join?.on as BinaryExpr).right).toEqual(
+      ParamRef.of('join-user-id', { name: 'userId', codecId: 'pg/uuid@1' }),
+    );
     expect(((join?.source as DerivedTableSource).query.where as BinaryExpr).right).toEqual(
-      ParamRef.of(4, 'title'),
+      ParamRef.of('Hello', { name: 'title', codecId: 'pg/text@1' }),
     );
 
-    expect((subquery.having as BinaryExpr).right).toEqual(ParamRef.of(2, 'minCount'));
+    expect((subquery.having as BinaryExpr).right).toEqual(
+      ParamRef.of(1, { name: 'minCount', codecId: 'pg/int4@1' }),
+    );
 
     const aggregate = subquery.projection[0]?.expr;
     expect(aggregate).toBeInstanceOf(JsonArrayAggExpr);
     expect(((aggregate as JsonArrayAggExpr).orderBy?.[0]?.expr as OperationExpr).args[0]).toEqual(
-      ParamRef.of(5, 'fallback'),
+      ParamRef.of('untitled', { name: 'fallback', codecId: 'pg/text@1' }),
     );
   });
 });

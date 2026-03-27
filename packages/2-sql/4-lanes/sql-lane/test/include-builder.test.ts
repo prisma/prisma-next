@@ -1,5 +1,10 @@
-import type { DerivedTableSource } from '@prisma-next/sql-relational-core/ast';
-import { AndExpr, BinaryExpr, ColumnRef, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import {
+  AndExpr,
+  BinaryExpr,
+  ColumnRef,
+  type DerivedTableSource,
+  ParamRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { describe, expect, it } from 'vitest';
@@ -79,7 +84,7 @@ describe('buildIncludeJoinArtifact', () => {
       childLimit: 10,
     };
 
-    const artifact = buildIncludeJoinArtifact(includeState, contract, { userId: 42 }, [], []);
+    const artifact = buildIncludeJoinArtifact(includeState, contract, { userId: 42 });
 
     expect(artifact.join.kind).toBe('join');
     expect(artifact.join.lateral).toBe(true);
@@ -87,13 +92,16 @@ describe('buildIncludeJoinArtifact', () => {
     expect(artifact.projection.expr).toEqual(ColumnRef.of('posts_lateral', 'posts'));
 
     const aggregateSelect = (artifact.join.source as DerivedTableSource).query;
-    expect(aggregateSelect.projection[0]?.expr?.kind).toBe('json-array-agg');
+    expect(aggregateSelect.projection[0]?.expr.kind).toBe('json-array-agg');
     expect(aggregateSelect.from.kind).toBe('derived-table-source');
     const rowsQuery = (aggregateSelect.from as DerivedTableSource).query;
     expect(rowsQuery.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'id')),
-        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'userId')),
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(42, { name: 'userId', codecId: 'pg/int4@1' }),
+        ),
       ]),
     );
     expect(rowsQuery.limit).toBe(10);
