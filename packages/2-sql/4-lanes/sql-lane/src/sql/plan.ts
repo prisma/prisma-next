@@ -221,10 +221,8 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     }
   }
 
-  // Merge projection and parameter codecs
   const allCodecs: Record<string, string> = {
     ...projectionCodecs,
-    ...(args.paramCodecs ? args.paramCodecs : {}),
   };
 
   return Object.freeze(

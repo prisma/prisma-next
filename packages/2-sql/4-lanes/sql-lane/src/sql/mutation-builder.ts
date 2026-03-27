@@ -120,7 +120,6 @@ export class InsertBuilderImpl<
 
   build(options?: BuildOptions): SqlQueryPlan<Row> {
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
-    const paramCodecs: Record<string, string> = {};
 
     const contractTable = this.contract.storage.tables[this.table.name];
     if (!contractTable) {
@@ -140,10 +139,6 @@ export class InsertBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      if (paramName && columnMeta.codecId) {
-        paramCodecs[paramName] = columnMeta.codecId;
-      }
-
       values[columnName] = ParamRef.of(value, {
         name: paramName,
         codecId: columnMeta.codecId,
@@ -162,7 +157,6 @@ export class InsertBuilderImpl<
         errorUnknownColumn(defaultValue.column, this.table.name);
       }
 
-      paramCodecs[defaultValue.column] = columnMeta.codecId;
       values[defaultValue.column] = ParamRef.of(defaultValue.value, {
         name: defaultValue.column,
         codecId: columnMeta.codecId,
@@ -194,7 +188,6 @@ export class InsertBuilderImpl<
       table: this.table,
       projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
     });
 
     const queryPlan: SqlQueryPlan<Row> = Object.freeze({
@@ -277,7 +270,6 @@ export class UpdateBuilderImpl<
     }
 
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
-    const paramCodecs: Record<string, string> = {};
 
     const contractTable = this.contract.storage.tables[this.table.name];
     if (!contractTable) {
@@ -297,10 +289,6 @@ export class UpdateBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      if (paramName && columnMeta.codecId) {
-        paramCodecs[paramName] = columnMeta.codecId;
-      }
-
       set[columnName] = ParamRef.of(value, {
         name: paramName,
         codecId: columnMeta.codecId,
@@ -319,7 +307,6 @@ export class UpdateBuilderImpl<
         errorUnknownColumn(defaultValue.column, this.table.name);
       }
 
-      paramCodecs[defaultValue.column] = columnMeta.codecId;
       set[defaultValue.column] = ParamRef.of(defaultValue.value, {
         name: defaultValue.column,
         codecId: columnMeta.codecId,
@@ -330,10 +317,6 @@ export class UpdateBuilderImpl<
     const whereExpr = whereResult.expr;
     if (!whereExpr) {
       errorFailedToBuildWhereClause();
-    }
-
-    if (whereResult.codecId && whereResult.paramName) {
-      paramCodecs[whereResult.paramName] = whereResult.codecId;
     }
 
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
@@ -361,7 +344,6 @@ export class UpdateBuilderImpl<
       table: this.table,
       projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
       where: this.wherePredicate,
     });
 
@@ -438,7 +420,6 @@ export class DeleteBuilderImpl<
     }
 
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
-    const paramCodecs: Record<string, string> = {};
 
     const contractTable = this.contract.storage.tables[this.table.name];
     if (!contractTable) {
@@ -449,10 +430,6 @@ export class DeleteBuilderImpl<
     const whereExpr = whereResult.expr;
     if (!whereExpr) {
       errorFailedToBuildWhereClause();
-    }
-
-    if (whereResult.codecId && whereResult.paramName) {
-      paramCodecs[whereResult.paramName] = whereResult.codecId;
     }
 
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
@@ -480,7 +457,6 @@ export class DeleteBuilderImpl<
       table: this.table,
       projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
       where: this.wherePredicate,
     });
 

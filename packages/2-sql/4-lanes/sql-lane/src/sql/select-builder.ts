@@ -311,16 +311,10 @@ export class SelectBuilderImpl<
       errorUnknownTable(table.name);
     }
 
-    const paramCodecs: Record<string, string> = {};
-
     const whereResult = this.state.where
       ? buildWhereExpr(this.contract, this.state.where, paramsMap)
       : undefined;
     const whereExpr = whereResult?.expr;
-
-    if (whereResult?.codecId && whereResult.paramName) {
-      paramCodecs[whereResult.paramName] = whereResult.codecId;
-    }
 
     const orderByClause = this.state.orderBy
       ? (() => {
@@ -379,7 +373,6 @@ export class SelectBuilderImpl<
       joins: this.state.joins,
       includes: this.state.includes,
       paramDescriptors,
-      paramCodecs,
       where: this.state.where,
       orderBy: this.state.orderBy,
       limit: this.state.limit,
@@ -393,7 +386,6 @@ export class SelectBuilderImpl<
       orderBy?: AnyOrderBuilder;
       limit?: number;
       paramDescriptors: typeof paramDescriptors;
-      paramCodecs?: Record<string, string>;
     });
 
     const queryPlan: SqlQueryPlan<Row> = Object.freeze({

@@ -124,7 +124,6 @@ describe('sql DSL builder', () => {
     expect(plan.meta.annotations?.codecs).toEqual({
       id: 'pg/int4@1',
       email: 'pg/text@1',
-      userId: 'pg/int4@1',
     });
   });
 
