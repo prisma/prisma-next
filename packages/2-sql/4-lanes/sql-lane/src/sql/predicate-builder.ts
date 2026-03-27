@@ -4,7 +4,6 @@ import type {
   AnyExpression,
   AnySqlComparable,
   AnyWhereExpr,
-  ColumnRef,
   NullCheckExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {

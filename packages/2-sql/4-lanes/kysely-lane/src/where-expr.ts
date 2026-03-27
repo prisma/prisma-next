@@ -3,7 +3,6 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type BoundWhereExpr,
   ListLiteralExpr,
-  type SelectAst,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { CompiledQuery } from 'kysely';

@@ -1,8 +1,4 @@
-import {
-  AggregateExpr,
-  type BinaryExpr,
-  type ColumnRef,
-} from '@prisma-next/sql-relational-core/ast';
+import { AggregateExpr, type BinaryExpr } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createCollectionFor } from './collection-fixtures';
 import { getTestContract, isSelectAst } from './helpers';
