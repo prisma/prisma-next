@@ -11,7 +11,6 @@ import {
   ParamRef,
   SelectAst,
   SubqueryExpr,
-  type ToWhereExpr,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -25,31 +24,21 @@ import {
 } from '../src/query-plan';
 import { baseContract, createCollectionFor } from './collection-fixtures';
 
-function boundParam(expr: BinaryExpr): ToWhereExpr {
-  return {
-    toWhereExpr: () => expr,
-  };
-}
-
 describe('SQL ORM rich AST query plans', () => {
   it('compiles include plans with AST classes and limit annotations', () => {
     const { collection } = createCollectionFor('User');
     const state = collection
       .where(() =>
-        boundParam(
-          BinaryExpr.eq(
-            ColumnRef.of('users', 'name'),
-            ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
-          ),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
         ),
       )
       .include('posts', (posts) =>
         posts.where(() =>
-          boundParam(
-            BinaryExpr.gte(
-              ColumnRef.of('posts', 'views'),
-              ParamRef.of(100, { name: 'views', codecId: 'pg/int4@1' }),
-            ),
+          BinaryExpr.gte(
+            ColumnRef.of('posts', 'views'),
+            ParamRef.of(100, { name: 'views', codecId: 'pg/int4@1' }),
           ),
         ),
       )
