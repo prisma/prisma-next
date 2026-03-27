@@ -55,6 +55,8 @@ Example from the `skipRollback` test graph (graph: `∅→A→B→C→D`, backwa
 
 **Suggested fix:** Find a better term for the concept ("apply path"? "target path"? "main path"?) and rename consistently across internal APIs. This is a naming pass, not a behavior change.
 
+**Linear:** [TML-2097](https://linear.app/prisma-next/issue/TML-2097) — audit all CLI output and error messages for graph jargon.
+
 ---
 
 ## Phantom `@prisma-next/cli` dependency in 4 packages causes turbo cache cascade
@@ -81,24 +83,34 @@ These are also architecture violations: adapters/targets/extensions should not d
 
 **Discovered:** 2026-03-26 | **Severity:** high | **Type:** bug — incorrect status display
 
-**Observed:** After running `db update` (which pushes the contract to the DB and writes the marker, but does not write ledger entries), `migration status` shows all edges from root to the marker as `✓ applied` even though no migrations were actually executed.
+**Observed:** After running `db update` (which pushes the contract to the DB and writes the marker, but does not write ledger entries for individual migrations), `migration status` shows all edges from root to the marker as `✓ applied` even though no migrations were actually executed.
 
-**Root cause:** `deriveEdgeStatuses` computes applied edges via `findPath(root → markerHash)` — a structural graph query. It assumes every edge on the path to the marker was applied via `migration apply`. The marker only says "the DB schema is at this hash"; the *ledger* records which migrations were actually run. After `db update`, the marker moves but the ledger is empty (or unchanged), so the assumption is wrong.
+**Root cause:** `deriveEdgeStatuses` computes applied edges via `findPath(root → markerHash)` — a structural graph query. It assumes every edge on the path to the marker was applied via `migration apply`. The marker only says "the DB schema is at this hash"; the *ledger* records which migrations were actually run. After `db update`, the marker moves but the ledger has no per-migration entries, so the assumption is wrong.
 
 **Core issue:** There is no `readLedger()` API on `ControlClient`. The CLI can read the marker (`readMarker()`) but has no way to read the list of actually-applied migrations from the ledger table.
 
-**Required fix:**
-1. Add `readLedger()` (or equivalent) to `ControlClient` — returns the list of migration IDs recorded in the ledger table.
-2. Pass ledger entries into `deriveEdgeStatuses` and mark only those edges as `applied`.
-3. Edges on the path to the marker that are not in the ledger need distinct treatment (possibly no status, or a new status indicating the DB is at this state but not via `migration apply`).
+**Ledger schema gap:** The current `prisma_contract.ledger` table stores `origin_core_hash` and `destination_core_hash` (the from/to contract hashes) but does **not** store `dir_name` or `migration_id`. While hash-pair matching against graph edges could work in the common case, it's fragile — the ledger is a DB-side artifact and the on-disk migrations are a repo-side artifact. They can get out of sync (e.g. using one local DB from a different project). The ledger should be self-describing: each entry should identify which migration was applied by name and content-addressed ID, independent of what's on disk.
 
-**Scope:** Control plane + CLI. Not a graph renderer issue.
+**Required fix:**
+
+1. **Add `dir_name text` and `migration_id text` columns to the ledger table.** This makes the ledger a proper audit log ("migration `20260315_add_users` (id `abc123`) was applied at this time"). Requires a schema migration of the control tables.
+2. **Thread `dirName`/`migrationId` through the runner.** `migration apply` has both values on `MigrationApplyStep`, but they're lost when building the plan for `runner.execute()`. They need to flow through `SqlMigrationRunnerExecuteOptions` → `buildLedgerInsertStatement` → the INSERT. This crosses the family/target boundary.
+3. **Add `readLedger()` to the control plane stack:**
+   - Core: add to `ControlFamilyInstance` interface in `@prisma-next/core-control-plane/types`
+   - Family: add read function in `@prisma-next/family-sql` (analogous to `readMarker()`)
+   - CLI: add to `ControlClient` interface and implement in `ControlClientImpl`
+4. **Update `deriveEdgeStatuses`:** Accept ledger entries, mark only edges present in the ledger as `applied`. Edges on the path to the marker but not in the ledger could get a new status like `"inferred"` indicating the DB reached that state via `db update`, not `migration apply`.
+
+**Scope:** Ledger schema + Postgres target + SQL family + core control plane + CLI.
 
 **Affected code:**
-- `cli/src/commands/migration-status.ts` — `deriveEdgeStatuses`
-- `cli/src/control-api/client.ts` — needs `readLedger()` method
+- `packages/3-targets/3-targets/postgres/src/core/migrations/statement-builders.ts` — ledger table DDL, insert statement
+- `packages/3-targets/3-targets/postgres/src/core/migrations/runner.ts` — `recordLedgerEntry()`, execute options
+- `packages/2-sql/3-tooling/family/src/core/` — new `readLedger()` function
+- `packages/1-framework/1-core/migration/control-plane/src/types.ts` — `ControlFamilyInstance` interface
 - `cli/src/control-api/types.ts` — `ControlClient` interface
-- Underlying family/target control plane — needs to expose ledger reads
+- `cli/src/control-api/client.ts` — `readLedger()` implementation
+- `cli/src/commands/migration-status.ts` — `deriveEdgeStatuses`
 
 ---
 

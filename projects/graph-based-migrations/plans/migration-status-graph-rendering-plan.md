@@ -66,7 +66,7 @@ Replace the existing `formatMigrationStatusOutput` pipeline with the new rendere
 **Tasks:**
 
 - [x] Update `migrationGraphToRenderInput` spine target: `activeRefHash → contractHash`, matching `migration apply`
-- [x] Implement continuity-aware relevant path computation (marker→contract and ref→contract preferred over BFS root→contract)
+- [x] Implement continuity-aware relevant path computation (marker→contract and ref→contract tried independently, not BFS root→contract)
 - [x] Add `--graph` flag to `migration status` command definition
 - [x] Unify renderer API: single `render(graph, options)` method; caller controls filtering via `extractRelevantSubgraph` (default) or full graph (`--graph`)
 - [x] Implement `extractRelevantSubgraph(graph, paths)` — union of multiple paths into a subgraph
@@ -82,7 +82,7 @@ Replace the existing `formatMigrationStatusOutput` pipeline with the new rendere
 - [x] Update `--json` output to strip internal fields before serialization
 - [x] Remove `formatMigrationStatusOutput`; privatize `resolveDisplayChain` and `buildMigrationEntries`
 - [x] Introduce `RenderGraph` as single graph representation with adjacency-list indexing
-- [x] Update existing `migration-status.test.ts` tests to match new output format
+- [x] Replace `migration-status.test.ts` tests to cover new output format and edge status derivation
 - [x] Unit tests: `extractRelevantSubgraph` — multi-path union, deduplication, detached node preservation, marker preservation
 - [x] Consolidate to single renderer: delete edge-centric renderer, DOT renderer, renderer registry, `--renderer` flag, `RendererName` type
 - [x] Rename `graph-render-dagre.ts` to `graph-render.ts`, export `graphRenderer`
@@ -94,10 +94,21 @@ Replace the existing `formatMigrationStatusOutput` pipeline with the new rendere
 - [x] Add `isLinearGraph()` — detect single-chain graphs, pass `ranksep: 1` for compact linear output
 - [x] Delete `graph-layout.ts` and dead types (`BranchTree`, `LayoutNode`, `LayoutEdge`, `GraphLayout`)
 - [x] Fix `CONTRACT.AHEAD` diagnostic: only fire when contract hash is not in graph (not when `--ref` differs)
+- [x] Fix summary counts: derive from `deriveEdgeStatuses` (not `buildMigrationEntries`) so summary matches visual
+- [x] Move `deriveEdgeStatuses` call into `executeMigrationStatusCommand`, store on result
+- [x] Remove dead `markerAccountedFor` branches (unreachable after early bail-out)
+- [x] Remove dead `knownStatuses`/`hasKnownStatus` functions
+- [x] Fix `--limit` help text: default is 10, not "show all"
+- [x] Fix CVD palette: replace `green` summary checkmark with `cyan`
+- [x] Fix contract path routing: try both marker→contract and ref→contract independently (diamond support)
+- [x] Simplify `buildVariant`: inline diagonal detection, introduce `BendDirection` type and `bitsToBends` helper
+- [x] Fix `node()` test helper: use `GraphNode['style']` instead of hardcoded `'detached'`
+- [x] Merge double JSDoc on `deriveEdgeStatuses` into single block
 
 **Remaining (deferred):**
 
-- [ ] Implement off-spine marker diagnostics: warn if DB or contract markers are not on the rendered path
+- [ ] Implement cross-branch contract diagnostic: warn when contract is in the graph but not reachable from the chosen `--ref` (see triaged issue: "migration status --ref places detached contract node on wrong branch")
+- [ ] Fix unreachable edge color — currently magenta, same as backward/rollback edges. These are different concepts and should be visually distinct.
 - [ ] Audit all CLI output and error messages for graph jargon — replace with migration-domain language (deferred to separate PR)
 - [ ] Integration/journey tests for `migration status` (deferred to follow-up)
 - [ ] `migration plan` needs optional `--db` support so `--from` defaults to the DB marker when online (see spec)
@@ -151,7 +162,7 @@ Files removed during development:
 | `--all` disables truncation | Unit | M2, M3 | ✅ |
 | Truncation expands for markers | Unit | M2 | ✅ |
 | `extractRelevantSubgraph` multi-path union | Unit | M3 | ✅ |
-| Existing tests updated | Unit | M3 | ✅ |
+| Tests replaced for new format | Unit | M3 | ✅ |
 | 35+ topology snapshot tests | Snapshot | M1 | ✅ |
 | `deriveEdgeStatuses` unit tests | Unit | M3 | ✅ |
 | `isLinearGraph` unit tests | Unit | M1 | ✅ |

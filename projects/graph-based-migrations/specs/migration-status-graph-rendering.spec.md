@@ -1,12 +1,28 @@
 # Summary
 
-Redesign `migration status` output around the principle "show what `migration apply` would do." The default view renders the relevant subgraph (the union of paths to contract, DB marker, and ref) — in the common case this is a linear chain. An optional `--graph` flag renders the full migration graph with branches, diamonds, and rollback cycles using a Dagre-based ASCII layout.
+Redesign `migration status` to answer two questions: (1) "can I apply, and what would happen?" and (2) "if not, what do I need to do?" The default view shows the minimum context needed to act: the apply path with edge statuses, plus any relevant forks (DB marker on a different branch, ref divergence) that explain why action is needed. An optional `--graph` flag shows the full migration graph for orientation.
 
 # Description
 
-`migration status` currently calls `findLeaf(graph)` to pick a single target node, then `findPath(∅ → target)` to produce a linear chain which `formatMigrationStatusOutput` renders as a vertical list. When the graph has multiple leaves (divergent branches — common during team collaboration), `findLeaf` throws `AMBIGUOUS_LEAF` and the command fails before producing any output.
+`migration status` currently shows only a single linear path through the migration graph — no branches, no forks, no visibility into the graph's actual shape. When the graph has multiple leaves (divergent branches — common during team collaboration), the command fails entirely (`AMBIGUOUS_LEAF`) before producing any output.
 
-The redesign has two parts:
+## Why the default view isn't a simple linear list
+
+A single linear path is only correct when the user's state is trivially simple: one branch, DB marker on it, contract at the tip. In practice, collaborative workflows produce states where a linear list is either misleading or impossible:
+
+- **DB marker on a different branch.** Two developers branch from the same point. Dev A applies their migration (marker moves to branch A). Dev B's migration is on branch B, which is the contract target. A linear list from root→contract would show all edges as "pending" — but the user can't just apply, because the DB is on a different branch. Without seeing the fork, the user has no idea why `migration apply` would fail.
+
+- **Diamond convergence.** Both developers eventually plan migrations from their respective branches to the agreed-upon final contract. The graph is a diamond. A linear list can only show one path — the user doesn't see that there's a second path from the other branch, which is critical context for understanding the migration topology.
+
+- **Ref divergence.** The user runs `migration status --ref staging` while their DB is on a different branch. A linear list to the ref hides the relationship between the DB state and the ref — the user needs to see both to understand what `migration apply --ref staging` would do.
+
+- **Contract ahead of all migrations.** The contract has changed but no migration has been planned. A linear list of existing migrations gives no indication that action is needed — the user needs to see the gap between the last migration and the contract. TODO: They also need to decide where to migrate from, right?
+
+In all these cases, the user needs to see the *structure* — the fork, the convergence, the gap — not just a flat list of migrations. The default view includes exactly the branches needed to explain the current state, and nothing more. It's the minimum context to act, not the minimum number of lines.
+
+In the common case — one branch, DB on it, contract at the tip — the default view *is* a simple linear list. The graph structure only becomes visible when it's needed to explain why the state isn't straightforward.
+
+## The redesign
 
 1. **Default view (relevant subgraph):** Align the target with `migration apply` semantics — contract hash (or ref hash if `--ref`). Extract the union of all relevant paths (root→contract, root→DB marker, root→ref) via `extractRelevantSubgraph`. When all targets align (the common case), this is a linear chain. When they diverge (e.g. DB marker on a different branch), the fork is naturally visible. For long graphs, truncate to the last ~N edges (default N=10) and show a `┊` indicator for elided history.
 
@@ -66,7 +82,7 @@ User-facing messages use migration-domain language:
 
 Edge status is derived by `deriveEdgeStatuses` in the command layer using path analysis across the full graph. The function takes the graph, target hash, contract hash, marker hash, and mode. It computes three kinds of paths and assigns statuses:
 
-- **Applied** (`✓`, cyan): The edge is on the path from `∅` to the DB marker. These migrations are recorded in the ledger.
+- **Applied** (`✓`, cyan): The edge is on the path from `∅` to the DB marker. (Note: this is currently a graph-path heuristic — `deriveEdgeStatuses` uses `findPath`, not the ledger. After `db update`, edges show as applied even though no migrations were executed. See triaged issue: "`deriveEdgeStatuses` uses graph path instead of ledger for applied status.")
 - **Pending** (`⧗`, yellow): The edge is on the path from the DB marker (or root, if empty DB) to the target, or from the target to the contract (when the target is a ref and the contract is reachable beyond it). These are migrations `migration apply` would execute.
 - **Unreachable** (`✗`, magenta): The edge is on the path from root to the target but is neither applied nor pending. This happens when the DB marker is on a different branch than the target — `apply` can't reach these edges without the DB first moving to this branch.
 - **No status** (no icon, dim): Everything else — branch edges not on any relevant path. They exist in the graph but are not on the user's apply path.
@@ -84,7 +100,7 @@ Renders the minimal subgraph covering all interesting paths. The path computatio
 
 1. Path to the DB marker (if online)
 2. Path to the ref (if `--ref`)
-3. Path to the contract — preferring to continue from the marker or ref rather than an independent BFS from root (which may route through an unrelated branch)
+3. Path(s) to the contract — tries both marker→contract and ref→contract independently (rather than an independent BFS from root, which may route through an unrelated branch). In diamond collaboration graphs, both legs are included so the full convergence is visible.
 
 When all targets align (the common case), this is a linear chain. When they diverge, the fork is naturally visible.
 
@@ -215,7 +231,7 @@ interface GraphRenderOptions {
 
 The mapper:
 
-1. **Computes relevant paths** with continuity-aware routing: prefers marker→contract and ref→contract over independent root→contract (which BFS may route through an unrelated branch).
+1. **Computes relevant paths** with continuity-aware routing: tries both marker→contract and ref→contract independently (rather than an independent root→contract BFS, which may route through an unrelated branch). In diamond graphs, both legs are included.
 2. **Resolves spine target** (for edge coloring and detached node alignment).
 3. **Bakes status icons into edge labels**: `✓` for applied, `⧗` for pending, `✗` for unreachable (from `edgeStatuses`).
 4. **Sets `colorHint`** on edges: applied → cyan, pending → yellow, unreachable → magenta.
@@ -237,24 +253,21 @@ The renderer converts Dagre's coordinate output into a character grid, using box
 ## Data flow: `migration status` command
 
 ```
-MigrationStatusResult (from executeMigrationStatusCommand)
-  ├── graph: MigrationGraph
-  ├── migrations: MigrationStatusEntry[]  (dirName + status per edge)
-  ├── markerHash?: string
-  ├── contractHash: string
-  ├── targetHash: string
-  └── refs, mode, etc.
-         │
-         ▼
-  deriveEdgeStatuses(graph, targetHash, contractHash, markerHash, mode)
-    → EdgeStatus[]  (applied/pending/unreachable)
-         │
-         ▼
+executeMigrationStatusCommand
+  ├── loadMigrationBundles → graph, attested
+  ├── buildMigrationEntries → entries (for JSON migrations array)
+  ├── deriveEdgeStatuses(graph, targetHash, contractHash, markerHash, mode)
+  │     → edgeStatuses: EdgeStatus[]  (applied/pending/unreachable)
+  ├── summary + diagnostics (counts from edgeStatuses)
+  └── MigrationStatusResult
+        ├── graph, migrations, edgeStatuses, markerHash, contractHash, targetHash, ...
+        │
+        ▼  (CLI handler)
   migrationGraphToRenderInput({
     graph, mode, markerHash, contractHash, edgeStatuses, refs...
   })
-         │
-         ▼
+        │
+        ▼
   MigrationRenderInput
     ├── graph: RenderGraph        (full graph: nodes with markers, edges with labels + colorHint)
     ├── options: GraphRenderOptions
@@ -297,7 +310,7 @@ MigrationStatusResult (from executeMigrationStatusCommand)
 
 12. **Deterministic output**: Same graph always produces the same output.
 
-13. **Color output**: ANSI color with `--no-color` override. CVD-safe palette — no red/green contrast. Meaning conveyed by shape/icon, color reinforces.
+13. **Color output**: ANSI color with `--no-color` override. CVD-safe palette — no red/green (green is not used anywhere). Meaning conveyed by shape/icon, color reinforces.
 
 14. **Truncation**: Both views truncate long graphs by default (N=10). `--limit N` overrides. `--all` disables. Marker-aware expansion: effective length = `max(limit, distance from earliest relevant marker to target)`.
 
@@ -337,55 +350,55 @@ MigrationStatusResult (from executeMigrationStatusCommand)
 # Acceptance Criteria
 
 ### Default view
-- [ ] Linear chain renders correctly with applied/pending status and markers
-- [ ] Target matches `migration apply` target (contract hash or ref hash)
-- [ ] Detached contract node renders when contract hash is not in graph
-- [ ] Offline mode shows graph without status badges
-- [ ] Divergent graph does not crash — shows full graph with diagnostic
-- [ ] Long graph (>N edges) truncates with `┊` indicator for elided history
-- [ ] Relevant path prefers marker→contract and ref→contract continuity over BFS shortest path
+- [x] Linear chain renders correctly with applied/pending status and markers
+- [x] Target matches `migration apply` target (contract hash or ref hash)
+- [x] Detached contract node renders when contract hash is not in graph
+- [x] Offline mode shows graph without status badges
+- [x] Divergent graph does not crash — shows full graph with diagnostic
+- [x] Long graph (>N edges) truncates with `┊` indicator for elided history
+- [x] Relevant path tries both marker→contract and ref→contract independently (not BFS shortest path)
 
 ### Full graph view (`--graph`)
-- [ ] Linear chain renders correctly
-- [ ] Two forward branches from the same node render in separate columns
-- [ ] Diamond (branch then merge) renders fork and convergence with connectors
-- [ ] Rollback cycle renders with forward portion and backward edge visually distinct
-- [ ] Detached contract node renders with dashed connector from bottom-most node
-- [ ] Ordering is deterministic: same graph always produces same output
-- [ ] Long graph truncates to last N nodes from target with subgraph rendering
+- [x] Linear chain renders correctly
+- [x] Two forward branches from the same node render in separate columns
+- [x] Diamond (branch then merge) renders fork and convergence with connectors
+- [x] Rollback cycle renders with forward portion and backward edge visually distinct
+- [x] Detached contract node renders with dashed connector from bottom-most node
+- [x] Ordering is deterministic: same graph always produces same output
+- [x] Long graph truncates to last N nodes from target with subgraph rendering
 
 ### Status labeling
-- [ ] Online mode: applied edges show `✓`, pending edges show `⧗`, unreachable edges show `✗`
-- [ ] Empty DB (no marker): all edges to target are `⧗` pending
-- [ ] Offline mode: no status icons on any edge
-- [ ] Legend always shows all three statuses right after the graph
+- [x] Online mode: applied edges show `✓`, pending edges show `⧗`, unreachable edges show `✗`
+- [x] Empty DB (no marker): all edges to target are `⧗` pending
+- [x] Offline mode: no status icons on any edge
+- [x] Legend always shows all three statuses right after the graph
 
 ### Diagnostics
-- [ ] "No migration exists for the current contract" fires when no migrations exist and contract is non-empty
-- [ ] "Contract has changed since the last migration was planned" fires when migrations exist but contract hash is not in the graph
-- [ ] Neither contract diagnostic fires when a migration for the contract exists (even if `--ref` points elsewhere)
-- [ ] "There are multiple valid migration paths" fires for divergent graph with no default target
-- [ ] Marker-not-in-graph diagnostic fires when DB marker is not in the migration graph
+- [x] "No migration exists for the current contract" fires when no migrations exist and contract is non-empty
+- [x] "Contract has changed since the last migration was planned" fires when migrations exist but contract hash is not in the graph
+- [x] Neither contract diagnostic fires when a migration for the contract exists (even if `--ref` points elsewhere)
+- [x] "There are multiple valid migration paths" fires for divergent graph with no default target
+- [x] Marker-not-in-graph diagnostic fires when DB marker is not in the migration graph
 
 ### Accessibility
-- [ ] Color palette is CVD-safe (no red/green contrast)
-- [ ] All meaning is conveyed by shape/icon — color is reinforcement only
-- [ ] Output is fully understandable with `--no-color`
+- [x] Color palette is CVD-safe (no red/green contrast)
+- [x] All meaning is conveyed by shape/icon — color is reinforcement only
+- [x] Output is fully understandable with `--no-color`
 
 ### Truncation flags
-- [ ] `--limit N` overrides the default truncation length
-- [ ] `--all` disables truncation (shows full history)
-- [ ] Truncation window expands beyond `--limit` when needed to include contract and DB markers
+- [x] `--limit N` overrides the default truncation length
+- [x] `--all` disables truncation (shows full history)
+- [x] Truncation window expands beyond `--limit` when needed to include contract and DB markers
 
 ### User-facing language
-- [ ] No graph jargon (spine, node, edge, leaf, forward branch) in CLI output, error messages, or diagnostics
-- [ ] JSON field names use migration-domain language (not graph internals)
+- [ ] No graph jargon (spine, node, edge, leaf, forward branch) in CLI output, error messages, or diagnostics (deferred — audit in separate PR)
+- [ ] JSON field names use migration-domain language (not graph internals) (deferred)
 
 ### Tests
-- [ ] Unit tests for `render`: linear, branching, diamond, rollback topologies
-- [ ] Unit tests for `extractSubgraph` and `extractRelevantSubgraph`: correct node/edge filtering, multi-path union
-- [ ] Snapshot tests against expected ASCII output
-- [ ] Existing `migration-status.test.ts` tests updated to match new format
+- [x] Unit tests for `render`: linear, branching, diamond, rollback topologies
+- [x] Unit tests for `extractSubgraph` and `extractRelevantSubgraph`: correct node/edge filtering, multi-path union
+- [x] Snapshot tests against expected ASCII output
+- [x] `migration-status.test.ts` tests replaced to cover new output format and edge status derivation
 
 # Other Considerations
 
@@ -464,7 +477,7 @@ No analytics events — CLI command, no telemetry.
 
 16. **`RenderGraph` as the single graph representation**: Built once at the mapping boundary, passed immutably through the pipeline.
 
-17. **Relevant path computation prefers continuity**: When computing paths for the default view, the mapper prefers marker→contract and ref→contract over independent root→contract BFS to avoid routing through unrelated branches.
+17. **Relevant path computation tries both marker and ref independently**: When computing paths for the default view, the mapper tries both marker→contract and ref→contract independently (rather than root→contract BFS). In diamond collaboration graphs, both legs are included so the full convergence is visible.
 
 18. **`colorHint` for domain-agnostic edge coloring**: The renderer applies `colorHint` in preference to role-based coloring (spine/branch/backward).
 
