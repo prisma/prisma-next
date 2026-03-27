@@ -15,6 +15,7 @@ import {
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { isAttested } from '@prisma-next/migration-tools/types';
 import { describe, expect, it } from 'vitest';
+import { resolveBundleByPrefix } from '../../src/commands/migration-plan';
 
 function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
   return {
@@ -381,9 +382,11 @@ describe('--from hash lookup', () => {
     await attestMigration(join(migrationsDir, dir2));
 
     const packages = await readMigrationsDir(migrationsDir);
-    const prefix = 'sha256:abc';
-    const candidates = packages.filter((p) => p.manifest.to.startsWith(prefix));
-    expect(candidates).toHaveLength(2);
+    const result = resolveBundleByPrefix(packages, 'sha256:abc');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toEqual({ reason: 'ambiguous', count: 2 });
+    }
   });
 });
 
