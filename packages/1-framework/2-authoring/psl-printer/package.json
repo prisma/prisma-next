@@ -31,7 +31,14 @@
     "src"
   ],
   "exports": {
-    ".": "./dist/index.mjs",
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./postgres": {
+      "types": "./dist/postgres.d.mts",
+      "import": "./dist/postgres.mjs"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",

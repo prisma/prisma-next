@@ -1,5 +1,9 @@
 import { defineConfig } from '@prisma-next/tsdown';
 
 export default defineConfig({
-  entry: ['src/exports/index.ts'],
+  entry: {
+    index: 'src/exports/index.ts',
+    postgres: 'src/exports/postgres.ts',
+  },
+  exports: { enabled: false },
 });

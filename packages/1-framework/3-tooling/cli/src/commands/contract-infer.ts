@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { printPsl } from '@prisma-next/psl-printer';
 import {
   createPostgresDefaultMapping,
   createPostgresTypeMap,
   extractEnumTypeNames,
-  printPsl,
-} from '@prisma-next/psl-printer';
+} from '@prisma-next/psl-printer/postgres';
 import { ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { dirname, relative } from 'pathe';
