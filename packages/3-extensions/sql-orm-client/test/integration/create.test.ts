@@ -17,11 +17,8 @@ function expectInsertBatchAst(
   }>,
 ): asserts ast is InsertAst {
   expect(ast).toBeInstanceOf(InsertAst);
-  if (!(ast instanceof InsertAst)) {
-    throw new Error('Expected execution to emit an insert AST');
-  }
 
-  expect(ast.rows).toEqual([
+  expect((ast as InsertAst).rows).toEqual([
     {
       id: ParamRef.of(rows[0]!.id, { name: 'id', codecId: 'pg/int4@1' }),
       name: ParamRef.of(rows[0]!.name, { name: 'name', codecId: 'pg/text@1' }),
