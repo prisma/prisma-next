@@ -2,9 +2,9 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:43f728c37e9b8f369b2b8acefa387906afd4555646a08528254eceee247342d7",
+  "storageHash": "sha256:3b2b9f8327591181f5630eb334005e789ab4a710c2877547e5c1c1303868324d",
   "executionHash": "sha256:630618d96f7674c186a027d1295bfc5d688c4168c5a023a1aea01553820387dc",
-  "profileHash": "sha256:83d66b1cce776c9ec9e6d168086e5bd1030ccf461823b9eef39cf49f1833c6dd",
+  "profileHash": "sha256:c54f610b4576f79290dede2b74376298ae75f3be3b60fcaf06b7e7cc19f76b7d",
   "models": {
     "Post": {
       "fields": {
@@ -96,9 +96,7 @@
             "codecId": "pg/vector@1",
             "nativeType": "vector",
             "nullable": true,
-            "typeParams": {
-              "length": 1536
-            }
+            "typeRef": "Embedding1536"
           },
           "id": {
             "codecId": "sql/char@1",
@@ -123,6 +121,7 @@
             ],
             "constraint": true,
             "index": true,
+            "name": "post_userId_fkey",
             "references": {
               "columns": [
                 "id"
@@ -224,6 +223,7 @@
   },
   "capabilities": {
     "postgres": {
+      "defaults.now": true,
       "jsonAgg": true,
       "lateral": true,
       "limit": true,
@@ -268,6 +268,13 @@
           "import": {
             "alias": "PgVectorOperationTypes",
             "named": "OperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
+        "queryOperationTypes": {
+          "import": {
+            "alias": "PgVectorQueryOperationTypes",
+            "named": "QueryOperationTypes",
             "package": "@prisma-next/extension-pgvector/operation-types"
           }
         },
