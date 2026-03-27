@@ -163,7 +163,7 @@ type StateOf<TCollection> =
     : never;
 
 const runtime = createMockRuntime();
-const context = {} as ExecutionContext<GeneratedLikeContract>;
+const context = {} as unknown as ExecutionContext<GeneratedLikeContract>;
 const collection = new PostCollection({ runtime, context }, 'Post');
 collection.forUser('user_001');
 

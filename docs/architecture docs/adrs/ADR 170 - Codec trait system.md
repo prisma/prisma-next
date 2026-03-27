@@ -304,4 +304,4 @@ Model traits as TypeScript interfaces that codecs extend (e.g., `interface Order
 - ADR 114 — Extension codecs & branded types
 - ADR 117 — Extension capability keys
 - ADR 113 — Extension function & operator registry
-- TML-2084 — Trait system for codecs (Linear)
+- PR #247 — feat: Introduce codec trait system

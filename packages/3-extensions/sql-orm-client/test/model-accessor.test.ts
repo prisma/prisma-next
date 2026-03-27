@@ -1,7 +1,10 @@
+import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
+  codec,
+  createCodecRegistry,
   ExistsExpr,
   ListExpression,
   LiteralExpr,
@@ -11,8 +14,6 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
-import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
 import { getTestContext, getTestContract } from './helpers';
@@ -131,14 +132,12 @@ describe('createModelAccessor', () => {
     const user = createModelAccessor(context, 'User');
     expect((user as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
 
-    const someUnknown = user['posts']!.some({ unknown: 'value' }) as ExistsExpr;
-    expect(someUnknown.subquery.where).toEqual(
-      AndExpr.of([
-        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
-        BinaryExpr.eq(ColumnRef.of('posts', 'unknown'), LiteralExpr.of('value')),
-      ]),
+    // Unknown fields have no codec → fail-closed → no eq method → throws
+    expect(() => user['posts']!.some({ unknown: 'value' })).toThrow(
+      /does not support equality comparisons/,
     );
 
+    // Undefined values are skipped, so unknown fields with undefined still work
     const someUndefined = user['posts']!.some({ unknown: undefined }) as ExistsExpr;
     expect(someUndefined.subquery.where).toEqual(
       BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
@@ -302,12 +301,13 @@ describe('createModelAccessor', () => {
       },
     };
 
+    // Table name falls back to models.User.storage.table ('users_storage').
+    // isNull is always available (traits: []) regardless of codec resolution.
     expect(
-      createModelAccessor(
-        { ...context, contract: storageFallbackContract } as never,
-        'User',
-      )['name']!.eq('Alice'),
-    ).toEqual(BinaryExpr.eq(ColumnRef.of('users_storage', 'name'), LiteralExpr.of('Alice')));
+      createModelAccessor({ ...context, contract: storageFallbackContract } as never, 'User')[
+        'name'
+      ]!.isNull(),
+    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('users_storage', 'name')));
 
     const modelNameFallbackContract = {
       ...base,
@@ -326,12 +326,12 @@ describe('createModelAccessor', () => {
       relations: {},
     };
 
+    // Table name falls back to model name ('User') when no storage.table exists.
     expect(
-      createModelAccessor(
-        { ...context, contract: modelNameFallbackContract } as never,
-        'User',
-      )['name']!.eq('Alice'),
-    ).toEqual(BinaryExpr.eq(ColumnRef.of('User', 'name'), LiteralExpr.of('Alice')));
+      createModelAccessor({ ...context, contract: modelNameFallbackContract } as never, 'User')[
+        'name'
+      ]!.isNull(),
+    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('User', 'name')));
   });
 
   it('combines relation shorthand fields with and() and rejects missing join arrays', () => {
@@ -436,6 +436,15 @@ describe('createModelAccessor', () => {
       ]) {
         expect(typeof field[method]).toBe('function');
       }
+    });
+
+    it('throws when relation shorthand filter targets a field without equality trait', () => {
+      const codecs = makeRegistry({ 'pg/int4@1': ['order'] });
+      const accessor = createModelAccessor({ ...context, codecs }, 'Post');
+
+      expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
+        /does not support equality comparisons/,
+      );
     });
   });
 });

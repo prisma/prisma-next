@@ -19,6 +19,8 @@ export function createPostsCollection(runtime: PgIntegrationRuntime) {
   return new Collection({ runtime, context: getTestContext() }, 'Post');
 }
 
+// Shallow spread is intentional — withReturningCapability only adds capabilities
+// without changing codec structure, so codecs/operations registries remain valid.
 export function createReturningUsersCollection(runtime: PgIntegrationRuntime) {
   const contract = withReturningCapability(getTestContract());
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;

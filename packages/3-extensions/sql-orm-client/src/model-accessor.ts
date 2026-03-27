@@ -70,25 +70,26 @@ function resolveFieldTraits(
   tableName: string,
   columnName: string,
   context: ExecutionContext,
-): readonly string[] | undefined {
+): readonly string[] {
   const tables = contract.storage?.tables as
     | Record<string, { columns?: Record<string, { codecId?: string }> }>
     | undefined;
   const codecId = tables?.[tableName]?.columns?.[columnName]?.codecId;
-  if (!codecId) return undefined; // Column not in storage — can't resolve traits
+  // unknown columns get no trait-gated methods
+  if (!codecId) return [];
   return context.codecs.traitsOf(codecId);
 }
 
 function createScalarFieldAccessor(
   tableName: string,
   columnName: string,
-  traits: readonly string[] | undefined,
+  traits: readonly string[],
 ): Partial<ComparisonMethodFns<unknown>> {
   const column = ColumnRef.of(tableName, columnName);
   const methods: Record<string, unknown> = {};
 
   for (const [name, meta] of Object.entries(COMPARISON_METHODS_META)) {
-    if (traits && meta.traits.length > 0 && !meta.traits.every((t) => traits.includes(t))) {
+    if (meta.traits.some((t) => !traits.includes(t))) {
       continue;
     }
     methods[name] = meta.create(column);
@@ -208,9 +209,12 @@ function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
     }
 
     if (value === null) {
-      if (fieldAccessor.isNull) {
-        exprs.push(fieldAccessor.isNull());
+      if (!fieldAccessor.isNull) {
+        throw new Error(
+          `Shorthand filter on "${relatedModelName}.${fieldName}": isNull is unexpectedly missing — this is a bug in trait gating`,
+        );
       }
+      exprs.push(fieldAccessor.isNull());
       continue;
     }
 
