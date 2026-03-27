@@ -4,8 +4,6 @@
 
 **Key constraint**: System design decisions must be stable, even if user-facing APIs are still changing. Contributors need confidence that the interfaces they build against won't be reworked.
 
-**What follows**: In May, we target EA in Postgres (+ one additional SQL database, likely SQLite) — APIs are stable, the system is correct, and we actively encourage users to try Prisma Next. In June/July, EA extends to all first-class databases. This milestone is the prerequisite: if the architecture isn't validated, we can't stabilize APIs for EA.
-
 ---
 
 ## Approach: architectural validation, not polish
