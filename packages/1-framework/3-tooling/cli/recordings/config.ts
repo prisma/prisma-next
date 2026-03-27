@@ -248,6 +248,14 @@ export const config: RecordingsConfig = {
           dbState: 'initialized, schema matches contract',
           sleepAfterEnter: '10s',
         },
+        {
+          ordinal: '11',
+          slug: 'contract-infer',
+          command: 'prisma-next contract infer',
+          description: 'Infer a PSL contract from the live database',
+          dbState: 'initialized with user(id, email)',
+          sleepAfterEnter: '10s',
+        },
       ],
     },
 

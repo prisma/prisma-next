@@ -30,7 +30,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Preview planned CREATE TABLE operations [empty database, contract emitted]
+> # Infer a PSL contract from the live database [initialized with user(id, email)]
 >
 
 
@@ -62,7 +62,7 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Preview planned CREATE TABLE operations [empty database, contract emitted]
+> # Infer a PSL contract from the live database [initialized with user(id, email)]
 >
 
 
@@ -94,8 +94,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Preview planned CREATE TABLE operations [empty database, contract emitted]
-> prisma-next db init --dry-run
+> # Infer a PSL contract from the live database [initialized with user(id, email)]
+> prisma-next contract infer
 
 
 
@@ -126,8 +126,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Preview planned CREATE TABLE operations [empty database, contract emitted]
-> prisma-next db init --dry-run
+> # Infer a PSL contract from the live database [initialized with user(id, email)]
+> prisma-next contract infer
 
 
 
@@ -158,8 +158,8 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Preview planned CREATE TABLE operations [empty database, contract emitted]
-> prisma-next db init --dry-run
+> # Infer a PSL contract from the live database [initialized with user(id, email)]
+> prisma-next contract infer
 
 
 
@@ -190,27 +190,27 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────
-> # Preview planned CREATE TABLE operations [empty database, contract emitted]
-> prisma-next db init --dry-run
-prisma-next db init → Bootstrap a database to match the current contract
+> # Infer a PSL contract from the live database [initialized with user(id, email)]
+> prisma-next contract infer
+prisma-next contract infer → Infer a PSL contract from the live database schema
 │
 │ config:               prisma-next.config.ts
-│ contract:             contract.json
-│ mode:                 dry run
+│ database:             postgres://****:****@127.0.0.1:5433/postgres
 │
-│ Read more             https://pris.ly/db-init
+│ Read more             https://pris.ly/contract-infer
 └
 
-│
-│  ✔ Planned 1 operation(s)
-│  │
-│  └─ Create table user [additive]
-│
-│  Destination hash: sha256:95060eda0d8ef9b30439212a41756c15066733defdde81ee7118f955be7361d1
-│
-│  This is a dry run. No changes were applied.
-│  Run without --dry-run to apply changes.
+✔ Contract written to contract.prisma
 >
+
+
+
+
+
+
+
+
+
 
 
 
