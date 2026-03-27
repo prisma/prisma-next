@@ -264,8 +264,6 @@ Tasks (sequential discovery phases — each phase may reveal changes needed befo
 
 Stop condition: A consumer library works against both a SQL and a document contract without family-specific code, backed by a real vertical slice (not just types) where the document contract was authored, emitted, and queried through the runtime and ORM. Both ORM clients satisfy a shared interface. Then stop — production-quality MongoDB driver, aggregation pipeline DSL, comprehensive codec coverage, and Mongo-native query ergonomics are all later.
 
-**Detailed plan**: [mongo-poc-plan.md](mongo-target/mongo-poc-plan.md)
-
 ---
 
 ### 5. Second SQL database (SQLite)
