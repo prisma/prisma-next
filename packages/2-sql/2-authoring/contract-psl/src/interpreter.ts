@@ -552,6 +552,91 @@ function parseOptionalNumericArguments(input: {
   return { precision, scale };
 }
 
+/**
+ * Declarative specification for @db.* native type attributes.
+ *
+ * Argument kinds:
+ * - `noArgs`: No arguments accepted; `codecId: null` means inherit from baseDescriptor.
+ * - `optionalLength`: Zero or one positional integer (minimum 1), stored as `{ length }`.
+ * - `optionalPrecision`: Zero or one positional integer (minimum 0), stored as `{ precision }`.
+ * - `optionalNumeric`: Zero, one, or two positional integers (precision + scale).
+ */
+type NativeTypeSpec =
+  | {
+      readonly args: 'noArgs';
+      readonly baseType: string;
+      readonly codecId: string | null;
+      readonly nativeType: string;
+    }
+  | {
+      readonly args: 'optionalLength';
+      readonly baseType: string;
+      readonly codecId: string;
+      readonly nativeType: string;
+    }
+  | {
+      readonly args: 'optionalPrecision';
+      readonly baseType: string;
+      readonly codecId: string;
+      readonly nativeType: string;
+    }
+  | {
+      readonly args: 'optionalNumeric';
+      readonly baseType: string;
+      readonly codecId: string;
+      readonly nativeType: string;
+    };
+
+const NATIVE_TYPE_SPECS: Readonly<Record<string, NativeTypeSpec>> = {
+  'db.VarChar': {
+    args: 'optionalLength',
+    baseType: 'String',
+    codecId: 'sql/varchar@1',
+    nativeType: 'character varying',
+  },
+  'db.Char': {
+    args: 'optionalLength',
+    baseType: 'String',
+    codecId: 'sql/char@1',
+    nativeType: 'character',
+  },
+  'db.Uuid': { args: 'noArgs', baseType: 'String', codecId: null, nativeType: 'uuid' },
+  'db.SmallInt': { args: 'noArgs', baseType: 'Int', codecId: 'pg/int2@1', nativeType: 'int2' },
+  'db.Real': { args: 'noArgs', baseType: 'Float', codecId: 'pg/float4@1', nativeType: 'float4' },
+  'db.Numeric': {
+    args: 'optionalNumeric',
+    baseType: 'Decimal',
+    codecId: 'pg/numeric@1',
+    nativeType: 'numeric',
+  },
+  'db.Timestamp': {
+    args: 'optionalPrecision',
+    baseType: 'DateTime',
+    codecId: 'pg/timestamp@1',
+    nativeType: 'timestamp',
+  },
+  'db.Timestamptz': {
+    args: 'optionalPrecision',
+    baseType: 'DateTime',
+    codecId: 'pg/timestamptz@1',
+    nativeType: 'timestamptz',
+  },
+  'db.Date': { args: 'noArgs', baseType: 'DateTime', codecId: null, nativeType: 'date' },
+  'db.Time': {
+    args: 'optionalPrecision',
+    baseType: 'DateTime',
+    codecId: 'pg/time@1',
+    nativeType: 'time',
+  },
+  'db.Timetz': {
+    args: 'optionalPrecision',
+    baseType: 'DateTime',
+    codecId: 'pg/timetz@1',
+    nativeType: 'timetz',
+  },
+  'db.Json': { args: 'noArgs', baseType: 'Json', codecId: 'pg/json@1', nativeType: 'json' },
+};
+
 function resolveDbNativeTypeAttribute(input: {
   readonly attribute: PslAttribute;
   readonly baseType: string;
@@ -560,19 +645,42 @@ function resolveDbNativeTypeAttribute(input: {
   readonly sourceId: string;
   readonly entityLabel: string;
 }): ColumnDescriptor | undefined {
-  const failForBaseType = (expectedBaseType: string) =>
-    pushInvalidAttributeArgument({
+  const spec = NATIVE_TYPE_SPECS[input.attribute.name];
+  if (!spec) {
+    input.diagnostics.push({
+      code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
+      message: `${input.entityLabel} uses unsupported attribute "@${input.attribute.name}"`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+
+  if (input.baseType !== spec.baseType) {
+    return pushInvalidAttributeArgument({
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
       span: input.attribute.span,
-      message: `${input.entityLabel} uses @${input.attribute.name} on unsupported base type "${input.baseType}". Expected "${expectedBaseType}".`,
+      message: `${input.entityLabel} uses @${input.attribute.name} on unsupported base type "${input.baseType}". Expected "${spec.baseType}".`,
     });
+  }
 
-  switch (input.attribute.name) {
-    case 'db.VarChar': {
-      if (input.baseType !== 'String') {
-        return failForBaseType('String');
+  switch (spec.args) {
+    case 'noArgs': {
+      if (getPositionalArguments(input.attribute).length > 0 || input.attribute.args.length > 0) {
+        return pushInvalidAttributeArgument({
+          diagnostics: input.diagnostics,
+          sourceId: input.sourceId,
+          span: input.attribute.span,
+          message: `${input.entityLabel} @${input.attribute.name} does not accept arguments.`,
+        });
       }
+      return {
+        codecId: spec.codecId ?? input.baseDescriptor.codecId,
+        nativeType: spec.nativeType,
+      };
+    }
+    case 'optionalLength': {
       const length = parseOptionalSingleIntegerArgument({
         attribute: input.attribute,
         diagnostics: input.diagnostics,
@@ -585,84 +693,30 @@ function resolveDbNativeTypeAttribute(input: {
         return undefined;
       }
       return {
-        codecId: 'sql/varchar@1',
-        nativeType: 'character varying',
+        codecId: spec.codecId,
+        nativeType: spec.nativeType,
         ...(length === null ? {} : { typeParams: { length } }),
       };
     }
-    case 'db.Char': {
-      if (input.baseType !== 'String') {
-        return failForBaseType('String');
-      }
-      const length = parseOptionalSingleIntegerArgument({
+    case 'optionalPrecision': {
+      const precision = parseOptionalSingleIntegerArgument({
         attribute: input.attribute,
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
         entityLabel: input.entityLabel,
-        minimum: 1,
-        valueLabel: 'positive integer length',
+        minimum: 0,
+        valueLabel: 'non-negative integer precision',
       });
-      if (length === undefined) {
+      if (precision === undefined) {
         return undefined;
       }
       return {
-        codecId: 'sql/char@1',
-        nativeType: 'character',
-        ...(length === null ? {} : { typeParams: { length } }),
+        codecId: spec.codecId,
+        nativeType: spec.nativeType,
+        ...(precision === null ? {} : { typeParams: { precision } }),
       };
     }
-    case 'db.Uuid':
-      if (input.baseType !== 'String') {
-        return failForBaseType('String');
-      }
-      if (getPositionalArguments(input.attribute).length > 0 || input.attribute.args.length > 0) {
-        return pushInvalidAttributeArgument({
-          diagnostics: input.diagnostics,
-          sourceId: input.sourceId,
-          span: input.attribute.span,
-          message: `${input.entityLabel} @${input.attribute.name} does not accept arguments.`,
-        });
-      }
-      return {
-        codecId: input.baseDescriptor.codecId,
-        nativeType: 'uuid',
-      };
-    case 'db.SmallInt':
-      if (input.baseType !== 'Int') {
-        return failForBaseType('Int');
-      }
-      if (getPositionalArguments(input.attribute).length > 0 || input.attribute.args.length > 0) {
-        return pushInvalidAttributeArgument({
-          diagnostics: input.diagnostics,
-          sourceId: input.sourceId,
-          span: input.attribute.span,
-          message: `${input.entityLabel} @${input.attribute.name} does not accept arguments.`,
-        });
-      }
-      return {
-        codecId: 'pg/int2@1',
-        nativeType: 'int2',
-      };
-    case 'db.Real':
-      if (input.baseType !== 'Float') {
-        return failForBaseType('Float');
-      }
-      if (getPositionalArguments(input.attribute).length > 0 || input.attribute.args.length > 0) {
-        return pushInvalidAttributeArgument({
-          diagnostics: input.diagnostics,
-          sourceId: input.sourceId,
-          span: input.attribute.span,
-          message: `${input.entityLabel} @${input.attribute.name} does not accept arguments.`,
-        });
-      }
-      return {
-        codecId: 'pg/float4@1',
-        nativeType: 'float4',
-      };
-    case 'db.Numeric': {
-      if (input.baseType !== 'Decimal') {
-        return failForBaseType('Decimal');
-      }
+    case 'optionalNumeric': {
       const numeric = parseOptionalNumericArguments({
         attribute: input.attribute,
         diagnostics: input.diagnostics,
@@ -673,135 +727,11 @@ function resolveDbNativeTypeAttribute(input: {
         return undefined;
       }
       return {
-        codecId: 'pg/numeric@1',
-        nativeType: 'numeric',
+        codecId: spec.codecId,
+        nativeType: spec.nativeType,
         ...(numeric === null ? {} : { typeParams: numeric }),
       };
     }
-    case 'db.Timestamp': {
-      if (input.baseType !== 'DateTime') {
-        return failForBaseType('DateTime');
-      }
-      const precision = parseOptionalSingleIntegerArgument({
-        attribute: input.attribute,
-        diagnostics: input.diagnostics,
-        sourceId: input.sourceId,
-        entityLabel: input.entityLabel,
-        minimum: 0,
-        valueLabel: 'non-negative integer precision',
-      });
-      if (precision === undefined) {
-        return undefined;
-      }
-      return {
-        codecId: 'pg/timestamp@1',
-        nativeType: 'timestamp',
-        ...(precision === null ? {} : { typeParams: { precision } }),
-      };
-    }
-    case 'db.Timestamptz': {
-      if (input.baseType !== 'DateTime') {
-        return failForBaseType('DateTime');
-      }
-      const precision = parseOptionalSingleIntegerArgument({
-        attribute: input.attribute,
-        diagnostics: input.diagnostics,
-        sourceId: input.sourceId,
-        entityLabel: input.entityLabel,
-        minimum: 0,
-        valueLabel: 'non-negative integer precision',
-      });
-      if (precision === undefined) {
-        return undefined;
-      }
-      return {
-        codecId: 'pg/timestamptz@1',
-        nativeType: 'timestamptz',
-        ...(precision === null ? {} : { typeParams: { precision } }),
-      };
-    }
-    case 'db.Date':
-      if (input.baseType !== 'DateTime') {
-        return failForBaseType('DateTime');
-      }
-      if (getPositionalArguments(input.attribute).length > 0 || input.attribute.args.length > 0) {
-        return pushInvalidAttributeArgument({
-          diagnostics: input.diagnostics,
-          sourceId: input.sourceId,
-          span: input.attribute.span,
-          message: `${input.entityLabel} @${input.attribute.name} does not accept arguments.`,
-        });
-      }
-      return {
-        codecId: input.baseDescriptor.codecId,
-        nativeType: 'date',
-      };
-    case 'db.Time': {
-      if (input.baseType !== 'DateTime') {
-        return failForBaseType('DateTime');
-      }
-      const precision = parseOptionalSingleIntegerArgument({
-        attribute: input.attribute,
-        diagnostics: input.diagnostics,
-        sourceId: input.sourceId,
-        entityLabel: input.entityLabel,
-        minimum: 0,
-        valueLabel: 'non-negative integer precision',
-      });
-      if (precision === undefined) {
-        return undefined;
-      }
-      return {
-        codecId: 'pg/time@1',
-        nativeType: 'time',
-        ...(precision === null ? {} : { typeParams: { precision } }),
-      };
-    }
-    case 'db.Timetz': {
-      if (input.baseType !== 'DateTime') {
-        return failForBaseType('DateTime');
-      }
-      const precision = parseOptionalSingleIntegerArgument({
-        attribute: input.attribute,
-        diagnostics: input.diagnostics,
-        sourceId: input.sourceId,
-        entityLabel: input.entityLabel,
-        minimum: 0,
-        valueLabel: 'non-negative integer precision',
-      });
-      if (precision === undefined) {
-        return undefined;
-      }
-      return {
-        codecId: 'pg/timetz@1',
-        nativeType: 'timetz',
-        ...(precision === null ? {} : { typeParams: { precision } }),
-      };
-    }
-    case 'db.Json':
-      if (input.baseType !== 'Json') {
-        return failForBaseType('Json');
-      }
-      if (getPositionalArguments(input.attribute).length > 0 || input.attribute.args.length > 0) {
-        return pushInvalidAttributeArgument({
-          diagnostics: input.diagnostics,
-          sourceId: input.sourceId,
-          span: input.attribute.span,
-          message: `${input.entityLabel} @${input.attribute.name} does not accept arguments.`,
-        });
-      }
-      return {
-        codecId: 'pg/json@1',
-        nativeType: 'json',
-      };
-    default:
-      input.diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
-        message: `${input.entityLabel} uses unsupported attribute "@${input.attribute.name}"`,
-        sourceId: input.sourceId,
-        span: input.attribute.span,
-      });
-      return undefined;
   }
 }
 
