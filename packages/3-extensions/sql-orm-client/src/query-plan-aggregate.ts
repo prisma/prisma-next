@@ -5,6 +5,7 @@ import {
   type AnyExpression,
   BinaryExpr,
   ColumnRef,
+  NotExpr,
   NullCheckExpr,
   OrExpr,
   ProjectionItem,
@@ -104,7 +105,7 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
       return new NullCheckExpr(validateGroupedMetricExpr(expr.expr), expr.isNull);
     },
     not(expr) {
-      throw new Error(`Unsupported grouped having expression kind "${expr.kind}"`);
+      return new NotExpr(validateGroupedHavingExpr(expr.expr));
     },
     binary(expr) {
       return new BinaryExpr(
