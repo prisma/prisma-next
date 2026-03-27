@@ -43,65 +43,53 @@ withTempDir(({ createTempDir }) => {
      * The user hasn't emitted a contract or planned any migrations.
      * Status should report the empty state without errors — this is the
      * starting point, not an error condition.
-     */
-    it('no migrations, no contract — reports empty', async () => {
-      const ctx: JourneyContext = setupJourney({ createTempDir });
-
-      const status = await runMigrationStatus(ctx);
-      const out = stripAnsi(status.stdout);
-
-      expect(status.exitCode).toBe(0);
-      expect(out).toContain('No migrations found');
-    });
-
-    /**
-     * Scenario: user emitted a contract but hasn't run `migration plan` yet.
      *
-     * The contract exists on disk so we know what the schema *should* look
-     * like, but no migration has been planned. The user needs to be told
-     * to run `migration plan` — this is the most common next step after
-     * initial contract authoring.
-     */
-    it('no migrations, contract exists — nudges toward migration plan', async () => {
-      const ctx: JourneyContext = setupJourney({ createTempDir });
-
-      const emit = await runContractEmit(ctx);
-      expect(emit.exitCode, 'emit succeeds').toBe(0);
-
-      const status = await runMigrationStatus(ctx);
-      const out = stripAnsi(status.stdout);
-
-      expect(status.exitCode).toBe(0);
-      expect(out).toContain('No migrations found');
-      expect(out).toContain('No migration exists for the current contract');
-      expect(out).toContain('migration plan');
-    });
-
-    /**
-     * Scenario: migrations have been planned but there's no database
-     * connection (offline mode, e.g. CI without DB access).
+     * Then: user emits a contract but hasn't run `migration plan` yet.
+     * The contract exists on disk so we know what the schema *should*
+     * look like, but no migration has been planned. The user needs to
+     * be told to run `migration plan`.
      *
-     * The user should still see the migration graph and a count of
-     * migrations on disk. No applied/pending/unreachable statuses are
-     * possible without a DB, so the output is purely informational —
-     * "here's what exists."
+     * Then: migrations have been planned but there's no database
+     * connection (offline mode). The user should see the migration
+     * graph and a count of migrations on disk, with no status
+     * indicators (applied/pending/unreachable can't be determined
+     * without a DB).
      */
-    it('offline with migrations — reports count on disk', async () => {
-      const ctx: JourneyContext = setupJourney({ createTempDir });
+    it(
+      'offline scenarios: empty → contract only → migrations on disk',
+      async () => {
+        const ctx: JourneyContext = setupJourney({ createTempDir });
 
-      const emit = await runContractEmit(ctx);
-      expect(emit.exitCode, 'emit').toBe(0);
-      const plan = await runMigrationPlan(ctx, ['--name', 'init']);
-      expect(plan.exitCode, 'plan').toBe(0);
+        // 1. No migrations, no contract — reports empty
+        const statusEmpty = await runMigrationStatus(ctx);
+        const outEmpty = stripAnsi(statusEmpty.stdout);
+        expect(statusEmpty.exitCode).toBe(0);
+        expect(outEmpty).toContain('No migrations found');
 
-      const status = await runMigrationStatus(ctx);
-      const out = stripAnsi(status.stdout);
+        // 2. No migrations, contract exists — nudges toward migration plan
+        const emit = await runContractEmit(ctx);
+        expect(emit.exitCode, 'emit succeeds').toBe(0);
 
-      expect(status.exitCode).toBe(0);
-      expect(out).toContain('1 migration(s) on disk');
-      // No status legend — offline mode can't determine applied/pending/unreachable
-      expect(out).not.toMatch(/[✓⧗✗] (applied|pending|unreachable)/);
-    });
+        const statusContract = await runMigrationStatus(ctx);
+        const outContract = stripAnsi(statusContract.stdout);
+        expect(statusContract.exitCode).toBe(0);
+        expect(outContract).toContain('No migrations found');
+        expect(outContract).toContain('No migration exists for the current contract');
+        expect(outContract).toContain('migration plan');
+
+        // 3. Offline with migrations — reports count on disk
+        const plan = await runMigrationPlan(ctx, ['--name', 'init']);
+        expect(plan.exitCode, 'plan').toBe(0);
+
+        const statusMigrations = await runMigrationStatus(ctx);
+        const outMigrations = stripAnsi(statusMigrations.stdout);
+        expect(statusMigrations.exitCode).toBe(0);
+        expect(outMigrations).toContain('1 migration(s) on disk');
+        // No status legend — offline mode can't determine applied/pending/unreachable
+        expect(outMigrations).not.toMatch(/[✓⧗✗] (applied|pending|unreachable)/);
+      },
+      timeouts.spinUpPpgDev,
+    );
 
     // -----------------------------------------------------------------------
     // Online scenarios — each gets its own database to avoid cross-test
