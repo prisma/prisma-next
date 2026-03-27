@@ -81,8 +81,7 @@ describe('delete with vector operations', () => {
     lowering: {
       targetFamily: 'sql' as const,
       strategy: 'infix' as const,
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-      template: '${self} <=> ${arg0}',
+      template: '{{self}} <=> {{arg0}}',
     },
   };
   const mockVectorExtensionDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {

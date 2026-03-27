@@ -12,8 +12,7 @@ describe('SQL OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -23,8 +22,7 @@ describe('SQL OperationRegistry', () => {
     expect(operations[0]?.lowering).toEqual({
       targetFamily: 'sql',
       strategy: 'infix',
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-      template: '${self} <=> ${arg0}',
+      template: '{{self}} <=> {{arg0}}',
     });
   });
 
@@ -38,8 +36,7 @@ describe('SQL OperationRegistry', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'normalize(${self})',
+        template: 'normalize({{self}})',
       },
     };
 

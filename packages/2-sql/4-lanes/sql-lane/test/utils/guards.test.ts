@@ -27,8 +27,7 @@ function normalize(column: ColumnRef): OperationExpr {
     self: column,
     args: [],
     returns: vectorReturn,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-    template: 'normalize(${self})',
+    template: 'normalize({{self}})',
   });
 }
 

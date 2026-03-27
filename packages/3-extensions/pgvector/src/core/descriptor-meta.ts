@@ -32,8 +32,7 @@ export const pgvectorQueryOperations: readonly QueryOperationDescriptor[] = [
     lowering: {
       targetFamily: 'sql',
       strategy: 'function',
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL lowering template
-      template: '1 - (${self} <=> ${arg0})',
+      template: '1 - ({{self}} <=> {{arg0}})',
     },
   },
 ];

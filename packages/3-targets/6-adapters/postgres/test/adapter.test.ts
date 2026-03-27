@@ -169,8 +169,7 @@ describe('Postgres adapter', () => {
       self: ColumnRef.of('user', 'vector'),
       args: [],
       returns: { kind: 'builtin', type: 'number' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'vector_length(${self})',
+      template: 'vector_length({{self}})',
     });
     const scalarSubquery = SelectAst.from(TableSource.named('post'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
