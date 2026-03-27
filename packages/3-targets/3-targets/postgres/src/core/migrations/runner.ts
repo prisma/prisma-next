@@ -21,7 +21,7 @@ import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
-import type { PostgresPlanTargetDetails } from './planner';
+import type { PostgresPlanTargetDetails } from './planner-types';
 import {
   buildLedgerInsertStatement,
   buildWriteMarkerStatements,
