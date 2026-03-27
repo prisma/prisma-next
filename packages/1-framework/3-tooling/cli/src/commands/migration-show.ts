@@ -146,7 +146,7 @@ async function executeMigrationShowCommand(
         if (!latestMigration) {
           return notOk(
             errorRuntime('Could not resolve latest migration', {
-              why: 'No latest migration found in the migration chain',
+              why: 'No latest migration found in the migration history',
               fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
             }),
           );

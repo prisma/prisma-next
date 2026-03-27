@@ -170,11 +170,11 @@ async function executeMigrationPlanCommand(
           f.reason === 'ambiguous'
             ? errorRuntime('Multiple matching migrations found', {
                 why: `Prefix "${options.from}" matches ${f.count} migrations in ${migrationsRelative}`,
-                fix: 'Provide a longer prefix to disambiguate, or omit --from to use the latest migration leaf.',
+                fix: 'Provide a longer prefix to disambiguate, or omit --from to use the latest migration target.',
               })
             : errorRuntime('Starting contract not found', {
                 why: `No migration with to hash matching "${options.from}" exists in ${migrationsRelative}`,
-                fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration leaf.',
+                fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration target.',
               }),
         );
       }
@@ -329,7 +329,7 @@ export function createMigrationPlanCommand(): Command {
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--name <slug>', 'Name slug for the migration directory', 'migration')
-    .option('--from <hash>', 'Explicit starting contract hash (overrides migration chain leaf)')
+    .option('--from <hash>', 'Explicit starting contract hash (overrides latest migration target)')
     .action(async (options: MigrationPlanOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
