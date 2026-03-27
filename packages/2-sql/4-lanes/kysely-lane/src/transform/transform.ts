@@ -21,10 +21,6 @@ import { transformSelect } from './transform-select';
 
 export type { TransformResult };
 
-function extractRefsFromAst(ast: AnyQueryAst): PlanRefs {
-  return ast.collectRefs();
-}
-
 export interface TransformResultWithParams extends TransformResult {
   readonly params: readonly unknown[];
 }
@@ -68,7 +64,7 @@ export function transformKyselyToPnAst(
     );
   }
 
-  const refs = extractRefsFromAst(ast);
+  const refs = ast.collectRefs();
 
   const paramDescriptors = ctx.paramDescriptors.map((descriptor, index) => ({
     ...descriptor,
@@ -151,7 +147,7 @@ export function transformKyselyToPnAstCollectingParams(
     );
   }
 
-  const refs = extractRefsFromAst(ast);
+  const refs = ast.collectRefs();
 
   const paramDescriptors = ctx.paramDescriptors.map((descriptor, index) => ({
     ...descriptor,
