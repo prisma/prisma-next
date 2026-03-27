@@ -3,7 +3,6 @@ import {
   BinaryExpr,
   ColumnRef,
   DerivedTableSource,
-  JoinAst,
   ListLiteralExpr,
   LiteralExpr,
   OrExpr,
@@ -75,7 +74,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     const childRowsSource = postsProjection.expr.query.from;
     expectDerivedTableSource(childRowsSource);
 
-    expect(childRowsSource.query.where).toBeInstanceOf(AndExpr);
+    expect(childRowsSource.query.where?.kind).toBe('and');
     expect(childRowsSource.query.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
@@ -191,7 +190,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     expectSelectAst(plan.ast);
 
     const join = plan.ast.joins?.[0];
-    expect(join).toBeInstanceOf(JoinAst);
+    expect(join?.kind).toBe('join');
     expect(join?.lateral).toBe(true);
     expectDerivedTableSource(join?.source);
 

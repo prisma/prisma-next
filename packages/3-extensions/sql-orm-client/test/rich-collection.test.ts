@@ -1,5 +1,4 @@
 import {
-  AggregateExpr,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
@@ -66,7 +65,7 @@ describe('SQL ORM collections with rich AST plans', () => {
     const plan = runtime.executions[0]?.plan;
     expect(plan?.ast).toBeInstanceOf(SelectAst);
     const ast = plan?.ast as SelectAst;
-    expect(ast.having).toBeInstanceOf(BinaryExpr);
-    expect((ast.having as BinaryExpr).left).toBeInstanceOf(AggregateExpr);
+    expect(ast.having?.kind).toBe('binary');
+    expect((ast.having as BinaryExpr).left.kind).toBe('aggregate');
   });
 });

@@ -1,15 +1,11 @@
 import {
-  AndExpr,
   type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
-  ExistsExpr,
+  type ExistsExpr,
   LiteralExpr,
   NullCheckExpr,
-  OrExpr,
   ParamRef,
-  SelectAst,
-  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or } from '../src/filters';
@@ -38,20 +34,20 @@ describe('SQL ORM rich AST filters', () => {
       user['posts']!.some((post) => post['views']!.gt(10)),
     );
 
-    expect(expr).toBeInstanceOf(AndExpr);
+    expect(expr.kind).toBe('and');
     const [nameFilter, postsFilter] = expr.exprs;
-    expect(nameFilter).toBeInstanceOf(BinaryExpr);
+    expect(nameFilter?.kind).toBe('binary');
     expect(nameFilter).toMatchObject({
       op: 'eq',
       left: ColumnRef.of('users', 'name'),
       right: LiteralExpr.of('Alice'),
     });
 
-    expect(postsFilter).toBeInstanceOf(ExistsExpr);
+    expect(postsFilter?.kind).toBe('exists');
     const exists = postsFilter as ExistsExpr;
-    expect(exists.subquery).toBeInstanceOf(SelectAst);
-    expect(exists.subquery.from).toBeInstanceOf(TableSource);
-    expect(exists.subquery.where).toBeInstanceOf(AndExpr);
+    expect(exists.subquery.kind).toBe('select');
+    expect(exists.subquery.from.kind).toBe('table-source');
+    expect(exists.subquery.where?.kind).toBe('and');
   });
 
   it('normalizes, combines, and negates bound filters', () => {
@@ -66,8 +62,8 @@ describe('SQL ORM rich AST filters', () => {
       { contract },
     );
 
-    expect(normalized).toBeInstanceOf(BinaryExpr);
-    expect(collectParamValues(normalized! as BinaryExpr)).toEqual([1]);
+    expect(normalized.kind).toBe('binary');
+    expect(collectParamValues(normalized as BinaryExpr)).toEqual([1]);
 
     const combined = combineWhereExprs([
       BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
@@ -76,14 +72,12 @@ describe('SQL ORM rich AST filters', () => {
         ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
       ),
     ]);
-    expect(combined).toBeInstanceOf(AndExpr);
+    expect(combined?.kind).toBe('and');
 
     expect(not(NullCheckExpr.isNull(ColumnRef.of('users', 'email')))).toEqual(
       NullCheckExpr.isNotNull(ColumnRef.of('users', 'email')),
     );
-    expect(or(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)))).toBeInstanceOf(
-      OrExpr,
-    );
-    expect(all()).toBeInstanceOf(AndExpr);
+    expect(or(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))).kind).toBe('or');
+    expect(all().kind).toBe('and');
   });
 });
