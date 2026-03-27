@@ -1,6 +1,4 @@
-import type { PlanMeta } from '@prisma-next/contract/types';
 import {
-  type AnyQueryAst,
   type AnyExpression as AstExpression,
   ColumnRef,
   DeleteAst,
@@ -19,58 +17,16 @@ import type {
   ReturningCapability,
   UpdateQuery,
 } from '../types/mutation-query';
-import { BuilderBase, type BuilderContext, combineWhereExprs } from './builder-base';
+import {
+  BuilderBase,
+  type BuilderContext,
+  buildQueryPlan,
+  combineWhereExprs,
+} from './builder-base';
 import { createFieldProxy } from './field-proxy';
 import { createFunctions } from './functions';
 
 type WhereCallback = ExpressionBuilder<Scope, QueryContext>;
-
-function buildMutationPlan(
-  ast: AnyQueryAst,
-  rowFields: Record<string, ScopeField>,
-  ctx: BuilderContext,
-): SqlQueryPlan {
-  const projectionTypes: Record<string, string> = {};
-  const codecs: Record<string, string> = {};
-  for (const [alias, field] of Object.entries(rowFields)) {
-    projectionTypes[alias] = field.codecId;
-    codecs[alias] = field.codecId;
-  }
-
-  const paramRefs = ast.collectParamRefs();
-  const seen = new Set<ParamRef>();
-  const uniqueRefs: ParamRef[] = [];
-  for (const ref of paramRefs) {
-    if (!seen.has(ref)) {
-      seen.add(ref);
-      uniqueRefs.push(ref);
-    }
-  }
-  const paramValues = uniqueRefs.map((r) => r.value);
-  const paramDescriptors = uniqueRefs.map((ref, i) => ({
-    index: i + 1,
-    source: 'dsl' as const,
-    ...(ref.codecId ? { codecId: ref.codecId } : {}),
-  }));
-
-  for (const [i, ref] of uniqueRefs.entries()) {
-    if (ref.codecId) codecs[`$${i + 1}`] = ref.codecId;
-  }
-
-  const hasProjectionTypes = Object.keys(projectionTypes).length > 0;
-  const hasCodecs = Object.keys(codecs).length > 0;
-
-  const meta: PlanMeta = Object.freeze({
-    target: ctx.target,
-    storageHash: ctx.storageHash,
-    lane: 'dsl',
-    paramDescriptors,
-    ...(hasProjectionTypes ? { projectionTypes } : {}),
-    ...(hasCodecs ? { annotations: Object.freeze({ codecs: Object.freeze(codecs) }) } : {}),
-  });
-
-  return Object.freeze({ ast, params: paramValues, meta });
-}
 
 function buildReturningColumnRefs(tableName: string, columns: string[]): ColumnRef[] {
   return columns.map((col) => ColumnRef.of(tableName, col));
@@ -151,7 +107,7 @@ export class InsertQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildMutationPlan(ast, this.#rowFields, this.ctx);
+    return buildQueryPlan(ast, this.#rowFields, this.ctx);
   }
 
   async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {
@@ -262,7 +218,7 @@ export class UpdateQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildMutationPlan(ast, this.#rowFields, this.ctx);
+    return buildQueryPlan(ast, this.#rowFields, this.ctx);
   }
 
   async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {
@@ -360,7 +316,7 @@ export class DeleteQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildMutationPlan(ast, this.#rowFields, this.ctx);
+    return buildQueryPlan(ast, this.#rowFields, this.ctx);
   }
 
   async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {

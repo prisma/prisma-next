@@ -117,12 +117,14 @@ export function buildSelectAst(state: BuilderState): SelectAst {
   });
 }
 
-export function buildPlan(state: BuilderState, ctx: BuilderContext): SqlQueryPlan {
-  const ast = buildSelectAst(state);
-
+export function buildQueryPlan(
+  ast: import('@prisma-next/sql-relational-core/ast').AnyQueryAst,
+  rowFields: Record<string, ScopeField>,
+  ctx: BuilderContext,
+): SqlQueryPlan {
   const projectionTypes: Record<string, string> = {};
   const codecs: Record<string, string> = {};
-  for (const [alias, field] of Object.entries(state.rowFields)) {
+  for (const [alias, field] of Object.entries(rowFields)) {
     projectionTypes[alias] = field.codecId;
     codecs[alias] = field.codecId;
   }
@@ -160,6 +162,10 @@ export function buildPlan(state: BuilderState, ctx: BuilderContext): SqlQueryPla
   });
 
   return Object.freeze({ ast, params: paramValues, meta });
+}
+
+export function buildPlan(state: BuilderState, ctx: BuilderContext): SqlQueryPlan {
+  return buildQueryPlan(buildSelectAst(state), state.rowFields, ctx);
 }
 
 export function tableToScope(name: string, table: StorageTable): Scope {
