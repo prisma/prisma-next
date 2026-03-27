@@ -2,7 +2,9 @@
 
 Design questions surfaced during the exploration of MongoDB primitives and their mapping to Prisma Next's architecture. These are questions where the answer is non-obvious, involves real trade-offs, or requires spiking to resolve. Grouped by theme.
 
-See also: [mongodb-primitives-reference.md](mongodb-primitives-reference.md), [mongo-poc-plan.md](mongo-poc-plan.md)
+See also: [mongodb-primitives-reference.md](mongodb-primitives-reference.md), [mongo-poc-plan.md](mongo-poc-plan.md), [user-promise.md](user-promise.md)
+
+**External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) and a [user journey narrative](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md). Where their priorities or observations surface new tensions, they're noted inline.
 
 ---
 
@@ -103,21 +105,25 @@ Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB col
 
 ---
 
-## 6. Array types and type unions
+## 6. Polymorphism, type unions, and mixed-type arrays
 
 MongoDB arrays can contain mixed types: `[1, "two", { three: true }]`. The contract type system currently assumes homogeneous types (every value in a field has the same type).
 
 **The question**: Does the contract type system need to support union types or discriminated unions?
 
+**Priority signal**: The MongoDB team rates "Inheritance and Polymorphism" as **High priority** — their highest tier. The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) describes this as an early pain point: a user's `ratings` field had different structures depending on the rating engine, and Prisma ORM typed it as `Json`, losing all type safety. The MongoDB team also lists "Support for Polymorphic Array/Embedded Field" (Low priority) and notes that Prisma ORM's workarounds involve untyped `Json` fields or multiple optional fields.
+
 Where this comes up:
+- **Polymorphic collections**: A single collection holding documents with different shapes distinguished by a discriminator field (single-table inheritance pattern). Common in MongoDB. The MongoDB team specifically calls out "defining base models and extending them into specialized sub models" as a key use case.
 - **Mixed-type arrays**: An `events` array containing `{ type: "click", x: number, y: number }` and `{ type: "scroll", offset: number }`. Common in event-sourcing patterns.
-- **Polymorphic collections**: A single collection holding documents with different shapes distinguished by a discriminator field (single-table inheritance pattern). Common in MongoDB.
+- **Polymorphic embedded fields**: A field like `ratings` whose structure varies per document, currently typed as `Json` in Prisma ORM.
 - **Optional/missing fields**: Mongo documents may omit fields entirely. `null` (field present, value null) is different from "field missing." The contract needs to express both.
 
 For the PoC:
 - Homogeneous arrays (`string[]`, `Comment[]`) cover the majority of use cases.
 - Union types are a significant type system extension. Defer to post-PoC.
 - **But note the gap**: if we defer this, the contract cannot express some common Mongo patterns. This is acceptable for architecture validation but would be a DX gap for real users.
+- **Critical constraint**: whatever contract type system decisions we make for the PoC must not *prevent* adding discriminated unions later. This is on the critical path for a Mongo experience that the MongoDB team would consider adequate.
 
 ---
 
@@ -186,3 +192,57 @@ Candidates for `ContractBase`:
 The tension: too little in `ContractBase` and consumer libraries can't do anything without family-specific code. Too much and `ContractBase` becomes a leaky abstraction that doesn't fit either family well.
 
 Related question: Is `ContractBase` a concrete type that consumer libraries accept, or an interface that both families implement? The answer affects how extensions declare compatibility.
+
+---
+
+## 11. Introspection: generating a contract from an existing database
+
+PN's contract flow assumes authoring-first — the user writes a schema, and the contract is emitted. But MongoDB users typically have existing databases with existing data and no formal schema.
+
+**The question**: Can PN generate a contract by introspecting an existing MongoDB database?
+
+The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) highlights this as an early pain point. Lucas ran `prisma db pull` and hit friction: plural collection names weren't normalized, relationships had to be defined manually (MongoDB has no foreign keys to introspect), and polymorphic fields were typed as `Json`.
+
+Sub-questions:
+- **Field type inference**: MongoDB fields have per-document types. Introspection would need to sample documents and infer the most common type for each field. What happens when a field has mixed types across documents? (Report it as a union? Pick the majority type and warn?)
+- **Relationship inference**: Without foreign keys, relationships can only be inferred by convention (field names ending in `Id`, arrays of `ObjectId`) or not at all. Should introspection attempt this, or just generate models with no relations and let the user add them?
+- **Embedded document detection**: Subdocuments and arrays of subdocuments are structurally visible. Introspection could detect these and generate embedded types automatically.
+- **Collection → model naming**: Should introspection normalize plural collection names to singular model names (as the user journey suggests)?
+
+For the PoC: Out of scope — we author contracts manually. But introspection is table-stakes for real Mongo adoption. Worth noting the constraints so the contract model doesn't make introspection harder than necessary.
+
+---
+
+## 12. MongoDB-specific extension packs
+
+PN's extension pack architecture (ADR 170) allows targets and extensions to contribute type constructors, query operators, and authoring helpers. Several MongoDB-specific capabilities are natural candidates for extension packs rather than core ORM features.
+
+**The question**: Which MongoDB capabilities become extension packs, and what does that require from the extension pack interface?
+
+Candidates (from the [MongoDB team's feature priority list](references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv)):
+- **Vector Search** (`$vectorSearch`) — Medium priority. Analogous to pgvector for Postgres. Contributes a vector field type, a similarity search operator, and vector search index definitions.
+- **Atlas Search** (`$search`) — Medium priority. Full-text search capabilities specific to MongoDB Atlas. Contributes search index definitions and search query operators.
+- **Geospatial** (`$near`, `$geoWithin`, `2dsphere` indexes) — Medium priority. Contributes GeoJSON field types, geospatial query operators, and geospatial index types.
+- **Time Series** — Medium priority. A specialized collection type for time-stamped data. Contributes a collection-level configuration rather than field-level types.
+
+Tensions:
+- The extension pack interface (ADR 170) was designed with SQL extensions in mind (pgvector, PostGIS). Do document-family extensions need different hooks? For example, Vector Search and Atlas Search operate through aggregation pipeline stages, not SQL operators.
+- Extension-contributed **index types** are a new surface. The current extension pack model contributes type constructors and field presets, but not index types. Mongo's specialized indexes (text, geospatial, TTL, vector search, Atlas search) would need index-type contributions from extension packs.
+- Extension-contributed **pipeline stages** may be needed for Vector Search and Atlas Search, since `$vectorSearch` and `$search` are aggregation pipeline stages, not standard query operators.
+
+For the PoC: Out of scope. But the architecture should anticipate that MongoDB's most differentiating features (Vector Search, Atlas Search, geospatial) will be delivered as extension packs. The extension pack interface needs to accommodate document-family contributions.
+
+---
+
+## 13. Client-side field-level encryption (CSFLE) and queryable encryption
+
+MongoDB offers client-side field-level encryption (CSFLE) and queryable encryption (QE) — features that encrypt sensitive fields before they leave the application, so the database server never sees plaintext values.
+
+**The question**: How does PN surface encryption configuration for MongoDB?
+
+The MongoDB team rates this as **Medium priority**. It's a driver-level concern — the `mongodb` Node.js driver handles encryption/decryption transparently when configured. PN's involvement would be:
+- **Contract-level**: Declaring which fields are encrypted and their encryption metadata (key ID, algorithm, query type for QE).
+- **Adapter-level**: Passing encryption configuration to the MongoDB driver when establishing connections.
+- **ORM-level**: Ensuring that encrypted fields participate correctly in queries (QE allows equality queries on encrypted data; CSFLE does not).
+
+For the PoC: Out of scope. This is a production-readiness concern, not an architecture validation concern. But worth noting because it has no SQL equivalent — SQL databases handle encryption at the storage layer (TDE) or connection layer (TLS), not at the field level.
