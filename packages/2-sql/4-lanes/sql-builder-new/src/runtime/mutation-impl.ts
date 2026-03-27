@@ -1,9 +1,11 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import {
+  type AnyQueryAst,
   type AnyExpression as AstExpression,
   ColumnRef,
   DeleteAst,
   InsertAst,
+  ParamRef,
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -20,13 +22,11 @@ import type {
 import { BuilderBase, type BuilderContext, combineWhereExprs } from './builder-base';
 import { createFieldProxy } from './field-proxy';
 import { createFunctions } from './functions';
-import { ParamCollector } from './param-collector';
 
 type WhereCallback = ExpressionBuilder<Scope, QueryContext>;
 
 function buildMutationPlan(
-  ast: InsertAst | UpdateAst | DeleteAst,
-  paramCollector: ParamCollector,
+  ast: AnyQueryAst,
   rowFields: Record<string, ScopeField>,
   ctx: BuilderContext,
 ): SqlQueryPlan {
@@ -37,16 +37,24 @@ function buildMutationPlan(
     codecs[alias] = field.codecId;
   }
 
-  const paramValues = paramCollector.getValues();
-  const paramMetas = paramCollector.getMetas();
-  const paramDescriptors = paramValues.map((_, i) => ({
+  const paramRefs = ast.collectParamRefs();
+  const seen = new Set<ParamRef>();
+  const uniqueRefs: ParamRef[] = [];
+  for (const ref of paramRefs) {
+    if (!seen.has(ref)) {
+      seen.add(ref);
+      uniqueRefs.push(ref);
+    }
+  }
+  const paramValues = uniqueRefs.map((r) => r.value);
+  const paramDescriptors = uniqueRefs.map((ref, i) => ({
     index: i + 1,
     source: 'dsl' as const,
-    ...(paramMetas[i]?.codecId ? { codecId: paramMetas[i].codecId } : {}),
+    ...(ref.codecId ? { codecId: ref.codecId } : {}),
   }));
 
-  for (const [i, meta] of paramMetas.entries()) {
-    if (meta.codecId) codecs[`$${i + 1}`] = meta.codecId;
+  for (const [i, ref] of uniqueRefs.entries()) {
+    if (ref.codecId) codecs[`$${i + 1}`] = ref.codecId;
   }
 
   const hasProjectionTypes = Object.keys(projectionTypes).length > 0;
@@ -71,11 +79,10 @@ function buildReturningColumnRefs(tableName: string, columns: string[]): ColumnR
 function evaluateWhere(
   whereCallback: WhereCallback,
   scope: Scope,
-  paramCollector: ParamCollector,
   queryOperationTypes: BuilderContext['queryOperationTypes'],
 ): AstExpression {
   const fieldProxy = createFieldProxy(scope);
-  const fns = createFunctions(paramCollector, queryOperationTypes);
+  const fns = createFunctions(queryOperationTypes);
   const result = whereCallback(fieldProxy, fns as never);
   return result.buildAst();
 }
@@ -132,11 +139,10 @@ export class InsertQueryImpl<
   );
 
   #buildPlan(): SqlQueryPlan {
-    const paramCollector = new ParamCollector();
-    const paramValues: Record<string, import('@prisma-next/sql-relational-core/ast').ParamRef> = {};
+    const paramValues: Record<string, ParamRef> = {};
     for (const [col, value] of Object.entries(this.#values)) {
       const field = this.#scope.topLevel[col];
-      paramValues[col] = paramCollector.add(value, field ? { codecId: field.codecId } : {});
+      paramValues[col] = ParamRef.of(value, field ? { codecId: field.codecId } : undefined);
     }
 
     let ast = InsertAst.into(TableSource.named(this.#tableName)).withValues(paramValues);
@@ -145,7 +151,7 @@ export class InsertQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildMutationPlan(ast, paramCollector, this.#rowFields, this.ctx);
+    return buildMutationPlan(ast, this.#rowFields, this.ctx);
   }
 
   async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {
@@ -236,16 +242,15 @@ export class UpdateQueryImpl<
   );
 
   #buildPlan(): SqlQueryPlan {
-    const paramCollector = new ParamCollector();
-    const setParams: Record<string, import('@prisma-next/sql-relational-core/ast').ParamRef> = {};
+    const setParams: Record<string, ParamRef> = {};
     for (const [col, value] of Object.entries(this.#setValues)) {
       const field = this.#scope.topLevel[col];
-      setParams[col] = paramCollector.add(value, field ? { codecId: field.codecId } : {});
+      setParams[col] = ParamRef.of(value, field ? { codecId: field.codecId } : undefined);
     }
 
     const whereExpr = combineWhereExprs(
       this.#whereCallbacks.map((cb) =>
-        evaluateWhere(cb, this.#scope, paramCollector, this.ctx.queryOperationTypes),
+        evaluateWhere(cb, this.#scope, this.ctx.queryOperationTypes),
       ),
     );
 
@@ -257,7 +262,7 @@ export class UpdateQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildMutationPlan(ast, paramCollector, this.#rowFields, this.ctx);
+    return buildMutationPlan(ast, this.#rowFields, this.ctx);
   }
 
   async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {
@@ -343,11 +348,9 @@ export class DeleteQueryImpl<
   );
 
   #buildPlan(): SqlQueryPlan {
-    const paramCollector = new ParamCollector();
-
     const whereExpr = combineWhereExprs(
       this.#whereCallbacks.map((cb) =>
-        evaluateWhere(cb, this.#scope, paramCollector, this.ctx.queryOperationTypes),
+        evaluateWhere(cb, this.#scope, this.ctx.queryOperationTypes),
       ),
     );
 
@@ -357,7 +360,7 @@ export class DeleteQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildMutationPlan(ast, paramCollector, this.#rowFields, this.ctx);
+    return buildMutationPlan(ast, this.#rowFields, this.ctx);
   }
 
   async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {

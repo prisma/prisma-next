@@ -108,13 +108,11 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
     callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Result,
   ): SelectQuery<QC, AvailableScope, Expand<ExtractScopeFields<Result>>>;
   select(...args: unknown[]): unknown {
-    const pc = this.#state.paramCollector.clone();
-    const { projections, newRowFields } = resolveSelectArgs(args, this.#state.scope, pc, this.ctx);
+    const { projections, newRowFields } = resolveSelectArgs(args, this.#state.scope, this.ctx);
     return new SelectQueryImpl<QC, AvailableScope>(
       cloneState(this.#state, {
         projections: [...this.#state.projections, ...projections],
         rowFields: { ...this.#state.rowFields, ...newRowFields },
-        paramCollector: pc,
       }),
       this.ctx,
     );
@@ -173,14 +171,13 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
     resultScope: ResultScope,
     onExpr: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
   ): JoinedTables<QC, ResultScope> {
-    const pc = this.#state.paramCollector.clone();
     const fieldProxy = createFieldProxy(
       mergeScopes(
         this.#state.scope as AvailableScope,
         other.getJoinOuterScope() as Other[typeof JoinOuterScope],
       ),
     ) as FieldProxy<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>>;
-    const fns = createFunctions<QC>(pc, this.ctx.queryOperationTypes);
+    const fns = createFunctions<QC>(this.ctx.queryOperationTypes);
     const onResult = onExpr(fieldProxy, fns);
     const joinAst = new JoinAst(joinType, other.buildAst(), onResult.buildAst());
 
@@ -188,7 +185,6 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
       cloneState(this.#state, {
         joins: [...this.#state.joins, joinAst],
         scope: resultScope,
-        paramCollector: pc,
       }),
       this.ctx,
     );

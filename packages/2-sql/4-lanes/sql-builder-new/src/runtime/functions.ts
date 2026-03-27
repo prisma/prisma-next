@@ -9,6 +9,7 @@ import {
   LiteralExpr,
   OperationExpr,
   OrExpr,
+  ParamRef,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { QueryOperationEntry } from '@prisma-next/sql-relational-core/query-operations';
@@ -23,16 +24,15 @@ import type {
 } from '../expression';
 import type { QueryContext, ScopeField, Subquery } from '../scope';
 import { ExpressionImpl } from './expression-impl';
-import type { ParamCollector } from './param-collector';
 
 type CodecTypes = Record<string, { readonly input: unknown }>;
 type ExprOrVal<T extends ScopeField = ScopeField> = ExpressionOrValue<T, CodecTypes>;
 
 const BOOL_FIELD: BooleanCodecType = { codecId: 'pg/bool@1', nullable: false };
 
-function resolve(value: ExprOrVal, pc: ParamCollector): AstExpression {
+function resolve(value: ExprOrVal): AstExpression {
   if (value instanceof ExpressionImpl) return value.buildAst();
-  return pc.add(value);
+  return ParamRef.of(value);
 }
 
 function resolveToAst(value: ExprOrVal): AstExpression {
@@ -44,26 +44,20 @@ function boolExpr(astNode: AstExpression): ExpressionImpl<BooleanCodecType> {
   return new ExpressionImpl(astNode, BOOL_FIELD);
 }
 
-function comparison(
-  a: ExprOrVal,
-  b: ExprOrVal,
-  op: BinaryOp,
-  pc: ParamCollector,
-): ExpressionImpl<BooleanCodecType> {
-  return boolExpr(new BinaryExpr(op, resolve(a, pc), resolve(b, pc)));
+function comparison(a: ExprOrVal, b: ExprOrVal, op: BinaryOp): ExpressionImpl<BooleanCodecType> {
+  return boolExpr(new BinaryExpr(op, resolve(a), resolve(b)));
 }
 
 function inOrNotIn(
   expr: Expression<ScopeField>,
   valuesOrSubquery: Subquery<Record<string, ScopeField>> | ExprOrVal[],
   op: 'in' | 'notIn',
-  pc: ParamCollector,
 ): ExpressionImpl<BooleanCodecType> {
   const left = expr.buildAst();
   const binaryFn = op === 'in' ? BinaryExpr.in : BinaryExpr.notIn;
 
   if (Array.isArray(valuesOrSubquery)) {
-    const refs = valuesOrSubquery.map((v) => resolve(v, pc));
+    const refs = valuesOrSubquery.map((v) => resolve(v));
     return boolExpr(binaryFn(left, ListExpression.of(refs)));
   }
   return boolExpr(binaryFn(left, SubqueryExpr.of(valuesOrSubquery.buildAst())));
@@ -79,14 +73,14 @@ function numericAgg(
   });
 }
 
-function createBuiltinFunctions(pc: ParamCollector) {
+function createBuiltinFunctions() {
   return {
-    eq: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'eq', pc),
-    ne: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'neq', pc),
-    gt: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'gt', pc),
-    gte: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'gte', pc),
-    lt: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'lt', pc),
-    lte: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'lte', pc),
+    eq: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'eq'),
+    ne: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'neq'),
+    gt: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'gt'),
+    gte: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'gte'),
+    lt: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'lt'),
+    lte: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'lte'),
     and: (...exprs: ExprOrVal<BooleanCodecType>[]) => boolExpr(AndExpr.of(exprs.map(resolveToAst))),
     or: (...exprs: ExprOrVal<BooleanCodecType>[]) => boolExpr(OrExpr.of(exprs.map(resolveToAst))),
     exists: (subquery: Subquery<Record<string, ScopeField>>) =>
@@ -96,11 +90,11 @@ function createBuiltinFunctions(pc: ParamCollector) {
     in: (
       expr: Expression<ScopeField>,
       valuesOrSubquery: Subquery<Record<string, ScopeField>> | ExprOrVal[],
-    ) => inOrNotIn(expr, valuesOrSubquery, 'in', pc),
+    ) => inOrNotIn(expr, valuesOrSubquery, 'in'),
     notIn: (
       expr: Expression<ScopeField>,
       valuesOrSubquery: Subquery<Record<string, ScopeField>> | ExprOrVal[],
-    ) => inOrNotIn(expr, valuesOrSubquery, 'notIn', pc),
+    ) => inOrNotIn(expr, valuesOrSubquery, 'notIn'),
   } satisfies BuiltinFunctions<CodecTypes>;
 }
 
@@ -123,13 +117,12 @@ function createAggregateOnlyFunctions() {
 function createExtensionFunction(
   name: string,
   entry: QueryOperationEntry,
-  pc: ParamCollector,
 ): (...args: ExprOrVal[]) => ExpressionImpl {
   return (...args: ExprOrVal[]) => {
     const resolvedArgs = args.map((arg, i) => {
       if (arg instanceof ExpressionImpl) return arg.buildAst();
       const codecId = entry.args[i]?.codecId;
-      return pc.add(arg, codecId ? { codecId } : {});
+      return ParamRef.of(arg, codecId ? { codecId } : undefined);
     });
     const self = resolvedArgs[0] as AstExpression;
     const restArgs = resolvedArgs.slice(1);
@@ -149,10 +142,9 @@ function createExtensionFunction(
 }
 
 export function createFunctions<QC extends QueryContext>(
-  paramCollector: ParamCollector,
   queryOperationTypes: Readonly<Record<string, QueryOperationEntry>>,
 ): Functions<QC> {
-  const builtins = createBuiltinFunctions(paramCollector);
+  const builtins = createBuiltinFunctions();
 
   return new Proxy({} as Functions<QC>, {
     get(_target, prop: string) {
@@ -161,7 +153,7 @@ export function createFunctions<QC extends QueryContext>(
 
       const extOp = queryOperationTypes[prop];
       if (extOp) {
-        return createExtensionFunction(prop, extOp, paramCollector);
+        return createExtensionFunction(prop, extOp);
       }
       return undefined;
     },
@@ -169,10 +161,9 @@ export function createFunctions<QC extends QueryContext>(
 }
 
 export function createAggregateFunctions<QC extends QueryContext>(
-  paramCollector: ParamCollector,
   queryOperationTypes: Readonly<Record<string, QueryOperationEntry>>,
 ): AggregateFunctions<QC> {
-  const baseFns = createFunctions<QC>(paramCollector, queryOperationTypes);
+  const baseFns = createFunctions<QC>(queryOperationTypes);
   const aggregates = createAggregateOnlyFunctions();
 
   return new Proxy({} as AggregateFunctions<QC>, {

@@ -25,7 +25,6 @@ import type {
 import type { ExpressionImpl } from './expression-impl';
 import { createFieldProxy } from './field-proxy';
 import { createAggregateFunctions, createFunctions } from './functions';
-import { ParamCollector } from './param-collector';
 
 export type ExprCallback = (fields: FieldProxy<Scope>, fns: unknown) => Expression<ScopeField>;
 
@@ -62,7 +61,6 @@ export interface BuilderState {
   readonly distinctOn: readonly AstExpression[] | undefined;
   readonly scope: Scope;
   readonly rowFields: Record<string, ScopeField>;
-  readonly paramCollector: ParamCollector;
 }
 
 export interface BuilderContext {
@@ -88,7 +86,6 @@ export function emptyState(from: TableSource, scope: Scope): BuilderState {
     distinctOn: undefined,
     scope,
     rowFields: {},
-    paramCollector: new ParamCollector(),
   };
 }
 
@@ -130,16 +127,24 @@ export function buildPlan(state: BuilderState, ctx: BuilderContext): SqlQueryPla
     codecs[alias] = field.codecId;
   }
 
-  const paramValues = state.paramCollector.getValues();
-  const paramMetas = state.paramCollector.getMetas();
-  const paramDescriptors = paramValues.map((_, i) => ({
+  const paramRefs = ast.collectParamRefs();
+  const seen = new Set<import('@prisma-next/sql-relational-core/ast').ParamRef>();
+  const uniqueRefs: import('@prisma-next/sql-relational-core/ast').ParamRef[] = [];
+  for (const ref of paramRefs) {
+    if (!seen.has(ref)) {
+      seen.add(ref);
+      uniqueRefs.push(ref);
+    }
+  }
+  const paramValues = uniqueRefs.map((r) => r.value);
+  const paramDescriptors = uniqueRefs.map((ref, i) => ({
     index: i + 1,
     source: 'dsl' as const,
-    ...(paramMetas[i]?.codecId ? { codecId: paramMetas[i].codecId } : {}),
+    ...(ref.codecId ? { codecId: ref.codecId } : {}),
   }));
 
-  for (const [i, meta] of paramMetas.entries()) {
-    if (meta.codecId) codecs[`$${i + 1}`] = meta.codecId;
+  for (const [i, ref] of uniqueRefs.entries()) {
+    if (ref.codecId) codecs[`$${i + 1}`] = ref.codecId;
   }
 
   const hasProjectionTypes = Object.keys(projectionTypes).length > 0;
@@ -218,7 +223,6 @@ export function assertCapability(
 export function resolveSelectArgs(
   args: unknown[],
   scope: Scope,
-  paramCollector: ParamCollector,
   ctx: BuilderContext,
 ): { projections: ProjectionItem[]; newRowFields: Record<string, ScopeField> } {
   const projections: ProjectionItem[] = [];
@@ -242,7 +246,7 @@ export function resolveSelectArgs(
       f: FieldProxy<Scope>,
       fns: AggregateFunctions<QueryContext>,
     ) => Expression<ScopeField>;
-    const fns = createAggregateFunctions(paramCollector, ctx.queryOperationTypes);
+    const fns = createAggregateFunctions(ctx.queryOperationTypes);
     const result = exprFn(createFieldProxy(scope), fns);
     projections.push(ProjectionItem.of(alias, result.buildAst()));
     newRowFields[alias] = (result as ExpressionImpl).field;
@@ -254,7 +258,7 @@ export function resolveSelectArgs(
       f: FieldProxy<Scope>,
       fns: AggregateFunctions<QueryContext>,
     ) => Record<string, Expression<ScopeField>>;
-    const fns = createAggregateFunctions(paramCollector, ctx.queryOperationTypes);
+    const fns = createAggregateFunctions(ctx.queryOperationTypes);
     const record = callbackFn(createFieldProxy(scope), fns);
     for (const [key, expr] of Object.entries(record)) {
       projections.push(ProjectionItem.of(key, expr.buildAst()));
@@ -271,7 +275,6 @@ export function resolveOrderBy(
   options: OrderByOptions | undefined,
   scope: Scope,
   rowFields: Record<string, ScopeField>,
-  paramCollector: ParamCollector,
   ctx: BuilderContext,
   useAggregateFns: boolean,
 ): OrderByItem {
@@ -288,8 +291,8 @@ export function resolveOrderBy(
   if (typeof arg === 'function') {
     const combined = orderByScopeOf(scope, rowFields);
     const fns = useAggregateFns
-      ? createAggregateFunctions(paramCollector, ctx.queryOperationTypes)
-      : createFunctions(paramCollector, ctx.queryOperationTypes);
+      ? createAggregateFunctions(ctx.queryOperationTypes)
+      : createFunctions(ctx.queryOperationTypes);
     const result = (arg as ExprCallback)(createFieldProxy(combined), fns);
     return dir === 'asc' ? OrderByItem.asc(result.buildAst()) : OrderByItem.desc(result.buildAst());
   }
@@ -301,7 +304,6 @@ export function resolveGroupBy(
   args: unknown[],
   scope: Scope,
   rowFields: Record<string, ScopeField>,
-  paramCollector: ParamCollector,
   ctx: BuilderContext,
 ): AstExpression[] {
   if (typeof args[0] === 'string') {
@@ -315,7 +317,7 @@ export function resolveGroupBy(
 
   if (typeof args[0] === 'function') {
     const combined = orderByScopeOf(scope, rowFields);
-    const fns = createFunctions(paramCollector, ctx.queryOperationTypes);
+    const fns = createFunctions(ctx.queryOperationTypes);
     const result = (args[0] as ExprCallback)(createFieldProxy(combined), fns);
     return [result.buildAst()];
   }
@@ -327,12 +329,11 @@ export function resolveDistinctOn(
   args: unknown[],
   scope: Scope,
   rowFields: Record<string, ScopeField>,
-  paramCollector: ParamCollector,
   ctx: BuilderContext,
 ): AstExpression[] {
   if (args.length === 1 && typeof args[0] === 'function') {
     const combined = orderByScopeOf(scope, rowFields);
-    const fns = createFunctions(paramCollector, ctx.queryOperationTypes);
+    const fns = createFunctions(ctx.queryOperationTypes);
     const result = (args[0] as ExprCallback)(createFieldProxy(combined), fns);
     return [result.buildAst()];
   }
