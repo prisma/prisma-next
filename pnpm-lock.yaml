@@ -1202,6 +1202,13 @@ importers:
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
   packages/2-sql/4-lanes/sql-builder-new:
+    dependencies:
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../relational-core
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../5-runtime
     devDependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
@@ -1212,6 +1219,12 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/shared/contract
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/runtime/execution-plane
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../../3-targets/7-drivers/postgres
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../../../3-extensions/pgvector
@@ -1236,6 +1249,12 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../../0-config/tsdown
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.16.0
+      pg:
+        specifier: 'catalog:'
+        version: 8.16.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)

@@ -3,8 +3,9 @@ import {
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
+  NotExpr,
   NullCheckExpr,
   ProjectionItem,
   SelectAst,
@@ -52,10 +53,10 @@ describe('createModelAccessor', () => {
     const accessor = createModelAccessor(contract, 'Post');
 
     expect(accessor['id']!.in([1, 2, 3])).toEqual(
-      BinaryExpr.in(ColumnRef.of('posts', 'id'), ListLiteralExpr.fromValues([1, 2, 3])),
+      BinaryExpr.in(ColumnRef.of('posts', 'id'), ListExpression.fromValues([1, 2, 3])),
     );
     expect(accessor['id']!.notIn([4, 5])).toEqual(
-      BinaryExpr.notIn(ColumnRef.of('posts', 'id'), ListLiteralExpr.fromValues([4, 5])),
+      BinaryExpr.notIn(ColumnRef.of('posts', 'id'), ListExpression.fromValues([4, 5])),
     );
     expect(accessor['id']!.asc()).toEqual({ column: 'id', direction: 'asc' });
     expect(accessor['id']!.desc()).toEqual({ column: 'id', direction: 'desc' });
@@ -96,7 +97,7 @@ describe('createModelAccessor', () => {
     expect(everyExpr.subquery.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
-        BinaryExpr.lte(ColumnRef.of('posts', 'views'), LiteralExpr.of(10)),
+        new NotExpr(BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(10))),
       ]),
     );
   });

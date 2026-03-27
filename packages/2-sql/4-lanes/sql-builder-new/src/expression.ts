@@ -11,6 +11,7 @@ import type {
 
 export type Expression<T extends ScopeField> = {
   [ExpressionType]: T;
+  buildAst(): import('@prisma-next/sql-relational-core/ast').AnyExpression;
 };
 
 export type WithField<Source, Field extends ScopeField, Alias extends string> = Expand<
@@ -79,7 +80,7 @@ type DeriveExtFunctions<
   ) => Expression<OT[K]['returns']>;
 };
 
-type BuiltinFunctions<CT extends Record<string, { readonly input: unknown }>> = {
+export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown }>> = {
   eq: <CodecId extends string>(
     a: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>,
     b: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>,
@@ -138,7 +139,7 @@ export type Functions<QC extends QueryContext> = BuiltinFunctions<QC['codecTypes
 
 export type CountField = { codecId: 'pg/int8@1'; nullable: false };
 
-export type AggregateFunctions<QC extends QueryContext> = Functions<QC> & {
+export type AggregateOnlyFunctions = {
   count: (expr?: Expression<ScopeField>) => Expression<CountField>;
   sum: <T extends ScopeField>(
     expr: Expression<T>,
@@ -153,3 +154,5 @@ export type AggregateFunctions<QC extends QueryContext> = Functions<QC> & {
     expr: Expression<T>,
   ) => Expression<{ codecId: T['codecId']; nullable: true }>;
 };
+
+export type AggregateFunctions<QC extends QueryContext> = Functions<QC> & AggregateOnlyFunctions;

@@ -17,7 +17,12 @@
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
+  "dependencies": {
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*"
+  },
   "devDependencies": {
+    "@types/pg": "catalog:",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
@@ -25,8 +30,11 @@
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
+    "pg": "catalog:",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
@@ -43,6 +51,7 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./types": "./dist/exports/types.mjs",
+    "./runtime": "./dist/runtime/index.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",

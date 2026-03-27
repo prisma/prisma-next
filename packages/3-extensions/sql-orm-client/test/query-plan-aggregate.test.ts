@@ -4,7 +4,7 @@ import {
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   NullCheckExpr,
   OrExpr,
@@ -80,7 +80,7 @@ describe('query plan aggregate', () => {
         { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
         BinaryExpr.in(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ListLiteralExpr.of([ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' })]),
+          ListExpression.of([ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' })]),
         ),
       ),
     ).toThrow('ParamRef is not supported in grouped having expressions');
@@ -94,7 +94,7 @@ describe('query plan aggregate', () => {
         { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
         ExistsExpr.exists(scalarSubquery),
       ),
-    ).toThrow('Unsupported grouped having expression kind "ExistsExpr"');
+    ).toThrow('Unsupported grouped having expression kind "exists"');
 
     expect(() =>
       compileGroupedAggregate(
@@ -121,7 +121,7 @@ describe('query plan aggregate', () => {
       AndExpr.of([
         BinaryExpr.in(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ListLiteralExpr.fromValues([1, 2]),
+          ListExpression.fromValues([1, 2]),
         ),
         NullCheckExpr.isNotNull(AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
       ]),
@@ -134,7 +134,7 @@ describe('query plan aggregate', () => {
       AndExpr.of([
         BinaryExpr.in(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ListLiteralExpr.of([LiteralExpr.of(1), LiteralExpr.of(2)]),
+          ListExpression.of([LiteralExpr.of(1), LiteralExpr.of(2)]),
         ),
         NullCheckExpr.isNotNull(AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
       ]),

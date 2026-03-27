@@ -26,23 +26,35 @@ export interface ExpressionSource {
 
 export interface ExpressionRewriter {
   columnRef?(expr: ColumnRef): AnyExpression;
+  identifierRef?(expr: IdentifierRef): AnyExpression;
   paramRef?(expr: ParamRef): ParamRef | LiteralExpr;
   literal?(expr: LiteralExpr): LiteralExpr;
-  listLiteral?(expr: ListLiteralExpr): ListLiteralExpr | LiteralExpr;
+  list?(expr: ListExpression): ListExpression | LiteralExpr;
   select?(ast: SelectAst): SelectAst;
 }
 
 export interface AstRewriter extends ExpressionRewriter {
   tableSource?(source: TableSource): TableSource;
-  eqColJoinOn?(on: EqColJoinOn): EqColJoinOn | AnyWhereExpr;
+  eqColJoinOn?(on: EqColJoinOn): EqColJoinOn | AnyExpression;
 }
 
-export interface WhereExprVisitor<R> {
+export interface ExprVisitor<R> {
+  columnRef(expr: ColumnRef): R;
+  identifierRef(expr: IdentifierRef): R;
+  subquery(expr: SubqueryExpr): R;
+  operation(expr: OperationExpr): R;
+  aggregate(expr: AggregateExpr): R;
+  jsonObject(expr: JsonObjectExpr): R;
+  jsonArrayAgg(expr: JsonArrayAggExpr): R;
   binary(expr: BinaryExpr): R;
   and(expr: AndExpr): R;
   or(expr: OrExpr): R;
   exists(expr: ExistsExpr): R;
   nullCheck(expr: NullCheckExpr): R;
+  not(expr: NotExpr): R;
+  literal(expr: LiteralExpr): R;
+  param(expr: ParamRef): R;
+  list(expr: ListExpression): R;
 }
 
 export interface ExpressionFolder<T> {
@@ -50,16 +62,17 @@ export interface ExpressionFolder<T> {
   combine(a: T, b: T): T;
   isAbsorbing?(value: T): boolean;
   columnRef?(expr: ColumnRef): T;
+  identifierRef?(expr: IdentifierRef): T;
   paramRef?(expr: ParamRef): T;
   literal?(expr: LiteralExpr): T;
-  listLiteral?(expr: ListLiteralExpr): T;
+  list?(expr: ListExpression): T;
   select?(ast: SelectAst): T;
 }
 
-export type ProjectionExpr = AnyExpression | LiteralExpr;
+export type ProjectionExpr = AnyExpression;
 export type InsertValue = ColumnRef | ParamRef | DefaultValueExpr;
-export type JoinOnExpr = EqColJoinOn | AnyWhereExpr;
-export type WhereArg = AnyWhereExpr | ToWhereExpr;
+export type JoinOnExpr = EqColJoinOn | AnyExpression;
+export type WhereArg = AnyExpression | ToWhereExpr;
 export type JsonObjectEntry = {
   readonly key: string;
   readonly value: ProjectionExpr;
@@ -96,58 +109,36 @@ function combineAll<T>(folder: ExpressionFolder<T>, thunks: Array<() => T>): T {
   return result;
 }
 
-function rewriteComparable(
-  value: AnySqlComparable,
-  rewriter: ExpressionRewriter,
-): AnySqlComparable {
+function rewriteComparable(value: AnyExpression, rewriter: ExpressionRewriter): AnyExpression {
   switch (value.kind) {
     case 'param-ref':
       return rewriter.paramRef ? rewriter.paramRef(value) : value;
     case 'literal':
       return rewriter.literal ? rewriter.literal(value) : value;
-    case 'list-literal':
-      if (rewriter.listLiteral) {
-        return rewriter.listLiteral(value);
+    case 'list':
+      if (rewriter.list) {
+        return rewriter.list(value);
       }
       return value.rewrite(rewriter);
-    case 'column-ref':
-    case 'subquery':
-    case 'operation':
-    case 'aggregate':
-    case 'json-object':
-    case 'json-array-agg':
-      return value.rewrite(rewriter);
-    // v8 ignore next 4
     default:
-      throw new Error(
-        `Unsupported comparable kind: ${(value satisfies never as { kind: string }).kind}`,
-      );
+      return value.rewrite(rewriter);
   }
 }
 
-function foldComparable<T>(value: AnySqlComparable, folder: ExpressionFolder<T>): T {
+function foldComparable<T>(value: AnyExpression, folder: ExpressionFolder<T>): T {
   switch (value.kind) {
     case 'param-ref':
       return folder.paramRef ? folder.paramRef(value) : folder.empty;
     case 'literal':
       return folder.literal ? folder.literal(value) : folder.empty;
-    case 'list-literal':
-    case 'column-ref':
-    case 'subquery':
-    case 'operation':
-    case 'aggregate':
-    case 'json-object':
-    case 'json-array-agg':
+    case 'list':
       return value.fold(folder);
-    // v8 ignore next 4
     default:
-      throw new Error(
-        `Unsupported comparable kind: ${(value satisfies never as { kind: string }).kind}`,
-      );
+      return value.fold(folder);
   }
 }
 
-function collectColumnRefsWith<TNode extends Expression | WhereExpr>(node: TNode): ColumnRef[] {
+function collectColumnRefsWith<TNode extends Expression>(node: TNode): ColumnRef[] {
   return node.fold<ColumnRef[]>({
     empty: [],
     combine: (a, b) => [...a, ...b],
@@ -156,7 +147,7 @@ function collectColumnRefsWith<TNode extends Expression | WhereExpr>(node: TNode
   });
 }
 
-function collectParamRefsWith<TNode extends Expression | WhereExpr>(node: TNode): ParamRef[] {
+function collectParamRefsWith<TNode extends Expression>(node: TNode): ParamRef[] {
   return node.fold<ParamRef[]>({
     empty: [],
     combine: (a, b) => [...a, ...b],
@@ -226,13 +217,12 @@ abstract class AstNode {
 abstract class QueryAst extends AstNode {
   abstract collectRefs(): PlanRefs;
   abstract collectParamRefs(): ParamRef[];
+  abstract toQueryAst(): AnyQueryAst;
 
   collectColumnRefs(): ColumnRef[] {
     const refs = this.collectRefs().columns ?? [];
     return refs.map((ref) => new ColumnRef(ref.table, ref.column));
   }
-
-  abstract toQueryAst(): AnyQueryAst;
 }
 
 abstract class FromSource extends AstNode {
@@ -242,9 +232,9 @@ abstract class FromSource extends AstNode {
 }
 
 abstract class Expression extends AstNode implements ExpressionSource {
+  abstract accept<R>(visitor: ExprVisitor<R>): R;
   abstract rewrite(rewriter: ExpressionRewriter): AnyExpression;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
-  abstract toExpr(): AnyExpression;
 
   collectColumnRefs(): ColumnRef[] {
     return collectColumnRefsWith(this);
@@ -257,21 +247,13 @@ abstract class Expression extends AstNode implements ExpressionSource {
   baseColumnRef(): ColumnRef {
     throw new Error(`${this.constructor.name} does not expose a base column reference`);
   }
-}
 
-abstract class WhereExpr extends AstNode implements ToWhereExpr {
-  abstract accept<R>(visitor: WhereExprVisitor<R>): R;
-  abstract rewrite(rewriter: ExpressionRewriter): AnyWhereExpr;
-  abstract fold<T>(folder: ExpressionFolder<T>): T;
-  abstract not(): AnyWhereExpr;
-  abstract toWhereExpr(): AnyWhereExpr;
-
-  collectColumnRefs(): ColumnRef[] {
-    return collectColumnRefsWith(this);
+  toExpr(): AnyExpression {
+    return this as unknown as AnyExpression;
   }
 
-  collectParamRefs(): ParamRef[] {
-    return collectParamRefsWith(this);
+  not(): NotExpr {
+    return new NotExpr(this as unknown as AnyExpression);
   }
 }
 
@@ -287,16 +269,16 @@ export class TableSource extends FromSource {
     this.freeze();
   }
 
-  override toFromSource(): AnyFromSource {
-    return this;
-  }
-
   static named(name: string, alias?: string): TableSource {
     return new TableSource(name, alias);
   }
 
   override rewrite(rewriter: AstRewriter): AnyFromSource {
     return rewriter.tableSource ? rewriter.tableSource(this) : this;
+  }
+
+  override toFromSource(): AnyFromSource {
+    return this;
   }
 
   override collectRefs(): PlanRefs {
@@ -335,12 +317,12 @@ export class DerivedTableSource extends FromSource {
     return new DerivedTableSource(this.alias, this.query.rewrite(rewriter));
   }
 
-  override collectRefs(): PlanRefs {
-    return this.query.collectRefs();
-  }
-
   override toFromSource(): AnyFromSource {
     return this;
+  }
+
+  override collectRefs(): PlanRefs {
+    return this.query.collectRefs();
   }
 }
 
@@ -360,6 +342,10 @@ export class ColumnRef extends Expression {
     return new ColumnRef(table, column);
   }
 
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.columnRef(this);
+  }
+
   override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     return rewriter.columnRef ? rewriter.columnRef(this) : this;
   }
@@ -371,13 +357,36 @@ export class ColumnRef extends Expression {
   override baseColumnRef(): ColumnRef {
     return this;
   }
+}
 
-  override toExpr(): AnyExpression {
-    return this;
+export class IdentifierRef extends Expression {
+  readonly kind = 'identifier-ref' as const;
+  readonly name: string;
+
+  constructor(name: string) {
+    super();
+    this.name = name;
+    this.freeze();
+  }
+
+  static of(name: string): IdentifierRef {
+    return new IdentifierRef(name);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.identifierRef(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return rewriter.identifierRef ? rewriter.identifierRef(this) : this;
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return folder.identifierRef ? folder.identifierRef(this) : folder.empty;
   }
 }
 
-export class ParamRef extends AstNode {
+export class ParamRef extends Expression {
   readonly kind = 'param-ref' as const;
   readonly value: unknown;
   readonly name: string | undefined;
@@ -406,6 +415,18 @@ export class ParamRef extends AstNode {
   ): ParamRef {
     return new ParamRef(value, options);
   }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.param(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return rewriter.paramRef ? rewriter.paramRef(this) : this;
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return folder.paramRef ? folder.paramRef(this) : folder.empty;
+  }
 }
 
 export class DefaultValueExpr extends AstNode {
@@ -417,7 +438,7 @@ export class DefaultValueExpr extends AstNode {
   }
 }
 
-export class LiteralExpr extends AstNode {
+export class LiteralExpr extends Expression {
   readonly kind = 'literal' as const;
   readonly value: unknown;
 
@@ -429,6 +450,18 @@ export class LiteralExpr extends AstNode {
 
   static of(value: unknown): LiteralExpr {
     return new LiteralExpr(value);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.literal(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return rewriter.literal ? rewriter.literal(this) : this;
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return folder.literal ? folder.literal(this) : folder.empty;
   }
 }
 
@@ -446,6 +479,10 @@ export class SubqueryExpr extends Expression {
     return new SubqueryExpr(query);
   }
 
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.subquery(this);
+  }
+
   override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     const query = this.query.rewrite(rewriter);
     return new SubqueryExpr(query);
@@ -454,10 +491,6 @@ export class SubqueryExpr extends Expression {
   override fold<T>(folder: ExpressionFolder<T>): T {
     return folder.select ? folder.select(this.query) : folder.empty;
   }
-
-  override toExpr(): AnyExpression {
-    return this;
-  }
 }
 
 export class OperationExpr extends Expression {
@@ -465,7 +498,7 @@ export class OperationExpr extends Expression {
   readonly method: string;
   readonly forTypeId: string;
   readonly self: AnyExpression;
-  readonly args: ReadonlyArray<AnyOperationArg>;
+  readonly args: ReadonlyArray<AnyExpression | ParamRef | LiteralExpr>;
   readonly returns: ReturnSpec;
   readonly lowering: SqlLoweringSpec;
 
@@ -473,7 +506,7 @@ export class OperationExpr extends Expression {
     readonly method: string;
     readonly forTypeId: string;
     readonly self: AnyExpression;
-    readonly args: ReadonlyArray<AnyOperationArg> | undefined;
+    readonly args: ReadonlyArray<AnyExpression | ParamRef | LiteralExpr> | undefined;
     readonly returns: ReturnSpec;
     readonly lowering: SqlLoweringSpec;
   }) {
@@ -491,7 +524,7 @@ export class OperationExpr extends Expression {
     readonly method: string;
     readonly forTypeId: string;
     readonly self: AnyExpression;
-    readonly args: ReadonlyArray<AnyOperationArg> | undefined;
+    readonly args: ReadonlyArray<AnyExpression | ParamRef | LiteralExpr> | undefined;
     readonly returns: ReturnSpec;
     readonly template: string;
   }): OperationExpr {
@@ -509,14 +542,18 @@ export class OperationExpr extends Expression {
     });
   }
 
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.operation(this);
+  }
+
   override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     return new OperationExpr({
       method: this.method,
       forTypeId: this.forTypeId,
       self: this.self.rewrite(rewriter),
-      args: this.args.map((arg) =>
-        rewriteComparable(arg, rewriter),
-      ) as ReadonlyArray<AnyOperationArg>,
+      args: this.args.map((arg) => rewriteComparable(arg, rewriter)) as ReadonlyArray<
+        AnyExpression | ParamRef | LiteralExpr
+      >,
       returns: this.returns,
       lowering: this.lowering,
     });
@@ -531,10 +568,6 @@ export class OperationExpr extends Expression {
 
   override baseColumnRef(): ColumnRef {
     return this.self.baseColumnRef();
-  }
-
-  override toExpr(): AnyExpression {
-    return this;
   }
 }
 
@@ -573,16 +606,16 @@ export class AggregateExpr extends Expression {
     return new AggregateExpr('max', expr);
   }
 
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.aggregate(this);
+  }
+
   override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     return this.expr === undefined ? this : new AggregateExpr(this.fn, this.expr.rewrite(rewriter));
   }
 
   override fold<T>(folder: ExpressionFolder<T>): T {
     return this.expr ? this.expr.fold(folder) : folder.empty;
-  }
-
-  override toExpr(): AnyExpression {
-    return this;
   }
 }
 
@@ -596,10 +629,6 @@ export class JsonObjectExpr extends Expression {
     this.freeze();
   }
 
-  override toExpr(): AnyExpression {
-    return this;
-  }
-
   static entry(key: string, value: ProjectionExpr): JsonObjectEntry {
     return {
       key,
@@ -609,6 +638,10 @@ export class JsonObjectExpr extends Expression {
 
   static fromEntries(entries: ReadonlyArray<JsonObjectEntry>): JsonObjectExpr {
     return new JsonObjectExpr(entries);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.jsonObject(this);
   }
 
   override rewrite(rewriter: ExpressionRewriter): AnyExpression {
@@ -691,8 +724,8 @@ export class JsonArrayAggExpr extends Expression {
     return new JsonArrayAggExpr(expr, onEmpty, orderBy);
   }
 
-  override toExpr(): AnyExpression {
-    return this;
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.jsonArrayAgg(this);
   }
 
   override rewrite(rewriter: ExpressionRewriter): AnyExpression {
@@ -711,66 +744,54 @@ export class JsonArrayAggExpr extends Expression {
   }
 }
 
-export class ListLiteralExpr extends AstNode {
-  readonly kind = 'list-literal' as const;
-  readonly values: ReadonlyArray<ParamRef | LiteralExpr>;
+export class ListExpression extends Expression {
+  readonly kind = 'list' as const;
+  readonly values: ReadonlyArray<AnyExpression>;
 
-  constructor(values: ReadonlyArray<ParamRef | LiteralExpr>) {
+  constructor(values: ReadonlyArray<AnyExpression>) {
     super();
     this.values = frozenArrayCopy(values);
     this.freeze();
   }
 
-  static of(values: ReadonlyArray<ParamRef | LiteralExpr>): ListLiteralExpr {
-    return new ListLiteralExpr(values);
+  static of(values: ReadonlyArray<AnyExpression>): ListExpression {
+    return new ListExpression(values);
   }
 
-  static fromValues(values: ReadonlyArray<unknown>): ListLiteralExpr {
-    return new ListLiteralExpr(values.map((value) => new LiteralExpr(value)));
+  static fromValues(values: ReadonlyArray<unknown>): ListExpression {
+    return new ListExpression(values.map((value) => new LiteralExpr(value)));
   }
 
-  rewrite(rewriter: ExpressionRewriter): ListLiteralExpr | LiteralExpr {
-    if (rewriter.listLiteral) {
-      return rewriter.listLiteral(this);
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.list(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    if (rewriter.list) {
+      return rewriter.list(this);
     }
 
-    return new ListLiteralExpr(
-      this.values.map((value) => {
-        if (value.kind === 'param-ref') {
-          return rewriter.paramRef ? rewriter.paramRef(value) : value;
-        }
-        return rewriter.literal ? rewriter.literal(value) : value;
-      }) as ReadonlyArray<ParamRef | LiteralExpr>,
-    );
+    return new ListExpression(this.values.map((value) => value.rewrite(rewriter)));
   }
 
   fold<T>(folder: ExpressionFolder<T>): T {
-    if (folder.listLiteral) {
-      return folder.listLiteral(this);
+    if (folder.list) {
+      return folder.list(this);
     }
     return combineAll(
       folder,
-      this.values.map(
-        (value) => () =>
-          value.kind === 'param-ref'
-            ? folder.paramRef
-              ? folder.paramRef(value)
-              : folder.empty
-            : folder.literal
-              ? folder.literal(value)
-              : folder.empty,
-      ),
+      this.values.map((value) => () => value.fold(folder)),
     );
   }
 }
 
-export class BinaryExpr extends WhereExpr {
+export class BinaryExpr extends Expression {
   readonly kind = 'binary' as const;
   readonly op: BinaryOp;
   readonly left: AnyExpression;
-  readonly right: AnySqlComparable;
+  readonly right: AnyExpression;
 
-  constructor(op: BinaryOp, left: AnyExpression, right: AnySqlComparable) {
+  constructor(op: BinaryOp, left: AnyExpression, right: AnyExpression) {
     super();
     this.op = op;
     this.left = left;
@@ -778,113 +799,77 @@ export class BinaryExpr extends WhereExpr {
     this.freeze();
   }
 
-  static eq(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static eq(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('eq', left, right);
   }
 
-  static neq(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static neq(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('neq', left, right);
   }
 
-  static gt(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static gt(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('gt', left, right);
   }
 
-  static lt(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static lt(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('lt', left, right);
   }
 
-  static gte(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static gte(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('gte', left, right);
   }
 
-  static lte(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static lte(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('lte', left, right);
   }
 
-  static like(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static like(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('like', left, right);
   }
 
-  static ilike(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static ilike(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('ilike', left, right);
   }
 
-  static in(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static in(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('in', left, right);
   }
 
-  static notIn(left: AnyExpression, right: AnySqlComparable): BinaryExpr {
+  static notIn(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('notIn', left, right);
   }
 
-  override accept<R>(visitor: WhereExprVisitor<R>): R {
+  override accept<R>(visitor: ExprVisitor<R>): R {
     return visitor.binary(this);
   }
 
-  override rewrite(rewriter: ExpressionRewriter): AnyWhereExpr {
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     return new BinaryExpr(
       this.op,
-      this.left.rewrite(rewriter),
+      rewriteComparable(this.left, rewriter),
       rewriteComparable(this.right, rewriter),
     );
   }
 
   override fold<T>(folder: ExpressionFolder<T>): T {
     return combineAll(folder, [
-      () => this.left.fold(folder),
+      () => foldComparable(this.left, folder),
       () => foldComparable(this.right, folder),
     ]);
   }
-
-  override not(): AnyWhereExpr {
-    return new BinaryExpr(negateBinaryOp(this.op), this.left, this.right);
-  }
-
-  override toWhereExpr(): AnyWhereExpr {
-    return this;
-  }
 }
 
-function negateBinaryOp(op: BinaryOp): BinaryOp {
-  switch (op) {
-    case 'eq':
-      return 'neq';
-    case 'neq':
-      return 'eq';
-    case 'gt':
-      return 'lte';
-    case 'lt':
-      return 'gte';
-    case 'gte':
-      return 'lt';
-    case 'lte':
-      return 'gt';
-    case 'in':
-      return 'notIn';
-    case 'notIn':
-      return 'in';
-    case 'like':
-    case 'ilike':
-      throw new Error(`Operator "${op}" is not negatable without explicit NOT support in the AST`);
-    default: {
-      const exhaustiveCheck: never = op;
-      throw new Error(`Unknown binary operator: ${String(exhaustiveCheck)}`);
-    }
-  }
-}
-
-export class AndExpr extends WhereExpr {
+export class AndExpr extends Expression {
   readonly kind = 'and' as const;
-  readonly exprs: ReadonlyArray<AnyWhereExpr>;
+  readonly exprs: ReadonlyArray<AnyExpression>;
 
-  constructor(exprs: ReadonlyArray<AnyWhereExpr>) {
+  constructor(exprs: ReadonlyArray<AnyExpression>) {
     super();
     this.exprs = frozenArrayCopy(exprs);
     this.freeze();
   }
 
-  static of(exprs: ReadonlyArray<AnyWhereExpr>): AndExpr {
+  static of(exprs: ReadonlyArray<AnyExpression>): AndExpr {
     return new AndExpr(exprs);
   }
 
@@ -892,11 +877,11 @@ export class AndExpr extends WhereExpr {
     return new AndExpr([]);
   }
 
-  override accept<R>(visitor: WhereExprVisitor<R>): R {
+  override accept<R>(visitor: ExprVisitor<R>): R {
     return visitor.and(this);
   }
 
-  override rewrite(rewriter: ExpressionRewriter): AnyWhereExpr {
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     return new AndExpr(this.exprs.map((expr) => expr.rewrite(rewriter)));
   }
 
@@ -906,27 +891,19 @@ export class AndExpr extends WhereExpr {
       this.exprs.map((expr) => () => expr.fold(folder)),
     );
   }
-
-  override not(): AnyWhereExpr {
-    return new OrExpr(this.exprs.map((expr) => expr.not()));
-  }
-
-  override toWhereExpr(): AnyWhereExpr {
-    return this;
-  }
 }
 
-export class OrExpr extends WhereExpr {
+export class OrExpr extends Expression {
   readonly kind = 'or' as const;
-  readonly exprs: ReadonlyArray<AnyWhereExpr>;
+  readonly exprs: ReadonlyArray<AnyExpression>;
 
-  constructor(exprs: ReadonlyArray<AnyWhereExpr>) {
+  constructor(exprs: ReadonlyArray<AnyExpression>) {
     super();
     this.exprs = frozenArrayCopy(exprs);
     this.freeze();
   }
 
-  static of(exprs: ReadonlyArray<AnyWhereExpr>): OrExpr {
+  static of(exprs: ReadonlyArray<AnyExpression>): OrExpr {
     return new OrExpr(exprs);
   }
 
@@ -934,11 +911,11 @@ export class OrExpr extends WhereExpr {
     return new OrExpr([]);
   }
 
-  override accept<R>(visitor: WhereExprVisitor<R>): R {
+  override accept<R>(visitor: ExprVisitor<R>): R {
     return visitor.or(this);
   }
 
-  override rewrite(rewriter: ExpressionRewriter): AnyWhereExpr {
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     return new OrExpr(this.exprs.map((expr) => expr.rewrite(rewriter)));
   }
 
@@ -948,17 +925,9 @@ export class OrExpr extends WhereExpr {
       this.exprs.map((expr) => () => expr.fold(folder)),
     );
   }
-
-  override not(): AnyWhereExpr {
-    return new AndExpr(this.exprs.map((expr) => expr.not()));
-  }
-
-  override toWhereExpr(): AnyWhereExpr {
-    return this;
-  }
 }
 
-export class ExistsExpr extends WhereExpr {
+export class ExistsExpr extends Expression {
   readonly kind = 'exists' as const;
   readonly notExists: boolean;
   readonly subquery: SelectAst;
@@ -978,28 +947,20 @@ export class ExistsExpr extends WhereExpr {
     return new ExistsExpr(subquery, true);
   }
 
-  override accept<R>(visitor: WhereExprVisitor<R>): R {
+  override accept<R>(visitor: ExprVisitor<R>): R {
     return visitor.exists(this);
   }
 
-  override rewrite(rewriter: ExpressionRewriter): AnyWhereExpr {
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     return new ExistsExpr(this.subquery.rewrite(rewriter), this.notExists);
   }
 
   override fold<T>(folder: ExpressionFolder<T>): T {
     return folder.select ? folder.select(this.subquery) : folder.empty;
   }
-
-  override not(): AnyWhereExpr {
-    return new ExistsExpr(this.subquery, !this.notExists);
-  }
-
-  override toWhereExpr(): AnyWhereExpr {
-    return this;
-  }
 }
 
-export class NullCheckExpr extends WhereExpr {
+export class NullCheckExpr extends Expression {
   readonly kind = 'null-check' as const;
   readonly expr: AnyExpression;
   readonly isNull: boolean;
@@ -1019,24 +980,43 @@ export class NullCheckExpr extends WhereExpr {
     return new NullCheckExpr(expr, false);
   }
 
-  override accept<R>(visitor: WhereExprVisitor<R>): R {
+  override accept<R>(visitor: ExprVisitor<R>): R {
     return visitor.nullCheck(this);
   }
 
-  override rewrite(rewriter: ExpressionRewriter): AnyWhereExpr {
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     return new NullCheckExpr(this.expr.rewrite(rewriter), this.isNull);
   }
 
   override fold<T>(folder: ExpressionFolder<T>): T {
     return this.expr.fold(folder);
   }
+}
 
-  override not(): AnyWhereExpr {
-    return new NullCheckExpr(this.expr, !this.isNull);
+export class NotExpr extends Expression {
+  readonly kind = 'not' as const;
+  readonly expr: AnyExpression;
+
+  constructor(expr: AnyExpression) {
+    super();
+    this.expr = expr;
+    this.freeze();
   }
 
   override toWhereExpr(): AnyWhereExpr {
     return this;
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.not(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return new NotExpr(this.expr.rewrite(rewriter));
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return this.expr.fold(folder);
   }
 }
 
@@ -1056,7 +1036,7 @@ export class EqColJoinOn extends AstNode {
     return new EqColJoinOn(left, right);
   }
 
-  rewrite(rewriter: AstRewriter): EqColJoinOn | AnyWhereExpr {
+  rewrite(rewriter: AstRewriter): EqColJoinOn | AnyExpression {
     return rewriter.eqColJoinOn ? rewriter.eqColJoinOn(this) : this;
   }
 }
@@ -1102,7 +1082,7 @@ export class JoinAst extends AstNode {
     return new JoinAst(
       this.joinType,
       this.source.rewrite(rewriter),
-      this.on.rewrite(rewriter),
+      this.on.kind === 'eq-col-join-on' ? this.on.rewrite(rewriter) : this.on.rewrite(rewriter),
       this.lateral,
     );
   }
@@ -1129,12 +1109,12 @@ export interface SelectAstOptions {
   readonly from: AnyFromSource;
   readonly joins: ReadonlyArray<JoinAst> | undefined;
   readonly projection: ReadonlyArray<ProjectionItem>;
-  readonly where: AnyWhereExpr | undefined;
+  readonly where: AnyExpression | undefined;
   readonly orderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly distinct: true | undefined;
   readonly distinctOn: ReadonlyArray<AnyExpression> | undefined;
   readonly groupBy: ReadonlyArray<AnyExpression> | undefined;
-  readonly having: AnyWhereExpr | undefined;
+  readonly having: AnyExpression | undefined;
   readonly limit: number | undefined;
   readonly offset: number | undefined;
   readonly selectAllIntent: { readonly table?: string } | undefined;
@@ -1145,12 +1125,12 @@ export class SelectAst extends QueryAst {
   readonly from: AnyFromSource;
   readonly joins: ReadonlyArray<JoinAst> | undefined;
   readonly projection: ReadonlyArray<ProjectionItem>;
-  readonly where: AnyWhereExpr | undefined;
+  readonly where: AnyExpression | undefined;
   readonly orderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly distinct: true | undefined;
   readonly distinctOn: ReadonlyArray<AnyExpression> | undefined;
   readonly groupBy: ReadonlyArray<AnyExpression> | undefined;
-  readonly having: AnyWhereExpr | undefined;
+  readonly having: AnyExpression | undefined;
   readonly limit: number | undefined;
   readonly offset: number | undefined;
   readonly selectAllIntent: { readonly table?: string } | undefined;
@@ -1217,7 +1197,7 @@ export class SelectAst extends QueryAst {
     });
   }
 
-  withWhere(where: AnyWhereExpr | undefined): SelectAst {
+  withWhere(where: AnyExpression | undefined): SelectAst {
     return new SelectAst({ ...this, where });
   }
 
@@ -1249,7 +1229,7 @@ export class SelectAst extends QueryAst {
     });
   }
 
-  withHaving(having: AnyWhereExpr | undefined): SelectAst {
+  withHaving(having: AnyExpression | undefined): SelectAst {
     return new SelectAst({ ...this, having });
   }
 
@@ -1305,7 +1285,7 @@ export class SelectAst extends QueryAst {
     }
 
     for (const projection of this.projection) {
-      if (projection.expr.kind !== 'literal') {
+      if (!(projection.expr.kind === 'literal')) {
         pushRefs(projection.expr.collectColumnRefs());
       }
     }
@@ -1350,7 +1330,7 @@ export class SelectAst extends QueryAst {
     }
 
     for (const projection of this.projection) {
-      if (projection.expr.kind !== 'literal') {
+      if (!(projection.expr.kind === 'literal')) {
         pushRefs(projection.expr.collectParamRefs());
       }
     }
@@ -1374,7 +1354,7 @@ export class SelectAst extends QueryAst {
       if (join.source.kind === 'derived-table-source') {
         pushRefs(join.source.query.collectParamRefs());
       }
-      if (join.on.kind !== 'eq-col-join-on') {
+      if (!(join.on.kind === 'eq-col-join-on')) {
         pushRefs(join.on.collectParamRefs());
       }
     }
@@ -1574,8 +1554,7 @@ export class InsertAst extends QueryAst {
         addColumn(columnRef);
       }
       if (this.onConflict.action.kind === 'do-update-set') {
-        const action = this.onConflict.action as DoUpdateSetConflictAction;
-        for (const value of Object.values(action.set)) {
+        for (const value of Object.values(this.onConflict.action.set)) {
           if (value.kind === 'column-ref') {
             addColumn(value);
           }
@@ -1595,13 +1574,13 @@ export class UpdateAst extends QueryAst {
   readonly kind = 'update' as const;
   readonly table: TableSource;
   readonly set: Readonly<Record<string, ColumnRef | ParamRef>>;
-  readonly where: AnyWhereExpr | undefined;
+  readonly where: AnyExpression | undefined;
   readonly returning: ReadonlyArray<ColumnRef> | undefined;
 
   constructor(
     table: TableSource,
     set: Readonly<Record<string, ColumnRef | ParamRef>> = {},
-    where?: AnyWhereExpr,
+    where?: AnyExpression,
     returning?: ReadonlyArray<ColumnRef>,
   ) {
     super();
@@ -1620,7 +1599,7 @@ export class UpdateAst extends QueryAst {
     return new UpdateAst(this.table, set, this.where, this.returning);
   }
 
-  withWhere(where: AnyWhereExpr | undefined): UpdateAst {
+  withWhere(where: AnyExpression | undefined): UpdateAst {
     return new UpdateAst(this.table, this.set, where, this.returning);
   }
 
@@ -1670,10 +1649,10 @@ export class UpdateAst extends QueryAst {
 export class DeleteAst extends QueryAst {
   readonly kind = 'delete' as const;
   readonly table: TableSource;
-  readonly where: AnyWhereExpr | undefined;
+  readonly where: AnyExpression | undefined;
   readonly returning: ReadonlyArray<ColumnRef> | undefined;
 
-  constructor(table: TableSource, where?: AnyWhereExpr, returning?: ReadonlyArray<ColumnRef>) {
+  constructor(table: TableSource, where?: AnyExpression, returning?: ReadonlyArray<ColumnRef>) {
     super();
     this.table = table;
     this.where = where;
@@ -1685,7 +1664,7 @@ export class DeleteAst extends QueryAst {
     return new DeleteAst(table);
   }
 
-  withWhere(where: AnyWhereExpr | undefined): DeleteAst {
+  withWhere(where: AnyExpression | undefined): DeleteAst {
     return new DeleteAst(this.table, where, this.returning);
   }
 
@@ -1721,14 +1700,23 @@ export type AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst;
 export type AnyFromSource = TableSource | DerivedTableSource;
 export type AnyExpression =
   | ColumnRef
+  | IdentifierRef
+  | ParamRef
+  | LiteralExpr
   | SubqueryExpr
   | OperationExpr
   | AggregateExpr
   | JsonObjectExpr
-  | JsonArrayAggExpr;
-export type AnyWhereExpr = BinaryExpr | AndExpr | OrExpr | ExistsExpr | NullCheckExpr;
+  | JsonArrayAggExpr
+  | ListExpression
+  | BinaryExpr
+  | AndExpr
+  | OrExpr
+  | ExistsExpr
+  | NullCheckExpr
+  | NotExpr;
+export type AnyWhereExpr = BinaryExpr | AndExpr | OrExpr | ExistsExpr | NullCheckExpr | NotExpr;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
-export type AnySqlComparable = AnyExpression | ParamRef | LiteralExpr | ListLiteralExpr;
 export type AnyInsertValue = ColumnRef | ParamRef | DefaultValueExpr;
 export type AnyOperationArg = AnyExpression | ParamRef | LiteralExpr;
 
@@ -1738,12 +1726,13 @@ export const queryAstKinds: ReadonlySet<string> = new Set<AnyQueryAst['kind']>([
   'update',
   'delete',
 ]);
-export const whereExprKinds: ReadonlySet<string> = new Set<AnyWhereExpr['kind']>([
+export const whereExprKinds: ReadonlySet<string> = new Set<AnyExpression['kind']>([
   'binary',
   'and',
   'or',
   'exists',
   'null-check',
+  'not',
 ]);
 
 export function isQueryAst(value: unknown): value is AnyQueryAst {
@@ -1755,13 +1744,19 @@ export function isQueryAst(value: unknown): value is AnyQueryAst {
   );
 }
 
-export function isWhereExpr(value: unknown): value is AnyWhereExpr {
+export function isWhereExpr(value: unknown): value is AnyExpression {
   return (
     typeof value === 'object' &&
     value !== null &&
     'kind' in value &&
     whereExprKinds.has((value as { kind: string }).kind)
   );
+}
+
+export interface BoundWhereExpr {
+  readonly expr: AnyExpression;
+  readonly params: readonly unknown[];
+  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
 }
 
 export interface ToWhereExpr {

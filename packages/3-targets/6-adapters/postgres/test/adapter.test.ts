@@ -11,7 +11,7 @@ import {
   InsertAst,
   InsertOnConflict,
   JsonObjectExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   NullCheckExpr,
   OperationExpr,
@@ -191,8 +191,8 @@ describe('Postgres adapter', () => {
             ColumnRef.of('user', 'metadata'),
             ParamRef.of({ source: 'test' }, { name: 'metadata', codecId: 'pg/json@1' }),
           ),
-          BinaryExpr.in(ColumnRef.of('user', 'id'), ListLiteralExpr.fromValues([])),
-          BinaryExpr.notIn(ColumnRef.of('user', 'id'), ListLiteralExpr.fromValues([])),
+          BinaryExpr.in(ColumnRef.of('user', 'id'), ListExpression.fromValues([])),
+          BinaryExpr.notIn(ColumnRef.of('user', 'id'), ListExpression.fromValues([])),
         ]),
       );
 

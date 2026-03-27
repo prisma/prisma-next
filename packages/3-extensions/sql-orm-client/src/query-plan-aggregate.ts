@@ -3,8 +3,6 @@ import {
   AggregateExpr,
   AndExpr,
   type AnyExpression,
-  type AnySqlComparable,
-  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   NullCheckExpr,
@@ -33,29 +31,19 @@ function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>
 // ORM HAVING filters use literal binding (values inlined at plan-build time),
 // not parameterized binding. ParamRef is rejected because the ORM's grouped
 // collection API always produces literal comparisons for having() predicates.
-function validateGroupedComparable(value: AnySqlComparable): AnySqlComparable {
+function validateGroupedComparable(value: AnyExpression): AnyExpression {
   switch (value.kind) {
     case 'param-ref':
       throw new Error('ParamRef is not supported in grouped having expressions');
     case 'literal':
       return value;
-    case 'list-literal':
+    case 'list':
       if (value.values.some((entry) => entry.kind === 'param-ref')) {
         throw new Error('ParamRef is not supported in grouped having expressions');
       }
       return value;
-    case 'column-ref':
-    case 'subquery':
-    case 'operation':
-    case 'aggregate':
-    case 'json-object':
-    case 'json-array-agg':
-      return value;
-    // v8 ignore next 4
     default:
-      throw new Error(
-        `Unsupported comparable kind in grouped having: ${(value satisfies never as { kind: string }).kind}`,
-      );
+      return value;
   }
 }
 
@@ -67,8 +55,38 @@ function validateGroupedMetricExpr(expr: AnyExpression): AggregateExpr {
   return expr;
 }
 
-function validateGroupedHavingExpr(expr: AnyWhereExpr): AnyWhereExpr {
-  return expr.accept<AnyWhereExpr>({
+function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
+  return expr.accept<AnyExpression>({
+    columnRef(expr) {
+      return expr;
+    },
+    identifierRef(expr) {
+      return expr;
+    },
+    subquery(expr) {
+      return expr;
+    },
+    operation(expr) {
+      return expr;
+    },
+    aggregate(expr) {
+      return expr;
+    },
+    jsonObject(expr) {
+      return expr;
+    },
+    jsonArrayAgg(expr) {
+      return expr;
+    },
+    literal(expr) {
+      return expr;
+    },
+    param(expr) {
+      return expr;
+    },
+    list(expr) {
+      return expr;
+    },
     and(expr) {
       return AndExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
     },
@@ -76,10 +94,13 @@ function validateGroupedHavingExpr(expr: AnyWhereExpr): AnyWhereExpr {
       return OrExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
     },
     exists(expr) {
-      throw new Error(`Unsupported grouped having expression kind "${expr.constructor.name}"`);
+      throw new Error(`Unsupported grouped having expression kind "${expr.kind}"`);
     },
     nullCheck(expr) {
       return new NullCheckExpr(validateGroupedMetricExpr(expr.expr), expr.isNull);
+    },
+    not(expr) {
+      throw new Error(`Unsupported grouped having expression kind "${expr.kind}"`);
     },
     binary(expr) {
       return new BinaryExpr(
@@ -121,7 +142,7 @@ export function compileGroupedAggregate(
   filters: readonly AnyWhereExpr[],
   groupByColumns: readonly string[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
-  havingExpr: AnyWhereExpr | undefined,
+  havingExpr: AnyExpression | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   if (groupByColumns.length === 0) {
     throw new Error('groupBy() requires at least one field');

@@ -1,7 +1,9 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
+  type AnyExpression,
   type AnyWhereExpr,
   BinaryExpr,
+  type BoundWhereExpr,
   ColumnRef,
   LiteralExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -539,8 +541,8 @@ function readParentColumnValues(
 function buildChildJoinWhere(
   relation: RelationDefinition,
   childValues: Map<string, unknown>,
-): AnyWhereExpr {
-  const exprs: AnyWhereExpr[] = [];
+): AnyExpression {
+  const exprs: AnyExpression[] = [];
 
   for (const [childColumn, parentValue] of childValues.entries()) {
     exprs.push(

@@ -1,5 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { AnyWhereExpr, ToWhereExpr, WhereArg } from '@prisma-next/sql-relational-core/ast';
+import type { AnyExpression, ToWhereExpr, WhereArg } from '@prisma-next/sql-relational-core/ast';
 import { isWhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { bindWhereExpr } from './where-binding';
 
@@ -9,15 +9,15 @@ interface NormalizeWhereArgOptions {
 
 export function normalizeWhereArg(arg: undefined): undefined;
 export function normalizeWhereArg(arg: undefined, options: NormalizeWhereArgOptions): undefined;
-export function normalizeWhereArg(arg: WhereArg, options?: NormalizeWhereArgOptions): AnyWhereExpr;
+export function normalizeWhereArg(arg: WhereArg, options?: NormalizeWhereArgOptions): AnyExpression;
 export function normalizeWhereArg(
   arg: WhereArg | undefined,
   options?: NormalizeWhereArgOptions,
-): AnyWhereExpr | undefined;
+): AnyExpression | undefined;
 export function normalizeWhereArg(
   arg: WhereArg | undefined,
   options?: NormalizeWhereArgOptions,
-): AnyWhereExpr | undefined {
+): AnyExpression | undefined {
   if (arg === undefined) {
     return undefined;
   }

@@ -7,6 +7,7 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
 import type { AnyWhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyExpression, BoundWhereExpr } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { RowSelection } from './collection-internal-types';
@@ -140,18 +141,18 @@ export interface CollectionContext<TContract extends SqlContract<SqlStorage>> {
 // ---------------------------------------------------------------------------
 
 export type ComparisonMethods<T> = {
-  eq(value: T): AnyWhereExpr;
-  neq(value: T): AnyWhereExpr;
-  gt(value: T): AnyWhereExpr;
-  lt(value: T): AnyWhereExpr;
-  gte(value: T): AnyWhereExpr;
-  lte(value: T): AnyWhereExpr;
-  like(pattern: string): AnyWhereExpr;
-  ilike(pattern: string): AnyWhereExpr;
-  in(values: readonly T[]): AnyWhereExpr;
-  notIn(values: readonly T[]): AnyWhereExpr;
-  isNull(): AnyWhereExpr;
-  isNotNull(): AnyWhereExpr;
+  eq(value: T): AnyExpression;
+  neq(value: T): AnyExpression;
+  gt(value: T): AnyExpression;
+  lt(value: T): AnyExpression;
+  gte(value: T): AnyExpression;
+  lte(value: T): AnyExpression;
+  like(pattern: string): AnyExpression;
+  ilike(pattern: string): AnyExpression;
+  in(values: readonly T[]): AnyExpression;
+  notIn(values: readonly T[]): AnyExpression;
+  isNull(): AnyExpression;
+  isNotNull(): AnyExpression;
   asc(): OrderByDirective;
   desc(): OrderByDirective;
 };
@@ -159,7 +160,7 @@ export type ComparisonMethods<T> = {
 export type RelationPredicate<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
-> = (model: ModelAccessor<TContract, ModelName>) => AnyWhereExpr;
+> = (model: ModelAccessor<TContract, ModelName>) => AnyExpression;
 
 export type RelationPredicateInput<
   TContract extends SqlContract<SqlStorage>,
@@ -170,9 +171,9 @@ export type RelationFilterAccessor<
   TContract extends SqlContract<SqlStorage>,
   RelatedModelName extends string,
 > = {
-  some(predicate?: RelationPredicateInput<TContract, RelatedModelName>): AnyWhereExpr;
-  every(predicate: RelationPredicateInput<TContract, RelatedModelName>): AnyWhereExpr;
-  none(predicate?: RelationPredicateInput<TContract, RelatedModelName>): AnyWhereExpr;
+  some(predicate?: RelationPredicateInput<TContract, RelatedModelName>): AnyExpression;
+  every(predicate: RelationPredicateInput<TContract, RelatedModelName>): AnyExpression;
+  none(predicate?: RelationPredicateInput<TContract, RelatedModelName>): AnyExpression;
 };
 
 type ScalarModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {

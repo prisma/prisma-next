@@ -1,7 +1,7 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
-  type AnyWhereExpr,
+  type AnyExpression,
   type AstRewriter,
   BinaryExpr,
   type BinaryOp,
@@ -11,7 +11,7 @@ import {
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   OrderByItem,
   OrExpr,
@@ -57,7 +57,7 @@ function toOrderBy(
   );
 }
 
-function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): AnyWhereExpr {
+function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): AnyExpression {
   const comparator: BinaryOp = entry.direction === 'asc' ? 'gt' : 'lt';
   return new BinaryExpr(
     comparator,
@@ -69,9 +69,9 @@ function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): AnyWher
 function buildLexicographicCursorWhere(
   tableName: string,
   entries: readonly CursorOrderEntry[],
-): AnyWhereExpr {
-  const branches = entries.map((entry, index): AnyWhereExpr => {
-    const branchExprs: AnyWhereExpr[] = [];
+): AnyExpression {
+  const branches = entries.map((entry, index): AnyExpression => {
+    const branchExprs: AnyExpression[] = [];
 
     for (const prefixEntry of entries.slice(0, index)) {
       branchExprs.push(
@@ -84,14 +84,14 @@ function buildLexicographicCursorWhere(
 
     branchExprs.push(createBoundaryExpr(tableName, entry));
     if (branchExprs.length === 1) {
-      return branchExprs[0] as AnyWhereExpr;
+      return branchExprs[0] as AnyExpression;
     }
 
     return AndExpr.of(branchExprs);
   });
 
   if (branches.length === 1) {
-    return branches[0] as AnyWhereExpr;
+    return branches[0] as AnyExpression;
   }
 
   return OrExpr.of(branches);
@@ -101,7 +101,7 @@ function buildCursorWhere(
   tableName: string,
   orderBy: readonly OrderExpr[] | undefined,
   cursor: Readonly<Record<string, unknown>> | undefined,
-): AnyWhereExpr | undefined {
+): AnyExpression | undefined {
   if (!cursor || !orderBy || orderBy.length === 0) {
     return undefined;
   }
@@ -404,9 +404,9 @@ export function compileRelationSelect(
   parentPks: readonly unknown[],
   nestedState: CollectionState,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const inFilter: AnyWhereExpr = BinaryExpr.in(
+  const inFilter: AnyExpression = BinaryExpr.in(
     ColumnRef.of(relatedTableName, fkColumn),
-    ListLiteralExpr.fromValues(parentPks),
+    ListExpression.fromValues(parentPks),
   );
 
   return compileSelect(contract, relatedTableName, {
