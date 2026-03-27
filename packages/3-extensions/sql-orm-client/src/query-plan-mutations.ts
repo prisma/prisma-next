@@ -84,7 +84,11 @@ function normalizeInsertRows(
     const normalizedRow: Record<string, ParamRef | DefaultValueExpr> = {};
     for (const column of orderedColumns) {
       if (Object.hasOwn(row, column)) {
-        const codecId = contract.storage.tables[tableName]?.columns[column]?.codecId;
+        const table = contract.storage.tables[tableName];
+        if (!table) {
+          throw new Error(`Unknown table "${tableName}"`);
+        }
+        const codecId = table?.columns[column]?.codecId;
         if (!codecId) {
           throw new Error(`Unknown column "${column}" in table "${tableName}"`);
         }
