@@ -12,7 +12,13 @@ import {
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { QueryOperationEntry } from '@prisma-next/sql-relational-core/query-operations';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import type { AggregateFunctions, Expression, FieldProxy, OrderByOptions } from '../expression';
+import type {
+  AggregateFunctions,
+  Expression,
+  FieldProxy,
+  OrderByOptions,
+  OrderByScope,
+} from '../expression';
 import type {
   GatedMethod,
   MergeScopes,
@@ -205,7 +211,10 @@ export function nullableScope<S extends Scope>(scope: S): NullableScope<S> {
   return { topLevel: mkNullable(scope.topLevel), namespaces } as NullableScope<S>;
 }
 
-export function orderByScopeOf(scope: Scope, rowFields: Record<string, ScopeField>): Scope {
+export function orderByScopeOf<S extends Scope, R extends Record<string, ScopeField>>(
+  scope: S,
+  rowFields: R,
+): OrderByScope<S, R> {
   return {
     topLevel: { ...scope.topLevel, ...rowFields },
     namespaces: scope.namespaces,

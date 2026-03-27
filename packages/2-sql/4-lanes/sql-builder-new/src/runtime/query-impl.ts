@@ -231,9 +231,12 @@ export class GroupedQueryImpl<
       fns: AggregateFunctions<QC>,
     ) => Expression<BooleanCodecType>,
   ): GroupedQuery<QC, AvailableScope, RowType> {
-    const combined = orderByScopeOf(this.state.scope, this.state.rowFields);
+    const combined = orderByScopeOf(
+      this.state.scope as AvailableScope,
+      this.state.rowFields as RowType,
+    );
     const fns = createAggregateFunctions(this.ctx.queryOperationTypes);
-    const result = (expr as ExprCallback)(createFieldProxy(combined), fns);
+    const result = expr(createFieldProxy(combined), fns);
     return new GroupedQueryImpl(cloneState(this.state, { having: result.buildAst() }), this.ctx);
   }
 
