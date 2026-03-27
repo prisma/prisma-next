@@ -13,8 +13,9 @@ import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/famil
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
-import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
-import { createPostgresMigrationPlanner, renderDefaultLiteral } from '../core/migrations/planner';
+import { createPostgresMigrationPlanner } from '../core/migrations/planner';
+import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
+import type { PostgresPlanTargetDetails } from '../core/migrations/planner-types';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 
 function buildNativeTypeExpander(

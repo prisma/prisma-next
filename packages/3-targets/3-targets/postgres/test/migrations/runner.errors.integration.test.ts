@@ -1,6 +1,6 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner';
+import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner-types';
 import {
   buildWriteMarkerStatements,
   ensureLedgerTableStatement,

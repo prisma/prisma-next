@@ -8,16 +8,16 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { PlanningMode, PostgresPlanTargetDetails } from './planner';
+import { buildColumnTypeSql } from './planner-ddl-builders';
 import {
-  buildColumnTypeSql,
-  buildTargetDetails,
   columnExistsCheck,
   columnNullabilityCheck,
   constraintExistsCheck,
   qualifyTableName,
   toRegclassLiteral,
-} from './planner';
+} from './planner-sql-checks';
+import type { PlanningMode, PostgresPlanTargetDetails } from './planner-types';
+import { buildTargetDetails } from './planner-types';
 
 // ============================================================================
 // Public API
