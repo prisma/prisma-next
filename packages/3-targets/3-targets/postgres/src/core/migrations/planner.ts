@@ -52,17 +52,6 @@ import {
   type PostgresPlanTargetDetails,
 } from './planner-types';
 
-export { buildColumnTypeSql, renderDefaultLiteral } from './planner-ddl-builders';
-export {
-  columnExistsCheck,
-  columnNullabilityCheck,
-  constraintExistsCheck,
-  qualifyTableName,
-  toRegclassLiteral,
-} from './planner-sql-checks';
-export type { OperationClass, PlanningMode, PostgresPlanTargetDetails } from './planner-types';
-export { buildTargetDetails } from './planner-types';
-
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
 }
