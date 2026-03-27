@@ -1769,12 +1769,8 @@ export function isWhereExpr(value: unknown): value is AnyWhereExpr {
   );
 }
 
-export interface BoundWhereExpr {
-  readonly expr: AnyWhereExpr;
-}
-
 export interface ToWhereExpr {
-  toWhereExpr(): BoundWhereExpr;
+  toWhereExpr(): AnyWhereExpr;
 }
 
 export interface LoweredStatement {

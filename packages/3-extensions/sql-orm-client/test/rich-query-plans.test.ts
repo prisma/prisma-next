@@ -27,7 +27,7 @@ import { baseContract, createCollectionFor } from './collection-fixtures';
 
 function boundParam(expr: BinaryExpr): ToWhereExpr {
   return {
-    toWhereExpr: () => ({ expr }),
+    toWhereExpr: () => expr,
   };
 }
 

@@ -26,7 +26,7 @@ const literal = (value: unknown) => LiteralExpr.of(value);
 
 function toWhereExpr(expr: AnyWhereExpr): ToWhereExpr {
   return {
-    toWhereExpr: () => ({ expr }),
+    toWhereExpr: () => expr,
   };
 }
 

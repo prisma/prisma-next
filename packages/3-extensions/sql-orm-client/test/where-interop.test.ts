@@ -26,7 +26,7 @@ const literal = (value: unknown) => LiteralExpr.of(value);
 
 function toWhereExpr(expr: AnyWhereExpr): ToWhereExpr {
   return {
-    toWhereExpr: () => ({ expr }),
+    toWhereExpr: () => expr,
   };
 }
 
@@ -49,7 +49,7 @@ describe('where interop', () => {
   it('normalizes ToWhereExpr to expr only', () => {
     const expr = BinaryExpr.eq(col('users', 'name'), param('Alice', 'name'));
     const arg = {
-      toWhereExpr: () => ({ expr }),
+      toWhereExpr: () => expr,
     } satisfies ToWhereExpr;
 
     expect(normalizeWhereArg(arg)).toEqual(expr);

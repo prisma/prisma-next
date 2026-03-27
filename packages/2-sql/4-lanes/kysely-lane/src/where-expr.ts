@@ -1,18 +1,18 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { BoundWhereExpr, ToWhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyWhereExpr, ToWhereExpr } from '@prisma-next/sql-relational-core/ast';
 import type { CompiledQuery } from 'kysely';
 import type { BuildKyselyPlanOptions } from './plan';
 import { buildKyselyPlan } from './plan';
 
 class LaneWhereExpr implements ToWhereExpr {
-  readonly #bound: BoundWhereExpr;
+  readonly #expr: AnyWhereExpr;
 
-  constructor(bound: BoundWhereExpr) {
-    this.#bound = bound;
+  constructor(expr: AnyWhereExpr) {
+    this.#expr = expr;
   }
 
-  toWhereExpr(): BoundWhereExpr {
-    return this.#bound;
+  toWhereExpr(): AnyWhereExpr {
+    return this.#expr;
   }
 }
 
@@ -26,5 +26,5 @@ export function buildKyselyWhereExpr<Row>(
     throw new Error('whereExpr(...) requires a select query with a where clause');
   }
 
-  return new LaneWhereExpr({ expr: plan.ast.where });
+  return new LaneWhereExpr(plan.ast.where);
 }

@@ -28,7 +28,7 @@ export function normalizeWhereArg(
   }
 
   if (isToWhereExpr(arg)) {
-    return arg.toWhereExpr().expr;
+    return arg.toWhereExpr();
   }
 
   if (options?.contract) {

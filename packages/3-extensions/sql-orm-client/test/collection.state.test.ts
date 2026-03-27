@@ -49,12 +49,11 @@ describe('Collection', () => {
       const filtered = collection.where(
         (_user) =>
           ({
-            toWhereExpr: () => ({
-              expr: BinaryExpr.eq(
+            toWhereExpr: () =>
+              BinaryExpr.eq(
                 ColumnRef.of('users', 'name'),
                 ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
               ),
-            }),
           }) satisfies ToWhereExpr,
       );
 

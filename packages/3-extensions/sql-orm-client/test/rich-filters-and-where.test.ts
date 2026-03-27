@@ -57,12 +57,11 @@ describe('SQL ORM rich AST filters', () => {
   it('normalizes, combines, and negates bound filters', () => {
     const normalized = normalizeWhereArg(
       {
-        toWhereExpr: () => ({
-          expr: BinaryExpr.eq(
+        toWhereExpr: () =>
+          BinaryExpr.eq(
             ColumnRef.of('users', 'id'),
             ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
           ),
-        }),
       },
       { contract },
     );
