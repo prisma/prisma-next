@@ -4,6 +4,12 @@ What patterns do experienced MongoDB developers use, expect their tools to suppo
 
 For each idiom: what the developer does, a concrete example, and what it means for PN.
 
+### Sources
+
+- [Data Modeling](https://www.mongodb.com/docs/manual/data-modeling/) — MongoDB's top-level data modeling guide
+- [Schema Design Patterns](https://www.mongodb.com/docs/manual/data-modeling/design-patterns/) — Official pattern catalog
+- [Building with Patterns](https://www.mongodb.com/blog/post/building-with-patterns-a-summary) — MongoDB blog series summarizing all named patterns
+
 ---
 
 ## Data modeling idioms
@@ -11,6 +17,8 @@ For each idiom: what the developer does, a concrete example, and what it means f
 ### Embed what you read together
 
 The defining MongoDB idiom. If two pieces of data are always accessed together, store them in the same document. This eliminates joins and makes reads a single operation.
+
+> Source: [Embedded Data](https://www.mongodb.com/docs/manual/data-modeling/embedding/), [Model 1:1 with Embedded Documents](https://www.mongodb.com/docs/manual/tutorial/model-embedded-one-to-one-relationships-between-documents/), [Model 1:N with Embedded Documents](https://www.mongodb.com/docs/v6.0/tutorial/model-embedded-one-to-many-relationships-between-documents/)
 
 ```javascript
 // A blog post with its comments embedded
@@ -29,6 +37,8 @@ The defining MongoDB idiom. If two pieces of data are always accessed together, 
 
 ### Reference what grows unboundedly or is accessed independently
 
+> Source: [Referenced Data](https://www.mongodb.com/docs/manual/data-modeling/referencing/), [Model 1:N with Document References](https://www.mongodb.com/docs/manual/tutorial/model-referenced-one-to-many-relationships-between-documents/)
+
 When an embedded array would grow without limit, or when the related data needs to be queried on its own, store it in a separate collection with a reference.
 
 ```javascript
@@ -42,6 +52,8 @@ When an embedded array would grow without limit, or when the related data needs 
 **PN implication**: The ORM must resolve references — either via application-level joining or `$lookup`. The contract's relation declarations drive this. See [design question #7](design-questions.md#7-relation-loading-application-level-joining-vs-lookup).
 
 ### Extended reference (partial denormalization)
+
+> Source: [The Extended Reference Pattern](https://www.mongodb.com/company/blog/building-with-patterns-the-extended-reference-pattern)
 
 Embed a subset of a referenced document's frequently-accessed fields to avoid a join for common reads, while keeping the full document in its own collection.
 
@@ -64,6 +76,8 @@ The full `customer` document lives in the `customers` collection. The order embe
 
 ### Subset pattern
 
+> Source: [Subset Pattern](https://www.mongodb.com/docs/manual/data-modeling/design-patterns/group-data/subset-pattern/), [The Subset Pattern (blog)](https://www.mongodb.com/company/blog/building-with-patterns-the-subset-pattern)
+
 Embed only a bounded subset of a large related dataset to keep documents small, with the full dataset in a separate collection.
 
 ```javascript
@@ -83,6 +97,8 @@ Embed only a bounded subset of a large related dataset to keep documents small, 
 
 ### Polymorphic collection (single-collection inheritance)
 
+> Source: [Polymorphic Data](https://www.mongodb.com/docs/manual/data-modeling/design-patterns/polymorphic-data/), [Inheritance Pattern](https://www.mongodb.com/docs/v7.0/data-modeling/design-patterns/polymorphic-data/inheritance-schema-pattern/)
+
 Store documents of different "types" in one collection, distinguished by a discriminator field. Query them together or filter by type.
 
 ```javascript
@@ -97,6 +113,8 @@ All three share some fields (`_id`, `type`, `recipient`-ish) but have type-speci
 **PN implication**: The contract needs discriminated unions — a base model with shared fields and variant models with type-specific fields. This is promoted to April validation scope. See [design question #6](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april).
 
 ### Schema versioning
+
+> Source: [Schema Versioning](https://www.mongodb.com/docs/manual/data-modeling/design-patterns/data-versioning/schema-versioning/), [The Schema Versioning Pattern (blog)](https://www.mongodb.com/company/blog/building-with-patterns-the-schema-versioning-pattern)
 
 Add a `schemaVersion` field to documents. When the schema evolves, new documents get the new version; old documents are migrated lazily (on read) or in batch.
 
@@ -113,6 +131,8 @@ The application code handles both versions, typically with a migration function 
 **PN implication**: This is a data migration / schema evolution pattern. The migration workstream's data invariant model may provide a foundation. The contract's strict/permissive validation mode is relevant — strict mode would reject v1 documents if the contract describes v2. For Mongo users, permissive mode with lazy coercion may be more practical.
 
 ### Bucket pattern
+
+> Source: [Bucket Pattern](https://www.mongodb.com/docs/manual/data-modeling/design-patterns/group-data/bucket-pattern/), [The Bucket Pattern (blog)](https://www.mongodb.com/company/blog/building-with-patterns-the-bucket-pattern)
 
 Group time-series or sequential data into fixed-size "buckets" to avoid one document per event (too many small documents) or one unbounded array (document too large).
 
@@ -134,6 +154,8 @@ Group time-series or sequential data into fixed-size "buckets" to avoid one docu
 
 ### Tree patterns
 
+> Source: [Model Tree Structures](https://www.mongodb.com/docs/manual/applications/data-models-tree-structures/)
+
 Represent hierarchical data (categories, org charts, file systems) using one of several strategies:
 
 - **Parent reference**: Each node stores its parent's `_id`
@@ -154,6 +176,8 @@ Represent hierarchical data (categories, org charts, file systems) using one of 
 
 ### Filter with dot notation on nested fields
 
+> Source: [Query on Embedded/Nested Documents](https://www.mongodb.com/docs/manual/tutorial/query-embedded-documents/), [Field Paths](https://www.mongodb.com/docs/manual/core/field-paths/)
+
 Query embedded subdocuments using dot-separated paths. This is fundamental to how Mongo users think about querying nested data.
 
 ```javascript
@@ -164,6 +188,8 @@ db.posts.find({ "comments.user": "Bob" })
 **PN implication**: The ORM's filter/where clause must support type-safe dot-notation for embedded fields. `user.address.city.eq("Springfield")` should typecheck that `address` exists on `User`, `city` exists on `Address`, and `city` is a string.
 
 ### Array element matching
+
+> Source: [Query an Array](https://www.mongodb.com/docs/manual/tutorial/query-arrays/), [`$elemMatch`](https://www.mongodb.com/docs/manual/reference/operator/query/elemmatch/), [Array Query Operators](https://www.mongodb.com/docs/manual/reference/operator/query-array/)
 
 Query documents where an array contains a specific value, all specified values, or an element matching complex criteria.
 
@@ -179,6 +205,8 @@ db.posts.find({
 
 ### Projection (field selection)
 
+> Source: [Project Fields to Return from Query](https://www.mongodb.com/docs/manual/tutorial/project-fields-from-query-results/), [`$project` (aggregation)](https://www.mongodb.com/docs/manual/reference/operator/aggregation/project/)
+
 Select only the fields you need, reducing data transfer and improving performance.
 
 ```javascript
@@ -188,6 +216,8 @@ db.users.find({}, { name: 1, email: 1, _id: 0 })
 **PN implication**: The ORM's `select()` method maps directly. For embedded documents, projection can also select nested fields: `{ "address.city": 1 }`. This is more granular than SQL's column selection and may need special handling.
 
 ### Cursor-based pagination
+
+> Source: [Cursors](https://www.mongodb.com/docs/manual/core/cursors/), [`cursor.skip()`](https://www.mongodb.com/docs/manual/reference/method/cursor.skip/), [`cursor.limit()`](https://www.mongodb.com/docs/manual/reference/method/cursor.limit/)
 
 Paginate using a field value (typically `_id` or an indexed field) rather than `skip`/`limit`, which degrades on large collections.
 
@@ -202,6 +232,8 @@ db.users.find({ _id: { $gt: lastId } }).sort({ _id: 1 }).limit(20)
 **PN implication**: The SQL ORM already supports cursor-based pagination. The Mongo ORM should too — using `_id` or any indexed field as the cursor. The pattern is the same; the implementation differs (no `OFFSET`, use a range filter instead).
 
 ### Aggregation pipeline for analytics
+
+> Source: [Aggregation Operations](https://www.mongodb.com/docs/manual/aggregation/), [Aggregation Stages](https://www.mongodb.com/docs/manual/reference/operator/aggregation-pipeline/)
 
 Build multi-stage pipelines for grouping, joining, reshaping, and computing. This is how Mongo users think about anything beyond simple CRUD.
 
@@ -218,6 +250,8 @@ db.orders.aggregate([
 
 ### Distinct values
 
+> Source: [`db.collection.distinct()`](https://www.mongodb.com/docs/manual/reference/method/db.collection.distinct/)
+
 Get unique values for a field, often for populating filter dropdowns or faceted search.
 
 ```javascript
@@ -232,6 +266,8 @@ db.products.distinct("category", { inStock: true })
 ## Mutation idioms
 
 ### Atomic field-level updates
+
+> Source: [Update Operators](https://www.mongodb.com/docs/manual/reference/operator/update/), [`$set`](https://www.mongodb.com/docs/manual/reference/operator/update/set/), [`$inc`](https://www.mongodb.com/docs/manual/reference/operator/update/inc/)
 
 Update specific fields without reading or replacing the entire document. This is a defining Mongo mutation idiom — it avoids read-modify-write cycles and reduces contention.
 
@@ -249,6 +285,8 @@ db.posts.updateOne(
 **PN implication**: The ORM's `update()` should support `$set` (implicit for plain data) and expose `$inc`, `$currentDate` as Mongo-native extensions. See [design question #4](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations).
 
 ### Atomic array mutations
+
+> Source: [`$push`](https://www.mongodb.com/docs/manual/reference/operator/update/push/), [`$pull`](https://www.mongodb.com/docs/manual/reference/operator/update/pull/), [`$addToSet`](https://www.mongodb.com/docs/manual/reference/operator/update/addToSet/)
 
 Modify arrays in place without reading the document first.
 
@@ -273,6 +311,8 @@ db.movies.updateOne(
 
 ### Upsert (insert or update)
 
+> Source: [`db.collection.updateOne()`](https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/), [`$setOnInsert`](https://www.mongodb.com/docs/manual/reference/operator/update/setoninsert/)
+
 Insert a document if it doesn't exist, update it if it does. A single atomic operation.
 
 ```javascript
@@ -289,6 +329,8 @@ db.users.updateOne(
 
 ### Bulk writes
 
+> Source: [Bulk Write Operations](https://www.mongodb.com/docs/manual/core/bulk-write-operations/), [`db.collection.bulkWrite()`](https://www.mongodb.com/docs/manual/reference/method/db.collection.bulkWrite/)
+
 Perform multiple write operations in a single request for efficiency.
 
 ```javascript
@@ -302,6 +344,8 @@ db.orders.bulkWrite([
 **PN implication**: `createMany`, `updateMany`, `deleteMany` are standard ORM operations. MongoDB's `bulkWrite` (mixed operation types in one call) is more expressive — potentially a future Mongo-specific ORM method.
 
 ### findOneAndUpdate / findOneAndDelete
+
+> Source: [`findOneAndUpdate()`](https://www.mongodb.com/docs/manual/reference/method/db.collection.findoneandupdate/), [`findOneAndDelete()`](https://www.mongodb.com/docs/manual/reference/method/db.collection.findoneanddelete/), [Compound Operations (Node.js)](https://www.mongodb.com/docs/drivers/node/current/crud/compound-operations/)
 
 Atomically find a document and modify it, returning either the original or modified version. Used for queue processing, distributed locks, and compare-and-swap patterns.
 
@@ -322,6 +366,8 @@ const job = await db.jobs.findOneAndUpdate(
 
 ### Change streams for reactivity
 
+> Source: [Change Streams](https://www.mongodb.com/docs/manual/changeStreams/), [Monitor Data with Change Streams (Node.js)](https://www.mongodb.com/docs/drivers/node/current/usage-examples/changeStream/)
+
 Subscribe to real-time data changes. Used for reactive UIs, event-driven architectures, cache invalidation, and cross-service synchronization.
 
 ```javascript
@@ -338,6 +384,8 @@ for await (const change of stream) {
 
 ### TTL for automatic expiration
 
+> Source: [Expire Data from Collections by Setting TTL](https://www.mongodb.com/docs/manual/tutorial/expire-data/), [TTL Indexes](https://www.mongodb.com/docs/manual/core/index-ttl/)
+
 Set a TTL index on a date field to automatically delete documents after a specified time. Used for sessions, temporary data, audit logs.
 
 ```javascript
@@ -347,6 +395,8 @@ db.sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 3600 })
 **PN implication**: A TTL index is a contract-level concern — the authoring surface needs to express it, and the contract captures it. This is a Mongo-specific index property with behavioral semantics (auto-deletion), not just query optimization.
 
 ### Read/write concern tuning
+
+> Source: [Read Concern](https://www.mongodb.com/docs/manual/reference/read-concern/), [Write Concern](https://www.mongodb.com/docs/manual/reference/write-concern/)
 
 Control the durability and consistency guarantees per operation.
 
@@ -361,6 +411,8 @@ db.logs.insertOne(logEntry, { writeConcern: { w: 0 } })
 **PN implication**: These are driver-level options that PN would pass through to the MongoDB driver. The adapter could expose them as per-operation options or as runtime configuration.
 
 ### Connection string options and replica set awareness
+
+> Source: [Connection String Options](https://www.mongodb.com/docs/manual/reference/connection-string-options/), [Connection Strings](https://www.mongodb.com/docs/manual/reference/connection-string-examples/)
 
 MongoDB developers are accustomed to configuring behavior via connection string parameters: replica set name, read preference, auth mechanism, TLS, etc.
 
