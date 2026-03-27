@@ -381,7 +381,7 @@ export function createMigrationApplyCommand(): Command {
     command,
     'Apply planned migrations to the database',
     'Applies previously planned migrations (created by `migration plan`) to a live database.\n' +
-      'Compares the database marker against the migration chain to determine which\n' +
+      'Compares the database marker against the migration history to determine which\n' +
       'migrations are pending, then executes them sequentially. Each migration runs\n' +
       'in its own transaction. Does not plan new migrations — run `migration plan` first.',
   );

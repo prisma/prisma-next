@@ -101,7 +101,7 @@ export function resolveMigrationPaths(
 
 /**
  * Slim representation of a PathDecision for CLI JSON output.
- * Strips internal fields (createdAt, labels) from chain entries.
+ * Strips internal fields (createdAt, labels) from path entries.
  */
 export interface PathDecisionResult {
   readonly fromHash: string;

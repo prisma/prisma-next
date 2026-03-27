@@ -409,7 +409,7 @@ async function executeMigrationStatusCommand(
     }
     const header = formatStyledHeader({
       command: 'migration status',
-      description: 'Show migration chain and applied status',
+      description: 'Show migration history and applied status',
       details,
       flags,
     });
@@ -612,7 +612,7 @@ async function executeMigrationStatusCommand(
 
   if (!chain) {
     return notOk(
-      errorRuntime('Cannot reconstruct migration chain', {
+      errorRuntime('Cannot reconstruct migration history', {
         why: `No path from ${EMPTY_CONTRACT_HASH} to target ${targetHash}`,
         fix: 'The migration history may have gaps. Check the migrations directory for missing or corrupted packages.',
       }),
@@ -700,10 +700,10 @@ export function createMigrationStatusCommand(): Command {
   const command = new Command('status');
   setCommandDescriptions(
     command,
-    'Show migration chain and applied status',
-    'Displays the migration chain in order. When a database connection\n' +
+    'Show migration history and applied status',
+    'Displays the migration history in order. When a database connection\n' +
       'is available, shows which migrations are applied and which are pending.\n' +
-      'Without a database connection, shows the chain from disk only.',
+      'Without a database connection, shows the history from disk only.',
   );
   setCommandExamples(command, [
     'prisma-next migration status',
