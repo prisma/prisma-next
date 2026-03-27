@@ -1,0 +1,939 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Graph renderer — render extracted subgraph > extracts and renders spine from branching graph 1`] = `
+"○ ∅
+│
+│ init
+│
+▾
+○ A
+│
+│ add_users
+│
+▾
+○ B
+│
+│ add_posts
+│
+▾
+○ C prod"
+`;
+
+exports[`Graph renderer — render full graph > renders Branch with continuation 1`] = `
+"                                        ○ ∅
+                                        │
+                                        │ 2025-01-15T1022_add-users
+                                        │
+                                        ▾
+                              ┌─────────○ abc1234 ◆ db
+                              │                   │
+2025-03-20T0900_add-reactions │                   │ 2025-02-03T0905_add-posts
+                              │                   │
+                              ▾                   ▾
+                              ○ b82cc10           ○ 7e1b9a0
+                                                  │
+                                                  │ 2025-03-10T0900_add-comments
+                                                  │
+                                                  ▾
+                                                  ○ f03da82"
+`;
+
+exports[`Graph renderer — render full graph > renders Complex (diamond + branch + rollback) 1`] = `
+"                    ○ ∅
+                    │
+                    │ init
+                    │
+                    ▾
+          ┌─────────○ A───────┐
+          │                   │
+          │ path_b            │ path_a
+          │                   │
+          ▾                   ▾
+          ○ C                 ○ B
+          │                   │
+          │                   │
+          │merge_b     merge_a│
+          └─────────▾─────────┘add_tags
+┌──────────────────▸○ D──────────────────┐
+│rollback_staging   │                    │
+│                   │                    │
+│                   │ staging_feature    │
+└─────────▾─────────┘                    ▾
+          ○ E staging                    ○ F prod ◆ db"
+`;
+
+exports[`Graph renderer — render full graph > renders Converging branches (3→1) 1`] = `
+"                    ○ ∅
+                    │
+                    │ init
+                    │
+      carol         ▾         alice
+┌───────────────────○ A─────────────────┐
+│                   │                   │
+│                   │ bob               │
+│                   │                   │
+▾                   ▾                   ▾
+○ D                 ○ C                 ○ B
+│                   │                   │
+│                   │ merge_b           │
+│    merge_c        │        merge_a    │
+└───────────────────▾───────────────────┘
+                    ○ E"
+`;
+
+exports[`Graph renderer — render full graph > renders DB marker after rollback 1`] = `
+"                                             ○ ∅
+                                             │
+                                             │ 2025-01-15T1022_add-users
+                                             │
+                                             ▾
+2025-02-05T1000_rollback-add-posts ┌────────▸○ abc1234 ◆ db
+                                   │                   │
+                                   │                   │
+                                   │                   │ 2025-02-03T0905_add-posts
+                                   └─────────▾─────────┘
+                                             ○ def5678"
+`;
+
+exports[`Graph renderer — render full graph > renders DB marker on a branch 1`] = `
+"                                    ○ ∅
+                                    │
+                                    │ 2025-01-15T1022_add-users
+                                    │
+                                    ▾
+                         ┌──────────○ abc1234──┐
+                         │                     │
+2025-02-10T0800_add-tags │                     │ 2025-03-10T0900_add-comments
+                         │                     │
+                         ▾                     ▾
+                         ○ 9c4f1e7 ◆ db        ○ f03da82"
+`;
+
+exports[`Graph renderer — render full graph > renders DB marker — fully applied 1`] = `
+"○ ∅
+│
+│ 2025-01-15T1022_add-users
+│
+▾
+○ abc1234
+│
+│ 2025-03-10T0900_add-comments
+│
+▾
+○ f03da82 ◆ db"
+`;
+
+exports[`Graph renderer — render full graph > renders Detached contract node 1`] = `
+"○ ∅
+│
+│ init
+│
+▾
+○ A
+│
+│ add_users
+│
+▾
+○ B prod ◆ db
+┊
+◇ planned ◆ contract"
+`;
+
+exports[`Graph renderer — render full graph > renders Diamond (convergence) 1`] = `
+"          ○ ∅
+          │
+          │ init
+          │
+          ▾
+┌─────────○ A───────┐
+│                   │
+│ path_b            │ path_a
+│                   │
+▾                   ▾
+○ C                 ○ B
+│                   │
+│                   │
+│merge_b     merge_a│
+└─────────▾─────────┘
+          ○ D ◆ db prod"
+`;
+
+exports[`Graph renderer — render full graph > renders Diamond with sub-branch 1`] = `
+"                    ○ ∅
+                    │
+                    │ init
+                    │
+                    ▾         alice
+          ┌─────────○ A─────────────────┐
+          │                             │
+          │ bob                         │
+          │                             │
+          ▾                             ▾
+┌─────────○ C───────┐                   ○ B
+│                   │                   │
+│ bob_experiment    │                   │
+│                   │merge_b     merge_a│
+▾                   └─────────▾─────────┘
+○ E                           ○ D
+│
+│ bob_experiment_2
+│
+▾
+○ F"
+`;
+
+exports[`Graph renderer — render full graph > renders Empty graph 1`] = `"○ ∅"`;
+
+exports[`Graph renderer — render full graph > renders Linear chain 1`] = `
+"○ ∅
+│
+│ 20260101_init
+│
+▾
+○ abc1234
+│
+│ 20260102_add_users
+│
+▾
+○ 7e1b9a0
+│
+│ 20260103_add_posts
+│
+▾
+○ f03da82 ◆ db prod"
+`;
+
+exports[`Graph renderer — render full graph > renders Linear with rollbacks 1`] = `
+"2025-01-15T1023_rollback-add-users ┌────────▸○ ∅───────┐
+                                   │                   │
+                                   │                   │ 2025-01-15T1022_add-users
+                                   │                   │
+                                   └─────────▾─────────┘
+2025-02-03T0906_rollback-add-posts ┌────────▸○ abc1234─┐
+                                   │                   │
+                                   │                   │ 2025-02-03T0905_add-posts
+                                   │                   │
+                                   └─────────▾─────────┘
+                                             ○ def5678"
+`;
+
+exports[`Graph renderer — render full graph > renders Long spine (contract on graph) 1`] = `
+"                                ○ ∅
+                                │
+                                │ 20260101_init
+                                │
+                                ▾
+                                ○ S01
+                                │
+                                │ 20260102_add_users
+                                │
+                                ▾
+                      ┌─────────○ S02─────┐
+                      │                   │
+ 20260102_hotfix_typo │                   │ 20260103_add_posts
+                      │                   │
+                      ▾                   ▾
+                      ○ B1a hotfix        ○ S03
+                                          │
+                                          │ 20260104_add_comments
+                                          │
+                                          ▾
+                                ┌─────────○ S04─────┐
+                                │                   │
+        20260104_feature_search │                   │ 20260105_add_tags
+                                │                   │
+                                ▾                   ▾
+                                ○ B2a               ○ S05
+                                │                   │
+     20260104_feature_search_v2 │                   │ 20260106_add_likes
+                                │                   │
+                                ▾                   ▾
+                                ○ B2b     ┌─────────○ S06─────┐
+                                          │                   │
+                                          │                   │
+                  20260106_alice_refactor │                   │
+                                          ▾                   │
+                                          ○ B3a               │
+                                          │                   │
+                     20260106_merge_alice │                   │ 20260107_add_reactions
+                                          │                   │
+                                          └─────────▾─────────┘
+                                                    ○ S07
+                                                    │
+                                                    │ 20260108_add_notifications
+                                                    │
+                         20260108_experiment_a      ▾
+                      ┌─────────────────────────────○ S08─────┐
+                      │                                       │
+                      │                                       │ 20260109_add_settings
+                      │                                       │
+                      ▾                                       ▾
+                      ○ B4a               ┌──────────────────▸○ S09─────┐
+                      │                   │                             │
+20260108_experiment_b │                   │ 20260110_complete_rollback  │ 20260110_add_profiles
+                      │                   │                             │
+                      ▾                   │                             ▾
+                      ○ B4b               │                   ┌─────────○ S10─────┐
+                      │                   │                   │                   │
+20260108_experiment_c │                   │                   │                   │ 20260111_add_avatars
+                      │                   │                   │                   │
+                      ▾                   └─────────▾─────────┘                   ▾
+                      ○ B4c                         ○ R1                          ○ S11 ◆ db
+                                                                                  │
+                                                                                  │ 20260112_add_groups
+                                                                                  │
+                                                                                  ▾
+                                                                        ┌─────────○ S12─────┐
+                                                                        │                   │
+                                                20260112_staging_deploy │                   │ 20260113_add_roles
+                                                                        │                   │
+                                                                        ▾                   ▾
+                                                                        ○ B5a staging       ○ S13
+                                                                                            │
+                                                                                            │ 20260114_add_permissions
+                                                                                            │
+                                                                                            ▾
+                                                                                            ○ S14 prod ◆ contract"
+`;
+
+exports[`Graph renderer — render full graph > renders Long spine + late branch 1`] = `
+"           ○ ∅
+           │
+           │ step_1
+           │
+           ▾
+           ○ A
+           │
+           │ step_2
+           │
+           ▾
+           ○ B
+           │
+           │ step_3
+           │
+           ▾
+           ○ C
+           │
+           │ step_4
+           │
+           ▾
+           ○ D
+           │
+           │ step_5
+           │
+           ▾
+           ○ E
+           │
+           │ step_6
+           │
+           ▾
+           ○ F
+           │
+           │ step_7
+           │
+           ▾
+┌──────────○ G────────┐
+│                     │
+│ staging_feature     │ step_8
+│                     │
+▾                     ▾
+○ X staging           ○ H prod ◆ db"
+`;
+
+exports[`Graph renderer — render full graph > renders Long spine with varied branches 1`] = `
+"                                ○ ∅
+                                │
+                                │ 20260101_init
+                                │
+                                ▾
+                                ○ S01
+                                │
+                                │ 20260102_add_users
+                                │
+                                ▾
+                      ┌─────────○ S02─────┐
+                      │                   │
+ 20260102_hotfix_typo │                   │ 20260103_add_posts
+                      │                   │
+                      ▾                   ▾
+                      ○ B1a hotfix        ○ S03
+                                          │
+                                          │ 20260104_add_comments
+                                          │
+                                          ▾
+                                ┌─────────○ S04─────┐
+                                │                   │
+        20260104_feature_search │                   │ 20260105_add_tags
+                                │                   │
+                                ▾                   ▾
+                                ○ B2a               ○ S05
+                                │                   │
+     20260104_feature_search_v2 │                   │ 20260106_add_likes
+                                │                   │
+                                ▾                   ▾
+                                ○ B2b     ┌─────────○ S06─────┐
+                                          │                   │
+                                          │                   │
+                  20260106_alice_refactor │                   │
+                                          ▾                   │
+                                          ○ B3a               │
+                                          │                   │
+                     20260106_merge_alice │                   │ 20260107_add_reactions
+                                          │                   │
+                                          └─────────▾─────────┘
+                                                    ○ S07
+                                                    │
+                                                    │ 20260108_add_notifications
+                                                    │
+                         20260108_experiment_a      ▾
+                      ┌─────────────────────────────○ S08─────┐
+                      │                                       │
+                      │                                       │ 20260109_add_settings
+                      │                                       │
+                      ▾                                       ▾
+                      ○ B4a               ┌──────────────────▸○ S09─────┐
+                      │                   │                             │
+20260108_experiment_b │                   │ 20260110_complete_rollback  │ 20260110_add_profiles
+                      │                   │                             │
+                      ▾                   │                             ▾
+                      ○ B4b               │                   ┌─────────○ S10─────┐
+                      │                   │                   │                   │
+20260108_experiment_c │                   │                   │                   │ 20260111_add_avatars
+                      │                   │                   │                   │
+                      ▾                   └─────────▾─────────┘                   ▾
+                      ○ B4c                         ○ R1                          ○ S11 ◆ db
+                                                                                  │
+                                                                                  │ 20260112_add_groups
+                                                                                  │
+                                                                                  ▾
+                                                                        ┌─────────○ S12─────┐
+                                                                        │                   │
+                                                20260112_staging_deploy │                   │ 20260113_add_roles
+                                                                        │                   │
+                                                                        ▾                   ▾
+                                                                        ○ B5a staging       ○ S13
+                                                                                            │
+                                                                                            │ 20260114_add_permissions
+                                                                                            │
+                                                                                            ▾
+                                                                                            ○ S14 prod
+                                                                                            ┊
+                                                                                            ◇ planned ◆ contract"
+`;
+
+exports[`Graph renderer — render full graph > renders Multi-branch (3 branches) 1`] = `
+"          ○ ∅
+          │
+          │ init
+          │
+ hotfix   ▾
+┌─────────○ A───────┐
+│                   │
+│                   │ add_users
+│                   │
+▾    feature        ▾
+○ X─────────────────○ B───────┐
+│                             │
+│                             │ add_posts
+│                             │
+▾                             ▾
+○ Y                 ┌─────────○ C───────┐
+│                   │                   │
+│ feature_done      │ experiment        │ add_comments
+│                   │                   │
+▾                   ▾                   ▾
+○ Z                 ○ W                 ○ D"
+`;
+
+exports[`Graph renderer — render full graph > renders Multi-hop rollback 1`] = `
+"                                        ○ ∅
+                                        │
+                                        │ 2025-01-15T1022_add-users
+                                        │
+                                        ▾
+                              ┌────────▸○ abc1234─┐
+                              │                   │
+2025-03-12T0800_full-rollback │                   │ 2025-02-03T0905_add-posts
+                              │                   │
+                              │                   ▾
+                              │                   ○ def5678
+                              │                   │
+                              │                   │
+                              │                   │ 2025-03-10T0900_add-comments
+                              └─────────▾─────────┘
+                                        ○ ghi7890"
+`;
+
+exports[`Graph renderer — render full graph > renders Multi-team workflow (7 refs) 1`] = `
+"                ○ ∅
+                │
+                │ init
+                │
+                ▾
+                ○ abc1234
+                │
+                │ add_users
+                │
+    bob_wip     ▾             bob_add_comments alice_add_posts
+┌───────────────○ def5678────┬───────────────────────┬───────────────────┐
+│                            │                       │                   │
+│                            │ alice_wip             │                   │
+│                            │                       │                   │
+▾                            ▾                       ▾                   ▾
+○ dev0002 dev-bob            ○ dev0001 dev-alice     ○ b0b0001           ○ a11ce01
+│                            │                       │                   │
+│ preview_bob                │ preview_alice         │ merge_bob         │
+│                            │                       │      merge_alice  │
+▾                            ▾  rollback_staging     ▾───────────────────┘
+○ pre0002 preview-2          ○ pre0001 preview-1───┬▸○ mer9e01───────────┐
+                               │                   │                     │
+                               │                   │ staging_deploy      │ hotfix
+                               │                   │                     │
+                               └─────────▾─────────┘rollback_qa          ▾
+                                        ┌○ 5ta9e01 staging──┬───────────▸○ f1x0001─┐
+                                        │                   │                      │
+                                        │                   │ qa_deploy            │ release_v2
+                                        │                   │                      │
+                                        └─────────▾─────────┘                      ▾
+                                                  ○ qa00001 qa                     ○ re1ea5e prod ◆ db
+                                                                                   ┊
+                                                                                   ◇ c0n7rac ◆ contract"
+`;
+
+exports[`Graph renderer — render full graph > renders Multiple rollbacks + branch 1`] = `
+"                               ○ ∅
+                               │
+                               │ init
+                               │
+                               ▾
+                     ┌─────────○ A───────┐
+                     │                   │
+                     │ add_users         │ rollback_to_a
+                     │                   │
+                     ▾                   │add_posts
+┌───────────────────▸○ B─────────────────┼───────────────────┐
+│                    │                   │                   │
+│                    │ staging_feature   │                   │
+│                    │                   │                   │
+│                    ▾                   └─────────▾─────────┘
+│                    ○ E staging                   ○ C
+│                                                  │
+│                                                  │
+│       rollback_to_b                add_comments  │
+└─────────────────────────────▾────────────────────┘
+                              ○ D
+                              │
+                              │ add_tags
+                              │
+                              ▾
+                              ○ F prod ◆ db"
+`;
+
+exports[`Graph renderer — render full graph > renders Named refs 1`] = `
+"○ ∅
+│
+│ 2025-01-15T1022_add-users
+│
+▾
+○ abc1234
+│
+│ 2025-02-03T0905_add-posts
+│
+▾
+○ 7e1b9a0 staging
+│
+│ 2025-03-10T0900_add-comments
+│
+▾
+○ f03da82 production"
+`;
+
+exports[`Graph renderer — render full graph > renders Parallel edges 1`] = `
+"                                       ○ ∅
+                                       │
+                                       │ 2025-01-15T1022_add-users
+                                       │
+                                       ▾
+                             ┌─────────○ abc1234─┐
+                             │                   │
+2025-02-03T0906_add-posts-v2 │                   │ 2025-02-03T0905_add-posts
+                             │                   │
+                             └─────────▾─────────┘
+                                       ○ def5678"
+`;
+
+exports[`Graph renderer — render full graph > renders Partial rollback then continue 1`] = `
+"                                                          ○ ∅
+                                                          │
+                                                          │ 2025-01-15T1022_add-users
+                                                          │
+                                                          ▾
+                                                          ○ abc1234
+                                                          │
+                                                          │ 2025-02-03T0905_add-posts
+                                                          │
+                                                          ▾
+2025-03-12T0800_rollback-add-comments ┌──────────────────▸○ def5678───────────┐
+                                      │                   │                   │
+                                      │                   │                   │ 2025-03-20T0900_add-likes
+                                      │                   │                   │
+                                      └─────────▾─────────┘                   ▾
+                                                ○ ghi7890                     ○ jkl1234"
+`;
+
+exports[`Graph renderer — render full graph > renders Realistic team workflow 1`] = `
+"              ○ sha256:∅
+              │
+              │ init
+              │
+              ▾
+              ○ a1b2c3d
+              │
+              │ add_users
+              │
+              ▾
+    ┌─────────○ e4f5g6h─┐
+    │                   │
+    │ bob_add_comments  │ alice_add_posts
+    │                   │
+    ▾                   ▾
+    ○ g0h1i2j           ○ f7a8b9c
+    │                   │
+    │ merge_bob         │ merge_alice
+    │                   │
+    └─────────▾─────────┘
+┌─────────────○ k3l4m5n─────┐
+│                           │
+│ staging_experiment        │ add_tags
+│                           │
+▾                           ▾
+○ t9u0v1w staging           ○ p6q7r8s prod ◆ db
+                            ┊
+                            ◇ x2y3z4a ◇ contract"
+`;
+
+exports[`Graph renderer — render full graph > renders Refs + DB combined 1`] = `
+"○ ∅
+│
+│ 2025-01-15T1022_add-users
+│
+▾
+○ abc1234
+│
+│ 2025-02-03T0905_add-posts
+│
+▾
+○ 7e1b9a0 ◆ db staging
+│
+│ 2025-03-10T0900_add-comments
+│
+▾
+○ f03da82 ◇ contract production"
+`;
+
+exports[`Graph renderer — render full graph > renders Rollback then continue 1`] = `
+"                    ○ ∅
+                    │
+                    │ init
+                    │
+   rollback_b       ▾      fresh_start
+┌──────────────────▸○ A─────────────────┐
+│                   │                   │
+│                   │                   │
+│            step_1 │                   │
+└─────────▾─────────┘                   ▾
+┌────────▸○ B───────┐                   ○ E ◆ db prod
+│ rollback_c        │
+│                   │
+│            step_2 │
+└─────────▾─────────┘
+┌────────▸○ C───────┐
+│ rollback_d        │
+│                   │
+│             step_3│
+└─────────▾─────────┘
+          ○ D"
+`;
+
+exports[`Graph renderer — render full graph > renders Rollback via intermediates 1`] = `
+"                    ○ ∅
+                    │
+                    │ init
+                    │
+    rollback        ▾       add_users
+┌──────────────────▸○ A─────────────────┐
+│                   │                   │
+│                   │ experiment        │
+│                   │                   │
+│                   ▾                   ▾
+│                   ○ X                 ○ B
+│                   │                   │
+│                   │                   │ add_posts
+│                   │ experiment_2      │
+└─────────▾─────────┘                   ▾
+          ○ Y                           ○ C ◆ db prod"
+`;
+
+exports[`Graph renderer — render full graph > renders Sequential diamonds 1`] = `
+"          ○ ∅
+          │
+          │ init
+          │
+          ▾
+┌─────────○ A───────┐
+│                   │
+│ bob_1             │ alice_1
+│                   │
+▾                   ▾
+○ C                 ○ B
+│                   │
+│                   │
+│merge_1b   merge_1a│
+└─────────▾─────────┘
+┌─────────○ D───────┐
+│                   │
+│ bob_2             │ alice_2
+│                   │
+▾                   ▾
+○ F                 ○ E
+│                   │
+│                   │
+│merge_2b   merge_2a│
+└─────────▾─────────┘
+          ○ G"
+`;
+
+exports[`Graph renderer — render full graph > renders Simple rollback 1`] = `
+"          ○ ∅
+          │
+          │ init
+          │
+ rollback ▾
+┌────────▸○ A───────┐
+│                   │
+│                   │ add_users
+│                   │
+│                   ▾
+│                   ○ B
+│                   │
+│                   │
+│                   │ bad_migration
+└─────────▾─────────┘
+          ○ C"
+`;
+
+exports[`Graph renderer — render full graph > renders Simple rollback cycle 1`] = `
+"                                             ○ ∅
+                                             │
+                                             │ 2025-01-15T1022_add-users
+                                             │
+                                             ▾
+2025-02-05T1000_rollback-add-posts ┌────────▸○ abc1234─┐
+                                   │                   │
+                                   │                   │ 2025-02-03T0905_add-posts
+                                   │                   │
+                                   └─────────▾─────────┘
+                                             ○ def5678"
+`;
+
+exports[`Graph renderer — render full graph > renders Single branch 1`] = `
+"          ○ ∅
+          │
+          │ init
+          │
+          ▾
+┌─────────○ A───────┐
+│                   │
+│ feature_x         │ add_users
+│                   │
+▾                   ▾
+○ X                 ○ B
+│                   │
+│ feature_y         │ add_posts
+│                   │
+▾                   ▾
+○ Y staging         ○ C prod"
+`;
+
+exports[`Graph renderer — render full graph > renders Single edge 1`] = `
+"○ ∅
+│
+│ 2025-01-15T1022_add-users
+│
+▾
+○ abc1234"
+`;
+
+exports[`Graph renderer — render full graph > renders Skip rollback 1`] = `
+"                    ○ ∅
+                    │
+                    │ init
+                    │
+  rollback_to_a     ▾
+┌──────────────────▸○ A───────┐
+│                             │
+│                             │ step_1
+│                             │
+│                             ▾
+│                   ┌────────▸○ B───────┐
+│                   │                   │
+│                   │                   │ step_2
+│                   │ rollback_to_b     │
+└───────────────────┼───────────────────▾
+                    │                   ○ C
+                    │                   │
+                    │                   │
+                    │             step_3│
+                    └─────────▾─────────┘
+                              ○ D"
+`;
+
+exports[`Graph renderer — render full graph > renders Step-by-step rollback 1`] = `
+"          ○ ∅
+          │
+          │ init
+          │
+          ▾
+┌────────▸○ A───────┐
+│ rollback_b        │
+│                   │
+│            step_1 │
+└─────────▾─────────┘
+┌────────▸○ B───────┐
+│ rollback_c        │
+│                   │
+│            step_2 │
+└─────────▾─────────┘
+┌────────▸○ C───────┐
+│ rollback_d        │
+│                   │
+│             step_3│
+└─────────▾─────────┘
+          ○ D"
+`;
+
+exports[`Graph renderer — render full graph > renders Sub-branches 1`] = `
+"                    ○ ∅
+                    │
+                    │ init
+                    │
+                    ▾       add_users
+          ┌─────────○ A─────────────────┐
+          │                             │
+          │ feature                     │
+          │                             │
+          ▾                             ▾
+┌─────────○ X───────┐                   ○ B
+│                   │                   │
+│ sub_feature       │ feature_done      │ add_posts
+│                   │                   │
+▾                   ▾                   ▾
+○ W                 ○ Y                 ○ C
+│
+│ sub_feature_done
+│
+▾
+○ U"
+`;
+
+exports[`Graph renderer — render full graph > renders Wide fan (5 branches) 1`] = `
+"                                                  ○ ∅
+                                                  │
+                                                  │ init
+                                                  │
+                   branch_5  branch_4             ▾                   spine_continue
+┌───────────────────┬───────────────────┬─────────○ A───────┬───────────────────┬───────────────────┐
+│                   │                   │                   │  branch_1         │                   │
+│                   │                   │ branch_3          │                   │                   │
+│                   │                   │                   │                   │                   │
+▾                   ▾                   ▾                   ▾ branch_2          ▾                   ▾
+○ F                 ○ E                 ○ D                 ○ C                 ○ B                 ○ G prod ◆ db"
+`;
+
+exports[`render with truncation > renders truncated extracted subgraph with elided indicator 1`] = `
+"┊
+┊ (9 earlier migrations)
+┊
+○ S09
+│
+│ 20260110_add_profiles
+│
+▾
+○ S10
+│
+│ 20260111_add_avatars
+│
+▾
+○ S11 ◆ db
+│
+│ 20260112_add_groups
+│
+▾
+○ S12
+│
+│ 20260113_add_roles
+│
+▾
+○ S13
+│
+│ 20260114_add_permissions
+│
+▾
+○ S14 prod ◆ contract"
+`;
+
+exports[`render with truncation > renders truncated graph with detached contract 1`] = `
+"                                  ┊
+                                  ┊ (11 earlier migrations)
+                                  ┊
+                                  ○ S11 ◆ db
+                                  │
+                                  │ 20260112_add_groups
+                                  │
+                                  ▾
+                        ┌─────────○ S12─────┐
+                        │                   │
+20260112_staging_deploy │                   │ 20260113_add_roles
+                        │                   │
+                        ▾                   ▾
+                        ○ B5a staging       ○ S13
+                                            │
+                                            │ 20260114_add_permissions
+                                            │
+                                            ▾
+                                            ○ S14 prod
+                                            ┊
+                                            ◇ planned ◆ contract"
+`;
+
+exports[`render with truncation > renders truncated graph with ⋮ indicator 1`] = `
+"                    ┊
+                    ┊ (9 earlier migrations)
+                    ┊
+┌──────────────────▸○ S09─────┐
+│                             │
+│ 20260110_complete_rollback  │ 20260110_add_profiles
+│                             │
+│                             ▾
+│                   ┌─────────○ S10─────┐
+│                   │                   │
+│                   │                   │ 20260111_add_avatars
+│                   │                   │
+└─────────▾─────────┘                   ▾
+          ○ R1                          ○ S11 ◆ db
+                                        │
+                                        │ 20260112_add_groups
+                                        │
+                                        ▾
+                              ┌─────────○ S12─────┐
+                              │                   │
+      20260112_staging_deploy │                   │ 20260113_add_roles
+                              │                   │
+                              ▾                   ▾
+                              ○ B5a staging       ○ S13
+                                                  │
+                                                  │ 20260114_add_permissions
+                                                  │
+                                                  ▾
+                                                  ○ S14 prod ◆ contract"
+`;

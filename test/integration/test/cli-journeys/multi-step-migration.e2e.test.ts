@@ -64,7 +64,7 @@ withTempDir(({ createTempDir }) => {
         expect(statusPending.exitCode, 'C.05: migration status pending').toBe(0);
         const pendingOutput = stripAnsi(statusPending.stdout);
         // Should show at least 2 pending
-        expect(pendingOutput, 'C.05: shows pending migrations').toContain('Pending');
+        expect(pendingOutput, 'C.05: shows pending migrations').toContain('pending');
 
         // C.06: migration apply --db (applies both)
         const apply = await runMigrationApply(ctx);
@@ -73,7 +73,7 @@ withTempDir(({ createTempDir }) => {
         // C.07: migration status --db (all applied)
         const statusApplied = await runMigrationStatus(ctx);
         expect(statusApplied.exitCode, 'C.07: migration status all applied').toBe(0);
-        expect(stripAnsi(statusApplied.stdout), 'C.07: all applied').toContain('Applied');
+        expect(stripAnsi(statusApplied.stdout), 'C.07: all applied').toContain('applied');
 
         // C.08: db verify
         const verify = await runDbVerify(ctx);

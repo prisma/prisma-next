@@ -1,0 +1,66 @@
+[
+  {
+    "id": "dropTable.post",
+    "label": "Drop table post",
+    "summary": "Drops extra table post",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"post\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NOT NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop table \"post\"",
+        "sql": "DROP TABLE \"public\".\"post\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"post\" is removed",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NULL"
+      }
+    ]
+  },
+  {
+    "id": "column.user.phone",
+    "label": "Add column phone to user",
+    "summary": "Adds column phone to table user",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"phone\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"phone\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD COLUMN \"phone\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"phone\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n)"
+      }
+    ]
+  }
+]

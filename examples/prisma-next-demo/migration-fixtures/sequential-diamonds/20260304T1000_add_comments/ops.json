@@ -1,0 +1,34 @@
+[
+  {
+    "id": "table.comment",
+    "label": "Create table comment",
+    "summary": "Creates table comment with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"comment\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"comment\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"comment\"",
+        "sql": "CREATE TABLE \"public\".\"comment\" (\n  \"id\" uuid NOT NULL,\n  \"body\" text NOT NULL,\n  \"postId\" uuid NOT NULL,\n  \"userId\" uuid NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"comment\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"comment\"') IS NOT NULL"
+      }
+    ]
+  }
+]
