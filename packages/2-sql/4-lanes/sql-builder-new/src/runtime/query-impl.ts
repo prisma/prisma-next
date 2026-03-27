@@ -32,7 +32,6 @@ import {
   buildPlan,
   buildSelectAst,
   cloneState,
-  type ExprCallback,
   orderByScopeOf,
   resolveDistinctOn,
   resolveGroupBy,
