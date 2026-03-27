@@ -546,7 +546,7 @@ async function executeMigrationStatusCommand(
       );
     }
     diagnostics.push({
-      code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
+      code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
       severity: 'warn',
       message:
         'Database was updated outside the migration system (marker does not match any migration)',
@@ -645,7 +645,7 @@ async function executeMigrationStatusCommand(
   if (mode === 'online') {
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       diagnostics.push({
-        code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
+        code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
         severity: 'warn',
         message:
           'Database matches the current contract but was updated directly (not via migration apply)',

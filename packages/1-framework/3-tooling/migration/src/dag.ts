@@ -1,11 +1,11 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
-  errorAmbiguousLeaf,
+  errorDivergentBranches,
   errorDuplicateMigrationId,
-  errorNoResolvableLeaf,
-  errorNoRoot,
-  errorSelfLoop,
+  errorNoInitialMigration,
+  errorNoTarget,
+  errorSameSourceAndTarget,
 } from './errors';
 import type { AttestedMigrationBundle, MigrationChainEntry, MigrationGraph } from './types';
 
@@ -19,7 +19,7 @@ export function reconstructGraph(packages: readonly AttestedMigrationBundle[]): 
     const { from, to } = pkg.manifest;
 
     if (from === to) {
-      throw errorSelfLoop(pkg.dirName, from);
+      throw errorSameSourceAndTarget(pkg.dirName, from);
     }
 
     nodes.add(from);
@@ -276,10 +276,10 @@ export function findReachableLeaves(graph: MigrationGraph, fromHash: string): re
 }
 
 /**
- * Find the leaf contract hash of the migration graph reachable from
- * EMPTY_CONTRACT_HASH. Throws NO_ROOT if the graph has nodes but none
- * originate from the empty hash (e.g. root migration was deleted).
- * Throws AMBIGUOUS_LEAF if multiple leaves exist.
+ * Find the target contract hash of the migration graph reachable from
+ * EMPTY_CONTRACT_HASH. Throws NO_INITIAL_MIGRATION if the graph has
+ * nodes but none originate from the empty hash.
+ * Throws DIVERGENT_BRANCHES if multiple branch tips exist.
  */
 export function findLeaf(graph: MigrationGraph): string {
   if (graph.nodes.size === 0) {
@@ -287,7 +287,7 @@ export function findLeaf(graph: MigrationGraph): string {
   }
 
   if (!graph.nodes.has(EMPTY_CONTRACT_HASH)) {
-    throw errorNoRoot([...graph.nodes]);
+    throw errorNoInitialMigration([...graph.nodes]);
   }
 
   const leaves = findReachableLeaves(graph, EMPTY_CONTRACT_HASH);
@@ -295,21 +295,21 @@ export function findLeaf(graph: MigrationGraph): string {
   if (leaves.length === 0) {
     const reachable = [...graph.nodes].filter((n) => n !== EMPTY_CONTRACT_HASH);
     if (reachable.length > 0) {
-      throw errorNoResolvableLeaf(reachable);
+      throw errorNoTarget(reachable);
     }
     return EMPTY_CONTRACT_HASH;
   }
 
   if (leaves.length > 1) {
     const divergencePoint = findDivergencePoint(graph, EMPTY_CONTRACT_HASH, leaves);
-    const branches = leaves.map((leaf) => {
-      const path = findPath(graph, divergencePoint, leaf);
+    const branches = leaves.map((tip) => {
+      const path = findPath(graph, divergencePoint, tip);
       return {
-        leaf,
+        tip,
         edges: (path ?? []).map((e) => ({ dirName: e.dirName, from: e.from, to: e.to })),
       };
     });
-    throw errorAmbiguousLeaf(leaves, { divergencePoint, branches });
+    throw errorDivergentBranches(leaves, { divergencePoint, branches });
   }
 
   const leaf = leaves[0];
@@ -318,8 +318,8 @@ export function findLeaf(graph: MigrationGraph): string {
 
 /**
  * Find the latest migration entry by traversing from EMPTY_CONTRACT_HASH
- * to the single leaf. Returns null for an empty graph.
- * Throws AMBIGUOUS_LEAF if the graph has multiple leaves.
+ * to the single target. Returns null for an empty graph.
+ * Throws DIVERGENT_BRANCHES if the graph has multiple branch tips.
  */
 export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry | null {
   if (graph.nodes.size === 0) {
