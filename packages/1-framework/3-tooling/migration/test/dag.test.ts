@@ -76,14 +76,14 @@ describe('reconstructGraph', () => {
     expect(graph.migrationById.size).toBe(2);
   });
 
-  it('rejects self-loop with code MIGRATION.SELF_LOOP', () => {
+  it('rejects same source and target with code MIGRATION.SAME_SOURCE_AND_TARGET', () => {
     try {
       reconstructGraph([pkg('H1', 'H1', 'm1')]);
       expect.fail('expected error');
     } catch (e) {
       expect(MigrationToolsError.is(e)).toBe(true);
       const mte = e as MigrationToolsError;
-      expect(mte.code).toBe('MIGRATION.SELF_LOOP');
+      expect(mte.code).toBe('MIGRATION.SAME_SOURCE_AND_TARGET');
       expect(mte.category).toBe('MIGRATION');
       expect(mte.details).toHaveProperty('dirName', 'm1');
       expect(mte.details).toHaveProperty('hash', 'H1');
@@ -124,7 +124,7 @@ describe('findLeaf', () => {
     expect(findLeaf(graph)).toBe('H3');
   });
 
-  it('throws NO_RESOLVABLE_LEAF on cycle-without-exit (A→B→A)', () => {
+  it('throws NO_TARGET on cycle-without-exit (A→B→A)', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2'], ['H2', 'H1', 'm3']);
     const graph = reconstructGraph(packages);
     try {
@@ -133,9 +133,9 @@ describe('findLeaf', () => {
     } catch (e) {
       expect(MigrationToolsError.is(e)).toBe(true);
       const mte = e as MigrationToolsError;
-      expect(mte.code).toBe('MIGRATION.NO_RESOLVABLE_LEAF');
+      expect(mte.code).toBe('MIGRATION.NO_TARGET');
       expect(mte.fix).toContain('--from');
-      expect(mte.details).toHaveProperty('reachableNodes');
+      expect(mte.details).toHaveProperty('reachableHashes');
     }
   });
 
@@ -150,7 +150,7 @@ describe('findLeaf', () => {
     expect(findLeaf(graph)).toBe('H3');
   });
 
-  it('errors on branching with code MIGRATION.AMBIGUOUS_LEAF', () => {
+  it('errors on branching with code MIGRATION.AMBIGUOUS_TARGET', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2a', 'm2a'], ['H1', 'H2b', 'm2b']);
     const graph = reconstructGraph(packages);
     try {
@@ -159,9 +159,9 @@ describe('findLeaf', () => {
     } catch (e) {
       expect(MigrationToolsError.is(e)).toBe(true);
       const mte = e as MigrationToolsError;
-      expect(mte.code).toBe('MIGRATION.AMBIGUOUS_LEAF');
+      expect(mte.code).toBe('MIGRATION.AMBIGUOUS_TARGET');
       expect(mte.category).toBe('MIGRATION');
-      expect(mte.details).toHaveProperty('leaves');
+      expect(mte.details).toHaveProperty('branchTips');
       expect(mte.fix).toContain('--from');
     }
   });

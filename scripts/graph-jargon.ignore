@@ -1,0 +1,20 @@
+# Directories
+node_modules/
+dist/
+.git/
+
+# Test files and fixtures
+**/test/
+**/scratchpad-dots/
+**/*.snap
+
+# Renderer internals ("spine" is fine internally)
+**/graph-render.ts
+**/graph-types.ts
+**/graph-migration-mapper.ts
+**/test-graphs.ts
+
+# This script and transient project artifacts
+scripts/check-graph-jargon.sh
+scripts/graph-jargon.ignore
+projects/

@@ -262,7 +262,7 @@ withTempDir(({ createTempDir }) => {
      * to either plan a migration to formalize this state, or accept that
      * their migration history has a gap.
      */
-    describe('DB updated directly — MARKER_NOT_IN_GRAPH', () => {
+    describe('DB updated directly — MARKER_NOT_IN_HISTORY', () => {
       const db = useDevDatabase();
 
       it(
