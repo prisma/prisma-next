@@ -388,13 +388,13 @@ export function compileSelect(
   tableName: string,
   state: CollectionState,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const built = buildSelectAst(contract, tableName, {
+  const ast = buildSelectAst(contract, tableName, {
     ...state,
     includes: [],
   });
 
-  const { params, paramDescriptors } = deriveParamsFromAst(built.ast);
-  return buildOrmQueryPlan(contract, built.ast, params, paramDescriptors);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
 export function compileRelationSelect(
