@@ -559,6 +559,15 @@ async function executeMigrationStatusCommand(
     });
   }
 
+  if (mode === 'online' && markerHash === undefined) {
+    diagnostics.push({
+      code: 'MIGRATION.NO_MARKER',
+      severity: 'warn',
+      message: 'Database has not been initialized — no migration marker found',
+      hints: ["Run 'prisma-next migration apply' to apply pending migrations"],
+    });
+  }
+
   // Contract diagnostic — fires when no migration produces the current contract hash.
   // Suppressed when: (a) graph is diverged (MIGRATION.DIVERGED already guides the user),
   // (b) marker === contract and both off-graph (marker-not-in-graph diagnostic covers it).
