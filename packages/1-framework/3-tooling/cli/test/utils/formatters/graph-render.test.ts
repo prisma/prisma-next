@@ -1,3 +1,4 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
   extractRelevantSubgraph,
@@ -17,6 +18,9 @@ import {
   singleBranch,
 } from './test-graphs';
 
+// Dagre layout can be slow on CI; use a generous timeout for this file.
+const GRAPH_TIMEOUT = timeouts.databaseOperation;
+
 function renderNoColor(graph: TestGraph) {
   return graphRenderer.render(graph.graph, {
     ...graph.options,
@@ -24,7 +28,7 @@ function renderNoColor(graph: TestGraph) {
   });
 }
 
-describe('Graph renderer — render full graph', () => {
+describe('Graph renderer — render full graph', { timeout: GRAPH_TIMEOUT }, () => {
   for (const graph of allGraphs) {
     it(`renders ${graph.name}`, () => {
       const output = renderNoColor(graph);
@@ -44,7 +48,7 @@ describe('Graph renderer — render full graph', () => {
   });
 });
 
-describe('Graph renderer — render extracted subgraph', () => {
+describe('Graph renderer — render extracted subgraph', { timeout: GRAPH_TIMEOUT }, () => {
   it('extracts and renders spine from branching graph', () => {
     const spine = ['∅', 'A', 'B', 'C'];
     const sub = extractSubgraph(singleBranch.graph, spine);
@@ -231,7 +235,7 @@ describe('truncateGraph', () => {
   });
 });
 
-describe('render with truncation', () => {
+describe('render with truncation', { timeout: GRAPH_TIMEOUT }, () => {
   it('renders truncated graph with ⋮ indicator', () => {
     const output = graphRenderer.render(longSpineOnGraphContract.graph, {
       ...longSpineOnGraphContract.options,

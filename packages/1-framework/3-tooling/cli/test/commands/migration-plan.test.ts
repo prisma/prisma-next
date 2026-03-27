@@ -273,7 +273,7 @@ describe('--from hash lookup', () => {
     expect(found).toBeUndefined();
   });
 
-  it('matches by prefix without sha256: scheme', async () => {
+  it('resolves prefix without sha256: scheme', async () => {
     const tempDir = await createTempDir('prefix-no-scheme');
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -296,16 +296,14 @@ describe('--from hash lookup', () => {
     await attestMigration(packageDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-
-    // Prefix "abcdef" (without sha256:) finds the migration with to="sha256:abcdef1234567890"
-    const prefixWithScheme = 'sha256:abcdef';
-    const found = packages.find((p) => p.manifest.to.startsWith(prefixWithScheme));
-    expect(found).toBeDefined();
-    expect(found!.manifest.to).toBe('sha256:abcdef1234567890');
-    expect(found!.manifest.toContract).toEqual(contract);
+    const result = resolveBundleByPrefix(packages, 'abcdef');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.manifest.to).toBe('sha256:abcdef1234567890');
+    }
   });
 
-  it('matches by prefix with sha256: scheme', async () => {
+  it('resolves prefix with sha256: scheme', async () => {
     const tempDir = await createTempDir('prefix-with-scheme');
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -328,12 +326,11 @@ describe('--from hash lookup', () => {
     await attestMigration(packageDir);
 
     const packages = await readMigrationsDir(migrationsDir);
-
-    // Prefix "sha256:abcdef" (with scheme) also works
-    const needle = 'sha256:abcdef';
-    const found = packages.find((p) => p.manifest.to.startsWith(needle));
-    expect(found).toBeDefined();
-    expect(found!.manifest.to).toBe('sha256:abcdef1234567890');
+    const result = resolveBundleByPrefix(packages, 'sha256:abcdef');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.manifest.to).toBe('sha256:abcdef1234567890');
+    }
   });
 
   it('rejects ambiguous prefix matching multiple migrations', async () => {
