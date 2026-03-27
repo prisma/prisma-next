@@ -1,6 +1,5 @@
 import {
   AndExpr,
-  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   EqColJoinOn,
@@ -23,12 +22,6 @@ const col = (table: string, column: string) => ColumnRef.of(table, column);
 const param = (value: unknown, name?: string, codecId = 'pg/text@1') =>
   name !== undefined ? ParamRef.of(value, { name, codecId }) : ParamRef.of(value, { codecId });
 const literal = (value: unknown) => LiteralExpr.of(value);
-
-function toWhereExpr(expr: AnyWhereExpr): ToWhereExpr {
-  return {
-    toWhereExpr: () => expr,
-  };
-}
 
 function op(self: ColumnRef, args: Array<ColumnRef | ParamRef | LiteralExpr>): OperationExpr {
   return new OperationExpr({
@@ -68,7 +61,7 @@ describe('where interop', () => {
       ]),
     ]);
 
-    expect(normalizeWhereArg(toWhereExpr(expr))).toEqual(expr);
+    expect(normalizeWhereArg(expr)).toEqual(expr);
   });
 
   it('accepts bare WhereExpr with ParamRef when no contract is provided', () => {
@@ -123,11 +116,11 @@ describe('where interop', () => {
       BinaryExpr.in(col('users', 'id'), ListLiteralExpr.of([param('u1', 'first'), literal('u2')])),
     ]);
 
-    expect(normalizeWhereArg(toWhereExpr(expr))).toEqual(expr);
+    expect(normalizeWhereArg(expr)).toEqual(expr);
 
     const nullCheck = NullCheckExpr.isNotNull(
       op(col('users', 'email'), [col('users', 'email'), param('needle', 'needle'), literal('x')]),
     );
-    expect(normalizeWhereArg(toWhereExpr(nullCheck))).toEqual(nullCheck);
+    expect(normalizeWhereArg(nullCheck)).toEqual(nullCheck);
   });
 });

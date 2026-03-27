@@ -1,5 +1,4 @@
 import {
-  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   DerivedTableSource,
@@ -14,7 +13,6 @@ import {
   SelectAst,
   SubqueryExpr,
   TableSource,
-  type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { normalizeWhereArg } from '../src/where-interop';
@@ -23,12 +21,6 @@ const col = (table: string, column: string) => ColumnRef.of(table, column);
 const param = (value: unknown, name?: string, codecId = 'pg/text@1') =>
   name !== undefined ? ParamRef.of(value, { name, codecId }) : ParamRef.of(value, { codecId });
 const literal = (value: unknown) => LiteralExpr.of(value);
-
-function toWhereExpr(expr: AnyWhereExpr): ToWhereExpr {
-  return {
-    toWhereExpr: () => expr,
-  };
-}
 
 function op(self: ColumnRef, args: Array<ColumnRef | ParamRef | LiteralExpr>): OperationExpr {
   return new OperationExpr({
@@ -73,9 +65,7 @@ describe('where interop select/source branches', () => {
         ),
       ]);
 
-    expect(normalizeWhereArg(toWhereExpr(ExistsExpr.exists(select)))).toEqual(
-      ExistsExpr.exists(select),
-    );
+    expect(normalizeWhereArg(ExistsExpr.exists(select))).toEqual(ExistsExpr.exists(select));
   });
 
   it('preserves nullCheck expressions with operation args', () => {
@@ -83,7 +73,7 @@ describe('where interop select/source branches', () => {
       op(col('users', 'email'), [col('users', 'email'), param('needle', 'needle'), literal('x')]),
     );
 
-    expect(normalizeWhereArg(toWhereExpr(expr))).toEqual(expr);
+    expect(normalizeWhereArg(expr)).toEqual(expr);
   });
 
   it('accepts bare exists expressions with params in derived branches', () => {
