@@ -228,7 +228,7 @@ describe('GroupedCollection', () => {
         }
         const aggExpr = (having as BinaryExpr).left as AggregateExpr;
         return aggExpr.expr?.kind === 'column-ref'
-          ? `${(aggExpr.expr as ColumnRef).table}:${(aggExpr.expr as ColumnRef).column}`
+          ? `${aggExpr.expr.table}:${aggExpr.expr.column}`
           : undefined;
       })
       .filter((column): column is string => column !== undefined);

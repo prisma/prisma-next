@@ -53,7 +53,7 @@ function buildNullCheckExpr(
   const expr = where.expr;
 
   if (expr.kind === 'column-ref') {
-    const { table, column } = expr as ColumnRef;
+    const { table, column } = expr;
     const contractTable = contract.storage.tables[table];
     if (!contractTable) {
       errorUnknownTable(table);
@@ -93,7 +93,7 @@ export function buildWhereExpr(
   leftExpr = where.left;
 
   if (leftExpr.kind === 'column-ref') {
-    const { table, column } = leftExpr as ColumnRef;
+    const { table, column } = leftExpr;
     const contractTable = contract.storage.tables[table];
     if (!contractTable) {
       errorUnknownTable(table);
@@ -119,7 +119,7 @@ export function buildWhereExpr(
     const index = values.push(value);
 
     if (leftExpr.kind === 'column-ref') {
-      const { table, column } = leftExpr as ColumnRef;
+      const { table, column } = leftExpr;
       const contractTable = contract.storage.tables[table];
       const columnMeta = contractTable?.columns[column];
       if (columnMeta) {
@@ -139,7 +139,7 @@ export function buildWhereExpr(
     rightExpr = where.right.toExpr();
 
     if (rightExpr.kind === 'column-ref') {
-      const { table, column } = rightExpr as ColumnRef;
+      const { table, column } = rightExpr;
       const contractTable = contract.storage.tables[table];
       if (!contractTable) {
         errorUnknownTable(table);

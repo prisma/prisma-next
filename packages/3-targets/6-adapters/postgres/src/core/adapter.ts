@@ -300,7 +300,7 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   const left = renderExpr(leftExpr, contract);
   const leftRendered =
     leftExpr.kind === 'operation' || leftExpr.kind === 'subquery' ? `(${left})` : left;
-  const leftCol = leftExpr.kind === 'column-ref' ? (leftExpr as ColumnRef) : undefined;
+  const leftCol = leftExpr.kind === 'column-ref' ? leftExpr : undefined;
 
   const rightNode = expr.right;
   let right: string;

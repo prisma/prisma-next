@@ -353,7 +353,7 @@ describe('integration/include', () => {
           (join) =>
             join.lateral &&
             join.source.kind === 'derived-table-source' &&
-            (join.source as DerivedTableSource).alias === 'posts_lateral',
+            join.source.alias === 'posts_lateral',
         );
         expect(includeJoin).toBeDefined();
 
@@ -440,7 +440,7 @@ describe('integration/include', () => {
           (join) =>
             join.lateral &&
             join.source.kind === 'derived-table-source' &&
-            (join.source as DerivedTableSource).alias === 'invitedUsers_lateral',
+            join.source.alias === 'invitedUsers_lateral',
         );
         expect(includeJoin).toBeDefined();
 

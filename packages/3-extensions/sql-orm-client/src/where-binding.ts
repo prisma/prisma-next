@@ -53,7 +53,7 @@ function bindWhereExprNode(
   return expr.accept<AnyWhereExpr>({
     binary(expr) {
       const left = bindExpression(contract, expr.left, state);
-      const bindingColumn = left.kind === 'column-ref' ? (left as ColumnRef) : undefined;
+      const bindingColumn = left.kind === 'column-ref' ? left : undefined;
 
       return new BinaryExpr(
         expr.op,

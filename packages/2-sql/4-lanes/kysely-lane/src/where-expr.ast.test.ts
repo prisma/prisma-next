@@ -156,13 +156,13 @@ describe('buildKyselyWhereExpr nested AST traversal', () => {
     expect(bound.expr).toBeInstanceOf(ExistsExpr);
     const exists = bound.expr as ExistsExpr;
     const subquery = exists.subquery;
-    expect(subquery.from).toBeInstanceOf(DerivedTableSource);
+    expect(subquery.from.kind).toEqual('derived-table-source');
     expect(((subquery.from as DerivedTableSource).query.where as BinaryExpr).right).toEqual(
       ParamRef.of(3, 'kind'),
     );
 
     const join = subquery.joins?.[0];
-    expect(join?.source).toBeInstanceOf(DerivedTableSource);
+    expect(join?.source.kind).toEqual('derived-table-source');
     expect((join?.on as BinaryExpr).right).toEqual(ParamRef.of(1, 'userId'));
     expect(((join?.source as DerivedTableSource).query.where as BinaryExpr).right).toEqual(
       ParamRef.of(4, 'title'),

@@ -1251,7 +1251,7 @@ export class SelectAst extends QueryAst {
     };
 
     if (this.from.kind === 'derived-table-source') {
-      pushRefs((this.from as DerivedTableSource).query.collectColumnRefs());
+      pushRefs(this.from.query.collectColumnRefs());
     }
 
     for (const projection of this.projection) {
@@ -1277,7 +1277,7 @@ export class SelectAst extends QueryAst {
     }
     for (const join of this.joins ?? []) {
       if (join.source.kind === 'derived-table-source') {
-        pushRefs((join.source as DerivedTableSource).query.collectColumnRefs());
+        pushRefs(join.source.query.collectColumnRefs());
       }
       if (join.on.kind === 'eq-col-join-on') {
         refs.push(join.on.left, join.on.right);
@@ -1296,7 +1296,7 @@ export class SelectAst extends QueryAst {
     };
 
     if (this.from.kind === 'derived-table-source') {
-      pushRefs((this.from as DerivedTableSource).query.collectParamRefs());
+      pushRefs(this.from.query.collectParamRefs());
     }
 
     for (const projection of this.projection) {
@@ -1322,7 +1322,7 @@ export class SelectAst extends QueryAst {
     }
     for (const join of this.joins ?? []) {
       if (join.source.kind === 'derived-table-source') {
-        pushRefs((join.source as DerivedTableSource).query.collectParamRefs());
+        pushRefs(join.source.query.collectParamRefs());
       }
       if (join.on.kind !== 'eq-col-join-on') {
         pushRefs(join.on.collectParamRefs());
@@ -1496,7 +1496,7 @@ export class InsertAst extends QueryAst {
         const action = this.onConflict.action as DoUpdateSetConflictAction;
         for (const value of Object.values(action.set)) {
           if (value.kind === 'column-ref') {
-            addColumn(value as ColumnRef);
+            addColumn(value);
           }
         }
       }

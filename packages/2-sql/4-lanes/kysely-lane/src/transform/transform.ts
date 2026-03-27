@@ -9,7 +9,7 @@
  */
 import type { PlanRefs } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { AnyQueryAst, ColumnRef } from '@prisma-next/sql-relational-core/ast';
+import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { DeleteQueryNode, InsertQueryNode, SelectQueryNode, UpdateQueryNode } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
@@ -81,15 +81,14 @@ export function transformKyselyToPnAst(
   if (select) {
     projection = Object.fromEntries(
       select.projection.map((projected) => {
-        const col =
-          projected.expr.kind === 'column-ref' ? (projected.expr as ColumnRef) : undefined;
+        const col = projected.expr.kind === 'column-ref' ? projected.expr : undefined;
         return [projected.alias, col?.column ?? projected.alias];
       }),
     );
 
     projectionTypes = {};
     for (const projected of select.projection) {
-      const col = projected.expr.kind === 'column-ref' ? (projected.expr as ColumnRef) : undefined;
+      const col = projected.expr.kind === 'column-ref' ? projected.expr : undefined;
       if (col) {
         const column = ctx.contract.storage.tables[col.table]?.columns[col.column];
         if (column) {
@@ -165,15 +164,14 @@ export function transformKyselyToPnAstCollectingParams(
   if (select) {
     projection = Object.fromEntries(
       select.projection.map((projected) => {
-        const col =
-          projected.expr.kind === 'column-ref' ? (projected.expr as ColumnRef) : undefined;
+        const col = projected.expr.kind === 'column-ref' ? projected.expr : undefined;
         return [projected.alias, col?.column ?? projected.alias];
       }),
     );
 
     projectionTypes = {};
     for (const projected of select.projection) {
-      const col = projected.expr.kind === 'column-ref' ? (projected.expr as ColumnRef) : undefined;
+      const col = projected.expr.kind === 'column-ref' ? projected.expr : undefined;
       if (col) {
         const column = ctx.contract.storage.tables[col.table]?.columns[col.column];
         if (column) {

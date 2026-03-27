@@ -31,7 +31,7 @@ export function getColumnInfo(expr: AnyExpressionSource | OperationExpr): {
   column: string;
 } {
   if (expr.kind === 'operation') {
-    const baseCol = (expr as OperationExpr).baseColumnRef();
+    const baseCol = expr.baseColumnRef();
     return { table: baseCol.table, column: baseCol.column };
   }
   if (isExpressionBuilder(expr)) {
