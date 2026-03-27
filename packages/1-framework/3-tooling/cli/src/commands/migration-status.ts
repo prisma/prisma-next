@@ -228,13 +228,16 @@ function buildMigrationEntries(
   packages: readonly MigrationBundle[],
   mode: 'online' | 'offline',
   markerHash: string | undefined,
+  edgeStatuses?: readonly EdgeStatus[],
 ): MigrationStatusEntry[] {
   const pkgByDirName = new Map(packages.map((p) => [p.dirName, p]));
+  const statusByDirName = edgeStatuses
+    ? new Map(edgeStatuses.map((e) => [e.dirName, e.status]))
+    : undefined;
 
   const markerInChain = markerHash === undefined || chain.some((e) => e.to === markerHash);
 
   const entries: MigrationStatusEntry[] = [];
-  // Online with no marker = fresh database, all migrations are pending.
   let reachedMarker = mode === 'online' && markerHash === undefined;
 
   for (const migration of chain) {
@@ -242,8 +245,11 @@ function buildMigrationEntries(
     const ops = (pkg?.ops ?? []) as readonly MigrationPlanOperation[];
     const { summary, hasDestructive } = summarizeOps(ops);
 
-    let status: 'applied' | 'pending' | 'unknown';
-    if (mode === 'offline' || !markerInChain) {
+    let status: EdgeStatusKind | 'unknown';
+    const edgeStatus = statusByDirName?.get(migration.dirName);
+    if (edgeStatus) {
+      status = edgeStatus;
+    } else if (mode === 'offline' || !markerInChain) {
       status = 'unknown';
     } else if (reachedMarker) {
       status = 'pending';
@@ -613,8 +619,8 @@ async function executeMigrationStatusCommand(
     );
   }
 
-  const entries = buildMigrationEntries(chain, attested, mode, markerHash);
   const edgeStatuses = deriveEdgeStatuses(graph, targetHash, contractHash, markerHash, mode);
+  const entries = buildMigrationEntries(chain, attested, mode, markerHash, edgeStatuses);
 
   const pendingCount = edgeStatuses.filter((e) => e.status === 'pending').length;
   const appliedCount = edgeStatuses.filter((e) => e.status === 'applied').length;
