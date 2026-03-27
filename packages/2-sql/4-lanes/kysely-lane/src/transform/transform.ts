@@ -20,8 +20,6 @@ import { transformSelect } from './transform-select';
 
 export type { TransformResult };
 
-export interface TransformResultWithParams extends TransformResult {}
-
 export function transformKyselyToPnAst(
   contract: SqlContract<SqlStorage>,
   query: unknown,
