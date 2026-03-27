@@ -286,17 +286,19 @@ Clarity about what's out of scope is as important as the promises:
 
 | Concern | Raw `mongodb` driver | Mongoose | Prisma ORM (Mongo) | **Prisma Next** |
 |---|---|---|---|---|
-| Schema definition | None | Mongoose schemas (JS, partial TS) | PSL (no embedded docs) | Contract (TS or PSL, full embedding) |
-| Type safety (queries) | Shallow (top-level only) | Weak (FilterQuery → any) | Generated types (no embedding) | Full (filters, operators, nested fields) |
-| Type safety (mutations) | None | Partial | Generated types | Full (including Mongo operators) |
-| Referential integrity | None | Manual (middleware hooks) | None | Configurable (cascade, restrict, setNull) |
-| Embedded documents | Native | Native | Not supported | Native (first-class in contract) |
-| Polymorphism / unions | Native (untyped) | Discriminator plugin | Json fallback | Discriminated unions in contract (April) |
-| Schema validation | Manual $jsonSchema | Plugin-based | None | Built-in (write + configurable read) |
-| Aggregation pipelines | Untyped arrays | Untyped arrays | Not exposed | Raw escape hatch (typed DSL later) |
-| Vector / Atlas Search | Raw pipeline stages | Raw pipeline stages | Raw queries | Extension packs (planned) |
-| Change streams | Native | Native | Not supported | Planned (async iterable model) |
-| Schema evolution | N/A (manual scripts) | Manual (middleware) | No Mongo migrations | Data invariant model (planned) |
-| Introspection | N/A | N/A | db pull (limited) | Planned (type inference + convention) |
-| Cross-family support | N/A | N/A | SQL + Mongo (separate) | SQL + Mongo (shared interface) |
-| Plugin/middleware ecosystem | None | Mongoose plugins | Limited | Full (shared with SQL) |
+| Schema definition | ❌ None | 🟡 JS schemas, partial TS | 🟡 PSL (no embedded docs) | ✅ Contract (TS or PSL, full embedding) |
+| Type safety (queries) | 🟡 Top-level only | ❌ FilterQuery → any | 🟡 Generated (no embedding) | ✅ Full (filters, operators, nested) |
+| Type safety (mutations) | ❌ None | 🟡 Partial | 🟡 Generated types | ✅ Full (including Mongo operators) |
+| Referential integrity | ❌ None | 🟡 Manual (middleware) | ❌ None | ✅ Configurable (cascade, restrict, setNull) |
+| Embedded documents | ✅ Native | ✅ Native | ❌ Not supported | ✅ First-class in contract |
+| Polymorphism / unions | 🟡 Native (untyped) | 🟡 Discriminator plugin | ❌ Json fallback | 🟡 Discriminated unions (April) |
+| Schema validation | 🟡 Manual $jsonSchema | 🟡 Plugin-based | ❌ None | ✅ Built-in (write + configurable read) |
+| Aggregation pipelines | 🟡 Untyped arrays | 🟡 Untyped arrays | ❌ Not exposed | 🟡 Raw escape hatch (typed DSL later) |
+| Vector / Atlas Search | 🟡 Raw pipeline stages | 🟡 Raw pipeline stages | 🟡 Raw queries | 🔲 Extension packs (planned) |
+| Change streams | ✅ Native | ✅ Native | ❌ Not supported | 🔲 Planned (async iterable) |
+| Schema evolution | ❌ Manual scripts | 🟡 Manual (middleware) | ❌ No Mongo migrations | 🔲 Data invariant model (planned) |
+| Introspection | ➖ N/A | ➖ N/A | 🟡 db pull (limited) | 🔲 Planned (type inference) |
+| Cross-family support | ➖ N/A | ➖ N/A | 🟡 SQL + Mongo (separate) | ✅ SQL + Mongo (shared interface) |
+| Plugin/middleware | ❌ None | 🟡 Mongoose plugins | 🟡 Limited | ✅ Full (shared with SQL) |
+
+Legend: ✅ strong / native — 🟡 partial / manual — ❌ missing / none — 🔲 planned — ➖ not applicable
