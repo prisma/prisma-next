@@ -96,16 +96,16 @@ describe('sql lane rich select and include ASTs', () => {
       })
       .build();
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.joins?.[0]).toBeInstanceOf(JoinAst);
     expect(ast.projection[1]?.expr).toEqual(ColumnRef.of('posts_lateral', 'posts'));
 
     const aggregateSource = ast.joins?.[0]?.source;
-    expect(aggregateSource).toBeInstanceOf(DerivedTableSource);
+    expect(aggregateSource?.kind).toBe('derived-table-source');
     const aggregateSelect = (aggregateSource as DerivedTableSource).query;
-    expect(aggregateSelect.projection[0]?.expr).toBeInstanceOf(JsonArrayAggExpr);
-    expect(aggregateSelect.from).toBeInstanceOf(DerivedTableSource);
+    expect(aggregateSelect.projection[0]?.expr.kind).toBe('json-array-agg');
+    expect(aggregateSelect.from.kind).toBe('derived-table-source');
     expect((aggregateSelect.from as DerivedTableSource).query.limit).toBe(2);
     expect(plan.meta.refs?.tables).toContain('post');
   });
