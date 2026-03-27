@@ -57,9 +57,9 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 - Never use `@ts-expect-error` outside of negative type tests
 - Never use `@ts-nocheck`
 - Never suppress biome lints
-- Try to minimize type casts. Instead, prefer explic types that would make type casts unnecesarry. If type cast is unavoidable, try to minimize it's scope — never cast
+- Try to minimize type casts. Instead, prefer explicit types that would make type casts unnecessary. If type cast is unavoidable, try to minimize its scope — never cast
   entire object/class when casting one property would suffice.
-- `as unknown as SomeOtherType` type cast should be used only as a last resort and should allways be accompanied by the comment explaining why is it necessary.
+- `as unknown as SomeOtherType` type cast should be used only as a last resort and should always be accompanied by a comment explaining why it is necessary.
 
 ## Common Commands
 
