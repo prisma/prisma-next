@@ -96,8 +96,7 @@ export function buildWhereExpr(
 
     codecId = columnMeta.codecId;
   } else if (leftExpr.kind === 'operation') {
-    const opExpr = leftExpr as OperationExpr;
-    codecId = opExpr.returns.kind === 'typeId' ? opExpr.returns.type : opExpr.forTypeId;
+    codecId = leftExpr.returns.kind === 'typeId' ? leftExpr.returns.type : leftExpr.forTypeId;
   }
 
   if (isParamPlaceholder(where.right)) {

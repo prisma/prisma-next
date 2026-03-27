@@ -1260,6 +1260,9 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../relational-core
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/utils
     devDependencies:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*

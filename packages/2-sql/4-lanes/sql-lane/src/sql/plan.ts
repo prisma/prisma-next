@@ -194,7 +194,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
 
   // Build codec assignments from column types
   // Skip include aliases - they don't need codec entries
-  const projectionCodecs: Record<string, string> = {};
+  const codecs: Record<string, string> = {};
   for (let i = 0; i < args.projection.aliases.length; i++) {
     const alias = args.projection.aliases[i];
     if (!alias || includeAliases.has(alias)) {
@@ -207,7 +207,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (isExpressionBuilder(column)) {
       const operationExpr = column.expr;
       if (operationExpr.returns.kind === 'typeId') {
-        projectionCodecs[alias] = operationExpr.returns.type;
+        codecs[alias] = operationExpr.returns.type;
       }
     } else {
       // Use columnMeta.codecId directly as typeId (already canonicalized)
@@ -216,14 +216,10 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       const columnMeta = col.columnMeta;
       const codecId = columnMeta?.codecId;
       if (codecId) {
-        projectionCodecs[alias] = codecId;
+        codecs[alias] = codecId;
       }
     }
   }
-
-  const allCodecs: Record<string, string> = {
-    ...projectionCodecs,
-  };
 
   return Object.freeze(
     compact({
@@ -238,10 +234,10 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       projection: projectionMap,
       projectionTypes: Object.keys(projectionTypes).length > 0 ? projectionTypes : undefined,
       annotations:
-        Object.keys(allCodecs).length > 0 || args.limit !== undefined
+        Object.keys(codecs).length > 0 || args.limit !== undefined
           ? Object.freeze(
               compact({
-                codecs: Object.keys(allCodecs).length > 0 ? Object.freeze(allCodecs) : undefined,
+                codecs: Object.keys(codecs).length > 0 ? Object.freeze(codecs) : undefined,
                 limit: args.limit,
               }),
             )

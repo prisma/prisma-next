@@ -47,15 +47,16 @@ import { buildJoinAst } from './join-builder';
 import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
 import { buildProjectionState } from './projection';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
   const collected = [...new Set(ast.collectParamRefs())];
   return {
     paramValues: collected.map((p) => p.value),
     paramDescriptors: collected.map((p) => ({
-      ...(p.name !== undefined && { name: p.name }),
+      ...ifDefined('name', p.name),
       source: 'dsl' as const,
-      ...(p.codecId !== undefined && { codecId: p.codecId }),
+      ...ifDefined('codecId', p.codecId),
     })),
   };
 }
