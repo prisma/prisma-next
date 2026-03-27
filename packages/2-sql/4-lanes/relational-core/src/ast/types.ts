@@ -224,31 +224,26 @@ abstract class AstNode {
 }
 
 abstract class QueryAst extends AstNode {
-  abstract override readonly kind: 'select' | 'insert' | 'update' | 'delete';
   abstract collectRefs(): PlanRefs;
 
   collectColumnRefs(): ColumnRef[] {
     const refs = this.collectRefs().columns ?? [];
     return refs.map((ref) => new ColumnRef(ref.table, ref.column));
   }
+
+  abstract toQueryAst(): AnyQueryAst;
 }
 
 abstract class FromSource extends AstNode {
-  abstract override readonly kind: 'table-source' | 'derived-table-source';
   abstract collectRefs(): PlanRefs;
   abstract rewrite(rewriter: AstRewriter): AnyFromSource;
+  abstract toFromSource(): AnyFromSource;
 }
 
 abstract class Expression extends AstNode implements ExpressionSource {
-  abstract override readonly kind:
-    | 'column-ref'
-    | 'subquery'
-    | 'operation'
-    | 'aggregate'
-    | 'json-object'
-    | 'json-array-agg';
   abstract rewrite(rewriter: ExpressionRewriter): AnyExpression;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
+  abstract toExpr(): AnyExpression;
 
   collectColumnRefs(): ColumnRef[] {
     return collectColumnRefsWith(this);
@@ -261,20 +256,14 @@ abstract class Expression extends AstNode implements ExpressionSource {
   baseColumnRef(): ColumnRef {
     throw new Error(`${this.constructor.name} does not expose a base column reference`);
   }
-
-  toExpr(): AnyExpression {
-    // Safe: every concrete Expression subclass is a member of AnyExpression.
-    // The double cast is needed because TS can't narrow `this` (abstract) to the union.
-    return this as unknown as AnyExpression;
-  }
 }
 
 abstract class WhereExpr extends AstNode {
-  abstract override readonly kind: 'binary' | 'and' | 'or' | 'exists' | 'null-check';
   abstract accept<R>(visitor: WhereExprVisitor<R>): R;
   abstract rewrite(rewriter: ExpressionRewriter): AnyWhereExpr;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
   abstract not(): AnyWhereExpr;
+  abstract toWhereExpr(): AnyWhereExpr;
 
   collectColumnRefs(): ColumnRef[] {
     return collectColumnRefsWith(this);
@@ -295,6 +284,10 @@ export class TableSource extends FromSource {
     this.name = name;
     this.alias = alias;
     this.freeze();
+  }
+
+  override toFromSource(): AnyFromSource {
+    return this;
   }
 
   static named(name: string, alias?: string): TableSource {
@@ -344,6 +337,10 @@ export class DerivedTableSource extends FromSource {
   override collectRefs(): PlanRefs {
     return this.query.collectRefs();
   }
+
+  override toFromSource(): AnyFromSource {
+    return this;
+  }
 }
 
 export class ColumnRef extends Expression {
@@ -371,6 +368,10 @@ export class ColumnRef extends Expression {
   }
 
   override baseColumnRef(): ColumnRef {
+    return this;
+  }
+
+  override toExpr(): AnyExpression {
     return this;
   }
 }
@@ -443,6 +444,10 @@ export class SubqueryExpr extends Expression {
 
   override fold<T>(folder: ExpressionFolder<T>): T {
     return folder.select ? folder.select(this.query) : folder.empty;
+  }
+
+  override toExpr(): AnyExpression {
+    return this;
   }
 }
 
@@ -518,6 +523,10 @@ export class OperationExpr extends Expression {
   override baseColumnRef(): ColumnRef {
     return this.self.baseColumnRef();
   }
+
+  override toExpr(): AnyExpression {
+    return this;
+  }
 }
 
 export class AggregateExpr extends Expression {
@@ -562,6 +571,10 @@ export class AggregateExpr extends Expression {
   override fold<T>(folder: ExpressionFolder<T>): T {
     return this.expr ? this.expr.fold(folder) : folder.empty;
   }
+
+  override toExpr(): AnyExpression {
+    return this;
+  }
 }
 
 export class JsonObjectExpr extends Expression {
@@ -572,6 +585,10 @@ export class JsonObjectExpr extends Expression {
     super();
     this.entries = frozenArrayCopy(entries.map((entry) => Object.freeze({ ...entry })));
     this.freeze();
+  }
+
+  override toExpr(): AnyExpression {
+    return this;
   }
 
   static entry(key: string, value: ProjectionExpr): JsonObjectEntry {
@@ -663,6 +680,10 @@ export class JsonArrayAggExpr extends Expression {
     orderBy?: ReadonlyArray<OrderByItem>,
   ): JsonArrayAggExpr {
     return new JsonArrayAggExpr(expr, onEmpty, orderBy);
+  }
+
+  override toExpr(): AnyExpression {
+    return this;
   }
 
   override rewrite(rewriter: ExpressionRewriter): AnyExpression {
@@ -810,6 +831,10 @@ export class BinaryExpr extends WhereExpr {
   override not(): AnyWhereExpr {
     return new BinaryExpr(negateBinaryOp(this.op), this.left, this.right);
   }
+
+  override toWhereExpr(): AnyWhereExpr {
+    return this;
+  }
 }
 
 function negateBinaryOp(op: BinaryOp): BinaryOp {
@@ -876,6 +901,10 @@ export class AndExpr extends WhereExpr {
   override not(): AnyWhereExpr {
     return new OrExpr(this.exprs.map((expr) => expr.not()));
   }
+
+  override toWhereExpr(): AnyWhereExpr {
+    return this;
+  }
 }
 
 export class OrExpr extends WhereExpr {
@@ -914,6 +943,10 @@ export class OrExpr extends WhereExpr {
   override not(): AnyWhereExpr {
     return new AndExpr(this.exprs.map((expr) => expr.not()));
   }
+
+  override toWhereExpr(): AnyWhereExpr {
+    return this;
+  }
 }
 
 export class ExistsExpr extends WhereExpr {
@@ -951,6 +984,10 @@ export class ExistsExpr extends WhereExpr {
   override not(): AnyWhereExpr {
     return new ExistsExpr(this.subquery, !this.notExists);
   }
+
+  override toWhereExpr(): AnyWhereExpr {
+    return this;
+  }
 }
 
 export class NullCheckExpr extends WhereExpr {
@@ -987,6 +1024,10 @@ export class NullCheckExpr extends WhereExpr {
 
   override not(): AnyWhereExpr {
     return new NullCheckExpr(this.expr, !this.isNull);
+  }
+
+  override toWhereExpr(): AnyWhereExpr {
+    return this;
   }
 }
 
@@ -1360,10 +1401,14 @@ export class SelectAst extends QueryAst {
 
     return sortRefs(tables, columns);
   }
+
+  override toQueryAst(): AnyQueryAst {
+    return this;
+  }
 }
 
 abstract class InsertOnConflictAction extends AstNode {
-  abstract override readonly kind: 'do-nothing' | 'do-update-set';
+  abstract toInsertOnConflictAction(): AnyInsertOnConflictAction;
 }
 
 export class DoNothingConflictAction extends InsertOnConflictAction {
@@ -1372,6 +1417,10 @@ export class DoNothingConflictAction extends InsertOnConflictAction {
   constructor() {
     super();
     this.freeze();
+  }
+
+  override toInsertOnConflictAction(): AnyInsertOnConflictAction {
+    return this;
   }
 }
 
@@ -1383,6 +1432,10 @@ export class DoUpdateSetConflictAction extends InsertOnConflictAction {
     super();
     this.set = frozenRecordCopy(set);
     this.freeze();
+  }
+
+  override toInsertOnConflictAction(): AnyInsertOnConflictAction {
+    return this;
   }
 }
 
@@ -1504,6 +1557,10 @@ export class InsertAst extends QueryAst {
 
     return sortRefs(tables, columns);
   }
+
+  override toQueryAst(): AnyQueryAst {
+    return this;
+  }
 }
 
 export class UpdateAst extends QueryAst {
@@ -1563,6 +1620,10 @@ export class UpdateAst extends QueryAst {
 
     return sortRefs(tables, columns);
   }
+
+  override toQueryAst(): AnyQueryAst {
+    return this;
+  }
 }
 
 export class DeleteAst extends QueryAst {
@@ -1604,6 +1665,10 @@ export class DeleteAst extends QueryAst {
     }
 
     return sortRefs(tables, columns);
+  }
+
+  override toQueryAst(): AnyQueryAst {
+    return this;
   }
 }
 
