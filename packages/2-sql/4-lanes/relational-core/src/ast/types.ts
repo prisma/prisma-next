@@ -1539,8 +1539,7 @@ export class InsertAst extends QueryAst {
       }
     }
     if (this.onConflict?.action.kind === 'do-update-set') {
-      const action = this.onConflict.action as DoUpdateSetConflictAction;
-      for (const value of Object.values(action.set)) {
+      for (const value of Object.values(this.onConflict.action.set)) {
         if (value.kind === 'param-ref') {
           refs.push(value);
         }
@@ -1695,11 +1694,7 @@ export class DeleteAst extends QueryAst {
   }
 
   override collectParamRefs(): ParamRef[] {
-    const refs: ParamRef[] = [];
-    if (this.where) {
-      refs.push(...this.where.collectParamRefs());
-    }
-    return refs;
+    return this.where?.collectParamRefs() ?? [];
   }
 
   override collectRefs(): PlanRefs {
