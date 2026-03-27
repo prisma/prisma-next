@@ -134,7 +134,7 @@ class PostgresAdapterImpl
         break;
       default: {
         const _exhaustive: never = node;
-        throw new Error(`Unsupported AST node: ${(_exhaustive as AnyQueryAst).constructor.name}`);
+        throw new Error(`Unsupported AST node kind: ${(_exhaustive as { kind: string }).kind}`);
       }
     }
 
@@ -233,9 +233,7 @@ function renderSource(source: AnyFromSource, contract?: PostgresContract): strin
       return `(${renderSelect(node.query, contract)}) AS ${quoteIdentifier(node.alias)}`;
     default: {
       const _exhaustive: never = node;
-      throw new Error(
-        `Unsupported source node: ${(_exhaustive as AnyFromSource).constructor.name}`,
-      );
+      throw new Error(`Unsupported source node kind: ${(_exhaustive as { kind: string }).kind}`);
     }
   }
 }
@@ -430,7 +428,7 @@ function renderExpr(expr: AnyExpression, contract?: PostgresContract): string {
     default: {
       const _exhaustive: never = node;
       throw new Error(
-        `Unsupported expression node: ${(_exhaustive as AnyExpression).constructor.name}`,
+        `Unsupported expression node kind: ${(_exhaustive as { kind: string }).kind}`,
       );
     }
   }

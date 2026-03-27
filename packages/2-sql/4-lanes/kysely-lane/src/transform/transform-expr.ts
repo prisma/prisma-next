@@ -257,7 +257,7 @@ export function transformJoinOn(
     expr.left.kind === 'column-ref' &&
     expr.right.kind === 'column-ref'
   ) {
-    return EqColJoinOn.of(expr.left as ColumnRef, expr.right as ColumnRef);
+    return EqColJoinOn.of(expr.left, expr.right);
   }
 
   return expr;

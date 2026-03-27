@@ -35,26 +35,25 @@ function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>
 // not parameterized binding. ParamRef is rejected because the ORM's grouped
 // collection API always produces literal comparisons for having() predicates.
 function validateGroupedComparable(value: AnySqlComparable): AnySqlComparable {
-  const node = value;
-  switch (node.kind) {
+  switch (value.kind) {
     case 'param-ref':
       throw new Error('ParamRef is not supported in grouped having expressions');
     case 'literal':
-      return node;
+      return value;
     case 'list-literal':
-      if (node.values.some((entry) => entry.kind === 'param-ref')) {
+      if (value.values.some((entry) => entry.kind === 'param-ref')) {
         throw new Error('ParamRef is not supported in grouped having expressions');
       }
-      return node;
+      return value;
     case 'column-ref':
     case 'subquery':
     case 'operation':
     case 'aggregate':
     case 'json-object':
     case 'json-array-agg':
-      return node;
+      return value;
     default: {
-      const _exhaustive: never = node;
+      const _exhaustive: never = value;
       throw new Error(
         `Unsupported comparable kind in grouped having: ${(_exhaustive as { kind: string }).kind}`,
       );
@@ -67,7 +66,7 @@ function validateGroupedMetricExpr(expr: AnyExpression): AggregateExpr {
     throw new Error('groupBy().having() only supports aggregate metric expressions');
   }
 
-  return expr as AggregateExpr;
+  return expr;
 }
 
 function validateGroupedHavingExpr(expr: AnyWhereExpr): AnyWhereExpr {
