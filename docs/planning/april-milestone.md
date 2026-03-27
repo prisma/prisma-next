@@ -8,9 +8,9 @@
 
 ## Approach: architectural validation, not polish
 
-We have five weeks. The goal for each workstream is to **validate the architecture** — prove that the design decisions hold under real conditions. It is not to polish the experience for users. That's May.
+We have five weeks (Mar 31 – May 2, with an offsite in Week 3). The goal for each workstream is to **validate the architecture** — prove that the design decisions hold under real conditions. It is not to polish the experience for users. That's May.
 
-Each workstream below has a priority-ordered queue of **validation points** (VP). Each validation point identifies an architectural assumption to test, describes a user story that would prove it, lists the concrete tasks to get there, and defines a **stop condition** — the minimum result that answers the question. Everything beyond the stop condition is deferred. Work proceeds top-down: finish or explicitly stop VP1 before starting VP2.
+Each workstream is roughly independent, has a single owner, and that owner should progress through it as fast as possible. Each workstream has a priority-ordered queue of **validation points** (VP). Each VP identifies an architectural assumption to test, describes a user story that would prove it, lists the concrete tasks to get there, and defines a **stop condition** — the minimum result that answers the question. Everything beyond the stop condition is deferred. Work proceeds top-down: finish or explicitly stop VP1 before starting VP2. If you finish your workstream early, move to assist on another.
 
 The team's instinct is to perfect. The constraint is: prove the architecture works first, then we polish.
 
@@ -96,7 +96,7 @@ Users describe their domain model — which becomes the contract — in one of t
 
 **VP1: Symmetric authoring surfaces from shared composition**
 
-Both PSL and TS must present DSLs that are derived from the same framework composition data sources — families, targets, and extension packs contribute type constructors and field presets via the [ADR 170](../../architecture%20docs/adrs/ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md) registry, and both surfaces lower through these shared definitions. The two surfaces should be symmetrical in capability — what's expressible in one is broadly expressible in the other — but idiomatically different in each language.
+Both PSL and TS must present DSLs that are derived from the same framework composition data sources — families, targets, and extension packs contribute type constructors and field presets via the [ADR 170](../../architecture%20docs/adrs/ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md) registry (ADR 170 defines how extensions contribute authoring helpers like `pgvector.Vector(1536)` to both surfaces through a shared definition), and both surfaces lower through these shared definitions. The two surfaces should be symmetrical in capability — what's expressible in one is broadly expressible in the other — but idiomatically different in each language.
 
 User story: I author the same contract in PSL and in TS. Both use a family-provided type constructor (e.g. `sql.String(length: 35)`) and an extension-provided namespaced type constructor (e.g. `pgvector.Vector(1536)`). Both emit identical contracts.
 
@@ -311,54 +311,31 @@ Stop condition: A written assessment of whether D1 can layer on the SQLite found
 
 ---
 
-## Tangential topics
+### 6. Contributor readiness
 
-These are not primary workstreams but are important enough to track in this plan.
+**People**: unassigned (depends on stable interfaces from workstreams 2–5; a good workstream for someone who finishes early)
 
-### Benchmarks
+The milestone goal is "ready for external contributions." The other workstreams validate the architecture; this workstream validates that someone outside the team can actually build on it.
 
-Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visibility deliverable that substantiates our performance claims. In progress (Alexey).
+**Key risk**: We can validate every architectural assumption and still fail the milestone if contributors can't figure out how to build extensions without asking us questions.
 
-### ParadeDB PoC
+#### Priority queue
 
-Scaffolded extension that provides a new database primitive. Demonstrates that the extension model can go beyond middleware and schema tooling. Handoff target for the ParadeDB team.
+**VP1: An external contributor can build an extension end-to-end using only published docs and examples**
 
-### Community outreach
+User story: Someone unfamiliar with the codebase wants to build a middleware extension. They find a "build your first extension" guide, follow it, and have a working extension without asking the team any questions. They can also browse example extensions (SQL target, Postgres extension, middleware, framework integration) as templates for other extension types.
 
-Reaching out to potential contributors: authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations (see [community-generator-migration-analysis.md](0-references/community-generator-migration-analysis.md)). Depends on stable interfaces and contributor documentation. Can't meaningfully start until the core workstreams have landed.
+Tasks:
 
----
+1. **Example extensions** — at least one working example of each extension type we want contributors to build: SQL database target, Postgres extension (e.g. ParadeDB handoff), middleware, framework integration. These serve as templates.
+2. **API reference** — generated or hand-written documentation for extension-facing interfaces. Contributors need to know what interfaces to implement and what contracts to satisfy.
+3. **"Build your first extension" guide** — walks through building a trivial extension (e.g. a middleware) from scratch using the docs and examples.
+4. **Handoff to developer relations** — package the docs, examples, and guide for the dev relations team to use in community outreach (reaching out to authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations — see [community-generator-migration-analysis.md](0-references/community-generator-migration-analysis.md)).
 
-## Dependencies
+Stop condition: A team member who hasn't worked on extensions can scaffold and build a trivial middleware extension using only the docs and examples, without asking questions. Then stop — comprehensive docs, video tutorials, and community management are the dev relations team's job.
 
-```
-MongoDB PoC ──────→ Stable extension interfaces ──→ Community outreach
-                                                 ↗
-SQLite target ────→ Decoupled core ─────────────
+**Also tracked here**:
 
-ADR 170 (type constructors) → PSL + TS parity ──→ Extensions contribute authoring syntax
-                                                                    ↓
-                              SQL DSL pack ops ──→ Extensions contribute query operations
-                                                                    ↓
-                              Caching middleware → Middleware supports rewriting, not just observation
-                                                                    ↓
-                              RSC PoC ───────────→ Runtime validated under real-world concurrency
-```
+- **Benchmarks**: Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visibility deliverable that substantiates our performance claims. In progress (Alexey).
 
-- **MongoDB PoC** and **SQLite target** are the two validation axes: one validates the family abstraction (SQL vs document), the other validates the target abstraction (Postgres vs SQLite within SQL). Both must land before we can confidently stabilize interfaces for external contributors.
-- **ADR 170** (type constructors and field presets) is the extension contribution interface for the authoring layer. Both PSL extensibility and the TS DSL depend on it.
-- **SQL DSL pack extensibility** and **ORM extension-contributed operations** are the query-side counterpart of ADR 170 — extensions need to flow from contract authoring through to query surface.
-- **Caching middleware** validates that the middleware pipeline supports the full range of extension use cases, not just observability.
-- **RSC concurrency PoC** validates the runtime under the highest-impact framework's execution model.
-- **Migration system** is largely independent — it has its own design validation path.
-- **Community outreach** depends on stable interfaces and contributor docs; it's the last thing that can start.
-
-## Scheduling
-
-Five weeks remain (Mar 31 – May 2, with an offsite in Week 3). Rather than a fixed weekly timeline, each workstream has a priority-ordered task queue. Work proceeds top-down: finish or explicitly stop VP1 before starting VP2.
-
-## Open questions
-
-- For the language server: is updating the existing Prisma 7 language server feasible, or does it need a rewrite?
-- Is the ParadeDB PoC dependent on the MongoDB PoC (both validate extension interfaces), or can they proceed in parallel?
 
