@@ -82,12 +82,12 @@ type DeriveExtFunctions<
 
 export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown }>> = {
   eq: <CodecId extends string>(
-    a: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>,
-    b: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>,
+    a: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT> | null,
+    b: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT> | null,
   ) => Expression<BooleanCodecType>;
   ne: <T extends ScopeField>(
-    a: ExpressionOrValue<T, CT>,
-    b: ExpressionOrValue<T, CT>,
+    a: ExpressionOrValue<T, CT> | null,
+    b: ExpressionOrValue<T, CT> | null,
   ) => Expression<BooleanCodecType>;
   gt: <T extends ScopeField>(
     a: ExpressionOrValue<T, CT>,

@@ -7,6 +7,7 @@ import {
   ExistsExpr,
   ListExpression,
   LiteralExpr,
+  NullCheckExpr,
   OperationExpr,
   OrExpr,
   ParamRef,
@@ -44,6 +45,18 @@ function boolExpr(astNode: AstExpression): ExpressionImpl<BooleanCodecType> {
   return new ExpressionImpl(astNode, BOOL_FIELD);
 }
 
+function eq(a: ExprOrVal, b: ExprOrVal): ExpressionImpl<BooleanCodecType> {
+  if (b === null) return boolExpr(NullCheckExpr.isNull(resolve(a)));
+  if (a === null) return boolExpr(NullCheckExpr.isNull(resolve(b)));
+  return boolExpr(new BinaryExpr('eq', resolve(a), resolve(b)));
+}
+
+function ne(a: ExprOrVal, b: ExprOrVal): ExpressionImpl<BooleanCodecType> {
+  if (b === null) return boolExpr(NullCheckExpr.isNotNull(resolve(a)));
+  if (a === null) return boolExpr(NullCheckExpr.isNotNull(resolve(b)));
+  return boolExpr(new BinaryExpr('neq', resolve(a), resolve(b)));
+}
+
 function comparison(a: ExprOrVal, b: ExprOrVal, op: BinaryOp): ExpressionImpl<BooleanCodecType> {
   return boolExpr(new BinaryExpr(op, resolve(a), resolve(b)));
 }
@@ -75,8 +88,8 @@ function numericAgg(
 
 function createBuiltinFunctions() {
   return {
-    eq: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'eq'),
-    ne: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'neq'),
+    eq: (a: ExprOrVal, b: ExprOrVal) => eq(a, b),
+    ne: (a: ExprOrVal, b: ExprOrVal) => ne(a, b),
     gt: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'gt'),
     gte: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'gte'),
     lt: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'lt'),

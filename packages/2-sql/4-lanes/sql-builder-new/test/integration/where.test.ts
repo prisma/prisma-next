@@ -48,6 +48,29 @@ describe('integration: WHERE', () => {
     expect(rows.map((r) => r.id).sort()).toEqual([2, 3]);
   });
 
+  it('eq(col, null) produces IS NULL', async () => {
+    const rows = await collect(
+      db()
+        .users.select('id', 'name')
+        .where((f, fns) => fns.eq(f.invited_by_id, null))
+        .all(),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.name).toBe('Alice');
+  });
+
+  it('ne(col, null) produces IS NOT NULL', async () => {
+    const rows = await collect(
+      db()
+        .users.select('id', 'name')
+        .where((f, fns) => fns.ne(f.invited_by_id, null))
+        .orderBy('id')
+        .all(),
+    );
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.name)).toEqual(['Bob', 'Charlie', 'Diana']);
+  });
+
   it('or within a single where', async () => {
     const rows = await collect(
       db()
