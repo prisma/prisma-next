@@ -263,6 +263,8 @@ abstract class Expression extends AstNode implements ExpressionSource {
   }
 
   toExpr(): AnyExpression {
+    // Safe: every concrete Expression subclass is a member of AnyExpression.
+    // The double cast is needed because TS can't narrow `this` (abstract) to the union.
     return this as unknown as AnyExpression;
   }
 }
