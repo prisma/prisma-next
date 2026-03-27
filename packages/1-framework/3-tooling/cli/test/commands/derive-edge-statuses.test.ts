@@ -1,30 +1,7 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import type { MigrationChainEntry, MigrationGraph } from '@prisma-next/migration-tools/types';
 import { describe, expect, it } from 'vitest';
 import { deriveEdgeStatuses } from '../../src/commands/migration-status';
-
-function entry(from: string, to: string, dirName: string): MigrationChainEntry {
-  return { from, to, dirName, migrationId: `mid_${dirName}`, createdAt: '', labels: [] };
-}
-
-function buildGraph(entries: MigrationChainEntry[]): MigrationGraph {
-  const nodes = new Set<string>();
-  const forwardChain = new Map<string, MigrationChainEntry[]>();
-  const reverseChain = new Map<string, MigrationChainEntry[]>();
-  const migrationById = new Map<string, MigrationChainEntry>();
-
-  for (const e of entries) {
-    nodes.add(e.from);
-    nodes.add(e.to);
-    if (!forwardChain.has(e.from)) forwardChain.set(e.from, []);
-    forwardChain.get(e.from)!.push(e);
-    if (!reverseChain.has(e.to)) reverseChain.set(e.to, []);
-    reverseChain.get(e.to)!.push(e);
-    migrationById.set(e.migrationId, e);
-  }
-
-  return { nodes, forwardChain, reverseChain, migrationById };
-}
+import { buildGraph, entry } from '../utils/graph-helpers';
 
 const ROOT = EMPTY_CONTRACT_HASH;
 
