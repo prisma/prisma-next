@@ -210,6 +210,10 @@ Tasks:
 
 Stop condition: A repeated query is served from cache without hitting the database. The middleware interface supports short-circuiting and result injection. Then stop — cache invalidation strategies, TTL, and middleware composition are May.
 
+**Side quest: Benchmarks**
+
+Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visibility content piece — publish as soon as the ORM has enough query support to run the suite. In progress.
+
 **Deferred (May)**:
 
 - Full middleware API design and composition model
@@ -333,9 +337,5 @@ Tasks:
 4. **Handoff to developer relations** — package the docs, examples, and guide for the dev relations team to use in community outreach (reaching out to authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations — see [community-generator-migration-analysis.md](0-references/community-generator-migration-analysis.md)).
 
 Stop condition: A team member who hasn't worked on extensions can scaffold and build a trivial middleware extension using only the docs and examples, without asking questions. Then stop — comprehensive docs, video tutorials, and community management are the dev relations team's job.
-
-**Also tracked here**:
-
-- **Benchmarks**: Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visibility deliverable that substantiates our performance claims. In progress (Alexey).
 
 
