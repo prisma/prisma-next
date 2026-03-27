@@ -125,15 +125,12 @@ describe('bindWhereExpr', () => {
   });
 
   it('preserves ParamRef on the right side without rebinding', () => {
-    const expr = BinaryExpr.eq(
-      ColumnRef.of('users', 'id'),
-      ParamRef.of(42, { name: 'id', codecId: 'pg/int4@1' }),
-    );
+    const existing = ParamRef.of(42, { name: 'id', codecId: 'pg/int4@1' });
+    const expr = BinaryExpr.eq(ColumnRef.of('users', 'id'), existing);
     const bound = bindWhereExpr(contract, expr);
 
     const binary = bound as BinaryExpr;
-    expect(binary.right).toBeInstanceOf(ParamRef);
-    expect((binary.right as ParamRef).value).toBe(42);
+    expect(binary.right).toBe(existing);
   });
 
   it('binds subquery within a select that has joins, orderBy, and derived sources', () => {
@@ -206,18 +203,17 @@ describe('bindWhereExpr', () => {
   });
 
   it('passes through ParamRef values inside ListLiteralExpr without rebinding', () => {
+    const existing = ParamRef.of(99, { name: 'id', codecId: 'pg/int4@1' });
     const expr = BinaryExpr.in(
       ColumnRef.of('users', 'id'),
-      ListLiteralExpr.of([
-        ParamRef.of(99, { name: 'id', codecId: 'pg/int4@1' }),
-        LiteralExpr.of(42),
-      ]),
+      ListLiteralExpr.of([existing, LiteralExpr.of(42)]),
     );
     const bound = bindWhereExpr(contract, expr);
 
     const binary = bound as BinaryExpr;
     const list = binary.right as ListLiteralExpr;
     expect(list.values).toMatchObject([expect.any(ParamRef), expect.any(ParamRef)]);
+    expect(list.values[0]).toBe(existing);
     expect(list.values).toMatchObject([{ value: 99 }, { value: 42 }]);
   });
 });
