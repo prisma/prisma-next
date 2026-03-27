@@ -4,7 +4,7 @@
 
 **Key constraint**: System design decisions must be stable, even if user-facing APIs are still changing. Contributors need confidence that the interfaces they build against won't be reworked.
 
-See [roadmap.md](roadmap.md) for how this milestone fits into the broader timeline.
+**What follows**: In May, we target EA in Postgres (+ one additional SQL database, likely SQLite) — APIs are stable, the system is correct, and we actively encourage users to try Prisma Next. In June/July, EA extends to all first-class databases. This milestone is the prerequisite: if the architecture isn't validated, we can't stabilize APIs for EA.
 
 ---
 
@@ -227,7 +227,7 @@ Stop condition: A repeated query is served from cache without hitting the databa
 
 **Status**: Planning complete, implementation not started
 
-**Why this blocks the milestone**: We plan to invite community authors to build extensions. Our [community generator analysis](0-references/community-generator-migration-analysis.md) shows 31 of 33 use cases are family-agnostic — but every interface an extension would consume today is SQL-specific. Stabilizing these interfaces without validating a second family risks ecosystem fragmentation and breaking changes. See the [roadmap rationale](roadmap.md#april-ready-for-external-contributions) for the full argument.
+**Why this blocks the milestone**: We plan to invite community authors to build extensions. Our [community generator analysis](0-references/community-generator-migration-analysis.md) shows 31 of 33 use cases are family-agnostic — but every interface an extension would consume today is SQL-specific. Stabilizing these interfaces without validating a second family risks ecosystem fragmentation (extensions that only work with SQL), breaking changes (discovering later that the family-agnostic surface needs to look different), and target fragmentation within SQL (extensions that silently depend on Postgres-specific storage details).
 
 **Key risks**:
 
