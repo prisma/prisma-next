@@ -256,6 +256,14 @@ export const config: RecordingsConfig = {
           dbState: 'initialized with user(id, email)',
           sleepAfterEnter: '10s',
         },
+        {
+          ordinal: '12',
+          slug: 'contract-infer-cat',
+          command: 'cat contract.prisma',
+          description: 'View the inferred PSL contract',
+          dbState: 'contract.prisma written by previous step',
+          sleepAfterEnter: '5s',
+        },
       ],
     },
 
