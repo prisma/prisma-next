@@ -2,18 +2,17 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   AndExpr,
+  type AnyExpression,
   type AnySqlComparable,
+  type AnyWhereExpr,
   BinaryExpr,
   type BoundWhereExpr,
   ColumnRef,
-  type Expression,
   NullCheckExpr,
   OrExpr,
   ProjectionItem,
   SelectAst,
-  type SqlComparable,
   TableSource,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan } from './query-plan-meta';
@@ -35,8 +34,8 @@ function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>
 // ORM HAVING filters use literal binding (values inlined at plan-build time),
 // not parameterized binding. ParamRef is rejected because the ORM's grouped
 // collection API always produces literal comparisons for having() predicates.
-function validateGroupedComparable(value: SqlComparable): SqlComparable {
-  const node = value as AnySqlComparable;
+function validateGroupedComparable(value: AnySqlComparable): AnySqlComparable {
+  const node = value;
   switch (node.kind) {
     case 'param-ref':
       throw new Error('ParamRef is not supported in grouped having expressions');
@@ -63,7 +62,7 @@ function validateGroupedComparable(value: SqlComparable): SqlComparable {
   }
 }
 
-function validateGroupedMetricExpr(expr: Expression): AggregateExpr {
+function validateGroupedMetricExpr(expr: AnyExpression): AggregateExpr {
   if (expr.kind !== 'aggregate') {
     throw new Error('groupBy().having() only supports aggregate metric expressions');
   }
@@ -71,8 +70,8 @@ function validateGroupedMetricExpr(expr: Expression): AggregateExpr {
   return expr as AggregateExpr;
 }
 
-function validateGroupedHavingExpr(expr: WhereExpr): WhereExpr {
-  return expr.accept<WhereExpr>({
+function validateGroupedHavingExpr(expr: AnyWhereExpr): AnyWhereExpr {
+  return expr.accept<AnyWhereExpr>({
     and(expr) {
       return AndExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
     },
@@ -124,7 +123,7 @@ export function compileGroupedAggregate(
   filters: readonly BoundWhereExpr[],
   groupByColumns: readonly string[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
-  havingExpr: WhereExpr | undefined,
+  havingExpr: AnyWhereExpr | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   if (groupByColumns.length === 0) {
     throw new Error('groupBy() requires at least one field');

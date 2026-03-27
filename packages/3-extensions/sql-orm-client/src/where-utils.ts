@@ -1,12 +1,12 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import {
   AndExpr,
+  type AnyWhereExpr,
   type BoundWhereExpr,
   ParamRef,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 
-export function createBoundWhereExpr(expr: WhereExpr): BoundWhereExpr {
+export function createBoundWhereExpr(expr: AnyWhereExpr): BoundWhereExpr {
   return {
     expr,
     params: [],
@@ -14,11 +14,11 @@ export function createBoundWhereExpr(expr: WhereExpr): BoundWhereExpr {
   };
 }
 
-export function isBoundWhereExpr(value: BoundWhereExpr | WhereExpr): value is BoundWhereExpr {
+export function isBoundWhereExpr(value: BoundWhereExpr | AnyWhereExpr): value is BoundWhereExpr {
   return typeof value === 'object' && value !== null && 'expr' in value && 'params' in value;
 }
 
-export function ensureBoundWhereExpr(value: BoundWhereExpr | WhereExpr): BoundWhereExpr {
+export function ensureBoundWhereExpr(value: BoundWhereExpr | AnyWhereExpr): BoundWhereExpr {
   return isBoundWhereExpr(value) ? value : createBoundWhereExpr(value);
 }
 
@@ -32,7 +32,7 @@ function offsetParamDescriptors(
   }));
 }
 
-function offsetWhereExprParams(expr: WhereExpr, offset: number): WhereExpr {
+function offsetWhereExprParams(expr: AnyWhereExpr, offset: number): AnyWhereExpr {
   if (offset === 0) {
     return expr;
   }
@@ -86,7 +86,7 @@ export function combineWhereFilters(
   };
 }
 
-export function combinePlainWhereExprs(filters: readonly WhereExpr[]): WhereExpr | undefined {
+export function combinePlainWhereExprs(filters: readonly AnyWhereExpr[]): AnyWhereExpr | undefined {
   if (filters.length === 0) {
     return undefined;
   }

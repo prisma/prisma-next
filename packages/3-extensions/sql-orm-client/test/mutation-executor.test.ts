@@ -1,8 +1,8 @@
 import {
+  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -49,9 +49,9 @@ function withConnection(runtime: MockRuntime, onRelease: () => void) {
   });
 }
 
-const postIdFilter: WhereExpr = BinaryExpr.eq(ColumnRef.of('posts', 'id'), LiteralExpr.of(1));
+const postIdFilter: AnyWhereExpr = BinaryExpr.eq(ColumnRef.of('posts', 'id'), LiteralExpr.of(1));
 
-const userIdFilter: WhereExpr = BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1));
+const userIdFilter: AnyWhereExpr = BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1));
 
 describe('mutation-executor', () => {
   it('hasNestedMutationCallbacks() detects callbacks only on relation fields', () => {

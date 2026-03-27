@@ -1,4 +1,5 @@
 import {
+  type AnyWhereExpr,
   BinaryExpr,
   type BoundWhereExpr,
   ColumnRef,
@@ -7,7 +8,6 @@ import {
   NullCheckExpr,
   ParamRef,
   type ToWhereExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or } from '../src/filters';
@@ -20,7 +20,7 @@ import {
 } from '../src/where-utils';
 import { getTestContract } from './helpers';
 
-function collectParamIndexes(expr: WhereExpr): number[] {
+function collectParamIndexes(expr: AnyWhereExpr): number[] {
   return expr.fold<number[]>({
     empty: [],
     combine: (a, b) => [...a, ...b],

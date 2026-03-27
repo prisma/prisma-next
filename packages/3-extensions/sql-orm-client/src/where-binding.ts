@@ -2,15 +2,16 @@ import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
+  type AnyExpression,
   type AnyFromSource,
+  type AnySqlComparable,
+  type AnyWhereExpr,
   BinaryExpr,
   type BoundWhereExpr,
   type ColumnRef,
   DerivedTableSource,
   ExistsExpr,
-  type Expression,
   type ExpressionRewriter,
-  type FromSource,
   JoinAst,
   ListLiteralExpr,
   NullCheckExpr,
@@ -20,8 +21,6 @@ import {
   type ProjectionExpr,
   ProjectionItem,
   SelectAst,
-  type SqlComparable,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createColumnParamDescriptor } from './param-descriptors';
 
@@ -30,7 +29,10 @@ interface BindState {
   readonly paramDescriptors: ParamDescriptor[];
 }
 
-export function bindWhereExpr(contract: SqlContract<SqlStorage>, expr: WhereExpr): BoundWhereExpr {
+export function bindWhereExpr(
+  contract: SqlContract<SqlStorage>,
+  expr: AnyWhereExpr,
+): BoundWhereExpr {
   const state: BindState = {
     params: [],
     paramDescriptors: [],
@@ -45,10 +47,10 @@ export function bindWhereExpr(contract: SqlContract<SqlStorage>, expr: WhereExpr
 
 function bindWhereExprNode(
   contract: SqlContract<SqlStorage>,
-  expr: WhereExpr,
+  expr: AnyWhereExpr,
   state: BindState,
-): WhereExpr {
-  return expr.accept<WhereExpr>({
+): AnyWhereExpr {
+  return expr.accept<AnyWhereExpr>({
     binary(expr) {
       const left = bindExpression(contract, expr.left, state);
       const bindingColumn = left.kind === 'column-ref' ? (left as ColumnRef) : undefined;
@@ -80,10 +82,10 @@ function bindWhereExprNode(
 
 function bindComparable(
   contract: SqlContract<SqlStorage>,
-  comparable: SqlComparable,
+  comparable: AnySqlComparable,
   bindingColumn: ColumnRef | undefined,
   state: BindState,
-): SqlComparable {
+): AnySqlComparable {
   if (comparable.kind === 'param-ref' || bindingColumn === undefined) {
     return comparable.kind === 'param-ref'
       ? comparable
@@ -133,9 +135,9 @@ function createExpressionBinder(
 
 function bindExpression(
   contract: SqlContract<SqlStorage>,
-  expr: Expression,
+  expr: AnyExpression,
   state: BindState,
-): Expression {
+): AnyExpression {
   return expr.rewrite(createExpressionBinder(contract, state));
 }
 
@@ -166,10 +168,10 @@ function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst, state: BindS
 
 function bindFromSource(
   contract: SqlContract<SqlStorage>,
-  source: FromSource,
+  source: AnyFromSource,
   state: BindState,
-): FromSource {
-  const node = source as AnyFromSource;
+): AnyFromSource {
+  const node = source;
   switch (node.kind) {
     case 'table-source':
       return node;
