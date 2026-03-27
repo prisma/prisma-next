@@ -265,7 +265,10 @@ export function codec<
     ...ifDefined('meta', config.meta),
     ...ifDefined('paramsSchema', config.paramsSchema),
     ...ifDefined('init', config.init),
-    ...ifDefined('traits', config.traits),
+    ...ifDefined(
+      'traits',
+      config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
+    ),
     encode: config.encode,
     decode: config.decode,
   };
