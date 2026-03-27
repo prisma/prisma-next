@@ -4,17 +4,13 @@ import {
   type AggregateExpr,
   type AnyExpression,
   type AnyFromSource,
-  type AnyInsertOnConflictAction,
-  type AnyOperationArg,
   type AnyQueryAst,
-  type AnySqlComparable,
+  type AnyWhereExpr,
   type BinaryExpr,
   type CodecParamsDescriptor,
   type ColumnRef,
   createCodecRegistry,
   type DeleteAst,
-  type Expression,
-  type FromSource,
   type InsertAst,
   type InsertValue,
   type JoinAst,
@@ -29,11 +25,9 @@ import {
   type OrderByItem,
   type ParamRef,
   type ProjectionItem,
-  type QueryAst,
   type SelectAst,
   type SubqueryExpr,
   type UpdateAst,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
@@ -90,7 +84,9 @@ const parameterizedCodecs: ReadonlyArray<CodecParamsDescriptor> = Object.values(
     }),
   );
 
-class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, PostgresLoweredStatement> {
+class PostgresAdapterImpl
+  implements Adapter<AnyQueryAst, PostgresContract, PostgresLoweredStatement>
+{
   // These fields make the adapter instance structurally compatible with
   // RuntimeAdapterInstance<'sql', 'postgres'> without introducing a runtime-plane dependency.
   readonly familyId = 'sql' as const;
@@ -118,10 +114,10 @@ class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, Postgre
     return parameterizedCodecs;
   }
 
-  lower(ast: QueryAst, context: LowererContext<PostgresContract>) {
+  lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>) {
     let sql: string;
     const params = context.params ? [...context.params] : [];
-    const node = ast as AnyQueryAst;
+    const node = ast;
 
     switch (node.kind) {
       case 'select':
@@ -138,7 +134,7 @@ class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, Postgre
         break;
       default: {
         const _exhaustive: never = node;
-        throw new Error(`Unsupported AST node: ${(_exhaustive as QueryAst).constructor.name}`);
+        throw new Error(`Unsupported AST node: ${(_exhaustive as AnyQueryAst).constructor.name}`);
       }
     }
 
@@ -150,10 +146,11 @@ class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, Postgre
 }
 
 function renderSelect(ast: SelectAst, contract?: PostgresContract): string {
-  const selectClause = `SELECT ${renderDistinctPrefix(ast.distinct, ast.distinctOn, contract)}${renderProjection(
-    ast.projection,
+  const selectClause = `SELECT ${renderDistinctPrefix(
+    ast.distinct,
+    ast.distinctOn,
     contract,
-  )}`;
+  )}${renderProjection(ast.projection, contract)}`;
   const fromClause = `FROM ${renderSource(ast.from, contract)}`;
 
   const joinsClause = ast.joins?.length
@@ -209,7 +206,7 @@ function renderProjection(
 
 function renderDistinctPrefix(
   distinct: true | undefined,
-  distinctOn: ReadonlyArray<Expression> | undefined,
+  distinctOn: ReadonlyArray<AnyExpression> | undefined,
   contract?: PostgresContract,
 ): string {
   if (distinctOn && distinctOn.length > 0) {
@@ -222,8 +219,8 @@ function renderDistinctPrefix(
   return '';
 }
 
-function renderSource(source: FromSource, contract?: PostgresContract): string {
-  const node = source as AnyFromSource;
+function renderSource(source: AnyFromSource, contract?: PostgresContract): string {
+  const node = source;
   switch (node.kind) {
     case 'table-source': {
       const table = quoteIdentifier(node.name);
@@ -236,7 +233,9 @@ function renderSource(source: FromSource, contract?: PostgresContract): string {
       return `(${renderSelect(node.query, contract)}) AS ${quoteIdentifier(node.alias)}`;
     default: {
       const _exhaustive: never = node;
-      throw new Error(`Unsupported source node: ${(_exhaustive as FromSource).constructor.name}`);
+      throw new Error(
+        `Unsupported source node: ${(_exhaustive as AnyFromSource).constructor.name}`,
+      );
     }
   }
 }
@@ -252,7 +251,7 @@ function renderSubqueryExpr(expr: SubqueryExpr, contract?: PostgresContract): st
   return `(${renderSelect(expr.query, contract)})`;
 }
 
-function renderWhere(expr: WhereExpr, contract?: PostgresContract): string {
+function renderWhere(expr: AnyWhereExpr, contract?: PostgresContract): string {
   return expr.accept<string>({
     exists(expr) {
       const notKeyword = expr.notExists ? 'NOT ' : '';
@@ -303,7 +302,7 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
     leftExpr.kind === 'operation' || leftExpr.kind === 'subquery' ? `(${left})` : left;
   const leftCol = leftExpr.kind === 'column-ref' ? (leftExpr as ColumnRef) : undefined;
 
-  const rightNode = expr.right as AnySqlComparable;
+  const rightNode = expr.right;
   let right: string;
   switch (rightNode.kind) {
     case 'list-literal':
@@ -413,8 +412,8 @@ function renderJsonArrayAggExpr(expr: JsonArrayAggExpr, contract?: PostgresContr
   return aggregated;
 }
 
-function renderExpr(expr: Expression, contract?: PostgresContract): string {
-  const node = expr as AnyExpression;
+function renderExpr(expr: AnyExpression, contract?: PostgresContract): string {
+  const node = expr;
   switch (node.kind) {
     case 'column-ref':
       return renderColumn(node);
@@ -431,7 +430,7 @@ function renderExpr(expr: Expression, contract?: PostgresContract): string {
     default: {
       const _exhaustive: never = node;
       throw new Error(
-        `Unsupported expression node: ${(_exhaustive as Expression).constructor.name}`,
+        `Unsupported expression node: ${(_exhaustive as AnyExpression).constructor.name}`,
       );
     }
   }
@@ -484,7 +483,7 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
   const self = renderExpr(expr.self, contract);
   const isVectorOperation = expr.forTypeId === VECTOR_CODEC_ID;
   const args = expr.args.map((arg) => {
-    const node = arg as AnyOperationArg;
+    const node = arg;
     switch (node.kind) {
       case 'param-ref':
         return isVectorOperation ? `$${node.index}::vector` : renderParam(node, contract);
@@ -632,7 +631,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
           throw new Error('INSERT onConflict requires at least one conflict column');
         }
 
-        const action = ast.onConflict.action as AnyInsertOnConflictAction;
+        const action = ast.onConflict.action;
         switch (action.kind) {
           case 'do-nothing':
             return ` ON CONFLICT (${conflictColumns.join(', ')}) DO NOTHING`;
