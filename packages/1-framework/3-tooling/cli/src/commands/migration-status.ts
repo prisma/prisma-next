@@ -316,6 +316,23 @@ function resolveDisplayChain(
   return toTarget;
 }
 
+const DEFAULT_LIMIT = 10;
+
+function determineLimit(opts: MigrationStatusOptions) {
+  if (opts.all) {
+    // No limit
+    return;
+  }
+  if (!opts.limit) {
+    return DEFAULT_LIMIT;
+  }
+  const parsed = Number.parseInt(opts.limit, 10);
+  if (Number.isNaN(parsed)) {
+    return DEFAULT_LIMIT;
+  }
+  return parsed;
+}
+
 async function executeMigrationStatusCommand(
   options: MigrationStatusOptions,
   flags: GlobalFlags,
@@ -469,18 +486,6 @@ async function executeMigrationStatusCommand(
     }
   }
 
-  // Contract diagnostic — fires when no migration produces the current contract hash
-  // and we have a resolved target. When the graph is diverged (targetHash undefined),
-  // the MIGRATION.DIVERGED diagnostic already tells the user to select a target first.
-  if (targetHash && contractHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(contractHash)) {
-    diagnostics.push({
-      code: 'CONTRACT.AHEAD',
-      severity: 'warn',
-      message: 'Contract has changed since the last migration was planned',
-      hints: ["Run 'prisma-next migration plan' to generate a migration for the current contract"],
-    });
-  }
-
   let markerHash: string | undefined;
   let mode: 'online' | 'offline' = 'offline';
 
@@ -554,6 +559,23 @@ async function executeMigrationStatusCommand(
     });
   }
 
+  // Contract diagnostic — fires when no migration produces the current contract hash.
+  // Suppressed when: (a) graph is diverged (MIGRATION.DIVERGED already guides the user),
+  // (b) marker === contract and both off-graph (marker-not-in-graph diagnostic covers it).
+  if (
+    targetHash &&
+    contractHash !== EMPTY_CONTRACT_HASH &&
+    !graph.nodes.has(contractHash) &&
+    markerHash !== contractHash
+  ) {
+    diagnostics.push({
+      code: 'CONTRACT.AHEAD',
+      severity: 'warn',
+      message: 'Contract has changed since the last migration was planned',
+      hints: ["Run 'prisma-next migration plan' to generate a migration for the current contract"],
+    });
+  }
+
   if (!targetHash) {
     return ok({
       ok: true,
@@ -591,7 +613,7 @@ async function executeMigrationStatusCommand(
   let summary: string;
   if (mode === 'online') {
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
-      summary = 'Database matches the current contract — run migration plan to create a migration';
+      summary = `${attested.length} migration(s) on disk`;
     } else if (activeRefHash && markerHash !== undefined) {
       summary = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
     } else if (pendingCount === 0) {
@@ -609,12 +631,10 @@ async function executeMigrationStatusCommand(
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       diagnostics.push({
         code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
-        severity: 'info',
+        severity: 'warn',
         message:
           'Database matches the current contract but was updated directly (not via migration apply)',
-        hints: [
-          "Run 'prisma-next migration plan' to generate a migration for the current contract",
-        ],
+        hints: ["Run 'prisma-next migration plan' to plan a migration to your current contract"],
       });
     } else if (pendingCount > 0) {
       diagnostics.push({
@@ -704,12 +724,7 @@ export function createMigrationStatusCommand(): Command {
           const colorize = flags.color !== false;
 
           if (statusResult.graph) {
-            const DEFAULT_LIMIT = 10;
-            const limit = options.all
-              ? undefined
-              : options.limit
-                ? Number.parseInt(options.limit, 10)
-                : DEFAULT_LIMIT;
+            const limit = determineLimit(options);
             const renderInput = migrationGraphToRenderInput({
               graph: statusResult.graph,
               mode: statusResult.mode,
