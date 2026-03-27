@@ -20,6 +20,33 @@ describe('integration: subqueries', () => {
     expect(rows.map((r) => r.name)).toEqual(['Alice', 'Bob', 'Charlie']);
   });
 
+  it('IN with subquery and parameters in both parent and subquery', async () => {
+    // Users whose id is IN the set of user_ids from posts with views > 50
+    // Then further filter parent to name != 'Bob'
+    // Posts with views > 50: id=1 (user_id=1, 100), id=3 (user_id=2, 200)
+    // So subquery returns user_ids [1, 2]
+    // Parent filters out Bob (id=2), leaving only Alice (id=1)
+    const d = db();
+    const rows = await collect(
+      d.users
+        .select('id', 'name')
+        .where((f, fns) =>
+          fns.and(
+            fns.ne(f.name, 'Bob'),
+            fns.in(
+              f.id,
+              d.posts.select('user_id').where((pf, pfns) => pfns.gt(pf.views, 50)),
+            ),
+          ),
+        )
+        .orderBy('id')
+        .all(),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.name).toBe('Alice');
+    expect(rows[0]!.id).toBe(1);
+  });
+
   it('subquery as join source', async () => {
     const d = db();
     const sub = d.posts.select('user_id', 'title').as('sub');
