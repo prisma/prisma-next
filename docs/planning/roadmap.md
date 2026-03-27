@@ -53,7 +53,7 @@ External authors can meaningfully contribute to the development of Prisma Next. 
 
 **Mongo PoC (essential — prerequisite for extension ecosystem):**
 
-We have scaffolded a representative example of the Mongo solution and we can hand it over to their team to extend. See [mongo-poc-plan.md](mongo-target/mongo-poc-plan.md) for the detailed plan.
+We have scaffolded a representative example of the Mongo solution and we can hand it over to their team to extend.
 
 *Why this is essential, not optional:* The April milestone is "ready for external contributions." We plan to invite community authors to build extensions (validators, GraphQL integrations, visualization tools, etc.). Our [community generator analysis](0-references/community-generator-migration-analysis.md) shows that 31 of 33 community generator use cases are conceptually family-agnostic — they care about models, fields, and relations, not SQL tables specifically. But today, every interface an extension would consume is SQL-specific (`SqlContract`, `ExecutionContext`, the ORM client). If we stabilize these SQL-specific interfaces for external authors without first validating the document family, we risk:
 
@@ -121,5 +121,5 @@ We release Prisma Next in EA for all FCDBs, and hopefully other DBs are supporte
 - [April Milestone Plan](april-milestone.md) — detailed workstreams and deliverables for the April milestone
 - [Framework Integration Analysis](0-references/framework-integration-analysis.md) — hard problems for integrating Prisma Next into popular frameworks
 - [Community Generator Migration Analysis](0-references/community-generator-migration-analysis.md) — mapping Prisma ORM community generators to Prisma Next extension capabilities
-- [MongoDB PoC Plan](mongo-target/mongo-poc-plan.md) — detailed plan for the MongoDB proof of concept
+
 
