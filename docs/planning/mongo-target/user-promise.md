@@ -262,7 +262,7 @@ This is out of scope for the PoC but is a cross-workstream connection worth trac
 
 #### Runtime guardrails
 
-The same plugin pipeline that works for SQL works for Mongo:
+The aspiration is that the same plugin pipeline that works for SQL also works for Mongo — plugins written for one family should work for both without modification. This is unvalidated and depends on the plugin interface being truly family-agnostic, which the PoC will test:
 
 - **Budget enforcement**: Limit the number of rows returned, query execution time, etc.
 - **Query linting**: Reject dangerous operations (e.g. unbounded queries).
