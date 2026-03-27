@@ -274,7 +274,7 @@ Clarity about what's out of scope is as important as the promises:
 | Type safety (mutations) | None | Partial | Generated types | Full (including Mongo operators) |
 | Referential integrity | None | Manual (middleware hooks) | None | Configurable (cascade, restrict, setNull) |
 | Embedded documents | Native | Native | Not supported | Native (first-class in contract) |
-| Polymorphism / unions | Native (untyped) | Discriminator plugin | Json fallback | Planned (discriminated unions in contract) |
+| Polymorphism / unions | Native (untyped) | Discriminator plugin | Json fallback | Discriminated unions in contract (April) |
 | Schema validation | Manual $jsonSchema | Plugin-based | None | Built-in (write + configurable read) |
 | Aggregation pipelines | Untyped arrays | Untyped arrays | Not exposed | Raw escape hatch (typed DSL later) |
 | Vector / Atlas Search | Raw pipeline stages | Raw pipeline stages | Raw queries | Extension packs (planned) |

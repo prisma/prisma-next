@@ -105,25 +105,52 @@ Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB col
 
 ---
 
-## 6. Polymorphism, type unions, and mixed-type arrays
+## 6. Polymorphism and discriminated unions *(validate in April)*
 
-MongoDB arrays can contain mixed types: `[1, "two", { three: true }]`. The contract type system currently assumes homogeneous types (every value in a field has the same type).
+**This is a cross-family concern.** Both SQL and MongoDB need discriminated unions in the contract type system — they just surface differently at the storage layer.
 
-**The question**: Does the contract type system need to support union types or discriminated unions?
+**The question**: How does the contract type system represent discriminated unions / model inheritance, and how does each family store them?
 
 **Priority signal**: The MongoDB team rates "Inheritance and Polymorphism" as **High priority** — their highest tier. The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) describes this as an early pain point: a user's `ratings` field had different structures depending on the rating engine, and Prisma ORM typed it as `Json`, losing all type safety. The MongoDB team also lists "Support for Polymorphic Array/Embedded Field" (Low priority) and notes that Prisma ORM's workarounds involve untyped `Json` fields or multiple optional fields.
 
-Where this comes up:
-- **Polymorphic collections**: A single collection holding documents with different shapes distinguished by a discriminator field (single-table inheritance pattern). Common in MongoDB. The MongoDB team specifically calls out "defining base models and extending them into specialized sub models" as a key use case.
-- **Mixed-type arrays**: An `events` array containing `{ type: "click", x: number, y: number }` and `{ type: "scroll", offset: number }`. Common in event-sourcing patterns.
+### Where this comes up
+
+**In MongoDB:**
+- **Polymorphic collections**: A single collection holding documents with different shapes distinguished by a discriminator field (single-table inheritance). The MongoDB team specifically calls out "defining base models and extending them into specialized sub models" as a key use case.
 - **Polymorphic embedded fields**: A field like `ratings` whose structure varies per document, currently typed as `Json` in Prisma ORM.
+- **Mixed-type arrays**: An `events` array containing `{ type: "click", x: number, y: number }` and `{ type: "scroll", offset: number }`. Common in event-sourcing patterns.
 - **Optional/missing fields**: Mongo documents may omit fields entirely. `null` (field present, value null) is different from "field missing." The contract needs to express both.
 
-For the PoC:
-- Homogeneous arrays (`string[]`, `Comment[]`) cover the majority of use cases.
-- Union types are a significant type system extension. Defer to post-PoC.
-- **But note the gap**: if we defer this, the contract cannot express some common Mongo patterns. This is acceptable for architecture validation but would be a DX gap for real users.
-- **Critical constraint**: whatever contract type system decisions we make for the PoC must not *prevent* adding discriminated unions later. This is on the critical path for a Mongo experience that the MongoDB team would consider adequate.
+**In SQL:**
+- **Single-table inheritance (STI)**: One table holds multiple model types, distinguished by a discriminator column (e.g. `type = 'admin' | 'viewer'`). Shared fields are on the table; type-specific fields are nullable. Common in Rails, Django, and many TS codebases.
+- **Multi-table inheritance**: A base table with shared fields, plus extension tables joined by FK for type-specific fields. More normalized but more complex to query.
+- **Enum-discriminated rows**: A pattern where a row's behavior changes based on a discriminator field, even if the schema is the same. The ORM needs to narrow the type based on the discriminator value.
+
+### Contract-level representation
+
+Options:
+- **Discriminated union in the model graph.** The contract declares a base model (`Notification`) and variant models (`EmailNotification`, `SmsNotification`) with a discriminator field (`type`). Each variant extends the base with additional fields. Consumer libraries traverse the model graph and see both the base and variants.
+- **Union field type.** A field's type is declared as a union: `ratings: ImdbRating | RottenTomatoesRating`. The contract type system gains a union type constructor. Simpler than model inheritance but limited to field-level polymorphism.
+- **Both.** Model-level inheritance (base + variants) for polymorphic collections/tables, and field-level unions for polymorphic embedded fields and arrays. These serve different use cases.
+
+### Storage-level mapping
+
+| Pattern | SQL storage | MongoDB storage |
+|---|---|---|
+| Model inheritance (STI) | One table, discriminator column, nullable type-specific columns | One collection, discriminator field, variant-specific fields present/absent |
+| Model inheritance (multi-table) | Base table + extension tables with FK | N/A (Mongo doesn't have joins built-in; embed instead) |
+| Polymorphic embedded field | `Json` column (loses type safety) or separate tables | Embedded subdocument with discriminator field |
+| Mixed-type array | Not idiomatic (junction table + discriminator) | Native — array of variant subdocuments |
+
+### What to validate in April
+
+At minimum:
+- The contract can express a discriminated union (base model + variants with a discriminator field).
+- The emitter produces TypeScript types that narrow correctly based on the discriminator.
+- The ORM client can query a polymorphic collection/table and return narrowed types.
+- The storage mapping works for at least STI (one table/collection, discriminator column/field).
+
+Rough edges are acceptable — exhaustive pattern matching, complex nested unions, and multi-table inheritance can wait. But the contract type system must handle the basic discriminated-union shape, and it must work for both families.
 
 ---
 
