@@ -39,6 +39,8 @@ We announce our plans for Prisma Next and Prisma 7. The repo becomes public and 
 
 ### April: Ready for external contributions
 
+> **Detailed plan**: [april-milestone.md](april-milestone.md)
+
 External authors can meaningfully contribute to the development of Prisma Next. This accelerates our progress towards EA/GA. In particular, this requires the system design decisions to be stable, even if user-facing APIs are still changing.
 
 **What external contributors can create:**
@@ -116,6 +118,7 @@ We release Prisma Next in EA for all FCDBs, and hopefully other DBs are supporte
 
 ## Related documents
 
+- [April Milestone Plan](april-milestone.md) — detailed workstreams and deliverables for the April milestone
 - [Framework Integration Analysis](0-references/framework-integration-analysis.md) — hard problems for integrating Prisma Next into popular frameworks
 - [Community Generator Migration Analysis](0-references/community-generator-migration-analysis.md) — mapping Prisma ORM community generators to Prisma Next extension capabilities
 - [MongoDB PoC Plan](mongo-target/mongo-poc-plan.md) — detailed plan for the MongoDB proof of concept
