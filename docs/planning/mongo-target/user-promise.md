@@ -14,7 +14,7 @@ A TypeScript developer building an application backed by MongoDB. They want to m
 
 - **New to MongoDB** — coming from SQL/Prisma ORM, want familiar patterns
 - **Experienced with MongoDB** — frustrated by Mongoose's type gaps, want better DX without losing Mongo idioms
-- **Using both SQL and Mongo** — want a consistent interface across both, without learning two entirely different tools
+- **Using both SQL and Mongo** — want a familiar, symmetric interface across both, without learning two entirely different tools
 
 All three should find something in PN that they can't get elsewhere.
 
