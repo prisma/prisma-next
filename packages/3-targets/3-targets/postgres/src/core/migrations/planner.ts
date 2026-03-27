@@ -35,12 +35,29 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
 import { buildReconciliationPlan } from './planner-reconciliation';
 import {
+  columnExistsCheck,
+  columnHasNoDefaultCheck,
+  columnNullabilityCheck,
+  constraintExistsCheck,
+  qualifyTableName,
+  tableHasPrimaryKeyCheck,
+  tableIsEmptyCheck,
+  toRegclassLiteral,
+} from './planner-sql-checks';
+import {
   buildTargetDetails,
   type OperationClass,
   type PlanningMode,
   type PostgresPlanTargetDetails,
 } from './planner-types';
 
+export {
+  columnExistsCheck,
+  columnNullabilityCheck,
+  constraintExistsCheck,
+  qualifyTableName,
+  toRegclassLiteral,
+} from './planner-sql-checks';
 export type { OperationClass, PlanningMode, PostgresPlanTargetDetails } from './planner-types';
 export { buildTargetDetails } from './planner-types';
 
@@ -1016,93 +1033,8 @@ export function renderDefaultLiteral(value: unknown, column?: StorageColumn): st
   return `'${escapeLiteral(json)}'`;
 }
 
-export function qualifyTableName(schema: string, table: string): string {
-  return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
-}
-
-export function toRegclassLiteral(schema: string, name: string): string {
-  const regclass = `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
-  return `'${escapeLiteral(regclass)}'`;
-}
-
 function sortedEntries<V>(record: Readonly<Record<string, V>>): Array<[string, V]> {
   return Object.entries(record).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, V]>;
-}
-
-export function constraintExistsCheck({
-  constraintName,
-  schema,
-  exists = true,
-}: {
-  constraintName: string;
-  schema: string;
-  exists?: boolean;
-}): string {
-  const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
-  return `SELECT ${existsClause} (
-  SELECT 1 FROM pg_constraint c
-  JOIN pg_namespace n ON c.connamespace = n.oid
-  WHERE c.conname = '${escapeLiteral(constraintName)}'
-  AND n.nspname = '${escapeLiteral(schema)}'
-)`;
-}
-
-export function columnExistsCheck({
-  schema,
-  table,
-  column,
-  exists = true,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  exists?: boolean;
-}): string {
-  const existsClause = exists ? '' : 'NOT ';
-  return `SELECT ${existsClause}EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-)`;
-}
-
-export function columnNullabilityCheck({
-  schema,
-  table,
-  column,
-  nullable,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  nullable: boolean;
-}): string {
-  const expected = nullable ? 'YES' : 'NO';
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-    AND is_nullable = '${expected}'
-)`;
-}
-
-function tableIsEmptyCheck(qualifiedTableName: string): string {
-  return `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedTableName} LIMIT 1)`;
-}
-
-function columnHasNoDefaultCheck(opts: { schema: string; table: string; column: string }): string {
-  return `SELECT NOT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(opts.schema)}'
-    AND table_name = '${escapeLiteral(opts.table)}'
-    AND column_name = '${escapeLiteral(opts.column)}'
-    AND column_default IS NOT NULL
-)`;
 }
 
 /**
@@ -1259,29 +1191,6 @@ function buildAddColumnSql(
     column.nullable ? '' : 'NOT NULL',
   ].filter(Boolean);
   return parts.join(' ');
-}
-
-function tableHasPrimaryKeyCheck(
-  schema: string,
-  table: string,
-  exists: boolean,
-  constraintName?: string,
-): string {
-  const comparison = exists ? '' : 'NOT ';
-  const constraintFilter = constraintName
-    ? `AND c2.relname = '${escapeLiteral(constraintName)}'`
-    : '';
-  return `SELECT ${comparison}EXISTS (
-  SELECT 1
-  FROM pg_index i
-  JOIN pg_class c ON c.oid = i.indrelid
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  LEFT JOIN pg_class c2 ON c2.oid = i.indexrelid
-  WHERE n.nspname = '${escapeLiteral(schema)}'
-    AND c.relname = '${escapeLiteral(table)}'
-    AND i.indisprimary
-    ${constraintFilter}
-)`;
 }
 
 /**
