@@ -7,7 +7,6 @@
  * - Ambiguous selectAll in multi-table scope → AMBIGUOUS_SELECT_ALL
  * - Unsupported node kinds → UNSUPPORTED_NODE
  */
-import type { PlanRefs } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
