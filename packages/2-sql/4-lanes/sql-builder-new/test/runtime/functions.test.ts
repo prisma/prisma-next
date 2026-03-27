@@ -6,6 +6,7 @@ import {
   ExistsExpr,
   IdentifierRef,
   ListExpression,
+  NullCheckExpr,
   OperationExpr,
   OrExpr,
   ParamRef,
@@ -78,6 +79,33 @@ describe('createFunctions', () => {
       expect(ast.right).toBeInstanceOf(ColumnRef);
       expect((ast.left as ColumnRef).table).toBe('users');
       expect((ast.right as ColumnRef).table).toBe('posts');
+    });
+
+    it('eq with null produces NullCheckExpr (IS NULL)', () => {
+      const result = fns.eq(f().id, null);
+      const ast = result.buildAst() as NullCheckExpr;
+
+      expect(ast).toBeInstanceOf(NullCheckExpr);
+      expect(ast.isNull).toBe(true);
+      expect(ast.expr).toBeInstanceOf(IdentifierRef);
+    });
+
+    it('ne with null produces NullCheckExpr (IS NOT NULL)', () => {
+      const result = fns.ne(f().name, null);
+      const ast = result.buildAst() as NullCheckExpr;
+
+      expect(ast).toBeInstanceOf(NullCheckExpr);
+      expect(ast.isNull).toBe(false);
+      expect(ast.expr).toBeInstanceOf(IdentifierRef);
+    });
+
+    it('eq with null on left side produces NullCheckExpr', () => {
+      const result = fns.eq(null, f().id);
+      const ast = result.buildAst() as NullCheckExpr;
+
+      expect(ast).toBeInstanceOf(NullCheckExpr);
+      expect(ast.isNull).toBe(true);
+      expect(ast.expr).toBeInstanceOf(IdentifierRef);
     });
   });
 
