@@ -9,7 +9,6 @@
  * a graph node. With ref production=C3, apply routes via C1→C3.
  */
 
-import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
