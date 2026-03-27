@@ -41,8 +41,8 @@ export function parseGlobalFlags(options: CommonCommandOptions): GlobalFlags {
     yes?: boolean;
   } = {};
 
-  // JSON output: explicit --json flag only (TODO: restore TTY auto-detect)
-  if (options.json) {
+  // JSON output: explicit --json flag or auto-detect piped stdout (Unix convention)
+  if (options.json || !process.stdout.isTTY) {
     flags.json = true;
   }
 
