@@ -1,17 +1,15 @@
 import {
   AggregateExpr,
-  AndExpr,
+  type AndExpr,
   BinaryExpr,
   ColumnRef,
-  DeleteAst,
-  DerivedTableSource,
-  DoUpdateSetConflictAction,
-  InsertAst,
+  type DerivedTableSource,
+  type InsertAst,
   LiteralExpr,
   ParamRef,
-  SelectAst,
-  SubqueryExpr,
-  UpdateAst,
+  type SelectAst,
+  type SubqueryExpr,
+  type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
@@ -46,22 +44,22 @@ describe('SQL ORM rich AST query plans', () => {
 
     const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     expect(plan.params).toEqual([100, 'Alice']);
     expect(plan.meta.annotations).toEqual({ limit: 5 });
 
     const ast = plan.ast as SelectAst;
-    expect(ast.where).toBeInstanceOf(BinaryExpr);
+    expect(ast.where?.kind).toBe('binary');
 
     const postsProjection = ast.projection.find((item) => item.alias === 'posts');
-    expect(postsProjection?.expr).toBeInstanceOf(SubqueryExpr);
+    expect(postsProjection?.expr.kind).toBe('subquery');
     const aggregateQuery = (postsProjection?.expr as SubqueryExpr).query;
-    expect(aggregateQuery.from).toBeInstanceOf(DerivedTableSource);
+    expect(aggregateQuery.from.kind).toBe('derived-table-source');
 
     const rowsQuery = (aggregateQuery.from as DerivedTableSource).query;
-    expect(rowsQuery.where).toBeInstanceOf(AndExpr);
+    expect(rowsQuery.where?.kind).toBe('and');
     const childFilter = (rowsQuery.where as AndExpr).exprs[1] as BinaryExpr;
-    expect(childFilter.right).toBeInstanceOf(ParamRef);
+    expect(childFilter.right.kind).toBe('param-ref');
     expect((childFilter.right as ParamRef).value).toBe(100);
   });
 
@@ -72,7 +70,7 @@ describe('SQL ORM rich AST query plans', () => {
       [{ id: 1, name: 'Alice', email: 'a@example.com' }],
       ['id'],
     );
-    expect(insertPlan.ast).toBeInstanceOf(InsertAst);
+    expect(insertPlan.ast.kind).toBe('insert');
 
     const upsertPlan = compileUpsertReturning(
       baseContract,
@@ -82,10 +80,8 @@ describe('SQL ORM rich AST query plans', () => {
       ['email'],
       ['id'],
     );
-    expect(upsertPlan.ast).toBeInstanceOf(InsertAst);
-    expect((upsertPlan.ast as InsertAst).onConflict?.action).toBeInstanceOf(
-      DoUpdateSetConflictAction,
-    );
+    expect(upsertPlan.ast.kind).toBe('insert');
+    expect((upsertPlan.ast as InsertAst).onConflict?.action.kind).toBe('do-update-set');
 
     const updatePlan = compileUpdateReturning(
       baseContract,
@@ -94,8 +90,8 @@ describe('SQL ORM rich AST query plans', () => {
       [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
       ['id'],
     );
-    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
-    expect((updatePlan.ast as UpdateAst).where).toBeInstanceOf(BinaryExpr);
+    expect(updatePlan.ast.kind).toBe('update');
+    expect((updatePlan.ast as UpdateAst).where?.kind).toBe('binary');
 
     const deletePlan = compileDeleteReturning(
       baseContract,
@@ -103,7 +99,7 @@ describe('SQL ORM rich AST query plans', () => {
       [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
       ['id'],
     );
-    expect(deletePlan.ast).toBeInstanceOf(DeleteAst);
+    expect(deletePlan.ast.kind).toBe('delete');
 
     const groupedPlan = compileGroupedAggregate(
       baseContract,
@@ -116,9 +112,9 @@ describe('SQL ORM rich AST query plans', () => {
       },
       BinaryExpr.gt(AggregateExpr.count(), LiteralExpr.of(1)),
     );
-    expect(groupedPlan.ast).toBeInstanceOf(SelectAst);
+    expect(groupedPlan.ast.kind).toBe('select');
     const groupedAst = groupedPlan.ast as SelectAst;
     expect(groupedAst.groupBy).toEqual([ColumnRef.of('posts', 'user_id')]);
-    expect(groupedAst.having).toBeInstanceOf(BinaryExpr);
+    expect(groupedAst.having?.kind).toBe('binary');
   });
 });
