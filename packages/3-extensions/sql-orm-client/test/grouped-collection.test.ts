@@ -39,9 +39,7 @@ describe('GroupedCollection', () => {
     }
     const totalViewsProjection = firstAst.projection.find((item) => item.alias === 'totalViews');
     expect(totalViewsProjection?.expr.kind).toBe('aggregate');
-    if (totalViewsProjection?.expr.kind === 'aggregate') {
-      expect((totalViewsProjection.expr as AggregateExpr).fn).toBe('sum');
-    }
+    expect((totalViewsProjection?.expr as AggregateExpr).fn).toBe('sum');
   });
 
   it('groupBy().aggregate() validates selector shape and non-empty spec', async () => {
@@ -102,10 +100,10 @@ describe('GroupedCollection', () => {
           return undefined;
         }
         const having = entry.plan.ast.having;
-        if (having?.kind !== 'binary' || (having as BinaryExpr).left.kind !== 'aggregate') {
+        if (having?.kind !== 'binary' || having.left.kind !== 'aggregate') {
           return undefined;
         }
-        return `${((having as BinaryExpr).left as AggregateExpr).fn}:${(having as BinaryExpr).op}`;
+        return `${having.left.fn}:${having.op}`;
       })
       .filter((comparison): comparison is string => comparison !== undefined);
 
@@ -219,10 +217,10 @@ describe('GroupedCollection', () => {
           return undefined;
         }
         const having = entry.plan.ast.having;
-        if (having?.kind !== 'binary' || (having as BinaryExpr).left.kind !== 'aggregate') {
+        if (having?.kind !== 'binary' || having.left.kind !== 'aggregate') {
           return undefined;
         }
-        const aggExpr = (having as BinaryExpr).left as AggregateExpr;
+        const aggExpr = having.left;
         return aggExpr.expr?.kind === 'column-ref'
           ? `${aggExpr.expr.table}:${aggExpr.expr.column}`
           : undefined;
