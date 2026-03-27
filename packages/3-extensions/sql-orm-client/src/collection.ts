@@ -169,7 +169,7 @@ export class Collection<
         ? input(createModelAccessor(this.ctx.context, this.modelName))
         : isWhereDirectInput(input)
           ? input
-          : shorthandToWhereExpr(this.contract, this.modelName, input);
+          : shorthandToWhereExpr(this.ctx.context, this.modelName, input);
     const filter = normalizeWhereArg(whereArg, { contract: this.contract });
 
     if (!filter) {
@@ -577,7 +577,7 @@ export class Collection<
       hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
     ) {
       const createdRow = await executeNestedCreateMutation({
-        contract: this.contract,
+        context: this.ctx.context,
         runtime: this.ctx.runtime,
         modelName: this.modelName,
         data: data as MutationCreateInput<SqlContract<SqlStorage>, string>,
@@ -720,7 +720,7 @@ export class Collection<
       hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
     ) {
       const updatedRow = await executeNestedUpdateMutation({
-        contract: this.contract,
+        context: this.ctx.context,
         runtime: this.ctx.runtime,
         modelName: this.modelName,
         filters: this.state.filters,
@@ -893,7 +893,7 @@ export class Collection<
     criterionLabel: string,
   ): Promise<Row | null> {
     const whereExpr = shorthandToWhereExpr(
-      this.contract,
+      this.ctx.context,
       this.modelName,
       criterion as ShorthandWhereFilter<TContract, ModelName>,
     );

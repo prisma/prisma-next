@@ -94,7 +94,7 @@ describe('filters', () => {
   });
 
   it('shorthandToWhereExpr() maps nulls, skips undefined, and combines multiple fields', () => {
-    const expr = shorthandToWhereExpr(contract, 'Post', {
+    const expr = shorthandToWhereExpr(context, 'Post', {
       id: 1,
       userId: null,
       views: undefined,
@@ -109,7 +109,7 @@ describe('filters', () => {
   });
 
   it('shorthandToWhereExpr() supports storage and model-name fallbacks', () => {
-    expect(shorthandToWhereExpr(contract, 'User', {})).toBeUndefined();
+    expect(shorthandToWhereExpr(context, 'User', {})).toBeUndefined();
 
     const withoutModelToTable = {
       ...contract,
@@ -119,8 +119,9 @@ describe('filters', () => {
       },
     } as typeof contract;
 
+    // Table resolves via modelToTable fallback; isNull is always available
     expect(
-      shorthandToWhereExpr(withoutModelToTable, 'User', {
+      shorthandToWhereExpr({ ...context, contract: withoutModelToTable } as never, 'User', {
         email: 'alice@example.com',
       }),
     ).toEqual(BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('alice@example.com')));
@@ -141,10 +142,12 @@ describe('filters', () => {
       },
     } as typeof contract;
 
+    // Table resolves to model name; field has no codec → fail-closed → no eq
+    // isNull is still available (traits: [])
     expect(
-      shorthandToWhereExpr(withoutMappings, 'User', {
-        unknownField: 123,
+      shorthandToWhereExpr({ ...context, contract: withoutMappings } as never, 'User', {
+        unknownField: null,
       } as never),
-    ).toEqual(BinaryExpr.eq(ColumnRef.of('User', 'unknownField'), LiteralExpr.of(123)));
+    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('User', 'unknownField')));
   });
 });
