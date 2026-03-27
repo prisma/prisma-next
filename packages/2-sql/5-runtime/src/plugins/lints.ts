@@ -53,10 +53,10 @@ function getFromSourceTableDetail(source: AnyFromSource): string | undefined {
     case 'derived-table-source':
       return source.alias;
     // v8 ignore next 4
-    default: {
-      const _exhaustive: never = source;
-      throw new Error(`Unsupported source kind: ${(_exhaustive as { kind: string }).kind}`);
-    }
+    default:
+      throw new Error(
+        `Unsupported source kind: ${(source satisfies never as { kind: string }).kind}`,
+      );
   }
 }
 
@@ -112,11 +112,9 @@ function evaluateAstLints(ast: AnyQueryAst): LintFinding[] {
     case 'insert':
       break;
 
-    // v8 ignore next 4
-    default: {
-      const _exhaustive: never = ast;
-      throw new Error(`Unsupported AST kind: ${(_exhaustive as { kind: string }).kind}`);
-    }
+    // v8 ignore next 2
+    default:
+      throw new Error(`Unsupported AST kind: ${(ast satisfies never as { kind: string }).kind}`);
   }
 
   return findings;
