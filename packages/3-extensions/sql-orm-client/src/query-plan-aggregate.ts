@@ -36,6 +36,10 @@ function validateGroupedComparable(value: AnyExpression): AnyExpression {
     case 'param-ref':
       throw new Error('ParamRef is not supported in grouped having expressions');
     case 'literal':
+    case 'column-ref':
+    case 'identifier-ref':
+    case 'aggregate':
+    case 'operation':
       return value;
     case 'list':
       if (value.values.some((entry) => entry.kind === 'param-ref')) {
@@ -43,7 +47,7 @@ function validateGroupedComparable(value: AnyExpression): AnyExpression {
       }
       return value;
     default:
-      return value;
+      throw new Error(`Unsupported comparable kind in grouped having: "${value.kind}"`);
   }
 }
 
