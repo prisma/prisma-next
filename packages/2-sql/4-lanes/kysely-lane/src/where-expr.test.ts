@@ -71,7 +71,7 @@ describe('buildKyselyWhereExpr', () => {
   it('returns ToWhereExpr payload for select where filters', () => {
     const whereArg = buildKyselyWhereExpr(contract, createSelectWithWhereCompiledQuery());
     const expr = whereArg.toWhereExpr();
-    expect(expr).toBeInstanceOf(BinaryExpr);
+    expect(expr.kind).toBe('binary');
     expect((expr as BinaryExpr).right).toEqual(ParamRef.of('admin', { codecId: 'string' }));
   });
 

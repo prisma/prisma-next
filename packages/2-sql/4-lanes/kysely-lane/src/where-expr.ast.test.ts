@@ -147,13 +147,13 @@ describe('buildKyselyWhereExpr nested AST traversal', () => {
     expect(bound).toBeInstanceOf(ExistsExpr);
     const exists = bound as ExistsExpr;
     const subquery = exists.subquery;
-    expect(subquery.from).toBeInstanceOf(DerivedTableSource);
+    expect(subquery.from.kind).toBe('derived-table-source');
     expect(((subquery.from as DerivedTableSource).query.where as BinaryExpr).right).toEqual(
       ParamRef.of('admin', { name: 'kind', codecId: 'pg/text@1' }),
     );
 
     const join = subquery.joins?.[0];
-    expect(join?.source).toBeInstanceOf(DerivedTableSource);
+    expect(join?.source.kind).toBe('derived-table-source');
     expect((join?.on as BinaryExpr).right).toEqual(
       ParamRef.of('join-user-id', { name: 'userId', codecId: 'pg/uuid@1' }),
     );
