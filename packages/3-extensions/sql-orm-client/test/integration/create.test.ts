@@ -13,11 +13,8 @@ function isInsertAst(ast: unknown): ast is InsertAst {
 
 function expectInsertBatchAst(ast: unknown): asserts ast is InsertAst {
   expect(isInsertAst(ast)).toBe(true);
-  if (!isInsertAst(ast)) {
-    throw new Error('Expected execution to emit an insert AST');
-  }
 
-  expect(ast.rows).toEqual([
+  expect((ast as InsertAst).rows).toEqual([
     {
       id: ParamRef.of(1, 'id'),
       name: ParamRef.of(2, 'name'),
