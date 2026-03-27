@@ -331,7 +331,7 @@ User story: Someone unfamiliar with the codebase wants to build a middleware ext
 
 Tasks:
 
-1. **Example extensions** — at least one working example of each extension type we want contributors to build: SQL database target, Postgres extension (e.g. ParadeDB handoff), middleware, framework integration. These serve as templates.
+1. **Example extensions** — at least one working example of each extension type we want contributors to build: SQL database target, Postgres extension (e.g. ParadeDB handoff), middleware (e.g. a query lint rule — the lint plugin is in PoC state and lint rules are a natural first extension for contributors), framework integration. These serve as templates.
 2. **API reference** — generated or hand-written documentation for extension-facing interfaces. Contributors need to know what interfaces to implement and what contracts to satisfy.
 3. **"Build your first extension" guide** — walks through building a trivial extension (e.g. a middleware) from scratch using the docs and examples.
 4. **Handoff to developer relations** — package the docs, examples, and guide for the dev relations team to use in community outreach (reaching out to authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations — see [community-generator-migration-analysis.md](0-references/community-generator-migration-analysis.md)).
