@@ -3,37 +3,26 @@ import type { PslNativeTypeAttribute, PslTypeMap, PslTypeResolution } from './ty
 /**
  * Reverse mapping from Postgres native types to PSL scalar types.
  * This is the inverse of SCALAR_COLUMN_MAP in the PSL interpreter.
+ *
+ * Only types NOT covered by PRESERVED_NATIVE_TYPES belong here — preserved types
+ * are checked first in createPostgresTypeMap and would shadow any duplicate entries.
  */
 const POSTGRES_TO_PSL: Record<string, string> = {
   text: 'String',
-  varchar: 'String',
   bool: 'Boolean',
   boolean: 'Boolean',
   int4: 'Int',
   integer: 'Int',
-  int2: 'Int',
-  smallint: 'Int',
   int8: 'BigInt',
   bigint: 'BigInt',
-  float4: 'Float',
-  real: 'Float',
   float8: 'Float',
   'double precision': 'Float',
   numeric: 'Decimal',
   decimal: 'Decimal',
   timestamptz: 'DateTime',
   'timestamp with time zone': 'DateTime',
-  timestamp: 'DateTime',
-  'timestamp without time zone': 'DateTime',
-  date: 'DateTime',
-  time: 'DateTime',
-  'time without time zone': 'DateTime',
-  timetz: 'DateTime',
-  'time with time zone': 'DateTime',
   jsonb: 'Json',
-  json: 'Json',
   bytea: 'Bytes',
-  uuid: 'String',
 };
 
 /**
