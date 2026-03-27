@@ -1,33 +1,50 @@
-# @prisma-next/sql-lane-sql-builder-new
+# @prisma-next/sql-builder-new
 
 Type-safe SQL query builder for Prisma Next with runtime execution.
 
 ## Usage
 
 ```typescript
-import postgres from '@prisma-next/postgres/runtime';
-import type { Contract } from './contract.d';
+import { sql } from '@prisma-next/sql-builder-new/runtime';
 
-const db = postgres<Contract>({ contractJson, url: process.env['DATABASE_URL']! });
-const tables = db.schema.tables;
+const db = sql({ context, runtime });
 
 // SELECT with WHERE
-const user = await db.sql
-  .from(tables.user)
+const user = await db.users
   .select('id', 'email')
   .where((f, fns) => fns.eq(f.id, 1))
   .first();
 
+// Aliased expression select
+const rows = await db.users
+  .select('id')
+  .select('userName', (f) => f.name)
+  .all();
+
 // JOIN
-const rows = await db.sql
-  .from(tables.user)
-  .innerJoin(tables.post, (f, fns) => fns.eq(f.user.id, f.post.user_id))
+const rows = await db.users
+  .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+  .select('name', 'title')
+  .all();
+
+// Self-join via .as()
+const rows = await db.users
+  .as('invitee')
+  .innerJoin(db.users.as('inviter'), (f, fns) =>
+    fns.eq(f.invitee.invited_by_id, f.inviter.id),
+  )
+  .select('name')
+  .all();
+
+// Subquery as join source
+const sub = db.posts.select('user_id', 'title').as('sub');
+const rows = await db.users
+  .innerJoin(sub, (f, fns) => fns.eq(f.users.id, f.sub.user_id))
   .select('name', 'title')
   .all();
 
 // GROUP BY with aggregate
-const counts = await db.sql
-  .from(tables.post)
+const counts = await db.posts
   .select('user_id')
   .select('cnt', (_f, fns) => fns.count())
   .groupBy('user_id')

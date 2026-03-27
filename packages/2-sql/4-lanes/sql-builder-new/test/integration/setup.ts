@@ -15,7 +15,7 @@ import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll } from 'vitest';
-import { createDb } from '../../src/runtime/create-db';
+import { sql } from '../../src/runtime/sql';
 import { contract } from '../fixtures/contract';
 import type { Contract } from '../fixtures/generated/contract';
 
@@ -142,7 +142,7 @@ export function setupIntegrationTest() {
   });
 
   function db() {
-    return createDb({ context, runtime });
+    return sql({ context, runtime });
   }
 
   return { db };

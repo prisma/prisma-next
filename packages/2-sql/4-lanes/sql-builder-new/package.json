@@ -1,5 +1,5 @@
 {
-  "name": "@prisma-next/sql-lane-sql-builder-new",
+  "name": "@prisma-next/sql-builder-new",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
