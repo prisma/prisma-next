@@ -349,9 +349,7 @@ function buildSelectAst(
     readonly includeProjection?: ReadonlyArray<ProjectionItem>;
     readonly where?: AnyWhereExpr;
   } = {},
-): {
-  readonly ast: SelectAst;
-} {
+): SelectAst {
   const scalarProjection = buildProjection(contract, tableName, state.selectedFields);
   const projection = [...scalarProjection, ...(options.includeProjection ?? [])];
   const where = options.where ?? buildStateWhere(contract, tableName, state);
@@ -382,7 +380,7 @@ function buildSelectAst(
     ast = ast.withJoins(options.joins);
   }
 
-  return { ast };
+  return ast;
 }
 
 export function compileSelect(
@@ -449,7 +447,7 @@ export function compileSelectWithIncludeStrategy(
     includeProjection.push(artifact.projection);
   }
 
-  const built = buildSelectAst(
+  const ast = buildSelectAst(
     contract,
     tableName,
     {
@@ -463,6 +461,6 @@ export function compileSelectWithIncludeStrategy(
     },
   );
 
-  const { params, paramDescriptors } = deriveParamsFromAst(built.ast);
-  return buildOrmQueryPlan(contract, built.ast, params, paramDescriptors);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
