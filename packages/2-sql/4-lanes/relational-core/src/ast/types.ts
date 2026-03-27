@@ -263,7 +263,7 @@ abstract class WhereExpr extends AstNode {
   abstract rewrite(rewriter: ExpressionRewriter): AnyWhereExpr;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
   abstract not(): AnyWhereExpr;
-  abstract toWhereExpr(): AnyWhereExpr;
+  abstract toUnboundWhereExpr(): AnyWhereExpr;
 
   collectColumnRefs(): ColumnRef[] {
     return collectColumnRefsWith(this);
@@ -832,7 +832,7 @@ export class BinaryExpr extends WhereExpr {
     return new BinaryExpr(negateBinaryOp(this.op), this.left, this.right);
   }
 
-  override toWhereExpr(): AnyWhereExpr {
+  override toUnboundWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
@@ -902,7 +902,7 @@ export class AndExpr extends WhereExpr {
     return new OrExpr(this.exprs.map((expr) => expr.not()));
   }
 
-  override toWhereExpr(): AnyWhereExpr {
+  override toUnboundWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
@@ -944,7 +944,7 @@ export class OrExpr extends WhereExpr {
     return new AndExpr(this.exprs.map((expr) => expr.not()));
   }
 
-  override toWhereExpr(): AnyWhereExpr {
+  override toUnboundWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
@@ -985,7 +985,7 @@ export class ExistsExpr extends WhereExpr {
     return new ExistsExpr(this.subquery, !this.notExists);
   }
 
-  override toWhereExpr(): AnyWhereExpr {
+  override toUnboundWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
@@ -1026,7 +1026,7 @@ export class NullCheckExpr extends WhereExpr {
     return new NullCheckExpr(this.expr, !this.isNull);
   }
 
-  override toWhereExpr(): AnyWhereExpr {
+  override toUnboundWhereExpr(): AnyWhereExpr {
     return this;
   }
 }
