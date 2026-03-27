@@ -22,7 +22,8 @@ export function sql<C extends SqlContract<SqlStorage>>(options: SqlOptions<C>): 
 
   return new Proxy({} as Db<C>, {
     get(_target, prop: string) {
-      const table = context.contract.storage.tables[prop];
+      const tables = context.contract.storage.tables;
+      const table = Object.hasOwn(tables, prop) ? tables[prop] : undefined;
       if (table) {
         return new TableProxyImpl(prop, table, prop, ctx);
       }
