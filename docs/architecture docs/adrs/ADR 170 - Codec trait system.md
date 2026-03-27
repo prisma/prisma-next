@@ -45,7 +45,7 @@ Traits are **not mutually exclusive**. A numeric type is typically also order-co
  */
 type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
-interface Codec<Id, TWire, TJs, TParams, THelper> {
+interface Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
   // ... existing fields ...
 
   /**
@@ -53,7 +53,7 @@ interface Codec<Id, TWire, TJs, TParams, THelper> {
    * When omitted, the codec is treated as having no traits — only explicit
    * operations registered for this codec ID are available.
    */
-  readonly traits?: readonly CodecTrait[];
+  readonly traits?: TTraits;
 }
 ```
 
@@ -136,10 +136,10 @@ For **type-level** gating (TypeScript compile-time constraints), we need trait i
 ```ts
 // In emitted contract.d.ts — CodecTypes already exists, we extend each entry
 export type CodecTypes = {
-  readonly 'pg/int4@1': { readonly output: number; readonly traits: 'equality' | 'order' | 'numeric' };
-  readonly 'pg/text@1': { readonly output: string; readonly traits: 'equality' | 'order' | 'textual' };
-  readonly 'pg/bool@1': { readonly output: boolean; readonly traits: 'equality' | 'boolean' };
-  readonly 'pg/jsonb@1': { readonly output: JsonValue; readonly traits: 'equality' };
+  readonly 'pg/int4@1': { readonly input: number; readonly output: number; readonly traits: 'equality' | 'order' | 'numeric' };
+  readonly 'pg/text@1': { readonly input: string; readonly output: string; readonly traits: 'equality' | 'order' | 'textual' };
+  readonly 'pg/bool@1': { readonly input: boolean; readonly output: boolean; readonly traits: 'equality' | 'boolean' };
+  readonly 'pg/jsonb@1': { readonly input: JsonValue; readonly output: JsonValue; readonly traits: 'equality' };
   // ...
 };
 ```
