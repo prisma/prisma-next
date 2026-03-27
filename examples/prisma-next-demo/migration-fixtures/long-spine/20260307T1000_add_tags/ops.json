@@ -1,0 +1,34 @@
+[
+  {
+    "id": "table.tag",
+    "label": "Create table tag",
+    "summary": "Creates table tag with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "tag"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"tag\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"tag\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"tag\"",
+        "sql": "CREATE TABLE \"public\".\"tag\" (\n  \"id\" uuid NOT NULL,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"tag\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"tag\"') IS NOT NULL"
+      }
+    ]
+  }
+]

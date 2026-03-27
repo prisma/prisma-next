@@ -1,0 +1,35 @@
+[
+  {
+    "id": "alterNullability.user.email",
+    "label": "Relax nullability for email on user",
+    "summary": "Drops NOT NULL constraint for email on table user",
+    "operationClass": "widening",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "email",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"email\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'email'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop NOT NULL from \"email\"",
+        "sql": "ALTER TABLE \"public\".\"user\"\nALTER COLUMN \"email\" DROP NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify \"email\" is nullable",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'email'\n    AND is_nullable = 'YES'\n)"
+      }
+    ]
+  }
+]

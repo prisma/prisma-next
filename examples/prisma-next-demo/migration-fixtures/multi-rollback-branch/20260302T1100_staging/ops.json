@@ -1,0 +1,67 @@
+[
+  {
+    "id": "dropColumn.user.phone",
+    "label": "Drop column phone from user",
+    "summary": "Drops extra column phone from table user",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "phone",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"phone\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop column \"phone\"",
+        "sql": "ALTER TABLE \"public\".\"user\" DROP COLUMN \"phone\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"phone\" is removed",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n)"
+      }
+    ]
+  },
+  {
+    "id": "table.post",
+    "label": "Create table post",
+    "summary": "Creates table post with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"post\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"post\"",
+        "sql": "CREATE TABLE \"public\".\"post\" (\n  \"id\" uuid NOT NULL,\n  \"title\" text NOT NULL,\n  \"userId\" uuid NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"post\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NOT NULL"
+      }
+    ]
+  }
+]

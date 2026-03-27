@@ -1,0 +1,132 @@
+[
+  {
+    "id": "dropColumn.user.avatarUrl",
+    "label": "Drop column avatarUrl from user",
+    "summary": "Drops extra column avatarUrl from table user",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "avatarUrl",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"avatarUrl\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'avatarUrl'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop column \"avatarUrl\"",
+        "sql": "ALTER TABLE \"public\".\"user\" DROP COLUMN \"avatarUrl\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"avatarUrl\" is removed",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'avatarUrl'\n)"
+      }
+    ]
+  },
+  {
+    "id": "dropColumn.user.bio",
+    "label": "Drop column bio from user",
+    "summary": "Drops extra column bio from table user",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "bio",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"bio\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'bio'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop column \"bio\"",
+        "sql": "ALTER TABLE \"public\".\"user\" DROP COLUMN \"bio\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"bio\" is removed",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'bio'\n)"
+      }
+    ]
+  },
+  {
+    "id": "dropTable.comment",
+    "label": "Drop table comment",
+    "summary": "Drops extra table comment",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"comment\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"comment\"') IS NOT NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop table \"comment\"",
+        "sql": "DROP TABLE \"public\".\"comment\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"comment\" is removed",
+        "sql": "SELECT to_regclass('\"public\".\"comment\"') IS NULL"
+      }
+    ]
+  },
+  {
+    "id": "dropTable.post",
+    "label": "Drop table post",
+    "summary": "Drops extra table post",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"post\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NOT NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop table \"post\"",
+        "sql": "DROP TABLE \"public\".\"post\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"post\" is removed",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NULL"
+      }
+    ]
+  }
+]

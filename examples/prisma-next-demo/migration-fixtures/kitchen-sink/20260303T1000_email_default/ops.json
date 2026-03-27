@@ -1,0 +1,68 @@
+[
+  {
+    "id": "setDefault.user.email",
+    "label": "Set default for email on user",
+    "summary": "Sets default on column email of table user",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "email",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"email\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'email'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "set default on \"email\"",
+        "sql": "ALTER TABLE \"public\".\"user\"\nALTER COLUMN \"email\" SET DEFAULT 'unknown@example.com'"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"email\" default matches expected value",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'email'\n    AND column_default = '''unknown@example.com''::text'\n)"
+      }
+    ]
+  },
+  {
+    "id": "dropColumn.user.phone",
+    "label": "Drop column phone from user",
+    "summary": "Drops extra column phone from table user",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "phone",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"phone\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop column \"phone\"",
+        "sql": "ALTER TABLE \"public\".\"user\" DROP COLUMN \"phone\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"phone\" is removed",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n)"
+      }
+    ]
+  }
+]

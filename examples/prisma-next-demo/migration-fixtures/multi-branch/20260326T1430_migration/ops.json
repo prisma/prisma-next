@@ -1,0 +1,446 @@
+[
+  {
+    "id": "type.user_type",
+    "label": "Create type user_type",
+    "summary": "Creates enum type user_type",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "type",
+        "name": "user_type"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure type \"user_type\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create type \"user_type\"",
+        "sql": "CREATE TYPE \"public\".\"user_type\" AS ENUM ('admin', 'user')"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify type \"user_type\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)"
+      }
+    ]
+  },
+  {
+    "id": "dropColumn.user.bio",
+    "label": "Drop column bio from user",
+    "summary": "Drops extra column bio from table user",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "bio",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"bio\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'bio'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop column \"bio\"",
+        "sql": "ALTER TABLE \"public\".\"user\" DROP COLUMN \"bio\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"bio\" is removed",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'bio'\n)"
+      }
+    ]
+  },
+  {
+    "id": "alterNullability.user.createdAt",
+    "label": "Enforce NOT NULL for createdAt on user",
+    "summary": "Sets NOT NULL on createdAt for table user",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "createdAt",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"createdAt\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'createdAt'\n)"
+      },
+      {
+        "description": "ensure \"createdAt\" has no NULL values",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM \"public\".\"user\"\n  WHERE \"createdAt\" IS NULL\n  LIMIT 1\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"createdAt\"",
+        "sql": "ALTER TABLE \"public\".\"user\"\nALTER COLUMN \"createdAt\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify \"createdAt\" is NOT NULL",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'createdAt'\n    AND is_nullable = 'NO'\n)"
+      }
+    ]
+  },
+  {
+    "id": "alterNullability.user.email",
+    "label": "Enforce NOT NULL for email on user",
+    "summary": "Sets NOT NULL on email for table user",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "email",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"email\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'email'\n)"
+      },
+      {
+        "description": "ensure \"email\" has no NULL values",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM \"public\".\"user\"\n  WHERE \"email\" IS NULL\n  LIMIT 1\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"email\"",
+        "sql": "ALTER TABLE \"public\".\"user\"\nALTER COLUMN \"email\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify \"email\" is NOT NULL",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'email'\n    AND is_nullable = 'NO'\n)"
+      }
+    ]
+  },
+  {
+    "id": "alterNullability.user.id",
+    "label": "Enforce NOT NULL for id on user",
+    "summary": "Sets NOT NULL on id for table user",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'id'\n)"
+      },
+      {
+        "description": "ensure \"id\" has no NULL values",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM \"public\".\"user\"\n  WHERE \"id\" IS NULL\n  LIMIT 1\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"id\"",
+        "sql": "ALTER TABLE \"public\".\"user\"\nALTER COLUMN \"id\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify \"id\" is NOT NULL",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'id'\n    AND is_nullable = 'NO'\n)"
+      }
+    ]
+  },
+  {
+    "id": "alterNullability.user.phone",
+    "label": "Enforce NOT NULL for phone on user",
+    "summary": "Sets NOT NULL on phone for table user",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "phone",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"phone\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n)"
+      },
+      {
+        "description": "ensure \"phone\" has no NULL values",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM \"public\".\"user\"\n  WHERE \"phone\" IS NULL\n  LIMIT 1\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"phone\"",
+        "sql": "ALTER TABLE \"public\".\"user\"\nALTER COLUMN \"phone\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify \"phone\" is NOT NULL",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n    AND is_nullable = 'NO'\n)"
+      }
+    ]
+  },
+  {
+    "id": "alterType.user.id",
+    "label": "Alter type for id on user",
+    "summary": "Changes type of id to character(36)",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'id'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "alter type of \"id\"",
+        "sql": "ALTER TABLE \"public\".\"user\"\nALTER COLUMN \"id\"\nTYPE character(36)\nUSING \"id\"::character(36)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"id\" has type character(36)",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_attribute a\n  JOIN pg_class c ON c.oid = a.attrelid\n  JOIN pg_namespace n ON n.oid = c.relnamespace\n  WHERE n.nspname = 'public'\n    AND c.relname = 'user'\n    AND a.attname = 'id'\n    AND format_type(a.atttypid, a.atttypmod) = 'character(36)'\n    AND NOT a.attisdropped\n)"
+      }
+    ],
+    "meta": {
+      "warning": "TABLE_REWRITE",
+      "detail": "ALTER COLUMN TYPE requires a full table rewrite and acquires an ACCESS EXCLUSIVE lock. On large tables, this can cause significant downtime."
+    }
+  },
+  {
+    "id": "table.post",
+    "label": "Create table post",
+    "summary": "Creates table post with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"post\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"post\"",
+        "sql": "CREATE TABLE \"public\".\"post\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"embedding\" vector,\n  \"id\" character(36) NOT NULL,\n  \"title\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"post\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "column.user.age",
+    "label": "Add column age to user",
+    "summary": "Adds column age to table user",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"age\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'age'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"age\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD COLUMN \"age\" int4 NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"age\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'age'\n)"
+      }
+    ]
+  },
+  {
+    "id": "column.user.kind",
+    "label": "Add column kind to user",
+    "summary": "Adds column kind to table user",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"kind\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'kind'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"kind\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD COLUMN \"kind\" \"user_type\" NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"kind\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'kind'\n)"
+      }
+    ]
+  },
+  {
+    "id": "column.user.name",
+    "label": "Add column name to user",
+    "summary": "Adds column name to table user",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"name\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'name'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"name\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD COLUMN \"name\" text NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"name\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'name'\n)"
+      }
+    ]
+  },
+  {
+    "id": "index.post.post_userId_idx",
+    "label": "Create FK-backing index post_userId_idx on post",
+    "summary": "Creates FK-backing index post_userId_idx on post",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "post_userId_idx",
+        "table": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"post_userId_idx\" is missing",
+        "sql": "SELECT to_regclass('\"public\".\"post_userId_idx\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create FK-backing index \"post_userId_idx\"",
+        "sql": "CREATE INDEX \"post_userId_idx\" ON \"public\".\"post\" (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"post_userId_idx\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post_userId_idx\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.post.post_userId_fkey",
+    "label": "Add foreign key post_userId_fkey on post",
+    "summary": "Adds foreign key post_userId_fkey referencing user",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "post_userId_fkey",
+        "table": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure foreign key \"post_userId_fkey\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_userId_fkey'\n  AND n.nspname = 'public'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add foreign key \"post_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"post\"\nADD CONSTRAINT \"post_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify foreign key \"post_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_userId_fkey'\n  AND n.nspname = 'public'\n)"
+      }
+    ]
+  }
+]
