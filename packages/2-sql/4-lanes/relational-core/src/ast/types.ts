@@ -259,7 +259,7 @@ abstract class Expression extends AstNode implements ExpressionSource {
   }
 }
 
-abstract class WhereExpr extends AstNode {
+abstract class WhereExpr extends AstNode implements ToWhereExpr {
   abstract accept<R>(visitor: WhereExprVisitor<R>): R;
   abstract rewrite(rewriter: ExpressionRewriter): AnyWhereExpr;
   abstract fold<T>(folder: ExpressionFolder<T>): T;
