@@ -1003,7 +1003,7 @@ export class NotExpr extends Expression {
     this.freeze();
   }
 
-  override toWhereExpr(): AnyWhereExpr {
+  toWhereExpr(): AnyExpression {
     return this;
   }
 
@@ -1715,7 +1715,6 @@ export type AnyExpression =
   | ExistsExpr
   | NullCheckExpr
   | NotExpr;
-export type AnyWhereExpr = BinaryExpr | AndExpr | OrExpr | ExistsExpr | NullCheckExpr | NotExpr;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
 export type AnyInsertValue = ColumnRef | ParamRef | DefaultValueExpr;
 export type AnyOperationArg = AnyExpression | ParamRef | LiteralExpr;
@@ -1753,14 +1752,8 @@ export function isWhereExpr(value: unknown): value is AnyExpression {
   );
 }
 
-export interface BoundWhereExpr {
-  readonly expr: AnyExpression;
-  readonly params: readonly unknown[];
-  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
-}
-
 export interface ToWhereExpr {
-  toWhereExpr(): AnyWhereExpr;
+  toWhereExpr(): AnyExpression;
 }
 
 export interface LoweredStatement {

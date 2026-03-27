@@ -224,7 +224,11 @@ describe('rich SQL AST', () => {
   it('negates where expressions through not()', () => {
     expect(
       BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })).not(),
-    ).toEqual(new NotExpr(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' }))));
+    ).toEqual(
+      new NotExpr(
+        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
+      ),
+    );
     expect(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),

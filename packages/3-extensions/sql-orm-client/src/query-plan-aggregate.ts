@@ -120,7 +120,7 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
 export function compileAggregate(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly AnyWhereExpr[],
+  filters: readonly AnyExpression[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
 ): SqlQueryPlan<Record<string, unknown>> {
   const entries = Object.entries(aggregateSpec);
@@ -144,7 +144,7 @@ export function compileAggregate(
 export function compileGroupedAggregate(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly AnyWhereExpr[],
+  filters: readonly AnyExpression[],
   groupByColumns: readonly string[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
   havingExpr: AnyExpression | undefined,

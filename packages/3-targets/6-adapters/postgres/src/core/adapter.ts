@@ -272,7 +272,11 @@ function renderSubqueryExpr(
   return `(${renderSelect(expr.query, contract, pim)})`;
 }
 
-function renderWhere(expr: AnyExpression, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderWhere(
+  expr: AnyExpression,
+  contract?: PostgresContract,
+  pim?: ParamIndexMap,
+): string {
   return renderExpr(expr, contract, pim);
 }
 
@@ -343,7 +347,11 @@ function renderListLiteral(expr: ListExpression, pim?: ParamIndexMap): string {
     return '(NULL)';
   }
   const values = expr.values
-    .map((v) => (v.kind === 'param-ref' ? renderParamRef(v, pim) : renderLiteral(v)))
+    .map((v) => {
+      if (v.kind === 'param-ref') return renderParamRef(v, pim);
+      if (v.kind === 'literal') return renderLiteral(v);
+      return renderExpr(v, undefined, pim);
+    })
     .join(', ');
   return `(${values})`;
 }

@@ -150,7 +150,7 @@ function buildStateWhere(
   options?: {
     readonly filterTableName?: string;
   },
-): AnyWhereExpr | undefined {
+): AnyExpression | undefined {
   const filterTableName = options?.filterTableName;
   const cursorTableName = filterTableName ?? tableName;
   const cursorWhere = buildCursorWhere(cursorTableName, state.orderBy, state.cursor);
@@ -347,7 +347,7 @@ function buildSelectAst(
   options: {
     readonly joins?: ReadonlyArray<JoinAst>;
     readonly includeProjection?: ReadonlyArray<ProjectionItem>;
-    readonly where?: AnyWhereExpr;
+    readonly where?: AnyExpression;
   } = {},
 ): SelectAst {
   const scalarProjection = buildProjection(contract, tableName, state.selectedFields);
