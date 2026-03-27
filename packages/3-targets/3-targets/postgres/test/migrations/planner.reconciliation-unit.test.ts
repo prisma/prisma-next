@@ -3,8 +3,8 @@ import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type { MigrationOperationPolicy } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import type { PlanningMode } from '../../src/core/migrations/planner';
 import { buildReconciliationPlan } from '../../src/core/migrations/planner-reconciliation';
+import type { PlanningMode } from '../../src/core/migrations/planner-types';
 
 // ---------------------------------------------------------------------------
 // Policies

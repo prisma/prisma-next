@@ -34,16 +34,15 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
 import { buildReconciliationPlan } from './planner-reconciliation';
+import {
+  buildTargetDetails,
+  type OperationClass,
+  type PlanningMode,
+  type PostgresPlanTargetDetails,
+} from './planner-types';
 
-export type OperationClass =
-  | 'dependency'
-  | 'type'
-  | 'table'
-  | 'column'
-  | 'primaryKey'
-  | 'unique'
-  | 'index'
-  | 'foreignKey';
+export type { OperationClass, PlanningMode, PostgresPlanTargetDetails } from './planner-types';
+export { buildTargetDetails } from './planner-types';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -65,21 +64,8 @@ type PlannerDatabaseDependency = {
   readonly install: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
 };
 
-export interface PostgresPlanTargetDetails {
-  readonly schema: string;
-  readonly objectType: OperationClass;
-  readonly name: string;
-  readonly table?: string;
-}
-
 interface PlannerConfig {
   readonly defaultSchema: string;
-}
-
-export interface PlanningMode {
-  readonly includeExtraObjects: boolean;
-  readonly allowWidening: boolean;
-  readonly allowDestructive: boolean;
 }
 
 const DEFAULT_PLANNER_CONFIG: PlannerConfig = {
@@ -1028,20 +1014,6 @@ export function renderDefaultLiteral(value: unknown, column?: StorageColumn): st
     return `'${escapeLiteral(json)}'::${column.nativeType}`;
   }
   return `'${escapeLiteral(json)}'`;
-}
-
-export function buildTargetDetails(
-  objectType: OperationClass,
-  name: string,
-  schema: string,
-  table?: string,
-): PostgresPlanTargetDetails {
-  return {
-    schema,
-    objectType,
-    name,
-    ...ifDefined('table', table),
-  };
 }
 
 export function qualifyTableName(schema: string, table: string): string {
