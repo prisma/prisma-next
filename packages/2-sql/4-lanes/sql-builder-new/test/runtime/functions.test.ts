@@ -17,7 +17,6 @@ import type { Functions } from '../../src/expression';
 import { ExpressionImpl } from '../../src/runtime/expression-impl';
 import { createFieldProxy } from '../../src/runtime/field-proxy';
 import { createAggregateFunctions, createFunctions } from '../../src/runtime/functions';
-import { ParamCollector } from '../../src/runtime/param-collector';
 import type { ScopeField } from '../../src/scope';
 import { joinedScope, makeSubquery, usersScope } from './test-helpers';
 
@@ -25,12 +24,10 @@ const f = () => createFieldProxy(usersScope);
 const jf = () => createFieldProxy(joinedScope);
 
 describe('createFunctions', () => {
-  let pc: ParamCollector;
   let fns: ReturnType<typeof createFunctions>;
 
   beforeEach(() => {
-    pc = new ParamCollector();
-    fns = createFunctions(pc, {});
+    fns = createFunctions({});
   });
 
   describe('comparison operators', () => {
@@ -43,7 +40,7 @@ describe('createFunctions', () => {
       expect(ast.left).toBeInstanceOf(IdentifierRef);
       expect((ast.left as IdentifierRef).name).toBe('id');
       expect(ast.right).toBeInstanceOf(ParamRef);
-      expect(pc.getValues()).toEqual([1]);
+      expect((ast.right as ParamRef).value).toBe(1);
     });
 
     it('ne produces BinaryExpr with op neq', () => {
@@ -130,7 +127,7 @@ describe('createFunctions', () => {
   });
 
   describe('in / notIn', () => {
-    it('in with array produces BinaryExpr with ListExpression', () => {
+    it('in with array produces BinaryExpr with ListExpression of ParamRefs', () => {
       const result = fns.in(f().id, [1, 2, 3]);
       const ast = result.buildAst() as BinaryExpr;
 
@@ -138,7 +135,9 @@ describe('createFunctions', () => {
       expect(ast.op).toBe('in');
       expect(ast.left).toBeInstanceOf(IdentifierRef);
       expect(ast.right).toBeInstanceOf(ListExpression);
-      expect(pc.getValues()).toEqual([1, 2, 3]);
+      const list = ast.right as ListExpression;
+      expect(list.values).toHaveLength(3);
+      expect(list.values.every((v) => v instanceof ParamRef)).toBe(true);
     });
 
     it('in with subquery produces BinaryExpr with SubqueryExpr', () => {
@@ -168,12 +167,10 @@ describe('createFunctions', () => {
 });
 
 describe('createAggregateFunctions', () => {
-  let pc: ParamCollector;
   let fns: ReturnType<typeof createAggregateFunctions>;
 
   beforeEach(() => {
-    pc = new ParamCollector();
-    fns = createAggregateFunctions(pc, {});
+    fns = createAggregateFunctions({});
   });
 
   it('count() produces AggregateExpr with fn count and no expr', () => {
@@ -246,15 +243,12 @@ describe('extension functions', () => {
       },
     };
 
-    const pc = new ParamCollector();
-    const fns = createFunctions(pc, opTypes);
+    const fns = createFunctions(opTypes);
 
     const vectorField: ScopeField = { codecId: 'pgvector/vector@1', nullable: false };
     const expr1 = new ExpressionImpl(ColumnRef.of('posts', 'embedding'), vectorField);
     const expr2 = new ExpressionImpl(ColumnRef.of('other', 'embedding'), vectorField);
 
-    // Extension functions are added dynamically by the Proxy from queryOperationTypes.
-    // Access via the typed generic parameter to validate the call.
     type TestQC = {
       readonly codecTypes: Record<string, { readonly input: unknown; readonly output: unknown }>;
       readonly capabilities: Record<string, Record<string, boolean>>;
@@ -275,26 +269,27 @@ describe('extension functions', () => {
   });
 });
 
-describe('parameter collection', () => {
-  it('inline literal values are collected as params with correct indices', () => {
-    const pc = new ParamCollector();
-    const fns = createFunctions(pc, {});
+describe('parameter embedding', () => {
+  it('inline literal values are embedded as ParamRef nodes', () => {
+    const fns = createFunctions({});
     const fields = f();
 
-    fns.eq(fields.id, 42);
-    fns.eq(fields.name, 'alice');
+    const r1 = fns.eq(fields.id, 42);
+    const r2 = fns.eq(fields.name, 'alice');
 
-    expect(pc.getValues()).toEqual([42, 'alice']);
-    expect(pc.size).toBe(2);
+    const ast1 = r1.buildAst() as BinaryExpr;
+    const ast2 = r2.buildAst() as BinaryExpr;
+    expect((ast1.right as ParamRef).value).toBe(42);
+    expect((ast2.right as ParamRef).value).toBe('alice');
   });
 
-  it('expression-to-expression comparisons do not add params', () => {
-    const pc = new ParamCollector();
-    const fns = createFunctions(pc, {});
+  it('expression-to-expression comparisons do not create ParamRefs', () => {
+    const fns = createFunctions({});
     const fields = jf();
 
-    fns.eq(fields.users.id, fields.posts.user_id);
-
-    expect(pc.size).toBe(0);
+    const result = fns.eq(fields.users.id, fields.posts.user_id);
+    const ast = result.buildAst() as BinaryExpr;
+    expect(ast.left).toBeInstanceOf(ColumnRef);
+    expect(ast.right).toBeInstanceOf(ColumnRef);
   });
 });

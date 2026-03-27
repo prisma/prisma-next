@@ -60,12 +60,10 @@ abstract class QueryBase<
     { postgres: { distinctOn: true } },
     'distinctOn',
     (...args: unknown[]) => {
-      const pc = this.state.paramCollector.clone();
-      const exprs = resolveDistinctOn(args, this.state.scope, this.state.rowFields, pc, this.ctx);
+      const exprs = resolveDistinctOn(args, this.state.scope, this.state.rowFields, this.ctx);
       return this.clone(
         cloneState(this.state, {
           distinctOn: [...(this.state.distinctOn ?? []), ...exprs],
-          paramCollector: pc,
         }),
       );
     },
@@ -93,10 +91,9 @@ abstract class QueryBase<
     ) => Expression<ScopeField>,
   ): GroupedQuery<QC, AvailableScope, RowType>;
   groupBy(...args: unknown[]): unknown {
-    const pc = this.state.paramCollector.clone();
-    const exprs = resolveGroupBy(args, this.state.scope, this.state.rowFields, pc, this.ctx);
+    const exprs = resolveGroupBy(args, this.state.scope, this.state.rowFields, this.ctx);
     return new GroupedQueryImpl<QC, AvailableScope, RowType>(
-      cloneState(this.state, { groupBy: [...this.state.groupBy, ...exprs], paramCollector: pc }),
+      cloneState(this.state, { groupBy: [...this.state.groupBy, ...exprs] }),
       this.ctx,
     );
   }
@@ -168,27 +165,23 @@ export class SelectQueryImpl<
     callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Result,
   ): SelectQuery<QC, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>>;
   select(...args: unknown[]): unknown {
-    const pc = this.state.paramCollector.clone();
-    const { projections, newRowFields } = resolveSelectArgs(args, this.state.scope, pc, this.ctx);
+    const { projections, newRowFields } = resolveSelectArgs(args, this.state.scope, this.ctx);
     return new SelectQueryImpl(
       cloneState(this.state, {
         projections: [...this.state.projections, ...projections],
         rowFields: { ...this.state.rowFields, ...newRowFields },
-        paramCollector: pc,
       }),
       this.ctx,
     );
   }
 
   where(expr: ExpressionBuilder<AvailableScope, QC>): SelectQuery<QC, AvailableScope, RowType> {
-    const pc = this.state.paramCollector.clone();
     const fieldProxy = createFieldProxy(this.state.scope);
-    const fns = createFunctions<QC>(pc, this.ctx.queryOperationTypes);
+    const fns = createFunctions<QC>(this.ctx.queryOperationTypes);
     const result = (expr as ExpressionBuilder<Scope, QueryContext>)(fieldProxy, fns as never);
     return new SelectQueryImpl(
       cloneState(this.state, {
         where: [...this.state.where, result.buildAst()],
-        paramCollector: pc,
       }),
       this.ctx,
     );
@@ -206,19 +199,15 @@ export class SelectQueryImpl<
     options?: OrderByOptions,
   ): SelectQuery<QC, AvailableScope, RowType>;
   orderBy(arg: unknown, options?: OrderByOptions): unknown {
-    const pc = this.state.paramCollector.clone();
     const item = resolveOrderBy(
       arg,
       options,
       this.state.scope,
       this.state.rowFields,
-      pc,
       this.ctx,
       false,
     );
-    return this.clone(
-      cloneState(this.state, { orderBy: [...this.state.orderBy, item], paramCollector: pc }),
-    );
+    return this.clone(cloneState(this.state, { orderBy: [...this.state.orderBy, item] }));
   }
 }
 
@@ -242,14 +231,10 @@ export class GroupedQueryImpl<
       fns: AggregateFunctions<QC>,
     ) => Expression<BooleanCodecType>,
   ): GroupedQuery<QC, AvailableScope, RowType> {
-    const pc = this.state.paramCollector.clone();
     const combined = orderByScopeOf(this.state.scope, this.state.rowFields);
-    const fns = createAggregateFunctions(pc, this.ctx.queryOperationTypes);
+    const fns = createAggregateFunctions(this.ctx.queryOperationTypes);
     const result = (expr as ExprCallback)(createFieldProxy(combined), fns);
-    return new GroupedQueryImpl(
-      cloneState(this.state, { having: result.buildAst(), paramCollector: pc }),
-      this.ctx,
-    );
+    return new GroupedQueryImpl(cloneState(this.state, { having: result.buildAst() }), this.ctx);
   }
 
   orderBy(
@@ -264,18 +249,14 @@ export class GroupedQueryImpl<
     options?: OrderByOptions,
   ): GroupedQuery<QC, AvailableScope, RowType>;
   orderBy(arg: unknown, options?: OrderByOptions): unknown {
-    const pc = this.state.paramCollector.clone();
     const item = resolveOrderBy(
       arg,
       options,
       this.state.scope,
       this.state.rowFields,
-      pc,
       this.ctx,
       true,
     );
-    return this.clone(
-      cloneState(this.state, { orderBy: [...this.state.orderBy, item], paramCollector: pc }),
-    );
+    return this.clone(cloneState(this.state, { orderBy: [...this.state.orderBy, item] }));
   }
 }
