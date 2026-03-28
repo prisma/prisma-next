@@ -1,17 +1,12 @@
 import type { DocumentContract, PlanMeta } from '@prisma-next/contract/types';
-import type { AnyMongoCommand, MongoQueryPlan } from '@prisma-next/mongo-core';
+import type { AnyMongoCommand, AnyMongoWireCommand, MongoQueryPlan } from '@prisma-next/mongo-core';
 import {
   AggregateCommand,
-  AggregateWireCommand,
   DeleteOneCommand,
-  DeleteOneWireCommand,
   FindCommand,
-  FindWireCommand,
   InsertOneCommand,
-  InsertOneWireCommand,
   MongoParamRef,
   UpdateOneCommand,
-  UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
 import { describe, expect, it } from 'vitest';
 import { createMongoAdapter } from '../src/mongo-adapter';
@@ -29,6 +24,14 @@ function plan(command: AnyMongoCommand): MongoQueryPlan {
   return { command, meta: stubMeta };
 }
 
+function narrowWire<K extends AnyMongoWireCommand['kind']>(
+  wireCommand: AnyMongoWireCommand,
+  kind: K,
+): Extract<AnyMongoWireCommand, { kind: K }> {
+  expect(wireCommand.kind).toBe(kind);
+  return wireCommand as Extract<AnyMongoWireCommand, { kind: K }>;
+}
+
 describe('MongoAdapter', () => {
   const adapter = createMongoAdapter();
 
@@ -39,9 +42,8 @@ describe('MongoAdapter', () => {
         age: new MongoParamRef(30, { name: 'age' }),
       });
       const result = adapter.lower(plan(command), stubContext);
+      const wire = narrowWire(result.wireCommand, 'find');
 
-      expect(result.wireCommand).toBeInstanceOf(FindWireCommand);
-      const wire = result.wireCommand as FindWireCommand;
       expect(wire.collection).toBe('users');
       expect(wire.filter).toEqual({ name: 'Alice', age: 30 });
     });
@@ -53,7 +55,7 @@ describe('MongoAdapter', () => {
         { projection: { name: 1, email: 1 }, sort: { name: 1 }, limit: 10, skip: 5 },
       );
       const result = adapter.lower(plan(command), stubContext);
-      const wire = result.wireCommand as FindWireCommand;
+      const wire = narrowWire(result.wireCommand, 'find');
 
       expect(wire.projection).toEqual({ name: 1, email: 1 });
       expect(wire.sort).toEqual({ name: 1 });
@@ -64,7 +66,7 @@ describe('MongoAdapter', () => {
     it('handles empty filter', () => {
       const command = new FindCommand('users');
       const result = adapter.lower(plan(command), stubContext);
-      const wire = result.wireCommand as FindWireCommand;
+      const wire = narrowWire(result.wireCommand, 'find');
 
       expect(wire.filter).toBeUndefined();
     });
@@ -86,9 +88,8 @@ describe('MongoAdapter', () => {
         active: true,
       });
       const result = adapter.lower(plan(command), stubContext);
+      const wire = narrowWire(result.wireCommand, 'insertOne');
 
-      expect(result.wireCommand).toBeInstanceOf(InsertOneWireCommand);
-      const wire = result.wireCommand as InsertOneWireCommand;
       expect(wire.document).toEqual({ name: 'Bob', age: 25, active: true });
     });
   });
@@ -101,9 +102,8 @@ describe('MongoAdapter', () => {
         { $set: { name: new MongoParamRef('Charlie') } },
       );
       const result = adapter.lower(plan(command), stubContext);
+      const wire = narrowWire(result.wireCommand, 'updateOne');
 
-      expect(result.wireCommand).toBeInstanceOf(UpdateOneWireCommand);
-      const wire = result.wireCommand as UpdateOneWireCommand;
       expect(wire.filter).toEqual({ _id: 'id-123' });
       expect(wire.update).toEqual({ $set: { name: 'Charlie' } });
     });
@@ -115,9 +115,8 @@ describe('MongoAdapter', () => {
         _id: new MongoParamRef('id-456'),
       });
       const result = adapter.lower(plan(command), stubContext);
+      const wire = narrowWire(result.wireCommand, 'deleteOne');
 
-      expect(result.wireCommand).toBeInstanceOf(DeleteOneWireCommand);
-      const wire = result.wireCommand as DeleteOneWireCommand;
       expect(wire.filter).toEqual({ _id: 'id-456' });
     });
   });
@@ -130,9 +129,8 @@ describe('MongoAdapter', () => {
       ];
       const command = new AggregateCommand('users', pipeline);
       const result = adapter.lower(plan(command), stubContext);
+      const wire = narrowWire(result.wireCommand, 'aggregate');
 
-      expect(result.wireCommand).toBeInstanceOf(AggregateWireCommand);
-      const wire = result.wireCommand as AggregateWireCommand;
       expect(wire.pipeline).toEqual(pipeline);
     });
   });
@@ -144,7 +142,7 @@ describe('MongoAdapter', () => {
         $or: [{ status: new MongoParamRef('shipped') }, { status: new MongoParamRef('delivered') }],
       });
       const result = adapter.lower(plan(command), stubContext);
-      const wire = result.wireCommand as FindWireCommand;
+      const wire = narrowWire(result.wireCommand, 'find');
 
       expect(wire.filter).toEqual({
         'shipping.address.city': 'Sydney',
