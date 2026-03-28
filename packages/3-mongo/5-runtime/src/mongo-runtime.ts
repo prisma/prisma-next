@@ -1,20 +1,36 @@
-import type { DocumentContract } from '@prisma-next/contract/types';
-import type { MongoAdapter } from '@prisma-next/mongo-adapter';
+import type { MongoAdapter, MongoLoweringContext } from '@prisma-next/mongo-adapter';
 import type { MongoQueryPlan } from '@prisma-next/mongo-core';
 import type { MongoDriver } from '@prisma-next/mongo-driver';
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 
 export interface MongoRuntimeOptions {
-  readonly contract: DocumentContract;
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
+  readonly loweringContext: MongoLoweringContext;
 }
 
 export interface MongoRuntime {
-  execute<Row = Record<string, unknown>>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row>;
+  execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }
 
-export function createMongoRuntime(_options: MongoRuntimeOptions): MongoRuntime {
-  throw new Error('not implemented');
+export function createMongoRuntime(options: MongoRuntimeOptions): MongoRuntime {
+  const { adapter, driver, loweringContext } = options;
+
+  return {
+    execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
+      const executionPlan = adapter.lower(plan, loweringContext);
+      const iterable = driver.execute<Row>(executionPlan.wireCommand);
+
+      async function* toGenerator(): AsyncGenerator<Row, void, unknown> {
+        yield* iterable;
+      }
+
+      return new AsyncIterableResult(toGenerator());
+    },
+
+    async close(): Promise<void> {
+      await driver.close();
+    },
+  };
 }
