@@ -100,7 +100,7 @@ The `mongodb` driver's `FindCursor` is already an `AsyncIterable`, so streaming 
 
 **Connection management.** `MongoClient` has its own connection pool. The adapter wraps it, but: who owns the `MongoClient` lifecycle? The adapter? A factory function? How does this parallel the SQL adapter's connection management?
 
-**Session/transaction support.** The `mongodb` driver uses explicit `ClientSession` objects for transactions (`client.startSession()`, `session.withTransaction()`). The driver interface needs to accept an optional session parameter, or transactions need to flow through a different mechanism. Not needed for step 1, but the interface shouldn't prevent it.
+**Session/transaction support.** The `mongodb` driver uses explicit `ClientSession` objects for transactions (`client.startSession()`, `session.withTransaction()`). The driver interface needs to accept an optional session parameter, or transactions need to flow through a different mechanism. The initial implementation can omit this, but the interface shouldn't prevent it.
 
 **`explain()` support.** The SQL budgets plugin calls `driver.explain()` to get query plan estimates. MongoDB has `cursor.explain()` and `collection.find(filter).explain()`. Should the driver expose an `explain()` method from the start, or defer until the budgets plugin is ported?
 
@@ -134,9 +134,9 @@ Options:
 2. **Extract a generic lifecycle runner** — parameterize the lifecycle over plan type and driver interface. This is the "extract" step, done early. Risk: premature abstraction.
 3. **Start with option 1, extract later** — consistent with the "spike then extract" approach.
 
-**Plugin interface.** The PoC plan says to skip the plugin pipeline initially and add it trivially later. This is reasonable — the plugin lifecycle is well-understood and the interface is small. Start with direct driver calls, no hooks. Add `MongoPlugin` when we need budgets or linting for Mongo.
+**Plugin interface.** The plugin lifecycle is well-understood and the interface is small. The initial implementation can use direct driver calls with no hooks, then add `MongoPlugin` when budgets or linting for Mongo is needed.
 
-**Verification / markers.** The SQL runtime verifies contract hashes against a `_prisma_next_marker` table. Mongo doesn't have tables — it would use a marker collection. Not needed for the initial PoC (tests use known-good contracts), but worth noting for later.
+**Verification / markers.** The SQL runtime verifies contract hashes against a `_prisma_next_marker` table. Mongo doesn't have tables — it would use a marker collection. Who creates it? How is it managed without a migration runner? See also [Mongo Overview § verification](../Mongo%20Overview.md#what-we-dont-know-yet).
 
 ---
 
@@ -221,7 +221,7 @@ This means Mongo codecs don't need to reimplement base type conversion — the d
 
 ## 6. Operations
 
-**Status: deferred from steps 1–3, but the architecture is the same as SQL**
+**Status: not needed until rich `where` filters are exposed**
 
 ### What operations do (all families)
 
@@ -233,54 +233,22 @@ This is also the extension point for new operators. In SQL, pgvector registers a
 
 Mongo filter operators (`$eq`, `$gt`, `$lt`, `$in`, `$regex`, `$exists`, `$elemMatch`) map to similar concepts but have Mongo-specific additions (array operators, embedded document matching, `$type`). The gating question is the same: which operators are valid for which field types?
 
-### Deferral rationale
-
-The initial PoC builds hardcoded queries (step 1) then basic `findMany` through the ORM (step 3). Operator gating is only needed when the ORM exposes rich `where` filters — that's step 4+. Start with ungated filters and add the operations registry when the query surface demands it. But the architecture is already established — the operations registry is a family-agnostic pattern with family-specific operators.
+The operations registry is a family-agnostic pattern with family-specific operators. Start with ungated filters and add the registry when the query surface demands it.
 
 ---
 
-## 7. Deferred components
-
-These are needed eventually but explicitly out of scope for the initial vertical slice (steps 1–3):
-
-| Component | Why deferred | When needed |
-|---|---|---|
-| Plugin pipeline | Well-understood pattern, trivial to add | When budgets/linting for Mongo is wanted |
-| Verification / markers | Tests use known contracts | When running against uncontrolled databases |
-| Transactions / sessions | Needs session plumbing through the driver | When ORM supports transactions (step 4+) |
-| Aggregation pipeline dispatch | The driver's `collection.aggregate()` works | When the pipeline lane is built |
-| `explain()` support | Mongo's explain API exists but no consumer yet | When budgets plugin is ported |
-
----
-
-## Component dependency graph for the PoC
-
-Step 1 (minimal executable slice) needs:
-
-```
-MongoQueryPlan (type)
-  ↓
-MongoDriver (wraps mongodb driver, dispatches commands)
-  ↓
-MongoRuntimeCore (lifecycle: validate → execute → yield rows)
-  ↓
-AsyncIterableResult<Row> (already exists, family-agnostic)
-```
-
-Step 2 (contract types) adds:
+## Component dependency graph
 
 ```
 MongoContract (extends ContractBase, adds collections/embedded docs)
   ↓
-contract.json + contract.d.ts (hand-crafted)
-```
-
-Step 3 (ORM client) adds:
-
-```
-MongoContract types
+Query surface (reads contract, builds MongoQueryPlan)
   ↓
-Mongo ORM client (reads contract, builds MongoQueryPlan)
+MongoQueryPlan { command, meta }
   ↓
-MongoQueryPlan → MongoRuntimeCore → MongoDriver → MongoDB
+MongoRuntimeCore (lifecycle: validate → execute → yield rows)
+  ↓
+MongoDriver (wraps mongodb driver, dispatches commands)
+  ↓
+AsyncIterableResult<Row> (already exists, family-agnostic)
 ```
