@@ -45,20 +45,23 @@ Tensions:
 
 ---
 
-## 3. Execution plan generalization
+## 3. Execution plan generalization *(resolved)*
 
 The runtime's `ExecutionPlan` currently has `sql: string` and `params: unknown[]`. The runtime core passes `{ sql: plan.sql, params: plan.params }` to the driver's `execute` method.
 
 **The question**: How does the execution plan generalize to accommodate non-SQL query shapes?
 
-Options:
-- **Union type**: `ExecutionPlan` gets `sql?: string` + `command?: MongoCommand` (or similar). The driver inspects which field is populated.
-- **Generic type parameter**: `ExecutionPlan<TQuery>` where SQL plans have `TQuery = { sql: string; params: unknown[] }` and Mongo plans have `TQuery = { collection: string; operation: string; pipeline?: object[]; filter?: object }`.
-- **Family-specific plan types**: `SqlExecutionPlan` and `DocumentExecutionPlan` are separate types. The runtime is generic over the plan type. The plugin pipeline accepts a base `ExecutionPlan` with only the family-agnostic fields (operation name, model name, metadata).
+**Answer: it doesn't generalize at the query level. Each family has its own plan type, plugin interface, and runtime.** The shared surface is the plugin lifecycle (beforeExecute → onRow → afterExecute) and metadata (`PlanMeta`), not the query payload.
 
-Tensions:
-- Plugins need to inspect plans for logging, caching, budgets, etc. If the plan shape is family-specific, every plugin needs family-specific branches — or the plan must expose family-agnostic metadata (operation name, model, timing) separately from the family-specific query payload.
-- The current plugin interface (`beforeExecute(plan)`, `onRow(row, plan)`, `afterExecute(plan, result)`) should ideally work unchanged for both families. This pushes toward a base plan type with family-specific extensions.
+Analysis of the existing SQL plugins proves that generalization is impractical:
+- The **budgets plugin** reads `plan.sql`, calls `driver.explain({ sql, params })`, and parses the SQL string to detect SELECT statements.
+- The **lints plugin** checks `plan.ast instanceof QueryAst` and pattern-matches on SQL AST node types (`DeleteAst`, `UpdateAst`, `SelectAst`).
+
+Any generalization of `ExecutionPlan` (union type, generic type parameter, or base type) either forces every plugin to branch on family, strips the plan to useless metadata, or adds complexity without enabling reuse. Plugins do useful work by inspecting family-specific query payloads — that work is inherently family-specific.
+
+The Mongo PoC will build its own `MongoQueryPlan`, `MongoRuntimeCore`, `MongoPlugin`, and `MongoDriver`. Cross-family plugins that only need timing/metadata can be extracted after both runtimes exist.
+
+See [execution-architecture.md](execution-architecture.md) for the full analysis.
 
 ---
 
