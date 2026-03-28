@@ -140,11 +140,11 @@ Options:
 
 ### How SQL does it
 
-In the SQL family, row types flow through the query builder:
+In the SQL family, row types are derived from the contract's codec type map:
 
-1. The contract's `contract.d.ts` declares models with typed columns (e.g., `id: number`, `email: string`).
-2. The ORM client / SQL DSL creates `ColumnBuilder` objects carrying the JS type as a generic.
-3. When you call `.select({ id: columns.id, email: columns.email })`, the `Row` generic is inferred from the projection: `{ id: number, email: string }`.
+1. The contract's `contract.d.ts` declares a `CodecTypes` map (`'pg/int4@1' → { output: number }`, `'pg/text@1' → { output: string }`, etc.). Models list fields with `codecId` references into this map.
+2. The type system resolves a field's TypeScript type by looking up its `codecId` in `CodecTypes`. A column with `codecId: 'pg/int4@1'` has output type `number`.
+3. When you call `.select({ id: columns.id, email: columns.email })`, the `Row` generic is inferred from the selected columns' resolved types: `{ id: number, email: string }`.
 4. The plan carries `_row?: Row` as a phantom type for `ResultType<typeof plan>` extraction.
 
 ### How Mongo differs
