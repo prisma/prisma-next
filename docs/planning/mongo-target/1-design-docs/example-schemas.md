@@ -655,7 +655,7 @@ const frontendAuth = await db.Task
 
 ## Idiom coverage
 
-Which idioms from [mongo-idioms.md](mongo-idioms.md) do these examples exercise?
+Which idioms from [mongo-idioms.md](../9-references/mongo-idioms.md) do these examples exercise?
 
 | Idiom | Example | Coverage |
 |---|---|---|
