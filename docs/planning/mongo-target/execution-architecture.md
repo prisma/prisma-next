@@ -171,16 +171,26 @@ This is the key insight: **the useful work plugins do is inherently family-speci
 
 ### What IS shared
 
-The plugin **lifecycle** is shared:
+Sharing happens along two dimensions — **across families** (SQL vs. Mongo) and **across operation types** (request vs. subscribe). See [Streaming subscriptions](#streaming-subscriptions-change-streams-realtime) below for the full analysis of operation types.
+
+**Across families** (within the same operation type):
+
+The request-response **lifecycle** is shared:
 - `beforeExecute` — check the plan before sending to the database
 - `onRow` — observe each row/document as it streams back
 - `afterExecute` — observe timing and row counts after completion
 
-The **metadata** is shared:
-- Operation name, model name, lane, target, storageHash
-- Timing (`latencyMs`), row counts, completion status
+The subscription **lifecycle** is also shared (but different from request-response):
+- `onSubscribe` — observe a new subscription starting
+- `onEvent` — observe each change event
+- `onError` — handle errors / reconnection
+- `onUnsubscribe` — observe a subscription ending
 
-The **query payload** is not shared — and plugins that don't need it are the only candidates for cross-family reuse.
+The **metadata** is shared across both families and both operation types:
+- Operation name, model name, lane, target, storageHash
+- Timing (`latencyMs`), row/event counts, completion status
+
+The **query payload** is not shared — and plugins that don't inspect it are the only candidates for cross-family reuse.
 
 ### Cross-family plugin interface (to extract later)
 
@@ -189,17 +199,25 @@ After both runtimes exist, the common plugin interface would look something like
 ```typescript
 interface CrossFamilyPlugin {
   readonly name: string;
+
+  // Request-response hooks
   beforeExecute?(meta: PlanMeta, ctx: MinimalPluginContext): Promise<void>;
   onRow?(row: Record<string, unknown>, meta: PlanMeta, ctx: MinimalPluginContext): Promise<void>;
   afterExecute?(meta: PlanMeta, result: AfterExecuteResult, ctx: MinimalPluginContext): Promise<void>;
+
+  // Subscription hooks (future)
+  onSubscribe?(meta: PlanMeta, ctx: MinimalPluginContext): Promise<void>;
+  onEvent?(event: ChangeEvent<Record<string, unknown>>, meta: PlanMeta, ctx: MinimalPluginContext): Promise<void>;
+  onUnsubscribe?(meta: PlanMeta, stats: SubscriptionStats, ctx: MinimalPluginContext): Promise<void>;
 }
 ```
 
 This would support plugins like:
-- Latency logging
-- Row count telemetry
-- Rate limiting (by model/lane)
-- Generic caching (by metadata key, not by query content)
+- Latency logging (both operations)
+- Row/event count telemetry (both operations)
+- Rate limiting by model/lane (both operations)
+- Generic caching by metadata key (requests only)
+- Reconnection / resume token tracking (subscriptions only)
 
 But this interface is discovered after the fact, not designed up front.
 
