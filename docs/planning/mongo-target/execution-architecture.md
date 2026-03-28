@@ -205,6 +205,96 @@ But this interface is discovered after the fact, not designed up front.
 
 ---
 
+## Streaming subscriptions (change streams, realtime)
+
+### The problem
+
+The execution model above is **request-response**: send a query, get rows back, done. But both Mongo and SQL have streaming subscription models:
+
+- **Mongo**: [change streams](https://www.mongodb.com/docs/manual/changeStreams/) — `collection.watch()` returns a resumable, ordered stream of change events (insert/update/delete). A core part of the Mongo-native experience.
+- **SQL/Postgres**: [logical replication](https://supabase.com/docs/guides/realtime/architecture) (what Supabase Realtime uses), `LISTEN/NOTIFY` — WAL-based CDC that pushes row changes to subscribers.
+
+The current plugin lifecycle (`beforeExecute → onRow → afterExecute`) assumes bounded execution — `afterExecute` fires when the query completes. Subscriptions don't complete. They run indefinitely until explicitly closed.
+
+### Two axes of variation
+
+The runtime has two independent dimensions:
+
+|  | **Request** (bounded) | **Subscribe** (unbounded) |
+|---|---|---|
+| **SQL** | SQL query → rows | SQL query → change events |
+| **Mongo** | Mongo query → documents | Mongo query → change events |
+
+- **Family** (rows) determines the **query payload shape** — SQL filter vs. Mongo filter
+- **Operation type** (columns) determines the **output shape + lifecycle** — snapshot vs. stream
+
+### Shared input, different output
+
+A query describes **what data you're interested in** — "users where age > 25, with their posts." That description is the same regardless of whether you want a snapshot or a stream:
+
+```typescript
+const query = db.users.where({ age: { gt: 25 } }).include({ posts: true });
+
+// Request — current snapshot
+const users = await query.findMany();
+
+// Subscribe — stream of changes
+const stream = query.watch();
+for await (const event of stream) {
+  // { type: 'insert' | 'update' | 'delete', document, previousDocument? }
+}
+```
+
+The ORM client's query builder is reusable across both modes — only the terminal operation differs (`findMany()` vs. `watch()`).
+
+The input is "the same concept + subscription-specific options" rather than strictly identical. Subscriptions carry extra configuration that requests don't: resume tokens (Mongo `resumeAfter`), event type filters (only inserts? only updates?), full-document options (`fullDocument: 'updateLookup'`). And Mongo change streams use aggregation pipeline syntax for filtering (`$match`), not the same filter syntax as `find()`. But the conceptual query — the data interest — is shared.
+
+### Separate lifecycles
+
+Each operation type has its own plugin lifecycle:
+
+**Request lifecycle** (existing):
+```
+beforeExecute(plan) → onRow(row) → afterExecute(plan, { rowCount, latencyMs })
+```
+
+**Subscription lifecycle** (future):
+```
+onSubscribe(subscription) → onEvent(event) → onError(error) → onUnsubscribe(subscription, stats)
+```
+
+These don't cross over. A budget plugin that enforces row limits makes sense for requests but not subscriptions. A reconnection plugin that tracks resume tokens makes sense for subscriptions but not requests.
+
+### Change events may standardize across families
+
+Unlike query plans (which are deeply family-specific), the change event output may be standardizable. Every CDC system expresses the same thing: "entity X in collection/table Y was inserted/updated/deleted, here's the before/after state."
+
+```typescript
+interface ChangeEvent<Row> {
+  readonly type: 'insert' | 'update' | 'delete';
+  readonly collection: string;  // or table
+  readonly document: Row;
+  readonly previousDocument?: Row;  // for updates/deletes
+  readonly metadata: {
+    readonly resumeToken?: unknown;  // Mongo
+    readonly lsn?: string;          // Postgres
+    readonly timestamp: Date;
+  };
+}
+```
+
+This is speculative — the PoC doesn't implement subscriptions. But the structure is worth noting because it's a stronger candidate for cross-family sharing than query plans are.
+
+### Architecture constraints
+
+The PoC doesn't implement subscriptions, but must not prevent them:
+
+- **Don't assume `execute()` is the only operation** on the runtime. Leave room for `subscribe()`.
+- **Don't assume all `AsyncIterableResult` streams are finite.** The wrapper already supports unbounded iterables — don't add completion assumptions elsewhere.
+- **Keep the query builder terminal-agnostic.** The ORM client's filter/projection/include state should compile to a query description that both `execute()` and `subscribe()` can consume.
+
+---
+
 ## Implications for the PoC
 
 1. **Build a `MongoRuntimeCore`** with its own `MongoPlugin` interface accepting `MongoQueryPlan`. Do not try to generalize `RuntimeCore`.
