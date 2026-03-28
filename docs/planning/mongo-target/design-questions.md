@@ -191,18 +191,26 @@ For the PoC: Compile to `find()` / `insertOne()` / `updateOne()` / `deleteOne()`
 
 ---
 
-## 9. Change streams and the runtime's execution model
+## 9. Change streams and the runtime's execution model *(analysis complete, deferred)*
 
-MongoDB change streams are resumable, ordered, real-time event streams. They're a core part of the Mongo-native experience (reactive UIs, event-driven architectures, CDC).
+MongoDB change streams are resumable, ordered, real-time event streams. They're a core part of the Mongo-native experience (reactive UIs, event-driven architectures, CDC). This is a cross-family concern — Postgres has logical replication (used by Supabase Realtime) and LISTEN/NOTIFY.
 
-**The question**: Does PN's runtime model accommodate unbounded streaming queries?
+**The question**: Does PN's runtime model accommodate unbounded streaming subscriptions?
 
-The runtime currently produces `AsyncIterableResult<Row>` from queries. Change streams are a natural fit — they're async iterables of change events. But:
-- The plugin pipeline has `afterExecute` semantics (called when the query completes). Change streams don't complete — they run indefinitely until closed.
-- `beforeExecute` → `onRow` → `afterExecute` assumes a request-response lifecycle. Streaming subscriptions don't have a natural "after."
-- Resume tokens (for reconnection after disconnects) need to be surfaced somehow.
+**Analysis**: Subscriptions are a **separate operation type**, not a variant of `execute()`. The runtime has two axes of variation:
+- **Family** (SQL vs. Mongo) determines the query payload shape
+- **Operation type** (request vs. subscribe) determines the output shape and lifecycle
 
-For the PoC: Out of scope. But the architecture should not bake in assumptions that prevent streaming queries (e.g., "every query has a finite result set").
+The query input is shared across both modes within a family — "users where age > 25" is the same interest whether you want a snapshot or a stream. But subscriptions add subscription-specific options (resume tokens, event type filters, full-document mode) and have a fundamentally different lifecycle (`onSubscribe → onEvent → onError → onUnsubscribe` rather than `beforeExecute → onRow → afterExecute`).
+
+Change events may be more standardizable across families than query plans are, since every CDC system expresses the same fundamental thing: "entity X was inserted/updated/deleted, here's the before/after state."
+
+See [execution-architecture.md § Streaming subscriptions](execution-architecture.md#streaming-subscriptions-change-streams-realtime) for the full analysis.
+
+For the PoC: Out of scope. The architecture constraints are:
+- Don't assume `execute()` is the only operation on the runtime
+- Don't assume all `AsyncIterableResult` streams are finite
+- Keep the ORM client's query builder terminal-agnostic (compilable to both request and subscription)
 
 ---
 
