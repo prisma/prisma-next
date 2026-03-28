@@ -8,10 +8,8 @@ import { getConnectionUri, getDbName } from './setup';
 const stubMeta: PlanMeta = {
   target: 'mongo',
   storageHash: 'test-hash',
-  operationName: 'test',
+  lane: 'mongo',
   paramDescriptors: [],
-  refs: { tables: [], columns: [] },
-  projection: [],
 };
 
 export function makePlan<Row = unknown>(command: MongoCommand): MongoQueryPlan<Row> {
