@@ -117,7 +117,7 @@ The [design questions](design-questions.md) document has the full analysis. Belo
 
 ### Execution pipeline generalization (can queries flow through the same runtime?)
 
-- **[#3 — ExecutionPlan generalization](design-questions.md#3-execution-plan-generalization)**: `ExecutionPlan` has `sql: string` today. Mongo needs `{ collection, operation, filter/pipeline }`. Plugins inspect plans for logging, budgets, caching — if the plan shape is family-specific, every plugin needs family-specific branches. This is the "is the plugin pipeline actually family-agnostic?" risk. **PoC must answer.**
+- **[#3 — ExecutionPlan generalization](design-questions.md#3-execution-plan-generalization)**: ~~**PoC must answer.**~~ **Resolved.** The execution plan doesn't generalize at the query level. Each family gets its own plan type, plugin interface, and runtime. Plugins are family-specific because they inspect family-specific query payloads (SQL string/AST vs. Mongo commands). The shared surface is the lifecycle pattern and metadata, not the query payload. See [execution-architecture.md](execution-architecture.md).
 - **[#9 — Change streams vs. request-response lifecycle](design-questions.md#9-change-streams-and-the-runtimes-execution-model)**: The plugin pipeline assumes `beforeExecute → onRow → afterExecute`. Change streams never complete. Deferred, but the architecture must not prevent it.
 
 ### ORM surface generalization (can the query/mutation API span both families?)
