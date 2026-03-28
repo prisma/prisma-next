@@ -54,6 +54,62 @@ This forces concrete answers to:
 
 **Done when:** the queries from step 2 execute against a local MongoDB and return correct results.
 
+### 4. Broaden the query surface
+
+Add `findFirst`, `create`, `update`, `delete`. Each tests a different part of the pipeline (mutations vs. reads, return values vs. void). This is where you discover whether the mutation executor generalizes.
+
+### 5. Embedded document operations
+
+Query *into* embedded documents (`where: { address: { city: "Springfield" } }`), update embedded fields, create documents with embedded data. This is the Mongo-specific surface that SQL doesn't have — where the ORM client diverges most.
+
+### 6. Referenced relation loading
+
+`include` across collections. Forces an answer to [design question #7](design-questions.md#7-relation-loading-application-level-joining-vs-lookup) (application-level joining vs. `$lookup`), and tests whether the relation loading machinery can work without SQL joins.
+
+### 7. Cross-family validation
+
+Take one existing consumer library or plugin that works with SQL contracts and run it against the document contract. Does it work? Does it typecheck? This is the actual deliverable the PoC exists to validate — that the shared surface works.
+
+### 8. Polymorphism spike
+
+Flagged as an [April must-prove](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april). Take the [SaaS task management example schema](example-schemas.md#3-saas-task-management-with-polymorphism) (Bug/Feature/Chore) and get discriminated union queries working. Tests whether the contract can express it and whether the ORM can narrow types. This is a cross-family concern — the solution must work for SQL STI too.
+
+---
+
+## Architectural risks
+
+The [design questions](design-questions.md) document has the full analysis. Below is a summary organized by what each risk threatens, and which ones the PoC must answer.
+
+### Contract generalization (can the type system span both families?)
+
+- **[#10 — Shared contract surface](design-questions.md#10-shared-contract-surface-what-goes-in-contractbase)**: `ContractBase` doesn't include models or relations today — `SqlContract` adds them. If `DocumentContract` adds its own incompatible version, consumer libraries can't be family-agnostic. This is the foundational risk. **PoC must answer.**
+- **[#1 — Embedded documents](design-questions.md#1-embedded-documents-relation-field-or-distinct-concept)**: No SQL equivalent. Whatever we pick (relation with storage strategy, nested field type, or new concept) ripples through every layer. Get the contract shape wrong and everything downstream is wrong. **PoC must answer.**
+- **[#6 — Polymorphism / discriminated unions](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april)**: Cross-family concern. The contract type system needs to express it, the emitter needs to produce narrowing types, the ORM needs to query it. Neither family has this today. **PoC must answer.**
+
+### Execution pipeline generalization (can queries flow through the same runtime?)
+
+- **[#3 — ExecutionPlan generalization](design-questions.md#3-execution-plan-generalization)**: `ExecutionPlan` has `sql: string` today. Mongo needs `{ collection, operation, filter/pipeline }`. Plugins inspect plans for logging, budgets, caching — if the plan shape is family-specific, every plugin needs family-specific branches. This is the "is the plugin pipeline actually family-agnostic?" risk. **PoC must answer.**
+- **[#9 — Change streams vs. request-response lifecycle](design-questions.md#9-change-streams-and-the-runtimes-execution-model)**: The plugin pipeline assumes `beforeExecute → onRow → afterExecute`. Change streams never complete. Deferred, but the architecture must not prevent it.
+
+### ORM surface generalization (can the query/mutation API span both families?)
+
+- **[#4 — Update operators](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations)**: SQL is "set field = value". Mongo has `$inc`, `$push`, `$pull` — fundamentally different mutation semantics. How does the shared ORM `update()` surface accommodate both without becoming family-specific? **PoC must answer.**
+- **[#7 — Relation loading](design-questions.md#7-relation-loading-application-level-joining-vs-lookup)**: SQL uses joins. Mongo uses application-level stitching or `$lookup`. The ORM's `include` needs to work for both, but the implementation is completely different. **PoC must answer.**
+- **[#8 — Aggregation pipeline as compilation target](design-questions.md#8-aggregation-pipeline-dsl-scope-and-timing)**: The SQL ORM compiles to SQL strings. The Mongo ORM compiles to... what? `find()` for simple CRUD, but `$lookup` for includes, and pipelines for anything complex. The compilation target question is open.
+
+### Data integrity in a schemaless world
+
+- **[#2 — Referential integrity](design-questions.md#2-referential-integrity-enforcement)**: Mongo has no foreign keys. PN enforces cascades/restricts in application code — multi-step mutations, transactions for atomicity, real performance costs.
+- **[#5 — Read-time validation](design-questions.md#5-schema-validation-and-read-time-guarantees)**: Documents may not match the contract. Strict mode breaks on legacy data. Permissive mode returns unvalidated data. Neither is obviously right.
+
+### Deferred but load-bearing
+
+- **[#11 — Introspection](design-questions.md#11-introspection-generating-a-contract-from-an-existing-database)**: Table-stakes for real Mongo adoption but out of scope. Risk: the contract model we choose now makes introspection harder later.
+- **[#12 — Extension packs](design-questions.md#12-mongodb-specific-extension-packs)**: ADR 170 was designed for SQL. Mongo's differentiating features (Vector Search, Atlas Search, geo) need pipeline stages and index types the extension pack interface doesn't support yet.
+- **[#14 — Schema evolution](design-questions.md#14-schema-evolution-as-data-migration-cross-workstream)**: Cross-workstream dependency. If the invariant model doesn't fit schemaless databases, the migration story for Mongo is back to square one.
+
+---
+
 ## Reference material
 
 - [Example schemas](example-schemas.md) — concrete MongoDB schemas with speculative PSL and query patterns
