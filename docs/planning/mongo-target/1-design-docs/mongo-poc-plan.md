@@ -153,6 +153,7 @@ The [design questions](design-questions.md) document has the full analysis. Belo
 ## Reference material
 
 - [Execution architecture](execution-architecture.md) — why the execution pipeline (plans, plugins, runtime) is family-specific
+- [Execution components](mongo-execution-components.md) — component-level breakdown: what we need, what we know, what's open
 - [Example schemas](example-schemas.md) — concrete MongoDB schemas with speculative PSL and query patterns
 - [Design questions](design-questions.md) — open architectural questions this PoC must answer
 - [User promise](user-promise.md) — what we're promising Mongo users
