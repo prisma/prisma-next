@@ -5,8 +5,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    testTimeout: timeouts.spinUpPpgDev,
-    hookTimeout: timeouts.spinUpPpgDev,
+    testTimeout: timeouts.spinUpDbServer,
+    hookTimeout: timeouts.spinUpDbServer,
     fileParallelism: false,
     coverage: {
       provider: 'v8',

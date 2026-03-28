@@ -1,5 +1,6 @@
 const BASE_TIMEOUTS = {
   spinUpPpgDev: 30000,
+  spinUpDbServer: 30000,
   typeScriptCompilation: 8000,
   databaseOperation: 5000,
   default: 100,
@@ -50,6 +51,13 @@ export const timeouts = {
    */
   get spinUpPpgDev(): number {
     return Math.round(BASE_TIMEOUTS.spinUpPpgDev * getMultiplier());
+  },
+  /**
+   * Timeout for tests that spin up an in-memory database server (e.g. mongodb-memory-server).
+   * Use this when the timeout is not specific to a particular database technology.
+   */
+  get spinUpDbServer(): number {
+    return Math.round(BASE_TIMEOUTS.spinUpDbServer * getMultiplier());
   },
   /**
    * Timeout for tests that perform TypeScript compilation.

@@ -935,6 +935,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../0-config/tsdown
+      mongodb-memory-server:
+        specifier: ^10.4.0
+        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
