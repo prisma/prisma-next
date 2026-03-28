@@ -10,10 +10,14 @@ Validate that the Prisma Next architecture can accommodate a non-SQL database fa
 
 Start from the **consumer end** — importing and querying a contract — not the authoring/emission end. The contract shape should be driven by what the query client needs, not by what the authoring layer produces. Authoring and emission are machines that produce artifacts; build them once you know the target shape.
 
-**Deferred to later:**
+**Deferred from the initial PoC steps** (steps 1–3), but in-scope for April:
+- Emitter pipeline generalization — the authoring surfaces and emission process are coupled to SQL; this must be proven for Mongo before end of April
+- Shared ORM interface extraction — extracted after both ORM clients work independently
+- Cross-family consumer validation — a consumer library working against both SQL and Mongo contracts
+
+**Deferred beyond April:**
 - PSL authoring for document schemas
 - TypeScript authoring API
-- Emitter / document family hook
 - Production-quality driver, connection pooling, error handling
 - Aggregation pipeline DSL
 - Migrations / schema diffing
@@ -67,7 +71,7 @@ This is a type-level design exercise: does it typecheck? Does the API feel right
 This forces concrete answers to:
 - [Design question #4](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations): What mutation surface does the ORM expose?
 - [Design question #7](design-questions.md#7-relation-loading-application-level-joining-vs-lookup): How does `include` work for embedded vs. referenced?
-- Can the `Collection` base class abstract over both families, or does each family provide its own implementation?
+- Where do current SQL-oriented assumptions in `Collection` break? What would a shared `Collection` interface need to look like?
 
 **Done when:** a TypeScript file with representative queries typechecks against the hand-crafted contract types, covering `findMany`, `findFirst`, `create`, `update`, `where` with nested/embedded fields, and `include`.
 
@@ -76,10 +80,9 @@ This forces concrete answers to:
 Wire up the minimum adapter/driver/runtime to actually run the queries from step 2 against a real MongoDB instance.
 
 This forces concrete answers to:
-- What does `ExecutionPlan` look like for Mongo? (Today it's `{ sql: string }` — needs to generalize.)
-- What's shared between SQL and document execution contexts?
-- Is the plugin pipeline actually family-agnostic?
+- The execution plan is family-specific (see [execution-architecture.md](execution-architecture.md)). The Mongo PoC builds its own `MongoQueryPlan` and `MongoRuntimeCore`. This step validates that approach against a real database.
 - What codecs are needed for BSON ↔ JS?
+- Does `PlanMeta` (the shared metadata) work unchanged for Mongo, or does it need family-specific extensions?
 
 **Done when:** the queries from step 2 execute against a local MongoDB and return correct results.
 
