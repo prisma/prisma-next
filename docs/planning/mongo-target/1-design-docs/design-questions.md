@@ -176,18 +176,20 @@ For the PoC: application-level joining is sufficient. But the architecture shoul
 
 ---
 
-## 8. Aggregation pipeline DSL: scope and timing
+## 8. Aggregation pipeline as the Mongo query builder lane
 
-Aggregation pipelines are MongoDB's primary mechanism for complex queries — they replace SQL's `SELECT`, `JOIN`, `GROUP BY`, `HAVING`, subqueries, and window functions. They're both the ORM's internal compilation target (for complex queries) and a user-facing escape hatch (the Mongo equivalent of the SQL DSL).
+Aggregation pipelines are MongoDB's primary mechanism for complex queries — they replace SQL's `SELECT`, `JOIN`, `GROUP BY`, `HAVING`, subqueries, and window functions. They're both the ORM's internal compilation target (for complex queries) and the user-facing escape hatch when the ORM can't express a query.
 
-**The question**: What is the right scope for aggregation pipeline support in the PoC vs. later?
+This is architecturally symmetric with the SQL family: the SQL query builder (`db.sql.from(table).select(...)`) is the escape hatch for the SQL ORM. An aggregation pipeline builder fills the same role for the Mongo ORM. Each family has a high-level ORM client and a lower-level query builder lane, both sharing a session/transaction context (the same interop pattern validated by [workstream 3, VP1](../../april-milestone.md#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)). The lane interface is family-specific (SQL lanes compile to SQL strings, Mongo lanes compile to pipeline stage arrays), but the architectural role and interop guarantees are the same shared pattern.
+
+**The question**: What does this lane look like, and what's the right scope for the PoC vs. later?
 
 Sub-questions:
 - **As ORM compilation target**: The ORM needs to compile to *something*. For basic CRUD, `find()` / `insertOne()` / `updateOne()` / `deleteOne()` suffice. For includes via `$lookup`, the ORM would need to compile to aggregation pipelines. What's the minimum pipeline compilation needed for the PoC?
-- **As user-facing DSL**: The SQL work stream has a SQL DSL (`db.sql.from(table).select(...)`) as the escape hatch for queries the ORM can't express. The Mongo equivalent would be a type-safe pipeline builder. This is a large surface area (20+ stages, dozens of operators) and nobody in the ecosystem has solved type-safe pipelines well. When does this ship?
+- **As user-facing lane**: A type-safe pipeline builder is the full vision — but it's a large surface area (20+ stages, dozens of operators) and nobody in the ecosystem has solved type-safe pipelines well. When does this ship?
 - **Raw pipeline escape hatch**: As a minimum, let users pass a raw pipeline array (untyped) through the runtime. This validates that the execution plan and plugin pipeline accommodate non-SQL queries, without building a full DSL.
 
-For the PoC: Compile to `find()` / `insertOne()` / `updateOne()` / `deleteOne()` for basic CRUD. Provide a raw pipeline escape hatch. Defer the type-safe pipeline DSL.
+For the PoC: Compile to `find()` / `insertOne()` / `updateOne()` / `deleteOne()` for basic CRUD. Provide a raw pipeline escape hatch. Defer the type-safe pipeline lane.
 
 ---
 
