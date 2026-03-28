@@ -5,8 +5,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    testTimeout: timeouts.default,
-    hookTimeout: timeouts.default,
+    testTimeout: timeouts.spinUpDbServer,
+    hookTimeout: timeouts.spinUpDbServer,
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -20,10 +21,10 @@ export default defineConfig({
         '**/exports/**',
       ],
       thresholds: {
-        statements: 0,
-        branches: 0,
-        functions: 0,
-        lines: 0,
+        statements: 90,
+        branches: 85,
+        functions: 100,
+        lines: 90,
       },
     },
   },

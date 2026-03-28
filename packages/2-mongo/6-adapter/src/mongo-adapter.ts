@@ -76,8 +76,10 @@ function lowerCommand(command: AnyMongoCommand): AnyMongoWireCommand {
         command.collection,
         command.pipeline.map((stage) => ({ ...stage })),
       );
-    default:
-      throw new Error(`Unknown command kind: ${(command as { kind: string }).kind}`);
+    default: {
+      const _exhaustive: never = command;
+      throw new Error(`Unknown command kind: ${(_exhaustive as { kind: string }).kind}`);
+    }
   }
 }
 
