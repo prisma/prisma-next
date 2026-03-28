@@ -153,7 +153,10 @@ Stop condition: Modify a contract definition in a running dev server, see the co
 
 The ORM client, SQL DSL, middleware pipeline, and runtime together form the execution path from query to result. Multiple architectural assumptions along this path are untested under real-world conditions.
 
-**Key risk**: The ORM client and SQL DSL together form the primary user-facing query surface. If transactions aren't supported, extensions can't surface their operations, or the runtime breaks under RSC concurrency, users can't build real applications.
+**Key risks**:
+
+- The ORM client and SQL DSL together form the primary user-facing query surface. If transactions aren't supported, extensions can't surface their operations, or the runtime breaks under RSC concurrency, users can't build real applications.
+- The runtime interfaces are being stabilized for external contributors. If they're designed exclusively for request-response queries, a future streaming solution (Prisma Postgres, Supabase Realtime, or the Mongo PoC's change streams) may require breaking changes to interfaces contributors have already built against.
 
 #### Priority queue
 
@@ -210,6 +213,22 @@ Tasks:
 
 Stop condition: A repeated query is served from cache without hitting the database. The middleware interface supports short-circuiting and result injection. Then stop — cache invalidation strategies, TTL, and middleware composition are May.
 
+**VP5: Runtime interfaces accommodate streaming subscriptions**
+
+The runtime, middleware, and plugin interfaces assume request-response queries — `execute()` runs a query, returns a finite `AsyncIterableResult`, and the plugin lifecycle (`beforeExecute → onRow → afterExecute`) completes. Streaming subscriptions (Supabase Realtime, MongoDB change streams, future Prisma Postgres streaming) have a fundamentally different lifecycle: they don't complete until closed. If we stabilize these interfaces for contributors without validating streaming, we risk closing a door that's strategically important to keep open.
+
+Supabase Realtime is the validation target because it's a production-grade streaming API over Postgres, and it uses a completely different transport (WebSocket via the Supabase JS client) from regular queries (TCP via `pg`). This stress-tests the adapter abstraction — the adapter must surface streaming as a capability alongside regular query execution, with the runtime agnostic to the underlying transport.
+
+User story: I subscribe to changes on a Postgres table through Supabase Realtime, using the PN runtime. Change events flow through the runtime's plugin pipeline. I can cancel the subscription and it cleans up. The same runtime instance handles both regular request-response queries and streaming subscriptions without architectural contortion.
+
+Tasks:
+
+1. **Supabase adapter with streaming capability** — wrap the Supabase JS client as a driver. Regular queries use the Postgres connection; streaming uses `supabase.channel().on('postgres_changes', ...)`. The adapter exposes both capabilities. Local testing via `supabase start` (Docker).
+2. **Runtime `subscribe()` operation** — a new operation type on the runtime, distinct from `execute()`. Returns an unbounded `AsyncIterableResult` of change events. Plugins receive `beforeSubscribe` / `onChange` / `onUnsubscribe` hooks (or a minimal subset sufficient to prove the pattern).
+3. **Cancellation and cleanup** — the subscription can be cancelled via `AbortSignal` or explicit `close()`. The adapter cleans up the WebSocket channel. No leaked connections or orphaned subscriptions.
+
+Stop condition: A script that opens a Supabase Realtime subscription through the PN runtime, receives at least one change event through the plugin pipeline, and cancels cleanly. The runtime handles both `execute()` and `subscribe()` on the same instance. Then stop — subscription filtering, reconnection, backpressure, and production-quality error handling are all later. The point is proving the runtime interfaces can accommodate streaming, not shipping a streaming feature.
+
 **Side quest: Benchmarks**
 
 Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visibility content piece — publish as soon as the ORM has enough query support to run the suite. In progress.
@@ -220,6 +239,7 @@ Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visi
 - RSC pool sizing guidance
 - Edge runtime validation
 - Transaction isolation levels, savepoints, nested transactions
+- Streaming: subscription filtering, reconnection, backpressure, production error handling
 
 ---
 
