@@ -61,7 +61,7 @@ Any generalization of `ExecutionPlan` (union type, generic type parameter, or ba
 
 The Mongo PoC will build its own `MongoQueryPlan`, `MongoRuntimeCore`, `MongoPlugin`, and `MongoDriver`. Cross-family plugins that only need timing/metadata can be extracted after both runtimes exist.
 
-See [execution-architecture.md](execution-architecture.md) for the full analysis.
+See [mongo-execution-components.md](mongo-execution-components.md) for the component breakdown and rationale.
 
 ---
 
@@ -207,7 +207,7 @@ The query input is shared across both modes within a family — "users where age
 
 Change events may be more standardizable across families than query plans are, since every CDC system expresses the same fundamental thing: "entity X was inserted/updated/deleted, here's the before/after state."
 
-See [execution-architecture.md § Streaming subscriptions](execution-architecture.md#streaming-subscriptions-change-streams-realtime) for the full analysis.
+Streaming is validated in the SQL runtime workstream via Supabase Realtime ([VP5](../../april-milestone.md#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)); the patterns established there will inform Mongo change stream support.
 
 For the PoC: Out of scope. The architecture constraints are:
 - Don't assume `execute()` is the only operation on the runtime

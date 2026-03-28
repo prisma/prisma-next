@@ -44,7 +44,7 @@ Several key architectural questions have been answered through analysis of the e
 
 **Mongo is its own family, not a target under "document."** The SQL family abstraction works because SQL databases share a common query language. There is no equivalent shared interface for document databases — MongoDB and Firestore have different query languages, different data organization models, and different capabilities. A "document family" would contain very little that isn't trivially generic or actually MongoDB-specific. The contract hierarchy is `ContractBase` → `SqlContract` / `MongoContract`, with each family owning its own targets.
 
-**The execution pipeline is family-specific; the lifecycle is shared.** Plugins like the linter need to inspect query-specific structure — SQL AST nodes for the SQL linter, Mongo command fields for a Mongo linter. You can't abstract over these payloads without either making the abstraction useless or forcing every plugin to branch on family. Each family gets its own plan type (`MongoQueryPlan`), plugin interface (`MongoPlugin`), and runtime (`MongoRuntimeCore`). What IS shared is the plugin lifecycle pattern (`beforeExecute → onRow → afterExecute`) and the metadata (`PlanMeta`). See [execution-architecture.md](1-design-docs/execution-architecture.md).
+**The execution pipeline is family-specific; the lifecycle is shared.** Plugins like the linter need to inspect query-specific structure — SQL AST nodes for the SQL linter, Mongo command fields for a Mongo linter. You can't abstract over these payloads without either making the abstraction useless or forcing every plugin to branch on family. Each family gets its own plan type (`MongoQueryPlan`), plugin interface (`MongoPlugin`), and runtime (`MongoRuntimeCore`). What IS shared is the plugin lifecycle pattern (`beforeExecute → onRow → afterExecute`) and the metadata (`PlanMeta`). See [mongo-execution-components.md](1-design-docs/mongo-execution-components.md).
 
 **Streaming subscriptions are a separate operation type, not a variant of `execute()`.** Both Mongo change streams and SQL logical replication have real-time streaming models, but subscriptions don't complete — they run until closed. This is a different lifecycle from request-response queries and needs its own operation type with its own plugin hooks. The Mongo PoC doesn't implement subscriptions but must not prevent them. Streaming is validated in the SQL runtime workstream via Supabase Realtime ([VP5](../april-milestone.md#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)); the patterns established there will inform Mongo change stream support later.
 
@@ -113,7 +113,7 @@ Layer numbering follows the existing Domain -> Layer -> Plane structure. The exi
 
 **Analysis docs** — design decisions and rationale:
 - [user-promise.md](1-design-docs/user-promise.md) — the full value proposition for Mongo users
-- [execution-architecture.md](1-design-docs/execution-architecture.md) — why the execution pipeline is family-specific and what's shared
+- [mongo-execution-components.md](1-design-docs/mongo-execution-components.md) — execution pipeline components, what's shared, and what's open
 - [design-questions.md](1-design-docs/design-questions.md) — all 14 open architectural questions with full analysis
 
 **Reference material** — context, read as needed:
@@ -129,7 +129,7 @@ Layer numbering follows the existing Domain -> Layer -> Plane structure. The exi
 
 This overview is the source of truth for "what do we know and what don't we know." Keep it current as the work stream progresses.
 
-- **Design question resolved**: Update the narrative in "What we know so far" (or remove from "What we don't know yet"), update the full analysis in [design-questions.md](1-design-docs/design-questions.md) with the resolution and rationale, and link any new analysis document (as was done for [execution-architecture.md](1-design-docs/execution-architecture.md) when question #3 was resolved).
+- **Design question resolved**: Update the narrative in "What we know so far" (or remove from "What we don't know yet"), update the full analysis in [design-questions.md](1-design-docs/design-questions.md) with the resolution and rationale, and link any new analysis document (as was done for [mongo-execution-components.md](1-design-docs/mongo-execution-components.md) when question #3 was resolved).
 - **Design question added**: Add to [design-questions.md](1-design-docs/design-questions.md) first, then mention in "What we don't know yet" if it's consequential.
 - **Plan scope changes**: Update [mongo-poc-plan.md](1-design-docs/mongo-poc-plan.md) and the "Scope and status" section above to match.
 - **Implementation begins**: Create a Drive project spec under `projects/`. These research docs are the design reference, not task trackers.
