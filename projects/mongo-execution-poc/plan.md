@@ -40,6 +40,7 @@ Build Mongo codecs first (the type map foundation), then design an independent `
 - [ ] **Hand-craft `contract.d.ts`** — typed contract for the blog platform schema: `Users` (with embedded `Address`), `Posts` (with embedded `Comments` array), referenced `User→Posts` relationship. Models, fields with codec IDs, embedded document structure, collection mappings.
 - [ ] **Hand-craft `contract.json`** — runtime contract data matching the `.d.ts` types. Collection names, field definitions, embedded document descriptors.
 - [ ] **Type-level tests** — TypeScript files that must typecheck: verify the contract types carry collection names, field types resolve through `CodecTypes`, embedded document fields are accessible. No running database needed.
+- [ ] **Integration test: contract-driven plan with row type inference** — construct a `MongoQueryPlan` by hand using contract type information (look up collection, resolve field types through `CodecTypes`), with `Row` inferred from the contract rather than manually specified. Execute through the M1 pipeline against `mongodb-memory-server` and assert typed results. This proves the contract carries enough information for row type inference without requiring a query surface.
 - [ ] **Document structural symmetry** — note where `MongoContract` and `SqlContract` converge (models, fields, codec references, mappings pattern) and where they diverge (embedded documents, collection vs. table, field path vs. column). This becomes the input for the future extraction step.
 
 ### Milestone 3: Typed query surface with row type inference
@@ -74,6 +75,7 @@ Build a thin typed layer that reads the contract types and constructs `MongoQuer
 | Mongo codec registry with base codecs follows SQL registry shape | Unit + Type-level | M2 | encode/decode round-trip, type-level check |
 | `contract.json` and `contract.d.ts` exist with embedded + referenced relations | Manual | M2 | File existence, review |
 | Contract type structure contains info to build query plans | Type-level | M2 | `.ts` files that must typecheck |
+| Contract-driven plan executes with `Row` inferred from contract | Integration | M2 | Hand-built plan using contract types, `mongodb-memory-server` |
 | `MongoContract` is structurally symmetric with `SqlContract` | Manual + Type-level | M2 | Documented convergence/divergence, compile-time check |
 | Query surface constructs plan with `Row` inferred from contract | Type-level + Integration | M3 | Type-level tests + runtime execution |
 | Full flow: query surface → plan → runtime → driver → typed results | Integration | M3 | End-to-end test against `mongodb-memory-server` |
