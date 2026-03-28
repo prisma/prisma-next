@@ -4,7 +4,9 @@
 
 Validate that the Prisma Next architecture can accommodate a non-SQL database family. The primary deliverable is a working end-to-end path: hand-crafted contract → ORM client → query execution against a real MongoDB instance.
 
-## Approach: consumption-first
+## Approach
+
+### Consumption-first
 
 Start from the **consumer end** — importing and querying a contract — not the authoring/emission end. The contract shape should be driven by what the query client needs, not by what the authoring layer produces. Authoring and emission are machines that produce artifacts; build them once you know the target shape.
 
@@ -15,6 +17,33 @@ Start from the **consumer end** — importing and querying a contract — not th
 - Production-quality driver, connection pooling, error handling
 - Aggregation pipeline DSL
 - Migrations / schema diffing
+
+### "Mongo" is its own family, not a target under "document"
+
+The framework requires a `familyId` on every component (family, target, adapter, driver, extension). The question is whether MongoDB sits under a "document" family (analogous to how Postgres sits under "sql") or whether "mongo" IS the family.
+
+**Decision: `familyId: 'mongo'`, not `familyId: 'document'`.**
+
+The SQL family abstraction earns its keep because SQL databases genuinely share a common interface: the SQL query language, the relational model, and query semantics (joins, GROUP BY, WHERE). You can build a SQL query builder and swap Postgres for MySQL with a dialect adapter.
+
+There is no equivalent shared interface for "document databases." MongoDB and Firestore don't share a query language, don't share a data organization model (flat collections + embedded docs vs. hierarchical subcollections), and don't share query capabilities (aggregation pipeline vs. constrained queries). A "document family" abstraction would contain very little that isn't either trivially generic or actually MongoDB-specific. If Firestore came later, it would be its own family — `familyId: 'firestore'` — not a sibling target under `familyId: 'document'`.
+
+The contract hierarchy is:
+```
+ContractBase (shared: models, fields, relations, capabilities)
+├── SqlContract (SQL storage: tables, columns, mappings)
+│   └── Targets: Postgres, MySQL, SQLite...
+└── MongoContract (Mongo storage: collections, embedded docs, mappings)
+    └── Target: MongoDB
+```
+
+### Spike then extract
+
+Build a `mongo-orm-client` package that is **completely independent** of `sql-orm-client`. No shared base class, no imports from the SQL ORM, no predicted abstractions. Own `Collection` class, own query compilation, own mutation handling, own type plumbing.
+
+After the PoC produces a working Mongo ORM, compare the two implementations and extract the common interface. The abstraction should be discovered from two concrete implementations, not predicted from one.
+
+The one area where full independence isn't practical is the **contract types**. The contract is the input to both ORM clients — both need to consume `ContractBase` at minimum. The Mongo contract types may start inside the new package and be promoted later.
 
 ## Steps
 
