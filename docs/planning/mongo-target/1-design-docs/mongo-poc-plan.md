@@ -6,9 +6,13 @@ Validate that the Prisma Next architecture can accommodate a non-SQL database fa
 
 ## Approach
 
-### Consumption-first
+### Consumption-first, execution-inward
 
-Start from the **consumer end** — importing and querying a contract — not the authoring/emission end. The contract shape should be driven by what the query client needs, not by what the authoring layer produces. Authoring and emission are machines that produce artifacts; build them once you know the target shape.
+Start from the **consumer end** — not the authoring/emission end. But within the consumer side, start from **execution** (the runtime and driver), not the contract.
+
+Why: the existing runtime (`RuntimeCoreImpl`) is hardcoded to SQL. It calls `queryable.execute({ sql: plan.sql, params })` — the `Queryable` interface takes `{ sql: string, params: unknown[] }`, `ExecutionPlan` has a `sql: string` field, and the `MarkerReader` SPI returns SQL statements. You can't hand-craft a Mongo contract and plug it into the existing execution machinery. The first thing that needs to exist is a `MongoQueryPlan`, a `MongoDriver` wrapping the `mongodb` Node.js driver, and enough runtime glue to execute a query and get rows back. Once that works, the contract shape is informed by what the runtime and ORM client actually need — not guessed in advance.
+
+The contract shape is still driven by what the query client needs (not what the authoring layer produces), but the query client's needs are discovered by building the execution path first.
 
 **Deferred from the initial PoC steps** (steps 1–3), but in-scope for April:
 - Emitter pipeline generalization — the authoring surfaces and emission process are coupled to SQL; this must be proven for Mongo before end of April
@@ -51,40 +55,44 @@ The one area where full independence isn't practical is the **contract types**. 
 
 ## Steps
 
-### 1. Hand-craft a `contract.json` + `contract.d.ts`
+### 1. Minimal executable slice
 
-Write the contract artifacts by hand for the [blog platform example schema](example-schemas.md#1-blog-platform). This schema covers the essential patterns: embedded documents (1:1, 1:N), referenced relations, and array fields.
+Build the thinnest possible path from a hardcoded query to rows returned from a real MongoDB instance. No contract, no ORM — just execution machinery.
+
+Concrete deliverables:
+- **`MongoQueryPlan`** — the Mongo equivalent of `ExecutionPlan`. Instead of `{ sql: string, params: unknown[] }`, this carries a Mongo command (collection name, operation type, filter/projection/pipeline). Shares `PlanMeta` with the SQL family.
+- **`MongoDriver`** — wraps the `mongodb` Node.js driver. Implements a Mongo-specific `execute()` that takes a `MongoQueryPlan` and returns `AsyncIterable<Row>`.
+- **`MongoRuntimeCore`** — a standalone runtime (not the SQL `RuntimeCoreImpl`) that runs the `beforeExecute → onRow → afterExecute` lifecycle against Mongo plans and the Mongo driver. May start as a thin wrapper that just calls the driver directly.
+- **Test infrastructure** — [mongodb-memory-server](https://github.com/typegoose/mongodb-memory-server) for a real `mongod` in tests.
+
+This forces concrete answers to:
+- What does a Mongo query plan look like? What fields does it carry?
+- Does `PlanMeta` work unchanged, or does it need family-specific extensions?
+- What does the Mongo driver interface look like? How different is it from the SQL `Queryable`?
+
+**Done when:** a test constructs a hardcoded `MongoQueryPlan` for `findMany` on a `users` collection, executes it through `MongoRuntimeCore` and `MongoDriver` against `mongodb-memory-server`, and gets correct rows back.
+
+### 2. Contract types — work backwards from execution
+
+Now that the execution path exists, design the contract types that the ORM client will need to produce query plans. Hand-craft `contract.json` + `contract.d.ts` for the [blog platform example schema](example-schemas.md#1-blog-platform).
 
 This forces concrete answers to:
 - [Design question #1](design-questions.md#1-embedded-documents-relation-field-or-distinct-concept): How do embedded documents appear in the contract?
 - [Design question #10](design-questions.md#10-shared-contract-surface-what-goes-in-contractbase): What goes in `ContractBase` vs. family-specific extensions?
-- What do document-family mappings look like (model → collection, field → document path)?
+- What contract information does the ORM client need to construct `MongoQueryPlan` objects? (Now you know the plan shape from step 1.)
 
-**Done when:** a `contract.json` and `contract.d.ts` exist that describe Users, Posts, and Comments with both embedded and referenced relationships.
+**Done when:** a `contract.json` and `contract.d.ts` exist that describe Users, Posts, and Comments with both embedded and referenced relationships, and the type structure contains the information needed to build `MongoQueryPlan` objects.
 
-### 2. Write the ORM client code you wish worked
+### 3. Scaffold the ORM client
 
-Write the TypeScript usage code a developer would write to query the blog schema. Import the contract types, call `findMany`, use `where`, `include`, embedded field access, etc.
-
-This is a type-level design exercise: does it typecheck? Does the API feel right? Where do current SQL-oriented assumptions break?
+Build a `mongo-orm-client` that reads the contract types from step 2 and produces `MongoQueryPlan` objects that execute via the runtime from step 1.
 
 This forces concrete answers to:
 - [Design question #4](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations): What mutation surface does the ORM expose?
 - [Design question #7](design-questions.md#7-relation-loading-application-level-joining-vs-lookup): How does `include` work for embedded vs. referenced?
 - Where do current SQL-oriented assumptions in `Collection` break? What would a shared `Collection` interface need to look like?
 
-**Done when:** a TypeScript file with representative queries typechecks against the hand-crafted contract types, covering `findMany`, `findFirst`, `create`, `update`, `where` with nested/embedded fields, and `include`.
-
-### 3. Make it execute
-
-Wire up the minimum adapter/driver/runtime to actually run the queries from step 2 against a real MongoDB instance.
-
-This forces concrete answers to:
-- The execution plan is family-specific (see [execution-architecture.md](execution-architecture.md)). The Mongo PoC builds its own `MongoQueryPlan` and `MongoRuntimeCore`. This step validates that approach against a real database.
-- What codecs are needed for BSON ↔ JS?
-- Does `PlanMeta` (the shared metadata) work unchanged for Mongo, or does it need family-specific extensions?
-
-**Done when:** the queries from step 2 execute against a local MongoDB and return correct results.
+**Done when:** `findMany` on the blog schema's `users` collection works end-to-end: ORM client reads contract types, builds a `MongoQueryPlan`, executes it through `MongoRuntimeCore`, and returns typed results.
 
 ### 4. Broaden the query surface
 
