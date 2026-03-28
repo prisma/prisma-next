@@ -148,5 +148,5 @@ The [design questions](design-questions.md) document has the full analysis. Belo
 - [Example schemas](example-schemas.md) — concrete MongoDB schemas with speculative PSL and query patterns
 - [Design questions](design-questions.md) — open architectural questions this PoC must answer
 - [User promise](user-promise.md) — what we're promising Mongo users
-- [MongoDB idioms](mongo-idioms.md) — patterns the PoC should accommodate
-- [MongoDB primitives reference](mongodb-primitives-reference.md) — data model and query semantics
+- [MongoDB idioms](../9-references/mongo-idioms.md) — patterns the PoC should accommodate
+- [MongoDB primitives reference](../9-references/mongodb-primitives-reference.md) — data model and query semantics

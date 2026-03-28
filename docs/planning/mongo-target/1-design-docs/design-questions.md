@@ -2,9 +2,9 @@
 
 Design questions surfaced during the exploration of MongoDB primitives and their mapping to Prisma Next's architecture. These are questions where the answer is non-obvious, involves real trade-offs, or requires spiking to resolve. Grouped by theme.
 
-See also: [mongodb-primitives-reference.md](mongodb-primitives-reference.md), [mongo-poc-plan.md](mongo-poc-plan.md), [user-promise.md](user-promise.md)
+See also: [mongodb-primitives-reference.md](../9-references/mongodb-primitives-reference.md), [mongo-poc-plan.md](mongo-poc-plan.md), [user-promise.md](user-promise.md)
 
-**External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) and a [user journey narrative](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md). Where their priorities or observations surface new tensions, they're noted inline.
+**External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](../9-references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) and a [user journey narrative](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md). Where their priorities or observations surface new tensions, they're noted inline.
 
 ---
 
@@ -114,7 +114,7 @@ Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB col
 
 **The question**: How does the contract type system represent discriminated unions / model inheritance, and how does each family store them?
 
-**Priority signal**: The MongoDB team rates "Inheritance and Polymorphism" as **High priority** — their highest tier. The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) describes this as an early pain point: a user's `ratings` field had different structures depending on the rating engine, and Prisma ORM typed it as `Json`, losing all type safety. The MongoDB team also lists "Support for Polymorphic Array/Embedded Field" (Low priority) and notes that Prisma ORM's workarounds involve untyped `Json` fields or multiple optional fields.
+**Priority signal**: The MongoDB team rates "Inheritance and Polymorphism" as **High priority** — their highest tier. The [user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) describes this as an early pain point: a user's `ratings` field had different structures depending on the rating engine, and Prisma ORM typed it as `Json`, losing all type safety. The MongoDB team also lists "Support for Polymorphic Array/Embedded Field" (Low priority) and notes that Prisma ORM's workarounds involve untyped `Json` fields or multiple optional fields.
 
 ### Where this comes up
 
@@ -239,7 +239,7 @@ PN's contract flow assumes authoring-first — the user writes a schema, and the
 
 **The question**: Can PN generate a contract by introspecting an existing MongoDB database?
 
-The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) highlights this as an early pain point. Lucas ran `prisma db pull` and hit friction: plural collection names weren't normalized, relationships had to be defined manually (MongoDB has no foreign keys to introspect), and polymorphic fields were typed as `Json`.
+The [user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) highlights this as an early pain point. Lucas ran `prisma db pull` and hit friction: plural collection names weren't normalized, relationships had to be defined manually (MongoDB has no foreign keys to introspect), and polymorphic fields were typed as `Json`.
 
 Sub-questions:
 - **Field type inference**: MongoDB fields have per-document types. Introspection would need to sample documents and infer the most common type for each field. What happens when a field has mixed types across documents? (Report it as a union? Pick the majority type and warn?)
@@ -257,7 +257,7 @@ PN's extension pack architecture (ADR 170) allows targets and extensions to cont
 
 **The question**: Which MongoDB capabilities become extension packs, and what does that require from the extension pack interface?
 
-Candidates (from the [MongoDB team's feature priority list](references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv)):
+Candidates (from the [MongoDB team's feature priority list](../9-references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv)):
 - **Vector Search** (`$vectorSearch`) — Medium priority. Analogous to pgvector for Postgres. Contributes a vector field type, a similarity search operator, and vector search index definitions.
 - **Atlas Search** (`$search`) — Medium priority. Full-text search capabilities specific to MongoDB Atlas. Contributes search index definitions and search query operators.
 - **Geospatial** (`$near`, `$geoWithin`, `2dsphere` indexes) — Medium priority. Contributes GeoJSON field types, geospatial query operators, and geospatial index types.
@@ -291,15 +291,15 @@ For the PoC: Out of scope. This is a production-readiness concern, not an archit
 
 In SQL, schema evolution has two parts: structural migrations (DDL changes) and data migrations (content transforms). In MongoDB, **that distinction collapses**. There is no DDL — collections don't have enforced schemas. Adding a field, splitting a field, or changing a storage strategy (embedded → referenced) are all pure data transforms. In Mongo, schema evolution IS data migration.
 
-**The question**: Does the data invariant model from the migration workstream (see [data-migrations.md](../0-references/data-migrations.md), [data-migrations-solutions.md](../0-references/data-migrations-solutions.md)) serve as the foundation for MongoDB schema evolution?
+**The question**: Does the data invariant model from the migration workstream (see [data-migrations.md](../../0-references/data-migrations.md), [data-migrations-solutions.md](../../0-references/data-migrations-solutions.md)) serve as the foundation for MongoDB schema evolution?
 
 The fit is strong:
 - **"Done" = contract hash + invariants.** For Mongo, the contract hash captures the expected document shape, and the invariant captures "all documents conform to that shape." This is exactly the data invariant model's definition of desired state.
 - **Postcondition = a Mongo query.** "All users migrated to v2" is checkable: `db.users.countDocuments({ schemaVersion: { $ne: 2 } }) === 0`. This satisfies the invariant model's requirement for machine-checkable postconditions.
 - **Transformation = a Mongo update.** `db.users.updateMany({ schemaVersion: 1 }, [{ $set: { firstName: { $first: { $split: ["$name", " "] } } } }])`. This is idempotent by construction — it only touches documents that still need it.
-- **Schema versioning pattern is native.** Mongo developers already use `schemaVersion` fields and lazy migration (see [mongo-idioms.md](mongo-idioms.md#schema-versioning)). The invariant model formalizes what they already do informally.
+- **Schema versioning pattern is native.** Mongo developers already use `schemaVersion` fields and lazy migration (see [mongo-idioms.md](../9-references/mongo-idioms.md#schema-versioning)). The invariant model formalizes what they already do informally.
 
-The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team explicitly calls out the lack of automated data migrations as a disappointment — the developer had to manually write a migration script to move data from embedded to referenced.
+The [user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team explicitly calls out the lack of automated data migrations as a disappointment — the developer had to manually write a migration script to move data from embedded to referenced.
 
 Sub-questions:
 - **Structural vs. data migration for Mongo**: In the migration workstream's graph model, Mongo "migrations" are almost exclusively data migrations (no DDL). Does the graph model still make sense when there's no structural migration? Or is the invariant model sufficient on its own?

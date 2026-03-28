@@ -18,7 +18,7 @@ ORM client (Collection)
 
 ### Key types
 
-**`ExecutionPlan`** ([`packages/1-framework/1-core/shared/contract/src/types.ts`](../../../packages/1-framework/1-core/shared/contract/src/types.ts)):
+**`ExecutionPlan`** ([`packages/1-framework/1-core/shared/contract/src/types.ts`](../../../../packages/1-framework/1-core/shared/contract/src/types.ts)):
 ```typescript
 interface ExecutionPlan<Row = unknown, Ast = unknown> {
   readonly sql: string;
@@ -31,7 +31,7 @@ interface ExecutionPlan<Row = unknown, Ast = unknown> {
 
 **`PlanMeta`** — target, storageHash, lane, annotations (limit, codecs), refs (tables), projection, paramDescriptors.
 
-**`Plugin`** ([`packages/1-framework/4-runtime-executor/src/plugins/types.ts`](../../../packages/1-framework/4-runtime-executor/src/plugins/types.ts)):
+**`Plugin`** ([`packages/1-framework/4-runtime-executor/src/plugins/types.ts`](../../../../packages/1-framework/4-runtime-executor/src/plugins/types.ts)):
 ```typescript
 interface Plugin<TContract, TAdapter, TDriver> {
   readonly name: string;
@@ -41,7 +41,7 @@ interface Plugin<TContract, TAdapter, TDriver> {
 }
 ```
 
-**`RuntimeFamilyAdapter`** ([`packages/1-framework/4-runtime-executor/src/runtime-spi.ts`](../../../packages/1-framework/4-runtime-executor/src/runtime-spi.ts)):
+**`RuntimeFamilyAdapter`** ([`packages/1-framework/4-runtime-executor/src/runtime-spi.ts`](../../../../packages/1-framework/4-runtime-executor/src/runtime-spi.ts)):
 ```typescript
 interface RuntimeFamilyAdapter<TContract> {
   readonly contract: TContract;
@@ -50,7 +50,7 @@ interface RuntimeFamilyAdapter<TContract> {
 }
 ```
 
-**`RuntimeCore.execute()`** ([`packages/1-framework/4-runtime-executor/src/runtime-core.ts`](../../../packages/1-framework/4-runtime-executor/src/runtime-core.ts)) — validates the plan, runs the plugin lifecycle, passes `{ sql, params }` to the driver's `execute()`, and wraps the result in `AsyncIterableResult<Row>`.
+**`RuntimeCore.execute()`** ([`packages/1-framework/4-runtime-executor/src/runtime-core.ts`](../../../../packages/1-framework/4-runtime-executor/src/runtime-core.ts)) — validates the plan, runs the plugin lifecycle, passes `{ sql, params }` to the driver's `execute()`, and wraps the result in `AsyncIterableResult<Row>`.
 
 ---
 
@@ -126,7 +126,7 @@ The obvious approach is to make `ExecutionPlan` generic: `ExecutionPlan<TQuery>`
 
 ### Evidence: the budgets plugin
 
-[`packages/2-sql/5-runtime/src/plugins/budgets.ts`](../../../packages/2-sql/5-runtime/src/plugins/budgets.ts):
+[`packages/2-sql/5-runtime/src/plugins/budgets.ts`](../../../../packages/2-sql/5-runtime/src/plugins/budgets.ts):
 
 - Reads `plan.sql` and `plan.params` to call `driver.explain({ sql: plan.sql, params: plan.params })` (line 35)
 - Parses the SQL string: `plan.sql.trimStart().toUpperCase()` to detect `SELECT` statements (line 315)
@@ -135,7 +135,7 @@ The obvious approach is to make `ExecutionPlan` generic: `ExecutionPlan<TQuery>`
 
 ### Evidence: the lints plugin
 
-[`packages/2-sql/5-runtime/src/plugins/lints.ts`](../../../packages/2-sql/5-runtime/src/plugins/lints.ts):
+[`packages/2-sql/5-runtime/src/plugins/lints.ts`](../../../../packages/2-sql/5-runtime/src/plugins/lints.ts):
 
 - Checks `plan.ast instanceof QueryAst` — the SQL AST class hierarchy (line 15-17)
 - Pattern-matches on SQL AST node types: `DeleteAst`, `UpdateAst`, `SelectAst` (lines 70-113)
