@@ -229,25 +229,25 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/3-mongo/1-core/**",
+      "glob": "packages/2-mongo/1-core/**",
       "domain": "mongo",
       "layer": "core",
       "plane": "shared"
     },
     {
-      "glob": "packages/3-mongo/5-runtime/**",
+      "glob": "packages/2-mongo/5-runtime/**",
       "domain": "mongo",
       "layer": "runtime",
       "plane": "runtime"
     },
     {
-      "glob": "packages/3-mongo/6-adapter/**",
+      "glob": "packages/2-mongo/6-adapter/**",
       "domain": "mongo",
       "layer": "adapters",
       "plane": "shared"
     },
     {
-      "glob": "packages/3-mongo/7-driver/**",
+      "glob": "packages/2-mongo/7-driver/**",
       "domain": "mongo",
       "layer": "drivers",
       "plane": "runtime"
