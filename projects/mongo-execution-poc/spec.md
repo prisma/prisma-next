@@ -21,11 +21,15 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 - A `MongoRuntimeCore` that validates a plan, calls the driver, and wraps results in `AsyncIterableResult<Row>`.
 - Supported operations: `find`, `insertOne`, `updateOne`, `deleteOne`, `aggregate` (raw pipeline).
 
+**Codecs:**
+
+- A Mongo codec registry following the same shape as SQL (`typeId → encode/decode/types`), with base codecs for `ObjectId`, `String`, `Int32`, `Boolean`, `Date`.
+
 **Contract types:**
 
 - Hand-crafted `contract.json` and `contract.d.ts` for the [blog platform example schema](../../docs/planning/mongo-target/1-design-docs/example-schemas.md#1-blog-platform) (Users, Posts, Comments with embedded and referenced relationships).
-- A `MongoContract` type that extends `ContractBase` with collection and embedded document information.
-- A `CodecTypes` map for Mongo base types (at minimum `ObjectId`, `String`, `Int32`, `Boolean`, `Date`).
+- A `MongoContract` type that is independent of `SqlContract` but structurally symmetric — same patterns for models referencing fields, fields referencing codec IDs, and mappings connecting domain names to storage names. Do NOT modify `ContractBase`; build the Mongo equivalent independently so the common elements can be extracted later.
+- A `CodecTypes` map for Mongo base types referencing the codec registry above.
 
 **Typed query surface:**
 
@@ -40,7 +44,7 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 
 ## Non-Functional Requirements
 
-- All Mongo packages live under `packages/3-mongo/` and are independent of SQL packages. No imports from `2-sql/`* or `3-extensions/*`. `3-extensions` will be renumbered (e.g. to `9-extensions`) later to make the dependency direction clear. **Assumption:** layering enforcement via `pnpm lint:deps` covers this.
+- All Mongo packages live under `packages/2-mongo/` and are independent of SQL packages. No imports from `2-sql/`* or `3-extensions/*`. `3-extensions` will be renumbered (e.g. to `9-extensions`) later to make the dependency direction clear. **Assumption:** layering enforcement via `pnpm lint:deps` covers this.
 - The interface designs must not prevent future addition of: session/transaction support, plugin hooks, `explain()`, streaming subscriptions.
 
 ## Non-goals
@@ -64,11 +68,15 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 - `aggregate` with a raw pipeline executes and returns results.
 - The driver dispatches to the correct `mongodb` driver method for each operation type.
 
+**Codecs:**
+
+- A Mongo codec registry exists with base codecs (`objectId`, `string`, `int32`, `boolean`, `date`) following the same registry shape as SQL.
+
 **Contract types:**
 
 - `contract.json` and `contract.d.ts` exist for the blog platform schema with Users, Posts (embedded Comments), and referenced User→Posts relationships.
 - The contract type structure contains the information needed to build `MongoQueryPlan` objects (collection names, field types via codec IDs, embedded document structure).
-- `MongoContract` extends `ContractBase`.
+- `MongoContract` is structurally symmetric with `SqlContract`: same patterns for models, fields, codec references, and mappings. Convergence and divergence points are documented.
 
 **Typed query surface:**
 
@@ -77,8 +85,9 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 
 **Architecture:**
 
-- No Mongo package imports from `2-sql/`* or `3-extensions/*`.
+- No `2-mongo` package imports from `2-sql/`* or `3-extensions/*`.
 - `PlanMeta` is reused or a clear decision is documented about what needs to change.
+- Convergence/divergence between `MongoContract` and `SqlContract` is documented, preparing for future `ContractBase` extraction.
 
 # Other Considerations
 
@@ -111,6 +120,12 @@ Not applicable.
 - [Example schemas](../../docs/planning/mongo-target/1-design-docs/example-schemas.md) — the blog platform schema used for the hand-crafted contract
 - [Mongo Overview](../../docs/planning/mongo-target/Mongo%20Overview.md) — entrypoint for all Mongo workstream docs
 - [April milestone](../../docs/planning/april-milestone.md) — workstream 4
+
+# Decisions
+
+1. **Codecs first** — build the Mongo codec registry before the contract type, since `CodecTypes` form the foundation of the contract's type system.
+2. **Independent `MongoContract`** — build `MongoContract` as an independent type, structurally parallel to `SqlContract`. Do not modify `ContractBase`. Extract common elements to the framework domain in a follow-on step. This follows the "spike then extract" approach.
+3. **Structural symmetry is a functional requirement** — `MongoContract` must mirror `SqlContract`'s patterns (models → fields → codec IDs → CodecTypes, storage mappings). Divergence points (embedded documents, collections vs. tables, etc.) must be documented.
 
 # Open Questions
 
