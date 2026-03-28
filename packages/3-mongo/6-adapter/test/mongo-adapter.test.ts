@@ -20,10 +20,8 @@ import { createMongoAdapter } from '../src/mongo-adapter';
 const stubMeta: PlanMeta = {
   target: 'mongo',
   storageHash: 'test-hash',
-  operationName: 'test',
+  lane: 'mongo',
   paramDescriptors: [],
-  refs: { tables: [], columns: [] },
-  projection: [],
 };
 
 const stubContext = { contract: {} as DocumentContract };
