@@ -1,21 +1,30 @@
-export type { FindOptions } from './commands';
+export type { MongoAdapter, MongoLoweringContext } from './adapter-types';
+export type { AnyMongoCommand, FindOptions } from './commands';
 export {
   AggregateCommand,
   DeleteOneCommand,
   FindCommand,
   InsertOneCommand,
-  MongoCommand,
   UpdateOneCommand,
 } from './commands';
-export type { LiteralValue, MongoArray, MongoDocument, MongoExpr, MongoValue } from './param-ref';
+export type { MongoDriver } from './driver-types';
 export { MongoParamRef } from './param-ref';
 export type { MongoExecutionPlan, MongoQueryPlan } from './plan';
-export type { Document } from './wire-commands';
+export type { DeleteOneResult, InsertOneResult, UpdateOneResult } from './results';
+export type {
+  LiteralValue,
+  MongoArray,
+  MongoDocument,
+  MongoExpr,
+  MongoUpdateDocument,
+  MongoValue,
+  RawPipeline,
+} from './values';
+export type { AnyMongoWireCommand, Document } from './wire-commands';
 export {
   AggregateWireCommand,
   DeleteOneWireCommand,
   FindWireCommand,
   InsertOneWireCommand,
-  MongoWireCommand,
   UpdateOneWireCommand,
 } from './wire-commands';
