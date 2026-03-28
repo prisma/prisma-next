@@ -121,7 +121,7 @@ The [design questions](design-questions.md) document has the full analysis. Belo
 ### Execution pipeline generalization (can queries flow through the same runtime?)
 
 - **[#3 — ExecutionPlan generalization](design-questions.md#3-execution-plan-generalization)**: ~~**PoC must answer.**~~ **Resolved.** The execution plan doesn't generalize at the query level. Each family gets its own plan type, plugin interface, and runtime. Plugins are family-specific because they inspect family-specific query payloads (SQL string/AST vs. Mongo commands). The shared surface is the lifecycle pattern and metadata, not the query payload. See [execution-architecture.md](execution-architecture.md).
-- **[#9 — Change streams vs. request-response lifecycle](design-questions.md#9-change-streams-and-the-runtimes-execution-model)**: The plugin pipeline assumes `beforeExecute → onRow → afterExecute`. Change streams never complete. Deferred, but the architecture must not prevent it.
+- **[#9 — Change streams vs. request-response lifecycle](design-questions.md#9-change-streams-and-the-runtimes-execution-model)**: The plugin pipeline assumes `beforeExecute → onRow → afterExecute`. Change streams never complete. Deferred for the Mongo PoC, but the architecture must not prevent it. Streaming is validated in the SQL runtime workstream via Supabase Realtime ([VP5](../../april-milestone.md#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)); the patterns established there will inform Mongo change stream support.
 
 ### ORM surface generalization (can the query/mutation API span both families?)
 
