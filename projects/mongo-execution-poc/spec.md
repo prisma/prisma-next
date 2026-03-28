@@ -15,28 +15,32 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 ## Functional Requirements
 
 **Execution pipeline:**
+
 - A `MongoQueryPlan` type that pairs a `MongoCommand` (discriminated union — `FindCommand`, `InsertOneCommand`, etc., each with exactly the fields it needs) with `PlanMeta` metadata.
 - A `MongoDriver` that wraps `MongoClient` from the `mongodb` package, dispatches commands based on operation type, and returns `AsyncIterable<Document>`.
 - A `MongoRuntimeCore` that validates a plan, calls the driver, and wraps results in `AsyncIterableResult<Row>`.
 - Supported operations: `find`, `insertOne`, `updateOne`, `deleteOne`, `aggregate` (raw pipeline).
 
 **Contract types:**
+
 - Hand-crafted `contract.json` and `contract.d.ts` for the [blog platform example schema](../../docs/planning/mongo-target/1-design-docs/example-schemas.md#1-blog-platform) (Users, Posts, Comments with embedded and referenced relationships).
 - A `MongoContract` type that extends `ContractBase` with collection and embedded document information.
 - A `CodecTypes` map for Mongo base types (at minimum `ObjectId`, `String`, `Int32`, `Boolean`, `Date`).
 
 **Typed query surface:**
+
 - A thin typed layer that reads contract types and constructs `MongoQueryPlan` objects with correct `Row` phantom types.
 - Return types inferred from the contract — not manually specified by the caller.
 - No relation loading, no `include`, no shared ORM interface.
 
 **Test infrastructure:**
+
 - `mongodb-memory-server` for running a real `mongod` in tests, configured as a replica set.
 - Integration tests using vitest, following existing repo conventions.
 
 ## Non-Functional Requirements
 
-- All Mongo packages live under `packages/3-mongo/` and are independent of SQL packages. No imports from `2-sql/*` or `3-extensions/*`. `3-extensions` will be renumbered (e.g. to `9-extensions`) later to make the dependency direction clear. **Assumption:** layering enforcement via `pnpm lint:deps` covers this.
+- All Mongo packages live under `packages/3-mongo/` and are independent of SQL packages. No imports from `2-sql/`* or `3-extensions/*`. `3-extensions` will be renumbered (e.g. to `9-extensions`) later to make the dependency direction clear. **Assumption:** layering enforcement via `pnpm lint:deps` covers this.
 - The interface designs must not prevent future addition of: session/transaction support, plugin hooks, `explain()`, streaming subscriptions.
 
 ## Non-goals
@@ -54,23 +58,27 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 # Acceptance Criteria
 
 **Execution pipeline:**
-- [ ] A test constructs a `MongoQueryPlan` for `find` on a `users` collection, executes it through `MongoRuntimeCore` and `MongoDriver` against `mongodb-memory-server`, and gets correct rows back.
-- [ ] `insertOne`, `updateOne`, `deleteOne` execute through the same pipeline and return correct results (inserted ID, matched/modified counts, etc.).
-- [ ] `aggregate` with a raw pipeline executes and returns results.
-- [ ] The driver dispatches to the correct `mongodb` driver method for each operation type.
+
+- A test constructs a `MongoQueryPlan` for `find` on a `users` collection, executes it through `MongoRuntimeCore` and `MongoDriver` against `mongodb-memory-server`, and gets correct rows back.
+- `insertOne`, `updateOne`, `deleteOne` execute through the same pipeline and return correct results (inserted ID, matched/modified counts, etc.).
+- `aggregate` with a raw pipeline executes and returns results.
+- The driver dispatches to the correct `mongodb` driver method for each operation type.
 
 **Contract types:**
-- [ ] `contract.json` and `contract.d.ts` exist for the blog platform schema with Users, Posts (embedded Comments), and referenced User→Posts relationships.
-- [ ] The contract type structure contains the information needed to build `MongoQueryPlan` objects (collection names, field types via codec IDs, embedded document structure).
-- [ ] `MongoContract` extends `ContractBase`.
+
+- `contract.json` and `contract.d.ts` exist for the blog platform schema with Users, Posts (embedded Comments), and referenced User→Posts relationships.
+- The contract type structure contains the information needed to build `MongoQueryPlan` objects (collection names, field types via codec IDs, embedded document structure).
+- `MongoContract` extends `ContractBase`.
 
 **Typed query surface:**
-- [ ] The query surface constructs a `MongoQueryPlan` for `find` on `users` with the `Row` type inferred from the contract (not manually specified).
-- [ ] A test exercises the full flow: query surface → plan → runtime → driver → `mongodb-memory-server` → typed results.
+
+- The query surface constructs a `MongoQueryPlan` for `find` on `users` with the `Row` type inferred from the contract (not manually specified).
+- A test exercises the full flow: query surface → plan → runtime → driver → `mongodb-memory-server` → typed results.
 
 **Architecture:**
-- [ ] No Mongo package imports from `2-sql/*` or `3-extensions/*`.
-- [ ] `PlanMeta` is reused or a clear decision is documented about what needs to change.
+
+- No Mongo package imports from `2-sql/`* or `3-extensions/*`.
+- `PlanMeta` is reused or a clear decision is documented about what needs to change.
 
 # Other Considerations
 
@@ -96,6 +104,7 @@ Not applicable.
 
 # References
 
+- [Mongo PoC (Linear)](https://linear.app/prisma-company/project/mongo-poc-89d4dcdbcd9a) — keep Linear in sync as tasks progress, scope changes, or milestones complete
 - [Mongo execution pipeline components](../../docs/planning/mongo-target/1-design-docs/mongo-execution-components.md) — the design reference for MongoQueryPlan, MongoDriver, MongoRuntimeCore
 - [Mongo PoC plan](../../docs/planning/mongo-target/1-design-docs/mongo-poc-plan.md) — full PoC sequencing (this project covers steps 1–3)
 - [Design questions](../../docs/planning/mongo-target/1-design-docs/design-questions.md) — open architectural questions, especially #1 (embedded documents), #10 (ContractBase), #3 (resolved: execution plan generalization)
@@ -106,5 +115,5 @@ Not applicable.
 # Open Questions
 
 1. **Does `PlanMeta` work as-is for Mongo?** Several fields assume SQL: `paramDescriptors` (positional params — Mongo values are inline), `refs.tables`/`refs.columns` (SQL naming), `projection`/`projectionTypes` (SQL column aliases vs. Mongo inclusion/exclusion). **Decision: reuse with empty/unused SQL fields initially, split into shared + family-specific later if the mismatch is more than cosmetic.**
-
 2. **What does `ObjectId` look like to the user?** Normalize to `string` (simpler, consistent with JSON serialization) or preserve the driver's `ObjectId` class (richer, preserves BSON identity)? This decision affects every Mongo contract's type map.
+
