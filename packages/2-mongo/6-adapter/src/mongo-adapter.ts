@@ -1,35 +1,22 @@
-import type { DocumentContract } from '@prisma-next/contract/types';
+import type {
+  AnyMongoCommand,
+  AnyMongoWireCommand,
+  Document,
+  MongoAdapter,
+  MongoExecutionPlan,
+  MongoExpr,
+  MongoLoweringContext,
+  MongoQueryPlan,
+  MongoValue,
+} from '@prisma-next/mongo-core';
 import {
-  AggregateCommand,
   AggregateWireCommand,
-  DeleteOneCommand,
   DeleteOneWireCommand,
-  type Document,
-  FindCommand,
   FindWireCommand,
-  InsertOneCommand,
   InsertOneWireCommand,
-  type MongoCommand,
-  type MongoExecutionPlan,
-  type MongoExpr,
   MongoParamRef,
-  type MongoQueryPlan,
-  type MongoValue,
-  type MongoWireCommand,
-  UpdateOneCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
-
-export interface MongoLoweringContext {
-  readonly contract: DocumentContract;
-}
-
-export interface MongoAdapter {
-  lower<Row>(
-    queryPlan: MongoQueryPlan<Row>,
-    context: MongoLoweringContext,
-  ): MongoExecutionPlan<Row>;
-}
 
 function resolveValue(value: MongoValue): unknown {
   if (value instanceof MongoParamRef) {
@@ -55,58 +42,59 @@ function resolveDocument(expr: MongoExpr): Document {
   return result;
 }
 
-function lowerCommand(command: MongoCommand): MongoWireCommand {
-  if (command instanceof FindCommand) {
-    const options: {
-      projection?: Document;
-      sort?: Document;
-      limit?: number;
-      skip?: number;
-    } = {};
-    if (command.projection) options.projection = { ...command.projection };
-    if (command.sort) options.sort = { ...command.sort };
-    if (command.limit !== undefined) options.limit = command.limit;
-    if (command.skip !== undefined) options.skip = command.skip;
-    return new FindWireCommand(
-      command.collection,
-      command.filter ? resolveDocument(command.filter) : undefined,
-      options,
-    );
+function lowerCommand(command: AnyMongoCommand): AnyMongoWireCommand {
+  switch (command.kind) {
+    case 'find': {
+      const options: {
+        projection?: Document;
+        sort?: Document;
+        limit?: number;
+        skip?: number;
+      } = {};
+      if (command.projection) options.projection = { ...command.projection };
+      if (command.sort) options.sort = { ...command.sort };
+      if (command.limit !== undefined) options.limit = command.limit;
+      if (command.skip !== undefined) options.skip = command.skip;
+      return new FindWireCommand(
+        command.collection,
+        command.filter ? resolveDocument(command.filter) : undefined,
+        options,
+      );
+    }
+    case 'insertOne':
+      return new InsertOneWireCommand(command.collection, resolveDocument(command.document));
+    case 'updateOne':
+      return new UpdateOneWireCommand(
+        command.collection,
+        resolveDocument(command.filter),
+        resolveDocument(command.update),
+      );
+    case 'deleteOne':
+      return new DeleteOneWireCommand(command.collection, resolveDocument(command.filter));
+    case 'aggregate':
+      return new AggregateWireCommand(
+        command.collection,
+        command.pipeline.map((stage) => ({ ...stage })),
+      );
+    default:
+      throw new Error(`Unknown command kind: ${(command as { kind: string }).kind}`);
   }
-  if (command instanceof InsertOneCommand) {
-    return new InsertOneWireCommand(command.collection, resolveDocument(command.document));
+}
+
+class MongoAdapterImpl implements MongoAdapter {
+  lower<Row>(
+    queryPlan: MongoQueryPlan<Row>,
+    _context: MongoLoweringContext,
+  ): MongoExecutionPlan<Row> {
+    const wireCommand = lowerCommand(queryPlan.command);
+    return Object.freeze({
+      wireCommand,
+      command: queryPlan.command,
+      meta: queryPlan.meta,
+    });
   }
-  if (command instanceof UpdateOneCommand) {
-    return new UpdateOneWireCommand(
-      command.collection,
-      resolveDocument(command.filter),
-      resolveDocument(command.update),
-    );
-  }
-  if (command instanceof DeleteOneCommand) {
-    return new DeleteOneWireCommand(command.collection, resolveDocument(command.filter));
-  }
-  if (command instanceof AggregateCommand) {
-    return new AggregateWireCommand(
-      command.collection,
-      command.pipeline.map((stage) => ({ ...stage })),
-    );
-  }
-  throw new Error(`Unknown command type: ${command.constructor.name}`);
 }
 
 export function createMongoAdapter(): MongoAdapter {
-  return {
-    lower<Row>(
-      queryPlan: MongoQueryPlan<Row>,
-      _context: MongoLoweringContext,
-    ): MongoExecutionPlan<Row> {
-      const wireCommand = lowerCommand(queryPlan.command);
-      return Object.freeze({
-        wireCommand,
-        command: queryPlan.command,
-        meta: queryPlan.meta,
-      });
-    },
-  };
+  return new MongoAdapterImpl();
 }
