@@ -2,7 +2,7 @@
 
 ## Goal
 
-Validate that the Prisma Next architecture can accommodate a non-SQL database family. The primary deliverable is a working end-to-end path: hand-crafted contract → ORM client → query execution against a real MongoDB instance.
+Validate that the Prisma Next architecture can accommodate a non-SQL database family. The primary deliverable is a working end-to-end path: execution machinery → hand-crafted contract → typed query surface → query execution against a real MongoDB instance. The ORM client is a later concern — the PoC validates the runtime, contract, and basic query surface first.
 
 ## Approach
 
@@ -16,6 +16,7 @@ The contract shape is still driven by what the query client needs (not what the 
 
 **Deferred from the initial PoC steps** (steps 1–3), but in-scope for April:
 - Emitter pipeline generalization — the authoring surfaces and emission process are coupled to SQL; this must be proven for Mongo before end of April
+- ORM client — the full `findMany`/`create`/`update`/`where`/`include` surface. In the SQL family, the query builder lane and runtime existed long before the ORM client was designed. Same approach here: prove the execution path and contract first, then build the ORM on proven foundations
 - Shared ORM interface extraction — extracted after both ORM clients work independently
 - Cross-family consumer validation — a consumer library working against both SQL and Mongo contracts
 
@@ -47,11 +48,11 @@ ContractBase (shared: models, fields, relations, capabilities)
 
 ### Spike then extract
 
-Build a `mongo-orm-client` package that is **completely independent** of `sql-orm-client`. No shared base class, no imports from the SQL ORM, no predicted abstractions. Own `Collection` class, own query compilation, own mutation handling, own type plumbing.
+Build all Mongo packages **completely independent** of their SQL equivalents. No shared base class, no imports from SQL packages, no predicted abstractions. Own query plan type, own driver, own runtime, own query surface.
 
-After the PoC produces a working Mongo ORM, compare the two implementations and extract the common interface. The abstraction should be discovered from two concrete implementations, not predicted from one.
+After both families have working implementations, compare them and extract common interfaces. The abstraction should be discovered from two concrete implementations, not predicted from one.
 
-The one area where full independence isn't practical is the **contract types**. The contract is the input to both ORM clients — both need to consume `ContractBase` at minimum. The Mongo contract types may start inside the new package and be promoted later.
+The one area where full independence isn't practical is the **contract types**. The contract is the input to both query surfaces — both need to consume `ContractBase` at minimum. The Mongo contract types may start inside the new package and be promoted later.
 
 ## Steps
 
@@ -83,36 +84,43 @@ This forces concrete answers to:
 
 **Done when:** a `contract.json` and `contract.d.ts` exist that describe Users, Posts, and Comments with both embedded and referenced relationships, and the type structure contains the information needed to build `MongoQueryPlan` objects.
 
-### 3. Scaffold the ORM client
+### 3. Basic typed query surface
 
-Build a `mongo-orm-client` that reads the contract types from step 2 and produces `MongoQueryPlan` objects that execute via the runtime from step 1.
+Build a thin typed layer that reads contract types from step 2 and constructs `MongoQueryPlan` objects. This is the Mongo equivalent of the SQL query builder lane — close to the metal, not an ORM.
+
+The query surface is a factory or builder that takes contract type information and produces plans the runtime can execute. No relation loading, no `include`, no shared ORM interface concerns. Think `find('users', filter, options)` → `MongoQueryPlan`, not `db.users.findMany({ where, include })`.
 
 This forces concrete answers to:
-- [Design question #4](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations): What mutation surface does the ORM expose?
-- [Design question #7](design-questions.md#7-relation-loading-application-level-joining-vs-lookup): How does `include` work for embedded vs. referenced?
-- Where do current SQL-oriented assumptions in `Collection` break? What would a shared `Collection` interface need to look like?
+- Does the contract contain the information needed to construct query plans?
+- What does the typed contract → plan flow look like?
+- How do codec types map from the contract to the plan's `Row` phantom type?
 
-**Done when:** `findMany` on the blog schema's `users` collection works end-to-end: ORM client reads contract types, builds a `MongoQueryPlan`, executes it through `MongoRuntimeCore`, and returns typed results.
+**Done when:** a typed query surface reads the hand-crafted contract types, constructs a `MongoQueryPlan` for `find` on `users`, executes it through `MongoRuntimeCore`, and returns typed results. The return type is inferred from the contract, not manually specified.
 
 ### 4. Broaden the query surface
 
-Add `findFirst`, `create`, `update`, `delete`. Each tests a different part of the pipeline (mutations vs. reads, return values vs. void). This is where you discover whether the mutation executor generalizes.
+Add `insertOne`, `updateOne`, `deleteOne`, `findOne`, `aggregate` (raw pipeline). Each tests a different part of the pipeline (mutations vs. reads, return values vs. acknowledgments, cursors vs. single results). This is where you discover whether the plan shape and driver dispatch generalize across operations.
 
 ### 5. Embedded document operations
 
-Query *into* embedded documents (`where: { address: { city: "Springfield" } }`), update embedded fields, create documents with embedded data. This is the Mongo-specific surface that SQL doesn't have — where the ORM client diverges most.
+Query *into* embedded documents (`{ 'address.city': 'Springfield' }`), update embedded fields, create documents with embedded data. This validates that the contract representation of embedded documents (from step 2) actually works at the query level.
 
-### 6. Referenced relation loading
+### 6. Cross-family validation
 
-`include` across collections. Forces an answer to [design question #7](design-questions.md#7-relation-loading-application-level-joining-vs-lookup) (application-level joining vs. `$lookup`), and tests whether the relation loading machinery can work without SQL joins.
+Take one existing consumer library or plugin that works with SQL contracts and run it against the Mongo contract. Does it work? Does it typecheck? This is the actual deliverable the PoC exists to validate — that the shared contract surface works.
 
-### 7. Cross-family validation
+### 7. Polymorphism spike
 
-Take one existing consumer library or plugin that works with SQL contracts and run it against the document contract. Does it work? Does it typecheck? This is the actual deliverable the PoC exists to validate — that the shared surface works.
+Flagged as an [April must-prove](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april). Take the [SaaS task management example schema](example-schemas.md#3-saas-task-management-with-polymorphism) (Bug/Feature/Chore) and get discriminated union queries working. Tests whether the contract can express it and whether the query surface can narrow types. This is a cross-family concern — the solution must work for SQL STI too.
 
-### 8. Polymorphism spike
+### 8. ORM client (later)
 
-Flagged as an [April must-prove](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april). Take the [SaaS task management example schema](example-schemas.md#3-saas-task-management-with-polymorphism) (Bug/Feature/Chore) and get discriminated union queries working. Tests whether the contract can express it and whether the ORM can narrow types. This is a cross-family concern — the solution must work for SQL STI too.
+Build the full `findMany`/`create`/`update`/`where`/`include` surface on top of the proven execution path and contract types. This is where the hard ORM design questions get answered:
+- [Design question #4](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations): What mutation surface does the ORM expose for `$inc`, `$push`, `$pull`?
+- [Design question #7](design-questions.md#7-relation-loading-application-level-joining-vs-lookup): How does `include` work for embedded vs. referenced relations?
+- Where do current SQL-oriented assumptions in `Collection` break? What would a shared `Collection` interface need to look like?
+
+By this point, steps 1–7 have validated the runtime, contract, and basic query surface. The ORM client builds on proven foundations rather than speculating about them.
 
 ---
 
@@ -133,8 +141,10 @@ The [design questions](design-questions.md) document has the full analysis. Belo
 
 ### ORM surface generalization (can the query/mutation API span both families?)
 
-- **[#4 — Update operators](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations)**: SQL is "set field = value". Mongo has `$inc`, `$push`, `$pull` — fundamentally different mutation semantics. How does the shared ORM `update()` surface accommodate both without becoming family-specific? **PoC must answer.**
-- **[#7 — Relation loading](design-questions.md#7-relation-loading-application-level-joining-vs-lookup)**: SQL uses joins. Mongo uses application-level stitching or `$lookup`. The ORM's `include` needs to work for both, but the implementation is completely different. **PoC must answer.**
+These risks are real but deferred to step 8 (ORM client). The basic query surface (steps 1–3) validates the execution path and contract without needing to solve these:
+
+- **[#4 — Update operators](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations)**: SQL is "set field = value". Mongo has `$inc`, `$push`, `$pull` — fundamentally different mutation semantics. How does the shared ORM `update()` surface accommodate both without becoming family-specific? **Deferred to ORM client (step 8).**
+- **[#7 — Relation loading](design-questions.md#7-relation-loading-application-level-joining-vs-lookup)**: SQL uses joins. Mongo uses application-level stitching or `$lookup`. The ORM's `include` needs to work for both, but the implementation is completely different. **Deferred to ORM client (step 8).**
 - **[#8 — Aggregation pipeline as compilation target](design-questions.md#8-aggregation-pipeline-dsl-scope-and-timing)**: The SQL ORM compiles to SQL strings. The Mongo ORM compiles to... what? `find()` for simple CRUD, but `$lookup` for includes, and pipelines for anything complex. The compilation target question is open.
 
 ### Data integrity in a schemaless world
