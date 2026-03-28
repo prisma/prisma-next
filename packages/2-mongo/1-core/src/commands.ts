@@ -1,6 +1,7 @@
-import type { MongoExpr, MongoValue } from './param-ref';
+import type { MongoExpr, MongoUpdateDocument, MongoValue, RawPipeline } from './values';
 
-export abstract class MongoCommand {
+abstract class MongoCommand {
+  abstract readonly kind: string;
   readonly collection: string;
 
   protected constructor(collection: string) {
@@ -20,6 +21,7 @@ export interface FindOptions {
 }
 
 export class FindCommand extends MongoCommand {
+  readonly kind = 'find' as const;
   readonly filter: MongoExpr | undefined;
   readonly projection: Record<string, 1 | 0> | undefined;
   readonly sort: Record<string, 1 | -1> | undefined;
@@ -38,6 +40,7 @@ export class FindCommand extends MongoCommand {
 }
 
 export class InsertOneCommand extends MongoCommand {
+  readonly kind = 'insertOne' as const;
   readonly document: Record<string, MongoValue>;
 
   constructor(collection: string, document: Record<string, MongoValue>) {
@@ -48,10 +51,11 @@ export class InsertOneCommand extends MongoCommand {
 }
 
 export class UpdateOneCommand extends MongoCommand {
+  readonly kind = 'updateOne' as const;
   readonly filter: MongoExpr;
-  readonly update: Record<string, MongoValue>;
+  readonly update: MongoUpdateDocument;
 
-  constructor(collection: string, filter: MongoExpr, update: Record<string, MongoValue>) {
+  constructor(collection: string, filter: MongoExpr, update: MongoUpdateDocument) {
     super(collection);
     this.filter = filter;
     this.update = update;
@@ -60,6 +64,7 @@ export class UpdateOneCommand extends MongoCommand {
 }
 
 export class DeleteOneCommand extends MongoCommand {
+  readonly kind = 'deleteOne' as const;
   readonly filter: MongoExpr;
 
   constructor(collection: string, filter: MongoExpr) {
@@ -70,11 +75,19 @@ export class DeleteOneCommand extends MongoCommand {
 }
 
 export class AggregateCommand extends MongoCommand {
-  readonly pipeline: ReadonlyArray<Record<string, unknown>>;
+  readonly kind = 'aggregate' as const;
+  readonly pipeline: RawPipeline;
 
-  constructor(collection: string, pipeline: ReadonlyArray<Record<string, unknown>>) {
+  constructor(collection: string, pipeline: RawPipeline) {
     super(collection);
     this.pipeline = pipeline;
     this.freeze();
   }
 }
+
+export type AnyMongoCommand =
+  | FindCommand
+  | InsertOneCommand
+  | UpdateOneCommand
+  | DeleteOneCommand
+  | AggregateCommand;
