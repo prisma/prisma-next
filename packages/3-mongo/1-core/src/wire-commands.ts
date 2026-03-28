@@ -1,13 +1,82 @@
+export type Document = Record<string, unknown>;
+
 export abstract class MongoWireCommand {
   readonly collection: string;
 
-  constructor(collection: string) {
+  protected constructor(collection: string) {
     this.collection = collection;
+  }
+
+  protected freeze(): void {
+    Object.freeze(this);
   }
 }
 
-export class FindWireCommand extends MongoWireCommand {}
-export class InsertOneWireCommand extends MongoWireCommand {}
-export class UpdateOneWireCommand extends MongoWireCommand {}
-export class DeleteOneWireCommand extends MongoWireCommand {}
-export class AggregateWireCommand extends MongoWireCommand {}
+export class FindWireCommand extends MongoWireCommand {
+  readonly filter: Document | undefined;
+  readonly projection: Document | undefined;
+  readonly sort: Document | undefined;
+  readonly limit: number | undefined;
+  readonly skip: number | undefined;
+
+  constructor(
+    collection: string,
+    filter?: Document,
+    options?: {
+      projection?: Document;
+      sort?: Document;
+      limit?: number;
+      skip?: number;
+    },
+  ) {
+    super(collection);
+    this.filter = filter;
+    this.projection = options?.projection;
+    this.sort = options?.sort;
+    this.limit = options?.limit;
+    this.skip = options?.skip;
+    this.freeze();
+  }
+}
+
+export class InsertOneWireCommand extends MongoWireCommand {
+  readonly document: Document;
+
+  constructor(collection: string, document: Document) {
+    super(collection);
+    this.document = document;
+    this.freeze();
+  }
+}
+
+export class UpdateOneWireCommand extends MongoWireCommand {
+  readonly filter: Document;
+  readonly update: Document;
+
+  constructor(collection: string, filter: Document, update: Document) {
+    super(collection);
+    this.filter = filter;
+    this.update = update;
+    this.freeze();
+  }
+}
+
+export class DeleteOneWireCommand extends MongoWireCommand {
+  readonly filter: Document;
+
+  constructor(collection: string, filter: Document) {
+    super(collection);
+    this.filter = filter;
+    this.freeze();
+  }
+}
+
+export class AggregateWireCommand extends MongoWireCommand {
+  readonly pipeline: ReadonlyArray<Document>;
+
+  constructor(collection: string, pipeline: ReadonlyArray<Document>) {
+    super(collection);
+    this.pipeline = pipeline;
+    this.freeze();
+  }
+}

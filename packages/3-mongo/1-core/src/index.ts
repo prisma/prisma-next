@@ -1,3 +1,4 @@
+export type { FindOptions } from './commands';
 export {
   AggregateCommand,
   DeleteOneCommand,
@@ -6,8 +7,10 @@ export {
   MongoCommand,
   UpdateOneCommand,
 } from './commands';
-export { type LiteralValue, type MongoExpr, MongoParamRef, type MongoValue } from './param-ref';
+export type { LiteralValue, MongoArray, MongoDocument, MongoExpr, MongoValue } from './param-ref';
+export { MongoParamRef } from './param-ref';
 export type { MongoExecutionPlan, MongoQueryPlan } from './plan';
+export type { Document } from './wire-commands';
 export {
   AggregateWireCommand,
   DeleteOneWireCommand,
