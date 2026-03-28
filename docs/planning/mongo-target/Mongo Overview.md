@@ -72,9 +72,9 @@ Additional open questions cover [referential integrity enforcement](1-design-doc
 
 **Consumption-first.** Start from importing and querying a contract, not from authoring or emission. The contract shape is driven by what the query client needs, because querying is the primary user interaction. Authoring and emission are machines that produce artifacts — build them once you know the target shape.
 
-**Spike then extract.** Build a `mongo-orm-client` package completely independent of `sql-orm-client` — no shared base class, no imports from the SQL ORM, no predicted abstractions. After both implementations work, compare them and extract the shared interface. The abstraction is discovered from two concrete implementations, not predicted from one.
+**Spike then extract.** Build all Mongo packages completely independent of their SQL equivalents — no shared base class, no imports from SQL packages, no predicted abstractions. After both families have working implementations, compare them and extract common interfaces. The abstraction is discovered from two concrete implementations, not predicted from one.
 
-**Vertical slice, then broaden.** The first phase builds execution machinery (query plan, driver, runtime) against a real MongoDB instance, then works backwards to contract types and ORM client. Follow-on phases broaden the query surface, test embedded document operations, test referenced relation loading, validate cross-family reuse, and spike polymorphism.
+**Execution first, ORM later.** The first phase builds execution machinery (query plan, driver, runtime) against a real MongoDB instance, then works backwards to contract types and a basic typed query surface. The ORM client (`findMany`/`create`/`update`/`include`) is deferred — in the SQL family, the query builder lane and runtime existed long before the ORM client was designed. Follow-on phases broaden the query surface, test embedded document operations, validate cross-family reuse, and spike polymorphism.
 
 The full step-by-step plan, including architectural risks mapped to design questions, is in [mongo-poc-plan.md](1-design-docs/mongo-poc-plan.md).
 
@@ -83,6 +83,7 @@ The full step-by-step plan, including architectural risks mapped to design quest
 This work stream is [workstream 4](../april-milestone.md#4-mongodb-poc--validate-the-second-database-family) of the [April milestone](../april-milestone.md). The PoC plan currently covers the first phase (consumption-first vertical slice). The following are in-scope for April but not yet planned in detail — they will be added as project specs when the first phase answers the foundational questions:
 
 - **Emitter pipeline generalization** — the authoring surfaces and emission process are coupled to SQL; this must be proven for Mongo before end of April
+- **ORM client** — the full `findMany`/`create`/`update`/`include` surface, built on top of the proven execution path and contract
 - **Shared ORM interface extraction** — extracted after both ORM clients work independently
 - **Cross-family consumer validation** — a consumer library working against both SQL and Mongo contracts without family-specific code
 
