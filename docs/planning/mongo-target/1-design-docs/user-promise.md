@@ -2,9 +2,9 @@
 
 What does Prisma Next offer a MongoDB user, and why would they choose it over the `mongodb` driver or Mongoose? This document articulates the value proposition from the user's perspective — what they get, what they give up, and where PN sits in the spectrum between "raw driver" and "full ORM."
 
-See also: [design-questions.md](design-questions.md), [mongodb-primitives-reference.md](mongodb-primitives-reference.md)
+See also: [design-questions.md](design-questions.md), [mongodb-primitives-reference.md](../9-references/mongodb-primitives-reference.md)
 
-**External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) and a [user journey narrative](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) that informed this document.
+**External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](../9-references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) and a [user journey narrative](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) that informed this document.
 
 ---
 
@@ -82,7 +82,7 @@ The distinction between embedded and referenced is a **data modeling decision** 
 
 #### Bringing structure to existing databases (introspection)
 
-Many MongoDB users have existing databases with no formal schema. The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team describes a developer introspecting an existing database and hitting friction: plural collection names, manually defining every relationship, and polymorphic fields falling back to untyped `Json`.
+Many MongoDB users have existing databases with no formal schema. The [user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team describes a developer introspecting an existing database and hitting friction: plural collection names, manually defining every relationship, and polymorphic fields falling back to untyped `Json`.
 
 PN should offer introspection that generates a contract from an existing MongoDB database — sampling documents to infer field types, detecting embedded subdocuments, and normalizing collection names to model names. Relationships can't be fully inferred (MongoDB has no foreign keys), but conventions (fields ending in `Id`, arrays of `ObjectId`) can suggest candidates. The generated contract is a starting point that the user refines, not a finished artifact.
 
@@ -206,7 +206,7 @@ A type-safe aggregation pipeline builder (the Mongo equivalent of the SQL DSL) i
 
 #### MongoDB-specific capabilities via extension packs
 
-PN's extension pack architecture (the same system that delivers pgvector for Postgres) enables MongoDB-specific capabilities without bloating the core ORM. The [MongoDB team's feature priority list](references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) identifies several candidates:
+PN's extension pack architecture (the same system that delivers pgvector for Postgres) enables MongoDB-specific capabilities without bloating the core ORM. The [MongoDB team's feature priority list](../9-references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) identifies several candidates:
 
 - **Vector Search** (`$vectorSearch`) — contributes a vector field type, similarity search operators, and vector search index definitions. Analogous to pgvector for Postgres.
 - **Atlas Search** (`$search`) — full-text search via MongoDB Atlas. Contributes search index definitions and search query operators.
@@ -247,9 +247,9 @@ PN validates data at the application layer:
 
 In SQL, schema evolution is split cleanly: structural migrations change the DDL (add a column, change a type), and data migrations transform content (populate the new column). In MongoDB, **that distinction collapses**. There's no DDL — collections don't have enforced schemas. "Adding a field" means updating documents to include it. "Splitting `name` into `firstName` + `lastName`" is a data migration. "Moving data from embedded to referenced" is a data migration. In Mongo, schema evolution IS data migration.
 
-The [user journey](references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team confirms this is a pain point: "The lack of an automated data migration feature for this common MongoDB evolution made him feel disappointed."
+The [user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team confirms this is a pain point: "The lack of an automated data migration feature for this common MongoDB evolution made him feel disappointed."
 
-PN's data invariant model — being built for the SQL migration workstream (see [data-migrations.md](../0-references/data-migrations.md), [data-migrations-solutions.md](../0-references/data-migrations-solutions.md)) — is a natural foundation for Mongo schema evolution. The model treats data migrations as guarded transitions with machine-checkable postconditions:
+PN's data invariant model — being built for the SQL migration workstream (see [data-migrations.md](../../0-references/data-migrations.md), [data-migrations-solutions.md](../../0-references/data-migrations-solutions.md)) — is a natural foundation for Mongo schema evolution. The model treats data migrations as guarded transitions with machine-checkable postconditions:
 
 - **"Done"** = the contract describes v2 + the invariant "all documents migrated to v2" holds
 - **Postcondition check** = a Mongo query: `db.users.countDocuments({ schemaVersion: { $ne: 2 } }) === 0`
