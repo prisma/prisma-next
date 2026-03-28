@@ -5,6 +5,7 @@
 Build the minimal Mongo execution pipeline — `MongoQueryPlan`, `MongoDriver`, `MongoRuntimeCore` — prove it works against a real MongoDB instance, then add hand-crafted contract types and a basic typed query surface with row type inference. Success: a typed query on a `users` collection flows through the full pipeline and returns correctly-typed results.
 
 **Spec:** `projects/mongo-execution-poc/spec.md`
+**Linear:** [Mongo PoC](https://linear.app/prisma-company/project/mongo-poc-89d4dcdbcd9a) — keep Linear in sync as tasks progress, scope changes, or milestones complete.
 
 ## Collaborators
 
