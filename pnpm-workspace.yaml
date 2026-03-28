@@ -8,6 +8,7 @@ allowBuilds:
   '@prisma/client@6.18.0': true
   '@prisma/engines@6.18.0': true
   esbuild@0.25.11 || 0.27.2: true
+  mongodb-memory-server@10.4.3: true
   prisma@6.18.0: true
 
 blockExoticSubdeps: true
@@ -33,3 +34,4 @@ trustPolicy: no-downgrade
 
 trustPolicyExclude:
   - chokidar@4.0.3
+  - semver@6.3.1
