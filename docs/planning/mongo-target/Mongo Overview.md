@@ -72,7 +72,7 @@ Additional open questions cover [referential integrity enforcement](1-design-doc
 
 **Spike then extract.** Build a `mongo-orm-client` package completely independent of `sql-orm-client` — no shared base class, no imports from the SQL ORM, no predicted abstractions. After both implementations work, compare them and extract the shared interface. The abstraction is discovered from two concrete implementations, not predicted from one.
 
-**Vertical slice, then broaden.** The first phase hand-crafts a contract, writes the ORM client code, and wires it to a real MongoDB instance. Follow-on phases broaden the query surface, test embedded document operations, test referenced relation loading, validate cross-family reuse, and spike polymorphism.
+**Vertical slice, then broaden.** The first phase builds execution machinery (query plan, driver, runtime) against a real MongoDB instance, then works backwards to contract types and ORM client. Follow-on phases broaden the query surface, test embedded document operations, test referenced relation loading, validate cross-family reuse, and spike polymorphism.
 
 The full step-by-step plan, including architectural risks mapped to design questions, is in [mongo-poc-plan.md](1-design-docs/mongo-poc-plan.md).
 
