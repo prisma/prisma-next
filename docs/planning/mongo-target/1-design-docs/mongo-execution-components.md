@@ -149,69 +149,79 @@ In the SQL family, row types flow through the query builder:
 
 ### How Mongo differs
 
-For Mongo, the row type IS the document shape:
-- A `findMany` on `users` returns the full document type (all fields, including embedded documents).
-- A projection (`{ name: 1, email: 1 }`) narrows the type to those fields.
-- Embedded documents are part of the type — `user.profile.social.twitter` is a nested path.
-- There's no "join" — the document is self-contained.
+The default case is simpler than SQL: a `findMany` on `users` returns the full document type (including embedded documents), and there are no joins. But the return type is NOT always the document shape:
 
-This is conceptually simpler than SQL (no join algebra), but the type plumbing still needs to:
-- Map contract field definitions to TypeScript types
+- **Projection** — `collection.find(filter, { projection: { name: 1, email: 1 } })` returns only those fields. The return type is a subset of the document type.
+- **Aggregation pipelines** — `$project`, `$group`, `$addFields` can produce completely new shapes. A `$group` might return `{ _id: "$status", count: { $sum: 1 } }` — a shape that doesn't correspond to any model in the contract.
+- **ORM-level select** — if the ORM client supports field selection (analogous to SQL's `.select()`), the return type narrows to the selected fields.
+- **`findOneAndUpdate` / `findOneAndDelete`** — return the document (before or after modification), which is the full document type.
+- **Mutation acknowledgments** — `insertOne` returns `{ insertedId }`, `updateOne` returns `{ matchedCount, modifiedCount }`. These are not document types at all.
+
+This means the row type inference problem is as hard as SQL. The plan's projection information needs to inform the return type, and aggregation pipelines can produce arbitrary shapes that need their own type inference.
+
+The type plumbing needs to:
+- Map contract field definitions to TypeScript types (including embedded document nesting and arrays of embedded documents)
 - Support projection narrowing (only return requested fields)
-- Handle embedded document nesting
-- Handle arrays of embedded documents
+- Handle mutation acknowledgment types (not document-shaped)
+- Eventually handle aggregation pipeline output types (arbitrary shapes)
 
 ### Open questions
 
-**Where do the TypeScript types come from?** In SQL, they come from `contract.d.ts` (emitted by the emitter). For the PoC, we're hand-crafting `contract.d.ts`. What does the Mongo type map look like? SQL uses `CodecTypes` — a type map from codec IDs to `{ input: T, output: U }`. Does Mongo need the same, or is it simpler because BSON types map more directly to JS types?
+**Where do the TypeScript types come from?** In SQL, they come from `contract.d.ts` (emitted by the emitter). For the PoC, we're hand-crafting `contract.d.ts`. What does the Mongo type map look like? SQL uses `CodecTypes` — a type map from codec IDs to `{ input: T, output: U }`. Does Mongo need the same pattern?
 
 **How does the ORM client infer the return type?** When you call `db.users.findMany()`, how does the ORM know the return type is `User[]`? In SQL, the `Collection` class is generic over the model type. Presumably the Mongo ORM client follows the same pattern — but the model type includes embedded documents, which SQL models don't have.
+
+**How does projection narrowing work at the type level?** When you call `db.users.findMany({ projection: { name: 1, email: 1 } })`, the return type should be `Pick<User, 'name' | 'email'>[]` (plus `_id`). The ORM client needs to infer this from the projection argument — similar to how the SQL DSL infers row type from `.select()`.
+
+**What about aggregation pipeline return types?** Pipelines can produce arbitrary shapes. A type-safe pipeline builder would need to track the shape through each stage (`$match` preserves it, `$project` narrows it, `$group` replaces it). This is the hardest type-level problem and is deferred — the raw pipeline escape hatch returns `unknown` or a user-supplied type parameter.
 
 ---
 
 ## 5. Codecs
 
-**Status: probably needed, but may be simpler than SQL**
+**Status: needed — the `mongodb` driver handles base BSON types, but codecs serve a broader role**
 
-### What SQL codecs do
+### What codecs do (all families)
 
-Codecs have two runtime functions:
-- **encode** — convert a JS value to wire format for query parameters (e.g., `Date` → ISO string for `timestamptz`)
-- **decode** — convert wire format to JS value for result rows (e.g., ISO string → `Date`)
+Codecs serve three functions:
+1. **encode** — convert a JS value to wire format for query parameters / document fields
+2. **decode** — convert wire format to JS value for result rows / documents
+3. **type-level mapping** — declare the TypeScript types that correspond to database types in `contract.d.ts` (via `CodecTypes`)
 
-They also have a type-level function: mapping database types to TypeScript types in `contract.d.ts` (via `CodecTypes`).
+The codec system is also the extension point for user-defined and extension-defined types. An extension author who adds Atlas Vector Search needs a codec for vector embeddings. An application author who stores a custom `GeoPoint` class as `{ lat: number, lng: number }` in a document field needs a codec to rehydrate it on read and serialize it on write. This is the same architecture as SQL's pgvector codec — the base driver handles native types, but the codec registry is where custom serialization lives.
 
-### How Mongo differs
+### BSON base layer
 
-The `mongodb` Node.js driver already handles most BSON ↔ JS conversion:
+The `mongodb` Node.js driver handles BSON ↔ JS conversion for built-in types:
 - `ObjectId` → `ObjectId` (driver's class)
 - `Date` → `Date`
 - `Int32` / `Int64` → `number` / `Long`
 - `Decimal128` → `Decimal128` (driver's class)
 - `Binary` → `Binary` (driver's class)
 
-The driver does the work that SQL codecs do at the `encode`/`decode` level.
+This means Mongo codecs don't need to reimplement base type conversion — the driver is the base layer. PN codecs layer on top for cases where the driver's default conversion isn't what the application wants (e.g., normalizing `ObjectId` to `string`), and for custom/extension types that the driver doesn't know about.
 
 ### Open questions
 
-**Can the PoC skip codecs entirely?** If the driver handles BSON conversion, and the PoC uses basic types (string, number, boolean, Date, ObjectId), codecs may not be needed initially. The contract can declare types directly as JS types.
-
-**Where do codecs become necessary?** Likely:
-- `ObjectId` — does PN want to normalize this to `string` for consistency, or preserve the driver's `ObjectId` class?
+**What base codecs does the PoC need?** At minimum:
+- `ObjectId` — does PN want to normalize this to `string` for consistency, or preserve the driver's `ObjectId` class? This is a design decision that affects every Mongo contract.
 - `Decimal128` — SQL has the same problem; the codec converts to a JS-friendly representation.
-- Custom types / extension packs — when pgvector has a `Vector` type with a codec, the Mongo equivalent (Atlas Vector Search) would need similar treatment. Deferred.
 
 **Does the codec registry shape work for Mongo?** The SQL codec registry maps `typeId` (e.g., `pg/int4@1`) to encode/decode functions. A Mongo registry would map `typeId` (e.g., `mongo/objectId@1`) to the same shape. The registry interface is probably reusable; the codecs themselves are family-specific.
+
+**What happens when MongoDB adds new types?** MongoDB periodically adds new BSON types and operators. The codec + operations registry is how PN accommodates this without core changes — a new codec and new operations are registered, just like a SQL extension. This is the same pattern regardless of family.
 
 ---
 
 ## 6. Operations
 
-**Status: deferred — not needed for the initial PoC**
+**Status: deferred from steps 1–3, but the architecture is the same as SQL**
 
-### What SQL operations do
+### What operations do (all families)
 
 The operations registry gates which query operators are available per field type. Codecs declare semantic traits (`equality`, `order`, `numeric`, `textual`, `boolean`), and operators are gated by traits. A `bool` field gets `equals` but not `gt`; a `number` field gets both.
+
+This is also the extension point for new operators. In SQL, pgvector registers a `cosineDistance` operator gated to `vector`-trait fields. The Mongo equivalent: an Atlas Vector Search extension registers a `$vectorSearch` operator gated to vector-typed fields. When MongoDB itself adds new types or operators (which it does periodically — e.g., `$vectorSearch` was added in MongoDB 7.0), the operations registry is how they're surfaced through the ORM without core changes.
 
 ### How Mongo differs
 
@@ -219,7 +229,7 @@ Mongo filter operators (`$eq`, `$gt`, `$lt`, `$in`, `$regex`, `$exists`, `$elemM
 
 ### Deferral rationale
 
-The initial PoC builds hardcoded queries (step 1) then basic `findMany` through the ORM (step 3). Operator gating is only needed when the ORM exposes rich `where` filters — that's step 4+. Start with ungated filters and add the operations registry when the query surface demands it.
+The initial PoC builds hardcoded queries (step 1) then basic `findMany` through the ORM (step 3). Operator gating is only needed when the ORM exposes rich `where` filters — that's step 4+. Start with ungated filters and add the operations registry when the query surface demands it. But the architecture is already established — the operations registry is a family-agnostic pattern with family-specific operators.
 
 ---
 
