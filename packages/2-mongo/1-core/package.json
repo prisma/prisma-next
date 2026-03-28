@@ -1,9 +1,9 @@
 {
-  "name": "@prisma-next/mongo-adapter",
+  "name": "@prisma-next/mongo-core",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "MongoDB adapter for Prisma Next (lowers commands to wire format)",
+  "description": "Core types for Prisma Next MongoDB support",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
@@ -15,8 +15,7 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:*",
-    "@prisma-next/mongo-core": "workspace:*"
+    "@prisma-next/contract": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -40,6 +39,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/3-mongo/6-adapter"
+    "directory": "packages/2-mongo/1-core"
   }
 }
