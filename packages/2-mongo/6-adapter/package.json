@@ -1,9 +1,9 @@
 {
-  "name": "@prisma-next/mongo-driver",
+  "name": "@prisma-next/mongo-adapter",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "MongoDB driver for Prisma Next",
+  "description": "MongoDB adapter for Prisma Next (lowers commands to wire format)",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
@@ -15,8 +15,8 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/mongo-core": "workspace:*",
-    "mongodb": "^6.16.0"
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/mongo-core": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -40,6 +40,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/3-mongo/7-driver"
+    "directory": "packages/2-mongo/6-adapter"
   }
 }
