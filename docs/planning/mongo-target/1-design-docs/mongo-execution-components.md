@@ -1,6 +1,6 @@
 # Mongo Execution Pipeline — Component Breakdown
 
-What we need to build, what we know, and where the gaps are. This is a companion to [execution-architecture.md](execution-architecture.md), which explains *why* the pipeline is family-specific. This doc focuses on the concrete components for the Mongo family.
+What we need to build, what we know, and where the gaps are.
 
 ## Overview
 
@@ -15,6 +15,12 @@ Mongo ORM client
         → yields AsyncIterable<Document>
       → wraps in AsyncIterableResult<Row>
 ```
+
+### Why the pipeline is family-specific
+
+Each family needs its own plan type, plugin interface, and runtime because plugins do useful work by inspecting the query payload — and the payload is family-specific. The SQL budgets plugin reads `plan.sql`, calls `driver.explain({ sql, params })`, and parses the SQL string. The SQL lints plugin pattern-matches on SQL AST node types (`DeleteAst`, `UpdateAst`, `SelectAst`). A Mongo linter would check `command.operation` and `command.filter` instead. Any attempt to generalize `ExecutionPlan` across families either forces every plugin to branch on family, strips the plan to useless metadata, or adds type complexity for no benefit.
+
+What IS shared: the plugin lifecycle pattern (`beforeExecute → onRow → afterExecute`), the metadata (`PlanMeta`), and `AsyncIterableResult<Row>`. See [design question #3](design-questions.md#3-execution-plan-generalization) for the full resolution.
 
 ---
 
