@@ -75,7 +75,6 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 **Contract types:**
 
 - `contract.json` and `contract.d.ts` exist for the blog platform schema with Users, Posts (embedded Comments), and referenced User→Posts relationships.
-- The contract type structure contains the information needed to build `MongoQueryPlan` objects (collection names, field types via codec IDs, embedded document structure).
 - `MongoContract` is structurally symmetric with `SqlContract`: same patterns for models, fields, codec references, and mappings. Convergence and divergence points are documented.
 - A hand-built `MongoQueryPlan` using contract type information executes through the M1 pipeline with `Row` inferred from the contract (not manually specified), proving the contract carries enough information for row type inference.
 
