@@ -33,14 +33,20 @@ Build the three core components and prove they work end-to-end with hardcoded qu
 
 Build Mongo codecs first (the type map foundation), then design an independent `MongoContract` type that is structurally symmetric with `SqlContract` — same patterns for how models reference fields, fields reference codecs, and mappings connect domain names to storage names. Do NOT modify `ContractBase` or import from `2-sql`; instead, keep the shapes parallel so the common elements can be extracted to the framework domain later.
 
+**Detailed plan:** [`projects/mongo-execution-poc/plans/m2-codecs-contract-plan.md`](plans/m2-codecs-contract-plan.md)
+
 **Tasks:**
 
-- [ ] **Define Mongo codecs** — codec registry with encode/decode functions and type mappings for base Mongo types (`mongo/objectId@1`, `mongo/string@1`, `mongo/int32@1`, `mongo/boolean@1`, `mongo/date@1`). Follow the same codec registry shape as SQL (`typeId → encode/decode/types`). Settle the `ObjectId` representation question. Lives in `2-mongo/` (package TBD).
-- [ ] **Define `MongoContract` type** — independent of `SqlContract`, but structurally symmetric: models keyed by name, fields referencing codec IDs, storage mappings (collection names, field paths). Uses Mongo-specific storage concepts (collections, embedded document structure) where SQL uses tables/columns. Does NOT extend `ContractBase` — builds the Mongo equivalent independently, keeping the common portions as close as possible so extraction is mechanical later. Lives in `2-mongo/1-core/`.
-- [ ] **Hand-craft `contract.d.ts`** — typed contract for the blog platform schema: `Users` (with embedded `Address`), `Posts` (with embedded `Comments` array), referenced `User→Posts` relationship. Models, fields with codec IDs, embedded document structure, collection mappings.
-- [ ] **Hand-craft `contract.json`** — runtime contract data matching the `.d.ts` types. Collection names, field definitions, embedded document descriptors.
-- [ ] **Integration test: contract-driven plan with row type inference** — construct a `MongoQueryPlan` by hand using contract type information (look up collection, resolve field types through `CodecTypes`), with `Row` inferred from the contract rather than manually specified. Execute through the M1 pipeline against `mongodb-memory-server` and assert typed results. This proves the contract carries enough information for row type inference without requiring a query surface. The test compiling is itself the type-level validation.
-- [ ] **Document structural symmetry** — note where `MongoContract` and `SqlContract` converge (models, fields, codec references, mappings pattern) and where they diverge (embedded documents, collection vs. table, field path vs. column). This becomes the input for the future extraction step.
+- [ ] Define `MongoCodec` interface and `MongoCodecRegistry` (parallel to SQL)
+- [ ] Decide ObjectId representation (`string` vs. driver `ObjectId`)
+- [ ] Implement base Mongo codecs with unit tests (`objectId`, `string`, `int32`, `boolean`, `date`)
+- [ ] Define `MongoContract` type structure (`MongoStorage`, `MongoStorageCollection`, `MongoStorageField`, `MongoModelDefinition`, `MongoMappings`) — independent of `SqlContract` but structurally symmetric
+- [ ] Define `MongoTypeMaps` and `MongoContractWithTypeMaps` (phantom key pattern)
+- [ ] Update `MongoLoweringContext` to reference `MongoContract`
+- [ ] Hand-craft `contract.d.ts` for blog platform schema (Users, Posts with embedded Comments, User→Posts reference)
+- [ ] Hand-craft `contract.json` matching the `.d.ts` types
+- [ ] Integration test: contract-driven plan with `Row` inferred from contract, executed against `mongodb-memory-server`
+- [ ] Document structural symmetry (convergence/divergence table)
 
 ### Milestone 3: Typed query surface with row type inference
 
