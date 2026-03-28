@@ -1,6 +1,9 @@
-import type { MongoAdapter, MongoLoweringContext } from '@prisma-next/mongo-adapter';
-import type { MongoQueryPlan } from '@prisma-next/mongo-core';
-import type { MongoDriver } from '@prisma-next/mongo-driver';
+import type {
+  MongoAdapter,
+  MongoDriver,
+  MongoLoweringContext,
+  MongoQueryPlan,
+} from '@prisma-next/mongo-core';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 
 export interface MongoRuntimeOptions {
@@ -14,23 +17,33 @@ export interface MongoRuntime {
   close(): Promise<void>;
 }
 
+class MongoRuntimeImpl implements MongoRuntime {
+  readonly #adapter: MongoAdapter;
+  readonly #driver: MongoDriver;
+  readonly #loweringContext: MongoLoweringContext;
+
+  constructor(options: MongoRuntimeOptions) {
+    this.#adapter = options.adapter;
+    this.#driver = options.driver;
+    this.#loweringContext = options.loweringContext;
+  }
+
+  execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
+    const executionPlan = this.#adapter.lower(plan, this.#loweringContext);
+    const iterable = this.#driver.execute<Row>(executionPlan.wireCommand);
+
+    async function* toGenerator(): AsyncGenerator<Row, void, unknown> {
+      yield* iterable;
+    }
+
+    return new AsyncIterableResult(toGenerator());
+  }
+
+  async close(): Promise<void> {
+    await this.#driver.close();
+  }
+}
+
 export function createMongoRuntime(options: MongoRuntimeOptions): MongoRuntime {
-  const { adapter, driver, loweringContext } = options;
-
-  return {
-    execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
-      const executionPlan = adapter.lower(plan, loweringContext);
-      const iterable = driver.execute<Row>(executionPlan.wireCommand);
-
-      async function* toGenerator(): AsyncGenerator<Row, void, unknown> {
-        yield* iterable;
-      }
-
-      return new AsyncIterableResult(toGenerator());
-    },
-
-    async close(): Promise<void> {
-      await driver.close();
-    },
-  };
+  return new MongoRuntimeImpl(options);
 }

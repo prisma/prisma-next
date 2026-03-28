@@ -1,38 +1,61 @@
+import type { DocumentContract, PlanMeta } from '@prisma-next/contract/types';
+import { createMongoAdapter } from '@prisma-next/mongo-adapter';
+import type {
+  AnyMongoCommand,
+  MongoLoweringContext,
+  MongoQueryPlan,
+} from '@prisma-next/mongo-core';
+import { createMongoDriver } from '@prisma-next/mongo-driver';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { createMongoRuntime, type MongoRuntime } from '../src/mongo-runtime';
 
-let replSet: MongoMemoryReplSet | undefined;
-let client: MongoClient | undefined;
-let connectionUri = '';
-const dbName = 'test';
-
-export function getConnectionUri(): string {
-  if (!connectionUri) throw new Error('MongoMemoryReplSet not started');
-  return connectionUri;
+export interface MongodContext {
+  readonly connectionUri: string;
+  readonly dbName: string;
+  readonly client: MongoClient;
+  readonly runtime: MongoRuntime;
+  makePlan<Row = unknown>(command: AnyMongoCommand): MongoQueryPlan<Row>;
 }
 
-export function getDbName(): string {
-  return dbName;
-}
+const stubMeta: PlanMeta = {
+  target: 'mongo',
+  storageHash: 'test-hash',
+  lane: 'mongo',
+  paramDescriptors: [],
+};
 
-export function getClient(): MongoClient {
-  if (!client) throw new Error('MongoClient not connected');
-  return client;
-}
-
-beforeAll(async () => {
-  replSet = await MongoMemoryReplSet.create({
+export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Promise<T> {
+  const replSet = await MongoMemoryReplSet.create({
     replSet: { count: 1, storageEngine: 'wiredTiger' },
   });
-  connectionUri = replSet.getUri();
-  client = new MongoClient(connectionUri);
+  const connectionUri = replSet.getUri();
+  const dbName = 'test';
+  const client = new MongoClient(connectionUri);
   await client.connect();
-});
 
-afterAll(async () => {
-  await client?.close();
-  await replSet?.stop();
-  client = undefined;
-  replSet = undefined;
-  connectionUri = '';
-});
+  const adapter = createMongoAdapter();
+  const driver = await createMongoDriver(connectionUri, dbName);
+  const loweringContext: MongoLoweringContext = {
+    contract: {} as DocumentContract,
+  };
+  const runtime = createMongoRuntime({ adapter, driver, loweringContext });
+
+  const ctx: MongodContext = {
+    connectionUri,
+    dbName,
+    client,
+    runtime,
+    makePlan<Row = unknown>(command: AnyMongoCommand): MongoQueryPlan<Row> {
+      return { command, meta: stubMeta };
+    },
+  };
+
+  try {
+    return await fn(ctx);
+  } finally {
+    await runtime.close();
+    await client.close();
+    await replSet.stop();
+  }
+}

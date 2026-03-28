@@ -17,11 +17,11 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/mongo-core": "workspace:*",
-    "@prisma-next/mongo-adapter": "workspace:*",
-    "@prisma-next/mongo-driver": "workspace:*",
     "@prisma-next/runtime-executor": "workspace:*"
   },
   "devDependencies": {
+    "@prisma-next/mongo-adapter": "workspace:*",
+    "@prisma-next/mongo-driver": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",

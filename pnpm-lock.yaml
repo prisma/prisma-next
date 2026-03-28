@@ -851,19 +851,19 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/contract
-      '@prisma-next/mongo-adapter':
-        specifier: workspace:*
-        version: link:../6-adapter
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../1-core
-      '@prisma-next/mongo-driver':
-        specifier: workspace:*
-        version: link:../7-driver
       '@prisma-next/runtime-executor':
         specifier: workspace:*
         version: link:../../1-framework/4-runtime-executor
     devDependencies:
+      '@prisma-next/mongo-adapter':
+        specifier: workspace:*
+        version: link:../6-adapter
+      '@prisma-next/mongo-driver':
+        specifier: workspace:*
+        version: link:../7-driver
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
