@@ -6,100 +6,157 @@ When a learning has been fully applied (code and docs updated across all affecte
 
 ---
 
-## 1. A shared contract base requires a new abstraction
+## Contract design principles
 
-**Source**: M2 implementation (codecs and contract types)
+These principles emerged from the contract redesign discussion and apply to the entire contract, not just Mongo.
 
-The original plan was to keep `MongoContract` structurally parallel to `SqlContract` so extraction of a shared base would be mechanical. The implementation proved this isn't feasible — the shapes diverged meaningfully:
-
-- SQL: `model field → column name → storage column → codecId → CodecTypes` (3 hops, column indirection)
-- Mongo: `model field → codecId → CodecTypes` (2 hops, no indirection)
-
-This divergence isn't arbitrary — it reflects a fundamental difference in where the source of truth for data structure lives (database schema in SQL, application models in Mongo).
-
-A mechanical extraction would produce something either too loose to be useful or that forces one family into the other's shape. The right approach: implement both contracts fairly completely, then design a *new* abstraction rooted in common domain modeling concepts (see learning #4 below). This will probably require modifying both `SqlContract` and `MongoContract` to fit — producing a better result than either would alone.
-
-**Where to apply**: `packages/1-framework/1-core/shared/contract/` — when both family contracts are mature enough to inform the shared base design.
+1. **The domain model is self-describing.** Reading the `roots`, `models`, and `relations` sections should give a complete picture of the application domain without consulting the storage block. The domain describes *what* the application models and how they relate; storage describes *how* they persist.
+2. **Domain and persistence are separated.** Models describe the application domain (fields, relations, identity, polymorphism). Storage describes the database (tables, columns, collections, indexes). The bridge between them is `model.storage` — scoped and family-specific.
+3. **Family-specific details are scoped.** The contract's top-level structure (`roots`, `models`, `relations`) is family-agnostic. Family-specific persistence details live inside `model.storage` and the top-level `storage` section.
+4. **The contract describes facts, not instructions.** The contract states what exists (models, fields, storage units, discriminators) — the ORM decides how to represent it at runtime (class hierarchy, flat types, composition). Persistence strategies (STI vs MTI) are emergent from the combination of domain declarations and storage mappings, not labeled.
 
 ---
 
-## 2. Nested/embedded types are a cross-family concern
+## 1. The contract needs a `roots` section for aggregate roots
 
-**Source**: M2 implementation
+**Source**: M2 design discussion, contract redesign
 
-Embedded documents in Mongo (sub-documents, nested objects) are structurally identical to typed JSON columns in SQL. Both represent structured data nested within a parent entity. Both need:
+The ORM's top-level access points (`db.tasks`, `db.users`) correspond to **aggregate roots** — entities that own a storage unit and serve as the entry point for all access to entities within that aggregate. Today, aggregate roots are implicit: the ORM scans `models`, checks which ones have `storage.table`, and presents those. This should be explicit.
 
-- Type-safe dot-notation queries
-- TypeScript type generation
-- Reusability across models (e.g., `Address` used in both `User` and `Order`)
-- Potentially recursive/self-referential structure
+The contract should have a `roots` section that maps ORM accessor names to model names:
 
-The difference is convention: in Mongo, embedding is idiomatic and common; in SQL, JSON columns are an escape hatch. But the contract-level problem — describing nested structured types and making them queryable — is identical.
+```json
+{
+  "roots": {
+    "tasks": "Task",
+    "users": "User"
+  }
+}
+```
 
-This should be solved once for both families, not separately.
+- Presence in `roots` means the model is an aggregate root — no `strategy` field needed on the model.
+- The root name controls the ORM accessor name (pluralization, casing — the emitter decides).
+- Models not in `roots` are accessed through relations (embedded models) or via variant relationships (polymorphic models).
+
+**Where to apply**: Contract type system (`packages/1-framework/1-core/shared/contract/`), emitter, ORM client for both families.
+
+---
+
+## 2. The shared contract base: domain/storage separation with `model.storage` as the family-specific bridge
+
+**Source**: M2 implementation + contract redesign
+
+The original plan was to keep `MongoContract` structurally parallel to `SqlContract` for mechanical extraction. The M2 implementation proved this isn't feasible — the shapes diverge because SQL and Mongo have different sources of truth for data structure (database schema vs application models).
+
+The contract redesign found the right abstraction: separate domain from persistence, with `model.storage` as the scoped, family-specific bridge.
+
+**Model structure** — family-agnostic:
+- `fields` — array of field names (the domain vocabulary)
+- `discriminator` + `variants` — optional, for polymorphism
+- `relations` — connections to other models
+
+**`model.storage`** — family-specific bridge:
+
+SQL maps fields to column names; codec/type info lives on the top-level `storage.tables` section:
+```json
+{ "table": "tasks", "fields": { "id": { "column": "id" }, "title": { "column": "title" } } }
+```
+
+Mongo maps fields to codec info directly, because the model IS the schema:
+```json
+{ "collection": "tasks", "fields": { "_id": { "codecId": "mongo/objectId@1" }, "title": { "codecId": "mongo/string@1" } } }
+```
+
+The co-location of table/collection name with field mappings is intentional — in SQL, field-to-column mappings need their table context nearby. Separating them would leave column references dangling.
+
+**Where to apply**: `packages/1-framework/1-core/shared/contract/`, both family contract types, emitter. See [contract-symmetry.md](1-design-docs/contract-symmetry.md) for the convergence/divergence analysis.
+
+---
+
+## 3. Nested/embedded types are a cross-family concern
+
+**Source**: M2 implementation, contract redesign
+
+Embedded documents in Mongo and typed JSON columns in SQL are the same contract-level problem: structured data nested within a parent entity. Both need type-safe dot-notation queries, TypeScript type generation, and reusability across models.
+
+**Embedding is a relation property, not a model property.** The parent model's relation declares the embedding strategy (`"strategy": "embed"`); the embedded model doesn't know where it's embedded. An embedded model has its own `fields` and `storage` (field-to-codec mappings) but no table/collection name — it doesn't own a storage unit.
+
+The entity vs value type distinction matters: an embedded **entity** (e.g., a Post with `_id` embedded in User) has identity and lifecycle. An embedded **value type** (e.g., Address) has no identity — it belongs in a `types`/`composites` section, not `models`.
 
 **Where to apply**: Contract type system, authoring surfaces, emitter, query builder. See [design-questions.md § DQ #1](1-design-docs/design-questions.md#1-embedded-documents-relation-field-or-distinct-concept-cross-family-concern).
 
 ---
 
-## 3. The ORM client presents aggregate roots, not models
+## 4. Polymorphism: `discriminator` + `variants` as the domain primitive
 
-**Source**: M2 design discussion
+**Source**: Contract redesign
 
-The ORM client's top-level access points (`db.User`, `db.Post`) correspond to **aggregate roots** — entities that own a storage unit (collection or table) and serve as the entry point for all access to entities within that aggregate.
+All persistence-level polymorphism reduces to "multiple shapes in the same storage, distinguished by a field." This is fundamental enough to be a contract-level primitive.
 
-In SQL, every model has a root collection (table), so the distinction between "model" and "aggregate root" is invisible. In Mongo, that's not true — a model can be embedded in another model's collection. The ORM should present collections (aggregate roots), not models, as its top-level API.
+The base model declares a `discriminator` (which field) and `variants` (which models, with their discriminator values). Each variant appears as a sibling in the `models` dictionary with its own additional fields and storage mappings:
 
-In DDD terms: each aggregate root corresponds to a collection/table. Entities within the aggregate are accessed through the root, not independently.
+```json
+{
+  "Task": {
+    "fields": ["id", "title", "type"],
+    "discriminator": { "field": "type" },
+    "variants": { "Bug": { "value": "bug" }, "Feature": { "value": "feature" } },
+    "storage": { "table": "tasks", "fields": { ... } }
+  },
+  "Bug": {
+    "fields": ["severity"],
+    "storage": { "table": "tasks", "fields": { ... } }
+  },
+  "Feature": {
+    "fields": ["priority"],
+    "storage": { "table": "features", "fields": { ... } }
+  }
+}
+```
 
-**Where to apply**: ORM client design for both families. The SQL ORM already does this implicitly (every model has a table), but making the concept explicit would improve the framework's domain model.
+The persistence strategy is **emergent**: if Bug's storage points to the same table as Task, it's STI. If it points to a different table, it's MTI. The domain declaration (`discriminator` + `variants`) doesn't change — only the storage mappings do. The ORM derives the query strategy from the storage facts.
+
+Polymorphism is **orthogonal to aggregate root / embedded** — any model can be polymorphic, whether it's a root, a variant, or embedded.
+
+This design avoids prescribing OOP patterns. The contract says "Bug is a variant of Task" (a domain fact about the data). Whether the ORM represents this as class inheritance, composition, or flat types is a runtime decision the contract doesn't make.
+
+**Where to apply**: Contract type system, emitter, ORM client, PSL authoring. This is a cross-family concern — SQL STI and Mongo polymorphic collections use the same representation.
 
 ---
 
-## 4. A common domain model for the framework core
-
-**Source**: M2 design discussion, synthesizing learnings #1-3
-
-The concepts that emerged from the Mongo PoC aren't Mongo-specific — they're general data modeling concepts that apply equally to SQL and Mongo. Both families support the same four building blocks, differing only in convention and tooling:
-
-| Concept | Definition | Mongo | SQL |
-|---|---|---|---|
-| **Aggregate root** | An entity that owns a storage unit and is the entry point for all access to entities within it | Collection | Table |
-| **Entity** | Has unique identity and a lifecycle that matters to the application. May be an aggregate root or embedded within one | Sub-document with `_id` | JSON object/array with IDs (uncommon but possible) |
-| **Value type** | Defined entirely by its properties. No identity, no lifecycle. Interchangeable with any instance of the same shape and values | Embedded document without `_id` | JSON/JSONB structured data |
-| **Reference** | A cross-aggregate relation resolved at query time | ObjectId + `$lookup` | Foreign key + JOIN |
-
-The difference between families isn't capability — both databases can do all four patterns. The difference is convention and tooling: SQL has better primitives for references (enforced foreign keys, JOIN optimization), so entities almost always get their own tables. Mongo has better primitives for embedding (atomic document writes, nested queries, `$elemMatch`), so embedding is common.
-
-This gives us a path to pull common modeling concepts up from the family domains into the framework core. The contract's model layer could describe aggregates, entities, value types, and references in family-agnostic terms. Each family then maps these concepts to its storage primitives (collections/documents for Mongo, tables/columns/JSON for SQL).
-
-This is the "new abstraction" that learning #1 identified as necessary — not a mechanical extraction of `SqlContract` or `MongoContract`, but a domain model rooted in these four concepts.
-
-**Where to apply**: `packages/1-framework/1-core/` — contract type system, model definitions, relation graph. This is the most architecturally significant learning from the Mongo PoC.
-
----
-
-## 5. Models are entities, not just data descriptions
+## 5. Models are entities; value types are a separate concept
 
 **Source**: M2 design discussion
 
-The distinction between a **model** and a **type** (or **value object**) should follow DDD and OOP principles:
+A **model** (entity) has unique identity and a lifecycle that matters to the application. A **value type** has no identity — it's defined entirely by its properties. Two instances with the same values are interchangeable.
 
-- **Model (entity)** — has unique identity, a lifecycle that matters to the application, and conceptually carries associated business logic. Two users with identical names and emails are still *different users*, and deleting one is a meaningful change in application state.
-- **Type (value object)** — defined entirely by its properties. No identity, no meaningful lifecycle. Two instances with the same field values are interchangeable.
+The `models` section describes all entities regardless of storage strategy. Storage strategy (own table/collection vs embedded in parent) is orthogonal to identity. Types/value objects are a separate, simpler concept — named field structures with no identity semantics — and belong in a `types` or `composites` section.
 
-The storage strategy (own collection vs. embedded) is orthogonal to this distinction. The current PSL conflates them by using `model` for "has a collection" and `type @embedded` for "is embedded," which misrepresents entities that happen to be stored embedded (e.g., a Post with its own `_id` embedded in a User document).
-
-Today the framework treats models as pure data descriptions (no behavior). But framing models as entities keeps the door open for a natural future extension: letting users define the class instantiated for each entity retrieved from a collection — turning collections into proper repositories and models into real OOP entities with behavior.
-
-For the contract, this suggests:
-
-- The `models` section should describe all entities regardless of storage strategy
-- Storage strategy (own collection vs. embedded in parent) should be metadata on the model
-- Types/value objects are a separate, simpler concept — named field structures with no identity semantics
-- A `types` or `composites` section in the contract could be shared across families
+Today the framework treats models as pure data descriptions (no behavior). Framing models as entities keeps the door open for a natural future extension: letting users define the class instantiated for each entity retrieved from a collection, turning collections into proper repositories and models into real OOP entities with behavior.
 
 **Where to apply**: Contract type system, PSL authoring syntax, emitter.
+
+---
+
+## Open contract design questions
+
+These emerged from the contract redesign and need resolution before implementation.
+
+### Polymorphic associations
+
+A `Comment` can belong to either a `Post` or a `Video`, distinguished by a `commentable_type` discriminator column. This is polymorphism on the *relation*, not the model. The `relations` section would need to express "this relation can point to one of several models."
+
+### Many-to-many without a join model
+
+In Mongo, `student.courseIds: ObjectId[]` represents a many-to-many without a junction collection. In SQL, the junction table exists but has no domain identity — it's pure storage machinery, not a domain entity.
+
+### Relation storage details
+
+Relations with `"strategy": "reference"` need family-specific join details (SQL: foreign key columns; Mongo: which field holds the ObjectId). Relations with `"strategy": "embed"` need to know which field in the parent document holds the embedded data.
+
+### `nullable` location
+
+Is field nullability a domain concept ("can a User have no email?") or a storage concept ("can this column be NULL?")? If domain, it could live on `model.fields` entries (making them objects instead of strings). If storage, it stays on `model.storage.fields`.
 
 ---
 

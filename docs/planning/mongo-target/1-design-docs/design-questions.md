@@ -23,12 +23,11 @@ Options:
 
 **M2 insight — entity vs. value type distinction matters here.** The right representation depends on whether the embedded structure is an **entity** (has identity, lifecycle matters — e.g., a Post with `_id` embedded in a User) or a **value type** (no identity, interchangeable — e.g., an Address defined entirely by its fields). Entities embedded within another entity's aggregate need identity tracking; value types don't. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the full domain model analysis.
 
-Tensions:
-- If embedded documents are relations, then a `User` model with an embedded `Address` and a referenced `Post` both appear in the relation graph — but they have profoundly different query and atomicity semantics. Consumer libraries traversing relations would need to know which are embedded.
-- If embedded documents are *not* relations, then the shared model/relation surface (the cross-family contract) can't express the full document structure. A consumer library generating a JSON Schema would miss embedded types.
-- Embedded subdocument arrays blur the line: `comments: Comment[]` embedded in a `Post` looks like a 1:N relation, but `Comment` doesn't have its own collection, can't be queried independently, and has no `_id` (unless the app adds one).
+**Contract redesign answer: embedding is a relation property.** The parent model's relation declares `"strategy": "embed"` (vs `"reference"` for cross-collection/cross-table). The embedded model appears as a sibling in `models` with its own `fields` and `storage` block (field mappings but no table/collection). The embedded model doesn't know where it's embedded — that's on the parent's relation. See [cross-cutting-learnings.md § learning #3](../cross-cutting-learnings.md).
 
-**What we need to decide before implementing**: Whether `ContractBase`'s relation graph includes embedded documents. This affects every layer downstream — authoring, emitter, ORM client, and consumer libraries. The solution should work for both Mongo embedded documents and SQL typed JSON columns.
+This resolves the three options above in favor of **relations with a storage strategy**: embedded documents are relations, and the `strategy` property tells consumer libraries which are embedded. Value types (Address, GeoPoint) without identity are a separate concept — they belong in a `types`/`composites` section, not `models`.
+
+**Remaining tension**: Relation storage details for embedding are not yet designed. A relation with `"strategy": "embed"` needs to know which field in the parent document holds the embedded data.
 
 ---
 
@@ -133,12 +132,30 @@ Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB col
 - **Multi-table inheritance**: A base table with shared fields, plus extension tables joined by FK for type-specific fields. More normalized but more complex to query.
 - **Enum-discriminated rows**: A pattern where a row's behavior changes based on a discriminator field, even if the schema is the same. The ORM needs to narrow the type based on the discriminator value.
 
-### Contract-level representation
+### Contract redesign answer: `discriminator` + `variants` as the domain primitive
 
-Options:
-- **Discriminated union in the model graph.** The contract declares a base model (`Notification`) and variant models (`EmailNotification`, `SmsNotification`) with a discriminator field (`type`). Each variant extends the base with additional fields. Consumer libraries traverse the model graph and see both the base and variants.
-- **Union field type.** A field's type is declared as a union: `ratings: ImdbRating | RottenTomatoesRating`. The contract type system gains a union type constructor. Simpler than model inheritance but limited to field-level polymorphism.
-- **Both.** Model-level inheritance (base + variants) for polymorphic collections/tables, and field-level unions for polymorphic embedded fields and arrays. These serve different use cases.
+The contract redesign settled on `discriminator` + `variants` on the base model, with each variant appearing as a sibling in the `models` dictionary:
+
+```json
+{
+  "Task": {
+    "fields": ["id", "title", "type"],
+    "discriminator": { "field": "type" },
+    "variants": { "Bug": { "value": "bug" }, "Feature": { "value": "feature" } },
+    "storage": { "table": "tasks", "fields": { ... } }
+  },
+  "Bug": {
+    "fields": ["severity"],
+    "storage": { "table": "tasks", "fields": { ... } }
+  }
+}
+```
+
+The persistence strategy is **emergent**: if Bug's storage points to the same table/collection as Task → STI. If it points to a different one → MTI. The domain declaration doesn't change; only the storage mappings do.
+
+All persistence-level polymorphism reduces to "multiple shapes, distinguished by a field." This is fundamental enough to be a contract primitive. The contract describes facts ("Bug is a variant of Task, discriminated by `type`") — the ORM decides how to represent it at runtime (class hierarchy, flat union types, composition).
+
+See [cross-cutting-learnings.md § learning #4](../cross-cutting-learnings.md) for the full design.
 
 ### Storage-level mapping
 
@@ -158,6 +175,10 @@ At minimum:
 - The storage mapping works for at least STI (one table/collection, discriminator column/field).
 
 Rough edges are acceptable — exhaustive pattern matching, complex nested unions, and multi-table inheritance can wait. But the contract type system must handle the basic discriminated-union shape, and it must work for both families.
+
+### Remaining open: polymorphic associations
+
+A `Comment` that can belong to either a `Post` or a `Video` (distinguished by `commentable_type`) is polymorphism on the *relation*, not the model. The `relations` section would need to express "this relation can point to one of several models." Not yet designed.
 
 ---
 
@@ -220,26 +241,33 @@ For the PoC: Out of scope. The architecture constraints are:
 
 ---
 
-## 10. Shared contract surface: what goes in `ContractBase`? *(informed by M2)*
+## 10. Shared contract surface: what goes in `ContractBase`? *(contract redesign proposal)*
 
 The PoC plan identifies this as the most important architectural question. Today, `ContractBase` does not include models or relations — these are added by `SqlContract`.
 
 **The question**: What belongs in the shared contract surface that both SQL and document contracts extend?
 
-**M2 finding: mechanical extraction won't work.** The original plan was to keep `MongoContract` structurally parallel to `SqlContract` so extraction of a shared base would be mechanical. The M2 implementation proved the shapes diverge meaningfully — different sources of truth, different field indirection depth, different storage semantics (see [contract-symmetry.md](contract-symmetry.md)). A mechanical extraction would produce something either too loose to be useful or that forces one family into the other's shape.
+**Contract redesign answer: the domain level is the shared surface.** The contract redesign demonstrated that `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` are structurally identical between families. The divergence is scoped entirely to `model.storage` — the family-specific bridge from domain fields to persistence. See [contract-symmetry.md](contract-symmetry.md) for the convergence/divergence analysis.
 
-**Revised approach**: implement both contracts fairly completely, then design a **new abstraction** informed by both. This will likely require modifying both `SqlContract` and `MongoContract` to fit. The abstraction should be rooted in common domain modeling concepts — aggregate roots, entities, value types, and references — rather than in the implementation details of either family. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the domain model analysis.
+`ContractBase` should capture the domain-level structure:
+- **`roots`** — maps ORM accessor names to model names
+- **`models`** — all entities with `fields` (string arrays), optional `discriminator` + `variants`, and `relations`
+- **`model.storage`** — family-specific extension point (SQL: field → column; Mongo: field → codec)
+- **`relations`** — with cardinality and strategy (`"reference"` or `"embed"`)
+- **`types`/`composites`** — value objects without identity (not yet designed)
 
-Candidates for `ContractBase`:
-- Models (name, fields, field types) — both families have these, but field semantics differ (SQL fields indirect through columns; Mongo fields carry types directly)
-- Relations (cardinality, related model, storage strategy is family-specific)
-- Mappings (model → storage name, field → storage path) — both families need this, but the shapes differ (SQL: table/column, document: collection/field path)
-- Capabilities (what operations the target supports)
-- Codecs / type registry — the registry interface is family-agnostic; codecs are family-specific
+This is not a mechanical extraction from either contract — it's a new abstraction rooted in domain modeling concepts:
 
-The tension: too little in `ContractBase` and consumer libraries can't do anything without family-specific code. Too much and `ContractBase` becomes a leaky abstraction that doesn't fit either family well.
+| Concept | Contract representation |
+|---|---|
+| **Aggregate root** | Entry in `roots`, model with storage containing table/collection |
+| **Entity** | Entry in `models` |
+| **Value type** | Entry in `types`/`composites` |
+| **Reference** | Relation with `"strategy": "reference"` |
+| **Embedding** | Relation with `"strategy": "embed"` |
+| **Polymorphism** | `discriminator` + `variants` on any model |
 
-Related question: Is `ContractBase` a concrete type that consumer libraries accept, or an interface that both families implement? The answer affects how extensions declare compatibility.
+See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the full design principles, examples, and remaining open questions.
 
 ---
 
@@ -279,6 +307,8 @@ Tensions:
 - Extension-contributed **pipeline stages** may be needed for Vector Search and Atlas Search, since `$vectorSearch` and `$search` are aggregation pipeline stages, not standard query operators.
 
 For the PoC: Out of scope. But the architecture should anticipate that MongoDB's most differentiating features (Vector Search, Atlas Search, geospatial) will be delivered as extension packs. The extension pack interface needs to accommodate document-family contributions.
+
+**Budgets plugin opportunity**: A Mongo-specific budgeting plugin could warn when documents approach MongoDB's 16 MB document size limit. This is especially relevant for models with embedded arrays of sub-documents (e.g., a Post with embedded Comments) where the array grows over time. The plugin could estimate document size from the query plan and warn preemptively — similar to how the SQL budgets plugin uses `EXPLAIN` to estimate query cost.
 
 ---
 
