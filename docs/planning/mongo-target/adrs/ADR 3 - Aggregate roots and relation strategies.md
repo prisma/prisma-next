@@ -19,7 +19,10 @@ A User model as an aggregate root with a referenced relation (Post) and an embed
         "email": { "nullable": false, "codecId": "mongo/string@1" }
       },
       "relations": {
-        "posts": { "to": "Post", "cardinality": "1:N", "strategy": "reference" },
+        "posts": {
+          "to": "Post", "cardinality": "1:N", "strategy": "reference",
+          "on": { "localFields": ["id"], "targetFields": ["authorId"] }
+        },
         "addresses": { "to": "Address", "cardinality": "1:N", "strategy": "embed" }
       },
       "storage": { "collection": "users" }
@@ -31,7 +34,10 @@ A User model as an aggregate root with a referenced relation (Post) and an embed
         "authorId": { "nullable": false, "codecId": "mongo/objectId@1" }
       },
       "relations": {
-        "author": { "to": "User", "cardinality": "N:1", "strategy": "reference" }
+        "author": {
+          "to": "User", "cardinality": "N:1", "strategy": "reference",
+          "on": { "localFields": ["authorId"], "targetFields": ["id"] }
+        }
       },
       "storage": { "collection": "posts" }
     },
@@ -161,13 +167,13 @@ This design means:
 
 ### Costs
 
-- **Relation storage details are not yet designed.** A `"strategy": "reference"` relation needs join details (SQL: foreign key columns; Mongo: which field holds the ObjectId). A `"strategy": "embed"` relation needs to know which field/path in the parent holds the embedded data. The exact shape is TBD.
+- **Reference relation join details are now explicit.** A `"strategy": "reference"` relation carries `on: { localFields, targetFields }` to make both sides of the FK join unambiguous regardless of cardinality. A `"strategy": "embed"` relation carries `field` to identify the parent field that holds the embedded data.
 - **Many-to-many without a join model** (Mongo: `student.courseIds: ObjectId[]`) doesn't fit cleanly into `reference` or `embed`. It may need a third strategy or a way to express "this relation is stored as an array of ObjectIds on the parent." Not yet designed.
 - **Value types / composites section** is not yet designed. There's a fundamental DDD distinction between entities (have identity and lifecycle — a Post with its own `_id` is an entity even when embedded) and value types (no identity — an Address defined by its field values is interchangeable with any other identical Address). Currently, value objects must be represented as models, which is semantically incorrect. A future `types`/`composites` section would give value types their own concept.
 
 ### Open questions
 
-- **Relation storage details**: What's the shape of family-specific join info on `reference` relations? What field on the parent holds an `embed` relation's data?
+- ~~**Relation storage details**: What's the shape of family-specific join info on `reference` relations? What field on the parent holds an `embed` relation's data?~~ **Resolved**: Reference relations use `on: { localFields, targetFields }`. Embed relations use `field: string`.
 - **Many-to-many**: Does a junction table appear as a model? Probably not — it's storage machinery, not a domain entity. But the relation needs to reference it somehow.
 - **`nullable` on relations**: Can a reference relation be nullable (User may not have an assignee)? Where does this live — on the relation, on the field, or on the storage?
 - **Entity vs value type**: When should the contract distinguish models (entities) from composites (value types)? What triggers the need for a `types`/`composites` section? (See the Costs section above.)

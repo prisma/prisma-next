@@ -17,7 +17,10 @@ type TaskModel = {
       readonly to: 'User';
       readonly cardinality: 'N:1';
       readonly strategy: 'reference';
-      readonly fields: readonly ['assigneeId'];
+      readonly on: {
+        readonly localFields: readonly ['assigneeId'];
+        readonly targetFields: readonly ['_id'];
+      };
     };
     readonly comments: {
       readonly to: 'Comment';
