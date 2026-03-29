@@ -36,6 +36,7 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 - A thin typed layer that reads contract types and constructs `MongoQueryPlan` objects with correct `Row` phantom types.
 - Return types inferred from the contract — not manually specified by the caller.
 - No relation loading, no `include`, no shared ORM interface.
+- Scope is limited to what's achievable with flat-field contracts. Implement as much as possible; document what's blocked by the absence of embedded document support.
 
 **Test infrastructure:**
 
