@@ -64,8 +64,6 @@ An `SqlContract` has three layers: **storage** (what exists in the database — 
 | `ContractWithTypeMaps<C, T>`        | phantom key attaching TypeMaps                            | `MongoContractWithTypeMaps<C, T>`             | same phantom key pattern                         |
 
 
-**Deferred: embedded documents.** Representing nested/embedded document structure in the contract is deferred from this milestone. Embedded documents are a cross-family concern — SQL has the same problem with typed JSON columns — and adding them to the contract shape is a design question worth discussing separately. For now, the contract only describes flat top-level fields in each collection.
-
 **Tasks:**
 
 - **Define `MongoStorageField`** — describes a single field in a collection: `{ nativeType, codecId, nullable }`, same core shape as SQL's `StorageColumn`. Lives in `2-mongo/1-core/`.
