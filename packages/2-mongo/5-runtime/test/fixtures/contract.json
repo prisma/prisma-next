@@ -1,0 +1,55 @@
+{
+  "targetFamily": "mongo",
+  "storage": {
+    "collections": {
+      "users": {},
+      "posts": {}
+    }
+  },
+  "models": {
+    "User": {
+      "storage": { "collection": "users" },
+      "fields": {
+        "_id": { "codecId": "mongo/objectId@1", "nullable": false },
+        "name": { "codecId": "mongo/string@1", "nullable": false },
+        "email": { "codecId": "mongo/string@1", "nullable": false },
+        "bio": { "codecId": "mongo/string@1", "nullable": true },
+        "createdAt": { "codecId": "mongo/date@1", "nullable": false }
+      },
+      "relations": {
+        "posts": {}
+      }
+    },
+    "Post": {
+      "storage": { "collection": "posts" },
+      "fields": {
+        "_id": { "codecId": "mongo/objectId@1", "nullable": false },
+        "title": { "codecId": "mongo/string@1", "nullable": false },
+        "slug": { "codecId": "mongo/string@1", "nullable": false },
+        "content": { "codecId": "mongo/string@1", "nullable": false },
+        "status": { "codecId": "mongo/string@1", "nullable": false },
+        "authorId": { "codecId": "mongo/objectId@1", "nullable": false },
+        "viewCount": { "codecId": "mongo/int32@1", "nullable": false },
+        "publishedAt": { "codecId": "mongo/date@1", "nullable": true },
+        "updatedAt": { "codecId": "mongo/date@1", "nullable": false }
+      },
+      "relations": {
+        "author": {}
+      }
+    }
+  },
+  "relations": {
+    "User": { "posts": {} },
+    "Post": { "author": {} }
+  },
+  "mappings": {
+    "modelToCollection": {
+      "User": "users",
+      "Post": "posts"
+    },
+    "collectionToModel": {
+      "users": "User",
+      "posts": "Post"
+    }
+  }
+}
