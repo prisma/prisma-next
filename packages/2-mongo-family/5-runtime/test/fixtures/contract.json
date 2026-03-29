@@ -1,5 +1,9 @@
 {
   "targetFamily": "mongo",
+  "roots": {
+    "users": "User",
+    "posts": "Post"
+  },
   "storage": {
     "collections": {
       "users": {},
@@ -17,7 +21,12 @@
         "createdAt": { "codecId": "mongo/date@1", "nullable": false }
       },
       "relations": {
-        "posts": {}
+        "posts": {
+          "to": "Post",
+          "cardinality": "1:N",
+          "strategy": "reference",
+          "fields": ["authorId"]
+        }
       }
     },
     "Post": {
@@ -34,22 +43,13 @@
         "updatedAt": { "codecId": "mongo/date@1", "nullable": false }
       },
       "relations": {
-        "author": {}
+        "author": {
+          "to": "User",
+          "cardinality": "N:1",
+          "strategy": "reference",
+          "fields": ["authorId"]
+        }
       }
-    }
-  },
-  "relations": {
-    "User": { "posts": {} },
-    "Post": { "author": {} }
-  },
-  "mappings": {
-    "modelToCollection": {
-      "User": "users",
-      "Post": "posts"
-    },
-    "collectionToModel": {
-      "users": "User",
-      "posts": "Post"
     }
   }
 }
