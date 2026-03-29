@@ -1,53 +1,60 @@
 # MongoContract / SqlContract: Convergence and Divergence
 
-This document records where Mongo and SQL contract types follow the same
-structural pattern and where they intentionally diverge.
+This document records where Mongo and SQL contract types follow the same structural pattern and where they intentionally diverge, informed by the M2 implementation and the contract redesign proposal.
 
 ## Why the contracts diverge
 
 The fundamental difference: **in SQL, the database schema is the source of truth for data structure; in Mongo, the application's domain models are.**
 
-In SQL, tables and columns exist independently of the application. The contract's storage layer (tables, columns, native types, constraints) describes what the database enforces. The model layer is a mapping *onto* that schema — model fields indirect through column names because the column is the real thing, and the model field is a name the application gave it.
+In SQL, tables and columns exist independently of the application. The contract's storage layer describes what the database enforces. The model layer maps onto that schema — model fields indirect through column names because the column is the real thing.
 
-In Mongo, there is no enforced schema. A collection is just a name with some metadata (indexes, validators). The document structure exists only because the application writes it that way. The model layer IS the schema — model fields carry `codecId` and `nullable` directly because there's no underlying column to indirect through.
+In Mongo, there is no enforced schema. A collection is just a name with metadata. The document structure exists only because the application writes it that way. Model fields carry `codecId` directly — there's no underlying column to indirect through.
 
-This showed up concretely in the M2 implementation: `MongoStorageCollection` ended up as an empty type. All field information migrated to the model layer. Mirroring SQL's column indirection pattern would cause massive duplication in the 99% case where a Mongo model's fields are identical to the document's fields.
+## Contract redesign: domain/storage separation
 
-## Convergence
+The contract redesign proposal resolves most of the divergence by separating domain from persistence. The domain-level structure (`roots`, `models`, `relations`, `discriminator`, `variants`) is **identical** between families. The divergence is scoped entirely to `model.storage` — the family-specific bridge from domain fields to persistence.
 
-Both domains share these structural patterns:
+See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the full design principles and proposal.
 
-| Pattern | SQL | Mongo |
-|---|---|---|
-| **Top-level contract** | `SqlContract<S,M,R,Map>` | `MongoContract<S,M,R,Map>` |
-| **Storage container** | `SqlStorage.tables: Record<string, StorageTable>` | `MongoStorage.collections: Record<string, MongoStorageCollection>` |
-| **Model definition** | `ModelDefinition` with `storage`, `fields`, `relations` | `MongoModelDefinition` with `storage`, `fields`, `relations` |
-| **Model → storage link** | `ModelDefinition.storage.table: string` | `MongoModelDefinition.storage.collection: string` |
-| **Mappings** | `SqlMappings` with `modelToTable`, `tableToModel` | `MongoMappings` with `modelToCollection`, `collectionToModel` |
-| **TypeMaps phantom key** | `ContractWithTypeMaps<C, T>` | `MongoContractWithTypeMaps<C, T>` |
-| **Type extraction** | `ExtractCodecTypes<T>` | `ExtractMongoCodecTypes<T>` |
-| **Codec abstractions** | `Codec` interface, `codec()` factory, `CodecRegistry` | `MongoCodec` interface, `mongoCodec()` factory, `MongoCodecRegistry` |
-| **Codec ownership** | Concrete codecs in adapter (`adapter-postgres`) | Concrete codecs in adapter (`adapter-mongo`) |
-| **Codec ID constants** | `PG_*_CODEC_ID` in adapter | `MONGO_*_CODEC_ID` in adapter |
-| **Target pack** | `@prisma-next/target-postgres` | `@prisma-next/target-mongo` |
+## Convergence (family-agnostic)
 
-## Divergence
+These elements are identical between SQL and Mongo:
+
+| Element | Description |
+|---|---|
+| **`roots`** | Maps ORM accessor names to model names. Same structure in both families. |
+| **`model.fields`** | Array of field name strings. The domain vocabulary. |
+| **`discriminator` + `variants`** | Polymorphism declaration. Same structure in both families. |
+| **`model.relations`** | Connections to other models with cardinality and strategy. |
+| **Variant models as siblings** | Base models, variants, and embedded models all appear as top-level `models` entries. |
+| **TypeMaps phantom key** | `ContractWithTypeMaps<C, T>` / `MongoContractWithTypeMaps<C, T>` |
+| **Codec abstractions** | Registry interface is family-agnostic; codecs themselves are family-specific. |
+| **Codec ownership** | Concrete codecs in target adapter (`adapter-postgres` / `adapter-mongo`). |
+
+## Divergence (scoped to `model.storage`)
+
+The only structural divergence is inside `model.storage.fields` — the family-specific bridge:
 
 | Aspect | SQL | Mongo | Rationale |
 |---|---|---|---|
-| **Field location** | Storage columns carry `codecId`, `nativeType`, `nullable`; model fields indirect via column name | Model fields carry `codecId` and `nullable` directly | The model IS the schema in Mongo — there's no underlying column to indirect through |
-| **Storage detail** | `StorageTable.columns: Record<string, StorageColumn>` with full column metadata | `MongoStorageCollection: {}` (empty for PoC) | SQL storage describes what the database enforces; Mongo storage describes collection-level config (indexes, validators) that is orthogonal to document structure |
-| **Field-level mappings** | `SqlMappings.fieldToColumn`, `columnToField` | Not present | Model field names ARE the document field names |
-| **Inference chain** | `model field → column name → storage column → codecId → CodecTypes` | `model field → codecId → CodecTypes` | One fewer hop because there is no column indirection |
-| **Contract base** | Extends `ContractBase` | Independent type | See "Toward a shared contract base" below |
-| **TypeMaps breadth** | `{ codecTypes, operationTypes, queryOperationTypes }` | `{ codecTypes }` only | Mongo PoC only needs codec types for now |
+| **Field mapping** | `{ "column": "id" }` — field name → column name | `{ "codecId": "mongo/objectId@1" }` — field name → codec info | SQL has a storage schema to indirect through; Mongo doesn't |
+| **Type info location** | On the storage column (`storage.tables[t].columns[c].codecId`) | On the model's storage field mapping (`model.storage.fields[f].codecId`) | SQL's source of truth is the database; Mongo's is the model |
+| **`nullable`** | On the storage column | On the model's storage field mapping | Same rationale as type info |
+| **Top-level `storage` detail** | Rich: tables, columns, native types, defaults, constraints, indexes, foreign keys | Sparse: collections with metadata (indexes, validators) | SQL storage describes what the database enforces; Mongo collections hold orthogonal config |
 
 ## Toward a shared contract base
 
-The original plan was to keep `MongoContract` structurally parallel to `SqlContract` so extraction of a shared base would be mechanical. The M2 implementation proved this isn't feasible — the shapes diverged meaningfully because the two families have different sources of truth for data structure.
+The contract redesign demonstrates that a shared base IS viable — at the domain level. The `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` sections are structurally identical between families. Only `model.storage` differs, and it's scoped.
 
-A mechanical extraction would produce something either too loose to be useful or that forces one family into the other's shape. Instead, a shared contract base should be designed as a **new abstraction** informed by both implementations — one that will likely require modifying both `SqlContract` and `MongoContract` to fit.
+A shared `ContractBase` should capture the domain-level structure and leave `model.storage` as a family-specific extension point. This is not a mechanical extraction from either `SqlContract` or `MongoContract` — it's a new abstraction rooted in domain modeling concepts (aggregate roots, entities, value types, references) that both families implement.
 
-The parallel structure (both have `storage`, `models`, `relations`, `mappings`, `TypeMaps` phantom key) suggests a shared base is viable at the outer structural level. But field-level semantics must remain family-specific.
+The domain model's four building blocks map to contract structure:
 
-See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the broader domain modeling concepts (aggregate roots, entities, value types, references) that should inform the shared contract base design.
+| Concept | Contract representation |
+|---|---|
+| **Aggregate root** | Entry in `roots`, model with `storage` containing table/collection |
+| **Entity** | Entry in `models` with `fields` and `relations` |
+| **Value type** | Entry in `types`/`composites` (not yet designed) |
+| **Reference** | Relation with `"strategy": "reference"` |
+| **Embedding** | Relation with `"strategy": "embed"` |
+| **Polymorphism** | `discriminator` + `variants` on any model |
