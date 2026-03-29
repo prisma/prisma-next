@@ -50,7 +50,7 @@ A User model as an aggregate root with a referenced relation (Post) and an embed
 Three things to notice:
 
 1. **`roots`** maps ORM accessor names to models — `db.users` and `db.posts` are the entry points. Address is not in `roots` because it's only reachable through User.
-2. **`strategy: "reference"`** means Post lives in its own collection, resolved at query time. **`strategy: "embed"`** means Address lives nested inside User documents.
+2. **`strategy: "reference"`** on a relationship means Post lives in its own collection, resolved at query time. **`strategy: "embed"`** means Address lives nested inside User documents.
 3. **Address has `"storage": {}`** — empty, because it doesn't own a collection. Its data lives within User's storage. See [ADR 1](ADR%201%20-%20Contract%20domain-storage%20separation.md) for why `model.fields` carries `nullable` and `codecId`.
 
 ## Context
