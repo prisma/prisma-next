@@ -24,7 +24,10 @@
           "to": "User",
           "cardinality": "N:1",
           "strategy": "reference",
-          "fields": ["assigneeId"]
+          "on": {
+            "localFields": ["assigneeId"],
+            "targetFields": ["_id"]
+          }
         },
         "comments": {
           "to": "Comment",
