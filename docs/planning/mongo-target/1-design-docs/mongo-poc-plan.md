@@ -83,7 +83,7 @@ Restructure `MongoContract` to follow ADRs 1-3:
 - Add `roots` section (ORM entry points → model names)
 - Change `model.fields` to records of `{ nullable, codecId }` (domain metadata)
 - Restructure `model.storage` as the family-specific bridge (collection name + field → codec mappings)
-- Add `discriminator` + `variants` for polymorphism
+- Add `discriminator` + `variants` on base models; `base` on variant models
 - Add relation `strategy` (`"reference"` | `"embed"`)
 
 Hand-craft `contract.json` + `contract.d.ts` for the [SaaS task management schema](example-schemas.md#3-saas-task-management-with-polymorphism) — Task (polymorphic: Bug/Feature) with User, including at least one embedded relation.
@@ -138,7 +138,7 @@ The [design questions](design-questions.md) document has the full analysis and [
 
 - **[#10 — Shared contract surface](design-questions.md#10-shared-contract-surface-what-goes-in-contractbase)**: **Resolved** via [ADR 1](../adrs/ADR%201%20-%20Contract%20domain-storage%20separation.md). The domain level (`roots`, `models`, `relations`) is the shared surface. Divergence is scoped to `model.storage`.
 - **[#1 — Embedded documents](design-questions.md#1-embedded-documents-relation-field-or-distinct-concept)**: **Resolved** via [ADR 3](../adrs/ADR%203%20-%20Aggregate%20roots%20and%20relation%20strategies.md). Embedding is a relation property (`"strategy": "embed"`). Remaining detail: relation storage specifics for embedding.
-- **[#6 — Polymorphism](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april)**: **Resolved** via [ADR 2](../adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md). `discriminator` + `variants`, emergent persistence strategy. Remaining: polymorphic associations. **Implementation validation in Phase 3.**
+- **[#6 — Polymorphism](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april)**: **Resolved** via [ADR 2](../adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md). `discriminator` + `variants` on base models, `base` on variants (bidirectional navigation), emergent persistence strategy. Uses specialization/generalization terminology. Remaining: polymorphic associations. **Implementation validation in Phase 3.**
 - **[#3 — ExecutionPlan generalization](design-questions.md#3-execution-plan-generalization)**: **Resolved.** Each family gets its own plan type, plugin interface, and runtime. See [mongo-execution-components.md](mongo-execution-components.md).
 
 ### Open — addressed in Phase 3

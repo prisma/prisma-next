@@ -102,7 +102,7 @@ Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB col
 
 ## 6. Polymorphism and discriminated unions *(resolved — validate implementation in April)*
 
-**Answer**: `discriminator` + `variants` on the base model, with each variant as a sibling in `models`.
+**Answer**: `discriminator` + `variants` on the base model, `base` on each variant, with all models as siblings in `models`.
 
 ```json
 {
@@ -117,13 +117,16 @@ Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB col
     "storage": { "table": "tasks", "fields": { ... } }
   },
   "Bug": {
+    "base": "Task",
     "fields": { "severity": { "nullable": false, "codecId": "pg/text@1" } },
     "storage": { "table": "tasks", "fields": { ... } }
   }
 }
 ```
 
-The persistence strategy is **emergent**: if Bug's storage points to the same table/collection as Task → STI. If it points to a different one → MTI. The domain declaration doesn't change; only the storage mappings do. The contract describes facts ("Bug is a variant of Task, discriminated by `type`") — the ORM decides how to represent it at runtime.
+The relationship is bidirectional: `Task.variants` lists its specializations, `Bug.base` names the model it specializes. We use specialization/generalization terminology — `base` describes a structural fact without OOP inheritance baggage.
+
+The persistence strategy is **emergent**: if Bug's storage points to the same table/collection as Task → STI. If it points to a different one → MTI. The domain declaration doesn't change; only the storage mappings do. The contract describes facts ("Bug is a specialization of Task, discriminated by `type`") — the ORM decides how to represent it at runtime.
 
 All persistence-level polymorphism reduces to "multiple shapes, distinguished by a field." This is fundamental enough to be a contract primitive. See [cross-cutting-learnings.md § learning #4](../cross-cutting-learnings.md) for the full design.
 
