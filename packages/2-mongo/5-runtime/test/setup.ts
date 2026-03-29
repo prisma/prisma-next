@@ -1,11 +1,11 @@
+import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import type { DocumentContract, PlanMeta } from '@prisma-next/contract/types';
-import { createMongoAdapter } from '@prisma-next/mongo-adapter';
+import { createMongoDriver } from '@prisma-next/driver-mongo';
 import type {
   AnyMongoCommand,
   MongoLoweringContext,
   MongoQueryPlan,
 } from '@prisma-next/mongo-core';
-import { createMongoDriver } from '@prisma-next/mongo-driver';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createMongoRuntime, type MongoRuntime } from '../src/mongo-runtime';
