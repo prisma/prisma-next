@@ -1,5 +1,10 @@
-import type { DocumentContract, PlanMeta } from '@prisma-next/contract/types';
-import type { AnyMongoCommand, AnyMongoWireCommand, MongoQueryPlan } from '@prisma-next/mongo-core';
+import type { PlanMeta } from '@prisma-next/contract/types';
+import type {
+  AnyMongoCommand,
+  AnyMongoWireCommand,
+  MongoContract,
+  MongoQueryPlan,
+} from '@prisma-next/mongo-core';
 import {
   AggregateCommand,
   DeleteOneCommand,
@@ -18,7 +23,7 @@ const stubMeta: PlanMeta = {
   paramDescriptors: [],
 };
 
-const stubContext = { contract: {} as DocumentContract };
+const stubContext = { contract: {} as MongoContract };
 
 function plan(command: AnyMongoCommand): MongoQueryPlan {
   return { command, meta: stubMeta };
