@@ -45,6 +45,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/2-mongo/5-runtime"
+    "directory": "packages/2-mongo-family/5-runtime"
   }
 }
