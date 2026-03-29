@@ -93,7 +93,7 @@ The entity vs value type distinction matters: an embedded **entity** (e.g., a Po
 
 All persistence-level polymorphism reduces to "multiple shapes in the same storage, distinguished by a field." This is fundamental enough to be a contract-level primitive.
 
-The base model declares a `discriminator` (which field) and `variants` (which models, with their discriminator values). Each variant appears as a sibling in the `models` dictionary with its own additional fields and storage mappings:
+The base model declares a `discriminator` (which field) and `variants` (which models are specializations, with their discriminator values). Each variant names its `base` model and appears as a sibling in the `models` dictionary with its own additional fields and storage mappings:
 
 ```json
 {
@@ -108,21 +108,25 @@ The base model declares a `discriminator` (which field) and `variants` (which mo
     "storage": { "table": "tasks", "fields": { ... } }
   },
   "Bug": {
+    "base": "Task",
     "fields": { "severity": { "nullable": false, "codecId": "pg/text@1" } },
     "storage": { "table": "tasks", "fields": { ... } }
   },
   "Feature": {
+    "base": "Task",
     "fields": { "priority": { "nullable": false, "codecId": "pg/int4@1" } },
     "storage": { "table": "features", "fields": { ... } }
   }
 }
 ```
 
-The persistence strategy is **emergent**: if Bug's storage points to the same table as Task, it's STI. If it points to a different table, it's MTI. The domain declaration (`discriminator` + `variants`) doesn't change — only the storage mappings do. The ORM derives the query strategy from the storage facts.
+The relationship is bidirectional: the base model's `variants` answers "what are Task's specializations?", and each variant's `base` answers "what model does Bug specialize?" This eliminates the need for consumers to build a reverse index. Both sides are redundant (the emitter writes both), but each serves a different traversal.
+
+We use **specialization/generalization** terminology, not OOP inheritance language. `base` was chosen over `extends` because it describes a structural relationship ("Bug's base is Task") without implying runtime behavior (class hierarchies, method overriding, Liskov substitution). The contract says "Bug is a specialization of Task" (a domain fact about the data). Whether the ORM represents this as class inheritance, composition, or flat types is a runtime decision the contract doesn't make.
+
+The persistence strategy is **emergent**: if Bug's storage points to the same table as Task, it's STI. If it points to a different table, it's MTI. The domain declaration (`discriminator` + `variants` + `base`) doesn't change — only the storage mappings do.
 
 Polymorphism is **orthogonal to aggregate root / embedded** — any model can be polymorphic, whether it's a root, a variant, or embedded.
-
-This design avoids prescribing OOP patterns. The contract says "Bug is a variant of Task" (a domain fact about the data). Whether the ORM represents this as class inheritance, composition, or flat types is a runtime decision the contract doesn't make.
 
 **Where to apply**: Contract type system, emitter, ORM client, PSL authoring. This is a cross-family concern — SQL STI and Mongo polymorphic collections use the same representation.
 

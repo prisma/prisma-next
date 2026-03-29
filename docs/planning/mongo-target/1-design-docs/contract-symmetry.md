@@ -26,7 +26,7 @@ These elements are identical between SQL and Mongo:
 | **`model.fields`** | Record mapping field names to `{ nullable: boolean, codecId: string }`. Keys are the domain vocabulary. Values differ per contract but the structure is identical. |
 | **`codecId`** | Field type identifier on `model.fields[f].codecId`. The concept is family-agnostic; available IDs depend on framework composition. |
 | **`nullable`** | Domain-level field metadata (`model.fields[f].nullable`). Non-optional boolean. |
-| **`discriminator` + `variants`** | Polymorphism declaration. Same structure in both families. |
+| **`discriminator` + `variants` + `base`** | Polymorphism declaration. Base model lists specializations (`variants`); each variant names its generalization (`base`). Bidirectional, same structure in both families. |
 | **`model.relations`** | Connections to other models with cardinality and strategy. |
 | **Variant models as siblings** | Base models, variants, and embedded models all appear as top-level `models` entries. |
 | **TypeMaps phantom key** | `ContractWithTypeMaps<C, T>` / `MongoContractWithTypeMaps<C, T>` |
@@ -45,7 +45,7 @@ The divergence is scoped to `model.storage` — and it's narrow. With `codecId` 
 
 ## Toward a shared contract base
 
-The contract redesign demonstrates that a shared base IS viable — at the domain level. The `roots`, `models` (with `fields` carrying `nullable` and `codecId`, `discriminator`, `variants`), and `relations` sections are structurally identical between families. Only `model.storage` differs, and it's scoped. For Mongo, `model.storage` is minimal (collection name only); for SQL, it carries field-to-column mappings. This remaining divergence is justified — it reflects a real structural difference between the families, not an arbitrary placement choice.
+The contract redesign demonstrates that a shared base IS viable — at the domain level. The `roots`, `models` (with `fields` carrying `nullable` and `codecId`, `discriminator`/`variants`/`base`), and `relations` sections are structurally identical between families. Only `model.storage` differs, and it's scoped. For Mongo, `model.storage` is minimal (collection name only); for SQL, it carries field-to-column mappings. This remaining divergence is justified — it reflects a real structural difference between the families, not an arbitrary placement choice.
 
 A shared `ContractBase` should capture the domain-level structure and leave `model.storage` as a family-specific extension point. This is not a mechanical extraction from either `SqlContract` or `MongoContract` — it's a new abstraction rooted in domain modeling concepts (aggregate roots, entities, value types, references) that both families implement.
 
@@ -58,4 +58,4 @@ The domain model's four building blocks map to contract structure:
 | **Value type** | Entry in `types`/`composites` (not yet designed) |
 | **Reference** | Relation with `"strategy": "reference"` |
 | **Embedding** | Relation with `"strategy": "embed"` |
-| **Polymorphism** | `discriminator` + `variants` on any model |
+| **Polymorphism** | `discriminator` + `variants` on base model; `base` on each variant (specialization/generalization) |

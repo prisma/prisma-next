@@ -20,7 +20,7 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
   - `roots` section mapping ORM accessor names to model names
   - `model.fields` as records of `{ nullable: boolean, codecId: string }` (domain metadata)
   - `model.storage` as the family-specific bridge (collection name for Mongo; table + field-to-column mappings for SQL)
-  - `discriminator` + `variants` on polymorphic models
+  - `discriminator` + `variants` on polymorphic base models; `base` on each variant model
   - Relations with `strategy` (`"reference"` | `"embed"`)
 - Hand-craft `contract.json` and `contract.d.ts` for a schema that exercises all features: polymorphic model (Task with Bug/Feature variants), referenced relation (Task → User), and at least one embedded relation (e.g. User with embedded Address, or Post with embedded Comments).
 
@@ -62,7 +62,7 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
 - `MongoContract` has a `roots` section mapping accessor names to model names
 - `model.fields` is a record mapping field names to `{ nullable: boolean, codecId: string }`
 - `model.storage` contains collection name (Mongo) or table + field-to-column mappings (SQL)
-- At least one model has `discriminator` + `variants` with variant models as siblings
+- At least one model has `discriminator` + `variants` with variant models as siblings; each variant has `base` referencing the base model
 - At least one relation has `"strategy": "reference"` and at least one has `"strategy": "embed"`
 - `contract.json` and `contract.d.ts` exist for the test schema
 
@@ -128,10 +128,11 @@ Not applicable.
 3. **Consistent query interface.** Filters use structured objects matching the SQL ORM's patterns. The ORM compiles these to Mongo's native query format internally.
 4. **Embedded documents in scope.** Embedding is fundamental to idiomatic Mongo usage. The "cross-family concern" label means the solution should work for both families eventually, not that Mongo must wait for SQL.
 5. **`codecId` and `nullable` live on `model.fields` (domain level).** Both are domain concepts needed by every consumer for type inference. `codecId` as a concept is family-agnostic — every family uses codec identifiers. "Family-agnostic" describes the *structure* of the domain section, not its *values*. This means Mongo's `model.storage` shrinks to just the collection name (no field-to-codec mappings in storage), while SQL's retains field-to-column mappings. The `model.storage.fields` mechanism remains available to Mongo for field name remapping if needed.
+6. **Variants carry `base`; use specialization/generalization terminology.** Each variant model has a `base` property naming the model it specializes (e.g., `Bug.base = "Task"`). The base model's `variants` lists its specializations. The relationship is bidirectional — both sides are emitted for different traversal needs. We use `base` instead of `extends` because it describes a structural fact without OOP inheritance baggage. The contract speaks of specializations (variants add fields to the base shape) and generalizations (the base defines the shared shape), not subclasses and superclasses.
 
 # Open Questions
 
 1. **Test schema choice.** The SaaS task management example (Task/Bug/Feature + User) covers polymorphism and referenced relations. What should the embedded relation be? Options: User with embedded Addresses (simple, value-type-like), Post with embedded Comments (entity-like, tests identity in embedded docs). **Assumption:** include both — Address as a value-type embed, Comments as an entity embed — to test both patterns.
-2. **Variant field inheritance at the type level.** ADR 2 says variant models list only their own fields; they inherit the base model's fields. How does this work in `contract.d.ts`? Does the type system express the full merged shape, or does the consumer need to merge base + variant fields? **Assumption:** the `.d.ts` expresses the full merged shape for each variant (Bug has id + title + type + severity), since that's what the ORM needs at runtime.
+2. **Variant field resolution at the type level.** ADR 2 says variant models list only their own fields; they reference the base model via `base` and inherit its fields. How does this work in `contract.d.ts`? Does the type system express the full merged shape, or does the consumer need to merge base + variant fields? **Assumption:** the `.d.ts` expresses the full merged shape for each variant (Bug has id + title + type + severity), since that's what the ORM needs at runtime.
 3. **Relation storage details.** ADR 3 notes that the exact shape of family-specific join info on relations is not yet designed. For `"strategy": "reference"`, what fields describe the join? For `"strategy": "embed"`, what field describes the embedding location? This must be resolved during implementation. **Assumption:** `"reference"` relations carry a `fields` property naming the local field(s) holding the foreign key/ObjectId; `"embed"` relations carry a `field` property naming the parent document field holding the embedded data.
 

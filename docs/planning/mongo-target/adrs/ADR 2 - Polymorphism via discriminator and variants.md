@@ -4,7 +4,7 @@
 
 ## At a glance
 
-A polymorphic Task model with Bug and Feature variants. Task declares which field discriminates (`type`) and which models are variants. Each variant is a sibling in `models` listing only its own additional fields — it inherits the base model's fields through the variant relationship.
+A polymorphic Task model with Bug and Feature variants. Task declares which field discriminates (`type`) and which models are its specializations. Each variant is a sibling in `models` listing only its own additional fields — it names its `base` model and inherits the base's fields through that relationship.
 
 ```json
 {
@@ -36,6 +36,7 @@ A polymorphic Task model with Bug and Feature variants. Task declares which fiel
       }
     },
     "Bug": {
+      "base": "Task",
       "fields": {
         "severity": { "nullable": false, "codecId": "pg/text@1" }
       },
@@ -43,6 +44,7 @@ A polymorphic Task model with Bug and Feature variants. Task declares which fiel
       "storage": { "table": "tasks", "fields": { "severity": { "column": "severity" } } }
     },
     "Feature": {
+      "base": "Task",
       "fields": {
         "priority": { "nullable": false, "codecId": "pg/int4@1" }
       },
@@ -51,10 +53,9 @@ A polymorphic Task model with Bug and Feature variants. Task declares which fiel
     }
   }
 }
-
 ```
 
-Notice that the domain declaration (`discriminator`, `variants`, `fields`) is the same regardless of persistence strategy. Bug shares Task's table (single-table inheritance); Feature has its own table (multi-table inheritance). The ORM derives the query strategy from the storage mappings — the contract doesn't label it. See [ADR 1](ADR%201%20-%20Contract%20domain-storage%20separation.md) for why `model.fields` carries `nullable` and `codecId`.
+Notice that the domain declaration (`discriminator`, `variants`, `base`, `fields`) is the same regardless of persistence strategy. Bug shares Task's table (single-table inheritance); Feature has its own table (multi-table inheritance). The ORM derives the query strategy from the storage mappings — the contract doesn't label it. See [ADR 1](ADR%201%20-%20Contract%20domain-storage%20separation.md) for why `model.fields` carries `nullable` and `codecId`.
 
 ## Context
 
@@ -74,7 +75,7 @@ The contract needs to express polymorphism in a way that:
 
 ## Problem
 
-How does the contract represent the relationship between a base model (Task) and its variants (Bug, Feature)?
+How does the contract represent the relationship between a base model (Task) and its specializations (Bug, Feature)?
 
 ## Constraints
 
@@ -96,7 +97,7 @@ How does the contract represent the relationship between a base model (Task) and
 
 Each variant declares that it extends a base model and lists all fields (base + own).
 
-**Why we rejected it**: `extends` is prescriptive — it carries OOP inheritance baggage (single inheritance, Liskov substitution, parent-child hierarchy) and tells the ORM *how* to think about the relationship. The contract should describe structural facts, not prescribe runtime patterns. Whether the ORM represents Bug as a subclass of Task, a separate class, or a composed type is a runtime decision the contract should not influence. There's also a practical concern: `extends` encodes a directional parent-child relationship that doesn't cleanly map to MTI, where Bug has its own extension table joined to the base — the relationship is more "shares data with" than "inherits from."
+**Why we rejected it**: `extends` is prescriptive — it carries OOP inheritance baggage (single inheritance, Liskov substitution, parent-child hierarchy) and tells the ORM *how* to think about the relationship. The contract should describe structural facts, not prescribe runtime patterns. Whether the ORM represents Bug as a subclass of Task, a separate class, or a composed type is a runtime decision the contract should not influence. We use `base` instead — it says "Bug is a specialization of Task" (a structural fact about the data) without implying "Bug inherits from Task" (an OOP prescription).
 
 ### `strategy` label on the model
 
@@ -113,18 +114,24 @@ Each model explicitly labels its role in the polymorphic hierarchy.
 
 ## Decision
 
-Polymorphism is expressed with two domain-level properties on the base model:
+Polymorphism is expressed bidirectionally. On the base model:
 
 - **`discriminator`**: which field distinguishes the variants (`{ "field": "type" }`)
 - **`variants`**: which models are specializations, and what discriminator value each uses (`{ "Bug": { "value": "bug" }, "Feature": { "value": "feature" } }`)
 
+On each variant:
+
+- **`base`**: which model this variant specializes (`"Task"`)
+
 Each variant appears as a sibling in the `models` dictionary with its own fields and storage. Refer to the [At a glance](#at-a-glance) example for the complete structure.
+
+The `base` ↔ `variants` relationship is bidirectional: the base model answers "what are Task's specializations?" and each variant answers "what model does Bug specialize?" This is redundant (the emitter writes both sides), but each direction serves a different traversal — see [ADR 1](ADR%201%20-%20Contract%20domain-storage%20separation.md) for why redundancy in an emitted artifact is acceptable.
 
 ### Variant fields are thin
 
-Variants list only their own additional fields — they inherit the base model's fields through the `variants` relationship. In the example above, Bug's `fields` contains only `severity`; it inherits `id`, `title`, `type`, and `assigneeId` from Task.
+Variants list only their own additional fields — they inherit the base model's fields via the `base` reference. In the example above, Bug's `fields` contains only `severity`; it inherits `id`, `title`, `type`, and `assigneeId` from Task.
 
-This avoids redundancy (Task has 4 fields; repeating them on each variant triples the declarations), eliminates consistency risk (the emitter handles inheritance — it can't get out of sync), and makes domain reading cleaner (Bug's `fields` tells you exactly what Bug *adds* to the base).
+This avoids redundancy (Task has 4 fields; repeating them on each variant triples the declarations), eliminates consistency risk (the emitter handles field resolution — it can't get out of sync), and makes domain reading cleaner (Bug's `fields` tells you exactly what Bug *adds* to the base).
 
 ### Persistence strategy is emergent
 
@@ -136,11 +143,17 @@ The ORM reads the storage mappings to determine query behavior:
 
 The domain declaration (`discriminator` + `variants`) doesn't change across these strategies — only the storage mappings do. New persistence strategies don't require new contract schema concepts.
 
-### Why `discriminator` + `variants` is the right primitive
+### Terminology: specialization and generalization, not inheritance
 
-All persistence-level polymorphism reduces to "multiple shapes in the same storage, distinguished by a field." This is fundamental enough to bake into the contract. The contract says "Bug is a variant of Task, discriminated by the `type` field" — a domain fact about the data, not an instruction about OOP.
+We deliberately avoid OOP inheritance language. The contract describes **specialization** (Bug specializes Task — it adds fields to the base shape) and **generalization** (Task generalizes Bug and Feature — it defines the shared shape that all variants have in common). These are structural relationships between data shapes, not runtime class hierarchies.
 
-The ORM is free to interpret this however it wants at runtime: class inheritance, flat discriminated union type, composition, or independent classes. The contract doesn't close that door or force it open.
+The term `base` was chosen over `extends`, `parent`, or `supertype` because it describes a structural fact ("Bug's base is Task") without implying runtime behavior. `extends` carries OOP baggage; `parent` implies a lifecycle hierarchy; `supertype` implies a formal type system. `base` is neutral — it says where the shared fields come from, nothing more.
+
+Similarly, the base model's `variants` lists its specializations, and each specialization's `base` names its generalization. The ORM is free to interpret these relationships however it wants at runtime: class hierarchies, flat discriminated union types, composition, or independent classes. The contract doesn't close that door or force it open.
+
+### Why `discriminator` + `variants` + `base` is the right primitive
+
+All persistence-level polymorphism reduces to "multiple shapes in the same storage, distinguished by a field." This is fundamental enough to bake into the contract. The contract says "Bug is a specialization of Task, discriminated by the `type` field" — a domain fact about the data, not an instruction about OOP.
 
 ### Polymorphism is orthogonal to other model roles
 
@@ -156,14 +169,15 @@ These are independent properties. This composability is why we rejected labeled 
 ### Benefits
 
 - **Self-describing domain**: reading the models section reveals the polymorphic structure without consulting storage.
+- **Bidirectional navigation**: a consumer can traverse from base to specializations (`Task.variants`) or from specialization to base (`Bug.base`) without building a reverse index.
 - **Extensible**: new persistence strategies are expressed through storage mappings, not contract schema changes.
 - **Cross-family**: the same representation works for SQL STI/MTI and Mongo polymorphic collections.
-- **Minimal primitive**: `discriminator` + `variants` is the smallest domain concept that captures all persistence-level polymorphism.
+- **Neutral terminology**: `base`/`variants` describes structural facts (specialization/generalization) without prescribing OOP patterns.
 
 ### Costs
 
-- **Variant field inheritance is implicit.** A reader must know that a variant inherits the base model's fields — this convention must be documented and understood by all contract consumers.
-- **No explicit parent reference on variants.** To discover that Bug is a variant of Task, you must find the model that lists Bug in its `variants`. There's no back-reference on Bug itself. This is by design (avoids the prescriptive nature of `extends`), but some consumers will need to build an index.
+- **Variant field resolution is implicit.** A reader must know that a variant's full field set is its own `fields` merged with its `base` model's `fields`. This convention must be documented and understood by all contract consumers.
+- **Bidirectional redundancy.** The `base` ↔ `variants` relationship is expressed on both sides. The emitter guarantees consistency; the cost is a small amount of JSON redundancy.
 
 ### Open questions
 
