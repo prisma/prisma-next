@@ -50,7 +50,7 @@ Build Mongo codecs first (the type map foundation), then design an independent `
 
 ### Milestone 3: Typed query surface with row type inference
 
-Build a thin typed layer that reads the contract types and constructs `MongoQueryPlan` objects with the `Row` type inferred from the contract. Then run the full flow end-to-end.
+Build a thin typed layer that reads the contract types and constructs `MongoQueryPlan` objects with the `Row` type inferred from the contract. Then run the full flow end-to-end. Scope is limited to what's achievable with flat-field contracts (no embedded document support); implement as much as possible and document what's blocked.
 
 **Tasks:**
 
