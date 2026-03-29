@@ -829,10 +829,10 @@ importers:
     devDependencies:
       '@prisma-next/adapter-mongo':
         specifier: workspace:*
-        version: link:../../3-targets/6-adapters/mongo
+        version: link:../../3-mongo-target/2-mongo-adapter
       '@prisma-next/driver-mongo':
         specifier: workspace:*
-        version: link:../../3-targets/7-drivers/mongo
+        version: link:../../3-mongo-target/3-mongo-driver
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
@@ -1632,18 +1632,80 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/3-targets/3-targets/mongo:
+  packages/3-mongo-target/1-mongo-target:
     dependencies:
       '@prisma-next/mongo-core':
         specifier: workspace:*
-        version: link:../../../2-mongo/1-core
+        version: link:../../2-mongo/1-core
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
-        version: link:../../../0-config/tsconfig
+        version: link:../../0-config/tsconfig
       '@prisma-next/tsdown':
         specifier: workspace:*
-        version: link:../../../0-config/tsdown
+        version: link:../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/3-mongo-target/2-mongo-adapter:
+    dependencies:
+      '@prisma-next/mongo-core':
+        specifier: workspace:*
+        version: link:../../2-mongo/1-core
+      mongodb:
+        specifier: ^6.16.0
+        version: 6.21.0
+    devDependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/contract
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/3-mongo-target/3-mongo-driver:
+    dependencies:
+      '@prisma-next/mongo-core':
+        specifier: workspace:*
+        version: link:../../2-mongo/1-core
+      mongodb:
+        specifier: ^6.16.0
+        version: 6.21.0
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../0-config/tsdown
+      mongodb-memory-server:
+        specifier: ^10.4.0
+        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
@@ -1702,37 +1764,6 @@ importers:
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../../../3-extensions/pgvector
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../../test/utils
-      '@prisma-next/tsconfig':
-        specifier: workspace:*
-        version: link:../../../0-config/tsconfig
-      '@prisma-next/tsdown':
-        specifier: workspace:*
-        version: link:../../../0-config/tsdown
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.18.4(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
-
-  packages/3-targets/6-adapters/mongo:
-    dependencies:
-      '@prisma-next/mongo-core':
-        specifier: workspace:*
-        version: link:../../../2-mongo/1-core
-      mongodb:
-        specifier: ^6.16.0
-        version: 6.21.0
-    devDependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/shared/contract
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -1815,37 +1846,6 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../../0-config/tsdown
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.18.4(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
-
-  packages/3-targets/7-drivers/mongo:
-    dependencies:
-      '@prisma-next/mongo-core':
-        specifier: workspace:*
-        version: link:../../../2-mongo/1-core
-      mongodb:
-        specifier: ^6.16.0
-        version: 6.21.0
-    devDependencies:
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../../test/utils
-      '@prisma-next/tsconfig':
-        specifier: workspace:*
-        version: link:../../../0-config/tsconfig
-      '@prisma-next/tsdown':
-        specifier: workspace:*
-        version: link:../../../0-config/tsdown
-      mongodb-memory-server:
-        specifier: ^10.4.0
-        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
