@@ -81,7 +81,7 @@ This phase folds together what was previously steps 3 (query surface), 5 (embedd
 
 Restructure `MongoContract` to follow ADRs 1-3:
 - Add `roots` section (ORM entry points → model names)
-- Change `model.fields` to string arrays (domain vocabulary)
+- Change `model.fields` to records of `{ nullable, codecId }` (domain metadata)
 - Restructure `model.storage` as the family-specific bridge (collection name + field → codec mappings)
 - Add `discriminator` + `variants` for polymorphism
 - Add relation `strategy` (`"reference"` | `"embed"`)
