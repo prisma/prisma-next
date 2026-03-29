@@ -241,25 +241,25 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/3-targets/3-targets/mongo/src/exports/pack.ts",
+      "glob": "packages/3-mongo-target/1-mongo-target/src/exports/pack.ts",
       "domain": "extensions",
       "layer": "targets",
       "plane": "shared"
     },
     {
-      "glob": "packages/3-targets/6-adapters/mongo/src/core/**",
+      "glob": "packages/3-mongo-target/2-mongo-adapter/src/core/**",
       "domain": "targets",
       "layer": "adapters",
       "plane": "shared"
     },
     {
-      "glob": "packages/3-targets/6-adapters/mongo/src/exports/**",
+      "glob": "packages/3-mongo-target/2-mongo-adapter/src/exports/**",
       "domain": "targets",
       "layer": "adapters",
       "plane": "shared"
     },
     {
-      "glob": "packages/3-targets/7-drivers/mongo/**",
+      "glob": "packages/3-mongo-target/3-mongo-driver/**",
       "domain": "targets",
       "layer": "drivers",
       "plane": "runtime"

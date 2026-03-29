@@ -42,11 +42,3 @@ export const mongoDateCodec = mongoCodec({
   decode: (wire: Date) => wire,
   encode: (value: Date) => value,
 });
-
-export const codecDefinitions = {
-  objectId: mongoObjectIdCodec,
-  string: mongoStringCodec,
-  int32: mongoInt32Codec,
-  boolean: mongoBooleanCodec,
-  date: mongoDateCodec,
-} as const;
