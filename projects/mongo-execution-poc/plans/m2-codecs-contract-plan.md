@@ -64,11 +64,11 @@ An `SqlContract` has three layers: **storage** (what exists in the database — 
 | `ContractWithTypeMaps<C, T>`        | phantom key attaching TypeMaps                            | `MongoContractWithTypeMaps<C, T>`             | same phantom key pattern                         |
 
 
-**New concept — embedded documents:** SQL has no equivalent of a column containing a nested structure with its own typed fields. In Mongo, a field like `profile` contains sub-fields (`avatarUrl`, `website`, `social`) which themselves may contain further sub-fields. `MongoStorageField` needs an optional `embedded` property that describes this nested structure. This is the primary point where the Mongo contract diverges from SQL.
+**Deferred: embedded documents.** Representing nested/embedded document structure in the contract is deferred from this milestone. Embedded documents are a cross-family concern — SQL has the same problem with typed JSON columns — and adding them to the contract shape is a design question worth discussing separately. For now, the contract only describes flat top-level fields in each collection.
 
 **Tasks:**
 
-- **Define `MongoStorageField`** — describes a single field in a collection: `{ nativeType, codecId, nullable }`, same core shape as SQL's `StorageColumn`. Plus an optional `embedded` property: when present, the field contains a nested document (like `profile`) or array of documents (like `comments`) whose structure is described recursively. Lives in `2-mongo/1-core/`.
+- **Define `MongoStorageField`** — describes a single field in a collection: `{ nativeType, codecId, nullable }`, same core shape as SQL's `StorageColumn`. Lives in `2-mongo/1-core/`.
 - **Define `MongoStorageCollection`** — describes a collection's structure: `{ fields: Record<string, MongoStorageField> }`. Equivalent to SQL's `StorageTable` with `columns`. Skip primaryKey/uniques/indexes/foreignKeys for now (PoC scope). Lives in `2-mongo/1-core/`.
 - **Define `MongoStorage`** — the top-level storage container: `{ collections: Record<string, MongoStorageCollection> }`. Equivalent to SQL's `{ tables: Record<string, StorageTable> }`.
 - **Define `MongoModelField`** — `{ field: string }` where `field` is the name of the storage field in the collection. Equivalent to SQL's `{ column: string }`.
@@ -83,16 +83,16 @@ An `SqlContract` has three layers: **storage** (what exists in the database — 
 
 Write `contract.d.ts` and `contract.json` for the blog platform example schema. These are the concrete test fixtures that prove the contract type structure works.
 
-**Schema to encode** (from `docs/planning/mongo-target/1-design-docs/example-schemas.md`):
+**Schema to encode** (simplified from `docs/planning/mongo-target/1-design-docs/example-schemas.md`, flat fields only — embedded documents deferred):
 
-- **Users** collection: `_id` (ObjectId), `name` (string), `email` (string), `bio` (string?), `profile` (embedded: `avatarUrl`, `website`, `social` (embedded: `twitter`, `github`)), `createdAt` (Date)
-- **Posts** collection: `_id` (ObjectId), `title` (string), `slug` (string), `content` (string), `status` (string), `authorId` (ObjectId), `tags` (string[]), `viewCount` (int32), `comments` (embedded array: `authorId`, `text`, `createdAt`), `publishedAt` (Date?), `updatedAt` (Date)
-- **Relations**: User → Posts (via `authorId`), referenced (not embedded)
+- **Users** collection: `_id` (ObjectId), `name` (string), `email` (string), `bio` (string?), `createdAt` (Date)
+- **Posts** collection: `_id` (ObjectId), `title` (string), `slug` (string), `content` (string), `status` (string), `authorId` (ObjectId), `viewCount` (int32), `publishedAt` (Date?), `updatedAt` (Date)
+- **Relations**: User → Posts (via `authorId`), referenced
 
 **Tasks:**
 
-- **Hand-craft `contract.d.ts`** — write the TypeScript type definitions for the blog platform contract by hand (no emitter exists yet). This file declares the exact types for every collection, field, embedded document, codec mapping, and model. It exports a `Contract` type that carries the full type information. Think of it as the "type blueprint" — if this compiles, the contract type structure works. Lives in test fixtures (e.g. `2-mongo/5-runtime/test/fixtures/`).
-- **Hand-craft `contract.json`** — write the runtime JSON data that matches the `.d.ts` types. This is what gets loaded at runtime: collection names, field definitions with codec IDs, embedded document descriptors, mappings. The `.d.ts` describes the shape; the `.json` is the actual data. Same fixture location.
+- **Hand-craft `contract.d.ts`** — write the TypeScript type definitions for the blog platform contract by hand (no emitter exists yet). This file declares the exact types for every collection, field, codec mapping, and model. It exports a `Contract` type that carries the full type information. Think of it as the "type blueprint" — if this compiles, the contract type structure works. Lives in test fixtures (e.g. `2-mongo/5-runtime/test/fixtures/`).
+- **Hand-craft `contract.json`** — write the runtime JSON data that matches the `.d.ts` types. This is what gets loaded at runtime: collection names, field definitions with codec IDs, mappings. The `.d.ts` describes the shape; the `.json` is the actual data. Same fixture location.
 
 ### Milestone 4: Integration test and symmetry documentation
 
@@ -113,7 +113,6 @@ Prove the contract works by building a contract-driven query plan with inferred 
 | ObjectId representation decision documented                                    | Manual      | M1        | Decision record                                                    |
 | `MongoContract` type compiles with blog platform schema                        | Compilation | M3        | `contract.d.ts` compiles                                           |
 | `contract.json` structure matches `contract.d.ts` types                        | Manual      | M3        | Review                                                             |
-| Contract includes embedded documents (Profile, Comments)                       | Compilation | M3        | Embedded field types in `.d.ts`                                    |
 | Contract includes referenced relations (User→Posts)                            | Compilation | M3        | Relation types in `.d.ts`                                          |
 | Contract-driven plan executes with `Row` inferred from contract                | Integration | M4        | Hand-built plan, `mongodb-memory-server`, compilation proves types |
 | `MongoContract` structural symmetry with `SqlContract` documented              | Manual      | M4        | Convergence/divergence table                                       |
@@ -124,7 +123,6 @@ Prove the contract works by building a contract-driven query plan with inferred 
 
 - **ObjectId representation** — must be resolved before defining the `mongo/objectId@1` codec. Two options: represent ObjectIds as plain `string` (simpler, JSON-friendly, no driver class dependency in contract types) or preserve the driver's `ObjectId` class (richer comparison semantics, preserves BSON identity). Recommendation: start with `string` and revisit if it causes problems.
 - **Codec package location** — should codecs live in `2-mongo/1-core/` alongside the contract types, or in a separate `2-mongo/2-codecs/` package? SQL codecs ended up deep in the stack (`2-sql/4-lanes/relational-core/`), which is awkward. For the PoC, keeping everything in `1-core/` is simpler.
-- **Embedded document arrays** — the blog platform has `comments: Comment[]` (an array of embedded documents) as well as `profile: Profile` (a single embedded document). `MongoStorageField` needs to distinguish between the two. Options: add an `array: boolean` flag alongside `embedded`, use a separate `embeddedArray` property, or leverage the existing `FieldType.items` from the framework. Resolve during implementation.
 - **Row type inference mechanism** — we need a TypeScript utility type that, given a model name and the contract, produces the row type. In SQL, this chain is: model field → column name → storage column → `codecId` → `CodecTypes[codecId].output`. The Mongo equivalent would be: model field → storage field name → collection field → `codecId` → `MongoCodecTypes[codecId].output`. The integration test (M4) proves this chain works; the exact utility type will be designed during implementation.
 - **`MongoLoweringContext` update scope** — changing `MongoLoweringContext` to reference `MongoContract` instead of the current `DocumentContract` may require minor updates to the adapter and runtime. Keep changes minimal — the adapter still ignores the contract during lowering for now.
 
