@@ -1,7 +1,7 @@
 export type { MongoAdapter, MongoLoweringContext } from '../adapter-types';
 export type { MongoCodecRegistry } from '../codec-registry';
 export { createMongoCodecRegistry } from '../codec-registry';
-export type { MongoCodec, MongoCodecInput, MongoCodecOutput } from '../codecs';
+export type { MongoCodec, MongoCodecJsType } from '../codecs';
 export { mongoCodec } from '../codecs';
 export type { AnyMongoCommand, FindOptions } from '../commands';
 export {
@@ -14,6 +14,7 @@ export {
 export type {
   ExtractMongoCodecTypes,
   ExtractMongoTypeMaps,
+  InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoMappings,
