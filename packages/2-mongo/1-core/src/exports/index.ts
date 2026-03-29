@@ -11,6 +11,20 @@ export {
   InsertOneCommand,
   UpdateOneCommand,
 } from '../commands';
+export type {
+  ExtractMongoCodecTypes,
+  ExtractMongoTypeMaps,
+  MongoContract,
+  MongoContractWithTypeMaps,
+  MongoMappings,
+  MongoModelDefinition,
+  MongoModelField,
+  MongoModelStorage,
+  MongoStorage,
+  MongoStorageCollection,
+  MongoTypeMaps,
+  MongoTypeMapsPhantomKey,
+} from '../contract-types';
 export type { MongoDriver } from '../driver-types';
 export { MongoParamRef } from '../param-ref';
 export type { MongoExecutionPlan, MongoQueryPlan } from '../plan';

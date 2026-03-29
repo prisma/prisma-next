@@ -1,8 +1,9 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
-import type { DocumentContract, PlanMeta } from '@prisma-next/contract/types';
+import type { PlanMeta } from '@prisma-next/contract/types';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import type {
   AnyMongoCommand,
+  MongoContract,
   MongoLoweringContext,
   MongoQueryPlan,
 } from '@prisma-next/mongo-core';
@@ -37,7 +38,7 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
   const adapter = createMongoAdapter();
   const driver = await createMongoDriver(connectionUri, dbName);
   const loweringContext: MongoLoweringContext = {
-    contract: {} as DocumentContract,
+    contract: {} as MongoContract,
   };
   const runtime = createMongoRuntime({ adapter, driver, loweringContext });
 
