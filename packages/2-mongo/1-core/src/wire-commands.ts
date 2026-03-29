@@ -1,6 +1,4 @@
-import type { RawPipeline } from './values';
-
-export type Document = Record<string, unknown>;
+import type { Document, RawPipeline } from './values';
 
 abstract class MongoWireCommand {
   abstract readonly kind: string;
