@@ -127,8 +127,13 @@ Package boundaries are enforced by `pnpm lint:deps` — layering enforcement mus
 - [contract-symmetry.md](1-design-docs/contract-symmetry.md) — where Mongo and SQL contracts converge and diverge
 - [design-questions.md](1-design-docs/design-questions.md) — all 14 open architectural questions with full analysis
 
+**ADRs** — architectural decisions with full reasoning and rejected alternatives (scoped to mongo-target for now; will be promoted to `docs/architecture docs/adrs/` when implemented across families):
+- [ADR 1 — Contract domain-storage separation](adrs/ADR%201%20-%20Contract%20domain-storage%20separation.md) — separating `model.fields` (domain) from `model.storage` (family-specific bridge)
+- [ADR 2 — Polymorphism via discriminator and variants](adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — emergent persistence strategy, rejected alternatives (`extends`, strategy labels)
+- [ADR 3 — Aggregate roots and relation strategies](adrs/ADR%203%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — explicit `roots` section, embedding as a relation property
+
 **Cross-cutting learnings** — insights that affect the framework core:
-- [cross-cutting-learnings.md](cross-cutting-learnings.md) — domain model concepts, shared contract base design, entity/value type distinctions
+- [cross-cutting-learnings.md](cross-cutting-learnings.md) — design principles, domain model concepts, open contract design questions
 
 **Reference material** — context, read as needed:
 - [mongodb-primitives-reference.md](9-references/mongodb-primitives-reference.md) — MongoDB's data model, type system, query language, and transactions
@@ -149,4 +154,5 @@ This overview is the source of truth for "what do we know and what don't we know
 - **Implementation begins**: Create a Drive project spec under `projects/`. These research docs are the design reference, not task trackers.
 - **Cross-cutting insight discovered**: If a milestone reveals something that affects the framework core or another family (not just Mongo), add it to [cross-cutting-learnings.md](cross-cutting-learnings.md). Cross-reference from the relevant design doc so readers discover the insight in context. Remove entries from cross-cutting-learnings when the learning has been fully applied (code landed, docs updated across all affected domains).
 - **Milestone completed**: Review what was learned during implementation. Update the relevant design docs (this overview, design questions, execution components, contract symmetry) with resolved questions, new constraints, and refined understanding. Add any cross-cutting learnings per the rule above.
+- **Architectural decision made**: Write an ADR under `adrs/` capturing context, problem, alternatives considered (with reasons for rejection), decision, and consequences. Cross-reference from the relevant design question and cross-cutting learnings. These are scoped locally for now; promote to `docs/architecture docs/adrs/` when the decision is implemented across families.
 - **Reference material** (files under `9-references/`, plus `1-design-docs/example-schemas.md`) is stable context and rarely needs updates.
