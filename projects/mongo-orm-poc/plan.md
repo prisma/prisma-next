@@ -30,11 +30,36 @@ Restructure `MongoContract` to follow the ADRs and hand-craft contract artifacts
 - [ ] **Update existing M1/M2 tests** to work with the restructured contract (or create a parallel contract fixture for the new structure).
 - [ ] **Type-level test: contract structure** — verify that the contract types compile and that `roots`, `models`, `discriminator`, `variants`, `base`, and relation strategies are all present and correctly typed.
 
-### Milestone 2: Minimal ORM client with findMany and include
+### Milestone 2: Contract validation and minimal ORM client
 
-Build the ORM client that consumes the contract. Scoped to reads: root-based accessors, `findMany` with basic equality filters, `include` for both referenced and embedded relations, and polymorphic type narrowing.
+Validate the hand-crafted contract, then build the ORM client that consumes it. Starts with `validateMongoContract()` — the bridge between "I have JSON" and "I have a typed, verified contract" — then builds the read-only ORM client on top.
 
 **Tasks:**
+
+- [ ] **Implement `validateMongoContract()`** — loads a Mongo contract from JSON, performs structural and logical validation, builds computed indices, and returns a typed result. This is the Mongo equivalent of the SQL domain's `validateContract()` (see `packages/2-sql/1-core/contract/src/validate.ts` and `packages/2-sql/2-authoring/contract-ts/src/contract.ts`). The function has three responsibilities:
+
+  **Structural validation** (Arktype schema): Validate that the JSON conforms to the `MongoContract` shape — `roots` is `Record<string, string>`, `models` entries have `fields` as `Record<string, { nullable: boolean, codecId: string }>`, `storage` has `collection?: string`, relations have `strategy` and the correct shape for `"reference"` (`on: { localFields, targetFields }`) vs `"embed"` (`field: string`), `discriminator` has `field: string`, `variants` entries have `value: string`, `base` is a string when present. The Arktype schema should be defined alongside the TypeScript types in `2-mongo-family/1-core/`.
+
+  **Logical validation** (cross-referencing): Check invariants that the structural schema can't express:
+  - Every value in `roots` names a model that exists in `models`
+  - Every key in a model's `variants` names a model in `models`
+  - Every variant's `base` matches the model that lists it in its `variants` (bidirectional consistency — if `Task.variants.Bug` exists, then `Bug.base` must equal `"Task"`, and vice versa)
+  - Every relation's `to` names a model in `models`
+  - Every `"reference"` relation's `on.localFields` names fields that exist on the source model
+  - Every `"reference"` relation's `on.targetFields` names fields that exist on the target model
+  - Every `"embed"` relation targets a model with empty `storage` (no `collection`)
+  - Models with `discriminator` must have a `variants` section and the `discriminator.field` must name a field in the model's `fields`
+  - Models with `base` must not have `discriminator` or `variants` (variants don't nest — see ADR 2 open questions on multi-level polymorphism)
+  - Orphaned models (not in `roots`, not referenced by any relation, not listed as a variant) produce a warning
+
+  **Computed indices**: Build lookup structures the ORM client will need at runtime:
+  - **variant-to-base map**: `Record<string, string>` — for any model name, find its base (if it's a variant). Saves the ORM from scanning all models' `variants` dictionaries.
+  - **root-to-model map**: Already in `roots`, but validated. The ORM uses this directly.
+  - **model-to-variants map**: `Record<string, string[]>` — for any base model, list its variant model names. Built from `variants` dictionaries.
+
+  The function signature should follow the SQL pattern: `validateMongoContract<TContract extends MongoContract>(value: unknown): TContract`. The type parameter is the fully-typed contract from `contract.d.ts` (not the generic `MongoContract` — same pattern as SQL's `validateContract<Contract>(contractJson)`).
+
+  **Tests**: Unit tests covering structural validation (rejects malformed JSON, missing required fields, wrong types), logical validation (rejects dangling references, bidirectional inconsistency, orphaned models), and the happy path (valid contract produces correct computed indices). See `packages/2-sql/1-core/contract/test/validate.test.ts` for the SQL equivalent's test structure.
 
 - [ ] **Implement root-based accessor factory** — given a contract's `roots` section, produce an object with a property for each root (e.g. `db.tasks`, `db.users`). Each root provides a `findMany` method.
 - [ ] **Implement `findMany` with row type inference** — `findMany` on a root returns `AsyncIterableResult<Row>` where `Row` is inferred from the contract's model definition and codec types. No manual type annotation by the caller.
@@ -81,6 +106,11 @@ Prove that the domain level of the contract is family-agnostic by hand-crafting 
 | Model has `discriminator` + `variants` with sibling variants; variants have `base` | Type-level | M1 | Compile-time check |
 | Relations have `"strategy": "reference"` and `"strategy": "embed"` | Type-level | M1 | Compile-time check |
 | `contract.json` and `contract.d.ts` exist | Manual | M1 | File existence |
+| `validateMongoContract()` accepts valid contract JSON | Unit | M2 | Structural + logical pass |
+| `validateMongoContract()` rejects malformed JSON | Unit | M2 | Missing fields, wrong types |
+| `validateMongoContract()` rejects dangling references | Unit | M2 | Roots → non-existent model, variant → wrong base |
+| `validateMongoContract()` rejects bidirectional inconsistency | Unit | M2 | `Bug.base` doesn't match `Task.variants.Bug` |
+| `validateMongoContract()` builds computed indices | Unit | M2 | variant-to-base, model-to-variants maps |
 | ORM presents root-based accessors from `roots` | Integration | M2 | `db.tasks`, `db.users` exist |
 | `findMany` returns typed rows inferred from contract | Integration | M2 | Compilation + runtime assertion |
 | Basic equality filters work | Integration | M2 | Filter by field, verify results |
