@@ -1773,9 +1773,6 @@ importers:
 
   packages/3-targets/6-adapters/mongo:
     dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/shared/contract
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../../../2-mongo/1-core
@@ -1783,6 +1780,9 @@ importers:
         specifier: ^6.16.0
         version: 6.21.0
     devDependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/contract
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
