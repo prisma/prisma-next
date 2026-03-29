@@ -229,13 +229,13 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/2-mongo/1-core/**",
+      "glob": "packages/2-mongo-family/1-core/**",
       "domain": "mongo",
       "layer": "core",
       "plane": "shared"
     },
     {
-      "glob": "packages/2-mongo/5-runtime/**",
+      "glob": "packages/2-mongo-family/5-runtime/**",
       "domain": "mongo",
       "layer": "runtime",
       "plane": "runtime"
