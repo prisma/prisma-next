@@ -71,3 +71,19 @@ export type ExtractMongoCodecTypes<T> =
       ? C
       : Record<string, never>
     : Record<string, never>;
+
+// --- Row inference ---
+
+export type InferModelRow<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+  TFields extends Record<
+    string,
+    { codecId: string; nullable: boolean }
+  > = TContract['models'][ModelName]['fields'],
+  TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
+> = {
+  -readonly [FieldName in keyof TFields]: TFields[FieldName]['nullable'] extends true
+    ? TCodecTypes[TFields[FieldName]['codecId']]['output'] | null
+    : TCodecTypes[TFields[FieldName]['codecId']]['output'];
+};

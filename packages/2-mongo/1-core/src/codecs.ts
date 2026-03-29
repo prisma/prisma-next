@@ -19,5 +19,4 @@ export function mongoCodec<Id extends string, TWire, TJs>(config: {
   };
 }
 
-export type MongoCodecInput<T> = T extends MongoCodec<string, unknown, infer TJs> ? TJs : never;
-export type MongoCodecOutput<T> = T extends MongoCodec<string, unknown, infer TJs> ? TJs : never;
+export type MongoCodecJsType<T> = T extends MongoCodec<string, unknown, infer TJs> ? TJs : never;

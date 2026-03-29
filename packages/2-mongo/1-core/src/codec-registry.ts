@@ -9,29 +9,29 @@ export interface MongoCodecRegistry {
 }
 
 class MongoCodecRegistryImpl implements MongoCodecRegistry {
-  private readonly _byId = new Map<string, MongoCodec<string>>();
+  readonly #byId = new Map<string, MongoCodec<string>>();
 
   get(id: string): MongoCodec<string> | undefined {
-    return this._byId.get(id);
+    return this.#byId.get(id);
   }
 
   has(id: string): boolean {
-    return this._byId.has(id);
+    return this.#byId.has(id);
   }
 
   register(codec: MongoCodec<string>): void {
-    if (this._byId.has(codec.id)) {
+    if (this.#byId.has(codec.id)) {
       throw new Error(`Codec with ID '${codec.id}' is already registered`);
     }
-    this._byId.set(codec.id, codec);
+    this.#byId.set(codec.id, codec);
   }
 
   *[Symbol.iterator](): Iterator<MongoCodec<string>> {
-    yield* this._byId.values();
+    yield* this.#byId.values();
   }
 
   values(): IterableIterator<MongoCodec<string>> {
-    return this._byId.values();
+    return this.#byId.values();
   }
 }
 
