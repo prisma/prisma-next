@@ -1,14 +1,16 @@
 # Summary
 
-Build the minimal Mongo execution pipeline (query plan, driver, runtime) and a basic typed query surface, proving that PN's architecture can execute queries against MongoDB end-to-end with type inference — without building an ORM client.
+Build the minimal Mongo execution pipeline (query plan, driver, runtime) and prove that PN's architecture can execute queries against MongoDB end-to-end with type inference from a hand-crafted contract.
+
+> **Status: M1 and M2 complete. Close-out in progress.** The original M3 (typed query surface) was superseded by the contract redesign discussion. The next step is a new project (minimal ORM client with redesigned contract structure) — see [mongo-poc-plan.md Phase 3](../../docs/planning/mongo-target/1-design-docs/mongo-poc-plan.md).
 
 # Description
 
 Prisma Next's runtime is hardcoded to SQL. The `Queryable` interface takes `{ sql: string, params: unknown[] }`, `ExecutionPlan` has a `sql: string` field, and every plugin inspects SQL-specific payloads. Before we can build a Mongo ORM client, query builder, or emitter, the execution path itself needs to exist.
 
-This project builds that path: a `MongoQueryPlan` type, a `MongoDriver` wrapping the `mongodb` Node.js driver, a `MongoRuntimeCore` orchestrating the execution lifecycle, hand-crafted Mongo contract types, and a thin typed query surface that constructs plans from the contract. It follows the same trajectory the SQL family took — the SQL query builder lane and runtime existed long before the ORM client was designed.
+This project built that path: a `MongoQueryPlan` type, a `MongoDriver` wrapping the `mongodb` Node.js driver, a `MongoRuntimeCore` orchestrating the execution lifecycle, and hand-crafted Mongo contract types with type inference. The M2 implementation revealed that the contract structure needed a redesign (see [ADRs](../../docs/planning/mongo-target/adrs/)), which shifted the most valuable next step from "typed query surface" to "minimal ORM client validating the redesigned contract." That work is a separate project.
 
-The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-target/1-design-docs/mongo-poc-plan.md), part of [workstream 4](../../docs/planning/april-milestone.md#4-mongodb-poc--validate-the-second-database-family) of the April milestone.
+The project is part of the [MongoDB PoC](../../docs/planning/mongo-target/1-design-docs/mongo-poc-plan.md) (Phase 1), [workstream 4](../../docs/planning/april-milestone.md#4-mongodb-poc--validate-the-second-database-family) of the April milestone.
 
 # Requirements
 
