@@ -62,6 +62,13 @@ test('embed relation has strategy and field', () => {
   }>();
 });
 
+test('variant models have base backreference', () => {
+  type BugBase = Contract['models']['Bug']['base'];
+  type FeatureBase = Contract['models']['Feature']['base'];
+  expectTypeOf({} as BugBase).toEqualTypeOf<'Task'>();
+  expectTypeOf({} as FeatureBase).toEqualTypeOf<'Task'>();
+});
+
 test('InferModelRow resolves Task fields', () => {
   type TaskRow = InferModelRow<Contract, 'Task'>;
   expectTypeOf({} as TaskRow).toEqualTypeOf<{

@@ -60,6 +60,7 @@ export type MongoModelDefinition = {
   readonly relations: Record<string, MongoRelation>;
   readonly discriminator?: MongoDiscriminator;
   readonly variants?: Record<string, MongoVariantEntry>;
+  readonly base?: string;
 };
 
 // --- Contract ---
