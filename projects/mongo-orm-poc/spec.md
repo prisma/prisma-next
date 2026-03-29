@@ -4,7 +4,7 @@ Implement the redesigned contract structure (ADRs 1-3) and build a minimal read-
 
 # Description
 
-The [mongo-execution-poc](../mongo-execution-poc/spec.md) proved the Mongo execution pipeline works. The subsequent contract redesign discussion produced three ADRs defining a new contract structure: domain/storage separation ([ADR 1](../../docs/planning/mongo-target/adrs/ADR%201%20-%20Contract%20domain-storage%20separation.md)), polymorphism via `discriminator` + `variants` ([ADR 2](../../docs/planning/mongo-target/adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)), and aggregate roots with relation strategies ([ADR 3](../../docs/planning/mongo-target/adrs/ADR%203%20-%20Aggregate%20roots%20and%20relation%20strategies.md)).
+The [mongo-execution-poc](../mongo-execution-poc/spec.md) proved the Mongo execution pipeline works. The subsequent contract redesign discussion produced three ADRs defining a new contract structure: domain/storage separation ([ADR 1](../../docs/planning/mongo-target/adrs/ADR%201%20-%20Contract%20domain-storage%20separation.md)), polymorphism via `discriminator` + `variants` + `base` ([ADR 2](../../docs/planning/mongo-target/adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)), and aggregate roots with relation strategies ([ADR 3](../../docs/planning/mongo-target/adrs/ADR%203%20-%20Aggregate%20roots%20and%20relation%20strategies.md)).
 
 These decisions are design-only — they haven't been tested with a real consumer. Type-level tests on the contract alone aren't sufficient; the contract is only proven by a consumer with real needs. This project builds that consumer: a minimal ORM client scoped to reads, with enough surface to exercise the critical contract features (roots, polymorphism, embedding, referenced relations). The ORM client's query interface should be consistent with the SQL ORM client where possible — structured filter objects, not Mongo-native dot notation.
 
@@ -36,7 +36,7 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
 **Cross-family contract symmetry:**
 
 - Hand-craft the same domain model (Task/Bug/Feature/User) as both a Mongo contract and a SQL contract using the redesigned structure.
-- The domain level (`roots`, `models` with `fields`/`discriminator`/`variants`, `relations`) is structurally identical between the two contracts (same TypeScript types; values like `codecId` differ per family) — only `model.storage` and top-level `storage` differ.
+- The domain level (`roots`, `models` with `fields`/`discriminator`/`variants`/`base`, `relations`) is structurally identical between the two contracts (same TypeScript types; values like `codecId` differ per family) — only `model.storage` and top-level `storage` differ.
 
 ## Non-Functional Requirements
 
@@ -79,7 +79,7 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
 **Cross-family symmetry:**
 
 - The same domain model compiles as both a Mongo contract and a SQL contract
-- `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` sections are structurally identical between the two contracts (same shape; `codecId` values differ per family)
+- `roots`, `models` (with `fields`, `discriminator`, `variants`, `base`), and `relations` sections are structurally identical between the two contracts (same shape; `codecId` values differ per family)
 - Only `model.storage` and top-level `storage` differ
 
 **Architecture:**
