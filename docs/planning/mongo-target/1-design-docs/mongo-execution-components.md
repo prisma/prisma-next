@@ -150,15 +150,26 @@ Codecs sit at the boundary between the runtime and the driver, encoding values g
 2. **decode** — convert wire format to JS value for result documents
 3. **type-level mapping** — declare TypeScript types for database types in `contract.d.ts` (via `CodecTypes`)
 
-The `mongodb` Node.js driver already handles BSON ↔ JS conversion for built-in types (`ObjectId`, `Date`, `Int32`/`Int64`, `Decimal128`, `Binary`). PN codecs layer on top for two cases: when the driver's default conversion isn't what the application wants (e.g., normalizing `ObjectId` to `string`), and for custom/extension types the driver doesn't know about (e.g., a `GeoPoint` class serialized as `{ lat, lng }`, or an Atlas Vector Search embedding type).
+**M2 finding: most Mongo codecs are identity functions.** The `mongodb` Node.js driver already handles BSON ↔ JS conversion for built-in types (`ObjectId`, `Date`, `Int32`/`Int64`, `Decimal128`, `Binary`). Of the five base codecs implemented (`objectId`, `string`, `int32`, `boolean`, `date`), only `objectId` does real work (normalizing `ObjectId` to hex string and back). The other four pass values through unchanged.
 
-The codec registry shape (`typeId → encode/decode functions`) is likely reusable from SQL — the registry interface is family-agnostic, the codecs themselves are family-specific.
+Despite this, the codec abstraction earns its keep as an **extension point**:
+- Fields whose persisted structure differs from their runtime structure (e.g., a JS class that persists as a specific document structure)
+- New BSON types introduced by MongoDB in the future
+- Extension types the driver doesn't know about (e.g., a `GeoPoint` class serialized as `{ lat, lng }`, or an Atlas Vector Search embedding type)
 
-### Open questions
+These can be added transparently as target codecs without modifying the core — the same pattern as SQL extensions.
 
-**What base codecs are needed?** At minimum: `ObjectId` (normalize to `string` or keep the driver's class?) and `Decimal128` (same problem SQL has). This is a design decision that affects every Mongo contract.
+The codec abstraction (`MongoCodec` interface, `mongoCodec()` factory, `MongoCodecRegistry`) lives in the family core (`2-mongo/1-core/`). Concrete codecs live in the target adapter (`3-targets/6-adapters/mongo/`). This separation follows the architectural rule: family defines abstractions, target provides concretions.
 
-**What happens when MongoDB adds new types?** The codec + operations registry is how PN accommodates new types without core changes — same pattern as SQL extensions.
+### Resolved questions
+
+**ObjectId representation**: Normalized to `string` (hex). The `objectId@1` codec decodes `ObjectId` to hex string and encodes back. This keeps contract types JSON-friendly and avoids leaking the driver's `ObjectId` class into the contract type system.
+
+**Base codecs**: `objectId`, `string`, `int32`, `boolean`, `date` — implemented in `3-targets/6-adapters/mongo/src/core/codecs.ts`.
+
+### Remaining open questions
+
+**What happens when MongoDB adds new types?** The codec + operations registry is how PN accommodates new types without core changes — same pattern as SQL extensions. `Decimal128` is a likely near-term addition.
 
 ---
 

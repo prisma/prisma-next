@@ -8,23 +8,27 @@ See also: [mongodb-primitives-reference.md](../9-references/mongodb-primitives-r
 
 ---
 
-## 1. Embedded documents: relation, field, or distinct concept?
+## 1. Embedded documents: relation, field, or distinct concept? *(cross-family concern)*
 
-MongoDB's idiomatic data model puts related data *inside* the parent document — either as a single subdocument (1:1) or an array of subdocuments (1:N). This has no SQL equivalent.
+MongoDB's idiomatic data model puts related data *inside* the parent document — either as a single subdocument (1:1) or an array of subdocuments (1:N).
 
-**The question**: How does the PN contract model represent embedded documents?
+**M2 finding: this is a cross-family concern.** SQL has the same problem: typed JSON/JSONB columns contain structured data that is logically "embedded" within a parent row. Both families need type-safe dot-notation queries, TypeScript type generation, reusability across models (e.g., an `Address` type used in both `User` and `Order`), and potentially recursive/self-referential structures. The difference is convention: in Mongo, embedding is idiomatic and common; in SQL, JSON columns are an escape hatch. But the contract-level problem is identical.
+
+**The question**: How does the PN contract model represent embedded/nested structured types?
 
 Options:
 - **As relations with a storage strategy.** The contract declares a `User → Address` relation (just like SQL), and the storage layer says "this relation is embedded, not referenced." The ORM then knows whether to embed in one query or `$lookup` / multi-query. This keeps the domain model (relations) separate from the storage decision (embed vs. reference).
 - **As nested field types.** `Address` is a structured field type on `User`, not a separate model. No relation exists — it's just a complex field. Simpler, but loses the ability to query `Address` independently or change the storage strategy later.
 - **As a distinct concept.** Neither a relation nor a plain field — something new in the contract schema. Most flexible but adds a new concept that consumer libraries must understand.
 
+**M2 insight — entity vs. value type distinction matters here.** The right representation depends on whether the embedded structure is an **entity** (has identity, lifecycle matters — e.g., a Post with `_id` embedded in a User) or a **value type** (no identity, interchangeable — e.g., an Address defined entirely by its fields). Entities embedded within another entity's aggregate need identity tracking; value types don't. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the full domain model analysis.
+
 Tensions:
 - If embedded documents are relations, then a `User` model with an embedded `Address` and a referenced `Post` both appear in the relation graph — but they have profoundly different query and atomicity semantics. Consumer libraries traversing relations would need to know which are embedded.
 - If embedded documents are *not* relations, then the shared model/relation surface (the cross-family contract) can't express the full document structure. A consumer library generating a JSON Schema would miss embedded types.
 - Embedded subdocument arrays blur the line: `comments: Comment[]` embedded in a `Post` looks like a 1:N relation, but `Comment` doesn't have its own collection, can't be queried independently, and has no `_id` (unless the app adds one).
 
-**What we need to decide before implementing**: Whether `ContractBase`'s relation graph includes embedded documents. This affects every layer downstream — authoring, emitter, ORM client, and consumer libraries.
+**What we need to decide before implementing**: Whether `ContractBase`'s relation graph includes embedded documents. This affects every layer downstream — authoring, emitter, ORM client, and consumer libraries. The solution should work for both Mongo embedded documents and SQL typed JSON columns.
 
 ---
 
@@ -216,18 +220,22 @@ For the PoC: Out of scope. The architecture constraints are:
 
 ---
 
-## 10. Shared contract surface: what goes in `ContractBase`?
+## 10. Shared contract surface: what goes in `ContractBase`? *(informed by M2)*
 
 The PoC plan identifies this as the most important architectural question. Today, `ContractBase` does not include models or relations — these are added by `SqlContract`.
 
 **The question**: What belongs in the shared contract surface that both SQL and document contracts extend?
 
+**M2 finding: mechanical extraction won't work.** The original plan was to keep `MongoContract` structurally parallel to `SqlContract` so extraction of a shared base would be mechanical. The M2 implementation proved the shapes diverge meaningfully — different sources of truth, different field indirection depth, different storage semantics (see [contract-symmetry.md](contract-symmetry.md)). A mechanical extraction would produce something either too loose to be useful or that forces one family into the other's shape.
+
+**Revised approach**: implement both contracts fairly completely, then design a **new abstraction** informed by both. This will likely require modifying both `SqlContract` and `MongoContract` to fit. The abstraction should be rooted in common domain modeling concepts — aggregate roots, entities, value types, and references — rather than in the implementation details of either family. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the domain model analysis.
+
 Candidates for `ContractBase`:
-- Models (name, fields, field types)
+- Models (name, fields, field types) — both families have these, but field semantics differ (SQL fields indirect through columns; Mongo fields carry types directly)
 - Relations (cardinality, related model, storage strategy is family-specific)
 - Mappings (model → storage name, field → storage path) — both families need this, but the shapes differ (SQL: table/column, document: collection/field path)
 - Capabilities (what operations the target supports)
-- Codecs / type registry
+- Codecs / type registry — the registry interface is family-agnostic; codecs are family-specific
 
 The tension: too little in `ContractBase` and consumer libraries can't do anything without family-specific code. Too much and `ContractBase` becomes a leaky abstraction that doesn't fit either family well.
 
