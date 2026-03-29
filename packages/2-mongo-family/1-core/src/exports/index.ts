@@ -17,14 +17,18 @@ export type {
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoMappings,
+  MongoDiscriminator,
+  MongoEmbedRelation,
   MongoModelDefinition,
   MongoModelField,
   MongoModelStorage,
+  MongoReferenceRelation,
+  MongoRelation,
   MongoStorage,
   MongoStorageCollection,
   MongoTypeMaps,
   MongoTypeMapsPhantomKey,
+  MongoVariantEntry,
 } from '../contract-types';
 export type { MongoDriver } from '../driver-types';
 export { MongoParamRef } from '../param-ref';

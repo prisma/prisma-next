@@ -14,7 +14,12 @@ type UserModel = {
     readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
   };
   readonly relations: {
-    readonly posts: unknown;
+    readonly posts: {
+      readonly to: 'Post';
+      readonly cardinality: '1:N';
+      readonly strategy: 'reference';
+      readonly fields: readonly ['authorId'];
+    };
   };
 };
 
@@ -32,11 +37,20 @@ type PostModel = {
     readonly updatedAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
   };
   readonly relations: {
-    readonly author: unknown;
+    readonly author: {
+      readonly to: 'User';
+      readonly cardinality: 'N:1';
+      readonly strategy: 'reference';
+      readonly fields: readonly ['authorId'];
+    };
   };
 };
 
 type BlogContract = MongoContract<
+  {
+    readonly users: 'User';
+    readonly posts: 'Post';
+  },
   {
     readonly collections: {
       readonly users: Record<string, never>;
@@ -46,20 +60,6 @@ type BlogContract = MongoContract<
   {
     readonly User: UserModel;
     readonly Post: PostModel;
-  },
-  {
-    readonly User: { readonly posts: unknown };
-    readonly Post: { readonly author: unknown };
-  },
-  {
-    readonly modelToCollection: {
-      readonly User: 'users';
-      readonly Post: 'posts';
-    };
-    readonly collectionToModel: {
-      readonly users: 'User';
-      readonly posts: 'Post';
-    };
   }
 >;
 

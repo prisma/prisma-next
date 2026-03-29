@@ -1,48 +1,73 @@
 // --- Storage layer: collection-level metadata ---
-// Future: indexes, validators, capped settings, collation, time series config
+
 export type MongoStorageCollection = Record<string, never>;
 
 export type MongoStorage = {
   readonly collections: Record<string, MongoStorageCollection>;
 };
 
-// --- Model layer: application's view of the data ---
+// --- Model field (domain level) ---
 
 export type MongoModelField = {
   readonly codecId: string;
   readonly nullable: boolean;
 };
 
+// --- Model storage (family-specific bridge) ---
+
 export type MongoModelStorage = {
-  readonly collection: string;
+  readonly collection?: string;
 };
+
+// --- Polymorphism ---
+
+export type MongoDiscriminator = {
+  readonly field: string;
+};
+
+export type MongoVariantEntry = {
+  readonly value: string;
+};
+
+// --- Relations ---
+
+export type MongoReferenceRelation = {
+  readonly to: string;
+  readonly cardinality: '1:1' | '1:N' | 'N:1';
+  readonly strategy: 'reference';
+  readonly fields: readonly string[];
+};
+
+export type MongoEmbedRelation = {
+  readonly to: string;
+  readonly cardinality: '1:1' | '1:N';
+  readonly strategy: 'embed';
+  readonly field: string;
+};
+
+export type MongoRelation = MongoReferenceRelation | MongoEmbedRelation;
+
+// --- Model definition ---
 
 export type MongoModelDefinition = {
-  readonly storage: MongoModelStorage;
   readonly fields: Record<string, MongoModelField>;
-  readonly relations: Record<string, unknown>;
+  readonly storage: MongoModelStorage;
+  readonly relations: Record<string, MongoRelation>;
+  readonly discriminator?: MongoDiscriminator;
+  readonly variants?: Record<string, MongoVariantEntry>;
 };
 
-// --- Mappings: model name <-> collection name only ---
-
-export type MongoMappings = {
-  readonly modelToCollection?: Record<string, string>;
-  readonly collectionToModel?: Record<string, string>;
-};
-
-// --- Contract: top-level container ---
+// --- Contract ---
 
 export type MongoContract<
+  Roots extends Record<string, string> = Record<string, string>,
   S extends MongoStorage = MongoStorage,
   M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
-  R extends Record<string, unknown> = Record<string, unknown>,
-  Map extends MongoMappings = MongoMappings,
 > = {
   readonly targetFamily: string;
+  readonly roots: Roots;
   readonly storage: S;
   readonly models: M;
-  readonly relations: R;
-  readonly mappings: Map;
 };
 
 // --- TypeMaps: phantom type attachment ---
