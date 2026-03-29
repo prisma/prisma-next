@@ -107,13 +107,17 @@ Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB col
 ```json
 {
   "Task": {
-    "fields": ["id", "title", "type"],
+    "fields": {
+      "id": { "nullable": false, "codecId": "pg/int4@1" },
+      "title": { "nullable": false, "codecId": "pg/text@1" },
+      "type": { "nullable": false, "codecId": "pg/text@1" }
+    },
     "discriminator": { "field": "type" },
     "variants": { "Bug": { "value": "bug" }, "Feature": { "value": "feature" } },
     "storage": { "table": "tasks", "fields": { ... } }
   },
   "Bug": {
-    "fields": ["severity"],
+    "fields": { "severity": { "nullable": false, "codecId": "pg/text@1" } },
     "storage": { "table": "tasks", "fields": { ... } }
   }
 }
@@ -215,7 +219,7 @@ For the PoC: Out of scope. The architecture constraints are:
 
 `ContractBase` should capture the domain-level structure:
 - **`roots`** — maps ORM accessor names to model names
-- **`models`** — all entities with `fields` (string arrays), optional `discriminator` + `variants`, and `relations`
+- **`models`** — all entities with `fields` (records of `{ nullable, codecId }`), optional `discriminator` + `variants`, and `relations`
 - **`model.storage`** — family-specific extension point (SQL: field → column; Mongo: field → codec)
 - **`relations`** — with cardinality and strategy (`"reference"` or `"embed"`)
 - **`types`/`composites`** — value objects without identity (not yet designed)

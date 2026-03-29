@@ -24,7 +24,7 @@ Restructure `MongoContract` to follow the ADRs and hand-craft contract artifacts
 **Tasks:**
 
 - [ ] **Design relation storage details** — resolve the open question: what fields do `"reference"` and `"embed"` relations carry? Settle on a shape (e.g. `"reference"` → `{ fields: ["assigneeId"] }`, `"embed"` → `{ field: "comments" }`) and document it.
-- [ ] **Restructure `MongoContract` types** — update the TypeScript types to follow ADRs 1-3: add `roots`, change `model.fields` to string arrays, restructure `model.storage` as the bridge (collection + field-to-codec mappings), add `discriminator` + `variants`, add relation `strategy`.
+- [ ] **Restructure `MongoContract` types** — update the TypeScript types to follow ADRs 1-3: add `roots`, change `model.fields` to records of `{ nullable: boolean, codecId: string }` (domain metadata including type), restructure `model.storage` to contain only the collection name (Mongo has no field-to-storage mappings by default; SQL retains field-to-column mappings), add `discriminator` + `variants`, add relation `strategy`.
 - [ ] **Hand-craft `contract.d.ts`** for the test schema — Task (with discriminator/variants), Bug, Feature, User, Address (value type), Comment (embedded entity). Variant types express the full merged shape (base + own fields).
 - [ ] **Hand-craft `contract.json`** matching the `.d.ts` types.
 - [ ] **Update existing M1/M2 tests** to work with the restructured contract (or create a parallel contract fixture for the new structure).
@@ -57,7 +57,7 @@ Prove that the domain level of the contract is family-agnostic by hand-crafting 
 **Tasks:**
 
 - [ ] **Hand-craft SQL `contract.d.ts`** for the same domain model (Task/Bug/Feature/User/Address/Comment) using the redesigned structure with SQL-specific `model.storage` (field → column mappings) and `storage.tables`.
-- [ ] **Type-level test: domain symmetry** — a TypeScript file that imports both the Mongo and SQL contracts and statically verifies that `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` are structurally identical. Only `model.storage` and top-level `storage` differ.
+- [ ] **Type-level test: domain symmetry** — a TypeScript file that imports both the Mongo and SQL contracts and statically verifies that `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` are structurally identical (same TypeScript types; `codecId` values differ per family). Only `model.storage` and top-level `storage` differ.
 - [ ] **Document convergence/divergence** — update [contract-symmetry.md](../../docs/planning/mongo-target/1-design-docs/contract-symmetry.md) with concrete findings from the implementation.
 
 ### Milestone 4: Close-out
@@ -76,8 +76,8 @@ Prove that the domain level of the contract is family-agnostic by hand-crafting 
 | Acceptance Criterion | Test Type | Milestone | Notes |
 |---|---|---|---|
 | `MongoContract` has `roots` section | Type-level | M1 | Compile-time check |
-| `model.fields` is a string array | Type-level | M1 | Compile-time check |
-| `model.storage` has collection + field-to-codec mappings | Type-level | M1 | Compile-time check |
+| `model.fields` is a record of `{ nullable, codecId }` | Type-level | M1 | Compile-time check |
+| `model.storage` has collection name (Mongo) or table + field-to-column mappings (SQL) | Type-level | M1 | Compile-time check |
 | Model has `discriminator` + `variants` with sibling variants | Type-level | M1 | Compile-time check |
 | Relations have `"strategy": "reference"` and `"strategy": "embed"` | Type-level | M1 | Compile-time check |
 | `contract.json` and `contract.d.ts` exist | Manual | M1 | File existence |
@@ -89,7 +89,7 @@ Prove that the domain level of the contract is family-agnostic by hand-crafting 
 | Polymorphic root returns discriminated union | Integration + Type-level | M2 | Runtime: results include variants. Types: union type narrowable |
 | Full flow: ORM → plan → runtime → driver → typed results | Integration | M2 | End-to-end test |
 | Same domain model compiles as Mongo and SQL contract | Type-level | M3 | Both `.d.ts` files compile |
-| Domain sections identical between Mongo and SQL | Type-level | M3 | Static structural comparison |
+| Domain sections structurally identical between Mongo and SQL | Type-level | M3 | Same shape; `codecId` values differ per family |
 | Only `model.storage` and `storage` differ | Type-level | M3 | Verify divergence is scoped |
 | No Mongo imports from `2-sql/*` or `3-extensions/*` | Automated | M4 | `pnpm lint:deps` |
 

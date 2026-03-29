@@ -51,23 +51,23 @@ The original plan was to keep `MongoContract` structurally parallel to `SqlContr
 The contract redesign found the right abstraction: separate domain from persistence, with `model.storage` as the scoped, family-specific bridge.
 
 **Model structure** — family-agnostic:
-- `fields` — array of field names (the domain vocabulary)
+- `fields` — record mapping field names to domain metadata (e.g. `{ "email": { "nullable": false, "codecId": "pg/text@1" } }`). Keys are the domain vocabulary; values carry `nullable` (required boolean) and `codecId` (the field's type). Codec identifiers are a family-agnostic concept — "family-agnostic" describes the *structure* of the domain section, not its *values*.
 - `discriminator` + `variants` — optional, for polymorphism
 - `relations` — connections to other models
 
 **`model.storage`** — family-specific bridge:
 
-SQL maps fields to column names; codec/type info lives on the top-level `storage.tables` section:
+SQL maps fields to column names (because SQL has a genuine field → column indirection):
 ```json
 { "table": "tasks", "fields": { "id": { "column": "id" }, "title": { "column": "title" } } }
 ```
 
-Mongo maps fields to codec info directly, because the model IS the schema:
+Mongo needs only the collection name (no field mappings — the domain fields map directly to document fields):
 ```json
-{ "collection": "tasks", "fields": { "_id": { "codecId": "mongo/objectId@1" }, "title": { "codecId": "mongo/string@1" } } }
+{ "collection": "tasks" }
 ```
 
-The co-location of table/collection name with field mappings is intentional — in SQL, field-to-column mappings need their table context nearby. Separating them would leave column references dangling.
+The co-location of table name with field-to-column mappings in SQL is intentional — separating them would leave column references dangling.
 
 **Where to apply**: `packages/1-framework/1-core/shared/contract/`, both family contract types, emitter. See [contract-symmetry.md](1-design-docs/contract-symmetry.md) for the convergence/divergence analysis.
 
@@ -98,17 +98,21 @@ The base model declares a `discriminator` (which field) and `variants` (which mo
 ```json
 {
   "Task": {
-    "fields": ["id", "title", "type"],
+    "fields": {
+      "id": { "nullable": false, "codecId": "pg/int4@1" },
+      "title": { "nullable": false, "codecId": "pg/text@1" },
+      "type": { "nullable": false, "codecId": "pg/text@1" }
+    },
     "discriminator": { "field": "type" },
     "variants": { "Bug": { "value": "bug" }, "Feature": { "value": "feature" } },
     "storage": { "table": "tasks", "fields": { ... } }
   },
   "Bug": {
-    "fields": ["severity"],
+    "fields": { "severity": { "nullable": false, "codecId": "pg/text@1" } },
     "storage": { "table": "tasks", "fields": { ... } }
   },
   "Feature": {
-    "fields": ["priority"],
+    "fields": { "priority": { "nullable": false, "codecId": "pg/int4@1" } },
     "storage": { "table": "features", "fields": { ... } }
   }
 }
@@ -154,9 +158,20 @@ In Mongo, `student.courseIds: ObjectId[]` represents a many-to-many without a ju
 
 Relations with `"strategy": "reference"` need family-specific join details (SQL: foreign key columns; Mongo: which field holds the ObjectId). Relations with `"strategy": "embed"` need to know which field in the parent document holds the embedded data.
 
-### `nullable` location
+### `nullable` and `codecId` location *(resolved)*
 
-Is field nullability a domain concept ("can a User have no email?") or a storage concept ("can this column be NULL?")? If domain, it could live on `model.fields` entries (making them objects instead of strings). If storage, it stays on `model.storage.fields`.
+Both are **domain concepts** and live on `model.fields`:
+
+- **`nullable`** — "can a User have no email?" is a business rule that directly affects type inference (`string` vs `string | null`). Both families need it identically.
+- **`codecId`** — the field's type. Describing a field without its type leaves the domain section incomplete. The codecId *concept* is family-agnostic (every family uses codec identifiers); the specific IDs available depend on framework composition, but that's a composition concern, not a structural one. "Family-agnostic" describes the structure of the domain section, not its values.
+
+```json
+{ "id": { "nullable": false, "codecId": "pg/int4@1" }, "email": { "nullable": false, "codecId": "pg/text@1" }, "name": { "nullable": true, "codecId": "pg/text@1" } }
+```
+
+`nullable` is a required `boolean` — always present, never omitted. This follows design principle #1 ("the domain model is self-describing"): a reader should understand a field's nullability by looking at it, without knowing the contract's default conventions. Explicit `false` eliminates ambiguity between "not nullable" and "not yet specified," and makes contract diffs clearer (`false → true` vs `undefined → true`).
+
+Moving `codecId` to the domain field narrows the storage divergence: Mongo's `model.storage` shrinks to just the collection name, while SQL's retains field-to-column mappings because SQL has a genuine indirection layer. The remaining divergence is more honest — it reflects a real structural difference, not an artifact of where the codec was placed.
 
 ---
 

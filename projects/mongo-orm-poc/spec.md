@@ -18,8 +18,8 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
 
 - Restructure `MongoContract` to follow ADRs 1-3:
   - `roots` section mapping ORM accessor names to model names
-  - `model.fields` as string arrays (domain vocabulary)
-  - `model.storage` as the family-specific bridge (collection name + field-to-codec mappings)
+  - `model.fields` as records of `{ nullable: boolean, codecId: string }` (domain metadata)
+  - `model.storage` as the family-specific bridge (collection name for Mongo; table + field-to-column mappings for SQL)
   - `discriminator` + `variants` on polymorphic models
   - Relations with `strategy` (`"reference"` | `"embed"`)
 - Hand-craft `contract.json` and `contract.d.ts` for a schema that exercises all features: polymorphic model (Task with Bug/Feature variants), referenced relation (Task → User), and at least one embedded relation (e.g. User with embedded Address, or Post with embedded Comments).
@@ -36,7 +36,7 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
 **Cross-family contract symmetry:**
 
 - Hand-craft the same domain model (Task/Bug/Feature/User) as both a Mongo contract and a SQL contract using the redesigned structure.
-- The domain level (`roots`, `models` with `fields`/`discriminator`/`variants`, `relations`) is identical between the two contracts — only `model.storage` and top-level `storage` differ.
+- The domain level (`roots`, `models` with `fields`/`discriminator`/`variants`, `relations`) is structurally identical between the two contracts (same TypeScript types; values like `codecId` differ per family) — only `model.storage` and top-level `storage` differ.
 
 ## Non-Functional Requirements
 
@@ -48,7 +48,7 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
 
 - **Writes** (`create`, `update`, `delete`) — deferred to Phase 4 (full ORM client).
 - **Complex filters** (`$gt`, `$in`, `$or`, logical operators) — basic equality filters are sufficient to prove the contract.
-- **`orderBy`, pagination** (`take`/`skip`), **`select`** (field projection) — ORM convenience features, not contract validation concerns.
+- `**orderBy`, pagination** (`take`/`skip`), `**select`** (field projection) — ORM convenience features, not contract validation concerns.
 - **Custom collection classes or methods** — the ORM presents the same interface for all roots.
 - **Aggregation pipeline DSL** — raw pipeline passthrough exists from M1; a typed builder is a separate project.
 - **Shared ORM interface extraction** — building the Mongo ORM independently first; extraction happens after both families have working ORM clients.
@@ -59,32 +59,32 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
 
 **Contract structure:**
 
-- [ ] `MongoContract` has a `roots` section mapping accessor names to model names
-- [ ] `model.fields` is a string array (domain vocabulary)
-- [ ] `model.storage` contains collection name and field-to-codec mappings
-- [ ] At least one model has `discriminator` + `variants` with variant models as siblings
-- [ ] At least one relation has `"strategy": "reference"` and at least one has `"strategy": "embed"`
-- [ ] `contract.json` and `contract.d.ts` exist for the test schema
+- `MongoContract` has a `roots` section mapping accessor names to model names
+- `model.fields` is a record mapping field names to `{ nullable: boolean, codecId: string }`
+- `model.storage` contains collection name (Mongo) or table + field-to-column mappings (SQL)
+- At least one model has `discriminator` + `variants` with variant models as siblings
+- At least one relation has `"strategy": "reference"` and at least one has `"strategy": "embed"`
+- `contract.json` and `contract.d.ts` exist for the test schema
 
 **ORM client:**
 
-- [ ] ORM client presents root-based accessors derived from the `roots` section
-- [ ] `findMany` returns correctly-typed rows with types inferred from the contract (not manually specified)
-- [ ] Basic equality filters work on model fields
-- [ ] `include` traverses a referenced relation and returns related documents
-- [ ] `include` traverses an embedded relation and returns embedded documents
-- [ ] Querying a polymorphic root returns a discriminated union narrowable by the discriminator field
-- [ ] A test exercises the full flow: ORM client → query plan → runtime → driver → `mongodb-memory-server` → typed results
+- ORM client presents root-based accessors derived from the `roots` section
+- `findMany` returns correctly-typed rows with types inferred from the contract (not manually specified)
+- Basic equality filters work on model fields
+- `include` traverses a referenced relation and returns related documents
+- `include` traverses an embedded relation and returns embedded documents
+- Querying a polymorphic root returns a discriminated union narrowable by the discriminator field
+- A test exercises the full flow: ORM client → query plan → runtime → driver → `mongodb-memory-server` → typed results
 
 **Cross-family symmetry:**
 
-- [ ] The same domain model compiles as both a Mongo contract and a SQL contract
-- [ ] `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` sections are identical between the two contracts
-- [ ] Only `model.storage` and top-level `storage` differ
+- The same domain model compiles as both a Mongo contract and a SQL contract
+- `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` sections are structurally identical between the two contracts (same shape; `codecId` values differ per family)
+- Only `model.storage` and top-level `storage` differ
 
 **Architecture:**
 
-- [ ] No Mongo package imports from `2-sql/*` or `3-extensions/*`
+- No Mongo package imports from `2-sql/`* or `3-extensions/*`
 
 # Other Considerations
 
@@ -127,9 +127,11 @@ Not applicable.
 2. **Reads only.** The ORM client is scoped to `findMany` — enough to validate the contract without the complexity of mutation semantics (`$inc`, `$push`, etc.).
 3. **Consistent query interface.** Filters use structured objects matching the SQL ORM's patterns. The ORM compiles these to Mongo's native query format internally.
 4. **Embedded documents in scope.** Embedding is fundamental to idiomatic Mongo usage. The "cross-family concern" label means the solution should work for both families eventually, not that Mongo must wait for SQL.
+5. **`codecId` and `nullable` live on `model.fields` (domain level).** Both are domain concepts needed by every consumer for type inference. `codecId` as a concept is family-agnostic — every family uses codec identifiers. "Family-agnostic" describes the *structure* of the domain section, not its *values*. This means Mongo's `model.storage` shrinks to just the collection name (no field-to-codec mappings in storage), while SQL's retains field-to-column mappings. The `model.storage.fields` mechanism remains available to Mongo for field name remapping if needed.
 
 # Open Questions
 
 1. **Test schema choice.** The SaaS task management example (Task/Bug/Feature + User) covers polymorphism and referenced relations. What should the embedded relation be? Options: User with embedded Addresses (simple, value-type-like), Post with embedded Comments (entity-like, tests identity in embedded docs). **Assumption:** include both — Address as a value-type embed, Comments as an entity embed — to test both patterns.
 2. **Variant field inheritance at the type level.** ADR 2 says variant models list only their own fields; they inherit the base model's fields. How does this work in `contract.d.ts`? Does the type system express the full merged shape, or does the consumer need to merge base + variant fields? **Assumption:** the `.d.ts` expresses the full merged shape for each variant (Bug has id + title + type + severity), since that's what the ORM needs at runtime.
 3. **Relation storage details.** ADR 3 notes that the exact shape of family-specific join info on relations is not yet designed. For `"strategy": "reference"`, what fields describe the join? For `"strategy": "embed"`, what field describes the embedding location? This must be resolved during implementation. **Assumption:** `"reference"` relations carry a `fields` property naming the local field(s) holding the foreign key/ObjectId; `"embed"` relations carry a `field` property naming the parent document field holding the embedded data.
+
