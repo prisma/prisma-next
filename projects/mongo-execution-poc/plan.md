@@ -78,7 +78,7 @@ Build a thin typed layer that reads the contract types and constructs `MongoQuer
 | `aggregate` with raw pipeline executes and returns results | Integration | M1 | Hardcoded pipeline |
 | Driver dispatches to correct `mongodb` method per operation | Integration | M1 | Covered by the operation-specific tests |
 | Mongo codec registry with base codecs follows SQL registry shape | Unit + Type-level | M2 | encode/decode round-trip, type-level check |
-| `contract.json` and `contract.d.ts` exist with embedded + referenced relations | Manual | M2 | File existence, review |
+| `contract.json` and `contract.d.ts` exist with flat fields + referenced relation | Manual | M2 | File existence, review |
 | Contract-driven plan executes with `Row` inferred from contract | Integration | M2 | Hand-built plan using contract types, `mongodb-memory-server`; compilation proves types work |
 | `MongoContract` is structurally symmetric with `SqlContract` | Manual + Type-level | M2 | Documented convergence/divergence, compile-time check |
 | Query surface constructs plan with `Row` inferred from contract | Type-level + Integration | M3 | Type-level tests + runtime execution |
