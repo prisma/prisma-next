@@ -241,14 +241,26 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/2-mongo/6-adapter/**",
-      "domain": "mongo",
+      "glob": "packages/3-targets/3-targets/mongo/src/exports/pack.ts",
+      "domain": "extensions",
+      "layer": "targets",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-targets/6-adapters/mongo/src/core/**",
+      "domain": "targets",
       "layer": "adapters",
       "plane": "shared"
     },
     {
-      "glob": "packages/2-mongo/7-driver/**",
-      "domain": "mongo",
+      "glob": "packages/3-targets/6-adapters/mongo/src/exports/**",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-targets/7-drivers/mongo/**",
+      "domain": "targets",
       "layer": "drivers",
       "plane": "runtime"
     }
@@ -275,8 +287,8 @@
       "reason": "Mongo domain may import only from framework domain"
     },
     "targets": {
-      "mayImportFrom": ["framework", "sql"],
-      "reason": "Targets domain may import from framework and sql domains"
+      "mayImportFrom": ["framework", "sql", "mongo"],
+      "reason": "Targets domain may import from framework, sql, and mongo domains"
     },
     "extensions": {
       "mayImportFrom": ["framework", "sql", "mongo", "targets", "extensions"],
@@ -304,6 +316,6 @@
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-executor"],
     "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"],
-    "mongo": ["core", "runtime", "adapters", "drivers"]
+    "mongo": ["core", "runtime"]
   }
 }
