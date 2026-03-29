@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/mongo-core": "workspace:*"
+    "@prisma-next/mongo-core": "workspace:*",
+    "mongodb": "^6.16.0"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -32,6 +33,7 @@
   ],
   "exports": {
     ".": "./dist/index.mjs",
+    "./codec-types": "./dist/codec-types.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",
