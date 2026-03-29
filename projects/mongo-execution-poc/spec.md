@@ -27,7 +27,7 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 
 **Contract types:**
 
-- Hand-crafted `contract.json` and `contract.d.ts` for the [blog platform example schema](../../docs/planning/mongo-target/1-design-docs/example-schemas.md#1-blog-platform) (Users, Posts, Comments with embedded and referenced relationships).
+- Hand-crafted `contract.json` and `contract.d.ts` for a simplified blog platform schema (Users, Posts with flat fields and a referenced User→Posts relationship). Embedded documents are deferred — they are a cross-family concern shared with SQL's typed JSON columns.
 - A `MongoContract` type that is independent of `SqlContract` but structurally symmetric — same patterns for models referencing fields, fields referencing codec IDs, and mappings connecting domain names to storage names. Do NOT modify `ContractBase`; build the Mongo equivalent independently so the common elements can be extracted later.
 - A `CodecTypes` map for Mongo base types referencing the codec registry above.
 
@@ -74,7 +74,7 @@ The project is the first phase of the [MongoDB PoC](../../docs/planning/mongo-ta
 
 **Contract types:**
 
-- `contract.json` and `contract.d.ts` exist for the blog platform schema with Users, Posts (embedded Comments), and referenced User→Posts relationships.
+- `contract.json` and `contract.d.ts` exist for the blog platform schema with Users, Posts (flat fields), and referenced User→Posts relationship.
 - `MongoContract` is structurally symmetric with `SqlContract`: same patterns for models, fields, codec references, and mappings. Convergence and divergence points are documented.
 - A hand-built `MongoQueryPlan` using contract type information executes through the M1 pipeline with `Row` inferred from the contract (not manually specified), proving the contract carries enough information for row type inference.
 
