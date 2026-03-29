@@ -31,11 +31,16 @@ export type MongoVariantEntry = {
 
 // --- Relations ---
 
+export type MongoReferenceRelationOn = {
+  readonly localFields: readonly string[];
+  readonly targetFields: readonly string[];
+};
+
 export type MongoReferenceRelation = {
   readonly to: string;
   readonly cardinality: '1:1' | '1:N' | 'N:1';
   readonly strategy: 'reference';
-  readonly fields: readonly string[];
+  readonly on: MongoReferenceRelationOn;
 };
 
 export type MongoEmbedRelation = {

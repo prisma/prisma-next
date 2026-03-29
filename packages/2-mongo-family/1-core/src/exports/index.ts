@@ -23,6 +23,7 @@ export type {
   MongoModelField,
   MongoModelStorage,
   MongoReferenceRelation,
+  MongoReferenceRelationOn,
   MongoRelation,
   MongoStorage,
   MongoStorageCollection,

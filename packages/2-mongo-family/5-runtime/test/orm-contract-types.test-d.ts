@@ -39,13 +39,16 @@ test('Task has discriminator and variants', () => {
   }>();
 });
 
-test('reference relation has strategy and fields', () => {
+test('reference relation has strategy and on', () => {
   type AssigneeRel = Contract['models']['Task']['relations']['assignee'];
   expectTypeOf({} as AssigneeRel).toEqualTypeOf<{
     readonly to: 'User';
     readonly cardinality: 'N:1';
     readonly strategy: 'reference';
-    readonly fields: readonly ['assigneeId'];
+    readonly on: {
+      readonly localFields: readonly ['assigneeId'];
+      readonly targetFields: readonly ['_id'];
+    };
   }>();
 });
 
