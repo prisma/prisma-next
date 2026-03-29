@@ -47,7 +47,8 @@
       "fields": {
         "severity": { "codecId": "mongo/string@1", "nullable": false }
       },
-      "relations": {}
+      "relations": {},
+      "base": "Task"
     },
     "Feature": {
       "storage": { "collection": "tasks" },
@@ -55,7 +56,8 @@
         "priority": { "codecId": "mongo/string@1", "nullable": false },
         "targetRelease": { "codecId": "mongo/string@1", "nullable": false }
       },
-      "relations": {}
+      "relations": {},
+      "base": "Task"
     },
     "User": {
       "storage": { "collection": "users" },

@@ -42,6 +42,7 @@ type BugModel = {
     readonly severity: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
   };
   readonly relations: Record<string, never>;
+  readonly base: 'Task';
 };
 
 type FeatureModel = {
@@ -51,6 +52,7 @@ type FeatureModel = {
     readonly targetRelease: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
   };
   readonly relations: Record<string, never>;
+  readonly base: 'Task';
 };
 
 type UserModel = {
