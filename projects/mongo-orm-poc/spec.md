@@ -24,6 +24,14 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
   - Relations with `strategy` (`"reference"` | `"embed"`)
 - Hand-craft `contract.json` and `contract.d.ts` for a schema that exercises all features: polymorphic model (Task with Bug/Feature variants), referenced relation (Task → User), and at least one embedded relation (e.g. User with embedded Address, or Post with embedded Comments).
 
+**Contract validation:**
+
+- `validateMongoContract()` — a function that loads a Mongo contract from JSON and returns a typed, validated contract object. This is the Mongo equivalent of the SQL domain's `validateContract()` (see `packages/2-sql/1-core/contract/src/validate.ts`). It is the bridge between a JSON import and a typed contract the ORM client can trust.
+- **Structural validation**: uses an Arktype schema to verify the JSON conforms to the `MongoContract` shape — `roots`, `models` with `fields` as `{ nullable: boolean, codecId: string }`, `storage`, `relations` with correct `strategy`-specific shapes, `discriminator`/`variants`/`base`.
+- **Logical validation**: cross-references within the contract to catch inconsistencies that structural validation can't express. Every `roots` value must name an existing model. Every `variants` entry must name an existing model. Every variant's `base` must match the model that lists it in `variants` (bidirectional consistency). Every relation's `to` must name an existing model. Reference relations' `on.localFields`/`on.targetFields` must name fields that exist. Embed relations must target models with empty storage. Models with `discriminator` must have `variants`, and the discriminator field must exist in the model's `fields`.
+- **Computed indices**: builds lookup structures the ORM will need — variant-to-base map, model-to-variants map — rather than forcing the ORM to scan every model's `variants` dictionary at query time.
+- The function follows the SQL pattern: `validateMongoContract<TContract extends MongoContract>(value: unknown): TContract`, where the type parameter is the fully-typed contract from `contract.d.ts`.
+
 **Minimal ORM client:**
 
 - Root-based accessors derived from the contract's `roots` section (e.g. `db.tasks`, `db.users`).
@@ -65,6 +73,13 @@ This project is Phase 3 of the [MongoDB PoC](../../docs/planning/mongo-target/1-
 - At least one model has `discriminator` + `variants` with variant models as siblings; each variant has `base` referencing the base model
 - At least one relation has `"strategy": "reference"` and at least one has `"strategy": "embed"`
 - `contract.json` and `contract.d.ts` exist for the test schema
+
+**Contract validation:**
+
+- `validateMongoContract()` accepts a valid contract JSON and returns a typed contract
+- `validateMongoContract()` rejects contracts with structural errors (missing fields, wrong types)
+- `validateMongoContract()` rejects contracts with logical errors (dangling model references in `roots`, `variants`, `relations`; bidirectional inconsistency between `base` and `variants`)
+- `validateMongoContract()` produces computed indices (variant-to-base map, model-to-variants map)
 
 **ORM client:**
 
@@ -129,6 +144,7 @@ Not applicable.
 4. **Embedded documents in scope.** Embedding is fundamental to idiomatic Mongo usage. The "cross-family concern" label means the solution should work for both families eventually, not that Mongo must wait for SQL.
 5. **`codecId` and `nullable` live on `model.fields` (domain level).** Both are domain concepts needed by every consumer for type inference. `codecId` as a concept is family-agnostic — every family uses codec identifiers. "Family-agnostic" describes the *structure* of the domain section, not its *values*. This means Mongo's `model.storage` shrinks to just the collection name (no field-to-codec mappings in storage), while SQL's retains field-to-column mappings. The `model.storage.fields` mechanism remains available to Mongo for field name remapping if needed.
 6. **Variants carry `base`; use specialization/generalization terminology.** Each variant model has a `base` property naming the model it specializes (e.g., `Bug.base = "Task"`). The base model's `variants` lists its specializations. The relationship is bidirectional — both sides are emitted for different traversal needs. We use `base` instead of `extends` because it describes a structural fact without OOP inheritance baggage. The contract speaks of specializations (variants add fields to the base shape) and generalizations (the base defines the shared shape), not subclasses and superclasses.
+7. **Contract validation before ORM construction.** Implement `validateMongoContract()` as the first step of M2, before building the ORM client. The contract has intentional redundancy (e.g., `base` ↔ `variants` bidirectionality, field names in `model.fields` and `model.storage.fields` for SQL) that creates opportunities for inconsistency in hand-crafted contracts. Validating structural shape (Arktype), logical consistency (cross-references), and building computed indices (variant-to-base map) in a single entry point means the ORM client can trust the contract it receives. This follows the SQL domain's pattern (`validateContract()` in `packages/2-sql/2-authoring/contract-ts/src/contract.ts`).
 
 # Open Questions
 
