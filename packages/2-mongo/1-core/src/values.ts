@@ -9,3 +9,4 @@ export interface MongoArray extends ReadonlyArray<MongoValue> {}
 export type MongoExpr = MongoDocument;
 export type MongoUpdateDocument = Record<string, MongoValue>;
 export type RawPipeline = ReadonlyArray<Record<string, unknown>>;
+export type Document = Record<string, unknown>;

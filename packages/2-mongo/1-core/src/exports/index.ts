@@ -12,6 +12,7 @@ export { MongoParamRef } from '../param-ref';
 export type { MongoExecutionPlan, MongoQueryPlan } from '../plan';
 export type { DeleteOneResult, InsertOneResult, UpdateOneResult } from '../results';
 export type {
+  Document,
   LiteralValue,
   MongoArray,
   MongoDocument,
@@ -20,7 +21,7 @@ export type {
   MongoValue,
   RawPipeline,
 } from '../values';
-export type { AnyMongoWireCommand, Document } from '../wire-commands';
+export type { AnyMongoWireCommand } from '../wire-commands';
 export {
   AggregateWireCommand,
   DeleteOneWireCommand,
