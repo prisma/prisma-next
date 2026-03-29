@@ -48,7 +48,7 @@ export type MongoContract<
 // --- TypeMaps: phantom type attachment ---
 
 export type MongoTypeMaps<
-  TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  TCodecTypes extends Record<string, { output: unknown }> = Record<string, { output: unknown }>,
 > = {
   readonly codecTypes: TCodecTypes;
 };
