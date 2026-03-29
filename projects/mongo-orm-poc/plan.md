@@ -24,7 +24,7 @@ Restructure `MongoContract` to follow the ADRs and hand-craft contract artifacts
 **Tasks:**
 
 - [ ] **Design relation storage details** — resolve the open question: what fields do `"reference"` and `"embed"` relations carry? Settle on a shape (e.g. `"reference"` → `{ fields: ["assigneeId"] }`, `"embed"` → `{ field: "comments" }`) and document it.
-- [ ] **Restructure `MongoContract` types** — update the TypeScript types to follow ADRs 1-3: add `roots`, change `model.fields` to records of `{ nullable: boolean, codecId: string }` (domain metadata including type), restructure `model.storage` to contain only the collection name (Mongo has no field-to-storage mappings by default; SQL retains field-to-column mappings), add `discriminator` + `variants`, add relation `strategy`.
+- [ ] **Restructure `MongoContract` types** — update the TypeScript types to follow ADRs 1-3: add `roots`, change `model.fields` to records of `{ nullable: boolean, codecId: string }` (domain metadata including type), restructure `model.storage` to contain only the collection name (Mongo has no field-to-storage mappings by default; SQL retains field-to-column mappings), add `discriminator` + `variants` on base models, add `base` on variant models, add relation `strategy`.
 - [ ] **Hand-craft `contract.d.ts`** for the test schema — Task (with discriminator/variants), Bug, Feature, User, Address (value type), Comment (embedded entity). Variant types express the full merged shape (base + own fields).
 - [ ] **Hand-craft `contract.json`** matching the `.d.ts` types.
 - [ ] **Update existing M1/M2 tests** to work with the restructured contract (or create a parallel contract fixture for the new structure).
@@ -78,7 +78,7 @@ Prove that the domain level of the contract is family-agnostic by hand-crafting 
 | `MongoContract` has `roots` section | Type-level | M1 | Compile-time check |
 | `model.fields` is a record of `{ nullable, codecId }` | Type-level | M1 | Compile-time check |
 | `model.storage` has collection name (Mongo) or table + field-to-column mappings (SQL) | Type-level | M1 | Compile-time check |
-| Model has `discriminator` + `variants` with sibling variants | Type-level | M1 | Compile-time check |
+| Model has `discriminator` + `variants` with sibling variants; variants have `base` | Type-level | M1 | Compile-time check |
 | Relations have `"strategy": "reference"` and `"strategy": "embed"` | Type-level | M1 | Compile-time check |
 | `contract.json` and `contract.d.ts` exist | Manual | M1 | File existence |
 | ORM presents root-based accessors from `roots` | Integration | M2 | `db.tasks`, `db.users` exist |
@@ -96,7 +96,7 @@ Prove that the domain level of the contract is family-agnostic by hand-crafting 
 ## Open Items
 
 - **Relation storage details** — the exact shape of join/embed info on relations must be designed in M1. See spec open question #3.
-- **Variant type merging** — the `.d.ts` should express the full merged shape per variant (spec open question #2). Verify this works for the ORM's type inference.
+- **Variant type merging** — the `.d.ts` should express the full merged shape per variant (spec open question #2). Each variant names its `base` model; the merged shape combines base + variant fields. Verify this works for the ORM's type inference.
 - **`include` implementation strategy** — for referenced relations, should the ORM use `$lookup` (single aggregation pipeline) or multi-query stitching (separate `find` + application-level join)? Both approaches should be possible; pick the simpler one for the PoC and document the trade-off.
 - **Embedded relation `include` semantics** — embedded documents are always present in the parent document. Does `include: { comments: true }` mean "project them into the result type" (they're already in the data) or is `include` unnecessary for embedded relations? The SQL ORM may handle this differently. Resolve during M2 implementation.
 - **Package location for ORM client** — does the Mongo ORM client live in `2-mongo-family/` (as a lane or its own package) or `3-mongo-target/`? Resolve during M2 implementation.
