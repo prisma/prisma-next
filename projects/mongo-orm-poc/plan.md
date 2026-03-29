@@ -28,7 +28,7 @@ Restructure `MongoContract` to follow the ADRs and hand-craft contract artifacts
 - [ ] **Hand-craft `contract.d.ts`** for the test schema — Task (with discriminator/variants), Bug, Feature, User, Address (value type), Comment (embedded entity). Variant types express the full merged shape (base + own fields).
 - [ ] **Hand-craft `contract.json`** matching the `.d.ts` types.
 - [ ] **Update existing M1/M2 tests** to work with the restructured contract (or create a parallel contract fixture for the new structure).
-- [ ] **Type-level test: contract structure** — verify that the contract types compile and that `roots`, `models`, `discriminator`, `variants`, and relation strategies are all present and correctly typed.
+- [ ] **Type-level test: contract structure** — verify that the contract types compile and that `roots`, `models`, `discriminator`, `variants`, `base`, and relation strategies are all present and correctly typed.
 
 ### Milestone 2: Minimal ORM client with findMany and include
 
@@ -41,7 +41,7 @@ Build the ORM client that consumes the contract. Scoped to reads: root-based acc
 - [ ] **Implement basic equality filters** — `findMany({ where: { email: 'alice@example.com' } })` compiles to a Mongo filter document. Filter keys are constrained to the model's field names. Uses structured objects consistent with the SQL ORM's interface.
 - [ ] **Implement `include` for referenced relations** — `findMany({ include: { assignee: true } })` resolves the referenced User via `$lookup` or a follow-up query, returning the related document nested in the result. The relation's strategy and field info from the contract drive the query construction.
 - [ ] **Implement `include` for embedded relations** — `findMany({ include: { comments: true } })` returns embedded documents as part of the parent result. Since embedded documents are stored in the parent document, this is primarily a type-level concern (projecting the correct shape) rather than an additional query.
-- [ ] **Implement polymorphic query return types** — querying `db.tasks.findMany()` returns a discriminated union type (`Task | Bug | Feature`). The discriminator field (`type`) enables runtime narrowing. The ORM reads `discriminator` + `variants` from the contract to construct the union type.
+- [ ] **Implement polymorphic query return types** — querying `db.tasks.findMany()` returns a discriminated union type (`Task | Bug | Feature`). The discriminator field (`type`) enables runtime narrowing. The ORM reads `discriminator` + `variants` (and each variant's `base`) from the contract to construct the union type.
 - [ ] **Integration tests: full flow** — tests against `mongodb-memory-server` exercising:
   - `findMany` on a non-polymorphic root (`db.users`) returns typed results
   - `findMany` with equality filter narrows results correctly
@@ -57,7 +57,7 @@ Prove that the domain level of the contract is family-agnostic by hand-crafting 
 **Tasks:**
 
 - [ ] **Hand-craft SQL `contract.d.ts`** for the same domain model (Task/Bug/Feature/User/Address/Comment) using the redesigned structure with SQL-specific `model.storage` (field → column mappings) and `storage.tables`.
-- [ ] **Type-level test: domain symmetry** — a TypeScript file that imports both the Mongo and SQL contracts and statically verifies that `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` are structurally identical (same TypeScript types; `codecId` values differ per family). Only `model.storage` and top-level `storage` differ.
+- [ ] **Type-level test: domain symmetry** — a TypeScript file that imports both the Mongo and SQL contracts and statically verifies that `roots`, `models` (with `fields`, `discriminator`, `variants`, `base`), and `relations` are structurally identical (same TypeScript types; `codecId` values differ per family). Only `model.storage` and top-level `storage` differ.
 - [ ] **Document convergence/divergence** — update [contract-symmetry.md](../../docs/planning/mongo-target/1-design-docs/contract-symmetry.md) with concrete findings from the implementation.
 
 ### Milestone 4: Close-out
