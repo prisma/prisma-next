@@ -8,26 +8,15 @@ See also: [mongodb-primitives-reference.md](../9-references/mongodb-primitives-r
 
 ---
 
-## 1. Embedded documents: relation, field, or distinct concept? *(cross-family concern)*
+## 1. Embedded documents *(resolved — cross-family concern)*
 
-MongoDB's idiomatic data model puts related data *inside* the parent document — either as a single subdocument (1:1) or an array of subdocuments (1:N).
+**Answer**: Embedding is a relation property. The parent model's relation declares `"strategy": "embed"` (vs `"reference"` for cross-collection/cross-table). The embedded model appears as a sibling in `models` with its own `fields` and `storage` block (field mappings but no table/collection name). The embedded model doesn't know where it's embedded — that's on the parent's relation.
 
-**M2 finding: this is a cross-family concern.** SQL has the same problem: typed JSON/JSONB columns contain structured data that is logically "embedded" within a parent row. Both families need type-safe dot-notation queries, TypeScript type generation, reusability across models (e.g., an `Address` type used in both `User` and `Order`), and potentially recursive/self-referential structures. The difference is convention: in Mongo, embedding is idiomatic and common; in SQL, JSON columns are an escape hatch. But the contract-level problem is identical.
+This is a cross-family concern: SQL typed JSON/JSONB columns are the same contract-level problem (structured data nested in a parent entity). Both families need type-safe dot-notation queries, TypeScript type generation, and reusability across models. The difference is convention (Mongo: embedding is idiomatic; SQL: JSON columns are an escape hatch), not capability.
 
-**The question**: How does the PN contract model represent embedded/nested structured types?
+Value types (Address, GeoPoint) without identity are a separate concept — they belong in a `types`/`composites` section, not `models`. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the entity vs value type distinction.
 
-Options:
-- **As relations with a storage strategy.** The contract declares a `User → Address` relation (just like SQL), and the storage layer says "this relation is embedded, not referenced." The ORM then knows whether to embed in one query or `$lookup` / multi-query. This keeps the domain model (relations) separate from the storage decision (embed vs. reference).
-- **As nested field types.** `Address` is a structured field type on `User`, not a separate model. No relation exists — it's just a complex field. Simpler, but loses the ability to query `Address` independently or change the storage strategy later.
-- **As a distinct concept.** Neither a relation nor a plain field — something new in the contract schema. Most flexible but adds a new concept that consumer libraries must understand.
-
-**M2 insight — entity vs. value type distinction matters here.** The right representation depends on whether the embedded structure is an **entity** (has identity, lifecycle matters — e.g., a Post with `_id` embedded in a User) or a **value type** (no identity, interchangeable — e.g., an Address defined entirely by its fields). Entities embedded within another entity's aggregate need identity tracking; value types don't. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the full domain model analysis.
-
-**Contract redesign answer: embedding is a relation property.** The parent model's relation declares `"strategy": "embed"` (vs `"reference"` for cross-collection/cross-table). The embedded model appears as a sibling in `models` with its own `fields` and `storage` block (field mappings but no table/collection). The embedded model doesn't know where it's embedded — that's on the parent's relation. See [cross-cutting-learnings.md § learning #3](../cross-cutting-learnings.md).
-
-This resolves the three options above in favor of **relations with a storage strategy**: embedded documents are relations, and the `strategy` property tells consumer libraries which are embedded. Value types (Address, GeoPoint) without identity are a separate concept — they belong in a `types`/`composites` section, not `models`.
-
-**Remaining tension**: Relation storage details for embedding are not yet designed. A relation with `"strategy": "embed"` needs to know which field in the parent document holds the embedded data.
+**Still open**: relation storage details for embedding. A relation with `"strategy": "embed"` needs to know which field in the parent document holds the embedded data. The exact shape isn't designed yet.
 
 ---
 
@@ -111,30 +100,9 @@ Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB col
 
 ---
 
-## 6. Polymorphism and discriminated unions *(validate in April)*
+## 6. Polymorphism and discriminated unions *(resolved — validate implementation in April)*
 
-**This is a cross-family concern.** Both SQL and MongoDB need discriminated unions in the contract type system — they just surface differently at the storage layer.
-
-**The question**: How does the contract type system represent discriminated unions / model inheritance, and how does each family store them?
-
-**Priority signal**: The MongoDB team rates "Inheritance and Polymorphism" as **High priority** — their highest tier. The [user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) describes this as an early pain point: a user's `ratings` field had different structures depending on the rating engine, and Prisma ORM typed it as `Json`, losing all type safety. The MongoDB team also lists "Support for Polymorphic Array/Embedded Field" (Low priority) and notes that Prisma ORM's workarounds involve untyped `Json` fields or multiple optional fields.
-
-### Where this comes up
-
-**In MongoDB:**
-- **Polymorphic collections**: A single collection holding documents with different shapes distinguished by a discriminator field (single-table inheritance). The MongoDB team specifically calls out "defining base models and extending them into specialized sub models" as a key use case.
-- **Polymorphic embedded fields**: A field like `ratings` whose structure varies per document, currently typed as `Json` in Prisma ORM.
-- **Mixed-type arrays**: An `events` array containing `{ type: "click", x: number, y: number }` and `{ type: "scroll", offset: number }`. Common in event-sourcing patterns.
-- **Optional/missing fields**: Mongo documents may omit fields entirely. `null` (field present, value null) is different from "field missing." The contract needs to express both.
-
-**In SQL:**
-- **Single-table inheritance (STI)**: One table holds multiple model types, distinguished by a discriminator column (e.g. `type = 'admin' | 'viewer'`). Shared fields are on the table; type-specific fields are nullable. Common in Rails, Django, and many TS codebases.
-- **Multi-table inheritance**: A base table with shared fields, plus extension tables joined by FK for type-specific fields. More normalized but more complex to query.
-- **Enum-discriminated rows**: A pattern where a row's behavior changes based on a discriminator field, even if the schema is the same. The ORM needs to narrow the type based on the discriminator value.
-
-### Contract redesign answer: `discriminator` + `variants` as the domain primitive
-
-The contract redesign settled on `discriminator` + `variants` on the base model, with each variant appearing as a sibling in the `models` dictionary:
+**Answer**: `discriminator` + `variants` on the base model, with each variant as a sibling in `models`.
 
 ```json
 {
@@ -151,11 +119,11 @@ The contract redesign settled on `discriminator` + `variants` on the base model,
 }
 ```
 
-The persistence strategy is **emergent**: if Bug's storage points to the same table/collection as Task → STI. If it points to a different one → MTI. The domain declaration doesn't change; only the storage mappings do.
+The persistence strategy is **emergent**: if Bug's storage points to the same table/collection as Task → STI. If it points to a different one → MTI. The domain declaration doesn't change; only the storage mappings do. The contract describes facts ("Bug is a variant of Task, discriminated by `type`") — the ORM decides how to represent it at runtime.
 
-All persistence-level polymorphism reduces to "multiple shapes, distinguished by a field." This is fundamental enough to be a contract primitive. The contract describes facts ("Bug is a variant of Task, discriminated by `type`") — the ORM decides how to represent it at runtime (class hierarchy, flat union types, composition).
+All persistence-level polymorphism reduces to "multiple shapes, distinguished by a field." This is fundamental enough to be a contract primitive. See [cross-cutting-learnings.md § learning #4](../cross-cutting-learnings.md) for the full design.
 
-See [cross-cutting-learnings.md § learning #4](../cross-cutting-learnings.md) for the full design.
+This is a cross-family concern — both SQL and MongoDB need discriminated unions. The MongoDB team rates "Inheritance and Polymorphism" as **High priority** ([user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md)).
 
 ### Storage-level mapping
 
@@ -174,9 +142,9 @@ At minimum:
 - The ORM client can query a polymorphic collection/table and return narrowed types.
 - The storage mapping works for at least STI (one table/collection, discriminator column/field).
 
-Rough edges are acceptable — exhaustive pattern matching, complex nested unions, and multi-table inheritance can wait. But the contract type system must handle the basic discriminated-union shape, and it must work for both families.
+Rough edges are acceptable — exhaustive pattern matching, complex nested unions, and multi-table inheritance can wait.
 
-### Remaining open: polymorphic associations
+### Still open: polymorphic associations
 
 A `Comment` that can belong to either a `Post` or a `Video` (distinguished by `commentable_type`) is polymorphism on the *relation*, not the model. The `relations` section would need to express "this relation can point to one of several models." Not yet designed.
 
@@ -241,13 +209,9 @@ For the PoC: Out of scope. The architecture constraints are:
 
 ---
 
-## 10. Shared contract surface: what goes in `ContractBase`? *(contract redesign proposal)*
+## 10. Shared contract surface: what goes in `ContractBase`? *(resolved — not yet implemented)*
 
-The PoC plan identifies this as the most important architectural question. Today, `ContractBase` does not include models or relations — these are added by `SqlContract`.
-
-**The question**: What belongs in the shared contract surface that both SQL and document contracts extend?
-
-**Contract redesign answer: the domain level is the shared surface.** The contract redesign demonstrated that `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` are structurally identical between families. The divergence is scoped entirely to `model.storage` — the family-specific bridge from domain fields to persistence. See [contract-symmetry.md](contract-symmetry.md) for the convergence/divergence analysis.
+**Answer**: The domain level is the shared surface. `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` are structurally identical between families. The divergence is scoped entirely to `model.storage` — the family-specific bridge from domain fields to persistence. See [contract-symmetry.md](contract-symmetry.md) for the convergence/divergence analysis.
 
 `ContractBase` should capture the domain-level structure:
 - **`roots`** — maps ORM accessor names to model names
