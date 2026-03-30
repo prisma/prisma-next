@@ -28,7 +28,7 @@ The migration system uses a graph-based data structure for migration history. Th
 
 **Key risks**:
 
-- **Data migrations are the highest architectural risk.** The graph model's core invariant (route equivalence) breaks when data matters. If we can't extend routing to handle data invariants, the graph model may need fundamental rework — and we'd rather discover that now than after stabilizing the API. We have a theoretical model ([data-migrations.md](0-references/data-migrations.md), [data-migrations-solutions.md](0-references/data-migrations-solutions.md)) but it is entirely unproven. Prisma ORM had no data migration support, so we have no prior art to lean on.
+- **Data migrations are the highest architectural risk.** The graph model's core invariant (route equivalence) breaks when data matters. If we can't extend routing to handle data invariants, the graph model may need fundamental rework — and we'd rather discover that now than after stabilizing the API. We have a theoretical model ([ADR 176](../architecture%20docs/adrs/ADR%20176%20-%20Data%20migrations%20as%20invariant-guarded%20transitions.md)) but it is entirely unproven. Prisma ORM had no data migration support, so we have no prior art to lean on.
 - The graph-based model is our biggest UX bet. If common use cases aren't dead simple, the power of the graph is irrelevant.
 
 #### Priority queue
@@ -41,7 +41,7 @@ User story: I can define a migration that includes a data transformation (e.g. s
 
 Tasks:
 
-1. **Design the data migration representation** — what does a data migration node look like in the graph? What does the runner execute? How is the postcondition checked? Decide between Model A (co-located with structural migrations) and Model B (independent). Key open decisions: routing policy when multiple invariant-satisfying routes exist, and the concrete format of environment refs. Output: a concrete type definition and a sketch of the runner changes, not a document. See [data-migrations.md](0-references/data-migrations.md) and [data-migrations-solutions.md](0-references/data-migrations-solutions.md) for the theoretical model.
+1. **Design the data migration representation** — what does a data migration node look like in the graph? What does the runner execute? How is the postcondition checked? Decide between Model A (co-located with structural migrations) and Model B (independent). Key open decisions: routing policy when multiple invariant-satisfying routes exist, and the concrete format of environment refs. Output: a concrete type definition and a sketch of the runner changes, not a document. See [ADR 176 — Data migrations as invariant-guarded transitions](../architecture%20docs/adrs/ADR%20176%20-%20Data%20migrations%20as%20invariant-guarded%20transitions.md) for the theoretical model.
 2. **Implement a data migration end-to-end** — a migration that splits `name` into `firstName` + `lastName`, with a postcondition invariant. `plan`, `apply`, and `status` all understand "done = hash + invariant satisfied."
 3. **Invariant-aware routing** — create a graph with two paths to the same contract hash, only one of which includes the data migration. The system selects the path that satisfies the required invariant. The user has a way to declare which invariants are required for a given environment.
 
@@ -131,7 +131,7 @@ User story: I modify my PSL or TS contract definition, save the file, and my dev
 Tasks:
 
 1. **End-to-end validation in one framework** — pick a Vite-based framework or Next.js. Modify a contract definition, verify the dev server re-emits and types update without manual intervention.
-2. **HMR state mismatch** — validate that `globalThis`-cached runtime instances don't hold stale contracts after re-emission (see [framework integration analysis](0-references/framework-integration-analysis.md#unsolved-interaction-hmr-re-emit-and-runtime-state)).
+2. **HMR state mismatch** — validate that `globalThis`-cached runtime instances don't hold stale contracts after re-emission (see [framework integration analysis](../reference/framework-integration-analysis.md#unsolved-interaction-hmr-re-emit-and-runtime-state)).
 
 Stop condition: Modify a contract definition in a running dev server, see the contract re-emitted and types updated without running a manual command. HMR doesn't leave the runtime holding a stale contract. Then stop — plugins for other build tools (Webpack, Turbopack, esbuild) and production build integration are May.
 
@@ -190,7 +190,7 @@ Stop condition: An extension-contributed operation (e.g. pgvector similarity sea
 
 **VP3: RSC concurrency safety**
 
-The runtime has mutable state (`verified`, `startupVerified`), the ORM has a lazily-populated Collection cache — both are exposed by React Server Components' concurrent rendering model, where multiple components query in parallel through a shared instance. (See [framework integration analysis, Hard problem 2](0-references/framework-integration-analysis.md#hard-problem-2-concurrent-statefulness-under-rsc).)
+The runtime has mutable state (`verified`, `startupVerified`), the ORM has a lazily-populated Collection cache — both are exposed by React Server Components' concurrent rendering model, where multiple components query in parallel through a shared instance. (See [framework integration analysis, Hard problem 2](../reference/framework-integration-analysis.md#hard-problem-2-concurrent-statefulness-under-rsc).)
 
 User story: I have a Next.js App Router page with 5 parallel Server Components, each querying through a shared Prisma Next runtime. They all return correct results without race conditions, stale state, or connection pool exhaustion.
 
@@ -296,7 +296,7 @@ Stop condition: Both ORM clients consume `ContractBase`. Polymorphic models work
 
 **Status**: Not started
 
-**Why it matters**: Multiple systems have Postgres implementation details baked in (Kysely lane, migration planning, etc.). Supporting a second SQL target forces us to decouple target-specific assumptions from the core, which is a prerequisite for contributors building new SQL targets. SQLite also unlocks the path to Cloudflare D1 (SQLite-at-the-edge), which is a strategic target for edge framework support (see [framework integration analysis](0-references/framework-integration-analysis.md)).
+**Why it matters**: Multiple systems have Postgres implementation details baked in (Kysely lane, migration planning, etc.). Supporting a second SQL target forces us to decouple target-specific assumptions from the core, which is a prerequisite for contributors building new SQL targets. SQLite also unlocks the path to Cloudflare D1 (SQLite-at-the-edge), which is a strategic target for edge framework support (see [framework integration analysis](../reference/framework-integration-analysis.md)).
 
 **Key risk**: Postgres-specific assumptions may be deeply embedded across many layers. The value of this workstream is discovering every coupling point in one pass — each layer's assumptions are exposed by the next layer downstream.
 
@@ -356,7 +356,7 @@ Tasks:
 1. **Example extensions** — at least one working example of each extension type we want contributors to build: SQL database target, Postgres extension (e.g. ParadeDB handoff), middleware (e.g. a query lint rule — the lint plugin is in PoC state and lint rules are a natural first extension for contributors), framework integration. These serve as templates.
 2. **API reference** — generated or hand-written documentation for extension-facing interfaces. Contributors need to know what interfaces to implement and what contracts to satisfy.
 3. **"Build your first extension" guide** — walks through building a trivial extension (e.g. a middleware) from scratch using the docs and examples.
-4. **Handoff to developer relations** — package the docs, examples, and guide for the dev relations team to use in community outreach (reaching out to authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations — see [community-generator-migration-analysis.md](0-references/community-generator-migration-analysis.md)).
+4. **Handoff to developer relations** — package the docs, examples, and guide for the dev relations team to use in community outreach (reaching out to authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations — see [community-generator-migration-analysis.md](../reference/community-generator-migration-analysis.md)).
 
 Stop condition: A team member who hasn't worked on extensions can scaffold and build a trivial middleware extension using only the docs and examples, without asking questions. Then stop — comprehensive docs, video tutorials, and community management are the dev relations team's job.
 
