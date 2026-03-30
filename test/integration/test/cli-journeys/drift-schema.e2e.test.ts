@@ -5,8 +5,8 @@
  *     column via manual DDL. db verify catches that the live schema no longer
  *     matches the contract. db verify --marker-only still performs marker-only
  *     verification and therefore passes if the marker row is unchanged.
- *     Recovery via db update fails because re-adding a NOT NULL column to an
- *     existing table is unrecoverable without manual intervention.
+ *     Recovery via db update succeeds when the planner can use a temporary
+ *     default to re-add a dropped NOT NULL column on a non-empty table.
  *
  * N — Extra column drift: a DBA adds a column via manual DDL. Tolerant
  *     db verify passes (extras OK), strict db verify fails. Recovery
@@ -38,7 +38,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'init → manual DDL drop → verify fails → verify --marker-only passes → verify --schema-only fails',
+      'init → insert row → manual DDL drop → verify fails → verify --marker-only passes → verify --schema-only fails → update recovers',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -51,8 +51,8 @@ withTempDir(({ createTempDir }) => {
         const init = await runDbInit(ctx);
         expect(init.exitCode, 'M.pre: init').toBe(0);
 
-        // Manual DDL: drop email column
         await withClient(db.connectionString, async (client) => {
+          await client.query(`INSERT INTO "user" ("id", "email") VALUES (1, 'alice@example.com')`);
           await client.query('ALTER TABLE "user" DROP COLUMN email');
         });
 
@@ -72,14 +72,30 @@ withTempDir(({ createTempDir }) => {
         const schema = await runDbSchema(ctx);
         expect(schema.exitCode, 'M.04: db schema').toBe(0);
 
-        // M.05: db update recovery
-        // The planner cannot re-add a dropped NOT NULL column to an existing table
-        // because Postgres requires a DEFAULT for NOT NULL columns on non-empty tables
-        // (even if the table is technically empty, the planner validates post-update schema).
-        // db update correctly detects the drift but the runner fails (PN-RUN-3020).
-        // Recovery in this scenario requires manual DDL or db init with a fresh database.
+        // M.05: db update recovers by re-adding the NOT NULL column with a temporary default,
+        // then dropping that default so future inserts must provide an explicit value.
         const update = await runDbUpdate(ctx, ['-y']);
-        expect(update.exitCode, 'M.05: db update detects unrecoverable drift').toBe(1);
+        expect(update.exitCode, 'M.05: db update recovers dropped column drift').toBe(0);
+
+        // M.06: db verify passes after reconciliation
+        const verifyAfter = await runDbVerify(ctx);
+        expect(verifyAfter.exitCode, 'M.06: db verify passes after db update').toBe(0);
+
+        await withClient(db.connectionString, async (client) => {
+          const restoredRows = await client.query<{ email: string }>(
+            'SELECT email FROM "user" WHERE id = 1',
+          );
+          expect(restoredRows.rows).toEqual([{ email: '' }]);
+
+          const defaultCheck = await client.query<{ column_default: string | null }>(`
+            SELECT column_default
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'user'
+              AND column_name = 'email'
+          `);
+          expect(defaultCheck.rows[0]!['column_default']).toBeNull();
+        });
       },
       timeouts.spinUpPpgDev,
     );

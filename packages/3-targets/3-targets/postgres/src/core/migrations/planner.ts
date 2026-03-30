@@ -4,7 +4,6 @@ import {
   parsePostgresDefault,
   quoteIdentifier,
 } from '@prisma-next/adapter-postgres/control';
-import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
@@ -23,17 +22,28 @@ import {
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type {
-  ForeignKey,
-  ReferentialAction,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import type { ForeignKey, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { PostgresColumnDefault } from '../types';
+import { resolveIdentityValue } from './planner-identity-values';
+import {
+  buildAddColumnOperationIdentity,
+  buildAddNotNullColumnWithTemporaryDefaultOperation,
+} from './planner-recipes';
 import { buildReconciliationPlan } from './planner-reconciliation';
+import {
+  buildAddColumnSql,
+  buildCreateTableSql,
+  buildForeignKeySql,
+  columnExistsCheck,
+  columnNullabilityCheck,
+  constraintExistsCheck,
+  qualifyTableName,
+  tableIsEmptyCheck,
+  toRegclassLiteral,
+} from './planner-sql';
+import { buildTargetDetails } from './planner-target-details';
 
 export type OperationClass =
   | 'dependency'
@@ -143,7 +153,13 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       ...storageTypePlan.operations,
       ...reconciliationPlan.operations,
       ...this.buildTableOperations(sortedTables, options.schema, schemaName, codecHooks),
-      ...this.buildColumnOperations(sortedTables, options.schema, schemaName, codecHooks),
+      ...this.buildColumnOperations(
+        sortedTables,
+        options.schema,
+        schemaLookups,
+        schemaName,
+        codecHooks,
+      ),
       ...this.buildPrimaryKeyOperations(sortedTables, options.schema, schemaName),
       ...this.buildUniqueOperations(sortedTables, schemaLookups, schemaName),
       ...this.buildIndexOperations(sortedTables, schemaLookups, schemaName),
@@ -315,6 +331,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   private buildColumnOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
     codecHooks: Map<string, CodecControlHooks>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
@@ -324,84 +341,113 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       if (!schemaTable) {
         continue;
       }
+      const schemaLookup = schemaLookups.get(tableName);
       for (const [columnName, column] of sortedEntries(table.columns)) {
         if (schemaTable.columns[columnName]) {
           continue;
         }
         operations.push(
-          this.buildAddColumnOperation(schemaName, tableName, columnName, column, codecHooks),
+          this.buildAddColumnOperation({
+            schema: schemaName,
+            tableName,
+            table,
+            schemaTable,
+            schemaLookup,
+            columnName,
+            column,
+            codecHooks,
+          }),
         );
       }
     }
     return operations;
   }
 
-  private buildAddColumnOperation(
-    schema: string,
-    tableName: string,
-    columnName: string,
-    column: StorageColumn,
-    codecHooks: Map<string, CodecControlHooks>,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    const qualified = qualifyTableName(schema, tableName);
+  private buildAddColumnOperation(options: {
+    readonly schema: string;
+    readonly tableName: string;
+    readonly table: StorageTable;
+    readonly schemaTable: SqlSchemaIR['tables'][string];
+    readonly schemaLookup: SchemaTableLookup | undefined;
+    readonly columnName: string;
+    readonly column: StorageColumn;
+    readonly codecHooks: Map<string, CodecControlHooks>;
+  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    const { schema, tableName, table, schemaTable, schemaLookup, columnName, column, codecHooks } =
+      options;
     const notNull = column.nullable === false;
     const hasDefault = column.default !== undefined;
-    // Only require empty table for NOT NULL columns WITHOUT defaults.
-    // PostgreSQL allows adding NOT NULL columns with defaults to non-empty tables
-    // because the default value is applied to existing rows.
-    const requiresEmptyTable = notNull && !hasDefault;
-    const precheck = [
-      {
-        description: `ensure column "${columnName}" is missing`,
-        sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
-      },
-      ...(requiresEmptyTable
-        ? [
-            {
-              description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
-              sql: tableIsEmptyCheck(qualified),
-            },
-          ]
-        : []),
-    ];
-    const execute = [
-      {
-        description: `add column "${columnName}"`,
-        sql: buildAddColumnSql(qualified, columnName, column, codecHooks),
-      },
-    ];
-    const postcheck = [
-      {
-        description: `verify column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
-      },
-      ...(notNull
-        ? [
-            {
-              description: `verify column "${columnName}" is NOT NULL`,
-              sql: columnNullabilityCheck({
-                schema,
-                table: tableName,
-                column: columnName,
-                nullable: false,
-              }),
-            },
-          ]
-        : []),
-    ];
+    // Planner logic decides whether this column needs the coordinated multi-step
+    // strategy. The strategy recipe itself is built by a dedicated helper.
+    const needsTemporaryDefault = notNull && !hasDefault;
+    const temporaryDefault = needsTemporaryDefault
+      ? resolveIdentityValue(column, codecHooks)
+      : null;
+    const canUseSharedTemporaryDefault =
+      needsTemporaryDefault &&
+      temporaryDefault !== null &&
+      canUseSharedTemporaryDefaultStrategy({
+        table,
+        schemaTable,
+        schemaLookup,
+        columnName,
+      });
 
+    if (canUseSharedTemporaryDefault) {
+      return buildAddNotNullColumnWithTemporaryDefaultOperation({
+        schema,
+        tableName,
+        columnName,
+        column,
+        codecHooks,
+        temporaryDefault,
+      });
+    }
+
+    const qualified = qualifyTableName(schema, tableName);
+    const requiresEmptyTableCheck = needsTemporaryDefault && !canUseSharedTemporaryDefault;
     return {
-      id: `column.${tableName}.${columnName}`,
-      label: `Add column ${columnName} to ${tableName}`,
-      summary: `Adds column ${columnName} to table ${tableName}`,
+      ...buildAddColumnOperationIdentity(schema, tableName, columnName),
       operationClass: 'additive',
-      target: {
-        id: 'postgres',
-        details: this.buildTargetDetails('table', tableName, schema),
-      },
-      precheck,
-      execute,
-      postcheck,
+      precheck: [
+        {
+          description: `ensure column "${columnName}" is missing`,
+          sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
+        },
+        ...(requiresEmptyTableCheck
+          ? [
+              {
+                description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
+                sql: tableIsEmptyCheck(qualified),
+              },
+            ]
+          : []),
+      ],
+      execute: [
+        {
+          description: `add column "${columnName}"`,
+          sql: buildAddColumnSql(qualified, columnName, column, codecHooks),
+        },
+      ],
+      postcheck: [
+        {
+          description: `verify column "${columnName}" exists`,
+          sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
+        },
+        ...(notNull
+          ? [
+              {
+                description: `verify column "${columnName}" is NOT NULL`,
+                sql: columnNullabilityCheck({
+                  schema,
+                  table: tableName,
+                  column: columnName,
+                  nullable: false,
+                }),
+              },
+            ]
+          : []),
+      ],
     };
   }
 
@@ -697,6 +743,41 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   }
 }
 
+function canUseSharedTemporaryDefaultStrategy(options: {
+  readonly table: StorageTable;
+  readonly schemaTable: SqlSchemaIR['tables'][string];
+  readonly schemaLookup: SchemaTableLookup | undefined;
+  readonly columnName: string;
+}): boolean {
+  const { table, schemaTable, schemaLookup, columnName } = options;
+
+  // Shared placeholders are only safe when later plan steps do not require
+  // row-specific values for this newly added column.
+  if (table.primaryKey?.columns.includes(columnName) && !schemaTable.primaryKey) {
+    return false;
+  }
+
+  for (const unique of table.uniques) {
+    if (!unique.columns.includes(columnName)) {
+      continue;
+    }
+    if (!schemaLookup || !hasUniqueConstraint(schemaLookup, unique.columns)) {
+      return false;
+    }
+  }
+
+  for (const foreignKey of table.foreignKeys) {
+    if (foreignKey.constraint === false || !foreignKey.columns.includes(columnName)) {
+      continue;
+    }
+    if (!schemaLookup || !hasForeignKey(schemaLookup, foreignKey)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function sortDependencies(
   dependencies: ReadonlyArray<PlannerDatabaseDependency>,
 ): ReadonlyArray<PlannerDatabaseDependency> {
@@ -709,292 +790,8 @@ function isPostgresPlannerDependency(
   return dependency.install.every((operation) => operation.target.id === 'postgres');
 }
 
-function buildCreateTableSql(
-  qualifiedTableName: string,
-  table: StorageTable,
-  codecHooks: Map<string, CodecControlHooks>,
-): string {
-  const columnDefinitions = Object.entries(table.columns).map(
-    ([columnName, column]: [string, StorageColumn]) => {
-      const parts = [
-        quoteIdentifier(columnName),
-        buildColumnTypeSql(column, codecHooks),
-        buildColumnDefaultSql(column.default, column),
-        column.nullable ? '' : 'NOT NULL',
-      ].filter(Boolean);
-      return parts.join(' ');
-    },
-  );
-
-  const constraintDefinitions: string[] = [];
-  if (table.primaryKey) {
-    constraintDefinitions.push(
-      `PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
-    );
-  }
-
-  const allDefinitions = [...columnDefinitions, ...constraintDefinitions];
-  return `CREATE TABLE ${qualifiedTableName} (\n  ${allDefinitions.join(',\n  ')}\n)`;
-}
-
-/**
- * Pattern for safe PostgreSQL type names.
- * Allows letters, digits, underscores, spaces (for "double precision", "character varying"),
- * and trailing [] for array types.
- */
-const SAFE_NATIVE_TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_ ]*(\[\])?$/;
-
-function assertSafeNativeType(nativeType: string): void {
-  if (!SAFE_NATIVE_TYPE_PATTERN.test(nativeType)) {
-    throw new Error(
-      `Unsafe native type name in contract: "${nativeType}". ` +
-        'Native type names must match /^[a-zA-Z][a-zA-Z0-9_ ]*(\\[\\])?$/',
-    );
-  }
-}
-
-/**
- * Sanity check against accidental SQL injection from malformed contract files.
- * Rejects semicolons, SQL comment tokens, and dollar-quoting.
- * Not a comprehensive security boundary — the contract is developer-authored.
- */
-function assertSafeDefaultExpression(expression: string): void {
-  if (expression.includes(';') || /--|\/\*|\$\$|\bSELECT\b/i.test(expression)) {
-    throw new Error(
-      `Unsafe default expression in contract: "${expression}". ` +
-        'Default expressions must not contain semicolons, SQL comment tokens, dollar-quoting, or subqueries.',
-    );
-  }
-}
-
-export function buildColumnTypeSql(
-  column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
-): string {
-  const columnDefault = column.default;
-
-  if (columnDefault?.kind === 'function' && columnDefault.expression === 'autoincrement()') {
-    if (column.nativeType === 'int4' || column.nativeType === 'integer') {
-      return 'SERIAL';
-    }
-    if (column.nativeType === 'int8' || column.nativeType === 'bigint') {
-      return 'BIGSERIAL';
-    }
-    if (column.nativeType === 'int2' || column.nativeType === 'smallint') {
-      return 'SMALLSERIAL';
-    }
-  }
-
-  if (column.typeRef) {
-    return quoteIdentifier(column.nativeType);
-  }
-
-  assertSafeNativeType(column.nativeType);
-  return renderParameterizedTypeSql(column, codecHooks) ?? column.nativeType;
-}
-
-function renderParameterizedTypeSql(
-  column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
-): string | null {
-  if (!column.typeParams) {
-    return null;
-  }
-
-  if (!column.codecId) {
-    throw new Error(
-      `Column declares typeParams for nativeType "${column.nativeType}" but has no codecId. ` +
-        'Ensure the column is associated with a codec.',
-    );
-  }
-
-  const hooks = codecHooks.get(column.codecId);
-  if (!hooks?.expandNativeType) {
-    throw new Error(
-      `Column declares typeParams for nativeType "${column.nativeType}" ` +
-        `but no expandNativeType hook is registered for codecId "${column.codecId}". ` +
-        'Ensure the extension providing this codec is included in extensionPacks.',
-    );
-  }
-
-  const expanded = hooks.expandNativeType({
-    nativeType: column.nativeType,
-    codecId: column.codecId,
-    typeParams: column.typeParams,
-  });
-
-  return expanded !== column.nativeType ? expanded : null;
-}
-
-/**
- * Builds the DEFAULT clause for a column definition.
- * Returns empty string if no default is defined.
- *
- * Note: autoincrement is handled specially via SERIAL types, so we skip it here.
- */
-function buildColumnDefaultSql(
-  columnDefault: PostgresColumnDefault | undefined,
-  column?: StorageColumn,
-): string {
-  if (!columnDefault) {
-    return '';
-  }
-
-  switch (columnDefault.kind) {
-    case 'literal':
-      return `DEFAULT ${renderDefaultLiteral(columnDefault.value, column)}`;
-    case 'function': {
-      // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
-      if (columnDefault.expression === 'autoincrement()') {
-        return '';
-      }
-      assertSafeDefaultExpression(columnDefault.expression);
-      return `DEFAULT (${columnDefault.expression})`;
-    }
-    case 'sequence':
-      // Sequence names use quoteIdentifier for safe identifier handling
-      return `DEFAULT nextval(${quoteIdentifier(columnDefault.name)}::regclass)`;
-  }
-}
-
-export function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
-  const isJsonColumn = column?.nativeType === 'json' || column?.nativeType === 'jsonb';
-
-  if (value instanceof Date) {
-    return `'${escapeLiteral(value.toISOString())}'`;
-  }
-  if (!isJsonColumn && isTaggedBigInt(value)) {
-    if (!/^-?\d+$/.test(value.value)) {
-      throw new Error(`Invalid tagged bigint value: "${value.value}" is not a valid integer`);
-    }
-    return value.value;
-  }
-  if (typeof value === 'bigint') {
-    return value.toString();
-  }
-  if (typeof value === 'string') {
-    return `'${escapeLiteral(value)}'`;
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  if (value === null) {
-    return 'NULL';
-  }
-  const json = JSON.stringify(value);
-  if (isJsonColumn) {
-    return `'${escapeLiteral(json)}'::${column.nativeType}`;
-  }
-  return `'${escapeLiteral(json)}'`;
-}
-
-export function buildTargetDetails(
-  objectType: OperationClass,
-  name: string,
-  schema: string,
-  table?: string,
-): PostgresPlanTargetDetails {
-  return {
-    schema,
-    objectType,
-    name,
-    ...ifDefined('table', table),
-  };
-}
-
-export function qualifyTableName(schema: string, table: string): string {
-  return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
-}
-
-export function toRegclassLiteral(schema: string, name: string): string {
-  const regclass = `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
-  return `'${escapeLiteral(regclass)}'`;
-}
-
 function sortedEntries<V>(record: Readonly<Record<string, V>>): Array<[string, V]> {
   return Object.entries(record).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, V]>;
-}
-
-export function constraintExistsCheck({
-  constraintName,
-  schema,
-  exists = true,
-}: {
-  constraintName: string;
-  schema: string;
-  exists?: boolean;
-}): string {
-  const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
-  return `SELECT ${existsClause} (
-  SELECT 1 FROM pg_constraint c
-  JOIN pg_namespace n ON c.connamespace = n.oid
-  WHERE c.conname = '${escapeLiteral(constraintName)}'
-  AND n.nspname = '${escapeLiteral(schema)}'
-)`;
-}
-
-export function columnExistsCheck({
-  schema,
-  table,
-  column,
-  exists = true,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  exists?: boolean;
-}): string {
-  const existsClause = exists ? '' : 'NOT ';
-  return `SELECT ${existsClause}EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-)`;
-}
-
-export function columnNullabilityCheck({
-  schema,
-  table,
-  column,
-  nullable,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  nullable: boolean;
-}): string {
-  const expected = nullable ? 'YES' : 'NO';
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-    AND is_nullable = '${expected}'
-)`;
-}
-
-function tableIsEmptyCheck(qualifiedTableName: string): string {
-  return `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedTableName} LIMIT 1)`;
-}
-
-function buildAddColumnSql(
-  qualifiedTableName: string,
-  columnName: string,
-  column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
-): string {
-  const typeSql = buildColumnTypeSql(column, codecHooks);
-  const defaultSql = buildColumnDefaultSql(column.default, column);
-  const parts = [
-    `ALTER TABLE ${qualifiedTableName}`,
-    `ADD COLUMN ${quoteIdentifier(columnName)} ${typeSql}`,
-    defaultSql,
-    column.nullable ? '' : 'NOT NULL',
-  ].filter(Boolean);
-  return parts.join(' ');
 }
 
 function tableHasPrimaryKeyCheck(
@@ -1067,43 +864,4 @@ function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
   return lookup.fkKeys.has(
     `${fk.columns.join(',')}|${fk.references.table}|${fk.references.columns.join(',')}`,
   );
-}
-
-const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
-  noAction: 'NO ACTION',
-  restrict: 'RESTRICT',
-  cascade: 'CASCADE',
-  setNull: 'SET NULL',
-  setDefault: 'SET DEFAULT',
-};
-
-function buildForeignKeySql(
-  schemaName: string,
-  tableName: string,
-  fkName: string,
-  foreignKey: ForeignKey,
-): string {
-  let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ADD CONSTRAINT ${quoteIdentifier(fkName)}
-FOREIGN KEY (${foreignKey.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${foreignKey.references.columns
-    .map(quoteIdentifier)
-    .join(', ')})`;
-
-  if (foreignKey.onDelete !== undefined) {
-    const action = REFERENTIAL_ACTION_SQL[foreignKey.onDelete];
-    if (!action) {
-      throw new Error(`Unknown referential action for onDelete: ${String(foreignKey.onDelete)}`);
-    }
-    sql += `\nON DELETE ${action}`;
-  }
-  if (foreignKey.onUpdate !== undefined) {
-    const action = REFERENTIAL_ACTION_SQL[foreignKey.onUpdate];
-    if (!action) {
-      throw new Error(`Unknown referential action for onUpdate: ${String(foreignKey.onUpdate)}`);
-    }
-    sql += `\nON UPDATE ${action}`;
-  }
-
-  return sql;
 }
