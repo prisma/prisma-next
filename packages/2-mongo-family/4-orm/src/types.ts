@@ -17,8 +17,6 @@ export interface MongoOrmOptions<TContract extends MongoContract> {
   readonly executor: MongoQueryExecutor;
 }
 
-type Simplify<T extends object> = { [K in keyof T]: T[K] } & {};
-
 // --- Relation type helpers ---
 
 export type ReferenceRelationKeys<
@@ -171,8 +169,6 @@ export interface MongoCollection<
   findMany<TInclude extends MongoIncludeSpec<TContract, ModelName> = Record<string, never>>(
     options?: MongoFindManyOptions<TContract, ModelName, TInclude>,
   ): AsyncIterableResult<
-    Simplify<
-      InferRootRow<TContract, ModelName> & IncludeResultFields<TContract, ModelName, TInclude>
-    >
+    InferRootRow<TContract, ModelName> & IncludeResultFields<TContract, ModelName, TInclude>
   >;
 }
