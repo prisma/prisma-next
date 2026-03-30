@@ -158,8 +158,10 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 
 ### Other domain-level properties
 
-- `**model.relations*`* — connections to other models with cardinality and strategy (see [ADR 174](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)).
+- `**model.relations**` — connections to other models with cardinality and strategy (see [ADR 174](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)).
 - `**model.discriminator**` + `**model.variants**` — optional polymorphism declaration (see [ADR 173](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)).
+
+**Note — relations placement is a change from the current contract.** The current SQL emitter produces a top-level `relations` block as a sibling of `models`, keyed by model name (e.g., `contract.relations.user.posts`). The SQL ORM client consumes relations from this top-level block. This ADR moves relations onto each model (`model.relations`) because a model's relationships are part of its domain description — a reader should be able to understand a model completely without consulting a separate section. The current top-level placement was not a deliberate design choice; it diverged from the test fixtures (which use the nested form) during emitter development. The SQL emitter and ORM client will need to be updated to match.
 
 ## Consequences
 
@@ -179,7 +181,8 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 
 - Both `SqlContract` and `MongoContract` will need to be modified to adopt this structure.
 - The emitter must be updated to produce the new format.
-- Consumer libraries that read the contract will need to be updated.
+- The SQL emitter must move relations from the top-level `relations` block onto each model's `relations` property.
+- Consumer libraries that read the contract will need to be updated — notably the SQL ORM client, which currently reads from the top-level `relations` block.
 - The `ContractBase` type must be designed as a new abstraction, not extracted mechanically from either existing contract.
 
 ## Related
