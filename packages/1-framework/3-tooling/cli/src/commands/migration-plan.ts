@@ -144,10 +144,10 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  const toStorageHash = (toContractJson as unknown as Record<string, unknown>)['storageHash'] as
+  const toHash = (toContractJson as unknown as Record<string, unknown>)['storageHash'] as
     | string
     | undefined;
-  if (!toStorageHash) {
+  if (!toHash) {
     return notOk(
       errorContractValidationFailed('Contract is missing storageHash', {
         where: { path: contractPathAbsolute },
@@ -184,9 +184,11 @@ async function executeMigrationPlanCommand(
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
         fromHash = latestMigration.to;
-        const leafPkg = bundles.find((p) => p.manifest.migrationId === latestMigration.migrationId);
-        if (leafPkg) {
-          fromContract = leafPkg.manifest.toContract;
+        const latestPkg = bundles.find(
+          (p) => p.manifest.migrationId === latestMigration.migrationId,
+        );
+        if (latestPkg) {
+          fromContract = latestPkg.manifest.toContract;
         }
       }
     }
@@ -198,12 +200,12 @@ async function executeMigrationPlanCommand(
   }
 
   // Check for no-op (same hash means no changes)
-  if (fromHash === toStorageHash) {
+  if (fromHash === toHash) {
     const result: MigrationPlanResult = {
       ok: true,
       noOp: true,
       from: fromHash,
-      to: toStorageHash,
+      to: toHash,
       operations: [],
       summary: 'No changes detected between contracts',
       timings: { total: Date.now() - startTime },
@@ -271,7 +273,7 @@ async function executeMigrationPlanCommand(
 
   const manifest: MigrationManifest = {
     from: fromHash,
-    to: toStorageHash,
+    to: toHash,
     migrationId: null,
     kind: 'regular',
     fromContract,
@@ -295,7 +297,7 @@ async function executeMigrationPlanCommand(
       ok: true,
       noOp: false,
       from: fromHash,
-      to: toStorageHash,
+      to: toHash,
       migrationId,
       dir: relative(process.cwd(), packageDir),
       operations: plannerResult.plan.operations.map((op) => ({
