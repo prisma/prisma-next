@@ -20,6 +20,18 @@ import type {
 
 const DEFAULT_HEADER = '// This file was introspected from the database. Do not edit manually.';
 
+/**
+ * Escapes a string for use inside a PSL double-quoted context (e.g., @map("..."), @relation(name: "...")).
+ * Prevents malformed PSL when database identifiers contain `"` or newlines.
+ */
+function escapePslString(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r');
+}
+
 type ResolvedColumnFieldName = {
   readonly fieldName: string;
   readonly fieldMap?: string | undefined;
@@ -211,10 +223,10 @@ function processTable(
       // Unsupported type
       fields.push({
         name: fieldName,
-        typeName: `Unsupported("${resolution.nativeType}")`,
+        typeName: `Unsupported("${escapePslString(resolution.nativeType)}")`,
         optional: column.nullable,
         list: false,
-        attributes: fieldMap ? [`@map("${fieldMap}")`] : [],
+        attributes: fieldMap ? [`@map("${escapePslString(fieldMap)}")`] : [],
         mapName: fieldMap ?? undefined,
         isId: false,
         isRelation: false,
@@ -266,7 +278,7 @@ function processTable(
 
     // Map
     if (fieldMap) {
-      attributes.push(`@map("${fieldMap}")`);
+      attributes.push(`@map("${escapePslString(fieldMap)}")`);
     }
 
     fields.push({
@@ -292,7 +304,7 @@ function processTable(
     if (rel.fields && rel.references) {
       const parts: string[] = [];
       if (rel.relationName) {
-        parts.push(`name: "${rel.relationName}"`);
+        parts.push(`name: "${escapePslString(rel.relationName)}"`);
       }
       parts.push(
         `fields: [${rel.fields
@@ -313,11 +325,11 @@ function processTable(
         parts.push(`onUpdate: ${rel.onUpdate}`);
       }
       if (rel.fkName) {
-        parts.push(`map: "${rel.fkName}"`);
+        parts.push(`map: "${escapePslString(rel.fkName)}"`);
       }
       relAttributes.push(`@relation(${parts.join(', ')})`);
     } else if (rel.relationName) {
-      relAttributes.push(`@relation(name: "${rel.relationName}")`);
+      relAttributes.push(`@relation(name: "${escapePslString(rel.relationName)}")`);
     }
 
     fields.push({
@@ -368,7 +380,7 @@ function processTable(
 
   // @@map
   if (mapName) {
-    modelAttributes.push(`@@map("${mapName}")`);
+    modelAttributes.push(`@@map("${escapePslString(mapName)}")`);
   }
 
   // Table without PK warning
@@ -396,7 +408,7 @@ function formatFieldConstraintAttribute(
   attribute: '@id' | '@unique',
   constraintName?: string,
 ): string {
-  return constraintName ? `${attribute}(map: "${constraintName}")` : attribute;
+  return constraintName ? `${attribute}(map: "${escapePslString(constraintName)}")` : attribute;
 }
 
 function formatModelConstraintAttribute(
@@ -406,7 +418,7 @@ function formatModelConstraintAttribute(
 ): string {
   const parts = [`[${fields.join(', ')}]`];
   if (constraintName) {
-    parts.push(`map: "${constraintName}"`);
+    parts.push(`map: "${escapePslString(constraintName)}"`);
   }
   return `${attribute}(${parts.join(', ')})`;
 }
@@ -789,7 +801,7 @@ function serializeEnum(e: {
   }
   if (e.mapName) {
     lines.push('');
-    lines.push(`  @@map("${e.mapName}")`);
+    lines.push(`  @@map("${escapePslString(e.mapName)}")`);
   }
   lines.push('}');
   return lines.join('\n');

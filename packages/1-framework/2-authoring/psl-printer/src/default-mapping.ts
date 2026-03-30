@@ -36,7 +36,9 @@ export function mapDefault(
         options?.functionAttributes?.[columnDefault.expression] ??
         DEFAULT_FUNCTION_ATTRIBUTES[columnDefault.expression] ??
         options?.fallbackFunctionAttribute?.(columnDefault.expression);
-      return attribute ? { attribute } : { comment: `// Raw default: ${columnDefault.expression}` };
+      return attribute
+        ? { attribute }
+        : { comment: `// Raw default: ${columnDefault.expression.replace(/[\r\n]+/g, ' ')}` };
     }
   }
 }
