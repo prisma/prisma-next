@@ -1,6 +1,6 @@
 import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoOrm } from '@prisma-next/mongo-orm';
-import { expect, it } from 'vitest';
+import { expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/orm-contract';
 import ormContractJson from './fixtures/orm-contract.json';
 import { describeWithMongoDB } from './setup';
@@ -141,7 +141,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     });
   });
 
-  it('discriminator narrows variant types', async () => {
+  it('discriminator narrows variant types exclusively', async () => {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('tasks').insertOne({
       title: 'Fix crash',
@@ -155,13 +155,13 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     const results = await orm.tasks.findMany();
     const r0 = results[0]!;
 
-    switch (r0.type) {
-      case 'bug':
-        expect(r0.severity).toBe('critical');
-        break;
-      case 'feature':
-        expect(r0.priority).toBeDefined();
-        break;
+    if (r0.type === 'bug') {
+      expect(r0.severity).toBe('critical');
+      expectTypeOf(r0.severity).toBeString();
+      // @ts-expect-error priority only exists on Feature variant
+      r0.priority;
+      // @ts-expect-error targetRelease only exists on Feature variant
+      r0.targetRelease;
     }
   });
 
