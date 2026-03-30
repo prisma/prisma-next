@@ -1,6 +1,4 @@
-# ADR 3 — Aggregate roots and relation strategies
-
-> **Scope**: Mongo-target local ADR. Will be promoted to the repo-wide ADR directory when the contract redesign is implemented across both families.
+# ADR 174 — Aggregate roots and relation strategies
 
 ## At a glance
 
@@ -57,7 +55,7 @@ Three things to notice:
 
 1. **`roots`** maps ORM accessor names to models — `db.users` and `db.posts` are the entry points. Address is not in `roots` because it's only reachable through User.
 2. **`strategy: "reference"`** on a relationship means Post lives in its own collection, resolved at query time. **`strategy: "embed"`** means Address lives nested inside User documents.
-3. **Address has `"storage": {}`** — empty, because it doesn't own a collection. Its data lives within User's storage. See [ADR 1](ADR%201%20-%20Contract%20domain-storage%20separation.md) for why `model.fields` carries `nullable` and `codecId`.
+3. **Address has `"storage": {}`** — empty, because it doesn't own a collection. Its data lives within User's storage. See [ADR 172](ADR%20172%20-%20Contract%20domain-storage%20separation.md) for why `model.fields` carries `nullable` and `codecId`.
 
 ## Context
 
@@ -70,7 +68,7 @@ Before this decision, the ORM's top-level access points were derived, not declar
 MongoDB breaks this assumption:
 
 - A model can be **embedded** in another model's document as a sub-document. It has no collection of its own and cannot be queried independently.
-- A model can be a **polymorphic variant** stored in its parent's collection (see [ADR 2](ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)).
+- A model can be a **polymorphic variant** stored in its parent's collection (see [ADR 173](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)).
 - A model can own its own collection and serve as an entry point for queries.
 
 These are three different storage relationships, but the contract had no way to express them. The ORM had to infer "is this model an aggregate root?" from storage metadata.
@@ -103,11 +101,11 @@ Why we rejected it: This works for SQL where every model has a table, but breaks
 
 **`strategy` label on the model** — each model declares its role: `"strategy": "root"`, `"strategy": "embedded"`.
 
-Why we rejected it: This conflates domain identity with storage role. A model can be an entity regardless of how it's stored. `strategy` as an enum is not extensible and creates a false choice between "root" and "embedded" when these are orthogonal — a model's root-ness comes from appearing in `roots`, and its embedded-ness comes from how a parent relates to it. See [ADR 2](ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) for why strategy labels are problematic in general.
+Why we rejected it: This conflates domain identity with storage role. A model can be an entity regardless of how it's stored. `strategy` as an enum is not extensible and creates a false choice between "root" and "embedded" when these are orthogonal — a model's root-ness comes from appearing in `roots`, and its embedded-ness comes from how a parent relates to it. See [ADR 173](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) for why strategy labels are problematic in general.
 
 **Move storage off the model, onto roots** — `roots` carries the table/collection name and field-to-column mappings.
 
-Why we rejected it: This cleanly separates domain from storage at the JSON structure level, but breaks co-location for SQL. Field-to-column mappings need their table context nearby. See [ADR 1](ADR%201%20-%20Contract%20domain-storage%20separation.md) for the full co-location rationale.
+Why we rejected it: This cleanly separates domain from storage at the JSON structure level, but breaks co-location for SQL. Field-to-column mappings need their table context nearby. See [ADR 172](ADR%20172%20-%20Contract%20domain-storage%20separation.md) for the full co-location rationale.
 
 ### For relation strategies
 
@@ -180,8 +178,8 @@ This design means:
 
 ## Related
 
-- [ADR 1 — Contract domain-storage separation](ADR%201%20-%20Contract%20domain-storage%20separation.md) — why `model.storage` stays on the model
-- [ADR 2 — Polymorphism via discriminator and variants](ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — why strategy labels are problematic
-- [design-questions.md § DQ #1](../1-design-docs/design-questions.md) — embedded documents resolution
-- [cross-cutting-learnings.md § learning #1](../cross-cutting-learnings.md) — explicit aggregate roots
-- [cross-cutting-learnings.md § learning #5](../cross-cutting-learnings.md) — models are entities, not just data descriptions
+- [ADR 172 — Contract domain-storage separation](ADR%20172%20-%20Contract%20domain-storage%20separation.md) — why `model.storage` stays on the model
+- [ADR 173 — Polymorphism via discriminator and variants](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — why strategy labels are problematic
+- [design-questions.md § DQ #1](../../planning/mongo-target/1-design-docs/design-questions.md) — embedded documents resolution
+- [cross-cutting-learnings.md § learning #1](../../planning/mongo-target/cross-cutting-learnings.md) — explicit aggregate roots
+- [cross-cutting-learnings.md § learning #5](../../planning/mongo-target/cross-cutting-learnings.md) — models are entities, not just data descriptions

@@ -1,6 +1,4 @@
-# ADR 4 — Shared ORM Collection interface
-
-> **Scope**: Mongo-target local ADR. Will be promoted to the repo-wide ADR directory when the shared Collection interface is extracted into the framework layer.
+# ADR 175 — Shared ORM Collection interface
 
 ## At a glance
 
@@ -129,7 +127,7 @@ This follows the established "spike then extract" principle from the broader Mon
 
 - **Symmetric user experience.** Users learn one API pattern that works across families. Switching between SQL and Mongo databases requires changing the contract and runtime, not rewriting query code.
 - **Custom collections work everywhere.** Domain methods like `.admins()` and `.byEmail(email)` are just `this.where(...)` calls — they don't touch family-specific internals and work identically for SQL and Mongo.
-- **Shared row type inference.** With `codecId` on `model.fields` (ADR 1), the path from contract to TypeScript type is identical. A single `InferModelRow` utility type can serve both families.
+- **Shared row type inference.** With `codecId` on `model.fields` (ADR 172), the path from contract to TypeScript type is identical. A single `InferModelRow` utility type can serve both families.
 - **Framework-level testing and utilities.** Code that operates on "any collection" (test helpers, middleware, debugging tools) can be written against the shared interface.
 - **Incremental adoption.** The spike-then-extract approach means both families can evolve independently. The shared interface is extracted when the overlap is clear, not forced upfront.
 

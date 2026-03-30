@@ -1,5 +1,12 @@
 # Cross-Cutting Learnings
 
+> **Note**: The proven learnings from this document have been promoted to the main architecture docs:
+> - Contract design principles, domain/storage separation, polymorphism, embedded types, entity vs value type → [1. Data Contract.md § Cross-family contract design](../../architecture%20docs/subsystems/1.%20Data%20Contract.md)
+> - Shared ORM Collection interface → [3. Query Lanes.md § Shared Collection interface across families](../../architecture%20docs/subsystems/3.%20Query%20Lanes.md)
+> - Full MongoDB Family overview → [10. MongoDB Family.md](../../architecture%20docs/subsystems/10.%20MongoDB%20Family.md)
+>
+> This file is retained as a historical reference. The open questions below remain active.
+
 Running record of insights from the Mongo workstream that affect the framework core or other families. These are findings that transcend the Mongo domain and will need to be applied to the broader architecture.
 
 When a learning has been fully applied (code and docs updated across all affected domains), remove it from this document.
@@ -51,18 +58,21 @@ The original plan was to keep `MongoContract` structurally parallel to `SqlContr
 The contract redesign found the right abstraction: separate domain from persistence, with `model.storage` as the scoped, family-specific bridge.
 
 **Model structure** — family-agnostic:
+
 - `fields` — record mapping field names to domain metadata (e.g. `{ "email": { "nullable": false, "codecId": "pg/text@1" } }`). Keys are the domain vocabulary; values carry `nullable` (required boolean) and `codecId` (the field's type). Codec identifiers are a family-agnostic concept — "family-agnostic" describes the *structure* of the domain section, not its *values*.
 - `discriminator` + `variants` — optional, for polymorphism
 - `relations` — connections to other models
 
-**`model.storage`** — family-specific bridge:
+`**model.storage`** — family-specific bridge:
 
 SQL maps fields to column names (because SQL has a genuine field → column indirection):
+
 ```json
 { "table": "tasks", "fields": { "id": { "column": "id" }, "title": { "column": "title" } } }
 ```
 
 Mongo needs only the collection name (no field mappings — the domain fields map directly to document fields):
+
 ```json
 { "collection": "tasks" }
 ```
@@ -96,7 +106,7 @@ All persistence-level polymorphism reduces to "multiple shapes in the same stora
 The base model declares a `discriminator` (which field) and `variants` (which models are specializations, with their discriminator values). Each variant names its `base` model and appears as a sibling in the `models` dictionary with its own additional fields and storage mappings:
 
 ```json
-{
+"models": {
   "Task": {
     "fields": {
       "id": { "nullable": false, "codecId": "pg/int4@1" },
@@ -155,14 +165,16 @@ Today the framework treats models as pure data descriptions (no behavior). Frami
 Building a Mongo ORM client alongside the existing SQL ORM revealed that the consumer-facing surface is fundamentally the same pattern across families. The `Collection` class with fluent chaining (`.where().select().include().take().all()`) is the shared ORM interface — not an options-bag API like `findMany({ where, include })`.
 
 **What's shared (framework-level):**
-- **`Collection` chaining API.** Immutable method chaining where each call returns a new collection with accumulated state. Both families use the same method vocabulary: `where`, `select`, `include`, `orderBy`, `take`, `skip`, `all`, `first`.
-- **`CollectionState`.** The family-agnostic state bag (filters, includes, orderBy, selectedFields, limit, offset). Chaining methods accumulate state; terminal methods (`.all()`, `.first()`) compile it into a family-specific query plan.
+
+- `**Collection` chaining API.** Immutable method chaining where each call returns a new collection with accumulated state. Both families use the same method vocabulary: `where`, `select`, `include`, `orderBy`, `take`, `skip`, `all`, `first`.
+- `**CollectionState`.** The family-agnostic state bag (filters, includes, orderBy, selectedFields, limit, offset). Chaining methods accumulate state; terminal methods (`.all()`, `.first()`) compile it into a family-specific query plan.
 - **Row type inference.** Both families follow `model.fields[f].codecId` → `CodecTypes[codecId]['output']` with nullable handling. This is a framework-level utility type, not per-family.
 - **Custom collection subclasses.** `class UserCollection extends Collection<Contract, 'User'>` with domain methods like `.admins()` and `.byEmail(email)`. Nothing about this pattern is SQL-specific.
 - **Include interface.** `include('relation', refineFn?)` with cardinality-aware coercion (to-one → `T | null`, to-many → `T[]`). The refinement callback produces a nested collection with its own state.
 - **Client = map of root names → Collection instances.** Both families derive this from the contract's `roots` section.
 
 **What stays family-specific (internal plumbing):**
+
 - **Terminal compilation.** `.all()` compiles `CollectionState` → `SqlQueryPlan` (SQL AST) vs `MongoQueryPlan` (FindCommand / AggregateCommand).
 - **Include resolution strategy.** SQL uses lateral joins, correlated subqueries, or multi-query stitching. Mongo uses `$lookup` pipeline stages. Embedded relations in Mongo are auto-projected (no loading needed).
 - **Where expression compilation.** SQL compiles to SQL AST nodes. Mongo compiles to filter documents. The callback DSL shape (`.email.eq(...)`) could share the same signature, but the output types differ.
@@ -173,7 +185,7 @@ Building a Mongo ORM client alongside the existing SQL ORM revealed that the con
 
 The Phase 3 options-bag API (`findMany({ where, include })`) was expedient for proving the contract shape but is not the target design. Phase 4 will reimplement the Mongo ORM with the chaining Collection pattern.
 
-**Where to apply**: `packages/1-framework/` (shared Collection interface and CollectionState), both family ORM packages. See [ADR 4](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md).
+**Where to apply**: `packages/1-framework/` (shared Collection interface and CollectionState), both family ORM packages. See [ADR 175](../../architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md).
 
 ---
 
@@ -207,8 +219,8 @@ Relations with `"strategy": "reference"` need family-specific join details (SQL:
 
 Both are **domain concepts** and live on `model.fields`:
 
-- **`nullable`** — "can a User have no email?" is a business rule that directly affects type inference (`string` vs `string | null`). Both families need it identically.
-- **`codecId`** — the field's type. Describing a field without its type leaves the domain section incomplete. The codecId *concept* is family-agnostic (every family uses codec identifiers); the specific IDs available depend on framework composition, but that's a composition concern, not a structural one. "Family-agnostic" describes the structure of the domain section, not its values.
+- `**nullable`** — "can a User have no email?" is a business rule that directly affects type inference (`string` vs `string | null`). Both families need it identically.
+- `**codecId**` — the field's type. Describing a field without its type leaves the domain section incomplete. The codecId *concept* is family-agnostic (every family uses codec identifiers); the specific IDs available depend on framework composition, but that's a composition concern, not a structural one. "Family-agnostic" describes the structure of the domain section, not its values.
 
 ```json
 { "id": { "nullable": false, "codecId": "pg/int4@1" }, "email": { "nullable": false, "codecId": "pg/text@1" }, "name": { "nullable": true, "codecId": "pg/text@1" } }
@@ -223,6 +235,7 @@ Moving `codecId` to the domain field narrows the storage divergence: Mongo's `mo
 ## Maintenance
 
 This document is maintained alongside the Mongo design documents. Add entries when:
+
 - A Mongo PoC milestone reveals something that affects the framework core or another family
 - A design discussion surfaces a cross-cutting concern
 

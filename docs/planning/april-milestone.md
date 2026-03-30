@@ -243,48 +243,50 @@ Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visi
 
 ---
 
-### 4. MongoDB PoC — validate the second database family
+### 4. MongoDB — land the learnings
 
 **People**: Will, Serhii (after SQLite)
 
-**Status**: Planning complete, implementation not started
+**Status**: PoC complete. Architecture validated. Remaining work is integration.
 
-**Why this blocks the milestone**: We plan to invite community authors to build extensions. Our [community generator analysis](0-references/community-generator-migration-analysis.md) shows 31 of 33 use cases are family-agnostic — but every interface an extension would consume today is SQL-specific. Stabilizing these interfaces without validating a second family risks ecosystem fragmentation (extensions that only work with SQL), breaking changes (discovering later that the family-agnostic surface needs to look different), and target fragmentation within SQL (extensions that silently depend on Postgres-specific storage details).
+The Mongo PoC (Phases 1-3) validated that the Prisma Next architecture generalizes to a non-SQL database family. The execution pipeline, contract structure, ORM consumer surface, polymorphism, and embedded documents all work. The full assessment is in the [PoC conclusion](mongo-target/1-design-docs/mongo-poc-plan.md#poc-conclusion). Design decisions are documented in [ADRs 172-175](../architecture%20docs/adrs/) and the [MongoDB Family subsystem doc](../architecture%20docs/subsystems/10.%20MongoDB%20Family.md).
+
+The remaining risks are **integration risks**, not architectural ones. The longer the current SQL-centric contract shape and ORM structure harden, the more expensive the transition becomes.
 
 **Key risks**:
 
-- The ORM client and SQL DSL are both coupled directly to SQL. The SQL DSL is useless for Mongo. The ORM client's interface (`findMany`, `create`, `where`) is conceptually family-agnostic, but its implementation (query compilation into SQL AST) is deeply SQL-coupled. We need a document ORM implementation — but without a shared interface, the two implementations will diverge and users lose consistency across families.
-- The runtime execution plan shape (`ExecutionPlan` with `sql: string`) may need to generalize to accommodate non-SQL queries.
-- We don't yet know where the deepest coupling points are. This workstream is exploratory — the task breakdown will evolve as we discover what breaks.
+- The SQL contract, emitter, and ORM all use the pre-redesign shape. Every consumer that stabilizes against the old shape is a call site to update later.
+- The PSL/TS authoring surfaces are actively being designed. If they stabilize around SQL idioms (no `roots`, no `discriminator`/`variants`, no embed/reference strategy), retrofitting will be expensive.
+- The SQL ORM client is actively being refined. Pinning it to the new contract shape has high value but requires coordination with Alexey.
 
 #### Priority queue
 
-**VP1: The architecture accommodates a second database family**
+**P1 — Required:**
 
-This is proven by building a vertical slice through the stack for a document database (MongoDB). Unlike the SQLite workstream, this tests family abstraction (SQL vs document), not target abstraction (Postgres vs SQLite within SQL). Every layer of the stack is under test.
+**1. Contract extraction.** Extract `ContractBase` from the two concrete implementations (SQL and Mongo). Restructure `SqlContract` to the new shape: `model.fields` with `codecId`/`nullable`, `roots` section, domain/storage separation per [ADR 172](../architecture%20docs/adrs/ADR%20172%20-%20Contract%20domain-storage%20separation.md). Update the emitter, `validateContract()`, and all consumers (ORM client, query builder, demo app).
 
-Layers under test:
+Proof: both ORM clients consume `ContractBase` for domain-level operations. The domain validation layer is shared.
 
-- **Contract surface**: Can a consumer library traverse models and fields of both SQL and document contracts without family-specific code?
-- **Contract authoring**: Can TS authoring produce a document contract? Common parts (models, fields, relations) should be shared; storage-specific parts (collections, embedded documents, ObjectId) are family-specific.
-- **Contract emit**: Can the emitter produce a valid document contract with correct types?
-- **Type system / codecs**: Do BSON codecs work through the same codec registry and trait system?
-- **Runtime execution**: Can the runtime execute a non-SQL query plan? Does the middleware pipeline handle it?
-- **ORM client**: Does a document ORM client satisfy a shared interface with the SQL ORM client — conventional behaviors (`findMany`, `create`, `where`, etc.) are consistent — while compiling to Mongo-native queries? The shared interface is the guard against the two family implementations diverging. The goal is a Mongo-native experience, not a "swap target" portability story.
+**2. ORM consolidation.** Flesh out the Mongo ORM with the SQL ORM's fluent chaining API (`.where().select().include().take().all()`), following [ADR 175](../architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md). Build as an isolated spike first, then coordinate with Alexey on the shared Collection interface.
 
-Not applicable in April: migration planner/runner (Mongo is schemaless in the DDL sense), SQL generation, query escape hatch DSL (deferred — the ORM is the only query surface for documents in April), streaming subscriptions (change streams are validated in the SQL runtime workstream via Supabase Realtime — see [workstream 3, VP5](#3-runtime-pipeline-orm-query-builders-middleware-framework-integration); the Mongo PoC must not prevent streaming but doesn't implement it). Note: document databases still need data-level schema evolution (renaming fields, restructuring nested documents, splitting collections). If the data invariant model from workstream 1 works well, it may become the foundation for document schema evolution — that's a cross-workstream connection worth tracking.
+Proof: Mongo `Collection` class with the same method vocabulary as SQL, compiling to `MongoQueryPlan` at terminal methods.
 
-User story: I author a document contract in TS, emit it, and query a MongoDB database through the Prisma Next runtime and ORM. A consumer library (e.g. a validator or schema-to-JSON-Schema tool) works against both my SQL contract and my document contract without family-specific code.
+**3. Polymorphic models in both ORM clients.** Extend the shared ORM interface to support polymorphic models — `discriminator`/`variants`/`base` in the contract produce discriminated union return types with narrowing in both families, per [ADR 173](../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md). Depends on contract extraction.
 
-Tasks (sequential discovery phases — each phase may reveal changes needed before the next can proceed):
+Proof: querying a polymorphic root returns a discriminated union type that narrows correctly on the discriminator field in both SQL and Mongo ORM clients.
 
-1. **Contract surface + authoring** — define a document contract type, author it in TS. Does the contract structure generalize? Do authoring surfaces handle family-specific storage concepts (collections, embedded documents, ObjectId)?
-2. **Emit** — emit the document contract (`contract.json` + `contract.d.ts`). Does the emitter generalize beyond SQL?
-3. **Runtime execution** — execute a Mongo query through the runtime. Does the execution plan generalize? Does middleware work with non-SQL plans?
-4. **ORM client + shared interface** — build a document ORM client that satisfies a shared interface with the SQL ORM client. Does query compilation abstract cleanly, or is SQL AST baked in too deep?
-5. **Cross-family consumer library** — the final proof. A consumer library that works against both SQL and document contracts without family-specific code.
+**P2 — Stretch:**
 
-Stop condition: A consumer library works against both a SQL and a document contract without family-specific code, backed by a real vertical slice (not just types) where the document contract was authored, emitted, and queried through the runtime and ORM. Both ORM clients satisfy a shared interface. Then stop — production-quality MongoDB driver, aggregation pipeline DSL, comprehensive codec coverage, and Mongo-native query ergonomics are all later.
+**4. Basic Mongo query builder.** A type-safe query builder and/or aggregation pipeline builder for MongoDB, operating on the contract. This is the escape-hatch equivalent of the SQL query builder — a lower-level surface for queries the ORM can't express.
+
+**Cross-family validation (falls out of P1):**
+
+- **Contract generalizes**: both ORM clients read from `ContractBase`, shared domain validation layer.
+- **Runtime generalizes**: a caching or telemetry middleware works across both families without family-specific code.
+
+Not applicable in April: migration planner/runner (Mongo is schemaless in the DDL sense), streaming subscriptions (validated in the SQL runtime workstream via Supabase Realtime — see [workstream 3, VP5](#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)), production-quality MongoDB driver, Mongo-native query ergonomics.
+
+Stop condition: Both ORM clients consume `ContractBase`. Polymorphic models work in both families. A middleware operates across both families without family-specific code.
 
 ---
 
