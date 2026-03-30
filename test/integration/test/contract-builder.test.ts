@@ -5,7 +5,7 @@ import {
 } from '@prisma-next/adapter-postgres/column-types';
 import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -271,6 +271,72 @@ describe('builder integration', () => {
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
     expectTypeOf<ContractCodecTypes['pg/text@1']['output']>().toEqualTypeOf<string>();
     expectTypeOf<ContractCodecTypes['pg/timestamptz@1']['output']>().toEqualTypeOf<string>();
+  });
+
+  it('refined object contract works with schema() and sql()', () => {
+    const User = model('User', {
+      fields: {
+        id: field.column(int4Column).id(),
+        email: field.column(textColumn),
+        createdAt: field.column(timestamptzColumn),
+      },
+      relations: {
+        posts: rel.hasMany(() => Post, { by: 'userId' }),
+      },
+    }).sql({
+      table: 'user',
+    });
+
+    const Post = model('Post', {
+      fields: {
+        id: field.column(int4Column).id(),
+        userId: field.column(int4Column),
+        title: field.column(textColumn),
+      },
+      relations: {
+        user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+      },
+    }).sql(({ cols, constraints }) => ({
+      table: 'post',
+      foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
+    }));
+
+    const contract = defineContract({
+      target: postgresPack,
+      storageHash: 'sha256:test-refined',
+      models: {
+        User,
+        Post,
+      },
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema<typeof contract>(context).tables;
+    const userTable = tables.user;
+    expect(userTable).toBeDefined();
+    expectTypeOf<keyof typeof contract.storage.tables>().toEqualTypeOf<'user' | 'post'>();
+    expectTypeOf(contract.storage.tables.user.columns.id.codecId).toExtend<string>();
+    expectTypeOf(contract.models.User.storage.table).toEqualTypeOf<'user'>();
+
+    if (!userTable) throw new Error('user table not found');
+
+    const plan = sql<typeof contract>({ context })
+      .from(userTable)
+      .select({
+        id: userTable.columns.id!,
+        email: userTable.columns.email!,
+        createdAt: userTable.columns.createdAt!,
+      })
+      .build();
+
+    type Row = ResultType<typeof plan>;
+
+    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.meta.storageHash).toBe('sha256:test-refined');
+    expectTypeOf<Row>().toHaveProperty('id');
+    expectTypeOf<Row>().toHaveProperty('email');
+    expectTypeOf<Row>().toHaveProperty('createdAt');
   });
 
   it('contract structure matches fixture contract', () => {

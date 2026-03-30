@@ -16,6 +16,7 @@ import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
+import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
 import type {
   ExecutionHashBase,
@@ -32,15 +33,16 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:43f728c37e9b8f369b2b8acefa387906afd4555646a08528254eceee247342d7'>;
+  StorageHashBase<'sha256:3b2b9f8327591181f5630eb334005e789ab4a710c2877547e5c1c1303868324d'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:630618d96f7674c186a027d1295bfc5d688c4168c5a023a1aea01553820387dc'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:83d66b1cce776c9ec9e6d168086e5bd1030ccf461823b9eef39cf49f1833c6dd'>;
+  ProfileHashBase<'sha256:c54f610b4576f79290dede2b74376298ae75f3be3b60fcaf06b7e7cc19f76b7d'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
+export type QueryOperationTypes = PgVectorQueryOperationTypes;
 type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId] extends { readonly output: infer O }
     ? O extends Date | bigint
@@ -49,7 +51,7 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
     : Encoded
   : Encoded;
 
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
 type ContractBase = SqlContract<
   {
@@ -119,6 +121,7 @@ type ContractBase = SqlContract<
           {
             readonly columns: readonly ['userId'];
             readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly name: 'post_userId_fkey';
             readonly constraint: true;
             readonly index: true;
           },
@@ -126,19 +129,28 @@ type ContractBase = SqlContract<
       };
     };
     readonly types: {
-      readonly user_type: {
-        readonly codecId: 'pg/enum@1';
-        readonly nativeType: 'user_type';
-        readonly typeParams: { readonly values: readonly ['admin', 'user'] };
-      };
       readonly Embedding1536: {
         readonly codecId: 'pg/vector@1';
         readonly nativeType: 'vector';
         readonly typeParams: { readonly length: 1536 };
       };
+      readonly user_type: {
+        readonly codecId: 'pg/enum@1';
+        readonly nativeType: 'user_type';
+        readonly typeParams: { readonly values: readonly ['admin', 'user'] };
+      };
     };
   },
   {
+    readonly User: {
+      storage: { readonly table: 'user' };
+      fields: {
+        readonly id: Char<36>;
+        readonly email: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly kind: 'admin' | 'user';
+      };
+    };
     readonly Post: {
       storage: { readonly table: 'post' };
       fields: {
@@ -149,27 +161,8 @@ type ContractBase = SqlContract<
         readonly embedding: Vector<1536> | null;
       };
     };
-    readonly User: {
-      storage: { readonly table: 'user' };
-      fields: {
-        readonly id: Char<36>;
-        readonly email: CodecTypes['pg/text@1']['output'];
-        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-        readonly kind: 'admin' | 'user';
-      };
-    };
   },
   {
-    readonly post: {
-      readonly user: {
-        readonly to: 'User';
-        readonly cardinality: 'N:1';
-        readonly on: {
-          readonly parentCols: readonly ['userId'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-    };
     readonly user: {
       readonly posts: {
         readonly to: 'Post';
@@ -180,11 +173,27 @@ type ContractBase = SqlContract<
         };
       };
     };
+    readonly post: {
+      readonly user: {
+        readonly to: 'User';
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly parentCols: readonly ['userId'];
+          readonly childCols: readonly ['id'];
+        };
+      };
+    };
   },
   {
-    modelToTable: { readonly Post: 'post'; readonly User: 'user' };
-    tableToModel: { readonly post: 'Post'; readonly user: 'User' };
+    modelToTable: { readonly User: 'user'; readonly Post: 'post' };
+    tableToModel: { readonly user: 'User'; readonly post: 'Post' };
     fieldToColumn: {
+      readonly User: {
+        readonly id: 'id';
+        readonly email: 'email';
+        readonly createdAt: 'createdAt';
+        readonly kind: 'kind';
+      };
       readonly Post: {
         readonly id: 'id';
         readonly title: 'title';
@@ -192,26 +201,20 @@ type ContractBase = SqlContract<
         readonly createdAt: 'createdAt';
         readonly embedding: 'embedding';
       };
-      readonly User: {
+    };
+    columnToField: {
+      readonly user: {
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
         readonly kind: 'kind';
       };
-    };
-    columnToField: {
       readonly post: {
         readonly id: 'id';
         readonly title: 'title';
         readonly userId: 'userId';
         readonly createdAt: 'createdAt';
         readonly embedding: 'embedding';
-      };
-      readonly user: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'createdAt';
-        readonly kind: 'kind';
       };
     };
   },
@@ -222,6 +225,7 @@ type ContractBase = SqlContract<
   readonly target: 'postgres';
   readonly capabilities: {
     readonly postgres: {
+      readonly 'defaults.now': true;
       readonly jsonAgg: true;
       readonly lateral: true;
       readonly limit: true;
@@ -258,6 +262,13 @@ type ContractBase = SqlContract<
           readonly import: {
             readonly alias: 'PgVectorOperationTypes';
             readonly named: 'OperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
+        };
+        readonly queryOperationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorQueryOperationTypes';
+            readonly named: 'QueryOperationTypes';
             readonly package: '@prisma-next/extension-pgvector/operation-types';
           };
         };

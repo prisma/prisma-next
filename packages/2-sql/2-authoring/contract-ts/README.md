@@ -15,12 +15,14 @@ This package contains the SQL-specific TypeScript contract authoring surface for
 ## Overview
 
 This package is part of the SQL family namespace (`packages/2-sql/2-authoring/contract-ts`) and provides:
-- SQL contract builder (`defineContract`) - TypeScript builder for creating SQL contracts programmatically
+- SQL contract builder (`defineContract`) in two forms:
+  - legacy chain builder
+  - refined Option A object-literal authoring with `model('User', { fields, relations }).attributes(...).sql(...)`
 - SQL contract JSON schema - JSON schema for validating contract structure
 
 ## Responsibilities
 
-- **SQL Contract Builder**: Provides the `defineContract()` builder API for creating SQL contracts programmatically with type safety, including pack-ref based `.target()` and `.extensionPacks()` helpers
+- **SQL Contract Builder**: Provides both the existing chain builder and the refined Option A authoring surface for creating SQL contracts programmatically with type safety
 - **Storage Type Authoring**: Supports `storage.types` declarations and `typeRef` columns via the SQL builder
 - **SQL Contract JSON Schema**: Provides JSON schema for validating contract structure in IDEs and tooling
 - **Composition Layer**: Composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic
@@ -50,13 +52,94 @@ This package is part of the package layering architecture:
 
 ## Exports
 
-- `./contract-builder` - Contract builder API (`defineContract`, `ColumnBuilder`)
+- `./contract-builder` - Contract builder API (`defineContract`, `field`, `model`, `rel`, `ColumnBuilder`)
 - `./config-types` - TypeScript contract config helper (`typescriptContract`)
 - `./schema-sql` - SQL contract JSON schema (`data-contract-sql-v1.json`)
 
 ## Usage
 
 ### Building Contracts
+
+#### Refined Option A
+
+The refined surface keeps domain meaning close to the model:
+- field-level `id()` and `unique()` for the common single-field case
+- `.attributes(...)` for compound `id` and compound `unique`
+- optional staged `.relations(...)` for mutually recursive model graphs
+- `.sql(...)` for table naming, indexes, and foreign keys
+
+```typescript
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
+import { textColumn, timestamptzColumn } from '@prisma-next/adapter-postgres/column-types';
+import { uuidv4 } from '@prisma-next/ids';
+
+const User = model('User', {
+  fields: {
+    id: field.generated(uuidv4()).id({ name: 'app_user_pkey' }),
+    email: field.column(textColumn).unique({ name: 'app_user_email_key' }),
+    createdAt: field.column(timestamptzColumn).defaultSql('now()'),
+  },
+});
+
+const Post = model('Post', {
+  fields: {
+    id: field.generated(uuidv4()).id(),
+    userId: field.column(textColumn),
+    title: field.column(textColumn),
+  },
+});
+
+export const contract = defineContract({
+  target: postgresPack,
+  naming: { tables: 'snake_case', columns: 'snake_case' },
+  models: {
+    User: User.relations({
+      posts: rel.hasMany(Post, { by: 'userId' }),
+    }).sql({
+      table: 'app_user',
+    }),
+    Post: Post.relations({
+      user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+    }).sql({
+      table: 'blog_post',
+    }),
+  },
+});
+```
+
+Compound model-level constraints live in `.attributes(...)`:
+
+```typescript
+const Membership = model('Membership', {
+  fields: {
+    orgId: field.column(textColumn).column('org_id'),
+    userId: field.column(textColumn).column('user_id'),
+    role: field.column(textColumn),
+  },
+})
+  .attributes(({ fields, constraints }) => ({
+    id: constraints.id([fields.orgId, fields.userId], { name: 'membership_pkey' }),
+    uniques: [
+      constraints.unique([fields.orgId, fields.role], {
+        name: 'membership_org_role_key',
+      }),
+    ],
+  }))
+  .sql({ table: 'membership' });
+```
+
+This first slice intentionally keeps the scalar vocabulary pack-driven:
+
+- use pack-provided column descriptors with `field.column(...)`
+- use generated-column specs such as `uuidv4()` with `field.generated(...)`
+- use root `types` plus `field.namedType(...)` for `storage.types` references
+- use named model tokens plus `User.refs.id` or `User.ref('id')` for cross-model foreign-key targets
+- keep `constraints.ref('Model', 'field')` only as a fallback when you do not have a named token in scope
+- use `field.id()` for single-field identity and `.attributes(({ fields, constraints }) => ({ id: constraints.id([...]) }))` for compound identity
+- use `field.unique()` for single-field uniqueness and `.attributes(({ fields, constraints }) => ({ uniques: [constraints.unique([...])] }))` for compound uniqueness
+
+#### Legacy Chain Builder
 
 ```typescript
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -162,6 +245,8 @@ Integration tests that depend on both `sql-contract-ts` and `sql-query` are loca
 
 ## Migration Notes
 
+- **Refined Option A is the long-term direction**: `defineContract({ ... })` plus `model('User', { fields, relations }).sql(...)`
+- **The first slice keeps the helper vocabulary intentionally small**: prefer pack-provided descriptors over a large built-in preset surface for now
 - **Backward Compatibility**: `@prisma-next/sql-query` re-exports contract authoring functions for backward compatibility (will be removed in Slice 7)
 - **Import Path**: New code should import directly from `@prisma-next/sql-contract-ts`
 - **Phase 2 Complete**: The target-agnostic core has been extracted to `@prisma-next/contract-authoring`. This package composes the generic core with SQL-specific types.
@@ -171,4 +256,3 @@ Integration tests that depend on both `sql-contract-ts` and `sql-query` are loca
 - `@prisma-next/contract-authoring` - Target-agnostic builder core that this package composes
 - `@prisma-next/sql-contract-psl` - PSL parser-output to SQL `ContractIR` interpreter for provider-based flows
 - `@prisma-next/sql-contract-psl/provider` - SQL PSL-first `prismaContract()` helper (read -> parse -> interpret)
-

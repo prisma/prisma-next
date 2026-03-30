@@ -6,7 +6,7 @@ import {
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -101,6 +101,92 @@ test('ResultType inference works identically to fixture contract', () => {
   expectTypeOf<FixtureRow>().toHaveProperty('email');
   expectTypeOf<FixtureRow>().toHaveProperty('createdAt');
   expectTypeOf(_plan).toExtend<SqlQueryPlan<BuilderRow>>();
+});
+
+test('refined object contract preserves downstream schema and ResultType inference', () => {
+  const User = model('User', {
+    fields: {
+      id: field.column(int4Column).id(),
+      email: field.column(textColumn),
+      createdAt: field.column(timestamptzColumn),
+    },
+    relations: {
+      posts: rel.hasMany(() => Post, { by: 'userId' }),
+    },
+  }).sql({
+    table: 'user',
+  });
+
+  const Post = model('Post', {
+    fields: {
+      id: field.column(int4Column).id(),
+      userId: field.column(int4Column),
+      title: field.column(textColumn),
+    },
+    relations: {
+      user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+    },
+  }).sql(({ cols, constraints }) => ({
+    table: 'post',
+    foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
+  }));
+
+  const contract = defineContract({
+    target: postgresPack,
+    storageHash: 'sha256:test-refined',
+    models: {
+      User,
+      Post,
+    },
+  });
+
+  const validated = validateContract<typeof contract>(contract);
+  const adapter = createStubAdapter();
+  const context = createTestContext(validated, adapter);
+  const tables = schema(context).tables;
+  const userTable = tables.user;
+  if (!userTable) throw new Error('user table not found');
+
+  const _plan = sql({ context })
+    .from(userTable)
+    .select({
+      id: userTable.columns.id!,
+      email: userTable.columns.email!,
+      createdAt: userTable.columns.createdAt!,
+    })
+    .build();
+
+  type Row = ResultType<typeof _plan>;
+
+  expectTypeOf<keyof typeof validated.storage.tables>().toEqualTypeOf<'user' | 'post'>();
+  expectTypeOf(validated.storage.tables.user.columns.id.codecId).toExtend<string>();
+  expectTypeOf(validated.storage.tables.user.columns.createdAt.codecId).toExtend<string>();
+  expectTypeOf(validated.models.User.storage.table).toEqualTypeOf<'user'>();
+  expectTypeOf(validated.models.Post.fields.userId.column).toEqualTypeOf<'userId'>();
+  expectTypeOf(User.refs.id.fieldName).toEqualTypeOf<'id'>();
+  expectTypeOf(User.refs.id.modelName).toEqualTypeOf<'User'>();
+  expectTypeOf(User.ref('email').fieldName).toEqualTypeOf<'email'>();
+  expectTypeOf(User.ref('email').modelName).toEqualTypeOf<'User'>();
+
+  rel.belongsTo(User, { from: 'userId', to: 'id' });
+  rel.hasMany(Post, { by: 'userId' });
+
+  // @ts-expect-error relation fields must not appear in model token refs
+  User.refs.posts;
+
+  // @ts-expect-error unknown field names must not compile for model token refs
+  User.ref('posts');
+
+  // @ts-expect-error relation targets must expose real scalar fields
+  rel.belongsTo(User, { from: 'userId', to: 'posts' });
+
+  // @ts-expect-error relation targets must expose real scalar fields
+  rel.hasMany(Post, { by: 'posts' });
+
+  expectTypeOf<Row>().toHaveProperty('id');
+  expectTypeOf<Row>().toHaveProperty('email');
+  expectTypeOf<Row>().toHaveProperty('createdAt');
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('codec type inference via type option', () => {
