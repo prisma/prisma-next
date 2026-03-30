@@ -33,6 +33,8 @@ Architecture docs in this repo serve two audiences: team members working on the 
 
 ## Structure
 
+**Lead with a grounding example.** Put a concrete, complete code snippet, JSON example, or diagram near the top of the document — right after the overview — so the reader has a visual reference to pin their understanding to as they read. Abstract explanations are much easier to follow when the reader can refer back to something tangible. Annotate the example with brief callouts that preview the key concepts ("notice that `storage: {}` means this model is embedded"). The detailed sections that follow can then elaborate on what the reader has already seen.
+
 **Narrative flow.** Guide the reader from one concept to the next. Don't list a set of problems and then separately list a set of solutions — pair each problem with its solution so the reader builds understanding incrementally.
 
 **Overview section.** Open with plain language explaining what this part of the system is and why it exists. The first sentence should be immediately understandable by any engineer. Save technical details for later sections.
