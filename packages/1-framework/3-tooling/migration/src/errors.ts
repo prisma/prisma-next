@@ -96,7 +96,7 @@ export function errorSameSourceAndTarget(dirName: string, hash: string): Migrati
   );
 }
 
-export function errorDivergentBranches(
+export function errorAmbiguousTarget(
   branchTips: readonly string[],
   context?: {
     divergencePoint: string;

@@ -1,7 +1,7 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
-  errorDivergentBranches,
+  errorAmbiguousTarget,
   errorDuplicateMigrationId,
   errorNoInitialMigration,
   errorNoTarget,
@@ -279,7 +279,7 @@ export function findReachableLeaves(graph: MigrationGraph, fromHash: string): re
  * Find the target contract hash of the migration graph reachable from
  * EMPTY_CONTRACT_HASH. Throws NO_INITIAL_MIGRATION if the graph has
  * nodes but none originate from the empty hash.
- * Throws DIVERGENT_BRANCHES if multiple branch tips exist.
+ * Throws AMBIGUOUS_TARGET if multiple branch tips exist.
  */
 export function findLeaf(graph: MigrationGraph): string {
   if (graph.nodes.size === 0) {
@@ -309,7 +309,7 @@ export function findLeaf(graph: MigrationGraph): string {
         edges: (path ?? []).map((e) => ({ dirName: e.dirName, from: e.from, to: e.to })),
       };
     });
-    throw errorDivergentBranches(leaves, { divergencePoint, branches });
+    throw errorAmbiguousTarget(leaves, { divergencePoint, branches });
   }
 
   const leaf = leaves[0];
@@ -319,7 +319,7 @@ export function findLeaf(graph: MigrationGraph): string {
 /**
  * Find the latest migration entry by traversing from EMPTY_CONTRACT_HASH
  * to the single target. Returns null for an empty graph.
- * Throws DIVERGENT_BRANCHES if the graph has multiple branch tips.
+ * Throws AMBIGUOUS_TARGET if the graph has multiple branch tips.
  */
 export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry | null {
   if (graph.nodes.size === 0) {
