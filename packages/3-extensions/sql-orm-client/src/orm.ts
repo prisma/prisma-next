@@ -1,4 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from './collection';
 import type {
   CollectionContext,
@@ -12,9 +13,9 @@ export interface OrmOptions<
   TContract extends SqlContract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
 > {
-  readonly contract: TContract;
   readonly runtime: RuntimeQueryable;
   readonly collections?: Collections;
+  readonly context: ExecutionContext<TContract>;
 }
 
 type ModelNames<TContract extends SqlContract<SqlStorage>> = CollectionModelName<TContract>;
@@ -54,8 +55,9 @@ export function orm<
   TContract extends SqlContract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>> = Record<never, never>,
 >(options: OrmOptions<TContract, Collections>): OrmClient<TContract, Collections> {
-  const { contract, runtime, collections } = options;
-  const ctx: CollectionContext<TContract> = { contract, runtime };
+  const { runtime, collections, context } = options;
+  const contract = context.contract;
+  const ctx: CollectionContext<TContract> = { runtime, context };
   const modelNames = new Set(Object.keys(contract.models as Record<string, unknown>));
   const collectionRegistry = createCollectionRegistry(contract, collections);
   const cache = new Map<

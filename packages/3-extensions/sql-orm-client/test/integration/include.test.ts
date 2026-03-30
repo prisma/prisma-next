@@ -8,7 +8,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
-import { getTestContract, isSelectAst } from '../helpers';
+import { getTestContext, getTestContract, isSelectAst } from '../helpers';
 import {
   createPostsCollection,
   createUsersCollection,
@@ -55,7 +55,8 @@ function createUsersCollectionWithCapabilities(
     },
   } as typeof base;
 
-  return new Collection({ contract, runtime }, 'User');
+  const context = { ...getTestContext(), contract };
+  return new Collection({ runtime, context }, 'User');
 }
 
 type NumericPostField = import('../../src/types').NumericFieldNames<

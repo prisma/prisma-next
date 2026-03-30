@@ -2,7 +2,7 @@ import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
-import { getTestContract } from '../helpers';
+import { getTestContext, getTestContract } from '../helpers';
 import {
   createReturningUsersCollection,
   createUsersCollection,
@@ -96,7 +96,8 @@ describe('integration/upsert', () => {
       await withCollectionRuntime(async (runtime) => {
         const contract = withReturningCapability(getTestContract());
         delete (contract.storage.tables.users as { primaryKey?: unknown }).primaryKey;
-        const users = new Collection({ contract, runtime }, 'User');
+        const context = { ...getTestContext(), contract };
+        const users = new Collection({ runtime, context }, 'User');
 
         await expect(
           users.upsert({

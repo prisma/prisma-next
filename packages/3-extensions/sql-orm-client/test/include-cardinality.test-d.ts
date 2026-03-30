@@ -1,4 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
 import { createMockRuntime, type TestContract } from './helpers';
 
@@ -17,11 +18,11 @@ type Equal<A, B> =
 
 type Assert<T extends true> = T;
 
-const contract = {} as TestContract;
 const runtime = createMockRuntime();
+const context = {} as ExecutionContext<TestContract>;
 
-const userCollection = new Collection({ contract, runtime }, 'User');
-const postCollection = new Collection({ contract, runtime }, 'Post');
+const userCollection = new Collection({ runtime, context }, 'User');
+const postCollection = new Collection({ runtime, context }, 'Post');
 
 const usersWithPosts = userCollection.include('posts');
 const usersWithProfile = userCollection.include('profile');

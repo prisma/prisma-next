@@ -8,6 +8,7 @@ import {
   NullCheckExpr,
   OrExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ShorthandWhereFilter } from './types';
 
 export function and(...exprs: AnyWhereExpr[]): AndExpr {
@@ -30,10 +31,11 @@ export function shorthandToWhereExpr<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
 >(
-  contract: TContract,
+  context: ExecutionContext<TContract>,
   modelName: ModelName,
   filters: ShorthandWhereFilter<TContract, ModelName>,
 ): AnyWhereExpr | undefined {
+  const contract = context.contract;
   const models = contract.models as Record<
     string,
     {
@@ -60,6 +62,7 @@ export function shorthandToWhereExpr<
       continue;
     }
 
+    assertFieldHasEqualityTrait(context, tableName, columnName, modelName, fieldName);
     exprs.push(BinaryExpr.eq(left, LiteralExpr.of(value)));
   }
 
@@ -68,4 +71,23 @@ export function shorthandToWhereExpr<
   }
 
   return exprs.length === 1 ? exprs[0] : and(...exprs);
+}
+
+function assertFieldHasEqualityTrait(
+  context: ExecutionContext,
+  tableName: string,
+  columnName: string,
+  modelName: string,
+  fieldName: string,
+): void {
+  const tables = context.contract.storage?.tables as
+    | Record<string, { columns?: Record<string, { codecId?: string }> }>
+    | undefined;
+  const codecId = tables?.[tableName]?.columns?.[columnName]?.codecId;
+  const traits = codecId ? context.codecs.traitsOf(codecId) : [];
+  if (!traits.includes('equality')) {
+    throw new Error(
+      `Shorthand filter on "${modelName}.${fieldName}": field does not support equality comparisons`,
+    );
+  }
 }
