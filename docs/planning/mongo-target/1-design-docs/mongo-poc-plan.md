@@ -16,7 +16,7 @@ With the execution path proven, the contract redesign discussion ([ADRs](../adrs
 
 **Deferred from the PoC, but in-scope for April:**
 - Emitter pipeline generalization — the authoring surfaces and emission process are coupled to SQL; this must be proven for Mongo before end of April
-- Shared ORM interface extraction — extracted after both ORM clients work independently
+- Shared ORM interface extraction — extracted after both ORM clients use the shared Collection chaining API. See [ADR 4](../adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md).
 - Cross-family consumer validation — a consumer library working against both SQL and Mongo contracts
 
 **Deferred beyond April:**
@@ -71,58 +71,63 @@ The contract structure was redesigned through design discussion, informed by wha
 - [ADR 2 — Polymorphism via discriminator and variants](../adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — emergent persistence strategy
 - [ADR 3 — Aggregate roots and relation strategies](../adrs/ADR%203%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — explicit `roots`, embedding as a relation property
 
-## Next: Phase 3 — Minimal ORM client with contract validation
+### Phase 3: Minimal ORM client with contract validation *(done — [mongo-orm-poc](../../../../projects/mongo-orm-poc/spec.md))*
 
-Implement the redesigned contract structure and build a minimal ORM client that consumes it. The ORM client is scoped to **reads only** — enough to validate that the contract carries the right information for polymorphism, embedded documents, referenced relations, and type inference.
+Implemented the redesigned contract structure and built a minimal ORM client proving the contract carries enough information for polymorphism, embedded documents, referenced relations, and type inference.
 
-This phase folds together what was previously steps 3 (query surface), 5 (embedded documents), 7 (polymorphism spike), and the beginning of step 8 (ORM client).
+Deliverables:
+- **`validateMongoContract()`** — three-layer validation: structural (Arktype), domain (family-agnostic), storage (Mongo-specific). Produces computed indices (variant-to-base, model-to-variants). Reusable domain validation for SQL.
+- **`mongoOrm()`** — ORM client with root-based accessors derived from `roots` section, typed `findMany` with equality filters, `$lookup` includes for referenced relations, auto-projected embedded documents, polymorphic return types with discriminator narrowing.
+- **Contract restructure** — `MongoContract` follows ADRs 1-3: `roots`, `model.fields` as `{ nullable, codecId }`, `model.storage` with collection name, `discriminator`/`variants`/`base`, relation `strategy` (`reference`/`embed`).
+- **7 integration tests** covering findMany, filters, includes, embeds, polymorphism, and end-to-end flow against `mongodb-memory-server`.
+- All acceptance criteria met. See [code review](../../../../projects/mongo-orm-poc/reviews/code-review.md).
 
-### Contract implementation
+Key learning: a comparative analysis with the SQL ORM client revealed the `Collection` chaining API is a shared architectural pattern across families. This led to [ADR 4](../adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md) — the Mongo ORM will adopt the same fluent chaining API (`.where().select().include().take().all()`) as the SQL ORM, with family-specific compilation at terminal methods.
 
-Restructure `MongoContract` to follow ADRs 1-3:
-- Add `roots` section (ORM entry points → model names)
-- Change `model.fields` to records of `{ nullable, codecId }` (domain metadata)
-- Restructure `model.storage` as the family-specific bridge (collection name + field → codec mappings)
-- Add `discriminator` + `variants` on base models; `base` on variant models
-- Add relation `strategy` (`"reference"` | `"embed"`)
+## Next: Phase 4 — ORM client with shared Collection interface
 
-Hand-craft `contract.json` + `contract.d.ts` for the [SaaS task management schema](example-schemas.md#3-saas-task-management-with-polymorphism) — Task (polymorphic: Bug/Feature) with User, including at least one embedded relation.
+Reimplement the Mongo ORM client with the SQL ORM's fluent chaining API pattern, following [ADR 4](../adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md). The Phase 3 options-bag API (`findMany({ where, include })`) proved the contract shape works; Phase 4 adopts the target API design.
 
-### Minimal ORM client
+### Goal
 
-**In scope:**
-- **Root-based accessors** — `db.tasks`, `db.users` derived from the `roots` section
-- **`findMany`** with basic equality filters — consistent with the SQL ORM's query interface (structured filter objects, not Mongo dot notation)
-- **`include` for referenced relations** — proves relations with `"strategy": "reference"` carry enough info for `$lookup` or multi-query stitching
-- **`include` for embedded relations** — proves relations with `"strategy": "embed"` work with embedded documents that have no collection of their own
-- **Polymorphic queries** — querying `db.tasks` returns a union of Task | Bug | Feature, narrowed by discriminator
+A Mongo `Collection` class that mirrors the SQL ORM's chaining surface: `.where().select().include().orderBy().take().skip().all().first()`. The implementation uses `CollectionState` to accumulate query state through immutable method chaining, compiling to `MongoQueryPlan` at terminal methods (`.all()`, `.first()`).
 
-**Out of scope:**
-- Writes (`create`, `update`, `delete`)
-- Complex filters (`$gt`, `$in`, logical operators)
-- `orderBy`, pagination (`take`/`skip`), `select` (field projection)
-- Custom collection classes or methods
+### In scope
+
+- **Chaining Collection class** — immutable method chaining with `CollectionState` accumulation. Terminal methods compile state → `MongoQueryPlan` (FindCommand or AggregateCommand).
+- **`where`** — callback DSL (`(task) => task.assigneeId.eq('u1')`) and shorthand equality objects. Common comparison operators (eq, neq, gt, lt, gte, lte, in, isNull).
+- **`select`** — field projection, narrowing the return type.
+- **`include`** — referenced relations via `$lookup`, with refinement callbacks. Embedded relations remain auto-projected.
+- **`orderBy`** — callback DSL with asc/desc.
+- **`take`/`skip`** — pagination.
+- **`all`/`first`** — terminal methods returning `AsyncIterableResult<Row>` / `Promise<Row | null>`.
+- **Custom collection subclasses** — `class UserCollection extends Collection<Contract, 'User'>` with domain methods.
+- **Polymorphic return types** — discriminated union narrowing, same as Phase 3.
+
+### Out of scope
+
+- Writes (`create`, `update`, `delete`, `upsert`)
+- Mongo-specific operators (`$regex`, `$elemMatch`, `$exists`)
+- `groupBy`, `aggregate`, `distinct`, `cursor`
+- Shared interface extraction into `1-framework` (deferred to spike-then-extract)
 - Aggregation pipeline DSL
 
-### Cross-family contract symmetry
+### Design questions addressed
 
-Hand-craft the same domain model as both a Mongo contract and a SQL contract using the new structure. Prove that the domain level (`roots`, `models`, `relations`) is identical — only `model.storage` and top-level `storage` differ.
+- [Design question #4](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations): What mutation surface does the ORM expose for `$inc`, `$push`, `$pull`? *(deferred — Phase 4 is reads only)*
+- Where comparison DSL generalizes: which operators are shared (eq, neq, gt, lt) vs family-specific (ilike, $regex)?
+- How does `CollectionState` → `MongoQueryPlan` compilation work? (FindCommand for simple queries, AggregateCommand when includes or complex operations are needed)
 
 ### Done when
 
-- A Mongo ORM client presents root-based accessors derived from the contract's `roots` section
-- `findMany` returns correctly-typed rows with types inferred from the contract
-- `include` traverses both referenced and embedded relations
-- Querying a polymorphic collection returns a discriminated union, narrowable by the discriminator field
-- The same domain model compiles as both a Mongo contract and a SQL contract with identical `roots`, `models`, and `relations`
-
-## Later: Phase 4 — Full ORM client
-
-Build the full `findMany`/`create`/`update`/`where`/`include` surface. This is where the hard ORM design questions get answered:
-- [Design question #4](design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations): What mutation surface does the ORM expose for `$inc`, `$push`, `$pull`?
-- [Design question #7](design-questions.md#7-relation-loading-application-level-joining-vs-lookup): Detailed `include` strategy — when to use `$lookup` vs application stitching?
-- Where do current SQL-oriented assumptions in `Collection` break?
-- What would a shared `Collection` interface look like?
+- A Mongo `Collection` class with fluent chaining API matching the SQL ORM's method vocabulary
+- `where` with callback DSL and shorthand equality objects
+- `select` with field projection narrowing the return type
+- `include` for referenced relations with refinement callbacks
+- `orderBy`, `take`, `skip` with correct compilation
+- `all` and `first` terminal methods
+- Custom collection subclasses work (domain methods that chain via `this.where()`)
+- Polymorphic return types with discriminator narrowing
 
 ## Later: Phase 5 — Emitter and authoring
 
@@ -138,12 +143,9 @@ The [design questions](design-questions.md) document has the full analysis and [
 
 - **[#10 — Shared contract surface](design-questions.md#10-shared-contract-surface-what-goes-in-contractbase)**: **Resolved** via [ADR 1](../adrs/ADR%201%20-%20Contract%20domain-storage%20separation.md). The domain level (`roots`, `models`, `relations`) is the shared surface. Divergence is scoped to `model.storage`.
 - **[#1 — Embedded documents](design-questions.md#1-embedded-documents-relation-field-or-distinct-concept)**: **Resolved** via [ADR 3](../adrs/ADR%203%20-%20Aggregate%20roots%20and%20relation%20strategies.md). Embedding is a relation property (`"strategy": "embed"`). Remaining detail: relation storage specifics for embedding.
-- **[#6 — Polymorphism](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april)**: **Resolved** via [ADR 2](../adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md). `discriminator` + `variants` on base models, `base` on variants (bidirectional navigation), emergent persistence strategy. Uses specialization/generalization terminology. Remaining: polymorphic associations. **Implementation validation in Phase 3.**
+- **[#6 — Polymorphism](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april)**: **Resolved** via [ADR 2](../adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md). `discriminator` + `variants` on base models, `base` on variants (bidirectional navigation), emergent persistence strategy. Uses specialization/generalization terminology. Remaining: polymorphic associations. **Validated in Phase 3** — discriminator narrowing, polymorphic return types, and STI constraint all proven.
 - **[#3 — ExecutionPlan generalization](design-questions.md#3-execution-plan-generalization)**: **Resolved.** Each family gets its own plan type, plugin interface, and runtime. See [mongo-execution-components.md](mongo-execution-components.md).
-
-### Open — addressed in Phase 3
-
-- **[#7 — Relation loading](design-questions.md#7-relation-loading-application-level-joining-vs-lookup)**: How does `include` work for referenced vs embedded relations? Phase 3's minimal ORM client will prove at least one approach for each.
+- **[#7 — Relation loading](design-questions.md#7-relation-loading-application-level-joining-vs-lookup)**: **Resolved in Phase 3.** Referenced relations use `$lookup` aggregation pipeline stages with `$unwind` for to-one cardinalities. Embedded relations are auto-projected — they're always present in the document, so no loading is needed. The `include` interface is shared across families; the resolution strategy differs (SQL: lateral joins / correlated subqueries; Mongo: `$lookup`).
 
 ### Open — deferred to Phase 4+
 
