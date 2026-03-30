@@ -17,6 +17,8 @@ export interface MongoOrmOptions<TContract extends MongoContract> {
   readonly executor: MongoQueryExecutor;
 }
 
+type Simplify<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
+
 // --- Relation type helpers ---
 
 export type ReferenceRelationKeys<
@@ -83,8 +85,11 @@ type VariantRow<
   ? V extends Record<string, { readonly value: string }>
     ? {
         [VK in keyof V]: VK extends string & keyof TContract['models']
-          ? InferFullRow<TContract, ModelName> &
-              InferFullRow<TContract, VK> & { readonly [F in DiscField]: V[VK]['value'] }
+          ? Simplify<
+              Omit<InferFullRow<TContract, ModelName>, DiscField> &
+                InferFullRow<TContract, VK> &
+                Record<DiscField, V[VK]['value']>
+            >
           : never;
       }[keyof V]
     : InferFullRow<TContract, ModelName>

@@ -108,17 +108,31 @@ test('InferRootRow for polymorphic model returns union with literal discriminato
   >();
 });
 
-test('discriminator field narrows variant types in switch', () => {
+test('TaskRow type field carries literal discriminator values', () => {
   type TaskRow = InferRootRow<Contract, 'Task'>;
+  expectTypeOf<TaskRow['type']>().toEqualTypeOf<'bug' | 'feature'>();
+});
 
+test('discriminator narrows to Bug fields exclusively', () => {
+  type TaskRow = InferRootRow<Contract, 'Task'>;
   const r = {} as TaskRow;
   if (r.type === 'bug') {
-    expectTypeOf(r).toHaveProperty('severity');
     expectTypeOf(r.severity).toBeString();
-  } else {
-    expectTypeOf(r).toHaveProperty('priority');
+    // @ts-expect-error priority only exists on Feature variant
+    r.priority;
+    // @ts-expect-error targetRelease only exists on Feature variant
+    r.targetRelease;
+  }
+});
+
+test('discriminator narrows to Feature fields exclusively', () => {
+  type TaskRow = InferRootRow<Contract, 'Task'>;
+  const r = {} as TaskRow;
+  if (r.type === 'feature') {
     expectTypeOf(r.priority).toBeString();
-    expectTypeOf(r).toHaveProperty('targetRelease');
+    expectTypeOf(r.targetRelease).toBeString();
+    // @ts-expect-error severity only exists on Bug variant
+    r.severity;
   }
 });
 
