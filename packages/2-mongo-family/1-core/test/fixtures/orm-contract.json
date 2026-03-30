@@ -1,0 +1,97 @@
+{
+  "targetFamily": "mongo",
+  "roots": {
+    "tasks": "Task",
+    "users": "User"
+  },
+  "storage": {
+    "collections": {
+      "tasks": {},
+      "users": {}
+    }
+  },
+  "models": {
+    "Task": {
+      "storage": { "collection": "tasks" },
+      "fields": {
+        "_id": { "codecId": "mongo/objectId@1", "nullable": false },
+        "title": { "codecId": "mongo/string@1", "nullable": false },
+        "type": { "codecId": "mongo/string@1", "nullable": false },
+        "assigneeId": { "codecId": "mongo/objectId@1", "nullable": false }
+      },
+      "relations": {
+        "assignee": {
+          "to": "User",
+          "cardinality": "N:1",
+          "strategy": "reference",
+          "on": {
+            "localFields": ["assigneeId"],
+            "targetFields": ["_id"]
+          }
+        },
+        "comments": {
+          "to": "Comment",
+          "cardinality": "1:N",
+          "strategy": "embed",
+          "field": "comments"
+        }
+      },
+      "discriminator": { "field": "type" },
+      "variants": {
+        "Bug": { "value": "bug" },
+        "Feature": { "value": "feature" }
+      }
+    },
+    "Bug": {
+      "storage": { "collection": "tasks" },
+      "fields": {
+        "severity": { "codecId": "mongo/string@1", "nullable": false }
+      },
+      "relations": {},
+      "base": "Task"
+    },
+    "Feature": {
+      "storage": { "collection": "tasks" },
+      "fields": {
+        "priority": { "codecId": "mongo/string@1", "nullable": false },
+        "targetRelease": { "codecId": "mongo/string@1", "nullable": false }
+      },
+      "relations": {},
+      "base": "Task"
+    },
+    "User": {
+      "storage": { "collection": "users" },
+      "fields": {
+        "_id": { "codecId": "mongo/objectId@1", "nullable": false },
+        "name": { "codecId": "mongo/string@1", "nullable": false },
+        "email": { "codecId": "mongo/string@1", "nullable": false }
+      },
+      "relations": {
+        "addresses": {
+          "to": "Address",
+          "cardinality": "1:N",
+          "strategy": "embed",
+          "field": "addresses"
+        }
+      }
+    },
+    "Address": {
+      "storage": {},
+      "fields": {
+        "street": { "codecId": "mongo/string@1", "nullable": false },
+        "city": { "codecId": "mongo/string@1", "nullable": false },
+        "zip": { "codecId": "mongo/string@1", "nullable": false }
+      },
+      "relations": {}
+    },
+    "Comment": {
+      "storage": {},
+      "fields": {
+        "_id": { "codecId": "mongo/objectId@1", "nullable": false },
+        "text": { "codecId": "mongo/string@1", "nullable": false },
+        "createdAt": { "codecId": "mongo/date@1", "nullable": false }
+      },
+      "relations": {}
+    }
+  }
+}

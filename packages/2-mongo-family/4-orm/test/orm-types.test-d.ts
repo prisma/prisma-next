@@ -1,6 +1,6 @@
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { expectTypeOf, test } from 'vitest';
-import type { Contract } from '../../5-runtime/test/fixtures/orm-contract';
+import type { Contract } from '../../1-core/test/fixtures/orm-contract';
 import type {
   EmbedRelationKeys,
   InferFullRow,

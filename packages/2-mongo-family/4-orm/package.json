@@ -20,14 +20,9 @@
     "@prisma-next/runtime-executor": "workspace:*"
   },
   "devDependencies": {
-    "@prisma-next/adapter-mongo": "workspace:*",
-    "@prisma-next/driver-mongo": "workspace:*",
-    "@prisma-next/mongo-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
-    "mongodb": "^6.16.0",
-    "mongodb-memory-server": "^10.4.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

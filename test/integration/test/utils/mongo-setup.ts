@@ -5,14 +5,14 @@ import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtim
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 
-export interface OrmTestContext {
+export interface MongodContext {
   readonly connectionUri: string;
   readonly dbName: string;
   readonly client: MongoClient;
   readonly runtime: MongoRuntime;
 }
 
-export async function withMongod<T>(fn: (ctx: OrmTestContext) => Promise<T>): Promise<T> {
+export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Promise<T> {
   const replSet = await MongoMemoryReplSet.create({
     replSet: { count: 1, storageEngine: 'wiredTiger' },
   });

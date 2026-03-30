@@ -861,15 +861,6 @@ importers:
         specifier: workspace:*
         version: link:../../1-framework/4-runtime-executor
     devDependencies:
-      '@prisma-next/adapter-mongo':
-        specifier: workspace:*
-        version: link:../../3-mongo-target/2-mongo-adapter
-      '@prisma-next/driver-mongo':
-        specifier: workspace:*
-        version: link:../../3-mongo-target/3-mongo-driver
-      '@prisma-next/mongo-runtime':
-        specifier: workspace:*
-        version: link:../5-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
@@ -879,12 +870,6 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../0-config/tsdown
-      mongodb:
-        specifier: ^6.16.0
-        version: 6.21.0
-      mongodb-memory-server:
-        specifier: ^10.4.0
-        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
@@ -2091,6 +2076,9 @@ importers:
 
   test/integration:
     dependencies:
+      '@prisma-next/adapter-mongo':
+        specifier: workspace:*
+        version: link:../../packages/3-mongo-target/2-mongo-adapter
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/6-adapters/postgres
@@ -2106,6 +2094,9 @@ importers:
       '@prisma-next/core-execution-plane':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/runtime/execution-plane
+      '@prisma-next/driver-mongo':
+        specifier: workspace:*
+        version: link:../../packages/3-mongo-target/3-mongo-driver
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/7-drivers/postgres
@@ -2124,6 +2115,15 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/migration
+      '@prisma-next/mongo-core':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/1-core
+      '@prisma-next/mongo-orm':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/4-orm
+      '@prisma-next/mongo-runtime':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/5-runtime
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/shared/operations
@@ -2182,6 +2182,12 @@ importers:
       kysely:
         specifier: 'catalog:'
         version: 0.28.10
+      mongodb:
+        specifier: ^6.16.0
+        version: 6.21.0
+      mongodb-memory-server:
+        specifier: ^10.4.0
+        version: 10.4.3
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
