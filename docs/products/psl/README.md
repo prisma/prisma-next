@@ -36,8 +36,9 @@ For package-level responsibilities and supported defaults, see:
 
 This is a deliberate “strict subset” choice: PSL v1 is bounded by the current TS authoring surface + contract model and prefers “fail loudly” over silent partial interpretation.
 
-- **Native type attributes (`@db.`*) are mostly unsupported** today.
-  - The only parameterized attribute surface currently mapped for parity is `@pgvector.column(...)`.
+- **Selected Postgres native type attributes (`@db.`*) are supported on named types** for brownfield round-trips.
+  - Current support covers the printer/provider subset needed to preserve native storage shape for inferred PSL: `@db.Char`, `@db.VarChar`, `@db.Numeric`, `@db.Uuid`, `@db.SmallInt`, `@db.Real`, `@db.Timestamp`, `@db.Timestamptz`, `@db.Date`, `@db.Time`, `@db.Timetz`, and `@db.Json`.
+  - The extension-pack parity surface still includes `@pgvector.column(...)` when the corresponding pack is composed.
 - **Typed JSON schema parameterization is unsupported** (PSL has no way to encode TS `typeParams` schema payloads in v1).
 
 ### Relations
@@ -88,7 +89,7 @@ This is a deliberate “strict subset” choice: PSL v1 is bounded by the curren
 
 These are recurring “next” areas implied by the above limitations:
 
-- **Broader parameterized native types** (`@db.`* parity beyond pgvector)
+- **Broader `@db.` parity** beyond the current brownfield round-trip subset
 - **Richer index / constraint features** (names, methods, predicates) gated by target/packs
 - **Tooling-friendly inline language blocks** (tagged template literals like `sql\`...`) for SQL snippets, with explicit rules (e.g. no interpolation) and parser-agnostic tag configuration
 

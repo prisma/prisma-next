@@ -3,7 +3,8 @@ import { suggestCommands } from '../../src/utils/suggest-command';
 
 describe('suggestCommands', () => {
   const topLevel = ['contract', 'db', 'migration', 'help'];
-  const dbSubs = ['verify', 'init', 'update', 'introspect', 'sign'];
+  const contractSubs = ['emit', 'infer'];
+  const dbSubs = ['verify', 'init', 'update', 'schema', 'sign'];
 
   it('returns empty array when no candidates', () => {
     expect(suggestCommands('foo', [])).toEqual([]);
@@ -33,8 +34,12 @@ describe('suggestCommands', () => {
     expect(suggestCommands('sin', dbSubs)).toEqual(['sign']);
   });
 
-  it('suggests "init" for "int"', () => {
-    expect(suggestCommands('int', dbSubs)).toEqual(['init']);
+  it('suggests "schema" for "schem"', () => {
+    expect(suggestCommands('schem', dbSubs)).toEqual(['schema']);
+  });
+
+  it('suggests "infer" for "infr"', () => {
+    expect(suggestCommands('infr', contractSubs)).toEqual(['infer']);
   });
 
   it('returns empty for completely unrelated input', () => {

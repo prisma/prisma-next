@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:86859b72d123f5ff60e70b0e815fe077ca966e863d5aad1642e69b4691df67f9",
+  "storageHash": "sha256:ba5cf6cccf8cd906b25e0a8d075875aff7492d815c738166c0146ac4b2535a28",
   "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
   "models": {
     "Post": {
@@ -155,7 +155,7 @@
           },
           "role": {
             "codecId": "pg/enum@1",
-            "nativeType": "role",
+            "nativeType": "Role",
             "typeRef": "Role"
           }
         },
@@ -178,7 +178,7 @@
       },
       "Role": {
         "codecId": "pg/enum@1",
-        "nativeType": "role",
+        "nativeType": "Role",
         "typeParams": {
           "values": ["USER", "ADMIN"]
         }

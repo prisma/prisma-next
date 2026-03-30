@@ -1,12 +1,13 @@
 import { Command } from 'commander';
 import { createContractEmitCommand } from './commands/contract-emit';
+import { createContractInferCommand } from './commands/contract-infer';
 import { installShutdownHandlers } from './utils/shutdown';
 
 // Install SIGINT/SIGTERM handlers before anything else
 installShutdownHandlers();
 
 import { createDbInitCommand } from './commands/db-init';
-import { createDbIntrospectCommand } from './commands/db-introspect';
+import { createDbSchemaCommand } from './commands/db-schema';
 import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
@@ -161,6 +162,10 @@ contractCommand.configureHelp({
 const contractEmitCommand = createContractEmitCommand();
 contractCommand.addCommand(contractEmitCommand);
 
+// Add infer subcommand to contract
+const contractInferCommand = createContractInferCommand();
+contractCommand.addCommand(contractInferCommand);
+
 // Register contract command
 program.addCommand(contractCommand);
 
@@ -192,9 +197,9 @@ dbCommand.addCommand(dbInitCommand);
 const dbUpdateCommand = createDbUpdateCommand();
 dbCommand.addCommand(dbUpdateCommand);
 
-// Add introspect subcommand to db
-const dbIntrospectCommand = createDbIntrospectCommand();
-dbCommand.addCommand(dbIntrospectCommand);
+// Add schema subcommand to db
+const dbSchemaCommand = createDbSchemaCommand();
+dbCommand.addCommand(dbSchemaCommand);
 
 // Add sign subcommand to db
 const dbSignCommand = createDbSignCommand();

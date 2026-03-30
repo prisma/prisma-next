@@ -21,7 +21,7 @@ import {
   type JourneyContext,
   runContractEmit,
   runDbInit,
-  runDbIntrospect,
+  runDbSchema,
   runDbUpdate,
   runDbVerify,
   setupJourney,
@@ -68,9 +68,9 @@ withTempDir(({ createTempDir }) => {
         const schemaVerify = await runDbVerify(ctx, ['--schema-only']);
         expect(schemaVerify.exitCode, 'M.03: db verify --schema-only fails').toBe(1);
 
-        // M.04: db introspect (shows schema without email)
-        const introspect = await runDbIntrospect(ctx);
-        expect(introspect.exitCode, 'M.04: db introspect').toBe(0);
+        // M.04: db schema (shows schema without email)
+        const schema = await runDbSchema(ctx);
+        expect(schema.exitCode, 'M.04: db schema').toBe(0);
 
         // M.05: db update recovers by re-adding the NOT NULL column with a temporary default,
         // then dropping that default so future inserts must provide an explicit value.
@@ -138,10 +138,10 @@ withTempDir(({ createTempDir }) => {
         const strict = await runDbVerify(ctx, ['--strict']);
         expect(strict.exitCode, 'N.03: db verify strict fails').toBe(1);
 
-        // N.04: db introspect
-        const introspect = await runDbIntrospect(ctx);
-        expect(introspect.exitCode, 'N.04: db introspect').toBe(0);
-        expect(stripAnsi(introspect.stdout), 'N.04: shows age column').toContain('age');
+        // N.04: db schema
+        const schema = await runDbSchema(ctx);
+        expect(schema.exitCode, 'N.04: db schema').toBe(0);
+        expect(stripAnsi(schema.stdout), 'N.04: shows age column').toContain('age');
 
         // N.05: Evolve contract (adds 'name' column — 'age' remains as unmanaged extra)
         swapContract(ctx, 'contract-additive');

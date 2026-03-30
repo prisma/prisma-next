@@ -2,7 +2,8 @@ import { timeouts } from '@prisma-next/test-utils';
 import { Command } from 'commander';
 import { describe, expect, it } from 'vitest';
 import { createContractEmitCommand } from '../src/commands/contract-emit';
-import { createDbIntrospectCommand } from '../src/commands/db-introspect';
+import { createContractInferCommand } from '../src/commands/contract-infer';
+import { createDbSchemaCommand } from '../src/commands/db-schema';
 import { createDbUpdateCommand } from '../src/commands/db-update';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
 import { formatCommandHelp, formatRootHelp } from '../src/utils/formatters/help';
@@ -14,9 +15,13 @@ describe('help text snapshots', { timeout: timeouts.default }, () => {
     program.name('prisma-next').description('Prisma Next CLI');
     const contract = new Command('contract').description('Contract management commands');
     const contractEmit = createContractEmitCommand();
+    const contractInfer = createContractInferCommand();
     contract.addCommand(contractEmit);
+    contract.addCommand(contractInfer);
     const db = new Command('db').description('Database operations');
+    const dbSchema = createDbSchemaCommand();
     const dbVerify = createDbVerifyCommand();
+    db.addCommand(dbSchema);
     db.addCommand(dbVerify);
     program.addCommand(contract);
     program.addCommand(db);
@@ -37,6 +42,14 @@ describe('help text snapshots', { timeout: timeouts.default }, () => {
     expect(helpText).toMatchSnapshot();
   });
 
+  it('formats contract infer help', () => {
+    const command = createContractInferCommand();
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const helpText = formatCommandHelp({ command, flags });
+
+    expect(helpText).toMatchSnapshot();
+  });
+
   it('formats db verify help', () => {
     const command = createDbVerifyCommand();
     // Explicitly disable colors for consistent snapshots
@@ -51,9 +64,13 @@ describe('help text snapshots', { timeout: timeouts.default }, () => {
     program.name('prisma-next').description('Prisma Next CLI');
     const contract = new Command('contract').description('Contract management commands');
     const contractEmit = createContractEmitCommand();
+    const contractInfer = createContractInferCommand();
     contract.addCommand(contractEmit);
+    contract.addCommand(contractInfer);
     const db = new Command('db').description('Database operations');
+    const dbSchema = createDbSchemaCommand();
     const dbVerify = createDbVerifyCommand();
+    db.addCommand(dbSchema);
     db.addCommand(dbVerify);
     program.addCommand(contract);
     program.addCommand(db);
@@ -72,9 +89,8 @@ describe('help text snapshots', { timeout: timeouts.default }, () => {
     expect(helpText).toMatchSnapshot();
   });
 
-  it('formats db introspect help', () => {
-    const command = createDbIntrospectCommand();
-    // Explicitly disable colors for consistent snapshots
+  it('formats db schema help', () => {
+    const command = createDbSchemaCommand();
     const flags = parseGlobalFlags({ 'no-color': true });
     const helpText = formatCommandHelp({ command, flags });
 

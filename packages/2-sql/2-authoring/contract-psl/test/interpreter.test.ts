@@ -214,7 +214,7 @@ model Post {
     expect(result.value.storage).toMatchObject({
       types: {
         Email: { codecId: 'pg/text@1', nativeType: 'text' },
-        Role: { codecId: 'pg/enum@1', nativeType: 'role' },
+        Role: { codecId: 'pg/enum@1', nativeType: 'Role' },
       },
       tables: {
         user: {
@@ -258,6 +258,232 @@ model Post {
           on: {
             parentCols: ['userId'],
             childCols: ['id'],
+          },
+        },
+      },
+    });
+  });
+
+  it('lowers preserved native type named types into storage descriptors', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Id = String @db.Uuid
+  Slug = String @db.VarChar(191)
+  Rating = Int @db.SmallInt
+  HappenedAt = DateTime @db.Time(3)
+  PublishDay = DateTime @db.Date
+  Payload = Json @db.Json
+  Amount = Decimal @db.Numeric(10, 2)
+}
+
+model Event {
+  id Id @id
+  slug Slug
+  rating Rating
+  happenedAt HappenedAt
+  publishDay PublishDay
+  payload Payload
+  amount Amount
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      types: {
+        Id: { codecId: 'pg/text@1', nativeType: 'uuid' },
+        Slug: {
+          codecId: 'sql/varchar@1',
+          nativeType: 'character varying',
+          typeParams: { length: 191 },
+        },
+        Rating: { codecId: 'pg/int2@1', nativeType: 'int2' },
+        HappenedAt: {
+          codecId: 'pg/time@1',
+          nativeType: 'time',
+          typeParams: { precision: 3 },
+        },
+        PublishDay: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
+        Payload: { codecId: 'pg/json@1', nativeType: 'json' },
+        Amount: {
+          codecId: 'pg/numeric@1',
+          nativeType: 'numeric',
+          typeParams: { precision: 10, scale: 2 },
+        },
+      },
+      tables: {
+        event: {
+          columns: {
+            id: { codecId: 'pg/text@1', nativeType: 'uuid' },
+            slug: {
+              codecId: 'sql/varchar@1',
+              nativeType: 'character varying',
+              typeParams: { length: 191 },
+            },
+            rating: { codecId: 'pg/int2@1', nativeType: 'int2' },
+            happenedAt: {
+              codecId: 'pg/time@1',
+              nativeType: 'time',
+              typeParams: { precision: 3 },
+            },
+            publishDay: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
+            payload: { codecId: 'pg/json@1', nativeType: 'json' },
+            amount: {
+              codecId: 'pg/numeric@1',
+              nativeType: 'numeric',
+              typeParams: { precision: 10, scale: 2 },
+            },
+          },
+          primaryKey: { columns: ['id'] },
+        },
+      },
+    });
+  });
+
+  it('preserves enum native type names from @@map instead of lowercasing declarations', () => {
+    const document = parsePslDocument({
+      schema: `enum UserRole {
+  USER
+  ADMIN
+  @@map("user_role")
+}
+
+enum Role {
+  OWNER
+}
+
+model User {
+  id Int @id
+  role UserRole
+  legacyRole Role
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      types: {
+        UserRole: {
+          codecId: 'pg/enum@1',
+          nativeType: 'user_role',
+          typeParams: { values: ['USER', 'ADMIN'] },
+        },
+        Role: {
+          codecId: 'pg/enum@1',
+          nativeType: 'Role',
+          typeParams: { values: ['OWNER'] },
+        },
+      },
+      tables: {
+        user: {
+          columns: {
+            role: { codecId: 'pg/enum@1', nativeType: 'user_role' },
+            legacyRole: { codecId: 'pg/enum@1', nativeType: 'Role' },
+          },
+        },
+      },
+    });
+  });
+
+  it('lowers additional Postgres native type attributes on named types', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Code = String @db.Char(12)
+  Score = Float @db.Real
+  CreatedAt = DateTime @db.Timestamp(3)
+  PublishedAt = DateTime @db.Timestamptz(6)
+  ReminderAt = DateTime @db.Timetz(2)
+}
+
+model Event {
+  id Int @id
+  code Code
+  score Score
+  createdAt CreatedAt
+  publishedAt PublishedAt
+  reminderAt ReminderAt
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      types: {
+        Code: {
+          codecId: 'sql/char@1',
+          nativeType: 'character',
+          typeParams: { length: 12 },
+        },
+        Score: {
+          codecId: 'pg/float4@1',
+          nativeType: 'float4',
+        },
+        CreatedAt: {
+          codecId: 'pg/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: 3 },
+        },
+        PublishedAt: {
+          codecId: 'pg/timestamptz@1',
+          nativeType: 'timestamptz',
+          typeParams: { precision: 6 },
+        },
+        ReminderAt: {
+          codecId: 'pg/timetz@1',
+          nativeType: 'timetz',
+          typeParams: { precision: 2 },
+        },
+      },
+      tables: {
+        event: {
+          columns: {
+            code: {
+              codecId: 'sql/char@1',
+              nativeType: 'character',
+              typeParams: { length: 12 },
+            },
+            score: {
+              codecId: 'pg/float4@1',
+              nativeType: 'float4',
+            },
+            createdAt: {
+              codecId: 'pg/timestamp@1',
+              nativeType: 'timestamp',
+              typeParams: { precision: 3 },
+            },
+            publishedAt: {
+              codecId: 'pg/timestamptz@1',
+              nativeType: 'timestamptz',
+              typeParams: { precision: 6 },
+            },
+            reminderAt: {
+              codecId: 'pg/timetz@1',
+              nativeType: 'timetz',
+              typeParams: { precision: 2 },
+            },
           },
         },
       },

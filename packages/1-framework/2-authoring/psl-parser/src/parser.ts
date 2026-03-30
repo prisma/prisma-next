@@ -238,11 +238,20 @@ function parseModelBlock(context: ParserContext, name: string, bounds: BlockBoun
 
 function parseEnumBlock(context: ParserContext, name: string, bounds: BlockBounds): PslEnum {
   const values: PslEnumValue[] = [];
+  const attributes: PslAttribute[] = [];
 
   for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; lineIndex += 1) {
     const raw = context.lines[lineIndex] ?? '';
     const line = stripInlineComment(raw).trim();
     if (line.length === 0) {
+      continue;
+    }
+
+    if (line.startsWith('@@')) {
+      const attribute = parseEnumAttribute(context, line, lineIndex);
+      if (attribute) {
+        attributes.push(attribute);
+      }
       continue;
     }
 
@@ -267,6 +276,7 @@ function parseEnumBlock(context: ParserContext, name: string, bounds: BlockBound
     kind: 'enum',
     name,
     values,
+    attributes,
     span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
   };
 }
@@ -367,6 +377,50 @@ function parseModelAttribute(
   });
 }
 
+function parseEnumAttribute(
+  context: ParserContext,
+  line: string,
+  lineIndex: number,
+): PslAttribute | undefined {
+  const rawLine = context.lines[lineIndex] ?? '';
+  const tokenParse = extractAttributeTokensWithSpans(
+    context,
+    lineIndex,
+    line,
+    firstNonWhitespaceColumn(rawLine),
+  );
+  if (!tokenParse.ok || tokenParse.tokens.length !== 1) {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ENUM_MEMBER',
+      message: `Invalid enum value declaration "${line}"`,
+      span: createTrimmedLineSpan(context, lineIndex),
+    });
+    return undefined;
+  }
+  const token = tokenParse.tokens[0];
+  if (!token) {
+    return undefined;
+  }
+  const parsed = parseAttributeToken(context, {
+    token: token.text,
+    target: 'enum',
+    lineIndex,
+    span: token.span,
+  });
+  if (!parsed) {
+    return undefined;
+  }
+  if (parsed.name !== 'map') {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ENUM_MEMBER',
+      message: `Invalid enum value declaration "${line}"`,
+      span: createTrimmedLineSpan(context, lineIndex),
+    });
+    return undefined;
+  }
+  return parsed;
+}
+
 function parseField(context: ParserContext, line: string, lineIndex: number): PslField | undefined {
   const fieldMatch = line.match(/^([A-Za-z_]\w*)\s+([A-Za-z_]\w*(?:\[\])?)(\?)?(.*)$/);
   if (!fieldMatch) {
@@ -442,16 +496,17 @@ function parseAttributeToken(
     readonly span: PslSpan;
   },
 ): PslAttribute | undefined {
-  const expectsModelPrefix = input.target === 'model';
-  if (expectsModelPrefix && !input.token.startsWith('@@')) {
+  const expectsBlockPrefix = input.target === 'model' || input.target === 'enum';
+  const targetLabel = input.target === 'enum' ? 'Enum' : 'Model';
+  if (expectsBlockPrefix && !input.token.startsWith('@@')) {
     pushDiagnostic(context, {
       code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
-      message: `Model attribute "${input.token}" must use @@ prefix`,
+      message: `${targetLabel} attribute "${input.token}" must use @@ prefix`,
       span: input.span,
     });
     return undefined;
   }
-  if (!expectsModelPrefix && !input.token.startsWith('@')) {
+  if (!expectsBlockPrefix && !input.token.startsWith('@')) {
     pushDiagnostic(context, {
       code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
       message: `Attribute "${input.token}" must use @ prefix`,
@@ -459,7 +514,7 @@ function parseAttributeToken(
     });
     return undefined;
   }
-  if (!expectsModelPrefix && input.token.startsWith('@@')) {
+  if (!expectsBlockPrefix && input.token.startsWith('@@')) {
     pushDiagnostic(context, {
       code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
       message: `Attribute "${input.token}" is not valid in ${input.target} context`,
@@ -468,7 +523,7 @@ function parseAttributeToken(
     return undefined;
   }
 
-  const rawBody = expectsModelPrefix ? input.token.slice(2) : input.token.slice(1);
+  const rawBody = expectsBlockPrefix ? input.token.slice(2) : input.token.slice(1);
   const openParen = rawBody.indexOf('(');
   const closeParen = rawBody.lastIndexOf(')');
   const hasArgs = openParen >= 0 || closeParen >= 0;
@@ -504,7 +559,7 @@ function parseAttributeToken(
     const argsRaw = rawBody.slice(openParen + 1, closeParen);
     const parsedArgs = parseAttributeArguments(context, {
       argsRaw,
-      argsOffset: input.span.start.column - 1 + (expectsModelPrefix ? 2 : 1) + openParen + 1,
+      argsOffset: input.span.start.column - 1 + (expectsBlockPrefix ? 2 : 1) + openParen + 1,
       lineIndex: input.lineIndex,
       token: input.token,
       span: input.span,

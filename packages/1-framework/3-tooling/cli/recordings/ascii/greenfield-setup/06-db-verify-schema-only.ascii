@@ -1,4 +1,36 @@
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
 >
 
 
@@ -30,7 +62,6 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
 >
 
@@ -61,40 +92,8 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
-────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
 > prisma-next db verify --schema-only
 
@@ -125,8 +124,8 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
+
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
 > prisma-next db verify --schema-only
 
@@ -157,8 +156,8 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
+
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
 > prisma-next db verify --schema-only
 
@@ -189,11 +188,10 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
+
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Verify schema satisfies contract without marker checks [initialized, schema matches contract]
 > prisma-next db verify --schema-only
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 prisma-next db verify → Check whether the live database schema matches your contract
 │
 │ config:               prisma-next.config.ts
@@ -213,6 +211,8 @@ prisma-next db verify → Check whether the live database schema matches your co
 │
 │  ✔ Database schema satisfies contract
 >
+
+
 
 
 
