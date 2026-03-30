@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
 import { ormClientCreateUser } from '../src/orm-client/create-user';
 import { ormClientDeleteUser } from '../src/orm-client/delete-user';
+import { ormClientFindSimilarPosts } from '../src/orm-client/find-similar-posts';
 import { ormClientFindUserByEmail } from '../src/orm-client/find-user-by-email';
 import { ormClientFindUserById } from '../src/orm-client/find-user-by-id';
 import { ormClientGetAdminUsers } from '../src/orm-client/get-admin-users';
@@ -20,6 +21,7 @@ import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
 import { ormClientGetUsers } from '../src/orm-client/get-users';
 import { ormClientGetUsersBackwardCursor } from '../src/orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
+import { ormClientSearchPostsByEmbedding } from '../src/orm-client/search-posts-by-embedding';
 import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
 import { ormClientUpsertUser } from '../src/orm-client/upsert-user';
 import { db } from '../src/prisma/db';
@@ -71,6 +73,21 @@ const seededPostIds = {
   adminDeepDive: '10000000-0000-0000-0000-000000000004',
   adminZebra: '10000000-0000-0000-0000-000000000005',
 } as const;
+
+const embeddingPostIds = {
+  reference: '20000000-0000-0000-0000-000000000001',
+  similar1: '20000000-0000-0000-0000-000000000002',
+  similar2: '20000000-0000-0000-0000-000000000003',
+  dissimilar: '20000000-0000-0000-0000-000000000004',
+} as const;
+
+function makeVector(leadingValues: number[]): number[] {
+  const vec = new Array<number>(1536).fill(0);
+  for (let i = 0; i < leadingValues.length; i++) {
+    vec[i] = leadingValues[i]!;
+  }
+  return vec;
+}
 
 async function seedOrmClientData(runtime: Runtime): Promise<void> {
   const db = sql({ context });
@@ -136,6 +153,44 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
       title: 'Zebra post note',
       userId: seededUserIds.adminTwo,
       createdAt: new Date('2024-01-05T10:00:00.000Z'),
+    },
+  ];
+
+  for (const post of posts) {
+    await runtime.execute(db.post.insert(post).build());
+  }
+}
+
+async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
+  const db = sql({ context });
+  const posts = [
+    {
+      id: embeddingPostIds.reference,
+      title: 'Reference post',
+      userId: seededUserIds.admin,
+      createdAt: new Date('2024-02-01T10:00:00.000Z'),
+      embedding: makeVector([1, 0, 0]),
+    },
+    {
+      id: embeddingPostIds.similar1,
+      title: 'Very similar post',
+      userId: seededUserIds.member,
+      createdAt: new Date('2024-02-02T10:00:00.000Z'),
+      embedding: makeVector([0.95, 0.05, 0]),
+    },
+    {
+      id: embeddingPostIds.similar2,
+      title: 'Somewhat similar post',
+      userId: seededUserIds.adminTwo,
+      createdAt: new Date('2024-02-03T10:00:00.000Z'),
+      embedding: makeVector([0.7, 0.3, 0]),
+    },
+    {
+      id: embeddingPostIds.dissimilar,
+      title: 'Dissimilar post',
+      userId: seededUserIds.admin,
+      createdAt: new Date('2024-02-04T10:00:00.000Z'),
+      embedding: makeVector([-0.5, -0.5, 0]),
     },
   ];
 
@@ -604,6 +659,67 @@ describe('ORM client integration examples', () => {
 
           const emptyPage = await ormClientGetUsersBackwardCursor(seededUserIds.admin, 2, runtime);
           expect(emptyPage).toHaveLength(0);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientFindSimilarPosts returns posts ordered by cosine distance with user include',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          await seedEmbeddingPosts(runtime);
+          const results = await ormClientFindSimilarPosts(embeddingPostIds.reference, 10, runtime);
+
+          expect(results).toHaveLength(3);
+          expect(results.map((r) => r.id)).toEqual([
+            embeddingPostIds.reference,
+            embeddingPostIds.similar1,
+            embeddingPostIds.similar2,
+          ]);
+          expect(results.map((r) => r.user.email)).toEqual([
+            'admin@example.com',
+            'member@example.com',
+            'admin2@example.org',
+          ]);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientSearchPostsByEmbedding returns posts within max cosine distance ordered by similarity',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          await seedEmbeddingPosts(runtime);
+          const results = await ormClientSearchPostsByEmbedding(
+            makeVector([1, 0, 0]),
+            0.5,
+            10,
+            runtime,
+          );
+
+          expect(results.map((r) => r.id)).toEqual([
+            embeddingPostIds.reference,
+            embeddingPostIds.similar1,
+            embeddingPostIds.similar2,
+          ]);
         } finally {
           await runtime.close();
         }

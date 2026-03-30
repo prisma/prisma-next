@@ -2,6 +2,7 @@ import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type {
   ExtractCodecTypes,
+  ExtractQueryOperationTypes,
   SqlContract,
   SqlStorage,
   StorageColumn,
@@ -25,12 +26,24 @@ import type { RowSelection } from './collection-internal-types';
 // Comparison / Filter / Order / Include
 // ---------------------------------------------------------------------------
 
-export interface OrderExpr {
+export interface ColumnOrderBy {
   readonly column: string;
   readonly direction: 'asc' | 'desc';
 }
 
-export type OrderByDirective = OrderExpr;
+export interface ExpressionOrderBy {
+  readonly expr: AnyExpression;
+  readonly direction: 'asc' | 'desc';
+}
+
+export type AnyOrderBy = ColumnOrderBy | ExpressionOrderBy;
+
+export function isColumnOrderBy(order: AnyOrderBy): order is ColumnOrderBy {
+  return 'column' in order;
+}
+
+export type OrderExpr = ColumnOrderBy;
+export type OrderByDirective = ColumnOrderBy;
 
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
@@ -78,7 +91,7 @@ export interface IncludeExpr {
 export interface CollectionState {
   readonly filters: readonly AnyExpression[];
   readonly includes: readonly IncludeExpr[];
-  readonly orderBy: readonly OrderExpr[] | undefined;
+  readonly orderBy: readonly AnyOrderBy[] | undefined;
   readonly cursor: Readonly<Record<string, unknown>> | undefined;
   readonly distinct: readonly string[] | undefined;
   readonly distinctOn: readonly string[] | undefined;
@@ -177,6 +190,89 @@ export type ComparisonMethods<T, Traits> = {
     ? K
     : never]: ComparisonMethodFns<T>[K];
 };
+
+// ---------------------------------------------------------------------------
+// Extension operation result — returned by calling an extension method
+// ---------------------------------------------------------------------------
+
+type QueryOperationReturnTraits<
+  Returns,
+  TCodecTypes extends Record<string, unknown>,
+> = Returns extends { readonly codecId: infer Id extends string }
+  ? Id extends keyof TCodecTypes
+    ? TCodecTypes[Id] extends { readonly traits: infer Traits }
+      ? Traits
+      : never
+    : never
+  : never;
+
+type QueryOperationReturnJsType<
+  Returns,
+  TCodecTypes extends Record<string, unknown>,
+> = Returns extends { readonly codecId: infer Id extends string; readonly nullable: infer N }
+  ? Id extends keyof TCodecTypes
+    ? TCodecTypes[Id] extends { readonly output: infer O }
+      ? N extends true
+        ? O | null
+        : O
+      : unknown
+    : unknown
+  : unknown;
+
+export type ExpressionResult<T, Traits> = Omit<ComparisonMethods<T, Traits>, 'asc' | 'desc'> & {
+  asc(): ExpressionOrderBy;
+  desc(): ExpressionOrderBy;
+  isNull(): AnyExpression;
+  isNotNull(): AnyExpression;
+};
+
+type CodecArgJsType<Arg, TCodecTypes extends Record<string, unknown>> = Arg extends {
+  readonly codecId: infer CId extends string;
+  readonly nullable: infer N;
+}
+  ? CId extends keyof TCodecTypes
+    ? TCodecTypes[CId] extends { readonly output: infer O }
+      ? N extends true
+        ? O | null
+        : O
+      : unknown
+    : unknown
+  : unknown;
+
+type MapArgsToJsTypes<
+  Args extends readonly unknown[],
+  TCodecTypes extends Record<string, unknown>,
+> = Args extends readonly [infer Head, ...infer Tail]
+  ? [CodecArgJsType<Head, TCodecTypes>, ...MapArgsToJsTypes<Tail, TCodecTypes>]
+  : [];
+
+type QueryOperationMethod<Op, TCodecTypes extends Record<string, unknown>> = Op extends {
+  readonly args: readonly [unknown, ...infer UserArgs];
+  readonly returns: infer Returns;
+}
+  ? (
+      ...args: MapArgsToJsTypes<UserArgs, TCodecTypes>
+    ) => ExpressionResult<
+      QueryOperationReturnJsType<Returns, TCodecTypes>,
+      QueryOperationReturnTraits<Returns, TCodecTypes>
+    >
+  : never;
+
+type FieldOperations<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = FieldCodecId<TContract, ModelName, FieldName> extends infer CodecId extends string
+  ? ExtractQueryOperationTypes<TContract> extends infer AllOps
+    ? {
+        [OpName in keyof AllOps & string as AllOps[OpName] extends {
+          readonly args: readonly [{ readonly codecId: CodecId }, ...(readonly unknown[])];
+        }
+          ? OpName
+          : never]: QueryOperationMethod<AllOps[OpName], ExtractCodecTypes<TContract>>;
+      }
+    : unknown
+  : unknown;
 
 // ---------------------------------------------------------------------------
 // COMPARISON_METHODS_META — single source of truth for traits + factories
@@ -294,7 +390,8 @@ type ScalarModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName ex
   [K in keyof FieldsOf<TContract, ModelName> & string]: ComparisonMethods<
     FieldJsType<TContract, ModelName, K>,
     FieldTraits<TContract, ModelName, K>
-  >;
+  > &
+    FieldOperations<TContract, ModelName, K>;
 };
 
 type RelationModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {

@@ -5,11 +5,16 @@ import {
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
+  LiteralExpr,
+  NullCheckExpr,
+  OperationExpr,
+  ParamRef,
   ProjectionItem,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { QueryOperationEntry } from '@prisma-next/sql-relational-core/query-operations';
 import {
   getFieldToColumnMap,
   resolveFieldToColumn,
@@ -19,6 +24,7 @@ import { and, not } from './filters';
 import {
   COMPARISON_METHODS_META,
   type ComparisonMethodFns,
+  type ExpressionOrderBy,
   type ModelAccessor,
   type RelationFilterAccessor,
 } from './types';
@@ -60,7 +66,12 @@ export function createModelAccessor<
 
       const columnName = fieldToColumn[prop] ?? prop;
       const traits = resolveFieldTraits(contract, modelName, prop, context);
-      return createScalarFieldAccessor(tableName, columnName, traits);
+      const codecId = resolveFieldCodecId(contract, tableName, columnName);
+      const allQueryOps = context.queryOperations.entries();
+      const operations = codecId
+        ? Object.entries(allQueryOps).filter(([, entry]) => entry.args[0]?.codecId === codecId)
+        : [];
+      return createScalarFieldAccessor(tableName, columnName, traits, operations, context);
     },
   });
 }
@@ -80,10 +91,23 @@ function resolveFieldTraits(
   return context.codecs.traitsOf(codecId);
 }
 
+function resolveFieldCodecId(
+  contract: SqlContract<SqlStorage>,
+  tableName: string,
+  columnName: string,
+): string | undefined {
+  const tables = contract.storage?.tables as
+    | Record<string, { columns?: Record<string, { codecId?: string }> }>
+    | undefined;
+  return tables?.[tableName]?.columns?.[columnName]?.codecId;
+}
+
 function createScalarFieldAccessor(
   tableName: string,
   columnName: string,
   traits: readonly string[],
+  operations: ReadonlyArray<[string, QueryOperationEntry]>,
+  context: ExecutionContext,
 ): Partial<ComparisonMethodFns<unknown>> {
   const column = ColumnRef.of(tableName, columnName);
   const methods: Record<string, unknown> = {};
@@ -95,7 +119,75 @@ function createScalarFieldAccessor(
     methods[name] = meta.create(column);
   }
 
+  for (const [name, entry] of operations) {
+    methods[name] = createExtensionMethodFactory(column, name, entry, context);
+  }
+
   return methods as Partial<ComparisonMethodFns<unknown>>;
+}
+
+function createExtensionMethodFactory(
+  column: ColumnRef,
+  name: string,
+  entry: QueryOperationEntry,
+  context: ExecutionContext,
+): (...args: unknown[]) => Record<string, unknown> {
+  return (...args: unknown[]) => {
+    const userArgSpecs = entry.args.slice(1);
+    const astArgs = userArgSpecs.map((argSpec, i) => {
+      return ParamRef.of(args[i], { codecId: argSpec.codecId });
+    });
+
+    const opExpr = new OperationExpr({
+      method: name,
+      forTypeId: entry.args[0]?.codecId ?? 'unknown',
+      self: column,
+      args: astArgs,
+      returns: { kind: 'typeId', type: entry.returns.codecId },
+      lowering: entry.lowering,
+    });
+
+    return createExpressionResult(opExpr, entry.returns, context);
+  };
+}
+
+function createExpressionResult(
+  expr: OperationExpr,
+  returns: QueryOperationEntry['returns'],
+  context: ExecutionContext,
+): Record<string, unknown> {
+  const returnTraits = resolveReturnTraits(returns, context);
+  const methods: Record<string, unknown> = {};
+
+  for (const [name, meta] of Object.entries(COMPARISON_METHODS_META)) {
+    if (name === 'asc' || name === 'desc') continue;
+    if (name === 'isNull' || name === 'isNotNull') {
+      if (name === 'isNull') {
+        methods[name] = () => NullCheckExpr.isNull(expr);
+      } else {
+        methods[name] = () => NullCheckExpr.isNotNull(expr);
+      }
+      continue;
+    }
+    if (meta.traits.some((t) => !returnTraits.includes(t))) continue;
+
+    methods[name] = (value: unknown) => {
+      const right = LiteralExpr.of(value);
+      return new BinaryExpr(name as BinaryExpr['op'], expr, right);
+    };
+  }
+
+  methods['asc'] = (): ExpressionOrderBy => ({ expr, direction: 'asc' });
+  methods['desc'] = (): ExpressionOrderBy => ({ expr, direction: 'desc' });
+
+  return methods;
+}
+
+function resolveReturnTraits(
+  returns: { readonly codecId: string },
+  context: ExecutionContext,
+): readonly string[] {
+  return context.codecs.traitsOf(returns.codecId);
 }
 
 function createRelationFilterAccessor<
