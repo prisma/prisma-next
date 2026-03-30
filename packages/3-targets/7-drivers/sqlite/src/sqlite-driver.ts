@@ -139,22 +139,17 @@ class SqliteTransactionImpl implements SqlTransaction {
 
 export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
   readonly #path: string;
-  // REVIEW: do we need primary DB for this? Can't we just always acquire a new connection? in execute/explain/query ?
-  readonly #primary: DatabaseSync;
   #closed = false;
 
   constructor(path: string) {
     this.#path = path;
-    this.#primary = openConnection(path);
   }
 
   get state(): SqlDriverState {
     return this.#closed ? 'closed' : 'connected';
   }
 
-  async connect(_binding: SqliteBinding): Promise<void> {
-    // Already bound at construction time
-  }
+  async connect(_binding: SqliteBinding): Promise<void> {}
 
   async acquireConnection(): Promise<SqlConnection> {
     const db = openConnection(this.#path);
@@ -162,33 +157,27 @@ export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
   }
 
   async close(): Promise<void> {
-    if (this.#closed) {
-      return;
-    }
     this.#closed = true;
-    this.#primary.close();
   }
 
   async *execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
+    const conn = await this.acquireConnection();
     try {
-      const stmt = this.#primary.prepare(request.sql);
-      for (const row of stmt.iterate(...toSqliteParams(request.params))) {
-        yield row as Row;
+      for await (const row of conn.execute<Row>(request)) {
+        yield row;
       }
-    } catch (error) {
-      throw normalizeSqliteError(error);
+    } finally {
+      await conn.release();
     }
   }
 
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
+    const conn = await this.acquireConnection();
     try {
-      const stmt = this.#primary.prepare(`EXPLAIN QUERY PLAN ${request.sql}`);
-      const rows = stmt.all(...toSqliteParams(request.params)) as ReadonlyArray<
-        Record<string, unknown>
-      >;
-      return { rows };
-    } catch (error) {
-      throw normalizeSqliteError(error);
+      // SqliteConnectionImpl always has explain defined
+      return await conn.explain!(request);
+    } finally {
+      await conn.release();
     }
   }
 
@@ -196,12 +185,11 @@ export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
     sql: string,
     params?: readonly unknown[],
   ): Promise<SqlQueryResult<Row>> {
+    const conn = await this.acquireConnection();
     try {
-      const stmt = this.#primary.prepare(sql);
-      const rows = stmt.all(...toSqliteParams(params)) as Row[];
-      return { rows };
-    } catch (error) {
-      throw normalizeSqliteError(error);
+      return await conn.query<Row>(sql, params);
+    } finally {
+      await conn.release();
     }
   }
 }

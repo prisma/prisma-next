@@ -5,14 +5,12 @@ export const sqliteAdapterDescriptorMeta = {
   id: 'sqlite',
   version: '0.0.1',
   capabilities: {
-    sqlite: {
+    sql: {
       orderBy: true,
       limit: true,
       lateral: false,
       jsonAgg: true,
       returning: true,
-    },
-    sql: {
       enums: false,
     },
   },
