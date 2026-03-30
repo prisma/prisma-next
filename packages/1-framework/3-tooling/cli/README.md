@@ -299,13 +299,13 @@ Use `createControlPlaneStack()` from `@prisma-next/core-control-plane/stack` to 
 
 The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles marker checks, full `db verify` follows it with `schemaVerify()`, `--marker-only` skips that schema step, and `--schema-only` runs `schemaVerify()` without marker checks.
 
-### `prisma-next db introspect`
+### `prisma-next db schema`
 
-Inspect the live database schema and display it as a human-readable tree or machine-consumable JSON.
+Inspect the live database schema and display it as a human-readable tree or machine-consumable JSON. This command is read-only and never writes files.
 
 **Command:**
 ```bash
-prisma-next db introspect [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
+prisma-next db schema [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 Options:
@@ -320,21 +320,60 @@ Options:
 Examples:
 ```bash
 # Use config defaults
-prisma-next db introspect
+prisma-next db schema
 
 # Specify database URL
-prisma-next db introspect --db postgresql://user:pass@localhost/db
+prisma-next db schema --db postgresql://user:pass@localhost/db
 
 # JSON output
-prisma-next db introspect --json
+prisma-next db schema --json
 
 # Verbose output
-prisma-next db introspect -v
+prisma-next db schema -v
 ```
+
+### `prisma-next contract infer`
+
+Inspect the live database schema and write an inferred PSL contract to disk. Use this for brownfield adoption when you want a starting `contract.prisma` before running `contract emit` and `db sign`.
+
+**Command:**
+```bash
+prisma-next contract infer [--db <url>] [--config <path>] [--output <path>] [--json] [-v] [-q] [--color/--no-color]
+```
+
+Options:
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
+- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--output <path>`: Write the inferred PSL contract to the specified path
+- `--json`: Output a JSON result envelope (includes `psl.path`)
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `-vv, --trace`: Trace output (deep internals, stack traces)
+- `--color/--no-color`: Force/disable color output
+
+Examples:
+```bash
+# Infer contract.prisma next to the configured contract.json output
+prisma-next contract infer
+
+# Specify database URL
+prisma-next contract infer --db postgresql://user:pass@localhost/db
+
+# Override the output path
+prisma-next contract infer --output ./prisma/contract.prisma
+
+# JSON output
+prisma-next contract infer --json
+```
+
+By default, `contract infer` writes to:
+1. `--output <path>`, if provided
+2. `contract.prisma` next to `config.contract.output`
+3. `contract.prisma` in the current working directory
 
 **Config File Requirements:**
 
-The `db introspect` command requires a `driver` in the config to connect to the database:
+Both `db schema` and `contract infer` require a `driver` in the config to connect to the database:
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
@@ -1357,10 +1396,11 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/control-api`**: Exports `createControlClient` and control API types
 - **`@prisma-next/cli/commands/db-init`**: Exports `createDbInitCommand`
 - **`@prisma-next/cli/commands/db-update`**: Exports `createDbUpdateCommand`
-- **`@prisma-next/cli/commands/db-introspect`**: Exports `createDbIntrospectCommand`
+- **`@prisma-next/cli/commands/db-schema`**: Exports `createDbSchemaCommand`
 - **`@prisma-next/cli/commands/db-sign`**: Exports `createDbSignCommand`
 - **`@prisma-next/cli/commands/db-verify`**: Exports `createDbVerifyCommand`
 - **`@prisma-next/cli/commands/contract-emit`**: Exports `createContractEmitCommand`
+- **`@prisma-next/cli/commands/contract-infer`**: Exports `createContractInferCommand`
 - **`@prisma-next/cli/commands/migration-plan`**: Exports `createMigrationPlanCommand`
 - **`@prisma-next/cli/commands/migration-show`**: Exports `createMigrationShowCommand`
 - **`@prisma-next/cli/commands/migration-status`**: Exports `createMigrationStatusCommand`

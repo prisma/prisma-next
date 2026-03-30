@@ -2,7 +2,7 @@ import type { GeneratedValueSpec } from '@prisma-next/contract/types';
 import type { RuntimeAdapterInstance } from '@prisma-next/core-execution-plane/types';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
-import type { Adapter, CodecRegistry, QueryAst } from '@prisma-next/sql-relational-core/ast';
+import type { Adapter, AnyQueryAst, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   RuntimeParameterizedCodecDescriptor,
@@ -21,7 +21,7 @@ import type { PostgresContract, PostgresLoweredStatement } from '../core/types';
 
 export interface SqlRuntimeAdapter
   extends RuntimeAdapterInstance<'sql', 'postgres'>,
-    Adapter<QueryAst, PostgresContract, PostgresLoweredStatement> {}
+    Adapter<AnyQueryAst, PostgresContract, PostgresLoweredStatement> {}
 
 function createPostgresCodecRegistry(): CodecRegistry {
   const registry = createCodecRegistry();

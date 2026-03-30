@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DefaultValueExpr,
-  DoNothingConflictAction,
-  DoUpdateSetConflictAction,
+  type DoUpdateSetConflictAction,
   InsertAst,
   InsertOnConflict,
 } from '../../src/exports/ast';
@@ -68,7 +67,6 @@ describe('ast/insert', () => {
       .withOnConflict(onConflict);
 
     expect(insertAst.onConflict?.columns).toEqual([col('user', 'id')]);
-    expect(insertAst.onConflict?.action).toBeInstanceOf(DoUpdateSetConflictAction);
     expect((insertAst.onConflict?.action as DoUpdateSetConflictAction).set).toEqual({
       email: param(2, 'updatedEmail'),
     });
@@ -79,6 +77,42 @@ describe('ast/insert', () => {
       .withValues({ id: param(0, 'id') })
       .withOnConflict(InsertOnConflict.on([col('user', 'id')]).doNothing());
 
-    expect(insertAst.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+    expect(insertAst.onConflict?.action?.kind).toBe('do-nothing');
+  });
+
+  it('collectParamRefs returns row params then onConflict set params', () => {
+    const rowId = param('u1', 'id');
+    const rowEmail = param('a@b.com', 'email');
+    const conflictEmail = param('updated@b.com', 'updatedEmail');
+    const insertAst = InsertAst.into(table('user'))
+      .withRows([{ id: rowId, email: rowEmail }])
+      .withOnConflict(
+        InsertOnConflict.on([col('user', 'id')]).doUpdateSet({ email: conflictEmail }),
+      );
+
+    expect(insertAst.collectParamRefs()).toEqual([rowId, rowEmail, conflictEmail]);
+  });
+
+  it('collectParamRefs skips DefaultValueExpr entries', () => {
+    const rowId = param('u1', 'id');
+    const insertAst = InsertAst.into(table('user')).withValues({
+      id: rowId,
+      email: new DefaultValueExpr(),
+    });
+
+    expect(insertAst.collectParamRefs()).toEqual([rowId]);
+  });
+
+  it('collectParamRefs preserves row-major order across multiple rows', () => {
+    const r1Id = param('u1', 'id');
+    const r1Email = param('a@b.com', 'email');
+    const r2Id = param('u2', 'id');
+    const r2Email = param('c@d.com', 'email');
+    const insertAst = InsertAst.into(table('user')).withRows([
+      { id: r1Id, email: r1Email },
+      { id: r2Id, email: r2Email },
+    ]);
+
+    expect(insertAst.collectParamRefs()).toEqual([r1Id, r1Email, r2Id, r2Email]);
   });
 });

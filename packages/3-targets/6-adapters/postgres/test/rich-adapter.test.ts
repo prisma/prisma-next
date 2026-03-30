@@ -97,12 +97,17 @@ describe('Postgres rich AST lowering', () => {
       .withJoins([
         JoinAst.left(DerivedTableSource.as('posts_lateral', aggregateQuery), AndExpr.true(), true),
       ])
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'userId')))
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withOrderBy([OrderByItem.desc(ColumnRef.of('user', 'createdAt'))])
       .withLimit(10)
       .withOffset(5);
 
-    const lowered = adapter.lower(ast, { contract, params: [1] });
+    const lowered = adapter.lower(ast, { contract });
 
     expect(lowered.body.sql).toContain('LEFT JOIN LATERAL');
     expect(lowered.body.sql).toContain('json_agg(json_build_object');
@@ -116,13 +121,12 @@ describe('Postgres rich AST lowering', () => {
       method: 'cosineDistance',
       forTypeId: 'pg/vector@1',
       self: ColumnRef.of('user', 'vector'),
-      args: [ParamRef.of(1, 'other')],
+      args: [ParamRef.of([1, 2, 3], { name: 'other', codecId: 'pg/vector@1' })],
       returns: { kind: 'builtin', type: 'number' },
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     });
 
@@ -131,7 +135,7 @@ describe('Postgres rich AST lowering', () => {
       ProjectionItem.of('count', AggregateExpr.count()),
     ]);
 
-    const lowered = adapter.lower(ast, { contract, params: [[1, 2, 3]] });
+    const lowered = adapter.lower(ast, { contract });
 
     expect(lowered.body.sql).toContain('"user"."vector" <=> $1::vector');
     expect(lowered.body.sql).toContain('COUNT(*) AS "count"');
@@ -158,11 +162,11 @@ describe('Postgres rich AST lowering', () => {
     const insertAst = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(1, 'id'),
-          email: ParamRef.of(2, 'email'),
+          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
         },
         {
-          id: ParamRef.of(3, 'id'),
+          id: ParamRef.of(2, { name: 'id', codecId: 'pg/int4@1' }),
           email: new DefaultValueExpr(),
         },
       ])
@@ -173,8 +177,7 @@ describe('Postgres rich AST lowering', () => {
       )
       .withReturning([ColumnRef.of('user', 'id'), ColumnRef.of('user', 'email')]);
 
-    const insertSql = adapter.lower(insertAst, { contract, params: [1, 'a@example.com', 2] }).body
-      .sql;
+    const insertSql = adapter.lower(insertAst, { contract }).body.sql;
     expect(insertSql).toContain(
       'INSERT INTO "user" ("id", "email") VALUES ($1, $2), ($3, DEFAULT)',
     );
@@ -182,18 +185,28 @@ describe('Postgres rich AST lowering', () => {
     expect(insertSql).toContain('RETURNING "user"."id", "user"."email"');
 
     const updateAst = UpdateAst.table(TableSource.named('user'))
-      .withSet({ email: ParamRef.of(1, 'email') })
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(2, 'id')))
+      .withSet({ email: ParamRef.of('b@example.com', { name: 'email', codecId: 'pg/text@1' }) })
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'id')]);
-    const updateSql = adapter.lower(updateAst, { contract, params: ['b@example.com', 1] }).body.sql;
+    const updateSql = adapter.lower(updateAst, { contract }).body.sql;
     expect(updateSql).toBe(
       'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2 RETURNING "user"."id"',
     );
 
     const deleteAst = DeleteAst.from(TableSource.named('user'))
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'id')))
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'id')]);
-    const deleteSql = adapter.lower(deleteAst, { contract, params: [1] }).body.sql;
+    const deleteSql = adapter.lower(deleteAst, { contract }).body.sql;
     expect(deleteSql).toBe('DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id"');
   });
 });

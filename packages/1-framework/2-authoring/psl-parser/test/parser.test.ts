@@ -171,6 +171,30 @@ model Account {
     });
   });
 
+  it('parses enum @@map through generic attributes', () => {
+    const schema = `
+enum UserRole {
+  USER
+  ADMIN
+  @@map("user_role")
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    const userRole = result.ast.enums.find((enumBlock) => enumBlock.name === 'UserRole');
+    expect(userRole?.attributes.find((attribute) => attribute.name === 'map')).toMatchObject({
+      kind: 'attribute',
+      target: 'enum',
+      name: 'map',
+      args: [{ kind: 'positional', value: '"user_role"' }],
+    });
+  });
+
   it('returns diagnostics for malformed attribute syntax', () => {
     const schema = `
 model User {

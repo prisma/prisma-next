@@ -1,6 +1,6 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { type ToWhereExpr, type WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import { isWhereExpr, type ToWhereExpr, type WhereArg } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import {
@@ -91,13 +91,8 @@ import type {
 } from './types';
 import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
-import { createBoundWhereExpr } from './where-utils';
 
 type WhereDirectInput = WhereArg;
-
-function isWhereExprInput(value: unknown): value is WhereExpr {
-  return value instanceof WhereExpr;
-}
 
 function isToWhereExprInput(value: unknown): value is ToWhereExpr {
   return (
@@ -109,7 +104,10 @@ function isToWhereExprInput(value: unknown): value is ToWhereExpr {
 }
 
 function isWhereDirectInput(value: unknown): value is WhereDirectInput {
-  return isWhereExprInput(value) || isToWhereExprInput(value);
+  return (
+    (isWhereExpr(value) && typeof (value as { accept?: unknown }).accept === 'function') ||
+    isToWhereExprInput(value)
+  );
 }
 
 export class Collection<
@@ -122,6 +120,8 @@ export class Collection<
   declare readonly [RowType]: Row;
   /** @internal */
   readonly ctx: CollectionContext<TContract>;
+  /** @internal */
+  private readonly contract: TContract;
   /** @internal */
   readonly modelName: ModelName;
   /** @internal */
@@ -139,8 +139,9 @@ export class Collection<
     options: CollectionInit<TContract> = {},
   ) {
     this.ctx = ctx;
+    this.contract = ctx.context.contract;
     this.modelName = modelName;
-    this.tableName = options.tableName ?? resolveModelTableName(ctx.contract, modelName);
+    this.tableName = options.tableName ?? resolveModelTableName(this.contract, modelName);
     this.state = options.state ?? emptyState();
     this.registry = options.registry ?? new Map<string, CollectionConstructor<TContract>>();
     this.includeRefinementMode = options.includeRefinementMode ?? false;
@@ -165,11 +166,11 @@ export class Collection<
   ): Collection<TContract, ModelName, Row, WithWhereState<State>> {
     const whereArg =
       typeof input === 'function'
-        ? input(createModelAccessor(this.ctx.contract, this.modelName))
+        ? input(createModelAccessor(this.ctx.context, this.modelName))
         : isWhereDirectInput(input)
           ? input
-          : shorthandToWhereExpr(this.ctx.contract, this.modelName, input);
-    const filter = normalizeWhereArg(whereArg, { contract: this.ctx.contract });
+          : shorthandToWhereExpr(this.ctx.context, this.modelName, input);
+    const filter = normalizeWhereArg(whereArg, { contract: this.contract });
 
     if (!filter) {
       return this as Collection<TContract, ModelName, Row, WithWhereState<State>>;
@@ -225,11 +226,7 @@ export class Collection<
     },
     State
   > {
-    const relation = resolveIncludeRelation(
-      this.ctx.contract,
-      this.modelName,
-      relationName as string,
-    );
+    const relation = resolveIncludeRelation(this.contract, this.modelName, relationName as string);
 
     let nestedState = emptyState();
     let scalarSelector: IncludeScalar<unknown> | undefined;
@@ -321,7 +318,7 @@ export class Collection<
       IncludedRelationsForRow<TContract, ModelName, Row>,
     State
   > {
-    const selectedFields = mapFieldsToColumns(this.ctx.contract, this.modelName, fields);
+    const selectedFields = mapFieldsToColumns(this.contract, this.modelName, fields);
 
     return this.#cloneWithRow<
       Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
@@ -337,7 +334,7 @@ export class Collection<
       | ((model: ModelAccessor<TContract, ModelName>) => OrderByDirective)
       | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByDirective>,
   ): Collection<TContract, ModelName, Row, WithOrderByState<State>> {
-    const accessor = createModelAccessor(this.ctx.contract, this.modelName);
+    const accessor = createModelAccessor(this.ctx.context, this.modelName);
     const selectors = Array.isArray(selection) ? selection : [selection];
     const nextOrders: OrderExpr[] = selectors.map((selector) => {
       const order = selector(accessor as ModelAccessor<TContract, ModelName>);
@@ -358,7 +355,7 @@ export class Collection<
       ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
     ],
   >(...fields: Fields): GroupedCollection<TContract, ModelName, Fields> {
-    const groupByColumns = mapFieldsToColumns(this.ctx.contract, this.modelName, fields);
+    const groupByColumns = mapFieldsToColumns(this.contract, this.modelName, fields);
 
     return new GroupedCollection(this.ctx, this.modelName, {
       tableName: this.tableName,
@@ -378,7 +375,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('sum()');
-    const columnName = mapFieldToColumn(this.ctx.contract, this.modelName, field as string);
+    const columnName = mapFieldToColumn(this.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('sum', this.state, columnName);
   }
 
@@ -386,7 +383,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('avg()');
-    const columnName = mapFieldToColumn(this.ctx.contract, this.modelName, field as string);
+    const columnName = mapFieldToColumn(this.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('avg', this.state, columnName);
   }
 
@@ -394,7 +391,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('min()');
-    const columnName = mapFieldToColumn(this.ctx.contract, this.modelName, field as string);
+    const columnName = mapFieldToColumn(this.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('min', this.state, columnName);
   }
 
@@ -402,7 +399,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('max()');
-    const columnName = mapFieldToColumn(this.ctx.contract, this.modelName, field as string);
+    const columnName = mapFieldToColumn(this.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('max', this.state, columnName);
   }
 
@@ -458,7 +455,7 @@ export class Collection<
       : never,
   ): Collection<TContract, ModelName, Row, State> {
     const mappedCursor = mapCursorValuesToColumns(
-      this.ctx.contract,
+      this.contract,
       this.modelName,
       cursorValues as Readonly<Record<string, unknown>>,
     );
@@ -478,7 +475,7 @@ export class Collection<
       ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
     ],
   >(...fields: Fields): Collection<TContract, ModelName, Row, State> {
-    const distinctFields = mapFieldsToColumns(this.ctx.contract, this.modelName, fields);
+    const distinctFields = mapFieldsToColumns(this.contract, this.modelName, fields);
 
     return this.#clone({
       distinct: distinctFields,
@@ -495,7 +492,7 @@ export class Collection<
     ...fields: State['hasOrderBy'] extends true ? Fields : never
   ): Collection<TContract, ModelName, Row, State> {
     const distinctOnFields = mapFieldsToColumns(
-      this.ctx.contract,
+      this.contract,
       this.modelName,
       fields as readonly string[],
     );
@@ -542,7 +539,7 @@ export class Collection<
   async aggregate<Spec extends AggregateSpec>(
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
   ): Promise<AggregateResult<Spec>> {
-    const aggregateSpec = fn(createAggregateBuilder(this.ctx.contract, this.modelName));
+    const aggregateSpec = fn(createAggregateBuilder(this.contract, this.modelName));
     const entries = Object.entries(aggregateSpec);
     if (entries.length === 0) {
       throw new Error('aggregate() requires at least one aggregation selector');
@@ -555,7 +552,7 @@ export class Collection<
     }
 
     const compiled = compileAggregate(
-      this.ctx.contract,
+      this.contract,
       this.tableName,
       this.state.filters,
       aggregateSpec,
@@ -574,23 +571,19 @@ export class Collection<
       | CreateInput<TContract, ModelName>
       | MutationCreateInputWithRelations<TContract, ModelName>,
   ): Promise<Row> {
-    assertReturningCapability(this.ctx.contract, 'create()');
+    assertReturningCapability(this.contract, 'create()');
 
     if (
-      hasNestedMutationCallbacks(this.ctx.contract, this.modelName, data as Record<string, unknown>)
+      hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
     ) {
       const createdRow = await executeNestedCreateMutation({
-        contract: this.ctx.contract,
+        context: this.ctx.context,
         runtime: this.ctx.runtime,
         modelName: this.modelName,
         data: data as MutationCreateInput<SqlContract<SqlStorage>, string>,
       });
 
-      const pkCriterion = buildPrimaryKeyFilterFromRow(
-        this.ctx.contract,
-        this.modelName,
-        createdRow,
-      );
+      const pkCriterion = buildPrimaryKeyFilterFromRow(this.contract, this.modelName, createdRow);
       const reloaded = await this.#reloadMutationRowByPrimaryKey(pkCriterion);
       if (!reloaded) {
         throw new Error(`create() for model "${this.modelName}" did not return a row`);
@@ -613,10 +606,10 @@ export class Collection<
       return new AsyncIterableResult(generator());
     }
 
-    assertReturningCapability(this.ctx.contract, 'createAll()');
+    assertReturningCapability(this.contract, 'createAll()');
 
     const mappedRows = data.map((row) =>
-      mapModelDataToStorageRow(this.ctx.contract, this.modelName, row),
+      mapModelDataToStorageRow(this.contract, this.modelName, row),
     );
     const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
     const { selectedForQuery: selectedForInsert, hiddenColumns } = augmentSelectionForJoinColumns(
@@ -624,13 +617,13 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileInsertReturning(
-      this.ctx.contract,
+      this.contract,
       this.tableName,
       mappedRows,
       selectedForInsert,
     );
     return dispatchMutationRows<Row>({
-      contract: this.ctx.contract,
+      contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
@@ -646,9 +639,9 @@ export class Collection<
     }
 
     const mappedRows = data.map((row) =>
-      mapModelDataToStorageRow(this.ctx.contract, this.modelName, row),
+      mapModelDataToStorageRow(this.contract, this.modelName, row),
     );
-    const compiled = compileInsertCount(this.ctx.contract, this.tableName, mappedRows);
+    const compiled = compileInsertCount(this.contract, this.tableName, mappedRows);
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
     return data.length;
   }
@@ -663,13 +656,13 @@ export class Collection<
     update: Partial<DefaultModelRow<TContract, ModelName>>;
     conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
   }): Promise<Row> {
-    assertReturningCapability(this.ctx.contract, 'upsert()');
+    assertReturningCapability(this.contract, 'upsert()');
 
-    const createValues = mapModelDataToStorageRow(this.ctx.contract, this.modelName, input.create);
-    const updateValues = mapModelDataToStorageRow(this.ctx.contract, this.modelName, input.update);
+    const createValues = mapModelDataToStorageRow(this.contract, this.modelName, input.create);
+    const updateValues = mapModelDataToStorageRow(this.contract, this.modelName, input.update);
     const hasUpdateValues = Object.keys(updateValues).length > 0;
     const conflictColumns = resolveUpsertConflictColumns(
-      this.ctx.contract,
+      this.contract,
       this.modelName,
       input.conflictOn as Record<string, unknown> | undefined,
     );
@@ -683,7 +676,7 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileUpsertReturning(
-      this.ctx.contract,
+      this.contract,
       this.tableName,
       createValues,
       updateValues,
@@ -691,7 +684,7 @@ export class Collection<
       selectedForUpsert,
     );
     const row = await executeMutationReturningSingleRow<Row>({
-      contract: this.ctx.contract,
+      contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
@@ -721,13 +714,13 @@ export class Collection<
   async update(
     data: State['hasWhere'] extends true ? MutationUpdateInput<TContract, ModelName> : never,
   ): Promise<Row | null> {
-    assertReturningCapability(this.ctx.contract, 'update()');
+    assertReturningCapability(this.contract, 'update()');
 
     if (
-      hasNestedMutationCallbacks(this.ctx.contract, this.modelName, data as Record<string, unknown>)
+      hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
     ) {
       const updatedRow = await executeNestedUpdateMutation({
-        contract: this.ctx.contract,
+        context: this.ctx.context,
         runtime: this.ctx.runtime,
         modelName: this.modelName,
         filters: this.state.filters,
@@ -737,11 +730,7 @@ export class Collection<
         return null;
       }
 
-      const pkCriterion = buildPrimaryKeyFilterFromRow(
-        this.ctx.contract,
-        this.modelName,
-        updatedRow,
-      );
+      const pkCriterion = buildPrimaryKeyFilterFromRow(this.contract, this.modelName, updatedRow);
       return this.#reloadMutationRowByPrimaryKey(pkCriterion);
     }
 
@@ -756,9 +745,9 @@ export class Collection<
   updateAll(
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
   ): AsyncIterableResult<Row> {
-    assertReturningCapability(this.ctx.contract, 'updateAll()');
+    assertReturningCapability(this.contract, 'updateAll()');
 
-    const mappedData = mapModelDataToStorageRow(this.ctx.contract, this.modelName, data);
+    const mappedData = mapModelDataToStorageRow(this.contract, this.modelName, data);
     if (Object.keys(mappedData).length === 0) {
       const generator = async function* (): AsyncGenerator<Row, void, unknown> {};
       return new AsyncIterableResult(generator());
@@ -770,14 +759,14 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileUpdateReturning(
-      this.ctx.contract,
+      this.contract,
       this.tableName,
       mappedData,
       this.state.filters,
       selectedForUpdate,
     );
     return dispatchMutationRows<Row>({
-      contract: this.ctx.contract,
+      contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
@@ -790,25 +779,25 @@ export class Collection<
   async updateCount(
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
   ): Promise<number> {
-    const mappedData = mapModelDataToStorageRow(this.ctx.contract, this.modelName, data);
+    const mappedData = mapModelDataToStorageRow(this.contract, this.modelName, data);
     if (Object.keys(mappedData).length === 0) {
       return 0;
     }
 
-    const primaryKeyColumn = resolvePrimaryKeyColumn(this.ctx.contract, this.tableName);
+    const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
     const countState: CollectionState = {
       ...emptyState(),
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
     };
-    const countCompiled = compileSelect(this.ctx.contract, this.tableName, countState);
+    const countCompiled = compileSelect(this.contract, this.tableName, countState);
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
       countCompiled,
     ).toArray();
 
     const compiled = compileUpdateCount(
-      this.ctx.contract,
+      this.contract,
       this.tableName,
       mappedData,
       this.state.filters,
@@ -821,7 +810,7 @@ export class Collection<
   async delete(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
   ): Promise<Row | null> {
-    assertReturningCapability(this.ctx.contract, 'delete()');
+    assertReturningCapability(this.contract, 'delete()');
     const rows = await this.deleteAll().toArray();
     return rows[0] ?? null;
   }
@@ -829,7 +818,7 @@ export class Collection<
   deleteAll(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
   ): AsyncIterableResult<Row> {
-    assertReturningCapability(this.ctx.contract, 'deleteAll()');
+    assertReturningCapability(this.contract, 'deleteAll()');
 
     const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
     const { selectedForQuery: selectedForDelete, hiddenColumns } = augmentSelectionForJoinColumns(
@@ -837,13 +826,13 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileDeleteReturning(
-      this.ctx.contract,
+      this.contract,
       this.tableName,
       this.state.filters,
       selectedForDelete,
     );
     return dispatchMutationRows<Row>({
-      contract: this.ctx.contract,
+      contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
@@ -856,19 +845,19 @@ export class Collection<
   async deleteCount(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
   ): Promise<number> {
-    const primaryKeyColumn = resolvePrimaryKeyColumn(this.ctx.contract, this.tableName);
+    const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
     const countState: CollectionState = {
       ...emptyState(),
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
     };
-    const countCompiled = compileSelect(this.ctx.contract, this.tableName, countState);
+    const countCompiled = compileSelect(this.contract, this.tableName, countState);
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
       countCompiled,
     ).toArray();
 
-    const compiled = compileDeleteCount(this.ctx.contract, this.tableName, this.state.filters);
+    const compiled = compileDeleteCount(this.contract, this.tableName, this.state.filters);
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
 
     return matchingRows.length;
@@ -878,7 +867,7 @@ export class Collection<
     createValues: Record<string, unknown>,
     conflictColumns: readonly string[],
   ): Record<string, unknown> {
-    const columnToField = this.ctx.contract.mappings.columnToField?.[this.tableName] ?? {};
+    const columnToField = this.contract.mappings.columnToField?.[this.tableName] ?? {};
     const criterion: Record<string, unknown> = {};
 
     for (const columnName of conflictColumns) {
@@ -904,7 +893,7 @@ export class Collection<
     criterionLabel: string,
   ): Promise<Row | null> {
     const whereExpr = shorthandToWhereExpr(
-      this.ctx.contract,
+      this.ctx.context,
       this.modelName,
       criterion as ShorthandWhereFilter<TContract, ModelName>,
     );
@@ -916,14 +905,14 @@ export class Collection<
 
     const resultState: CollectionState = {
       ...emptyState(),
-      filters: [createBoundWhereExpr(whereExpr)],
+      filters: [whereExpr],
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       limit: 1,
     };
 
     const rows = await dispatchCollectionRows<Row>({
-      contract: this.ctx.contract,
+      contract: this.contract,
       runtime: this.ctx.runtime,
       state: resultState,
       tableName: this.tableName,
@@ -992,7 +981,7 @@ export class Collection<
 
   #dispatch(): AsyncIterableResult<Row> {
     return dispatchCollectionRows<Row>({
-      contract: this.ctx.contract,
+      contract: this.contract,
       runtime: this.ctx.runtime,
       state: this.state,
       tableName: this.tableName,

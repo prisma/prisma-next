@@ -6,7 +6,7 @@ import {
   vectorColumn as vectorColumnType,
 } from '@prisma-next/test-utils/column-descriptors';
 import { describe, expect, it } from 'vitest';
-import { ColumnRef, OperationExpr } from '../src/ast/types';
+import { ColumnRef, type OperationExpr } from '../src/ast/types';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
 import { createStubAdapter, createTestContext } from './utils';
@@ -45,8 +45,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -77,8 +76,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -107,8 +105,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
     const signature2: SqlOperationSignature = {
@@ -119,8 +116,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <-> ${arg0}',
+        template: '{{self}} <-> {{arg0}}',
       },
     };
 
@@ -151,8 +147,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -185,8 +180,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -219,8 +213,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -254,8 +247,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -289,8 +281,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: 'normalize(${self})',
+        template: 'normalize({{self}})',
       },
     };
     const signature2: SqlOperationSignature = {
@@ -301,8 +292,7 @@ describe('ColumnBuilder operations', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     };
 
@@ -337,13 +327,13 @@ describe('ColumnBuilder operations', () => {
     const outerOp = expressionBuilder.toExpr();
 
     // Verify the outer operation (cosineDistance) has the inner operation (normalize) as its self
-    expect(outerOp).toBeInstanceOf(OperationExpr);
+    expect(outerOp.kind).toBe('operation');
     expect(outerOp.method).toBe('cosineDistance');
-    expect(outerOp.self).toBeInstanceOf(OperationExpr);
+    expect(outerOp.self.kind).toBe('operation');
 
     // Verify the inner operation (normalize) has the column as its self
     const innerOp = outerOp.self as OperationExpr;
-    expect(innerOp).toBeInstanceOf(OperationExpr);
+    expect(innerOp.kind).toBe('operation');
     expect(innerOp.method).toBe('normalize');
     expect(innerOp.self).toEqual(ColumnRef.of('user', 'vector'));
   });

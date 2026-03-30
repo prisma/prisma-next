@@ -2,6 +2,7 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   AggregateExpr,
   AndExpr,
+  type AnyQueryAst,
   BinaryExpr,
   ColumnRef,
   DefaultValueExpr,
@@ -10,14 +11,13 @@ import {
   InsertAst,
   InsertOnConflict,
   JsonObjectExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   NullCheckExpr,
   OperationExpr,
   OrExpr,
   ParamRef,
   ProjectionItem,
-  QueryAst,
   SelectAst,
   SubqueryExpr,
   TableSource,
@@ -64,12 +64,6 @@ const contract = validateContract<PostgresContract>({
   mappings: {},
 });
 
-class UnsupportedAst extends QueryAst {
-  override collectRefs() {
-    return { tables: [], columns: [] };
-  }
-}
-
 describe('Postgres adapter', () => {
   const adapter = createPostgresAdapter();
 
@@ -104,8 +98,14 @@ describe('Postgres adapter', () => {
   it('lowers insert, update, and delete statements with returning clauses', () => {
     const insertAst = InsertAst.into(TableSource.named('user'))
       .withRows([
-        { id: ParamRef.of(1, 'id'), email: ParamRef.of(2, 'email') },
-        { id: ParamRef.of(3, 'id2'), email: new DefaultValueExpr() },
+        {
+          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+        },
+        {
+          id: ParamRef.of(2, { name: 'id2', codecId: 'pg/int4@1' }),
+          email: new DefaultValueExpr(),
+        },
       ])
       .withOnConflict(
         InsertOnConflict.on([ColumnRef.of('user', 'email')]).doUpdateSet({
@@ -114,27 +114,42 @@ describe('Postgres adapter', () => {
       )
       .withReturning([ColumnRef.of('user', 'id')]);
     const updateAst = UpdateAst.table(TableSource.named('user'))
-      .withSet({ email: ParamRef.of(1, 'email') })
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(2, 'id')))
+      .withSet({ email: ParamRef.of('b@example.com', { name: 'email', codecId: 'pg/text@1' }) })
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'email')]);
     const deleteAst = DeleteAst.from(TableSource.named('user'))
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'id')))
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'id')]);
 
-    expect(
-      adapter.lower(insertAst, { contract, params: [1, 'a@example.com', 2] }).body.sql,
-    ).toContain('ON CONFLICT ("email") DO UPDATE SET "email" = excluded."email"');
-    expect(adapter.lower(updateAst, { contract, params: ['b@example.com', 1] }).body.sql).toBe(
+    expect(adapter.lower(insertAst, { contract }).body.sql).toContain(
+      'ON CONFLICT ("email") DO UPDATE SET "email" = excluded."email"',
+    );
+    expect(adapter.lower(updateAst, { contract }).body.sql).toBe(
       'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2 RETURNING "user"."email"',
     );
-    expect(adapter.lower(deleteAst, { contract, params: [1] }).body.sql).toBe(
+    expect(adapter.lower(deleteAst, { contract }).body.sql).toBe(
       'DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id"',
     );
   });
 
   it('throws on unsupported AST nodes and invalid insert rows', () => {
-    expect(() => adapter.lower(new UnsupportedAst(), { contract, params: [] })).toThrow(
-      'Unsupported AST node: UnsupportedAst',
+    const unsupported = {
+      kind: 'unsupported',
+      collectParamRefs: () => [],
+      collectRefs: () => ({ tables: [], columns: [] }),
+    } as unknown as AnyQueryAst;
+    expect(() => adapter.lower(unsupported, { contract, params: [] })).toThrow(
+      'Unsupported AST node kind: unsupported',
     );
     expect(() =>
       adapter.lower(InsertAst.into(TableSource.named('user')).withRows([]), {
@@ -154,8 +169,7 @@ describe('Postgres adapter', () => {
       self: ColumnRef.of('user', 'vector'),
       args: [],
       returns: { kind: 'builtin', type: 'number' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'vector_length(${self})',
+      template: 'vector_length({{self}})',
     });
     const scalarSubquery = SelectAst.from(TableSource.named('post'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
@@ -168,17 +182,20 @@ describe('Postgres adapter', () => {
           ExistsExpr.notExists(existsSubquery),
           NullCheckExpr.isNull(vectorLength),
           NullCheckExpr.isNotNull(SubqueryExpr.of(scalarSubquery)),
-          BinaryExpr.eq(ColumnRef.of('user', 'profile'), ParamRef.of(1, 'profile')),
-          BinaryExpr.eq(ColumnRef.of('user', 'metadata'), ParamRef.of(2, 'metadata')),
-          BinaryExpr.in(ColumnRef.of('user', 'id'), ListLiteralExpr.fromValues([])),
-          BinaryExpr.notIn(ColumnRef.of('user', 'id'), ListLiteralExpr.fromValues([])),
+          BinaryExpr.eq(
+            ColumnRef.of('user', 'profile'),
+            ParamRef.of({ active: true }, { name: 'profile', codecId: 'pg/jsonb@1' }),
+          ),
+          BinaryExpr.eq(
+            ColumnRef.of('user', 'metadata'),
+            ParamRef.of({ source: 'test' }, { name: 'metadata', codecId: 'pg/json@1' }),
+          ),
+          BinaryExpr.in(ColumnRef.of('user', 'id'), ListExpression.fromValues([])),
+          BinaryExpr.notIn(ColumnRef.of('user', 'id'), ListExpression.fromValues([])),
         ]),
       );
 
-    const lowered = adapter.lower(ast, {
-      contract,
-      params: [{ active: true }, { source: 'test' }],
-    });
+    const lowered = adapter.lower(ast, { contract });
 
     expect(lowered.body.sql).toBe(
       [

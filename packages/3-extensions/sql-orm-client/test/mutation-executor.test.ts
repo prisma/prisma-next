@@ -1,8 +1,8 @@
 import {
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -12,7 +12,7 @@ import {
   hasNestedMutationCallbacks,
 } from '../src/mutation-executor';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContract } from './helpers';
+import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 
 function withTransaction(runtime: MockRuntime) {
   const commit = vi.fn(async () => undefined);
@@ -49,9 +49,9 @@ function withConnection(runtime: MockRuntime, onRelease: () => void) {
   });
 }
 
-const postIdFilter: WhereExpr = BinaryExpr.eq(ColumnRef.of('posts', 'id'), LiteralExpr.of(1));
+const postIdFilter: AnyExpression = BinaryExpr.eq(ColumnRef.of('posts', 'id'), LiteralExpr.of(1));
 
-const userIdFilter: WhereExpr = BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1));
+const userIdFilter: AnyExpression = BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1));
 
 describe('mutation-executor', () => {
   it('hasNestedMutationCallbacks() detects callbacks only on relation fields', () => {
@@ -179,7 +179,7 @@ describe('mutation-executor', () => {
     const transactional = withTransaction(runtime);
 
     const created = await executeNestedCreateMutation({
-      contract,
+      context: { ...getTestContext(), contract },
       runtime: transactional.runtime,
       modelName: 'User',
       data: { id: 1, name: 'Alice', email: 'alice@example.com' } as never,
@@ -204,7 +204,7 @@ describe('mutation-executor', () => {
     });
 
     const created = await executeNestedCreateMutation({
-      contract,
+      context: { ...getTestContext(), contract },
       runtime: runtimeWithBareTransaction,
       modelName: 'User',
       data: { id: 1, name: 'Alice', email: 'alice@example.com' } as never,
@@ -221,7 +221,7 @@ describe('mutation-executor', () => {
 
     await expect(
       executeNestedCreateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime: transactional.runtime,
         modelName: 'User',
         data: { id: 1, name: 'Alice', email: 'alice@example.com' } as never,
@@ -243,7 +243,7 @@ describe('mutation-executor', () => {
     });
 
     await executeNestedCreateMutation({
-      contract,
+      context: { ...getTestContext(), contract },
       runtime: scopedRuntime,
       modelName: 'User',
       data: { id: 1, name: 'Alice', email: 'alice@example.com' } as never,
@@ -258,7 +258,7 @@ describe('mutation-executor', () => {
 
     await expect(
       executeNestedCreateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'User',
         data: {
@@ -272,7 +272,7 @@ describe('mutation-executor', () => {
 
     await expect(
       executeNestedCreateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'User',
         data: {
@@ -291,7 +291,7 @@ describe('mutation-executor', () => {
 
     await expect(
       executeNestedCreateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'Post',
         data: {
@@ -306,7 +306,7 @@ describe('mutation-executor', () => {
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
     await expect(
       executeNestedCreateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'User',
         data: {
@@ -325,7 +325,7 @@ describe('mutation-executor', () => {
 
     await expect(
       executeNestedCreateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'Post',
         data: {
@@ -341,7 +341,7 @@ describe('mutation-executor', () => {
 
     await expect(
       executeNestedCreateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'Post',
         data: {
@@ -357,7 +357,7 @@ describe('mutation-executor', () => {
     runtime.setNextResults([[]]);
     await expect(
       executeNestedCreateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'Post',
         data: {
@@ -372,7 +372,7 @@ describe('mutation-executor', () => {
 
     await expect(
       executeNestedCreateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'Post',
         data: {
@@ -405,7 +405,7 @@ describe('mutation-executor', () => {
 
     await expect(
       executeNestedCreateMutation({
-        contract: withManyToMany,
+        context: { ...getTestContext(), contract: withManyToMany },
         runtime,
         modelName: 'User',
         data: {
@@ -428,7 +428,7 @@ describe('mutation-executor', () => {
     ]);
 
     const created = await executeNestedCreateMutation({
-      contract,
+      context: { ...getTestContext(), contract },
       runtime,
       modelName: 'Post',
       data: {
@@ -474,7 +474,7 @@ describe('mutation-executor', () => {
     ]);
 
     const created = await executeNestedCreateMutation({
-      contract: sparseAuthorRelation,
+      context: { ...getTestContext(), contract: sparseAuthorRelation },
       runtime,
       modelName: 'Post',
       data: {
@@ -495,7 +495,7 @@ describe('mutation-executor', () => {
     runtime.setNextResults([[]]);
 
     const updated = await executeNestedUpdateMutation({
-      contract,
+      context: { ...getTestContext(), contract },
       runtime,
       modelName: 'User',
       filters: [userIdFilter],
@@ -514,7 +514,7 @@ describe('mutation-executor', () => {
     ]);
 
     const updated = await executeNestedUpdateMutation({
-      contract,
+      context: { ...getTestContext(), contract },
       runtime,
       modelName: 'Post',
       filters: [postIdFilter],
@@ -532,7 +532,7 @@ describe('mutation-executor', () => {
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }], []]);
 
     const updated = await executeNestedUpdateMutation({
-      contract,
+      context: { ...getTestContext(), contract },
       runtime,
       modelName: 'User',
       filters: [userIdFilter],
@@ -549,7 +549,7 @@ describe('mutation-executor', () => {
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
     await expect(
       executeNestedUpdateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'User',
         filters: [userIdFilter],
@@ -562,7 +562,7 @@ describe('mutation-executor', () => {
 
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }], []]);
     const connected = await executeNestedUpdateMutation({
-      contract,
+      context: { ...getTestContext(), contract },
       runtime,
       modelName: 'User',
       filters: [userIdFilter],
@@ -576,7 +576,7 @@ describe('mutation-executor', () => {
 
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }], []]);
     const disconnected = await executeNestedUpdateMutation({
-      contract,
+      context: { ...getTestContext(), contract },
       runtime,
       modelName: 'User',
       filters: [userIdFilter],
@@ -590,7 +590,7 @@ describe('mutation-executor', () => {
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
     await expect(
       executeNestedUpdateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'User',
         filters: [userIdFilter],
@@ -625,7 +625,7 @@ describe('mutation-executor', () => {
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }], []]);
 
     const updated = await executeNestedUpdateMutation({
-      contract: compositeRelationContract,
+      context: { ...getTestContext(), contract: compositeRelationContract },
       runtime,
       modelName: 'User',
       filters: [userIdFilter],
@@ -644,7 +644,7 @@ describe('mutation-executor', () => {
 
     await expect(
       executeNestedUpdateMutation({
-        contract,
+        context: { ...getTestContext(), contract },
         runtime,
         modelName: 'User',
         filters: [userIdFilter],

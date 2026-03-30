@@ -15,9 +15,9 @@ import { AsyncIterableResult, createRuntimeCore } from '@prisma-next/runtime-exe
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
+  AnyQueryAst,
   CodecRegistry,
   LoweredStatement,
-  QueryAst,
   SelectAst,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
@@ -39,7 +39,7 @@ export interface RuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
   readonly context: ExecutionContext<TContract>;
-  readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+  readonly adapter: Adapter<AnyQueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin<
@@ -112,7 +112,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     SqlDriver<unknown>
   >;
   private readonly contract: TContract;
-  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+  private readonly adapter: Adapter<AnyQueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   private readonly codecRegistry: CodecRegistry;
   private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private codecRegistryValidated: boolean;
@@ -178,11 +178,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     const iterator = async function* (
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
-      const encodedParams = encodeParams(
-        executablePlan,
-        self.codecRegistry,
-        self.jsonSchemaValidators,
-      );
+      const encodedParams = encodeParams(executablePlan, self.codecRegistry);
       const planWithEncodedParams: ExecutionPlan<Row> = {
         ...executablePlan,
         params: encodedParams,

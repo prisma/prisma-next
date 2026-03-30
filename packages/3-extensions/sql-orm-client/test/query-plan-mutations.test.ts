@@ -1,13 +1,10 @@
 import {
   ColumnRef,
-  DefaultValueExpr,
-  DeleteAst,
-  DoNothingConflictAction,
-  DoUpdateSetConflictAction,
+  type DeleteAst,
+  type DoUpdateSetConflictAction,
   type InsertAst,
-  InsertAst as InsertAstClass,
   ParamRef,
-  UpdateAst,
+  type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
@@ -21,7 +18,22 @@ import { withReturningCapability } from './collection-fixtures';
 import { getTestContract } from './helpers';
 
 function assertInsertAst(ast: unknown): asserts ast is InsertAst {
-  expect(ast).toBeInstanceOf(InsertAstClass);
+  expect((ast as { kind: string }).kind).toBe('insert');
+}
+
+function usersColParam(
+  contract: ReturnType<typeof getTestContract>,
+  column: string,
+  value: unknown,
+): ParamRef {
+  const columns = contract.storage.tables.users?.columns as
+    | Record<string, { codecId?: string }>
+    | undefined;
+  const columnMeta = columns?.[column];
+  return ParamRef.of(value, {
+    name: column,
+    codecId: columnMeta?.codecId ?? 'unknown',
+  });
 }
 
 describe('query plan mutations', () => {
@@ -49,16 +61,16 @@ describe('query plan mutations', () => {
     ]);
     expect(plan.ast.rows).toHaveLength(2);
     expect(plan.ast.rows[0]).toMatchObject({
-      id: ParamRef.of(1, 'id'),
-      name: ParamRef.of(2, 'name'),
-      email: ParamRef.of(3, 'email'),
+      id: usersColParam(contract, 'id', 10),
+      name: usersColParam(contract, 'name', 'Alice'),
+      email: usersColParam(contract, 'email', 'alice@example.com'),
     });
-    expect(plan.ast.rows[0]?.['invited_by_id']).toBeInstanceOf(DefaultValueExpr);
+    expect(plan.ast.rows[0]?.['invited_by_id']?.kind).toBe('default-value');
     expect(plan.ast.rows[1]).toEqual({
-      id: ParamRef.of(4, 'id'),
-      name: ParamRef.of(5, 'name'),
-      email: ParamRef.of(6, 'email'),
-      invited_by_id: ParamRef.of(7, 'invited_by_id'),
+      id: usersColParam(contract, 'id', 11),
+      name: usersColParam(contract, 'name', 'Bob'),
+      email: usersColParam(contract, 'email', 'bob@example.com'),
+      invited_by_id: usersColParam(contract, 'invited_by_id', 10),
     });
     expect(plan.ast.returning).toEqual([
       ColumnRef.of('users', 'email'),
@@ -89,7 +101,7 @@ describe('query plan mutations', () => {
     );
 
     assertInsertAst(plan.ast);
-    expect(plan.ast.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+    expect(plan.ast.onConflict?.action?.kind).toBe('do-nothing');
     expect(plan.params).toEqual([10, 'Alice', 'alice@example.com']);
     expect(plan.ast.returning).toEqual(
       Object.keys(contract.storage.tables.users.columns).map((column) =>
@@ -124,9 +136,11 @@ describe('query plan mutations', () => {
     );
 
     assertInsertAst(plan.ast);
-    expect(plan.ast.onConflict?.action).toBeInstanceOf(DoUpdateSetConflictAction);
+    expect(plan.ast.onConflict?.action?.kind).toBe('do-update-set');
     const action = plan.ast.onConflict?.action as DoUpdateSetConflictAction;
-    expect(action.set).toEqual({ name: ParamRef.of(4, 'name') });
+    expect(action.set).toEqual({
+      name: usersColParam(contract, 'name', 'Updated Alice'),
+    });
     expect(plan.params).toEqual([10, 'Alice', 'alice@example.com', 'Updated Alice']);
   });
 
@@ -134,12 +148,12 @@ describe('query plan mutations', () => {
     const contract = getTestContract();
 
     const updatePlan = compileUpdateCount(contract, 'users', { name: 'Alice' }, []);
-    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
+    expect(updatePlan.ast.kind).toBe('update');
     expect((updatePlan.ast as UpdateAst).where).toBeUndefined();
     expect(updatePlan.params).toEqual(['Alice']);
 
     const deletePlan = compileDeleteCount(contract, 'users', []);
-    expect(deletePlan.ast).toBeInstanceOf(DeleteAst);
+    expect(deletePlan.ast.kind).toBe('delete');
     expect((deletePlan.ast as DeleteAst).where).toBeUndefined();
     expect(deletePlan.params).toEqual([]);
   });

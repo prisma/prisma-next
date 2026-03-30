@@ -17,13 +17,15 @@ pnpm test:journeys
 
 | File | What it covers |
 |---|---|
-| `greenfield-setup.e2e.test.ts` | New project with empty database: emit a contract, dry-run init to preview operations, apply init, confirm idempotency on re-run, verify marker and schema (`db verify`, `db verify --schema-only`, `db verify --strict`), introspect, and JSON output variants of full and schema-only verify |
+| `greenfield-setup.e2e.test.ts` | New project with empty database: emit a contract, dry-run init to preview operations, apply init, confirm idempotency on re-run, verify marker and schema (`db verify`, `db verify --schema-only`, `db verify --strict`), inspect the live schema with `db schema`, and check JSON output variants of full and schema-only verify |
+| `db-schema-discovery.e2e.test.ts` | **Live schema discovery**: inspect an unmanaged database with `db schema`, apply manual DDL, inspect again with `db schema --json`, and confirm the command stays read-only throughout |
 | `schema-evolution-migrations.e2e.test.ts` | **Migration lifecycle**: plan a migration, show its details, verify the planned directory, check status (offline + online), apply, confirm all applied, db verify. Also covers edge cases: apply when already up-to-date (noop), plan when contract is unchanged (noop), show by path and not-found. **Init-to-migrations transition**: initialize with `db init`, then switch to the migration workflow |
 | `multi-step-migration.e2e.test.ts` | Planning two migrations (base → additive → v3) without applying either, then batch-applying both at once. Verifies pending/applied status reporting |
 | `migration-plan-details.e2e.test.ts` | **Plan JSON envelope**: full `--json` output shape with operations, attestation round-trip (plan → verify). **Destructive planning**: drop-column migration produces destructive operation class |
 | `migration-apply-edge-cases.e2e.test.ts` | **No path**: apply fails when contract changed without planning. **Resume**: partial failure (NOT NULL violation) leaves marker at last success, re-apply resumes. **Destructive apply**: single drop-column migration verifies column removed + marker updated. **Multi-step destructive**: three-migration batch (create → add → drop) in one apply |
 | `db-update-workflows.e2e.test.ts` | **Direct update**: `db update` without migrations (additive-only, dry-run, noop). **Destructive update**: drops a column, tests `--no-interactive` rejection, `--json` error envelope, and `--json -y` auto-accept. **Re-init conflict**: `db init` on an already-initialized DB with a different contract fails; recovery via `db update` |
-| `brownfield-adoption.e2e.test.ts` | **Adopt Prisma on existing DB**: introspect → emit matching contract → `db verify --schema-only` → sign → verify → evolve via db update. **Schema mismatch**: emit a contract that doesn't match the DB, observe sign / schema-only verify failures, fix contract, retry |
+| `contract-infer-workflow.e2e.test.ts` | **PSL inference workflow**: refresh `contract.prisma` from the live database with `contract infer`, emit from the inferred PSL, verify the schema, and confirm a second infer is stable |
+| `brownfield-adoption.e2e.test.ts` | **Adopt Prisma on existing DB**: infer a PSL contract from the live DB, emit matching artifacts, `db verify --schema-only`, sign, verify, and then evolve via `db update`. **Schema mismatch**: emit a contract that doesn't match the DB, observe sign / schema-only verify failures, fix contract, retry |
 
 ### Graph features and refs
 

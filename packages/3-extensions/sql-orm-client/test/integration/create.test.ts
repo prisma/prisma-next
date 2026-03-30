@@ -7,24 +7,44 @@ import {
   withCollectionRuntime,
 } from './helpers';
 
-function expectInsertBatchAst(ast: unknown): asserts ast is InsertAst {
+function expectInsertBatchAst(
+  ast: unknown,
+  rows: ReadonlyArray<{
+    id: number;
+    name: string;
+    email: string;
+    invitedById: null | undefined;
+  }>,
+): asserts ast is InsertAst {
   expect(ast).toBeInstanceOf(InsertAst);
-  if (!(ast instanceof InsertAst)) {
-    throw new Error('Expected execution to emit an insert AST');
-  }
 
-  expect(ast.rows).toEqual([
+  expect((ast as InsertAst).rows).toEqual([
     {
-      id: ParamRef.of(1, 'id'),
-      name: ParamRef.of(2, 'name'),
-      email: ParamRef.of(3, 'email'),
-      invited_by_id: ParamRef.of(4, 'invited_by_id'),
+      id: ParamRef.of(rows[0]!.id, { name: 'id', codecId: 'pg/int4@1' }),
+      name: ParamRef.of(rows[0]!.name, { name: 'name', codecId: 'pg/text@1' }),
+      email: ParamRef.of(rows[0]!.email, {
+        name: 'email',
+        codecId: 'pg/text@1',
+      }),
+      invited_by_id: ParamRef.of(rows[0]!.invitedById ?? null, {
+        name: 'invited_by_id',
+        codecId: 'pg/int4@1',
+      }),
     },
     {
-      id: ParamRef.of(5, 'id'),
-      name: ParamRef.of(6, 'name'),
-      email: ParamRef.of(7, 'email'),
-      invited_by_id: new DefaultValueExpr(),
+      id: ParamRef.of(rows[1]!.id, { name: 'id', codecId: 'pg/int4@1' }),
+      name: ParamRef.of(rows[1]!.name, { name: 'name', codecId: 'pg/text@1' }),
+      email: ParamRef.of(rows[1]!.email, {
+        name: 'email',
+        codecId: 'pg/text@1',
+      }),
+      invited_by_id:
+        rows[1]!.invitedById === undefined
+          ? new DefaultValueExpr()
+          : ParamRef.of(rows[1]!.invitedById, {
+              name: 'invited_by_id',
+              codecId: 'pg/int4@1',
+            }),
     },
   ]);
 }
@@ -76,7 +96,10 @@ describe('integration/create', () => {
           { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null },
         ]);
         expect(runtime.executions).toHaveLength(1);
-        expectInsertBatchAst(runtime.executions[0]?.ast);
+        expectInsertBatchAst(runtime.executions[0]?.ast, [
+          { id: 10, name: 'Alice', email: 'alice@example.com', invitedById: null },
+          { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: undefined },
+        ]);
 
         const rows = await runtime.query<{ id: number; name: string; email: string }>(
           'select id, name, email from users order by id',
@@ -103,7 +126,10 @@ describe('integration/create', () => {
         ]);
         expect(count).toBe(2);
         expect(runtime.executions).toHaveLength(1);
-        expectInsertBatchAst(runtime.executions[0]?.ast);
+        expectInsertBatchAst(runtime.executions[0]?.ast, [
+          { id: 20, name: 'Cara', email: 'cara@example.com', invitedById: null },
+          { id: 21, name: 'Dan', email: 'dan@example.com', invitedById: undefined },
+        ]);
 
         const rows = await runtime.query<{ id: number; name: string }>(
           'select id, name from users order by id',

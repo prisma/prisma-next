@@ -70,8 +70,7 @@ describe('buildMeta', () => {
       self: ColumnRef.of('user', 'id'),
       args: [],
       returns: { kind: 'typeId', type: 'pg/vector@1' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'normalize(${self})',
+      template: 'normalize({{self}})',
     });
 
     const meta = buildMeta({
@@ -115,7 +114,6 @@ describe('buildMeta', () => {
       where: userColumns.id.eq(param('userId')),
       orderBy: userColumns.id.asc(),
       paramDescriptors: [],
-      paramCodecs: { userId: 'pg/int4@1' },
     });
 
     expect(meta.projection).toEqual({ id: 'user.id', posts: 'include:posts' });
@@ -123,7 +121,6 @@ describe('buildMeta', () => {
     expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
     expect(meta.annotations?.codecs).toEqual({
       id: 'pg/int4@1',
-      userId: 'pg/int4@1',
     });
   });
 
@@ -134,8 +131,7 @@ describe('buildMeta', () => {
       self: ColumnRef.of('user', 'id'),
       args: [],
       returns: { kind: 'builtin', type: 'number' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'vector_length(${self})',
+      template: 'vector_length({{self}})',
     });
 
     const meta = buildMeta({

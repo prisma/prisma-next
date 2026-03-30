@@ -2,47 +2,44 @@ import { describe, expect, it } from 'vitest';
 import {
   AggregateExpr,
   AndExpr,
+  type AnyOperationArg,
   BinaryExpr,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
   DerivedTableSource,
-  DoNothingConflictAction,
-  DoUpdateSetConflictAction,
   EqColJoinOn,
   ExistsExpr,
-  Expression,
   InsertAst,
   InsertOnConflict,
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
+  NotExpr,
   NullCheckExpr,
   OperationExpr,
   OrderByItem,
   OrExpr,
   ParamRef,
   ProjectionItem,
-  QueryAst,
   SelectAst,
   SubqueryExpr,
   TableSource,
   UpdateAst,
-  WhereExpr,
 } from '../../src/exports/ast';
+import { shiftParamRef } from './test-helpers';
 
 const stringReturn = { kind: 'builtin', type: 'string' } as const;
-function lowerEmail(column: ColumnRef, ...args: Array<Expression | ParamRef | LiteralExpr>) {
+function lowerEmail(column: ColumnRef, ...args: Array<AnyOperationArg>) {
   return OperationExpr.function({
     method: 'lower',
     forTypeId: 'pg/text@1',
     self: column,
     args,
     returns: stringReturn,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-    template: 'lower(${self})',
+    template: 'lower({{self}})',
   });
 }
 
@@ -54,41 +51,44 @@ describe('rich SQL AST', () => {
     const update = UpdateAst.table(table);
     const del = DeleteAst.from(table);
     const column = ColumnRef.of('user', 'id');
-    const param = ParamRef.of(0, 'id');
+    const param = ParamRef.of(0, { name: 'id', codecId: 'pg/int4@1' });
     const literal = LiteralExpr.of('alice');
     const binary = BinaryExpr.eq(column, param);
 
-    expect(select).toBeInstanceOf(QueryAst);
-    expect(insert).toBeInstanceOf(QueryAst);
-    expect(update).toBeInstanceOf(QueryAst);
-    expect(del).toBeInstanceOf(QueryAst);
-    expect(column).toBeInstanceOf(Expression);
-    expect(SubqueryExpr.of(select)).toBeInstanceOf(Expression);
-    expect(lowerEmail(column, param, literal)).toBeInstanceOf(Expression);
-    expect(AggregateExpr.sum(column)).toBeInstanceOf(Expression);
-    expect(JsonObjectExpr.fromEntries([JsonObjectExpr.entry('id', column)])).toBeInstanceOf(
-      Expression,
+    expect(select.kind).toBe('select');
+    expect(insert.kind).toBe('insert');
+    expect(update.kind).toBe('update');
+    expect(del.kind).toBe('delete');
+    expect(column.kind).toBe('column-ref');
+    expect(SubqueryExpr.of(select).kind).toBe('subquery');
+    expect(lowerEmail(column, param, literal).kind).toBe('operation');
+    expect(AggregateExpr.sum(column).kind).toBe('aggregate');
+    expect(JsonObjectExpr.fromEntries([JsonObjectExpr.entry('id', column)]).kind).toBe(
+      'json-object',
     );
-    expect(JsonArrayAggExpr.of(column)).toBeInstanceOf(Expression);
-    expect(binary).toBeInstanceOf(WhereExpr);
-    expect(AndExpr.of([binary])).toBeInstanceOf(WhereExpr);
-    expect(OrExpr.of([binary])).toBeInstanceOf(WhereExpr);
-    expect(ExistsExpr.exists(select)).toBeInstanceOf(WhereExpr);
-    expect(NullCheckExpr.isNull(column)).toBeInstanceOf(WhereExpr);
-    expect(EqColJoinOn.of(column, ColumnRef.of('post', 'userId'))).toBeInstanceOf(EqColJoinOn);
-    expect(JoinAst.left(TableSource.named('post'), binary)).toBeInstanceOf(JoinAst);
-    expect(ProjectionItem.of('id', column)).toBeInstanceOf(ProjectionItem);
-    expect(OrderByItem.asc(column)).toBeInstanceOf(OrderByItem);
-    expect(InsertOnConflict.on([column]).action).toBeInstanceOf(DoNothingConflictAction);
-    expect(InsertOnConflict.on([column]).doUpdateSet({ id: param }).action).toBeInstanceOf(
-      DoUpdateSetConflictAction,
+    expect(JsonArrayAggExpr.of(column).kind).toBe('json-array-agg');
+    expect(binary.kind).toBe('binary');
+    expect(AndExpr.of([binary]).kind).toBe('and');
+    expect(OrExpr.of([binary]).kind).toBe('or');
+    expect(ExistsExpr.exists(select).kind).toBe('exists');
+    expect(NullCheckExpr.isNull(column).kind).toBe('null-check');
+    expect(EqColJoinOn.of(column, ColumnRef.of('post', 'userId')).kind).toBe('eq-col-join-on');
+    expect(JoinAst.left(TableSource.named('post'), binary).kind).toBe('join');
+    expect(ProjectionItem.of('id', column).kind).toBe('projection-item');
+    expect(OrderByItem.asc(column).kind).toBe('order-by-item');
+    expect(InsertOnConflict.on([column]).action.kind).toBe('do-nothing');
+    expect(InsertOnConflict.on([column]).doUpdateSet({ id: param }).action.kind).toBe(
+      'do-update-set',
     );
-    expect(new DefaultValueExpr()).toBeInstanceOf(DefaultValueExpr);
+    expect(new DefaultValueExpr().kind).toBe('default-value');
   });
 
   it('supports fluent immutable query construction', () => {
     const base = SelectAst.from(TableSource.named('user'));
-    const where = BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, 'id'));
+    const where = BinaryExpr.eq(
+      ColumnRef.of('user', 'id'),
+      ParamRef.of(0, { name: 'id', codecId: 'pg/int4@1' }),
+    );
 
     const next = base
       .addProjection('id', ColumnRef.of('user', 'id'))
@@ -121,7 +121,13 @@ describe('rich SQL AST', () => {
 
     const ast = SelectAst.from(TableSource.named('user'))
       .addProjection('id', ColumnRef.of('user', 'id'))
-      .addProjection('email', lowerEmail(ColumnRef.of('user', 'email'), ParamRef.of(0, 'email')))
+      .addProjection(
+        'email',
+        lowerEmail(
+          ColumnRef.of('user', 'email'),
+          ParamRef.of(0, { name: 'email', codecId: 'pg/text@1' }),
+        ),
+      )
       .withJoins([
         JoinAst.left(
           DerivedTableSource.as('posts', inner),
@@ -131,7 +137,10 @@ describe('rich SQL AST', () => {
       ])
       .withWhere(
         AndExpr.of([
-          BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'id')),
+          BinaryExpr.eq(
+            ColumnRef.of('user', 'id'),
+            ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ),
           ExistsExpr.exists(
             SelectAst.from(TableSource.named('comment'))
               .addProjection('id', ColumnRef.of('comment', 'id'))
@@ -146,7 +155,7 @@ describe('rich SQL AST', () => {
       tableSource: (source) =>
         source.name === 'user' ? TableSource.named('member', source.alias) : source,
       columnRef: (expr) => (expr.table === 'user' ? ColumnRef.of('member', expr.column) : expr),
-      paramRef: (expr) => expr.withIndex(expr.index + 10),
+      paramRef: shiftParamRef(10),
       literal: (expr) => (expr.value === true ? LiteralExpr.of('TRUE') : expr),
       eqColJoinOn: (on) =>
         EqColJoinOn.of(
@@ -159,9 +168,9 @@ describe('rich SQL AST', () => {
     expect(rewritten.from).toEqual(TableSource.named('member'));
     expect(rewritten.limit).toBe(99);
     expect(rewritten.projection[0]?.expr).toEqual(ColumnRef.of('member', 'id'));
-    expect(rewritten.projection[1]?.expr).toBeInstanceOf(OperationExpr);
+    expect(rewritten.projection[1]?.expr?.kind).toBe('operation');
     expect((rewritten.projection[1]?.expr as OperationExpr).args[0]).toEqual(
-      ParamRef.of(10, 'email'),
+      ParamRef.of(10, { name: 'email', codecId: 'pg/text@1' }),
     );
     expect(rewritten.joins?.[0]?.on).toEqual(
       EqColJoinOn.of(
@@ -176,12 +185,12 @@ describe('rich SQL AST', () => {
 
   it('folds, collects column refs, and exposes base column refs', () => {
     const email = ColumnRef.of('user', 'email');
-    const op = lowerEmail(email, ParamRef.of(3, 'needle'));
+    const op = lowerEmail(email, ParamRef.of(3, { name: 'needle', codecId: 'pg/text@1' }));
     const where = AndExpr.of([
       BinaryExpr.eq(op, LiteralExpr.of('alice@example.com')),
       BinaryExpr.in(
         ColumnRef.of('user', 'status'),
-        ListLiteralExpr.of([ParamRef.of(4), LiteralExpr.of('active')]),
+        ListExpression.of([ParamRef.of(4, { codecId: 'pg/text@1' }), LiteralExpr.of('active')]),
       ),
     ]);
 
@@ -189,9 +198,9 @@ describe('rich SQL AST', () => {
       empty: [],
       combine: (a, b) => [...a, ...b],
       columnRef: (expr) => [`${expr.table}.${expr.column}`],
-      paramRef: (expr) => [`$${expr.name ?? expr.index}`],
+      paramRef: (expr) => [`$${expr.name ?? String(expr.value)}`],
       literal: (expr) => [`lit:${String(expr.value)}`],
-      listLiteral: (expr) => [`list:${expr.values.length}`],
+      list: (expr) => [`list:${expr.values.length}`],
       select: (ast) => ast.collectColumnRefs().map((expr) => `${expr.table}.${expr.column}`),
     });
 
@@ -213,26 +222,32 @@ describe('rich SQL AST', () => {
   });
 
   it('negates where expressions through not()', () => {
-    expect(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0)).not()).toEqual(
-      BinaryExpr.neq(ColumnRef.of('user', 'id'), ParamRef.of(0)),
+    expect(
+      BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })).not(),
+    ).toEqual(
+      new NotExpr(
+        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
+      ),
     );
     expect(
       AndExpr.of([
-        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0)),
+        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
         NullCheckExpr.isNull(ColumnRef.of('user', 'deletedAt')),
       ]).not(),
     ).toEqual(
-      OrExpr.of([
-        BinaryExpr.neq(ColumnRef.of('user', 'id'), ParamRef.of(0)),
-        NullCheckExpr.isNotNull(ColumnRef.of('user', 'deletedAt')),
-      ]),
+      new NotExpr(
+        AndExpr.of([
+          BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
+          NullCheckExpr.isNull(ColumnRef.of('user', 'deletedAt')),
+        ]),
+      ),
     );
     expect(ExistsExpr.exists(SelectAst.from(TableSource.named('user'))).not()).toEqual(
-      ExistsExpr.notExists(SelectAst.from(TableSource.named('user'))),
+      new NotExpr(ExistsExpr.exists(SelectAst.from(TableSource.named('user')))),
     );
-    expect(() =>
-      BinaryExpr.like(ColumnRef.of('user', 'email'), LiteralExpr.of('%a%')).not(),
-    ).toThrow('Operator "like" is not negatable without explicit NOT support in the AST');
+    expect(BinaryExpr.like(ColumnRef.of('user', 'email'), LiteralExpr.of('%a%')).not()).toEqual(
+      new NotExpr(BinaryExpr.like(ColumnRef.of('user', 'email'), LiteralExpr.of('%a%'))),
+    );
   });
 
   it('collects plan refs across select, insert, update, and delete ASTs', () => {
@@ -268,7 +283,7 @@ describe('rich SQL AST', () => {
     const insert = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(0, 'id'),
+          id: ParamRef.of(0, { name: 'id', codecId: 'pg/int4@1' }),
           managerId: ColumnRef.of('account', 'managerId'),
           nickname: new DefaultValueExpr(),
         },
@@ -276,7 +291,7 @@ describe('rich SQL AST', () => {
       .withOnConflict(
         InsertOnConflict.on([ColumnRef.of('user', 'email')]).doUpdateSet({
           email: ColumnRef.of('excluded', 'email'),
-          managerId: ParamRef.of(1, 'managerId'),
+          managerId: ParamRef.of(1, { name: 'managerId', codecId: 'pg/int4@1' }),
         }),
       )
       .withReturning([ColumnRef.of('user', 'id')]);
@@ -284,9 +299,14 @@ describe('rich SQL AST', () => {
     const update = UpdateAst.table(TableSource.named('user'))
       .withSet({
         managerId: ColumnRef.of('account', 'managerId'),
-        nickname: ParamRef.of(0, 'nickname'),
+        nickname: ParamRef.of(0, { name: 'nickname', codecId: 'pg/text@1' }),
       })
-      .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'id')))
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      )
       .withReturning([ColumnRef.of('user', 'email')]);
 
     const del = DeleteAst.from(TableSource.named('user'))

@@ -1,5 +1,5 @@
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
-import { type ExpressionSource, OperationExpr } from '../ast/types';
+import type { ExpressionSource, OperationExpr } from '../ast/types';
 import type {
   AnyColumnBuilder,
   AnyExpressionSource,
@@ -8,23 +8,13 @@ import type {
   ValueSource,
 } from '../types';
 
-/**
- * Helper to extract columnMeta from a ColumnBuilder or ExpressionBuilder.
- * Returns StorageColumn if present, undefined otherwise.
- * Both ColumnBuilder and ExpressionBuilder have columnMeta property.
- */
 export function getColumnMeta(expr: AnyExpressionSource): StorageColumn | undefined {
-  // Both ColumnBuilder and ExpressionBuilder have columnMeta: StorageColumn
-  // TypeScript should narrow the type after the 'in' check
   if ('columnMeta' in expr) {
     return expr.columnMeta;
   }
   return undefined;
 }
 
-/**
- * Type predicate to check if a value is a ParamPlaceholder.
- */
 export function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
   return (
     typeof value === 'object' &&
@@ -36,15 +26,11 @@ export function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
   );
 }
 
-/**
- * Helper to extract table and column from a ColumnBuilder, ExpressionBuilder, or OperationExpr.
- * For ExpressionBuilder or OperationExpr, recursively unwraps to find the base ColumnRef.
- */
 export function getColumnInfo(expr: AnyExpressionSource | OperationExpr): {
   table: string;
   column: string;
 } {
-  if (expr instanceof OperationExpr) {
+  if (expr.kind === 'operation') {
     const baseCol = expr.baseColumnRef();
     return { table: baseCol.table, column: baseCol.column };
   }
@@ -52,7 +38,6 @@ export function getColumnInfo(expr: AnyExpressionSource | OperationExpr): {
     const baseCol = expr.expr.baseColumnRef();
     return { table: baseCol.table, column: baseCol.column };
   }
-  // expr is ColumnBuilder - TypeScript can't narrow properly
   const colBuilder = expr as unknown as { table: string; column: string };
   return { table: colBuilder.table, column: colBuilder.column };
 }

@@ -1,6 +1,7 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
+  type AnyOperationArg,
   ColumnRef,
-  type Expression,
   LiteralExpr,
   OperationExpr,
   ParamRef,
@@ -18,26 +19,30 @@ export function col(tableName: string, column: string): ColumnRef {
   return ColumnRef.of(tableName, column);
 }
 
-export function param(index: number, name?: string): ParamRef {
-  return ParamRef.of(index, name);
+export function param(value: unknown, name?: string, codecId = 'pg/text@1'): ParamRef {
+  return ParamRef.of(value, { ...ifDefined('name', name), codecId });
+}
+
+export function shiftParamRef(delta: number): (expr: ParamRef) => ParamRef {
+  return (expr: ParamRef) =>
+    ParamRef.of(typeof expr.value === 'number' ? expr.value + delta : expr.value, {
+      ...ifDefined('name', expr.name),
+      ...ifDefined('codecId', expr.codecId),
+    });
 }
 
 export function lit(value: unknown): LiteralExpr {
   return LiteralExpr.of(value);
 }
 
-export function lowerExpr(
-  column: ColumnRef,
-  ...args: Array<Expression | ParamRef | LiteralExpr>
-): OperationExpr {
+export function lowerExpr(column: ColumnRef, ...args: Array<AnyOperationArg>): OperationExpr {
   return OperationExpr.function({
     method: 'lower',
     forTypeId: 'pg/text@1',
     self: column,
     args,
     returns: stringReturn,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-    template: 'lower(${self})',
+    template: 'lower({{self}})',
   });
 }
 

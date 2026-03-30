@@ -1,5 +1,8 @@
-import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
+import { existsSync, readFileSync } from 'node:fs';
+import { createContractInferCommand } from '@prisma-next/cli/commands/contract-infer';
+import { createDbSchemaCommand } from '@prisma-next/cli/commands/db-schema';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { join } from 'pathe';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -9,14 +12,8 @@ import {
   withTempDir,
 } from './utils/cli-test-helpers';
 
-// Fixture subdirectory for db-introspect e2e tests
 const fixtureSubdir = 'db-introspect';
 
-/**
- * Returns only the stdout lines from consoleOutput by filtering out stderr decoration.
- * The test mock pushes stderr writes to both consoleErrors and consoleOutput,
- * so removing consoleErrors entries yields stdout-only content.
- */
 function stdoutOnly(consoleOutput: string[], consoleErrors: string[]): string[] {
   const stderrBag = [...consoleErrors];
   return consoleOutput.filter((line) => {
@@ -29,14 +26,29 @@ function stdoutOnly(consoleOutput: string[], consoleErrors: string[]): string[] 
   });
 }
 
+function normalizeOutput(stripped: string): string {
+  return stripped
+    .replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX')
+    .replace(/\(\d+ms\)/g, '(Xms)')
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (/^[◒◐◓◑]/.test(trimmed)) return false;
+      if (/^◇/.test(trimmed)) return false;
+      if (trimmed === '│') return false;
+      return true;
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
 withTempDir(({ createTempDir }) => {
-  describe('db introspect command (e2e)', () => {
+  describe('live schema CLI commands (e2e)', () => {
     let consoleOutput: string[] = [];
     let consoleErrors: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
-      // Set up console and process.exit mocks
       const mocks = setupCommandMocks();
       consoleOutput = mocks.consoleOutput;
       consoleErrors = mocks.consoleErrors;
@@ -47,136 +59,192 @@ withTempDir(({ createTempDir }) => {
       cleanupMocks();
     });
 
-    it(
-      'outputs tree structure with real database',
-      async () => {
-        await withDevDatabase(async ({ connectionString }) => {
-          // Set up database schema first, then close connection
-          await withClient(connectionString, async (client) => {
-            await client.query(`
-              CREATE TABLE IF NOT EXISTS "user" (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL,
-                name TEXT
-              )
-            `);
-            await client.query(`
-              CREATE TABLE IF NOT EXISTS "post" (
-                id SERIAL PRIMARY KEY,
-                title TEXT NOT NULL,
-                "userId" INTEGER REFERENCES "user"(id)
-              )
-            `);
-            await client.query(`
-              CREATE UNIQUE INDEX IF NOT EXISTS "user_email_unique" ON "user"(email)
-            `);
+    describe('db schema', () => {
+      it(
+        'prints the live schema tree without writing files',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            await withClient(connectionString, async (client) => {
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS "user" (
+                  id SERIAL PRIMARY KEY,
+                  email TEXT NOT NULL,
+                  name TEXT
+                )
+              `);
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS "post" (
+                  id SERIAL PRIMARY KEY,
+                  title TEXT NOT NULL,
+                  "userId" INTEGER REFERENCES "user"(id)
+                )
+              `);
+              await client.query(`
+                CREATE UNIQUE INDEX IF NOT EXISTS "user_email_unique" ON "user"(email)
+              `);
+            });
+
+            const testSetup = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+
+            const command = createDbSchemaCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testSetup.testDir);
+              await executeCommand(command, ['--config', testSetup.configPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            expect(existsSync(join(testSetup.testDir, 'output/contract.prisma'))).toBe(false);
+
+            const output = consoleOutput.join('\n');
+            const normalized = normalizeOutput(stripAnsi(output));
+            expect(normalized).toMatchSnapshot();
           });
+        },
+        timeouts.spinUpPpgDev,
+      );
 
-          // Set up test directory with config
-          const testSetup = setupTestDirectoryFromFixtures(
-            createTempDir,
-            fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
-          );
-          const configPath = testSetup.configPath;
+      it(
+        '--json prints raw schema output without writing files',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            await withClient(connectionString, async (client) => {
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS "simple" (
+                  id SERIAL PRIMARY KEY
+                )
+              `);
+            });
 
-          const command = createDbIntrospectCommand();
-          const originalCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(command, ['--config', configPath, '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
+            const testSetup = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
 
-          // Get output and strip ANSI for snapshot
-          const output = consoleOutput.join('\n');
-          const stripped = stripAnsi(output);
+            const command = createDbSchemaCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testSetup.testDir);
+              await executeCommand(command, [
+                '--config',
+                testSetup.configPath,
+                '--json',
+                '--no-color',
+              ]);
+            } finally {
+              process.chdir(originalCwd);
+            }
 
-          // Normalize database URL (port number) and strip non-deterministic spinner output.
-          // The 100ms spinner delay means the spinner line may or may not appear.
-          // Strip: spinner frames (◒◐◓◑), completion lines (◇), and orphan bar lines (│ alone)
-          // that clack emits around spinner lifecycle.
-          const normalized = stripped
-            .replace(/127\.0\.0\.1:\d+/g, '127.0.0.1:XXXXX')
-            .replace(/\(\d+ms\)/g, '(Xms)')
-            .split('\n')
-            .filter((line) => {
-              const trimmed = line.trim();
-              // Strip non-deterministic spinner output (100ms delay means it may or may not appear)
-              if (/^[◒◐◓◑]/.test(trimmed)) return false;
-              if (/^◇/.test(trimmed)) return false;
-              // Strip bare bar lines (clack decoration from spinner lifecycle)
-              if (trimmed === '│') return false;
-              return true;
-            })
-            .join('\n')
-            .replace(/\n{3,}/g, '\n\n');
+            expect(existsSync(join(testSetup.testDir, 'output/contract.prisma'))).toBe(false);
 
-          // Snapshot test for tree output
-          expect(normalized).toMatchSnapshot();
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'outputs JSON envelope with real database',
-      async () => {
-        await withDevDatabase(async ({ connectionString }) => {
-          // Set up database schema first, then close connection
-          await withClient(connectionString, async (client) => {
-            await client.query(`
-              CREATE TABLE IF NOT EXISTS "user" (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL
-              )
-            `);
+            const output = stdoutOnly(consoleOutput, consoleErrors).join('\n');
+            const jsonOutput = JSON.parse(output);
+            expect(jsonOutput).toMatchObject({
+              ok: true,
+              summary: 'Schema read successfully',
+              schema: expect.any(Object),
+            });
           });
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
 
-          // Set up test directory with config
-          const testSetup = setupTestDirectoryFromFixtures(
-            createTempDir,
-            fixtureSubdir,
-            'prisma-next.config.with-db.ts',
-            { '{{DB_URL}}': connectionString },
-          );
-          const configPath = testSetup.configPath;
+    describe('contract infer', () => {
+      it(
+        'writes a full PSL snapshot to output/contract.prisma',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            await withClient(connectionString, async (client) => {
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS "user" (
+                  id SERIAL PRIMARY KEY,
+                  email TEXT NOT NULL,
+                  name TEXT
+                )
+              `);
+            });
 
-          const command = createDbIntrospectCommand();
-          const originalCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await executeCommand(command, ['--config', configPath, '--json', '--no-color']);
-          } finally {
-            process.chdir(originalCwd);
-          }
+            const testSetup = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
 
-          // Get stdout-only output (exclude stderr decoration) and parse JSON
-          const output = stdoutOnly(consoleOutput, consoleErrors).join('\n');
-          const jsonOutput = JSON.parse(output);
+            const command = createContractInferCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testSetup.testDir);
+              await executeCommand(command, ['--config', testSetup.configPath, '--no-color']);
+            } finally {
+              process.chdir(originalCwd);
+            }
 
-          // Normalize non-deterministic values (dbUrl and timing) for snapshot
-          const normalized = {
-            ...jsonOutput,
-            meta: {
-              ...jsonOutput.meta,
-              dbUrl: jsonOutput.meta?.dbUrl
-                ? jsonOutput.meta.dbUrl.replace(/127\.0\.0\.1:\d+/, '127.0.0.1:XXXXX')
-                : jsonOutput.meta?.dbUrl,
-            },
-            timings: {
-              ...jsonOutput.timings,
-              total: 0, // Normalize timing to 0 for snapshot
-            },
-          };
+            const pslPath = join(testSetup.testDir, 'output/contract.prisma');
+            expect(existsSync(pslPath)).toBe(true);
+            expect(readFileSync(pslPath, 'utf-8')).toMatchSnapshot();
 
-          // Snapshot test for JSON output
-          expect(normalized).toMatchSnapshot();
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
+            const stderrOutput = stripAnsi(consoleErrors.join('\n'));
+            expect(stderrOutput).toContain('Contract written to output/contract.prisma');
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+
+      it(
+        '--json includes the inferred PSL path',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            await withClient(connectionString, async (client) => {
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS "user" (
+                  id SERIAL PRIMARY KEY,
+                  email TEXT NOT NULL
+                )
+              `);
+            });
+
+            const testSetup = setupTestDirectoryFromFixtures(
+              createTempDir,
+              fixtureSubdir,
+              'prisma-next.config.with-db.ts',
+              { '{{DB_URL}}': connectionString },
+            );
+
+            const command = createContractInferCommand();
+            const originalCwd = process.cwd();
+            try {
+              process.chdir(testSetup.testDir);
+              await executeCommand(command, [
+                '--config',
+                testSetup.configPath,
+                '--json',
+                '--no-color',
+              ]);
+            } finally {
+              process.chdir(originalCwd);
+            }
+
+            const output = stdoutOnly(consoleOutput, consoleErrors).join('\n');
+            const jsonOutput = JSON.parse(output);
+            expect(jsonOutput).toMatchObject({
+              ok: true,
+              summary: 'Contract inferred successfully',
+              psl: { path: 'output/contract.prisma' },
+            });
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
   });
 });

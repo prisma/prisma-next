@@ -1,17 +1,17 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
+  type AnyExpression,
   type AstRewriter,
   BinaryExpr,
   type BinaryOp,
-  type BoundWhereExpr,
   ColumnRef,
   DerivedTableSource,
   EqColJoinOn,
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   OrderByItem,
   OrExpr,
@@ -19,13 +19,12 @@ import {
   SelectAst,
   SubqueryExpr,
   TableSource,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { buildOrmQueryPlan, resolveTableColumns } from './query-plan-meta';
+import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr, OrderExpr } from './types';
 import { bindWhereExpr } from './where-binding';
-import { combineWhereFilters, offsetBoundWhereExpr } from './where-utils';
+import { combineWhereExprs } from './where-utils';
 
 type CursorOrderEntry = OrderExpr & {
   readonly value: unknown;
@@ -58,7 +57,7 @@ function toOrderBy(
   );
 }
 
-function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): WhereExpr {
+function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): AnyExpression {
   const comparator: BinaryOp = entry.direction === 'asc' ? 'gt' : 'lt';
   return new BinaryExpr(
     comparator,
@@ -70,9 +69,9 @@ function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): WhereEx
 function buildLexicographicCursorWhere(
   tableName: string,
   entries: readonly CursorOrderEntry[],
-): WhereExpr {
-  const branches = entries.map((entry, index): WhereExpr => {
-    const branchExprs: WhereExpr[] = [];
+): AnyExpression {
+  const branches = entries.map((entry, index): AnyExpression => {
+    const branchExprs: AnyExpression[] = [];
 
     for (const prefixEntry of entries.slice(0, index)) {
       branchExprs.push(
@@ -85,14 +84,14 @@ function buildLexicographicCursorWhere(
 
     branchExprs.push(createBoundaryExpr(tableName, entry));
     if (branchExprs.length === 1) {
-      return branchExprs[0] as WhereExpr;
+      return branchExprs[0] as AnyExpression;
     }
 
     return AndExpr.of(branchExprs);
   });
 
   if (branches.length === 1) {
-    return branches[0] as WhereExpr;
+    return branches[0] as AnyExpression;
   }
 
   return OrExpr.of(branches);
@@ -102,7 +101,7 @@ function buildCursorWhere(
   tableName: string,
   orderBy: readonly OrderExpr[] | undefined,
   cursor: Readonly<Record<string, unknown>> | undefined,
-): WhereExpr | undefined {
+): AnyExpression | undefined {
   if (!cursor || !orderBy || orderBy.length === 0) {
     return undefined;
   }
@@ -151,27 +150,23 @@ function buildStateWhere(
   options?: {
     readonly filterTableName?: string;
   },
-): BoundWhereExpr | undefined {
+): AnyExpression | undefined {
   const filterTableName = options?.filterTableName;
   const cursorTableName = filterTableName ?? tableName;
   const cursorWhere = buildCursorWhere(cursorTableName, state.orderBy, state.cursor);
   const remappedFilters =
     filterTableName && filterTableName !== tableName
-      ? state.filters.map((filter) => ({
-          ...filter,
-          expr: filter.expr.rewrite(createTableRefRemapper(filterTableName, tableName)),
-        }))
+      ? state.filters.map((filter) =>
+          filter.rewrite(createTableRefRemapper(filterTableName, tableName)),
+        )
       : state.filters;
   const boundCursorWhere = cursorWhere ? bindWhereExpr(contract, cursorWhere) : undefined;
   const remappedCursorWhere =
     boundCursorWhere && filterTableName && filterTableName !== tableName
-      ? {
-          ...boundCursorWhere,
-          expr: boundCursorWhere.expr.rewrite(createTableRefRemapper(filterTableName, tableName)),
-        }
+      ? boundCursorWhere.rewrite(createTableRefRemapper(filterTableName, tableName))
       : boundCursorWhere;
   const filters = remappedCursorWhere ? [...remappedFilters, remappedCursorWhere] : remappedFilters;
-  return combineWhereFilters(filters);
+  return combineWhereExprs(filters);
 }
 
 function buildIncludeOrderArtifacts(
@@ -215,14 +210,11 @@ function buildIncludeChildRowsSelect(
   contract: SqlContract<SqlStorage>,
   parentTableName: string,
   include: IncludeExpr,
-  paramOffset = 0,
 ): {
   readonly childRows: SelectAst;
   readonly childProjection: ReadonlyArray<ProjectionItem>;
   readonly rowsAlias: string;
   readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
-  readonly params: readonly unknown[];
-  readonly paramDescriptors: BoundWhereExpr['paramDescriptors'];
 } {
   const childState = include.nested;
   const childTableAlias =
@@ -248,9 +240,7 @@ function buildIncludeChildRowsSelect(
     ColumnRef.of(childTableRef, include.fkColumn),
     ColumnRef.of(parentTableName, include.parentPkColumn),
   );
-  const shiftedChildWhere =
-    childWhere && paramOffset > 0 ? offsetBoundWhereExpr(childWhere, paramOffset) : childWhere;
-  const whereExpr = shiftedChildWhere ? AndExpr.of([joinExpr, shiftedChildWhere.expr]) : joinExpr;
+  const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
 
   let childRows = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
     .withProjection([...childProjection, ...hiddenOrderProjection])
@@ -278,8 +268,6 @@ function buildIncludeChildRowsSelect(
     childProjection,
     rowsAlias,
     aggregateOrderBy,
-    params: shiftedChildWhere?.params ?? [],
-    paramDescriptors: shiftedChildWhere?.paramDescriptors ?? [],
   };
 }
 
@@ -287,15 +275,15 @@ function buildLateralIncludeArtifacts(
   contract: SqlContract<SqlStorage>,
   parentTableName: string,
   include: IncludeExpr,
-  paramOffset = 0,
 ): {
   readonly join: JoinAst;
   readonly projection: ProjectionItem;
-  readonly params: readonly unknown[];
-  readonly paramDescriptors: BoundWhereExpr['paramDescriptors'];
 } {
-  const { childRows, childProjection, rowsAlias, aggregateOrderBy, params, paramDescriptors } =
-    buildIncludeChildRowsSelect(contract, parentTableName, include, paramOffset);
+  const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
+    contract,
+    parentTableName,
+    include,
+  );
   const lateralAlias = `${include.relationName}_lateral`;
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
     childProjection.map((item) =>
@@ -318,8 +306,6 @@ function buildLateralIncludeArtifacts(
       include.relationName,
       ColumnRef.of(lateralAlias, include.relationName),
     ),
-    params,
-    paramDescriptors,
   };
 }
 
@@ -327,14 +313,14 @@ function buildCorrelatedIncludeProjection(
   contract: SqlContract<SqlStorage>,
   parentTableName: string,
   include: IncludeExpr,
-  paramOffset = 0,
 ): {
   readonly projection: ProjectionItem;
-  readonly params: readonly unknown[];
-  readonly paramDescriptors: BoundWhereExpr['paramDescriptors'];
 } {
-  const { childRows, childProjection, rowsAlias, aggregateOrderBy, params, paramDescriptors } =
-    buildIncludeChildRowsSelect(contract, parentTableName, include, paramOffset);
+  const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
+    contract,
+    parentTableName,
+    include,
+  );
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
     childProjection.map((item) =>
       JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
@@ -351,8 +337,6 @@ function buildCorrelatedIncludeProjection(
 
   return {
     projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(aggregateQuery)),
-    params,
-    paramDescriptors,
   };
 }
 
@@ -363,15 +347,9 @@ function buildSelectAst(
   options: {
     readonly joins?: ReadonlyArray<JoinAst>;
     readonly includeProjection?: ReadonlyArray<ProjectionItem>;
-    readonly extraParams?: readonly unknown[];
-    readonly extraParamDescriptors?: BoundWhereExpr['paramDescriptors'];
-    readonly where?: BoundWhereExpr;
+    readonly where?: AnyExpression;
   } = {},
-): {
-  readonly ast: SelectAst;
-  readonly params: readonly unknown[];
-  readonly paramDescriptors: BoundWhereExpr['paramDescriptors'];
-} {
+): SelectAst {
   const scalarProjection = buildProjection(contract, tableName, state.selectedFields);
   const projection = [...scalarProjection, ...(options.includeProjection ?? [])];
   const where = options.where ?? buildStateWhere(contract, tableName, state);
@@ -379,7 +357,7 @@ function buildSelectAst(
 
   let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
   if (orderBy) {
     ast = ast.withOrderBy(orderBy);
@@ -402,14 +380,7 @@ function buildSelectAst(
     ast = ast.withJoins(options.joins);
   }
 
-  return {
-    ast,
-    params: [...(where?.params ?? []), ...(options.extraParams ?? [])],
-    paramDescriptors: [
-      ...(where?.paramDescriptors ?? []),
-      ...(options.extraParamDescriptors ?? []),
-    ],
-  };
+  return ast;
 }
 
 export function compileSelect(
@@ -417,12 +388,13 @@ export function compileSelect(
   tableName: string,
   state: CollectionState,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const built = buildSelectAst(contract, tableName, {
+  const ast = buildSelectAst(contract, tableName, {
     ...state,
     includes: [],
   });
 
-  return buildOrmQueryPlan(contract, built.ast, built.params, built.paramDescriptors);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
 export function compileRelationSelect(
@@ -432,9 +404,9 @@ export function compileRelationSelect(
   parentPks: readonly unknown[],
   nestedState: CollectionState,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const inFilter: WhereExpr = BinaryExpr.in(
+  const inFilter: AnyExpression = BinaryExpr.in(
     ColumnRef.of(relatedTableName, fkColumn),
-    ListLiteralExpr.fromValues(parentPks),
+    ListExpression.fromValues(parentPks),
   );
 
   return compileSelect(contract, relatedTableName, {
@@ -463,33 +435,19 @@ export function compileSelectWithIncludeStrategy(
   const includeJoins: JoinAst[] = [];
   const includeProjection: ProjectionItem[] = [];
   const topLevelWhere = buildStateWhere(contract, tableName, state);
-  const includeParams: unknown[] = [];
-  const includeParamDescriptors: Array<BoundWhereExpr['paramDescriptors'][number]> = [];
-  let nextParamOffset = topLevelWhere?.params.length ?? 0;
 
   for (const include of state.includes) {
     if (strategy === 'lateral') {
-      const artifact = buildLateralIncludeArtifacts(contract, tableName, include, nextParamOffset);
+      const artifact = buildLateralIncludeArtifacts(contract, tableName, include);
       includeJoins.push(artifact.join);
       includeProjection.push(artifact.projection);
-      includeParams.push(...artifact.params);
-      includeParamDescriptors.push(...artifact.paramDescriptors);
-      nextParamOffset += artifact.params.length;
       continue;
     }
-    const artifact = buildCorrelatedIncludeProjection(
-      contract,
-      tableName,
-      include,
-      nextParamOffset,
-    );
+    const artifact = buildCorrelatedIncludeProjection(contract, tableName, include);
     includeProjection.push(artifact.projection);
-    includeParams.push(...artifact.params);
-    includeParamDescriptors.push(...artifact.paramDescriptors);
-    nextParamOffset += artifact.params.length;
   }
 
-  const built = buildSelectAst(
+  const ast = buildSelectAst(
     contract,
     tableName,
     {
@@ -499,11 +457,10 @@ export function compileSelectWithIncludeStrategy(
     {
       joins: includeJoins,
       includeProjection,
-      extraParams: includeParams,
-      extraParamDescriptors: includeParamDescriptors,
       ...(topLevelWhere ? { where: topLevelWhere } : {}),
     },
   );
 
-  return buildOrmQueryPlan(contract, built.ast, built.params, built.paramDescriptors);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }

@@ -54,8 +54,36 @@ exports[`help text snapshots > formats contract emit help with no color 1`] = `
 "
 `;
 
-exports[`help text snapshots > formats db introspect help 1`] = `
-"prisma-next introspect → Inspect the database schema
+exports[`help text snapshots > formats contract infer help 1`] = `
+"prisma-next infer → Infer a PSL contract from the live database schema
+│
+│ --json                Output as JSON
+│ -q, --quiet           Quiet mode: errors only
+│ -v, --verbose         Verbose output: debug info, timings
+│ --trace               Trace output: deep internals, stack traces
+│ --color               Force color output
+│ --no-color            Disable color output
+│ --interactive         Force interactive mode
+│ --no-interactive      Disable interactive prompts
+│ -y, --yes             Auto-accept prompts
+│ --db <url>            Database connection string
+│ --config <path>       Path to prisma-next.config.ts
+│ --output <path>       Write the inferred PSL contract to the specified path
+│
+│ Examples:
+│   $ prisma-next contract infer --db $DATABASE_URL
+│   $ prisma-next contract infer --db $DATABASE_URL --output ./prisma/contract.prisma
+│   $ prisma-next contract infer --db $DATABASE_URL --json
+│
+│ Reads the live database schema and writes an inferred PSL contract to disk.
+│ This command stops at \`contract.prisma\`; follow it with \`contract emit\` and
+│ \`db sign\` as separate steps.
+└
+"
+`;
+
+exports[`help text snapshots > formats db schema help 1`] = `
+"prisma-next schema → Inspect the live database schema
 │
 │ --json                Output as JSON
 │ -q, --quiet           Quiet mode: errors only
@@ -70,13 +98,16 @@ exports[`help text snapshots > formats db introspect help 1`] = `
 │ --config <path>       Path to prisma-next.config.ts
 │
 │ Examples:
-│   $ prisma-next db introspect --db $DATABASE_URL
-│   $ prisma-next db introspect --db $DATABASE_URL --json
+│   $ prisma-next db schema --db $DATABASE_URL
+│   $ prisma-next db schema --db $DATABASE_URL --json
+│   $ prisma-next db schema --db $DATABASE_URL --json > schema.json
 │
-│ Reads the live database schema and displays it as a tree structure. This
-│ command
-│ does not check the schema against your contract - it only shows what exists in
-│ the database. Use \`db verify\` to compare against your contract.
+│ Reads the live database schema and prints it as a tree by default or as JSON
+│ with
+│ --json. This command is always read-only and never writes files. To save
+│ machine-
+│ readable output, use shell redirection, for example \`prisma-next db schema
+│ --json > schema.json\`.
 └
 "
 `;
@@ -157,8 +188,10 @@ exports[`help text snapshots > formats root help 1`] = `
 "prisma-next Manage your data layer
 │
 │ ├─ contract         
-│ │  └─ emit            Emit your contract artifacts
+│ │  ├─ emit            Emit your contract artifacts
+│ │  └─ infer           Infer a PSL contract from the live database schema
 │ └─ db               
+│ │  ├─ schema          Inspect the live database schema
 │    └─ verify          Check whether the database marker and live schema match your contract
 │
 │ Use Prisma Next to define your data layer as a contract. Sign your database
@@ -172,8 +205,10 @@ exports[`help text snapshots > formats root help with no color 1`] = `
 "prisma-next Manage your data layer
 │
 │ ├─ contract         
-│ │  └─ emit            Emit your contract artifacts
+│ │  ├─ emit            Emit your contract artifacts
+│ │  └─ infer           Infer a PSL contract from the live database schema
 │ └─ db               
+│ │  ├─ schema          Inspect the live database schema
 │    └─ verify          Check whether the database marker and live schema match your contract
 │
 │ Use Prisma Next to define your data layer as a contract. Sign your database

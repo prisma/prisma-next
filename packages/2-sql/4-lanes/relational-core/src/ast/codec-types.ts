@@ -3,6 +3,12 @@ import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
 /**
+ * Semantic traits a codec declares.
+ * Used by DSL surfaces to gate which operators and functions are available.
+ */
+export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
+
+/**
  * Descriptor for parameterized codecs that require type parameter validation.
  * Shared between adapter (compile-time) and runtime layers to avoid duplication.
  *
@@ -49,6 +55,7 @@ export interface CodecMeta {
  */
 export interface Codec<
   Id extends string = string,
+  TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
   TJs = unknown,
   TParams = Record<string, unknown>,
@@ -109,6 +116,13 @@ export interface Codec<
    * Must be synchronous and pure (no side effects).
    */
   encode?(value: TJs): TWire;
+
+  /**
+   * Semantic traits this codec's type supports.
+   * Used by DSL surfaces to gate which operators and functions are available.
+   * When omitted, the codec is treated as having no traits.
+   */
+  readonly traits?: TTraits;
 }
 
 /**
@@ -125,6 +139,10 @@ export interface CodecRegistry {
   getByScalar(scalar: string): readonly Codec<string>[];
   getDefaultCodec(scalar: string): Codec<string> | undefined;
   register(codec: Codec<string>): void;
+  /** Returns true if the codec with this ID has the given trait. */
+  hasTrait(codecId: string, trait: CodecTrait): boolean;
+  /** Returns all traits for a codec, or an empty array if not found. */
+  traitsOf(codecId: string): readonly CodecTrait[];
   [Symbol.iterator](): Iterator<Codec<string>>;
   values(): IterableIterator<Codec<string>>;
 }
@@ -194,6 +212,15 @@ class CodecRegistryImpl implements CodecRegistry {
     }
   }
 
+  hasTrait(codecId: string, trait: CodecTrait): boolean {
+    const codec = this._byId.get(codecId);
+    return codec?.traits?.includes(trait) ?? false;
+  }
+
+  traitsOf(codecId: string): readonly CodecTrait[] {
+    return this._byId.get(codecId)?.traits ?? [];
+  }
+
   /**
    * Returns an iterator over all registered codecs.
    * Useful for iterating through codecs from another registry.
@@ -217,6 +244,7 @@ class CodecRegistryImpl implements CodecRegistry {
  */
 export function codec<
   Id extends string,
+  const TTraits extends readonly CodecTrait[],
   TWire,
   TJs,
   TParams = Record<string, unknown>,
@@ -229,13 +257,18 @@ export function codec<
   meta?: CodecMeta;
   paramsSchema?: Type<TParams>;
   init?: (params: TParams) => THelper;
-}): Codec<Id, TWire, TJs, TParams, THelper> {
+  traits?: TTraits;
+}): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
     ...ifDefined('meta', config.meta),
     ...ifDefined('paramsSchema', config.paramsSchema),
     ...ifDefined('init', config.init),
+    ...ifDefined(
+      'traits',
+      config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
+    ),
     encode: config.encode,
     decode: config.decode,
   };
@@ -245,13 +278,13 @@ export function codec<
  * Type helpers to extract codec types.
  */
 export type CodecId<T> =
-  T extends Codec<infer Id, unknown, unknown>
-    ? Id
-    : T extends { readonly id: infer Id }
-      ? Id
-      : never;
-export type CodecInput<T> = T extends Codec<string, unknown, infer JsT> ? JsT : never;
-export type CodecOutput<T> = T extends Codec<string, unknown, infer JsT> ? JsT : never;
+  T extends Codec<infer Id> ? Id : T extends { readonly id: infer Id } ? Id : never;
+export type CodecInput<T> =
+  T extends Codec<string, readonly CodecTrait[], unknown, infer JsT> ? JsT : never;
+export type CodecOutput<T> =
+  T extends Codec<string, readonly CodecTrait[], unknown, infer JsT> ? JsT : never;
+export type CodecTraits<T> =
+  T extends Codec<string, infer TTraits> ? TTraits[number] & CodecTrait : never;
 
 /**
  * Type helper to extract codec types from builder instance.
@@ -259,11 +292,10 @@ export type CodecOutput<T> = T extends Codec<string, unknown, infer JsT> ? JsT :
 export type ExtractCodecTypes<
   ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>,
 > = {
-  readonly [K in keyof ScalarNames as ScalarNames[K] extends Codec<infer Id, unknown, unknown>
-    ? Id
-    : never]: {
+  readonly [K in keyof ScalarNames as ScalarNames[K] extends Codec<infer Id> ? Id : never]: {
     readonly input: CodecInput<ScalarNames[K]>;
     readonly output: CodecOutput<ScalarNames[K]>;
+    readonly traits: CodecTraits<ScalarNames[K]>;
   };
 };
 
@@ -299,9 +331,7 @@ export interface CodecDefBuilder<
 
   readonly codecDefinitions: {
     readonly [K in keyof ScalarNames]: {
-      readonly typeId: ScalarNames[K] extends Codec<infer Id extends string, unknown, unknown>
-        ? Id
-        : never;
+      readonly typeId: ScalarNames[K] extends Codec<infer Id extends string> ? Id : never;
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
@@ -337,12 +367,16 @@ class CodecDefBuilderImpl<
     this._codecs = codecs;
 
     // Populate CodecTypes from codecs
-    const codecTypes: Record<string, { readonly input: unknown; readonly output: unknown }> = {};
+    const codecTypes: Record<
+      string,
+      { readonly input: unknown; readonly output: unknown; readonly traits: unknown }
+    > = {};
     for (const [, codecImpl] of Object.entries(this._codecs)) {
       const codecImplTyped = codecImpl as Codec<string>;
       codecTypes[codecImplTyped.id] = {
         input: undefined as unknown as CodecInput<typeof codecImplTyped>,
         output: undefined as unknown as CodecOutput<typeof codecImplTyped>,
+        traits: undefined as unknown as CodecTraits<typeof codecImplTyped>,
       };
     }
     this.CodecTypes = codecTypes as ExtractCodecTypes<ScalarNames>;
@@ -382,7 +416,7 @@ class CodecDefBuilderImpl<
    */
   get codecDefinitions(): {
     readonly [K in keyof ScalarNames]: {
-      readonly typeId: ScalarNames[K] extends Codec<infer Id, unknown, unknown> ? Id : never;
+      readonly typeId: ScalarNames[K] extends Codec<infer Id> ? Id : never;
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
@@ -416,9 +450,7 @@ class CodecDefBuilderImpl<
 
     return result as {
       readonly [K in keyof ScalarNames]: {
-        readonly typeId: ScalarNames[K] extends Codec<infer Id extends string, unknown, unknown>
-          ? Id
-          : never;
+        readonly typeId: ScalarNames[K] extends Codec<infer Id extends string> ? Id : never;
         readonly scalar: K;
         readonly codec: ScalarNames[K];
         readonly input: CodecInput<ScalarNames[K]>;

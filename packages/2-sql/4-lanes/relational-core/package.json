@@ -46,6 +46,7 @@
     "./param": "./dist/exports/param.mjs",
     "./plan": "./dist/exports/plan.mjs",
     "./query-lane-context": "./dist/exports/query-lane-context.mjs",
+    "./query-operations": "./dist/exports/query-operations.mjs",
     "./schema": "./dist/exports/schema.mjs",
     "./types": "./dist/exports/types.mjs",
     "./utils/guards": "./dist/exports/utils/guards.mjs",

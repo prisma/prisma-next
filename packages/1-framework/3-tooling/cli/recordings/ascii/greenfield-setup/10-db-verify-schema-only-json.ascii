@@ -1,4 +1,36 @@
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
+>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> # Schema-only verification (JSON output for CI/agents) [initialized, schema matches contract]
 >
 
 
@@ -30,7 +62,6 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Schema-only verification (JSON output for CI/agents) [initialized, schema matches contract]
 >
 
@@ -61,40 +92,8 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
-────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
-> # Schema-only verification (JSON output for CI/agents) [initialized, schema matches contract]
->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Schema-only verification (JSON output for CI/agents) [initialized, schema matches contract]
 > prisma-next db verify --schema-only --json
 
@@ -125,8 +124,8 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
+
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Schema-only verification (JSON output for CI/agents) [initialized, schema matches contract]
 > prisma-next db verify --schema-only --json
 
@@ -157,8 +156,8 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
+
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Schema-only verification (JSON output for CI/agents) [initialized, schema matches contract]
 > prisma-next db verify --schema-only --json
 
@@ -189,11 +188,10 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
 
 
 
+
 ────────────────────────────────────────────────────────────────────────────────
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 > # Schema-only verification (JSON output for CI/agents) [initialized, schema matches contract]
 > prisma-next db verify --schema-only --json
-bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file or directory
 {
   "ok": true,
   "summary": "Database schema satisfies contract",
@@ -221,4 +219,6 @@ bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8): No such file o
           "name": "table user",
           "contractPath": "storage.tables.user",
           "code": "",
+          "message": "",
+          "children": [
 ────────────────────────────────────────────────────────────────────────────────

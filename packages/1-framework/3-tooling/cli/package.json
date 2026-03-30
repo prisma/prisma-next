@@ -23,11 +23,13 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
+    "@dagrejs/dagre": "^3.0.0",
     "@prisma-next/config": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
+    "@prisma-next/psl-printer": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0",
     "c12": "^3.3.2",
@@ -71,9 +73,9 @@
       "types": "./dist/commands/db-update.d.mts",
       "import": "./dist/commands/db-update.mjs"
     },
-    "./commands/db-introspect": {
-      "types": "./dist/commands/db-introspect.d.mts",
-      "import": "./dist/commands/db-introspect.mjs"
+    "./commands/db-schema": {
+      "types": "./dist/commands/db-schema.d.mts",
+      "import": "./dist/commands/db-schema.mjs"
     },
     "./commands/db-sign": {
       "types": "./dist/commands/db-sign.d.mts",
@@ -86,6 +88,10 @@
     "./commands/contract-emit": {
       "types": "./dist/commands/contract-emit.d.mts",
       "import": "./dist/commands/contract-emit.mjs"
+    },
+    "./commands/contract-infer": {
+      "types": "./dist/commands/contract-infer.d.mts",
+      "import": "./dist/commands/contract-infer.mjs"
     },
     "./commands/migration-plan": {
       "types": "./dist/commands/migration-plan.d.mts",

@@ -1,9 +1,10 @@
 import { Collection, orm } from '@prisma-next/sql-orm-client';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import type { Contract } from '../prisma/contract.d';
 import { db } from '../prisma/db';
 
-const contract = db.context.contract as Contract;
+const context = db.context as ExecutionContext<Contract>;
 
 class UserCollection extends Collection<Contract, 'User'> {
   admins() {
@@ -43,8 +44,8 @@ class PostCollection extends Collection<Contract, 'Post'> {
 
 export function createOrmClient(runtime: Runtime) {
   return orm({
-    contract,
     runtime,
+    context,
     collections: {
       User: UserCollection,
       Post: PostCollection,

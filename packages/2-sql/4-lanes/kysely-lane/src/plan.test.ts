@@ -2,7 +2,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type BinaryExpr,
   ParamRef,
-  SelectAst,
+  type SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { CompiledQuery } from 'kysely';
@@ -99,11 +99,11 @@ describe('buildKyselyPlan', () => {
   it('assembles plan metadata with stable refs and limit annotations', () => {
     const plan = buildKyselyPlan(contract, createSelectCompiledQuery());
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.from).toEqual(TableSource.named('user'));
     expect((ast.where as BinaryExpr).left).toEqual(ast.projection[0]!.expr);
-    expect((ast.where as BinaryExpr).right).toEqual(ParamRef.of(1));
+    expect((ast.where as BinaryExpr).right).toEqual(ParamRef.of('u1', { codecId: 'string' }));
     expect(ast.limit).toBe(2);
     expect(plan.params).toEqual(['u1']);
     expect(plan.meta.annotations).toMatchObject({ sql: REDACTED_SQL, limit: 2 });
@@ -275,7 +275,7 @@ describe('buildKyselyPlan', () => {
     } as unknown as CompiledQuery<unknown>;
 
     const plan = buildKyselyPlan(contract, query);
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.joins).toHaveLength(1);
     expect(ast.joins?.[0]?.joinType).toBe('left');

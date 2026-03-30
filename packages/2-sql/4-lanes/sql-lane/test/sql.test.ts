@@ -1,10 +1,11 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
+import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
   ColumnRef,
   OrderByItem,
   ParamRef,
-  SelectAst,
+  ProjectionItem,
 } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -31,13 +32,18 @@ describe('sql DSL builder', () => {
       .limit(5)
       .build({ params: { userId: 42 } });
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.projection).toEqual([
-      { alias: 'id', expr: ColumnRef.of('user', 'id') },
-      { alias: 'email', expr: ColumnRef.of('user', 'email') },
+      ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+      ProjectionItem.of('email', ColumnRef.of('user', 'email')),
     ]);
-    expect(ast.where).toEqual(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1, 'userId')));
+    expect(ast.where).toEqual(
+      BinaryExpr.eq(
+        ColumnRef.of('user', 'id'),
+        ParamRef.of(42, { name: 'userId', codecId: 'pg/int4@1' }),
+      ),
+    );
     expect(ast.orderBy).toEqual([OrderByItem.desc(ColumnRef.of('user', 'createdAt'))]);
     expect(ast.limit).toBe(5);
     expect(plan.params).toEqual([42]);
@@ -60,10 +66,7 @@ describe('sql DSL builder', () => {
       {
         name: 'userId',
         codecId: 'pg/int4@1',
-        nativeType: 'int4',
-        nullable: false,
         source: 'dsl',
-        refs: { table: 'user', column: 'id' },
       },
     ]);
   });
@@ -121,7 +124,6 @@ describe('sql DSL builder', () => {
     expect(plan.meta.annotations?.codecs).toEqual({
       id: 'pg/int4@1',
       email: 'pg/text@1',
-      userId: 'pg/int4@1',
     });
   });
 

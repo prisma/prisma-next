@@ -1,6 +1,11 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { BoundWhereExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
-import { BinaryExpr, ColumnRef, LiteralExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  type AnyExpression,
+  BinaryExpr,
+  ColumnRef,
+  LiteralExpr,
+} from '@prisma-next/sql-relational-core/ast';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { resolveModelTableName, resolvePrimaryKeyColumn } from './collection-contract';
 import {
   acquireRuntimeScope,
@@ -31,7 +36,6 @@ import type {
   RuntimeScope,
 } from './types';
 import { emptyState } from './types';
-import { createBoundWhereExpr, ensureBoundWhereExpr } from './where-utils';
 
 interface RelationDefinition {
   readonly relationName: string;
@@ -73,31 +77,25 @@ export function hasNestedMutationCallbacks(
 }
 
 export async function executeNestedCreateMutation(options: {
-  contract: SqlContract<SqlStorage>;
+  context: ExecutionContext;
   runtime: RuntimeQueryable;
   modelName: string;
   data: MutationCreateInput<SqlContract<SqlStorage>, string>;
 }): Promise<Record<string, unknown>> {
   return withMutationScope(options.runtime, async (scope) =>
-    createGraph(scope, options.contract, options.modelName, options.data),
+    createGraph(scope, options.context, options.modelName, options.data),
   );
 }
 
 export async function executeNestedUpdateMutation(options: {
-  contract: SqlContract<SqlStorage>;
+  context: ExecutionContext;
   runtime: RuntimeQueryable;
   modelName: string;
-  filters: readonly (BoundWhereExpr | WhereExpr)[];
+  filters: readonly AnyExpression[];
   data: MutationUpdateInput<SqlContract<SqlStorage>, string>;
 }): Promise<Record<string, unknown> | null> {
   return withMutationScope(options.runtime, async (scope) =>
-    updateFirstGraph(
-      scope,
-      options.contract,
-      options.modelName,
-      options.filters.map(ensureBoundWhereExpr),
-      options.data,
-    ),
+    updateFirstGraph(scope, options.context, options.modelName, options.filters, options.data),
   );
 }
 
@@ -153,10 +151,11 @@ async function withMutationScope<T>(
 
 async function createGraph(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  context: ExecutionContext,
   modelName: string,
   input: MutationCreateInput<SqlContract<SqlStorage>, string>,
 ): Promise<Record<string, unknown>> {
+  const contract = context.contract;
   const parsed = parseMutationInput(contract, modelName, input);
   const { parentOwned, childOwned } = partitionByOwnership(parsed.relationMutations);
 
@@ -169,7 +168,7 @@ async function createGraph(
 
     await applyParentOwnedMutation(
       scope,
-      contract,
+      context,
       modelName,
       scalarData,
       relationMutation.relation,
@@ -186,7 +185,7 @@ async function createGraph(
 
     await applyChildOwnedMutation(
       scope,
-      contract,
+      context,
       modelName,
       parentRow,
       relationMutation.relation,
@@ -199,11 +198,12 @@ async function createGraph(
 
 async function updateFirstGraph(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  context: ExecutionContext,
   modelName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyExpression[],
   input: MutationUpdateInput<SqlContract<SqlStorage>, string>,
 ): Promise<Record<string, unknown> | null> {
+  const contract = context.contract;
   const existingRow = await findFirstByFilters(scope, contract, modelName, filters);
   if (!existingRow) {
     return null;
@@ -217,7 +217,7 @@ async function updateFirstGraph(
   for (const relationMutation of parentOwned) {
     await applyParentOwnedMutation(
       scope,
-      contract,
+      context,
       modelName,
       scalarData,
       relationMutation.relation,
@@ -231,7 +231,7 @@ async function updateFirstGraph(
   if (Object.keys(mappedUpdateData).length > 0) {
     const pkFilter = buildPrimaryKeyFilterFromRow(contract, modelName, existingRow);
     const pkWhere = shorthandToWhereExpr(
-      contract,
+      context,
       modelName,
       pkFilter as MutationUpdateInput<SqlContract<SqlStorage>, string>,
     );
@@ -244,7 +244,7 @@ async function updateFirstGraph(
       contract,
       tableName,
       mappedUpdateData,
-      [createBoundWhereExpr(pkWhere)],
+      [pkWhere],
       undefined,
     );
     const updatedRowsRaw = await executeQueryPlan<Record<string, unknown>>(
@@ -261,7 +261,7 @@ async function updateFirstGraph(
   for (const relationMutation of childOwned) {
     await applyChildOwnedMutation(
       scope,
-      contract,
+      context,
       modelName,
       parentRow,
       relationMutation.relation,
@@ -348,12 +348,13 @@ function partitionByOwnership(relationMutations: readonly ParsedRelationMutation
 
 async function applyParentOwnedMutation(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  context: ExecutionContext,
   parentModelName: string,
   scalarData: Record<string, unknown>,
   relation: RelationDefinition,
   mutation: RelationMutation<SqlContract<SqlStorage>, string>,
 ): Promise<void> {
+  const contract = context.contract;
   if (mutation.kind === 'disconnect') {
     for (const parentColumn of relation.parentCols) {
       const parentFieldName = toFieldName(contract, parentModelName, parentColumn);
@@ -372,7 +373,7 @@ async function applyParentOwnedMutation(
 
     const relatedRow = await createGraph(
       scope,
-      contract,
+      context,
       relation.relatedModelName,
       row as MutationCreateInput<SqlContract<SqlStorage>, string>,
     );
@@ -389,7 +390,7 @@ async function applyParentOwnedMutation(
 
   const relatedRow = await findRowByCriterion(
     scope,
-    contract,
+    context,
     relation.relatedModelName,
     criterion as Record<string, unknown>,
   );
@@ -424,12 +425,13 @@ function copyRelatedValuesToParent(
 
 async function applyChildOwnedMutation(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  context: ExecutionContext,
   parentModelName: string,
   parentRow: Record<string, unknown>,
   relation: RelationDefinition,
   mutation: RelationMutation<SqlContract<SqlStorage>, string>,
 ): Promise<void> {
+  const contract = context.contract;
   const parentValues = readParentColumnValues(contract, parentModelName, relation, parentRow);
 
   if (mutation.kind === 'create') {
@@ -445,7 +447,7 @@ async function applyChildOwnedMutation(
 
       await createGraph(
         scope,
-        contract,
+        context,
         relation.relatedModelName,
         payload as MutationCreateInput<SqlContract<SqlStorage>, string>,
       );
@@ -456,7 +458,7 @@ async function applyChildOwnedMutation(
   if (mutation.kind === 'connect') {
     for (const criterion of mutation.criteria) {
       const criterionWhere = shorthandToWhereExpr(
-        contract,
+        context,
         relation.relatedModelName,
         criterion as MutationUpdateInput<SqlContract<SqlStorage>, string>,
       );
@@ -472,7 +474,7 @@ async function applyChildOwnedMutation(
       }
 
       await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
-        createBoundWhereExpr(criterionWhere),
+        criterionWhere,
       ]);
     }
     return;
@@ -486,14 +488,14 @@ async function applyChildOwnedMutation(
   if (!mutation.criteria || mutation.criteria.length === 0) {
     const parentJoinWhere = buildChildJoinWhere(relation, parentValues);
     await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
-      createBoundWhereExpr(parentJoinWhere),
+      parentJoinWhere,
     ]);
     return;
   }
 
   for (const criterion of mutation.criteria) {
     const criterionWhere = shorthandToWhereExpr(
-      contract,
+      context,
       relation.relatedModelName,
       criterion as MutationUpdateInput<SqlContract<SqlStorage>, string>,
     );
@@ -505,7 +507,7 @@ async function applyChildOwnedMutation(
 
     const parentJoinWhere = buildChildJoinWhere(relation, parentValues);
     await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
-      createBoundWhereExpr(and(parentJoinWhere, criterionWhere)),
+      and(parentJoinWhere, criterionWhere),
     ]);
   }
 }
@@ -542,8 +544,8 @@ function readParentColumnValues(
 function buildChildJoinWhere(
   relation: RelationDefinition,
   childValues: Map<string, unknown>,
-): WhereExpr {
-  const exprs: WhereExpr[] = [];
+): AnyExpression {
+  const exprs: AnyExpression[] = [];
 
   for (const [childColumn, parentValue] of childValues.entries()) {
     exprs.push(
@@ -583,12 +585,13 @@ async function insertSingleRow(
 
 async function findRowByCriterion(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  context: ExecutionContext,
   modelName: string,
   criterion: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
+  const contract = context.contract;
   const whereExpr = shorthandToWhereExpr(
-    contract,
+    context,
     modelName,
     criterion as MutationUpdateInput<SqlContract<SqlStorage>, string>,
   );
@@ -599,7 +602,7 @@ async function findRowByCriterion(
   const tableName = resolveModelTableName(contract, modelName);
   const state: CollectionState = {
     ...emptyState(),
-    filters: [createBoundWhereExpr(whereExpr)],
+    filters: [whereExpr],
     limit: 1,
   };
   const compiled = compileSelect(contract, tableName, state);
@@ -617,7 +620,7 @@ async function findFirstByFilters(
   scope: RuntimeScope,
   contract: SqlContract<SqlStorage>,
   modelName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyExpression[],
 ): Promise<Record<string, unknown> | null> {
   const tableName = resolveModelTableName(contract, modelName);
   const state: CollectionState = {
@@ -641,7 +644,7 @@ async function executeUpdateCount(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyExpression[],
 ): Promise<void> {
   const compiled = compileUpdateCount(contract, tableName, setValues, filters);
   await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();

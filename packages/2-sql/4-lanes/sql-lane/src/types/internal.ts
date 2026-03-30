@@ -39,5 +39,4 @@ export interface MetaBuildArgs {
   readonly orderBy?: AnyOrderBuilder;
   readonly limit?: number;
   readonly paramDescriptors: ParamDescriptor[];
-  readonly paramCodecs?: Record<string, string>;
 }

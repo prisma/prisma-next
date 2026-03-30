@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { execSync } from 'node:child_process';
-import { text } from 'node:stream/consumers';
 import { resolve } from 'node:path';
+import { text } from 'node:stream/consumers';
 
 const input = JSON.parse(await text(process.stdin));
 

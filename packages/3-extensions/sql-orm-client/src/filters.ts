@@ -1,28 +1,29 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
   NullCheckExpr,
   OrExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ShorthandWhereFilter } from './types';
 
-export function and(...exprs: WhereExpr[]): AndExpr {
+export function and(...exprs: AnyExpression[]): AndExpr {
   return AndExpr.of(exprs);
 }
 
-export function or(...exprs: WhereExpr[]): OrExpr {
+export function or(...exprs: AnyExpression[]): OrExpr {
   return OrExpr.of(exprs);
 }
 
-export function not(expr: WhereExpr): WhereExpr {
+export function not(expr: AnyExpression): AnyExpression {
   return expr.not();
 }
 
-export function all(): WhereExpr {
+export function all(): AnyExpression {
   return AndExpr.true();
 }
 
@@ -30,10 +31,11 @@ export function shorthandToWhereExpr<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
 >(
-  contract: TContract,
+  context: ExecutionContext<TContract>,
   modelName: ModelName,
   filters: ShorthandWhereFilter<TContract, ModelName>,
-): WhereExpr | undefined {
+): AnyExpression | undefined {
+  const contract = context.contract;
   const models = contract.models as Record<
     string,
     {
@@ -46,7 +48,7 @@ export function shorthandToWhereExpr<
     contract.mappings.modelToTable?.[modelName] ?? models[modelName]?.storage?.table ?? modelName;
   const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
 
-  const exprs: WhereExpr[] = [];
+  const exprs: AnyExpression[] = [];
   for (const [fieldName, value] of Object.entries(filters)) {
     if (value === undefined) {
       continue;
@@ -60,6 +62,7 @@ export function shorthandToWhereExpr<
       continue;
     }
 
+    assertFieldHasEqualityTrait(context, tableName, columnName, modelName, fieldName);
     exprs.push(BinaryExpr.eq(left, LiteralExpr.of(value)));
   }
 
@@ -68,4 +71,23 @@ export function shorthandToWhereExpr<
   }
 
   return exprs.length === 1 ? exprs[0] : and(...exprs);
+}
+
+function assertFieldHasEqualityTrait(
+  context: ExecutionContext,
+  tableName: string,
+  columnName: string,
+  modelName: string,
+  fieldName: string,
+): void {
+  const tables = context.contract.storage?.tables as
+    | Record<string, { columns?: Record<string, { codecId?: string }> }>
+    | undefined;
+  const codecId = tables?.[tableName]?.columns?.[columnName]?.codecId;
+  const traits = codecId ? context.codecs.traitsOf(codecId) : [];
+  if (!traits.includes('equality')) {
+    throw new Error(
+      `Shorthand filter on "${modelName}.${fieldName}": field does not support equality comparisons`,
+    );
+  }
 }

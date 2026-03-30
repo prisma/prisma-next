@@ -11,13 +11,13 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { PlanningMode, PostgresPlanTargetDetails } from './planner';
 import {
   buildColumnTypeSql,
-  buildTargetDetails,
   columnExistsCheck,
   columnNullabilityCheck,
   constraintExistsCheck,
   qualifyTableName,
   toRegclassLiteral,
-} from './planner';
+} from './planner-sql';
+import { buildTargetDetails } from './planner-target-details';
 
 // ============================================================================
 // Public API

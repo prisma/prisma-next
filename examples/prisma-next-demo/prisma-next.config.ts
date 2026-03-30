@@ -30,6 +30,9 @@ export default defineConfig({
     },
     composedExtensionPacks: extensionPacks.map((pack) => pack.id),
   }),
+  // migrations: {
+  //   dir: 'migration-fixtures/long-spine',
+  // },
   db: {
     // biome-ignore lint/style/noNonNullAssertion: loaded from .env
     connection: process.env['DATABASE_URL']!,

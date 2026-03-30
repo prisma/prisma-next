@@ -245,17 +245,17 @@ describe('budgets plugin', () => {
     );
 
     it(
-      'warns when latency exceeds budget in strict mode with warn severity',
+      'throws when latency exceeds budget in strict mode even with warn severity',
       async () => {
         const plugin = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
         const ctx = createPluginContext({ mode: 'strict' });
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
 
-        await plugin.afterExecute?.(plan, result, ctx);
-        expect(ctx.log.warn).toHaveBeenCalledWith(
-          expect.objectContaining({ code: 'BUDGET.TIME_EXCEEDED' }),
-        );
+        await expect(plugin.afterExecute?.(plan, result, ctx)).rejects.toMatchObject({
+          code: 'BUDGET.TIME_EXCEEDED',
+          category: 'BUDGET',
+        });
       },
       timeouts.default,
     );

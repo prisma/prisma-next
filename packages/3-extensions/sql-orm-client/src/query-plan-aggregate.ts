@@ -2,24 +2,20 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   AndExpr,
+  type AnyExpression,
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
-  type Expression,
-  ListLiteralExpr,
-  LiteralExpr,
+  NotExpr,
   NullCheckExpr,
   OrExpr,
-  ParamRef,
   ProjectionItem,
   SelectAst,
   TableSource,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { buildOrmQueryPlan } from './query-plan-meta';
+import { buildOrmQueryPlan, deriveParamsFromAst } from './query-plan-meta';
 import type { AggregateSelector } from './types';
-import { combineWhereFilters } from './where-utils';
+import { combineWhereExprs } from './where-utils';
 
 function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>): AggregateExpr {
   if (selector.fn === 'count') {
@@ -36,37 +32,52 @@ function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>
 // ORM HAVING filters use literal binding (values inlined at plan-build time),
 // not parameterized binding. ParamRef is rejected because the ORM's grouped
 // collection API always produces literal comparisons for having() predicates.
-function validateGroupedComparable(
-  value: Expression | ParamRef | LiteralExpr | ListLiteralExpr,
-): Expression | LiteralExpr | ListLiteralExpr {
-  if (value instanceof ParamRef) {
-    throw new Error('ParamRef is not supported in grouped having expressions');
-  }
-
-  if (value instanceof LiteralExpr) {
-    return value;
-  }
-
-  if (value instanceof ListLiteralExpr) {
-    if (value.values.some((entry) => entry instanceof ParamRef)) {
+function validateGroupedComparable(value: AnyExpression): AnyExpression {
+  switch (value.kind) {
+    case 'param-ref':
       throw new Error('ParamRef is not supported in grouped having expressions');
-    }
-    return value;
+    case 'literal':
+    case 'column-ref':
+    case 'identifier-ref':
+    case 'aggregate':
+    case 'operation':
+      return value;
+    case 'list':
+      if (value.values.some((entry) => entry.kind === 'param-ref')) {
+        throw new Error('ParamRef is not supported in grouped having expressions');
+      }
+      return value;
+    default:
+      throw new Error(`Unsupported comparable kind in grouped having: "${value.kind}"`);
   }
-
-  return value;
 }
 
-function validateGroupedMetricExpr(expr: Expression): AggregateExpr {
-  if (!(expr instanceof AggregateExpr)) {
+function validateGroupedMetricExpr(expr: AnyExpression): AggregateExpr {
+  if (expr.kind !== 'aggregate') {
     throw new Error('groupBy().having() only supports aggregate metric expressions');
   }
 
   return expr;
 }
 
-function validateGroupedHavingExpr(expr: WhereExpr): WhereExpr {
-  return expr.accept<WhereExpr>({
+function rejectHavingExpr(expr: { kind: string }): never {
+  throw new Error(`Unsupported grouped having expression kind "${expr.kind}"`);
+}
+
+function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
+  return expr.accept<AnyExpression>({
+    columnRef: rejectHavingExpr,
+    identifierRef: rejectHavingExpr,
+    subquery: rejectHavingExpr,
+    operation: rejectHavingExpr,
+    aggregate: rejectHavingExpr,
+    jsonObject: rejectHavingExpr,
+    jsonArrayAgg: rejectHavingExpr,
+    literal: rejectHavingExpr,
+    param() {
+      throw new Error('ParamRef is not supported in grouped having expressions');
+    },
+    list: rejectHavingExpr,
     and(expr) {
       return AndExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
     },
@@ -74,10 +85,13 @@ function validateGroupedHavingExpr(expr: WhereExpr): WhereExpr {
       return OrExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
     },
     exists(expr) {
-      throw new Error(`Unsupported grouped having expression kind "${expr.constructor.name}"`);
+      throw new Error(`Unsupported grouped having expression kind "${expr.kind}"`);
     },
     nullCheck(expr) {
       return new NullCheckExpr(validateGroupedMetricExpr(expr.expr), expr.isNull);
+    },
+    not(expr) {
+      return new NotExpr(validateGroupedHavingExpr(expr.expr));
     },
     binary(expr) {
       return new BinaryExpr(
@@ -92,7 +106,7 @@ function validateGroupedHavingExpr(expr: WhereExpr): WhereExpr {
 export function compileAggregate(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyExpression[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
 ): SqlQueryPlan<Record<string, unknown>> {
   const entries = Object.entries(aggregateSpec);
@@ -104,21 +118,22 @@ export function compileAggregate(
     ProjectionItem.of(alias, toAggregateExpr(tableName, selector)),
   );
   let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
 
-  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
 export function compileGroupedAggregate(
   contract: SqlContract<SqlStorage>,
   tableName: string,
-  filters: readonly BoundWhereExpr[],
+  filters: readonly AnyExpression[],
   groupByColumns: readonly string[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
-  havingExpr: WhereExpr | undefined,
+  havingExpr: AnyExpression | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   if (groupByColumns.length === 0) {
     throw new Error('groupBy() requires at least one field');
@@ -139,14 +154,15 @@ export function compileGroupedAggregate(
   let ast = SelectAst.from(TableSource.named(tableName))
     .withProjection(projection)
     .withGroupBy(groupByColumns.map((column) => ColumnRef.of(tableName, column)));
-  const where = combineWhereFilters(filters);
+  const where = combineWhereExprs(filters);
   if (where) {
-    ast = ast.withWhere(where.expr);
+    ast = ast.withWhere(where);
   }
 
   if (havingExpr) {
     ast = ast.withHaving(validateGroupedHavingExpr(havingExpr));
   }
 
-  return buildOrmQueryPlan(contract, ast, where?.params ?? [], where?.paramDescriptors ?? []);
+  const { params, paramDescriptors } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }

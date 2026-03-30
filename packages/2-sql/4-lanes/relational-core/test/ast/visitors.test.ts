@@ -9,18 +9,18 @@ import {
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
-  ListLiteralExpr,
+  ListExpression,
   NullCheckExpr,
   OrderByItem,
   SelectAst,
   SubqueryExpr,
 } from '../../src/exports/ast';
-import { col, lit, lowerExpr, param, simpleSelect, table } from './test-helpers';
+import { col, lit, lowerExpr, param, shiftParamRef, simpleSelect, table } from './test-helpers';
 
 describe('ast/visitors', () => {
   it('rewrites expressions through node-level rewrite methods', () => {
     const operation = lowerExpr(col('user', 'email'), param(0, 'email'), lit(true));
-    const list = ListLiteralExpr.of([param(1, 'firstId'), lit(2)]);
+    const list = ListExpression.of([param(1, 'firstId'), lit(2)]);
     const objectExpr = JsonObjectExpr.fromEntries([
       JsonObjectExpr.entry('email', operation),
       JsonObjectExpr.entry('active', lit(false)),
@@ -31,11 +31,11 @@ describe('ast/visitors', () => {
 
     const rewrittenOperation = operation.rewrite({
       columnRef: (expr) => (expr.table === 'user' ? col('member', expr.column) : expr),
-      paramRef: (expr) => expr.withIndex(expr.index + 10),
+      paramRef: shiftParamRef(10),
       literal: (expr) => (expr.value === true ? lit('TRUE') : expr),
     });
     const rewrittenList = list.rewrite({
-      paramRef: (expr) => expr.withIndex(expr.index + 20),
+      paramRef: shiftParamRef(20),
       literal: () => lit('mapped'),
     });
     const rewrittenObject = objectExpr.rewrite({
@@ -48,7 +48,7 @@ describe('ast/visitors', () => {
     expect(rewrittenOperation).toEqual(
       lowerExpr(col('member', 'email'), param(10, 'email'), lit('TRUE')),
     );
-    expect(rewrittenList).toEqual(ListLiteralExpr.of([param(21, 'firstId'), lit('mapped')]));
+    expect(rewrittenList).toEqual(ListExpression.of([param(21, 'firstId'), lit('mapped')]));
     expect(rewrittenObject).toEqual(
       JsonObjectExpr.fromEntries([
         JsonObjectExpr.entry('email', operation),
@@ -87,7 +87,7 @@ describe('ast/visitors', () => {
     const rewritten = ast.rewrite({
       tableSource: (source) => (source.name === 'user' ? table('member') : source),
       columnRef: (expr) => (expr.table === 'user' ? col('member', expr.column) : expr),
-      paramRef: (expr) => expr.withIndex(expr.index + 1),
+      paramRef: shiftParamRef(1),
       literal: (expr) => (expr.value === true ? lit('TRUE') : expr),
       eqColJoinOn: (on) => EqColJoinOn.of(col('member', on.left.column), on.right),
       select: (select) => select.withLimit(select.limit ?? 25),
@@ -113,7 +113,7 @@ describe('ast/visitors', () => {
   it('folds expression and where trees through node-level fold methods', () => {
     const where = AndExpr.of([
       BinaryExpr.eq(lowerExpr(col('user', 'email')), lit('a@example.com')),
-      BinaryExpr.in(col('user', 'status'), ListLiteralExpr.of([param(1), lit('active')])),
+      BinaryExpr.in(col('user', 'status'), ListExpression.of([param(1), lit('active')])),
       ExistsExpr.exists(simpleSelect('post', ['id'])),
     ]);
 
@@ -121,9 +121,9 @@ describe('ast/visitors', () => {
       empty: [],
       combine: (a, b) => [...a, ...b],
       columnRef: (expr) => [`${expr.table}.${expr.column}`],
-      paramRef: (expr) => [`$${expr.index}`],
+      paramRef: (expr) => [`$${expr.value}`],
       literal: (expr) => [`lit:${String(expr.value)}`],
-      listLiteral: (expr) => [`list:${expr.values.length}`],
+      list: (expr) => [`list:${expr.values.length}`],
       select: (ast) => ast.collectColumnRefs().map((expr) => `${expr.table}.${expr.column}`),
     });
 

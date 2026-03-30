@@ -1,12 +1,11 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
+  type AnyExpression,
   BinaryExpr,
   type BinaryOp,
-  type BoundWhereExpr,
   ColumnRef,
   LiteralExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { mapStorageRowToModelFields } from './collection-runtime';
@@ -21,14 +20,14 @@ import type {
   HavingBuilder,
   HavingComparisonMethods,
 } from './types';
-import { combinePlainWhereExprs } from './where-utils';
+import { combineWhereExprs } from './where-utils';
 
 interface GroupedCollectionInit {
   readonly tableName: string;
-  readonly baseFilters: readonly BoundWhereExpr[];
+  readonly baseFilters: readonly AnyExpression[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
-  readonly havingFilters: readonly WhereExpr[];
+  readonly havingFilters: readonly AnyExpression[];
 }
 
 type GroupByFieldName<
@@ -42,12 +41,13 @@ export class GroupedCollection<
   GroupFields extends readonly GroupByFieldName<TContract, ModelName>[],
 > {
   readonly ctx: CollectionContext<TContract>;
+  private readonly contract: TContract;
   readonly modelName: ModelName;
   readonly tableName: string;
-  readonly baseFilters: readonly BoundWhereExpr[];
+  readonly baseFilters: readonly AnyExpression[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
-  readonly havingFilters: readonly WhereExpr[];
+  readonly havingFilters: readonly AnyExpression[];
 
   constructor(
     ctx: CollectionContext<TContract>,
@@ -55,6 +55,7 @@ export class GroupedCollection<
     options: GroupedCollectionInit,
   ) {
     this.ctx = ctx;
+    this.contract = ctx.context.contract;
     this.modelName = modelName;
     this.tableName = options.tableName;
     this.baseFilters = options.baseFilters;
@@ -64,10 +65,10 @@ export class GroupedCollection<
   }
 
   having(
-    predicate: (having: HavingBuilder<TContract, ModelName>) => WhereExpr,
+    predicate: (having: HavingBuilder<TContract, ModelName>) => AnyExpression,
   ): GroupedCollection<TContract, ModelName, GroupFields> {
     const havingExpr = predicate(
-      createHavingBuilder(this.ctx.contract, this.modelName, this.tableName),
+      createHavingBuilder(this.contract, this.modelName, this.tableName),
     );
     return new GroupedCollection(this.ctx, this.modelName, {
       tableName: this.tableName,
@@ -83,7 +84,7 @@ export class GroupedCollection<
   ): Promise<
     Array<Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>>
   > {
-    const aggregateSpec = fn(createAggregateBuilder(this.ctx.contract, this.modelName));
+    const aggregateSpec = fn(createAggregateBuilder(this.contract, this.modelName));
     const aggregateEntries = Object.entries(aggregateSpec);
     if (aggregateEntries.length === 0) {
       throw new Error('groupBy().aggregate() requires at least one aggregation selector');
@@ -96,12 +97,12 @@ export class GroupedCollection<
     }
 
     const compiled = compileGroupedAggregate(
-      this.ctx.contract,
+      this.contract,
       this.tableName,
       this.baseFilters,
       this.groupByColumns,
       aggregateSpec,
-      combinePlainWhereExprs(this.havingFilters),
+      combineWhereExprs(this.havingFilters),
     );
     const rows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
@@ -109,7 +110,7 @@ export class GroupedCollection<
     ).toArray();
 
     return rows.map((row) => {
-      const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, row);
+      const mapped = mapStorageRowToModelFields(this.contract, this.tableName, row);
       for (const [alias, selector] of aggregateEntries) {
         mapped[alias] = coerceAggregateValue(selector.fn, row[alias]);
       }
@@ -154,7 +155,7 @@ function createHavingBuilder<TContract extends SqlContract<SqlStorage>, ModelNam
 function createHavingComparisonMethods<T extends number | null>(
   metric: AggregateExpr,
 ): HavingComparisonMethods<T> {
-  const buildBinaryExpr = (op: BinaryOp, value: unknown): WhereExpr =>
+  const buildBinaryExpr = (op: BinaryOp, value: unknown): AnyExpression =>
     new BinaryExpr(op, metric, LiteralExpr.of(value));
 
   return {

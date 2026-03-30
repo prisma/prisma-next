@@ -19,7 +19,7 @@ export const contract = defineContract<CodecTypes>()
     nativeType: 'text',
     typeParams: {},
   })
-  .storageType('Role', enumType('role', ['USER', 'ADMIN']))
+  .storageType('Role', enumType('Role', ['USER', 'ADMIN']))
   .table('user', (t) =>
     t
       .column('id', {
@@ -36,7 +36,7 @@ export const contract = defineContract<CodecTypes>()
         nullable: false,
       })
       .unique(['email'])
-      .column('role', { type: enumColumn('Role', 'role'), nullable: false })
+      .column('role', { type: enumColumn('Role', 'Role'), nullable: false })
       .column('createdAt', {
         type: timestamptzColumn,
         nullable: false,

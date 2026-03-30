@@ -1,8 +1,8 @@
-import { DoNothingConflictAction, InsertAst } from '@prisma-next/sql-relational-core/ast';
+import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
-import { getTestContract } from '../helpers';
+import { getTestContext, getTestContract } from '../helpers';
 import {
   createReturningUsersCollection,
   createUsersCollection,
@@ -12,7 +12,7 @@ import {
 import { seedUsers } from './runtime-helpers';
 
 function isInsertAst(ast: unknown): ast is InsertAst {
-  return ast instanceof InsertAst;
+  return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'insert';
 }
 
 describe('integration/upsert', () => {
@@ -96,7 +96,8 @@ describe('integration/upsert', () => {
       await withCollectionRuntime(async (runtime) => {
         const contract = withReturningCapability(getTestContract());
         delete (contract.storage.tables.users as { primaryKey?: unknown }).primaryKey;
-        const users = new Collection({ contract, runtime }, 'User');
+        const context = { ...getTestContext(), contract };
+        const users = new Collection({ runtime, context }, 'User');
 
         await expect(
           users.upsert({
@@ -132,7 +133,7 @@ describe('integration/upsert', () => {
         if (!isInsertAst(insertPlanAst)) {
           throw new Error('Expected first empty-update upsert execution to emit an insert AST');
         }
-        expect(insertPlanAst.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+        expect(insertPlanAst.onConflict?.action?.kind).toBe('do-nothing');
 
         runtime.resetExecutions();
         const existing = await users.upsert({
@@ -151,7 +152,7 @@ describe('integration/upsert', () => {
         if (!isInsertAst(conflictPlanAst)) {
           throw new Error('Expected second empty-update upsert execution to emit an insert AST');
         }
-        expect(conflictPlanAst.onConflict?.action).toBeInstanceOf(DoNothingConflictAction);
+        expect(conflictPlanAst.onConflict?.action?.kind).toBe('do-nothing');
 
         expect(await users.first({ id: 1 })).toEqual({
           id: 1,

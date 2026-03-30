@@ -2,7 +2,6 @@ import type { ParamDescriptor, PlanMeta, PlanRefs } from '@prisma-next/contract/
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from '../transform/errors';
 import { runGuardrails } from '../transform/guardrails';
 import { transformKyselyToPnAstCollectingParams } from '../transform/transform';
 
@@ -52,28 +51,15 @@ function buildMeta(
   };
 }
 
-/**
- * Internal helper for turning a Kysely operation node into a PN SqlQueryPlan without compiling SQL.
- * Not exported from the package public surface.
- */
 export function buildKyselyPlan<Row>(
   contract: SqlContract<SqlStorage>,
   query: unknown,
 ): SqlQueryPlan<Row> {
   runGuardrails(contract, query);
-  const { ast, params, metaAdditions } = transformKyselyToPnAstCollectingParams(contract, query);
+  const { ast, metaAdditions } = transformKyselyToPnAstCollectingParams(contract, query);
 
-  const paramDescriptors = metaAdditions.paramDescriptors;
-  if (params.length !== paramDescriptors.length) {
-    throw new KyselyTransformError(
-      'Collected params and param descriptors are misaligned in compile-free build path',
-      KYSELY_TRANSFORM_ERROR_CODES.PARAMETER_MISMATCH,
-      {
-        paramsLength: params.length,
-        descriptorLength: paramDescriptors.length,
-      },
-    );
-  }
+  const collectedParams = ast.collectParamRefs();
+  const params = collectedParams.map((p) => p.value);
 
   return {
     ast,

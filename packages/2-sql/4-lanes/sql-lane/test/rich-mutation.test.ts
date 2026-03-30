@@ -2,14 +2,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import type { DeleteAst, InsertAst, UpdateAst } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
   ColumnRef,
-  DeleteAst,
-  InsertAst,
   NullCheckExpr,
   ParamRef,
-  UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -47,12 +45,18 @@ describe('sql lane rich mutation ASTs', () => {
         },
       });
 
-    expect(insertPlan.ast).toBeInstanceOf(InsertAst);
+    expect(insertPlan.ast.kind).toBe('insert');
     const insertAst = insertPlan.ast as InsertAst;
     expect(insertAst.rows[0]).toMatchObject({
-      id: ParamRef.of(1, 'id'),
-      email: ParamRef.of(2, 'email'),
-      createdAt: ParamRef.of(3, 'createdAt'),
+      id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+      email: ParamRef.of('a@example.com', {
+        name: 'email',
+        codecId: 'pg/text@1',
+      }),
+      createdAt: ParamRef.of('2024-01-01T00:00:00.000Z', {
+        name: 'createdAt',
+        codecId: 'pg/timestamptz@1',
+      }),
     });
     expect(insertAst.returning).toEqual([ColumnRef.of('user', 'id')]);
 
@@ -67,11 +71,19 @@ describe('sql lane rich mutation ASTs', () => {
         },
       });
 
-    expect(updatePlan.ast).toBeInstanceOf(UpdateAst);
+    expect(updatePlan.ast.kind).toBe('update');
     const updateAst = updatePlan.ast as UpdateAst;
-    expect(updateAst.set['email']).toEqual(ParamRef.of(1, 'email'));
+    expect(updateAst.set['email']).toEqual(
+      ParamRef.of('updated@example.com', {
+        name: 'email',
+        codecId: 'pg/text@1',
+      }),
+    );
     expect(updateAst.where).toEqual(
-      BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(2, 'id')),
+      BinaryExpr.eq(
+        ColumnRef.of('user', 'id'),
+        ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+      ),
     );
     expect(updateAst.returning).toEqual([ColumnRef.of('user', 'email')]);
 
@@ -81,7 +93,7 @@ describe('sql lane rich mutation ASTs', () => {
       .returning(tables.user.columns.id)
       .build();
 
-    expect(deletePlan.ast).toBeInstanceOf(DeleteAst);
+    expect(deletePlan.ast.kind).toBe('delete');
     const deleteAst = deletePlan.ast as DeleteAst;
     expect(deleteAst.where).toEqual(NullCheckExpr.isNull(ColumnRef.of('user', 'deletedAt')));
     expect(deleteAst.returning).toEqual([ColumnRef.of('user', 'id')]);

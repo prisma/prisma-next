@@ -272,6 +272,8 @@ function generateTape(opts: {
   dbState?: string;
   sleepAfterEnter: string;
   height: number;
+  /** If set, a hidden `cd` is emitted before the visible command. */
+  cwd?: string;
 }): string {
   const lines = [
     `Set Height ${opts.height}`,
@@ -283,7 +285,15 @@ function generateTape(opts: {
   // Pre-write a shell comment describing the scenario + db state before the command.
   // Uses Hide/Show so the comment appears instantly (not typed character-by-character).
   const commentParts = [opts.description, opts.dbState ? `[${opts.dbState}]` : ''].filter(Boolean);
-  if (commentParts.length > 0) {
+  if (opts.cwd) {
+    // Hidden cd + clear so non-wrapper commands (e.g., cat) run in the workspace
+    // directory without the cd leaking into visible scrollback.
+    lines.push('Hide', `Type ${vhsQuote(`cd ${opts.cwd}`)}`, 'Enter', 'Type "clear"', 'Enter');
+    if (commentParts.length > 0) {
+      lines.push(`Type ${vhsQuote(`# ${commentParts.join(' ')}`)}`, 'Enter');
+    }
+    lines.push('Show', 'Sleep 500ms');
+  } else if (commentParts.length > 0) {
     lines.push(
       'Hide',
       `Type ${vhsQuote(`# ${commentParts.join(' ')}`)}`,
@@ -690,6 +700,9 @@ async function recordJourneyStep(ctx: JourneyContext, step: JourneyStep): Promis
   }
 
   console.log('         Recording...');
+  // Non-prisma-next commands (e.g. cat) need an explicit cd to the workspace
+  // because only the prisma-next wrapper auto-cds there.
+  const needsCwd = !step.command.startsWith('prisma-next');
   const tapeContent = generateTape({
     sharedTapePath: relative(CLI_ROOT, sharedTapePath),
     vhsPath,
@@ -699,6 +712,7 @@ async function recordJourneyStep(ctx: JourneyContext, step: JourneyStep): Promis
     dbState: step.dbState,
     sleepAfterEnter,
     height,
+    ...(needsCwd ? { cwd: workspaceDir } : {}),
   });
 
   const tapePath = join(TAPES_DIR, slug, `${name}.tape`);

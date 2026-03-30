@@ -80,7 +80,7 @@ const signature: SqlOperationSignature = {
   lowering: {
     targetFamily: 'sql',
     strategy: 'infix',
-    template: '${self} <=> ${arg0}',
+    template: '{{self}} <=> {{arg0}}',
   },
 };
 

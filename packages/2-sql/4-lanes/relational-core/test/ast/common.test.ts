@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   AggregateExpr,
-  ColumnRef,
   JsonArrayAggExpr,
   JsonObjectExpr,
   LiteralExpr,
   OperationExpr,
   OrderByItem,
   ParamRef,
-  TableSource,
 } from '../../src/exports/ast';
 import { col, lit, lowerExpr, param, stringReturn, table } from './test-helpers';
 
@@ -17,20 +15,23 @@ describe('ast/common', () => {
     const source = table('user', 'u');
     const column = col('user', 'id');
 
-    expect(source).toBeInstanceOf(TableSource);
-    expect(source).toMatchObject({ name: 'user', alias: 'u' });
-    expect(column).toBeInstanceOf(ColumnRef);
-    expect(column).toMatchObject({ table: 'user', column: 'id' });
+    expect(source).toMatchObject({ kind: 'table-source', name: 'user', alias: 'u' });
+    expect(column).toMatchObject({ kind: 'column-ref', table: 'user', column: 'id' });
   });
 
-  it('creates param refs and preserves immutability when changing indexes', () => {
+  it('creates param refs with value and options', () => {
     const original = param(1, 'userId');
-    const shifted = original.withIndex(4);
+    expect(original).toMatchObject({ kind: 'param-ref', value: 1, name: 'userId' });
 
-    expect(original).toBeInstanceOf(ParamRef);
-    expect(original).toMatchObject({ index: 1, name: 'userId' });
-    expect(shifted).toEqual(param(4, 'userId'));
-    expect(shifted).not.toBe(original);
+    const withCodec = ParamRef.of('test', {
+      name: 'field',
+      codecId: 'pg/text@1',
+    });
+    expect(withCodec).toMatchObject({
+      value: 'test',
+      name: 'field',
+      codecId: 'pg/text@1',
+    });
   });
 
   it('creates operation expressions directly and through function helpers', () => {
@@ -43,20 +44,21 @@ describe('ast/common', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-        template: '${self} || ${arg0}',
+        template: '{{self}} || {{arg0}}',
       },
     });
     const lowered = lowerExpr(col('user', 'email'));
 
-    expect(explicit).toBeInstanceOf(OperationExpr);
-    expect(explicit).toMatchObject({ method: 'concat', args: [param(0, 'suffix')] });
+    expect(explicit).toMatchObject({
+      kind: 'operation',
+      method: 'concat',
+      args: [param(0, 'suffix')],
+    });
     expect(explicit.baseColumnRef()).toEqual(col('user', 'email'));
     expect(lowered.lowering).toEqual({
       targetFamily: 'sql',
       strategy: 'function',
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'lower(${self})',
+      template: 'lower({{self}})',
     });
   });
 
