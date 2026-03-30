@@ -148,6 +148,35 @@ Today the framework treats models as pure data descriptions (no behavior). Frami
 
 ---
 
+## 6. The ORM Collection interface is a shared architectural pattern
+
+**Source**: Phase 3 Mongo ORM PoC + comparative analysis with SQL ORM
+
+Building a Mongo ORM client alongside the existing SQL ORM revealed that the consumer-facing surface is fundamentally the same pattern across families. The `Collection` class with fluent chaining (`.where().select().include().take().all()`) is the shared ORM interface — not an options-bag API like `findMany({ where, include })`.
+
+**What's shared (framework-level):**
+- **`Collection` chaining API.** Immutable method chaining where each call returns a new collection with accumulated state. Both families use the same method vocabulary: `where`, `select`, `include`, `orderBy`, `take`, `skip`, `all`, `first`.
+- **`CollectionState`.** The family-agnostic state bag (filters, includes, orderBy, selectedFields, limit, offset). Chaining methods accumulate state; terminal methods (`.all()`, `.first()`) compile it into a family-specific query plan.
+- **Row type inference.** Both families follow `model.fields[f].codecId` → `CodecTypes[codecId]['output']` with nullable handling. This is a framework-level utility type, not per-family.
+- **Custom collection subclasses.** `class UserCollection extends Collection<Contract, 'User'>` with domain methods like `.admins()` and `.byEmail(email)`. Nothing about this pattern is SQL-specific.
+- **Include interface.** `include('relation', refineFn?)` with cardinality-aware coercion (to-one → `T | null`, to-many → `T[]`). The refinement callback produces a nested collection with its own state.
+- **Client = map of root names → Collection instances.** Both families derive this from the contract's `roots` section.
+
+**What stays family-specific (internal plumbing):**
+- **Terminal compilation.** `.all()` compiles `CollectionState` → `SqlQueryPlan` (SQL AST) vs `MongoQueryPlan` (FindCommand / AggregateCommand).
+- **Include resolution strategy.** SQL uses lateral joins, correlated subqueries, or multi-query stitching. Mongo uses `$lookup` pipeline stages. Embedded relations in Mongo are auto-projected (no loading needed).
+- **Where expression compilation.** SQL compiles to SQL AST nodes. Mongo compiles to filter documents. The callback DSL shape (`.email.eq(...)`) could share the same signature, but the output types differ.
+- **Field mapping.** SQL needs column remapping via `model.storage.fields`. Mongo uses identity mapping by default.
+- **Mutation compilation.** SQL has `INSERT...RETURNING`, `ON CONFLICT`, FK cascades. Mongo has `insertOne`/`updateOne` with update operators.
+
+**Approach: spike then extract.** Build the Mongo Collection independently, mirroring the SQL ORM's chaining API shape. Once both families have working Collection implementations, extract the shared interface from two concrete implementations. The abstraction is discovered, not predicted.
+
+The Phase 3 options-bag API (`findMany({ where, include })`) was expedient for proving the contract shape but is not the target design. Phase 4 will reimplement the Mongo ORM with the chaining Collection pattern.
+
+**Where to apply**: `packages/1-framework/` (shared Collection interface and CollectionState), both family ORM packages. See [ADR 4](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md).
+
+---
+
 ## Open contract design questions
 
 These emerged from the contract redesign and need resolution before implementation.

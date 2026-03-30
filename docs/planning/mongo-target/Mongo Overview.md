@@ -52,6 +52,8 @@ Several key architectural questions have been answered through analysis of the e
 
 **Streaming subscriptions are a separate operation type, not a variant of `execute()`.** Both Mongo change streams and SQL logical replication have real-time streaming models, but subscriptions don't complete — they run until closed. This is a different lifecycle from request-response queries and needs its own operation type with its own plugin hooks. The Mongo PoC doesn't implement subscriptions but must not prevent them. Streaming is validated in the SQL runtime workstream via Supabase Realtime ([VP5](../april-milestone.md#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)); the patterns established there will inform Mongo change stream support later.
 
+**The ORM Collection chaining API is a shared pattern across families.** The Phase 3 Mongo ORM client proved the contract carries enough information for typed queries, polymorphism, embedded documents, and referenced relations. A comparative analysis with the SQL ORM revealed that the consumer-facing surface — `Collection` class with fluent chaining (`.where().select().include().take().all()`), `CollectionState` as the accumulated query state, row type inference from `model.fields[f].codecId`, custom collection subclasses — is fundamentally the same pattern. Family-specific concerns are cleanly bounded to terminal method compilation (`CollectionState` → `SqlQueryPlan` vs `MongoQueryPlan`) and include resolution strategy (lateral joins vs `$lookup`). The Mongo ORM will adopt the same chaining API as the SQL ORM, with shared interface extraction following the "spike then extract" approach. See [ADR 4](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md) and [cross-cutting-learnings.md § 6](cross-cutting-learnings.md).
+
 ## What we don't know yet
 
 The open design questions are tracked in [design-questions.md](1-design-docs/design-questions.md). The most consequential ones:
@@ -64,7 +66,7 @@ The open design questions are tracked in [design-questions.md](1-design-docs/des
 
 **How does the ORM mutation surface accommodate Mongo's update operators?** `$inc`, `$push`, `$pull` have no SQL equivalent. The shared ORM `update()` can handle plain data (compiled to `$set`), but atomic operators need either family-specific extensions to the shared interface or separate methods. See [design question #4](1-design-docs/design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations).
 
-**How does `include` work for referenced relations?** SQL uses joins. Mongo uses application-level stitching or `$lookup` in an aggregation pipeline. Embedded relations don't need loading at all — they're always present. See [design question #7](1-design-docs/design-questions.md#7-relation-loading-application-level-joining-vs-lookup).
+**How does `include` work for referenced relations?** *(resolved)* Phase 3 proved the approach: referenced relations use `$lookup` aggregation pipeline stages, with `$unwind` for to-one cardinalities. Embedded relations are auto-projected — they're always present in the document, so no loading is needed. The `include` interface is shared across families; the resolution strategy differs (SQL: lateral joins / correlated subqueries / multi-query stitching; Mongo: `$lookup` pipeline). See [design question #7](1-design-docs/design-questions.md#7-relation-loading-application-level-joining-vs-lookup).
 
 **What does the aggregation pipeline lane look like?** In the SQL family, the SQL query builder is the escape hatch — when the ORM can't express a query, you drop into `db.sql.from(...)`. Aggregation pipelines fill the same architectural role for Mongo. The pattern is symmetric: each family has a high-level ORM client and a lower-level query builder lane for everything the ORM can't express, both sharing a session/transaction. The lane interface isn't shared across families (SQL lanes compile to SQL strings, Mongo lanes compile to pipeline stage arrays), but the architectural role and interop guarantees are the same. See [design question #8](1-design-docs/design-questions.md#8-aggregation-pipeline-dsl-scope-and-timing).
 
@@ -84,11 +86,17 @@ The full step-by-step plan, including architectural risks mapped to design quest
 
 ### Scope and status
 
-This work stream is [workstream 4](../april-milestone.md#4-mongodb-poc--validate-the-second-database-family) of the [April milestone](../april-milestone.md). The PoC plan currently covers the first phase (consumption-first vertical slice). The following are in-scope for April but not yet planned in detail — they will be added as project specs when the first phase answers the foundational questions:
+This work stream is [workstream 4](../april-milestone.md#4-mongodb-poc--validate-the-second-database-family) of the [April milestone](../april-milestone.md). Phases 1–3 of the PoC are complete:
+
+- **Phase 1** (execution pipeline): `MongoQueryPlan`, `MongoDriver`, `MongoRuntimeCore`, codecs, test infrastructure. See [mongo-execution-poc](../../projects/mongo-execution-poc/spec.md).
+- **Phase 2** (contract redesign): Domain/storage separation, polymorphism, aggregate roots. See [ADRs](adrs/).
+- **Phase 3** (minimal ORM client + contract validation): `validateMongoContract()`, `mongoOrm()` with typed `findMany`, equality filters, `$lookup` includes, embedded document projection, polymorphic queries. All acceptance criteria met. See [mongo-orm-poc](../../projects/mongo-orm-poc/spec.md) and [code review](../../projects/mongo-orm-poc/reviews/code-review.md).
+
+The following are in-scope for April but not yet planned in detail:
 
 - **Emitter pipeline generalization** — the authoring surfaces and emission process are coupled to SQL; this must be proven for Mongo before end of April
-- **ORM client** — the full `findMany`/`create`/`update`/`include` surface, built on top of the proven execution path and contract
-- **Shared ORM interface extraction** — extracted after both ORM clients work independently
+- **ORM client with shared Collection interface** — reimplement the Mongo ORM with the SQL ORM's fluent chaining API (`.where().select().include().take().all()`), following [ADR 4](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md). The Phase 3 options-bag API proved the contract shape; Phase 4 adopts the target API pattern.
+- **Shared ORM interface extraction** — after both families have working Collection implementations, extract the shared interface. Spike then extract per [ADR 4](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md).
 - **Cross-family consumer validation** — a consumer library working against both SQL and Mongo contracts without family-specific code
 
 ## Testing strategy
@@ -107,6 +115,7 @@ Mongo packages are split across two domains — family (abstractions) and target
 ```
 packages/2-mongo-family/
   1-core/            -- MongoContract types, MongoQueryPlan, MongoCodec interfaces
+  4-orm/             -- Mongo ORM client (findMany, include, polymorphic queries)
   5-runtime/         -- MongoRuntime, MongoPlugin interface
 
 packages/3-mongo-target/
@@ -131,6 +140,7 @@ Package boundaries are enforced by `pnpm lint:deps` — layering enforcement mus
 - [ADR 1 — Contract domain-storage separation](adrs/ADR%201%20-%20Contract%20domain-storage%20separation.md) — separating `model.fields` (domain) from `model.storage` (family-specific bridge)
 - [ADR 2 — Polymorphism via discriminator and variants](adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — emergent persistence strategy, rejected alternatives (`extends`, strategy labels)
 - [ADR 3 — Aggregate roots and relation strategies](adrs/ADR%203%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — explicit `roots` section, embedding as a relation property
+- [ADR 4 — Shared ORM Collection interface](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md) — fluent chaining as the shared ORM API, family-specific compilation at terminal methods
 
 **Cross-cutting learnings** — insights that affect the framework core:
 - [cross-cutting-learnings.md](cross-cutting-learnings.md) — design principles, domain model concepts, open contract design questions
