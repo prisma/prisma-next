@@ -11,13 +11,14 @@ import {
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or, shorthandToWhereExpr } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
-import { getTestContract } from './helpers';
+import { getTestContext, getTestContract } from './helpers';
 
 describe('filters', () => {
   const contract = getTestContract();
+  const context = getTestContext();
 
   it('and(), or(), not(), and all() use rich where objects', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
 
     const andExpr = and(user['name']!.eq('Alice'), user['email']!.neq('bob@example.com'));
     expect(andExpr).toEqual(
@@ -59,7 +60,7 @@ describe('filters', () => {
   });
 
   it('wraps scalar binary operators in NotExpr', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
 
     expect(not(user['id']!.neq(1))).toEqual(
       new NotExpr(BinaryExpr.neq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
@@ -82,7 +83,7 @@ describe('filters', () => {
   });
 
   it('wraps like and ilike in NotExpr', () => {
-    const user = createModelAccessor(contract, 'User');
+    const user = createModelAccessor(context, 'User');
 
     expect(not(user['name']!.like('%a%'))).toEqual(
       new NotExpr(BinaryExpr.like(ColumnRef.of('users', 'name'), LiteralExpr.of('%a%'))),
@@ -93,7 +94,7 @@ describe('filters', () => {
   });
 
   it('shorthandToWhereExpr() maps nulls, skips undefined, and combines multiple fields', () => {
-    const expr = shorthandToWhereExpr(contract, 'Post', {
+    const expr = shorthandToWhereExpr(context, 'Post', {
       id: 1,
       userId: null,
       views: undefined,
@@ -108,7 +109,7 @@ describe('filters', () => {
   });
 
   it('shorthandToWhereExpr() supports storage and model-name fallbacks', () => {
-    expect(shorthandToWhereExpr(contract, 'User', {})).toBeUndefined();
+    expect(shorthandToWhereExpr(context, 'User', {})).toBeUndefined();
 
     const withoutModelToTable = {
       ...contract,
@@ -118,8 +119,9 @@ describe('filters', () => {
       },
     } as typeof contract;
 
+    // Table resolves via modelToTable fallback; isNull is always available
     expect(
-      shorthandToWhereExpr(withoutModelToTable, 'User', {
+      shorthandToWhereExpr({ ...context, contract: withoutModelToTable } as never, 'User', {
         email: 'alice@example.com',
       }),
     ).toEqual(BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('alice@example.com')));
@@ -140,10 +142,12 @@ describe('filters', () => {
       },
     } as typeof contract;
 
+    // Table resolves to model name; field has no codec → fail-closed → no eq
+    // isNull is still available (traits: [])
     expect(
-      shorthandToWhereExpr(withoutMappings, 'User', {
-        unknownField: 123,
+      shorthandToWhereExpr({ ...context, contract: withoutMappings } as never, 'User', {
+        unknownField: null,
       } as never),
-    ).toEqual(BinaryExpr.eq(ColumnRef.of('User', 'unknownField'), LiteralExpr.of(123)));
+    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('User', 'unknownField')));
   });
 });

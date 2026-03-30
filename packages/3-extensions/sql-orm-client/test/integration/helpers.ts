@@ -1,7 +1,8 @@
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
-import { getTestContract } from '../helpers';
+import { getTestContext, getTestContract, type TestContract } from '../helpers';
 import {
   createPgIntegrationRuntime,
   type PgIntegrationRuntime,
@@ -11,23 +12,25 @@ import {
 export { timeouts };
 
 export function createUsersCollection(runtime: PgIntegrationRuntime) {
-  const contract = getTestContract();
-  return new Collection({ contract, runtime }, 'User');
+  return new Collection({ runtime, context: getTestContext() }, 'User');
 }
 
 export function createPostsCollection(runtime: PgIntegrationRuntime) {
-  const contract = getTestContract();
-  return new Collection({ contract, runtime }, 'Post');
+  return new Collection({ runtime, context: getTestContext() }, 'Post');
 }
 
+// Shallow spread is intentional — withReturningCapability only adds capabilities
+// without changing codec structure, so codecs/operations registries remain valid.
 export function createReturningUsersCollection(runtime: PgIntegrationRuntime) {
   const contract = withReturningCapability(getTestContract());
-  return new Collection({ contract, runtime }, 'User');
+  const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
+  return new Collection({ runtime, context }, 'User');
 }
 
 export function createReturningPostsCollection(runtime: PgIntegrationRuntime) {
   const contract = withReturningCapability(getTestContract());
-  return new Collection({ contract, runtime }, 'Post');
+  const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
+  return new Collection({ runtime, context }, 'Post');
 }
 
 export async function withCollectionRuntime(
