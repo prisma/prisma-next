@@ -1,8 +1,6 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import { mapDefault } from './default-mapping';
 import { toEnumName, toFieldName, toModelName, toNamedTypeName } from './name-transforms';
-import { extractEnumInfo } from './postgres-type-map';
-import { parseRawDefault } from './raw-default-parser';
 import { inferRelations } from './relation-inference';
 import type {
   PrintableSqlColumnDefault,
@@ -10,6 +8,7 @@ import type {
   PslPrintableSqlTable,
 } from './schema-validation';
 import type {
+  EnumInfo,
   PrinterField,
   PrinterModel,
   PrinterNamedType,
@@ -85,13 +84,14 @@ const PSL_SCALAR_TYPE_NAMES = new Set([
  * @returns A valid PSL string
  */
 export function printPsl(schemaIR: PslPrintableSqlSchemaIR, options: PslPrinterOptions): string {
-  const { typeMap, header, defaultMapping } = options;
+  const { typeMap, header, defaultMapping, enumInfo, parseRawDefault } = options;
   const headerComment = header ?? DEFAULT_HEADER;
 
-  // Extract enum info from annotations (single traversal)
-  const { typeNames: enumTypeNames, definitions: enumDefinitions } = extractEnumInfo(
-    schemaIR.annotations,
-  );
+  const emptyEnumInfo: EnumInfo = {
+    typeNames: new Set<string>(),
+    definitions: new Map<string, readonly string[]>(),
+  };
+  const { typeNames: enumTypeNames, definitions: enumDefinitions } = enumInfo ?? emptyEnumInfo;
 
   // Build model name mapping (db table name → PSL model name)
   const modelNames = buildTopLevelNameMap(
@@ -131,6 +131,7 @@ export function printPsl(schemaIR: PslPrintableSqlSchemaIR, options: PslPrinterO
       fieldNamesByTable,
       namedTypes,
       defaultMapping,
+      parseRawDefault,
       relationsByTable.get(table.name) ?? [],
     );
     models.push(model);
@@ -186,6 +187,7 @@ function processTable(
   fieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>,
   namedTypes: NamedTypeRegistry,
   defaultMapping: PslPrinterOptions['defaultMapping'],
+  rawDefaultParser: PslPrinterOptions['parseRawDefault'],
   relationFields: readonly RelationField[],
 ): PrinterModel {
   const { name: modelName, map: mapName } = toModelName(table.name);
@@ -257,7 +259,7 @@ function processTable(
     // Default value
     let comment: string | undefined;
     if (column.default !== undefined) {
-      const parsed = parseDefaultIfNeeded(column.default, column.nativeType);
+      const parsed = parseDefaultIfNeeded(column.default, column.nativeType, rawDefaultParser);
       if (parsed) {
         const result = mapDefault(parsed, defaultMapping);
         if ('attribute' in result) {
@@ -399,9 +401,13 @@ function processTable(
 
 function parseDefaultIfNeeded(
   value: PrintableSqlColumnDefault,
-  nativeType?: string,
+  nativeType: string | undefined,
+  rawDefaultParser: PslPrinterOptions['parseRawDefault'],
 ): ColumnDefault | undefined {
-  return typeof value === 'string' ? parseRawDefault(value, nativeType) : value;
+  if (typeof value === 'string') {
+    return rawDefaultParser ? rawDefaultParser(value, nativeType) : undefined;
+  }
+  return value;
 }
 
 function formatFieldConstraintAttribute(

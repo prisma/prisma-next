@@ -3,7 +3,8 @@ import { printPsl } from '@prisma-next/psl-printer';
 import {
   createPostgresDefaultMapping,
   createPostgresTypeMap,
-  extractEnumTypeNames,
+  extractEnumInfo,
+  parseRawDefault,
 } from '@prisma-next/psl-printer/postgres';
 import { ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -59,10 +60,12 @@ async function executeContractInferCommand(
 
   const { config, schema, target, meta } = inspectResult.value;
   const outputPath = resolveContractInferOutputPath(options, config.contract?.output);
-  const enumTypeNames = extractEnumTypeNames(schema.annotations);
+  const enumInfo = extractEnumInfo(schema.annotations);
   const pslContent = printPsl(schema, {
     defaultMapping: createPostgresDefaultMapping(),
-    typeMap: createPostgresTypeMap(enumTypeNames),
+    typeMap: createPostgresTypeMap(enumInfo.typeNames),
+    enumInfo,
+    parseRawDefault,
   });
 
   if (existsSync(outputPath) && !flags.json && !flags.quiet) {

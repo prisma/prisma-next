@@ -5,4 +5,4 @@ export type {
   PslPrintableSqlTable,
 } from '../schema-validation';
 export { validatePrintableSqlSchemaIR } from '../schema-validation';
-export type { PslPrinterOptions, PslTypeMap, PslTypeResolution } from '../types';
+export type { EnumInfo, PslPrinterOptions, PslTypeMap, PslTypeResolution } from '../types';

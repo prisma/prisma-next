@@ -1,11 +1,14 @@
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresDefaultMapping } from '../src/postgres-default-mapping';
-import { createPostgresTypeMap, extractEnumTypeNames } from '../src/postgres-type-map';
+import { createPostgresTypeMap, extractEnumInfo } from '../src/postgres-type-map';
+import { parseRawDefault } from '../src/raw-default-parser';
 
 export function makeOptions(schemaIR: SqlSchemaIR) {
-  const enumTypeNames = extractEnumTypeNames(schemaIR.annotations);
+  const enumInfo = extractEnumInfo(schemaIR.annotations);
   return {
     defaultMapping: createPostgresDefaultMapping(),
-    typeMap: createPostgresTypeMap(enumTypeNames),
+    typeMap: createPostgresTypeMap(enumInfo.typeNames),
+    enumInfo,
+    parseRawDefault,
   };
 }

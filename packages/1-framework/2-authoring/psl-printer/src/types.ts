@@ -30,12 +30,24 @@ export interface PslTypeMap {
 }
 
 /**
+ * Pre-extracted enum information from target-specific annotations.
+ */
+export interface EnumInfo {
+  readonly typeNames: ReadonlySet<string>;
+  readonly definitions: ReadonlyMap<string, readonly string[]>;
+}
+
+/**
  * Options for the PSL printer.
  */
 export interface PslPrinterOptions {
   readonly typeMap: PslTypeMap;
   readonly header?: string;
   readonly defaultMapping?: DefaultMappingOptions;
+  /** Pre-extracted enum info. Required for schemas with enum types. */
+  readonly enumInfo?: EnumInfo;
+  /** Target-specific parser for raw default expressions (e.g., Postgres SQL dialect). */
+  readonly parseRawDefault?: (rawDefault: string, nativeType?: string) => ColumnDefault | undefined;
 }
 
 /**

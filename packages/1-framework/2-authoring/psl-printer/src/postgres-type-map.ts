@@ -1,4 +1,4 @@
-import type { PslNativeTypeAttribute, PslTypeMap, PslTypeResolution } from './types';
+import type { EnumInfo, PslNativeTypeAttribute, PslTypeMap, PslTypeResolution } from './types';
 
 /**
  * Reverse mapping from Postgres native types to PSL scalar types.
@@ -157,10 +157,7 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
   };
 }
 
-export type EnumInfo = {
-  readonly typeNames: ReadonlySet<string>;
-  readonly definitions: ReadonlyMap<string, readonly string[]>;
-};
+export type { EnumInfo };
 
 /**
  * Extracts enum type names and definitions from SqlSchemaIR annotations

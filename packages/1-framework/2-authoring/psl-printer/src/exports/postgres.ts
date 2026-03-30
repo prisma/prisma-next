@@ -5,3 +5,4 @@ export {
   extractEnumInfo,
   extractEnumTypeNames,
 } from '../postgres-type-map';
+export { parseRawDefault } from '../raw-default-parser';
