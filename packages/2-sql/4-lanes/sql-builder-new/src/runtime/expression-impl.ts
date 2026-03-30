@@ -1,6 +1,7 @@
 import type { AnyExpression as AstExpression } from '@prisma-next/sql-relational-core/ast';
 import type { Expression } from '../expression';
-import { ExpressionType, type ScopeField } from '../scope';
+// biome-ignore lint/correctness/noUnusedImports: used in `declare` property
+import type { ExpressionType, ScopeField } from '../scope';
 
 /**
  * Runtime wrapper around a relational-core AST expression node.
@@ -12,7 +13,6 @@ export class ExpressionImpl<T extends ScopeField = ScopeField> implements Expres
   readonly field: T;
 
   constructor(ast: AstExpression, field: T) {
-    this[ExpressionType] = field;
     this.ast = ast;
     this.field = field;
   }

@@ -26,10 +26,11 @@ import type {
   IncludeRefinementValue,
   IsToManyRelation,
   RowSelection,
+  // biome-ignore lint/correctness/noUnusedImports: used in `declare` property
+  RowType,
   WithOrderByState,
   WithWhereState,
 } from './collection-internal-types';
-import { RowType } from './collection-internal-types';
 import {
   dispatchMutationRows,
   executeMutationReturningSingleRow,
