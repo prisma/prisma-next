@@ -60,38 +60,24 @@ function validateGroupedMetricExpr(expr: AnyExpression): AggregateExpr {
   return expr;
 }
 
+function rejectHavingExpr(expr: { kind: string }): never {
+  throw new Error(`Unsupported grouped having expression kind "${expr.kind}"`);
+}
+
 function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
   return expr.accept<AnyExpression>({
-    columnRef(expr) {
-      return expr;
+    columnRef: rejectHavingExpr,
+    identifierRef: rejectHavingExpr,
+    subquery: rejectHavingExpr,
+    operation: rejectHavingExpr,
+    aggregate: rejectHavingExpr,
+    jsonObject: rejectHavingExpr,
+    jsonArrayAgg: rejectHavingExpr,
+    literal: rejectHavingExpr,
+    param() {
+      throw new Error('ParamRef is not supported in grouped having expressions');
     },
-    identifierRef(expr) {
-      return expr;
-    },
-    subquery(expr) {
-      return expr;
-    },
-    operation(expr) {
-      return expr;
-    },
-    aggregate(expr) {
-      return expr;
-    },
-    jsonObject(expr) {
-      return expr;
-    },
-    jsonArrayAgg(expr) {
-      return expr;
-    },
-    literal(expr) {
-      return expr;
-    },
-    param(expr) {
-      return expr;
-    },
-    list(expr) {
-      return expr;
-    },
+    list: rejectHavingExpr,
     and(expr) {
       return AndExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
     },

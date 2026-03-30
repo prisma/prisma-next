@@ -36,19 +36,19 @@ function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: AnyExpressio
       return expr;
     },
     subquery(expr) {
-      return expr;
+      return bindExpression(contract, expr);
     },
     operation(expr) {
-      return expr;
+      return bindExpression(contract, expr);
     },
     aggregate(expr) {
-      return expr;
+      return bindExpression(contract, expr);
     },
     jsonObject(expr) {
-      return expr;
+      return bindExpression(contract, expr);
     },
     jsonArrayAgg(expr) {
-      return expr;
+      return bindExpression(contract, expr);
     },
     literal(expr) {
       return expr;
@@ -57,7 +57,7 @@ function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: AnyExpressio
       return expr;
     },
     list(expr) {
-      return expr;
+      return bindExpression(contract, expr);
     },
     binary(expr) {
       const left = bindExpression(contract, expr.left);
