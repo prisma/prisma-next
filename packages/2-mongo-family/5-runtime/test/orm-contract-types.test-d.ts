@@ -1,6 +1,6 @@
 import type { InferModelRow } from '@prisma-next/mongo-core';
 import { expectTypeOf, test } from 'vitest';
-import type { Contract } from './fixtures/orm-contract';
+import type { Contract } from '../../1-core/test/fixtures/orm-contract';
 
 test('roots maps accessor names to model names', () => {
   type Roots = Contract['roots'];
