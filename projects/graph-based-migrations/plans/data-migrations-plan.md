@@ -72,16 +72,13 @@ The router collects data migration names along paths and selects paths that sati
 
 **Tasks:**
 
-- [ ] Extend `MigrationChainEntry` (or the migration manifest) to carry data migration metadata: `dataMigration?: { name: string; contentHash: string }`
+- [ ] Extend `MigrationChainEntry` (or the migration manifest) to carry data migration metadata: `dataMigration?: { name: string }`
 - [ ] Update `reconstructGraph` to include data migration metadata from migration packages
 - [ ] Extend `findPath` / `findPathWithDecision` to collect data migration names along candidate paths
 - [ ] Implement invariant-aware path selection: filter paths by required invariants from ref, prefer paths with more invariants, tie-break by existing rules
 - [ ] Write tests for routing: path with required invariant selected over shorter path without; when no invariants required, path with more data migrations preferred; no path satisfying invariants → clear error
-- [ ] Extend ledger insert to record data migration name and content hash in the existing `operations` JSONB field (no schema change needed)
-- [ ] Implement content hash computation: hash full `data-migration.ts` source file
-- [ ] Implement drift detection: on apply, compare content hash with previously recorded hash for same-named migration in ledger. Emit warning if code changed since last apply.
+- [ ] Extend ledger insert to record data migration name in the existing `operations` JSONB field (no schema change needed)
 - [ ] Implement invariant querying from ledger: derive "which invariants are satisfied for this database" by querying ledger for completed edges that carried data migrations
-- [ ] Write tests for drift detection: same hash → no warning; different hash → warning emitted; first apply → no comparison
 - [ ] Update `migration status` to display data migration information: which edges have data migrations, invariant status per ref
 - [ ] Update `migration plan` output to show data migration slot in the operation list with transaction mode
 - [ ] E2E test: graph with two paths to same hash, one with data migration, one without. Router selects data-migration path when invariant required. Both paths available when no invariant required but data-migration path preferred.
@@ -121,7 +118,6 @@ Validate all acceptance criteria, finalize documentation, clean up.
 | Phase 1 skipped on retry via idempotency | Integration | M1 | Postchecks pass on re-run |
 | `check` skip on retry | Integration | M1 | check returns true → run skipped |
 | Data migration name recorded in ledger | Integration | M3 | Ledger query after apply |
-| Content hash drift → warning | Integration | M3 | Apply after code change |
 | Router selects invariant-satisfying path | Integration | M3 | Multi-path graph test |
 | Prefer more invariants when none required | Integration | M3 | Multi-path graph test |
 | Ref declares required invariants | Integration | M3 (+ prereq P1) | Ref format test |
