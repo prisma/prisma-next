@@ -8,13 +8,13 @@ Prisma Next's architecture was built for SQL. Every interface a consumer touches
 
 MongoDB is the test case. If PN can support MongoDB without breaking its core abstractions, the architecture generalizes. If it can't, we'd rather discover that now — before stabilizing interfaces for external contributors — than after.
 
-MongoDB is also a strategic target. The [MongoDB engineering team's feature gap analysis](9-references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) and [user journey](9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) show that Prisma ORM's current Mongo support has significant gaps: no embedded document support, polymorphic fields fall back to untyped `Json`, no change streams, no aggregation pipeline access, and no data migrations. PN has an opportunity to offer a genuinely Mongo-native experience.
+MongoDB is also a strategic target. The [feature gap analysis](../../reference/mongodb-feature-support-priorities.md) and [user journey](../../reference/mongodb-user-journey.md) show that Prisma ORM's current Mongo support has significant gaps: no embedded document support, polymorphic fields fall back to untyped `Json`, no change streams, no aggregation pipeline access, and no data migrations. PN has an opportunity to offer a genuinely Mongo-native experience.
 
 ## What makes MongoDB different
 
 MongoDB's data model is fundamentally different from SQL in ways that stress every layer of the PN stack:
 
-**Embedded documents replace joins.** The idiomatic MongoDB pattern is to store related data inside the parent document — a User contains an Address, a Post contains its Comments. There's no SQL equivalent. This blurs the line between "relation" and "field" in PN's contract model, and changes how the ORM loads and mutates related data. See [mongodb-primitives-reference.md](9-references/mongodb-primitives-reference.md) and [mongo-idioms.md](9-references/mongo-idioms.md).
+**Embedded documents replace joins.** The idiomatic MongoDB pattern is to store related data inside the parent document — a User contains an Address, a Post contains its Comments. There's no SQL equivalent. This blurs the line between "relation" and "field" in PN's contract model, and changes how the ORM loads and mutates related data. See [MongoDB primitives reference](../../reference/mongodb-primitives-reference.md) and [MongoDB idioms](../../reference/mongodb-idioms.md).
 
 **No schema enforcement by default.** MongoDB doesn't enforce types at the storage level. A field declared as `number` in the contract might contain a string in the database. PN's contract guarantees are aspirational, not structurally enforced — the runtime must decide what to do when reality doesn't match the contract.
 
@@ -150,10 +150,11 @@ Package boundaries are enforced by `pnpm lint:deps` — layering enforcement mus
 - [cross-cutting-learnings.md](cross-cutting-learnings.md) — design principles, domain model concepts, open contract design questions
 
 **Reference material** — context, read as needed:
-- [mongodb-primitives-reference.md](9-references/mongodb-primitives-reference.md) — MongoDB's data model, type system, query language, and transactions
-- [mongo-idioms.md](9-references/mongo-idioms.md) — patterns experienced MongoDB developers use and expect
+- [MongoDB primitives reference](../../reference/mongodb-primitives-reference.md) — MongoDB's data model, type system, query language, and transactions
+- [MongoDB idioms](../../reference/mongodb-idioms.md) — patterns experienced MongoDB developers use and expect
 - [example-schemas.md](1-design-docs/example-schemas.md) — three concrete schemas with speculative PSL and query patterns
-- [9-references/](9-references/) — external documents from the MongoDB engineering team
+- [MongoDB user journey](../../reference/mongodb-user-journey.md) — typical developer experience and friction points
+- [MongoDB feature support priorities](../../reference/mongodb-feature-support-priorities.md) — prioritized feature inventory
 
 **Plan** — sequencing and risks:
 - [mongo-poc-plan.md](1-design-docs/mongo-poc-plan.md) — PoC steps, follow-on steps, and architectural risks
