@@ -41,7 +41,7 @@ export interface PslDefaultLiteralValue {
 
 export type PslDefaultValue = PslDefaultFunctionValue | PslDefaultLiteralValue;
 
-export type PslAttributeTarget = 'field' | 'model' | 'namedType';
+export type PslAttributeTarget = 'field' | 'model' | 'enum' | 'namedType';
 
 export interface PslAttributePositionalArgument {
   readonly kind: 'positional';
@@ -113,6 +113,7 @@ export interface PslEnum {
   readonly kind: 'enum';
   readonly name: string;
   readonly values: readonly PslEnumValue[];
+  readonly attributes: readonly PslAttribute[];
   readonly span: PslSpan;
 }
 

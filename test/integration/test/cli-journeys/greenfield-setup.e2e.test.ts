@@ -5,7 +5,7 @@
  * the full initialization lifecycle: emit a contract, dry-run the init to
  * preview planned operations, apply it for real, confirm idempotency on
  * re-run, then verify the marker and schema (tolerant and strict). Finishes
- * with introspection and JSON output variants of full and schema-only verify.
+ * with schema inspection and JSON output variants of full and schema-only verify.
  */
 
 import stripAnsi from 'strip-ansi';
@@ -16,7 +16,7 @@ import {
   parseJsonOutput,
   runContractEmit,
   runDbInit,
-  runDbIntrospect,
+  runDbSchema,
   runDbVerify,
   setupJourney,
   sql,
@@ -29,7 +29,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'emit → init → verify → introspect (full greenfield workflow)',
+      'emit → init → verify → schema inspection (full greenfield workflow)',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -87,10 +87,10 @@ withTempDir(({ createTempDir }) => {
         const schemaVerifyStrict = await runDbVerify(ctx, ['--strict']);
         expect(schemaVerifyStrict.exitCode, 'A.07: db verify strict').toBe(0);
 
-        // A.08: db introspect
-        const introspect = await runDbIntrospect(ctx);
-        expect(introspect.exitCode, 'A.08: db introspect').toBe(0);
-        expect(stripAnsi(introspect.stdout), 'A.08: shows user table').toContain('user');
+        // A.08: db schema
+        const schema = await runDbSchema(ctx);
+        expect(schema.exitCode, 'A.08: db schema').toBe(0);
+        expect(stripAnsi(schema.stdout), 'A.08: shows user table').toContain('user');
 
         // A.09: db verify --json
         const verifyJson = await runDbVerify(ctx, ['--json']);

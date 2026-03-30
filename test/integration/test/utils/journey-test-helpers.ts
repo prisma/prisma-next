@@ -8,8 +8,9 @@
 
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
+import { createContractInferCommand } from '@prisma-next/cli/commands/contract-infer';
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
-import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
+import { createDbSchemaCommand } from '@prisma-next/cli/commands/db-schema';
 import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
@@ -42,6 +43,8 @@ export interface JourneySetupOptions {
   connectionString?: string;
   /** Function to create a temp directory (from withTempDir). */
   createTempDir: () => string;
+  /** Which contract source mode the config should use. */
+  contractMode?: 'ts' | 'psl';
 }
 
 /** Context object returned by setupJourney and used by all run* helpers. */
@@ -120,19 +123,27 @@ const JOURNEY_FIXTURES_DIR = join(
  * The config's `{{DB_URL}}` placeholder is replaced with the connection string.
  */
 export function setupJourney(options: JourneySetupOptions): JourneyContext {
-  const { connectionString, createTempDir } = options;
+  const { connectionString, createTempDir, contractMode = 'ts' } = options;
 
   const testDir = createTempDir();
   const outputDir = join(testDir, 'output');
   mkdirSync(outputDir, { recursive: true });
   mkdirSync(join(testDir, 'migrations'), { recursive: true });
 
-  // Copy base contract
-  copyFileSync(join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'), join(testDir, 'contract.ts'));
+  if (contractMode === 'psl') {
+    copyFileSync(
+      join(JOURNEY_FIXTURES_DIR, 'contract-base.prisma'),
+      join(testDir, 'contract.prisma'),
+    );
+  } else {
+    copyFileSync(join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'), join(testDir, 'contract.ts'));
+  }
 
   // Copy and process config
   const configFileName = connectionString
-    ? 'prisma-next.config.with-db.ts'
+    ? contractMode === 'psl'
+      ? 'prisma-next.config.with-db.psl.ts'
+      : 'prisma-next.config.with-db.ts'
     : 'prisma-next.config.ts';
   let configContent = readFileSync(join(JOURNEY_FIXTURES_DIR, configFileName), 'utf-8');
   if (connectionString) {
@@ -168,6 +179,13 @@ export const contractFixtures = {
 
 export type ContractVariant = keyof typeof contractFixtures;
 
+export const pslContractFixtures = {
+  'contract-base': join(JOURNEY_FIXTURES_DIR, 'contract-base.prisma'),
+  'contract-additive': join(JOURNEY_FIXTURES_DIR, 'contract-additive.prisma'),
+} as const;
+
+export type PslContractVariant = keyof typeof pslContractFixtures;
+
 /**
  * Swaps the active contract in the test directory to a different variant.
  * Copies the variant file over `contract.ts` so the config picks it up on next emit.
@@ -175,6 +193,16 @@ export type ContractVariant = keyof typeof contractFixtures;
 export function swapContract(ctx: JourneyContext, variant: ContractVariant): void {
   const src = contractFixtures[variant];
   const dest = join(ctx.testDir, 'contract.ts');
+  copyFileSync(src, dest);
+}
+
+/**
+ * Swaps the active PSL contract in the test directory to a different variant.
+ * Copies the variant file over `contract.prisma` so the PSL-backed config picks it up.
+ */
+export function swapPslContract(ctx: JourneyContext, variant: PslContractVariant): void {
+  const src = pslContractFixtures[variant];
+  const dest = join(ctx.testDir, 'contract.prisma');
   copyFileSync(src, dest);
 }
 
@@ -260,6 +288,13 @@ export async function runContractEmit(
   return runCommand(createContractEmitCommand(), ctx, extraArgs, options);
 }
 
+export async function runContractInfer(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createContractInferCommand(), ctx, extraArgs);
+}
+
 export async function runDbInit(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
@@ -288,11 +323,11 @@ export async function runDbSign(
   return runCommand(createDbSignCommand(), ctx, extraArgs);
 }
 
-export async function runDbIntrospect(
+export async function runDbSchema(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
-  return runCommand(createDbIntrospectCommand(), ctx, extraArgs);
+  return runCommand(createDbSchemaCommand(), ctx, extraArgs);
 }
 
 export async function runMigrationPlan(
