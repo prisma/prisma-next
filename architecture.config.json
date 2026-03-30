@@ -227,6 +227,48 @@
       "domain": "extensions",
       "layer": "adapters",
       "plane": "shared"
+    },
+    {
+      "glob": "packages/2-mongo-family/1-core/**",
+      "domain": "mongo",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/2-mongo-family/4-orm/**",
+      "domain": "mongo",
+      "layer": "orm",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/2-mongo-family/5-runtime/**",
+      "domain": "mongo",
+      "layer": "runtime",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-mongo-target/1-mongo-target/src/exports/pack.ts",
+      "domain": "extensions",
+      "layer": "targets",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-mongo-target/2-mongo-adapter/src/core/**",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-mongo-target/2-mongo-adapter/src/exports/**",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-mongo-target/3-mongo-driver/**",
+      "domain": "targets",
+      "layer": "drivers",
+      "plane": "runtime"
     }
   ],
   "rules": {
@@ -246,16 +288,16 @@
       "mayImportFrom": ["framework"],
       "reason": "SQL domain may import only from framework domain"
     },
-    "document": {
+    "mongo": {
       "mayImportFrom": ["framework"],
-      "reason": "Document domain may import only from framework domain"
+      "reason": "Mongo domain may import only from framework domain"
     },
     "targets": {
-      "mayImportFrom": ["framework", "sql"],
-      "reason": "Targets domain may import from framework and sql domains"
+      "mayImportFrom": ["framework", "sql", "mongo"],
+      "reason": "Targets domain may import from framework, sql, and mongo domains"
     },
     "extensions": {
-      "mayImportFrom": ["framework", "sql", "document", "targets", "extensions"],
+      "mayImportFrom": ["framework", "sql", "mongo", "targets", "extensions"],
       "reason": "Extensions domain may import from any domain"
     }
   },
@@ -279,6 +321,7 @@
   "crossDomainExceptions": [],
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-executor"],
-    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"]
+    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"],
+    "mongo": ["core", "orm", "runtime"]
   }
 }

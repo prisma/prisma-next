@@ -1,0 +1,320 @@
+# MongoDB Work Stream — Open Design Questions
+
+Design questions surfaced during the exploration of MongoDB primitives and their mapping to Prisma Next's architecture. These are questions where the answer is non-obvious, involves real trade-offs, or requires spiking to resolve. Grouped by theme.
+
+See also: [mongodb-primitives-reference.md](../9-references/mongodb-primitives-reference.md), [mongo-poc-plan.md](mongo-poc-plan.md), [user-promise.md](user-promise.md)
+
+**External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](../9-references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv) and a [user journey narrative](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md). Where their priorities or observations surface new tensions, they're noted inline.
+
+---
+
+## 1. Embedded documents *(resolved — cross-family concern)*
+
+**Answer**: Embedding is a relation property. The parent model's relation declares `"strategy": "embed"` (vs `"reference"` for cross-collection/cross-table). The embedded model appears as a sibling in `models` with its own `fields` and `storage` block (field mappings but no table/collection name). The embedded model doesn't know where it's embedded — that's on the parent's relation.
+
+This is a cross-family concern: SQL typed JSON/JSONB columns are the same contract-level problem (structured data nested in a parent entity). Both families need type-safe dot-notation queries, TypeScript type generation, and reusability across models. The difference is convention (Mongo: embedding is idiomatic; SQL: JSON columns are an escape hatch), not capability.
+
+Value types (Address, GeoPoint) without identity are a separate concept — they belong in a `types`/`composites` section, not `models`. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the entity vs value type distinction.
+
+**Still open**: relation storage details for embedding. A relation with `"strategy": "embed"` needs to know which field in the parent document holds the embedded data. The exact shape isn't designed yet.
+
+---
+
+## 2. Referential integrity enforcement
+
+MongoDB provides **no foreign key constraints, no cascading deletes, no referential integrity guarantees**. Every reference is a manual link that the application must maintain.
+
+**The question**: What level of referential integrity does PN enforce for document databases, and where in the stack?
+
+Sub-questions:
+- **Cascading deletes**: When the user deletes a `User`, should PN automatically delete or nullify their `Post` references? The SQL ORM already orchestrates multi-statement cascades in `mutation-executor.ts` — the Mongo equivalent would issue `deleteMany` / `updateMany` on related collections. But Mongo's single-document atomicity means embedded deletes are atomic (no cascade needed), while cross-collection cascades are not atomic without a multi-document transaction.
+- **Orphan prevention**: Should PN reject a delete if it would create dangling references (the SQL `RESTRICT` equivalent)? This requires a read-before-delete check.
+- **Relation semantics in the contract**: The contract can declare `onDelete: cascade | restrict | setNull | noAction`. For SQL, the database enforces these. For Mongo, PN must enforce them. Does the contract express the same semantics for both families, with enforcement location being an implementation detail?
+
+Tensions:
+- Enforcement adds real value (this is one of the strongest reasons to use PN with Mongo). But it also means PN mutations become multi-step (read references → delete/update → delete target), which is slower and requires multi-document transactions for atomicity on cross-collection operations.
+- Users who chose Mongo for its flexibility may not want PN enforcing constraints they didn't ask for. This suggests the enforcement level should be configurable (per-relation or globally).
+
+---
+
+## 3. Execution plan generalization *(resolved)*
+
+The runtime's `ExecutionPlan` currently has `sql: string` and `params: unknown[]`. The runtime core passes `{ sql: plan.sql, params: plan.params }` to the driver's `execute` method.
+
+**The question**: How does the execution plan generalize to accommodate non-SQL query shapes?
+
+**Answer: it doesn't generalize at the query level. Each family has its own plan type, plugin interface, and runtime.** The shared surface is the plugin lifecycle (beforeExecute → onRow → afterExecute) and metadata (`PlanMeta`), not the query payload.
+
+Analysis of the existing SQL plugins proves that generalization is impractical:
+- The **budgets plugin** reads `plan.sql`, calls `driver.explain({ sql, params })`, and parses the SQL string to detect SELECT statements.
+- The **lints plugin** checks `plan.ast instanceof QueryAst` and pattern-matches on SQL AST node types (`DeleteAst`, `UpdateAst`, `SelectAst`).
+
+Any generalization of `ExecutionPlan` (union type, generic type parameter, or base type) either forces every plugin to branch on family, strips the plan to useless metadata, or adds complexity without enabling reuse. Plugins do useful work by inspecting family-specific query payloads — that work is inherently family-specific.
+
+The Mongo PoC will build its own `MongoQueryPlan`, `MongoRuntimeCore`, `MongoPlugin`, and `MongoDriver`. Cross-family plugins that only need timing/metadata can be extracted after both runtimes exist.
+
+See [mongo-execution-components.md](mongo-execution-components.md) for the component breakdown and rationale.
+
+---
+
+## 4. Update operators: shared ORM surface vs. Mongo-native operations
+
+SQL updates are "set field = value" operations. MongoDB updates use operators (`$set`, `$inc`, `$push`, `$pull`, `$addToSet`, etc.) that express field-level mutations.
+
+**The question**: How does the ORM mutation surface accommodate Mongo's update operators?
+
+Layers:
+- **Basic updates map naturally.** `db.users.where({ id }).update({ name: "Bob" })` → `{ $set: { name: "Bob" } }`. This works today with the shared ORM interface.
+- **Atomic operators are Mongo-native.** `$inc` (increment without read-modify-write), `$push` (append to array), `$pull` (remove from array), `$addToSet` (append unique) — these have no SQL equivalent and express operations that are fundamentally different from "set field = value."
+
+Options:
+- **Shared ORM surface only**: The ORM's `update()` method always takes a plain data object. The Mongo adapter translates `{ views: 1 }` into `{ $set: { views: 1 } }`. Atomic operators are not exposed — users who want `$inc` must use a lower-level escape hatch (raw commands or a document query DSL).
+- **Family-specific ORM extensions**: The document ORM client's `update()` accepts an extended input type with operator helpers: `{ views: { $inc: 1 }, tags: { $push: "new" } }`. The shared interface still accepts plain data; the extensions are additive.
+- **Separate mutation methods**: `db.users.where({ id }).increment({ views: 1 })`, `db.users.where({ id }).push("tags", "new")`. Mongo-native operations become explicit ORM methods.
+
+Tensions:
+- Atomic operators are a major part of the Mongo-native experience. `$inc` avoids a read-modify-write cycle and is one of Mongo's key advantages for high-contention data. Not exposing these through the ORM would be a significant DX gap.
+- But extending the shared ORM interface with Mongo-specific operators means the interface is no longer truly shared. Consumer libraries that generate mutations would need to know about document-specific update shapes.
+- The SQL ORM already has family-specific behavior (e.g. `RETURNING` clause, upsert conflict resolution). Update operators may be another case of "shared interface, family-specific extensions."
+
+---
+
+## 5. Schema validation and read-time guarantees
+
+MongoDB doesn't enforce types — a field declared as `number` in the contract might contain a string in the database. Documents may not match the contract for many reasons: pre-existing data, direct writes bypassing PN, schema evolution.
+
+**The question**: What does PN guarantee about data returned from reads?
+
+Options:
+- **Validate on read, error on mismatch (strict)**: Reject documents that don't match the contract. Consistent with the runtime's existing `mode: 'strict'`. Risk: breaks reads on legacy data.
+- **Validate on read, warn on mismatch (permissive)**: Return the data but emit a diagnostic. The user sees their data, but gets notified of schema drift. The diagnostic channel is the runtime's log infrastructure — whether it pipes to error monitoring is the user's concern.
+- **Validate on write only**: Trust reads, validate writes. PN guarantees what it writes is correct; existing data is the user's problem. Lightest approach.
+- **Coerce where possible**: If the contract says `age: Int` and the doc has `age: "30"`, coerce it. This is what Mongoose does.
+
+Tensions:
+- Strict validation on reads is the most correct behavior but may be impractical for users migrating from untyped Mongo usage — their existing data won't match the contract.
+- The runtime already has `mode: 'strict' | 'permissive'`. This is a natural place to control read validation behavior.
+- Coercion is convenient but lossy — it silently changes semantics. A string `"30"` and an integer `30` behave differently in comparisons, sorting, and aggregation.
+
+Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB collections? This would give database-level write enforcement, complementing application-level validation.
+
+---
+
+## 6. Polymorphism and discriminated unions *(resolved — validate implementation in April)*
+
+**Answer**: `discriminator` + `variants` on the base model, `base` on each variant, with all models as siblings in `models`.
+
+```json
+{
+  "Task": {
+    "fields": {
+      "id": { "nullable": false, "codecId": "pg/int4@1" },
+      "title": { "nullable": false, "codecId": "pg/text@1" },
+      "type": { "nullable": false, "codecId": "pg/text@1" }
+    },
+    "discriminator": { "field": "type" },
+    "variants": { "Bug": { "value": "bug" }, "Feature": { "value": "feature" } },
+    "storage": { "table": "tasks", "fields": { ... } }
+  },
+  "Bug": {
+    "base": "Task",
+    "fields": { "severity": { "nullable": false, "codecId": "pg/text@1" } },
+    "storage": { "table": "tasks", "fields": { ... } }
+  }
+}
+```
+
+The relationship is bidirectional: `Task.variants` lists its specializations, `Bug.base` names the model it specializes. We use specialization/generalization terminology — `base` describes a structural fact without OOP inheritance baggage.
+
+The persistence strategy is **emergent**: if Bug's storage points to the same table/collection as Task → STI. If it points to a different one → MTI. The domain declaration doesn't change; only the storage mappings do. The contract describes facts ("Bug is a specialization of Task, discriminated by `type`") — the ORM decides how to represent it at runtime.
+
+All persistence-level polymorphism reduces to "multiple shapes, distinguished by a field." This is fundamental enough to be a contract primitive. See [cross-cutting-learnings.md § learning #4](../cross-cutting-learnings.md) for the full design.
+
+This is a cross-family concern — both SQL and MongoDB need discriminated unions. The MongoDB team rates "Inheritance and Polymorphism" as **High priority** ([user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md)).
+
+### Storage-level mapping
+
+| Pattern | SQL storage | MongoDB storage |
+|---|---|---|
+| Model inheritance (STI) | One table, discriminator column, nullable type-specific columns | One collection, discriminator field, variant-specific fields present/absent |
+| Model inheritance (multi-table) | Base table + extension tables with FK | N/A (Mongo doesn't have joins built-in; embed instead) |
+| Polymorphic embedded field | `Json` column (loses type safety) or separate tables | Embedded subdocument with discriminator field |
+| Mixed-type array | Not idiomatic (junction table + discriminator) | Native — array of variant subdocuments |
+
+### What to validate in April
+
+At minimum:
+- The contract can express a discriminated union (base model + variants with a discriminator field).
+- The emitter produces TypeScript types that narrow correctly based on the discriminator.
+- The ORM client can query a polymorphic collection/table and return narrowed types.
+- The storage mapping works for at least STI (one table/collection, discriminator column/field).
+
+Rough edges are acceptable — exhaustive pattern matching, complex nested unions, and multi-table inheritance can wait.
+
+### Still open: polymorphic associations
+
+A `Comment` that can belong to either a `Post` or a `Video` (distinguished by `commentable_type`) is polymorphism on the *relation*, not the model. The `relations` section would need to express "this relation can point to one of several models." Not yet designed.
+
+---
+
+## 7. Relation loading: application-level joining vs. `$lookup`
+
+When the user asks to load a `User` and include their `Posts` (a referenced 1:N relation), there are two strategies.
+
+**The question**: Which strategy does the PN document ORM use, and when?
+
+Options:
+- **Application-level joining**: Issue `find()` for users, then `find()` for posts where `authorId` is in the user ID set, stitch in JS. This is what the SQL ORM already does for includes, and what Prisma ORM does for Mongo.
+- **`$lookup` in aggregation pipeline**: Build a pipeline with a `$lookup` stage that joins users and posts server-side. More efficient for large result sets, but requires the ORM to compile to aggregation pipelines rather than simple `find()` calls.
+
+Tensions:
+- Application-level joining is simpler to implement and reuses existing patterns. But it requires N+1 queries (or 2 queries with an `$in` batch) and moves data over the wire that `$lookup` would handle server-side.
+- `$lookup` is more efficient but forces the ORM's query compilation to target aggregation pipelines for any query involving includes. This is a bigger implementation surface.
+- For embedded relations, neither approach is needed — the data comes back in the parent document's `find()` result. The ORM needs to know which relations are embedded and which are referenced to choose the right strategy.
+
+For the PoC: application-level joining is sufficient. But the architecture should not *prevent* `$lookup` optimization later.
+
+---
+
+## 8. Aggregation pipeline as the Mongo query builder lane
+
+Aggregation pipelines are MongoDB's primary mechanism for complex queries — they replace SQL's `SELECT`, `JOIN`, `GROUP BY`, `HAVING`, subqueries, and window functions. They're both the ORM's internal compilation target (for complex queries) and the user-facing escape hatch when the ORM can't express a query.
+
+This is architecturally symmetric with the SQL family: the SQL query builder (`db.sql.from(table).select(...)`) is the escape hatch for the SQL ORM. An aggregation pipeline builder fills the same role for the Mongo ORM. Each family has a high-level ORM client and a lower-level query builder lane, both sharing a session/transaction context (the same interop pattern validated by [workstream 3, VP1](../../april-milestone.md#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)). The lane interface is family-specific (SQL lanes compile to SQL strings, Mongo lanes compile to pipeline stage arrays), but the architectural role and interop guarantees are the same shared pattern.
+
+**The question**: What does this lane look like, and what's the right scope for the PoC vs. later?
+
+Sub-questions:
+- **As ORM compilation target**: The ORM needs to compile to *something*. For basic CRUD, `find()` / `insertOne()` / `updateOne()` / `deleteOne()` suffice. For includes via `$lookup`, the ORM would need to compile to aggregation pipelines. What's the minimum pipeline compilation needed for the PoC?
+- **As user-facing lane**: A type-safe pipeline builder is the full vision — but it's a large surface area (20+ stages, dozens of operators) and nobody in the ecosystem has solved type-safe pipelines well. When does this ship?
+- **Raw pipeline escape hatch**: As a minimum, let users pass a raw pipeline array (untyped) through the runtime. This validates that the execution plan and plugin pipeline accommodate non-SQL queries, without building a full DSL.
+
+For the PoC: Compile to `find()` / `insertOne()` / `updateOne()` / `deleteOne()` for basic CRUD. Provide a raw pipeline escape hatch. Defer the type-safe pipeline lane.
+
+---
+
+## 9. Change streams and the runtime's execution model *(analysis complete, deferred)*
+
+MongoDB change streams are resumable, ordered, real-time event streams. They're a core part of the Mongo-native experience (reactive UIs, event-driven architectures, CDC). This is a cross-family concern — Postgres has logical replication (used by Supabase Realtime) and LISTEN/NOTIFY.
+
+**The question**: Does PN's runtime model accommodate unbounded streaming subscriptions?
+
+**Analysis**: Subscriptions are a **separate operation type**, not a variant of `execute()`. The runtime has two axes of variation:
+- **Family** (SQL vs. Mongo) determines the query payload shape
+- **Operation type** (request vs. subscribe) determines the output shape and lifecycle
+
+The query input is shared across both modes within a family — "users where age > 25" is the same interest whether you want a snapshot or a stream. But subscriptions add subscription-specific options (resume tokens, event type filters, full-document mode) and have a fundamentally different lifecycle (`onSubscribe → onEvent → onError → onUnsubscribe` rather than `beforeExecute → onRow → afterExecute`).
+
+Change events may be more standardizable across families than query plans are, since every CDC system expresses the same fundamental thing: "entity X was inserted/updated/deleted, here's the before/after state."
+
+Streaming is validated in the SQL runtime workstream via Supabase Realtime ([VP5](../../april-milestone.md#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)); the patterns established there will inform Mongo change stream support.
+
+For the PoC: Out of scope. The architecture constraints are:
+- Don't assume `execute()` is the only operation on the runtime
+- Don't assume all `AsyncIterableResult` streams are finite
+- Keep the ORM client's query builder terminal-agnostic (compilable to both request and subscription)
+
+---
+
+## 10. Shared contract surface: what goes in `ContractBase`? *(resolved — not yet implemented)*
+
+**Answer**: The domain level is the shared surface. `roots`, `models` (with `fields`, `discriminator`, `variants`), and `relations` are structurally identical between families. The divergence is scoped entirely to `model.storage` — the family-specific bridge from domain fields to persistence. See [contract-symmetry.md](contract-symmetry.md) for the convergence/divergence analysis.
+
+`ContractBase` should capture the domain-level structure:
+- **`roots`** — maps ORM accessor names to model names
+- **`models`** — all entities with `fields` (records of `{ nullable, codecId }`), optional `discriminator` + `variants`, and `relations`
+- **`model.storage`** — family-specific extension point (SQL: field → column; Mongo: field → codec)
+- **`relations`** — with cardinality and strategy (`"reference"` or `"embed"`)
+- **`types`/`composites`** — value objects without identity (not yet designed)
+
+This is not a mechanical extraction from either contract — it's a new abstraction rooted in domain modeling concepts:
+
+| Concept | Contract representation |
+|---|---|
+| **Aggregate root** | Entry in `roots`, model with storage containing table/collection |
+| **Entity** | Entry in `models` |
+| **Value type** | Entry in `types`/`composites` |
+| **Reference** | Relation with `"strategy": "reference"` |
+| **Embedding** | Relation with `"strategy": "embed"` |
+| **Polymorphism** | `discriminator` + `variants` on any model |
+
+See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the full design principles, examples, and remaining open questions.
+
+---
+
+## 11. Introspection: generating a contract from an existing database
+
+PN's contract flow assumes authoring-first — the user writes a schema, and the contract is emitted. But MongoDB users typically have existing databases with existing data and no formal schema.
+
+**The question**: Can PN generate a contract by introspecting an existing MongoDB database?
+
+The [user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) highlights this as an early pain point. Lucas ran `prisma db pull` and hit friction: plural collection names weren't normalized, relationships had to be defined manually (MongoDB has no foreign keys to introspect), and polymorphic fields were typed as `Json`.
+
+Sub-questions:
+- **Field type inference**: MongoDB fields have per-document types. Introspection would need to sample documents and infer the most common type for each field. What happens when a field has mixed types across documents? (Report it as a union? Pick the majority type and warn?)
+- **Relationship inference**: Without foreign keys, relationships can only be inferred by convention (field names ending in `Id`, arrays of `ObjectId`) or not at all. Should introspection attempt this, or just generate models with no relations and let the user add them?
+- **Embedded document detection**: Subdocuments and arrays of subdocuments are structurally visible. Introspection could detect these and generate embedded types automatically.
+- **Collection → model naming**: Should introspection normalize plural collection names to singular model names (as the user journey suggests)?
+
+For the PoC: Out of scope — we author contracts manually. But introspection is table-stakes for real Mongo adoption. Worth noting the constraints so the contract model doesn't make introspection harder than necessary.
+
+---
+
+## 12. MongoDB-specific extension packs
+
+PN's extension pack architecture (ADR 170) allows targets and extensions to contribute type constructors, query operators, and authoring helpers. Several MongoDB-specific capabilities are natural candidates for extension packs rather than core ORM features.
+
+**The question**: Which MongoDB capabilities become extension packs, and what does that require from the extension pack interface?
+
+Candidates (from the [MongoDB team's feature priority list](../9-references/Prisma_MongoDB_%20Feature%20support%20priority%20list%20-%20Sheet1.csv)):
+- **Vector Search** (`$vectorSearch`) — Medium priority. Analogous to pgvector for Postgres. Contributes a vector field type, a similarity search operator, and vector search index definitions.
+- **Atlas Search** (`$search`) — Medium priority. Full-text search capabilities specific to MongoDB Atlas. Contributes search index definitions and search query operators.
+- **Geospatial** (`$near`, `$geoWithin`, `2dsphere` indexes) — Medium priority. Contributes GeoJSON field types, geospatial query operators, and geospatial index types.
+- **Time Series** — Medium priority. A specialized collection type for time-stamped data. Contributes a collection-level configuration rather than field-level types.
+
+Tensions:
+- The extension pack interface (ADR 170) was designed with SQL extensions in mind (pgvector, PostGIS). Do document-family extensions need different hooks? For example, Vector Search and Atlas Search operate through aggregation pipeline stages, not SQL operators.
+- Extension-contributed **index types** are a new surface. The current extension pack model contributes type constructors and field presets, but not index types. Mongo's specialized indexes (text, geospatial, TTL, vector search, Atlas search) would need index-type contributions from extension packs.
+- Extension-contributed **pipeline stages** may be needed for Vector Search and Atlas Search, since `$vectorSearch` and `$search` are aggregation pipeline stages, not standard query operators.
+
+For the PoC: Out of scope. But the architecture should anticipate that MongoDB's most differentiating features (Vector Search, Atlas Search, geospatial) will be delivered as extension packs. The extension pack interface needs to accommodate document-family contributions.
+
+**Budgets plugin opportunity**: A Mongo-specific budgeting plugin could warn when documents approach MongoDB's 16 MB document size limit. This is especially relevant for models with embedded arrays of sub-documents (e.g., a Post with embedded Comments) where the array grows over time. The plugin could estimate document size from the query plan and warn preemptively — similar to how the SQL budgets plugin uses `EXPLAIN` to estimate query cost.
+
+---
+
+## 13. Client-side field-level encryption (CSFLE) and queryable encryption
+
+MongoDB offers client-side field-level encryption (CSFLE) and queryable encryption (QE) — features that encrypt sensitive fields before they leave the application, so the database server never sees plaintext values.
+
+**The question**: How does PN surface encryption configuration for MongoDB?
+
+The MongoDB team rates this as **Medium priority**. It's a driver-level concern — the `mongodb` Node.js driver handles encryption/decryption transparently when configured. PN's involvement would be:
+- **Contract-level**: Declaring which fields are encrypted and their encryption metadata (key ID, algorithm, query type for QE).
+- **Adapter-level**: Passing encryption configuration to the MongoDB driver when establishing connections.
+- **ORM-level**: Ensuring that encrypted fields participate correctly in queries (QE allows equality queries on encrypted data; CSFLE does not).
+
+For the PoC: Out of scope. This is a production-readiness concern, not an architecture validation concern. But worth noting because it has no SQL equivalent — SQL databases handle encryption at the storage layer (TDE) or connection layer (TLS), not at the field level.
+
+---
+
+## 14. Schema evolution as data migration *(cross-workstream)*
+
+In SQL, schema evolution has two parts: structural migrations (DDL changes) and data migrations (content transforms). In MongoDB, **that distinction collapses**. There is no DDL — collections don't have enforced schemas. Adding a field, splitting a field, or changing a storage strategy (embedded → referenced) are all pure data transforms. In Mongo, schema evolution IS data migration.
+
+**The question**: Does the data invariant model from the migration workstream (see [data-migrations.md](../../0-references/data-migrations.md), [data-migrations-solutions.md](../../0-references/data-migrations-solutions.md)) serve as the foundation for MongoDB schema evolution?
+
+The fit is strong:
+- **"Done" = contract hash + invariants.** For Mongo, the contract hash captures the expected document shape, and the invariant captures "all documents conform to that shape." This is exactly the data invariant model's definition of desired state.
+- **Postcondition = a Mongo query.** "All users migrated to v2" is checkable: `db.users.countDocuments({ schemaVersion: { $ne: 2 } }) === 0`. This satisfies the invariant model's requirement for machine-checkable postconditions.
+- **Transformation = a Mongo update.** `db.users.updateMany({ schemaVersion: 1 }, [{ $set: { firstName: { $first: { $split: ["$name", " "] } } } }])`. This is idempotent by construction — it only touches documents that still need it.
+- **Schema versioning pattern is native.** Mongo developers already use `schemaVersion` fields and lazy migration (see [mongo-idioms.md](../9-references/mongo-idioms.md#schema-versioning)). The invariant model formalizes what they already do informally.
+
+The [user journey](../9-references/MongoDB-Prisma_%20User%20journey%20&%20Feature%20gaps.md) from the MongoDB team explicitly calls out the lack of automated data migrations as a disappointment — the developer had to manually write a migration script to move data from embedded to referenced.
+
+Sub-questions:
+- **Structural vs. data migration for Mongo**: In the migration workstream's graph model, Mongo "migrations" are almost exclusively data migrations (no DDL). Does the graph model still make sense when there's no structural migration? Or is the invariant model sufficient on its own?
+- **Compatibility checks**: The data migration solutions doc describes schema-based compatibility checks ("is the database schema compatible with the migration's requirements?"). For Mongo, this becomes "does the collection have the fields the migration expects?" — which is a document-sampling question, not a DDL introspection.
+- **Runner integration**: The migration runner needs to execute Mongo update commands, not SQL. Does the runner use the same adapter interface the ORM uses, or does it need its own execution path?
+
+For the PoC: Out of scope for the Mongo workstream, but the april-milestone doc already notes the cross-workstream connection: "If the data invariant model from workstream 1 works well, it may become the foundation for document schema evolution." The Mongo workstream should validate that the invariant model's assumptions hold for a schemaless database — the main risk is that "postcondition = query" becomes expensive when you have to sample documents rather than inspect DDL.
