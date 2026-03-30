@@ -56,11 +56,11 @@ describe('demo contract visualization DX', () => {
     expect(Object.hasOwn(contract as object, '_generated')).toBe(false);
   });
 
-  it('emitted postgres<Contract, TypeMaps> builds valid query plan', () => {
-    const userTable = db.schema.tables.user;
-    const plan = db.sql.from(userTable).select({ id: userTable.columns.id }).limit(1).build();
-    expect(plan).toBeDefined();
-    expect((plan as { meta?: unknown }).meta).toBeDefined();
+  it('emitted postgres<Contract, TypeMaps> exposes sql builder with table proxies', () => {
+    const sql = db.sql;
+    expect(sql).toBeDefined();
+    expect(sql.user).toBeDefined();
+    expect(sql.post).toBeDefined();
   });
 
   it('validated contract is traversable for render use-case', () => {

@@ -38,7 +38,7 @@
   "devDependencies": {
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
-    "@prisma-next/sql-lane": "workspace:*",
+    "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",

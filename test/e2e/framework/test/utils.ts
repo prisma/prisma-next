@@ -7,6 +7,8 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
+import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
+import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -16,6 +18,12 @@ import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 
 const execFileAsync = promisify(execFile);
+
+export async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
+  const out: T[] = [];
+  for await (const item of iter) out.push(item);
+  return out;
+}
 
 /**
  * Creates a control client configured for the e2e test stack (Postgres + pgvector).
@@ -145,6 +153,8 @@ export interface TestRuntimeContext<TContract extends SqlContract<SqlStorage>> {
   readonly runtime: Awaited<ReturnType<typeof createTestRuntimeFromClient>>;
   /** The schema tables extracted from the contract */
   readonly tables: ReturnType<typeof schema<TContract>>['tables'];
+  /** The sql-builder Db proxy for building and executing queries */
+  readonly db: Db<TContract>;
   /** The raw pg client for direct SQL queries */
   readonly client: Client;
   /** The DDL SQL generated for the contract */
@@ -190,7 +200,8 @@ export async function withTestRuntime<TContract extends SqlContract<SqlStorage>>
 
       try {
         const tables = schema<TContract>(context).tables;
-        await callback({ contract, context, runtime, tables, client, sql });
+        const db = sqlBuilder<TContract>({ context, runtime });
+        await callback({ contract, context, runtime, tables, db, client, sql });
       } finally {
         await runtime.close();
       }

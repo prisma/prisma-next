@@ -4,8 +4,8 @@ import { ESLintUtils } from '@typescript-eslint/utils';
 import type * as ts from 'typescript';
 
 const PRISMA_NEXT_SQL_PACKAGES = [
-  '@prisma-next/sql-lane',
-  'packages/2-sql/4-lanes/sql-lane',
+  '@prisma-next/sql-builder',
+  'packages/2-sql/4-lanes/sql-builder',
 ] as const;
 
 const PLAN_TYPE_PATTERNS = [/^SqlQueryPlan$/] as const;

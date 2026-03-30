@@ -1,8 +1,6 @@
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import { sql } from '@prisma-next/sql-lane';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import { param } from '@prisma-next/sql-relational-core/param';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
@@ -76,50 +74,37 @@ const seededPostIds = {
 } as const;
 
 async function seedOrmClientData(runtime: Runtime): Promise<void> {
-  const tables = schema(context).tables;
-  const userTable = tables['user']!;
-  const postTable = tables['post']!;
+  const db = sql({ context, runtime });
 
   const users = [
     {
       id: seededUserIds.admin,
       email: 'admin@example.com',
-      createdAt: new Date('2024-01-01T00:00:00.000Z'),
+      createdAt: '2024-01-01T00:00:00.000Z',
       kind: 'admin' as const,
     },
     {
       id: seededUserIds.member,
       email: 'member@example.com',
-      createdAt: new Date('2024-01-02T00:00:00.000Z'),
+      createdAt: '2024-01-02T00:00:00.000Z',
       kind: 'user' as const,
     },
     {
       id: seededUserIds.adminTwo,
       email: 'admin2@example.org',
-      createdAt: new Date('2024-01-03T00:00:00.000Z'),
+      createdAt: '2024-01-03T00:00:00.000Z',
       kind: 'admin' as const,
     },
     {
       id: seededUserIds.reader,
       email: 'reader@example.com',
-      createdAt: new Date('2024-01-04T00:00:00.000Z'),
+      createdAt: '2024-01-04T00:00:00.000Z',
       kind: 'user' as const,
     },
   ];
 
   for (const user of users) {
-    const plan = sql({ context })
-      .insert(userTable, {
-        id: param('id'),
-        email: param('email'),
-        createdAt: param('createdAt'),
-        kind: param('kind'),
-      })
-      .build({ params: user });
-
-    for await (const _row of runtime.execute(plan)) {
-      // consume iterator
-    }
+    await db.user.insert(user).first();
   }
 
   const posts = [
@@ -127,47 +112,36 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
       id: seededPostIds.older,
       title: 'Older post',
       userId: seededUserIds.admin,
-      createdAt: new Date('2024-01-01T10:00:00.000Z'),
+      createdAt: '2024-01-01T10:00:00.000Z',
     },
     {
       id: seededPostIds.newer,
       title: 'Newer post',
       userId: seededUserIds.admin,
-      createdAt: new Date('2024-01-02T10:00:00.000Z'),
+      createdAt: '2024-01-02T10:00:00.000Z',
     },
     {
       id: seededPostIds.memberNote,
       title: 'Other user note',
       userId: seededUserIds.member,
-      createdAt: new Date('2024-01-03T10:00:00.000Z'),
+      createdAt: '2024-01-03T10:00:00.000Z',
     },
     {
       id: seededPostIds.adminDeepDive,
       title: 'Admin deep dive post',
       userId: seededUserIds.adminTwo,
-      createdAt: new Date('2024-01-04T10:00:00.000Z'),
+      createdAt: '2024-01-04T10:00:00.000Z',
     },
     {
       id: seededPostIds.adminZebra,
       title: 'Zebra post note',
       userId: seededUserIds.adminTwo,
-      createdAt: new Date('2024-01-05T10:00:00.000Z'),
+      createdAt: '2024-01-05T10:00:00.000Z',
     },
   ];
 
   for (const post of posts) {
-    const plan = sql({ context })
-      .insert(postTable, {
-        id: param('id'),
-        title: param('title'),
-        userId: param('userId'),
-        createdAt: param('createdAt'),
-      })
-      .build({ params: post });
-
-    for await (const _row of runtime.execute(plan)) {
-      // consume iterator
-    }
+    await db.post.insert(post).first();
   }
 }
 
@@ -310,7 +284,7 @@ describe('ORM client integration examples', () => {
               id: '00000000-0000-0000-0000-000000000099',
               email: 'created@example.com',
               kind: 'user',
-              createdAt: new Date('2024-02-01T00:00:00.000Z'),
+              createdAt: '2024-02-01T00:00:00.000Z',
             },
             runtime,
           );

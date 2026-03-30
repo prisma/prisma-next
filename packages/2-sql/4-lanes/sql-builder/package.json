@@ -1,9 +1,9 @@
 {
-  "name": "@prisma-next/sql-builder-new",
+  "name": "@prisma-next/sql-builder",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "SQL builder new lane for Prisma Next",
+  "description": "SQL builder lane for Prisma Next",
   "scripts": {
     "build": "tsdown",
     "preemit": "pnpm --filter @prisma-next/cli... build",
@@ -61,6 +61,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/2-sql/4-lanes/sql-builder-new"
+    "directory": "packages/2-sql/4-lanes/sql-builder"
   }
 }

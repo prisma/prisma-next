@@ -1,73 +1,33 @@
-import { param } from '@prisma-next/sql-relational-core/param';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 
-export async function insertUser(email: string, runtime: Runtime) {
-  const userTable = db.schema.tables.user;
-  const userColumns = userTable.columns;
-
-  const plan = db.sql
-    .insert(userTable, {
-      email: param('email'),
-    })
-    .returning(userColumns.id, userColumns.email)
-    .build({
-      params: {
-        email,
-      },
-    });
-
-  const rows: Array<{ id: string; email: string }> = [];
-  for await (const row of runtime.execute(plan)) {
-    rows.push(row as { id: string; email: string });
-  }
-
-  return rows[0];
+export async function insertUser(email: string) {
+  await db.sql.user.insert({ email }).first();
+  // Query back the inserted user since returning() requires sql.returning capability
+  return db.sql.user
+    .select('id', 'email')
+    .where((f, fns) => fns.eq(f.email, email))
+    .first();
 }
 
-export async function updateUser(userId: string, newEmail: string, runtime: Runtime) {
-  const userTable = db.schema.tables.user;
-  const userColumns = userTable.columns;
-
-  const plan = db.sql
-    .update(userTable, {
-      email: param('newEmail'),
-    })
-    .where(userColumns.id.eq(param('userId')))
-    .returning(userColumns.id, userColumns.email)
-    .build({
-      params: {
-        newEmail,
-        userId,
-      },
-    });
-
-  const rows: Array<{ id: string; email: string }> = [];
-  for await (const row of runtime.execute(plan)) {
-    rows.push(row as { id: string; email: string });
-  }
-
-  return rows[0];
+export async function updateUser(userId: string, newEmail: string) {
+  await db.sql.user
+    .update({ email: newEmail })
+    .where((f, fns) => fns.eq(f.id, userId))
+    .first();
+  return db.sql.user
+    .select('id', 'email')
+    .where((f, fns) => fns.eq(f.id, userId))
+    .first();
 }
 
-export async function deleteUser(userId: string, runtime: Runtime) {
-  const userTable = db.schema.tables.user;
-  const userColumns = userTable.columns;
-
-  const plan = db.sql
-    .delete(userTable)
-    .where(userColumns.id.eq(param('userId')))
-    .returning(userColumns.id, userColumns.email)
-    .build({
-      params: {
-        userId,
-      },
-    });
-
-  const rows: Array<{ id: string; email: string }> = [];
-  for await (const row of runtime.execute(plan)) {
-    rows.push(row as { id: string; email: string });
-  }
-
-  return rows[0];
+export async function deleteUser(userId: string) {
+  const user = await db.sql.user
+    .select('id', 'email')
+    .where((f, fns) => fns.eq(f.id, userId))
+    .first();
+  await db.sql.user
+    .delete()
+    .where((f, fns) => fns.eq(f.id, userId))
+    .first();
+  return user;
 }

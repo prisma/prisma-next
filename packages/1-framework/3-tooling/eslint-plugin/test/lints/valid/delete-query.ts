@@ -1,4 +1,4 @@
-import { sql } from '@prisma-next/sql-lane';
+import { sql } from '@prisma-next/sql-builder';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';

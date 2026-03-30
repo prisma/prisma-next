@@ -24,13 +24,10 @@ test('emitted workflow postgres<Contract> produces typed schema and sql', () => 
   expectTypeOf(userTable.columns.id).not.toEqualTypeOf<never>();
   expectTypeOf(userTable.columns.email).not.toEqualTypeOf<never>();
 
-  const plan = db.sql
-    .from(userTable)
-    .select({ id: userTable.columns.id, email: userTable.columns.email })
-    .limit(5)
-    .build();
-
-  expectTypeOf(plan).not.toEqualTypeOf<never>();
+  const sql = db.sql;
+  expectTypeOf(sql).not.toEqualTypeOf<never>();
+  expectTypeOf(sql.user).not.toEqualTypeOf<never>();
+  expectTypeOf(sql.post).not.toEqualTypeOf<never>();
 });
 
 test('validateContract<Contract> output is assignable to visualization shape', () => {

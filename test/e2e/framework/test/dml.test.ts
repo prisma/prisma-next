@@ -1,10 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sql } from '@prisma-next/sql-lane/sql';
-import { param } from '@prisma-next/sql-relational-core/param';
-import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
-import { describe, expect, expectTypeOf, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 import { withTestRuntime } from './utils';
 
@@ -12,128 +8,68 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
-const UUIDV7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 describe('DML E2E Tests', { timeout: 30000 }, () => {
   it('inserts, updates, and deletes a user', async () => {
-    await withTestRuntime<Contract>(
-      contractJsonPath,
-      async ({ tables, runtime, context, client }) => {
-        const userTable = tables.user!;
-        const userColumns = userTable.columns;
-        const builder = sql({ context });
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+      // Insert
+      await db.user.insert({ email: 'e2e@example.com' }).first();
 
-        // Insert
-        const insertPlan = builder
-          .insert(userTable, {
-            email: param('email'),
-          })
-          .returning(
-            userColumns.id!,
-            userColumns.email,
-            userColumns.created_at!,
-            userColumns.update_at,
-          )
-          .build({
-            params: {
-              email: 'e2e@example.com',
-            },
-          });
+      const inserted = await db.user
+        .select('id', 'email', 'created_at', 'update_at')
+        .where((f, fns) => fns.eq(f.email, 'e2e@example.com'))
+        .first();
 
-        const insertRows = await executePlanAndCollect(runtime, insertPlan);
-        type InsertRow = ResultType<typeof insertPlan>;
-        expect(insertRows.length).toBe(1);
-        expect(insertRows[0]).toMatchObject({
-          id: expect.any(Number),
-          email: 'e2e@example.com',
-          created_at: expect.any(String),
-          update_at: null,
-        });
+      expect(inserted).toMatchObject({
+        id: expect.any(Number),
+        email: 'e2e@example.com',
+        created_at: expect.any(String),
+        update_at: null,
+      });
 
-        const firstRow = insertRows[0] as InsertRow | undefined;
-        const userId = firstRow?.id;
-        if (userId === undefined) {
-          throw new Error('Expected insert to return id');
-        }
+      const userId = inserted!.id;
 
-        // Update
-        const updatePlan = builder
-          .update(userTable, {
-            email: param('newEmail'),
-          })
-          .where(userColumns.id!.eq(param('userId')))
-          .returning(
-            userColumns.id!,
-            userColumns.email!,
-            userColumns.created_at!,
-            userColumns.update_at,
-          )
-          .build({
-            params: {
-              newEmail: 'updated-e2e@example.com',
-              userId,
-            },
-          });
+      // Update
+      await db.user
+        .update({ email: 'updated-e2e@example.com' })
+        .where((f, fns) => fns.eq(f.id, userId))
+        .first();
 
-        const updateRows = await executePlanAndCollect(runtime, updatePlan);
-        expect(updateRows.length).toBe(1);
-        expect(updateRows[0]).toMatchObject({
-          id: userId,
-          email: 'updated-e2e@example.com',
-        });
+      const updated = await db.user
+        .select('id', 'email')
+        .where((f, fns) => fns.eq(f.id, userId))
+        .first();
 
-        // Delete
-        const deletePlan = builder
-          .delete(userTable)
-          .where(userColumns.id!.eq(param('userId')))
-          .returning(userColumns.id!, userColumns.email!)
-          .build({
-            params: {
-              userId,
-            },
-          });
+      expect(updated).toMatchObject({
+        id: userId,
+        email: 'updated-e2e@example.com',
+      });
 
-        const deleteRows = await executePlanAndCollect(runtime, deletePlan);
-        expect(deleteRows.length).toBe(1);
-        expect(deleteRows[0]).toMatchObject({
-          id: userId,
-          email: 'updated-e2e@example.com',
-        });
+      // Delete
+      await db.user
+        .delete()
+        .where((f, fns) => fns.eq(f.id, userId))
+        .first();
 
-        // Verify deleted
-        const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [userId]);
-        expect(selectResult.rows.length).toBe(0);
-      },
-    );
+      // Verify deleted
+      const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [userId]);
+      expect(selectResult.rows.length).toBe(0);
+    });
   });
 });
 
 describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () => {
+  const UUIDV7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
   it('auto-generates a valid UUIDv7 id on insert', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ tables, runtime, context }) => {
-      const eventTable = tables.event!;
-      const eventColumns = eventTable.columns;
-      const builder = sql({ context });
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db }) => {
+      await db.event.insert({ name: 'uuidv7-test-event' }).first();
 
-      const insertPlan = builder
-        .insert(eventTable, {
-          name: param('name'),
-        })
-        .returning(
-          eventColumns.id!,
-          eventColumns.name!,
-          eventColumns.created_at!,
-          eventColumns.scheduled_at!,
-        )
-        .build({
-          params: {
-            name: 'uuidv7-test-event',
-          },
-        });
+      const row = await db.event
+        .select('id', 'name', 'created_at', 'scheduled_at')
+        .where((f, fns) => fns.eq(f.name, 'uuidv7-test-event'))
+        .first();
 
-      const insertRows = await executePlanAndCollect(runtime, insertPlan);
-      expect(insertRows.length).toBe(1);
-      expect(insertRows[0]).toMatchObject({
+      expect(row).toMatchObject({
         id: expect.stringMatching(UUIDV7_REGEX),
         name: 'uuidv7-test-event',
         created_at: expect.any(String),
@@ -143,29 +79,17 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
   });
 
   it('allows overriding the auto-generated id', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ tables, runtime, context }) => {
-      const eventTable = tables.event!;
-      const eventColumns = eventTable.columns;
-      const builder = sql({ context });
-
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db }) => {
       const overrideId = '019470ab-9a66-7000-8000-000000000001';
 
-      const insertPlan = builder
-        .insert(eventTable, {
-          id: param('id'),
-          name: param('name'),
-        })
-        .returning(eventColumns.id!, eventColumns.name!)
-        .build({
-          params: {
-            id: overrideId,
-            name: 'override-event',
-          },
-        });
+      await db.event.insert({ id: overrideId, name: 'override-event' }).first();
 
-      const insertRows = await executePlanAndCollect(runtime, insertPlan);
-      expect(insertRows.length).toBe(1);
-      expect(insertRows[0]).toMatchObject({
+      const row = await db.event
+        .select('id', 'name')
+        .where((f, fns) => fns.eq(f.id, overrideId))
+        .first();
+
+      expect(row).toMatchObject({
         id: overrideId,
         name: 'override-event',
       });
@@ -173,121 +97,68 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
   });
 
   it('updates and deletes by UUIDv7 id', async () => {
-    await withTestRuntime<Contract>(
-      contractJsonPath,
-      async ({ tables, runtime, context, client }) => {
-        const eventTable = tables.event!;
-        const eventColumns = eventTable.columns;
-        const builder = sql({ context });
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+      // Insert (auto-generated id)
+      await db.event.insert({ name: 'to-be-updated' }).first();
 
-        // Insert (auto-generated id)
-        const insertPlan = builder
-          .insert(eventTable, {
-            name: param('name'),
-          })
-          .returning(eventColumns.id!, eventColumns.name!)
-          .build({
-            params: {
-              name: 'to-be-updated',
-            },
-          });
+      const inserted = await db.event
+        .select('id', 'name')
+        .where((f, fns) => fns.eq(f.name, 'to-be-updated'))
+        .first();
 
-        const insertRows = await executePlanAndCollect(runtime, insertPlan);
-        type InsertRow = ResultType<typeof insertPlan>;
-        const firstRow = insertRows[0] as InsertRow | undefined;
-        const eventId = firstRow?.id;
-        if (eventId === undefined) {
-          throw new Error('Expected insert to return id');
-        }
-        expect(eventId).toMatch(UUIDV7_REGEX);
+      const eventId = inserted!.id;
+      expect(eventId).toMatch(UUIDV7_REGEX);
 
-        // Update
-        const updatePlan = builder
-          .update(eventTable, {
-            name: param('newName'),
-          })
-          .where(eventColumns.id!.eq(param('eventId')))
-          .returning(eventColumns.id!, eventColumns.name!)
-          .build({
-            params: {
-              newName: 'updated-event',
-              eventId,
-            },
-          });
+      // Update
+      await db.event
+        .update({ name: 'updated-event' })
+        .where((f, fns) => fns.eq(f.id, eventId))
+        .first();
 
-        const updateRows = await executePlanAndCollect(runtime, updatePlan);
-        expect(updateRows.length).toBe(1);
-        expect(updateRows[0]).toMatchObject({
-          id: eventId,
-          name: 'updated-event',
-        });
+      const updated = await db.event
+        .select('id', 'name')
+        .where((f, fns) => fns.eq(f.id, eventId))
+        .first();
 
-        // Delete
-        const deletePlan = builder
-          .delete(eventTable)
-          .where(eventColumns.id!.eq(param('eventId')))
-          .returning(eventColumns.id!, eventColumns.name!)
-          .build({
-            params: {
-              eventId,
-            },
-          });
+      expect(updated).toMatchObject({
+        id: eventId,
+        name: 'updated-event',
+      });
 
-        const deleteRows = await executePlanAndCollect(runtime, deletePlan);
-        expect(deleteRows.length).toBe(1);
-        expect(deleteRows[0]).toMatchObject({
-          id: eventId,
-          name: 'updated-event',
-        });
+      // Delete
+      await db.event
+        .delete()
+        .where((f, fns) => fns.eq(f.id, eventId))
+        .first();
 
-        // Verify deleted
-        const selectResult = await client.query('SELECT * FROM "event" WHERE id = $1', [eventId]);
-        expect(selectResult.rows.length).toBe(0);
-      },
-    );
+      // Verify deleted
+      const selectResult = await client.query('SELECT * FROM "event" WHERE id = $1', [eventId]);
+      expect(selectResult.rows.length).toBe(0);
+    });
   });
 
   it('applies literal defaults for every supported type', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ tables, runtime, context }) => {
-      const litTable = tables.literal_defaults!;
-      const cols = litTable.columns;
-      const builder = sql({ context });
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db }) => {
+      await db.literal_defaults.insert({}).first();
 
-      const insertPlan = builder
-        .insert(litTable, {})
-        .returning(
-          cols.id!,
-          cols.label!,
-          cols.score!,
-          cols.rating!,
-          cols.active!,
-          cols.big_count!,
-          cols.metadata!,
-          cols.tags!,
-        )
-        .build({ params: {} });
+      const row = await db.literal_defaults
+        .select('id', 'label', 'score', 'rating', 'active', 'big_count', 'metadata', 'tags')
+        .first();
 
-      const rows = await executePlanAndCollect(runtime, insertPlan);
-      expect(rows).toHaveLength(1);
-
-      const row = rows[0]!;
-      expect(row.id).toEqual(expect.any(Number));
-      expect(row.label).toBe('draft');
-      expect(row.score).toBe(0);
-      expect(row.rating).toBeCloseTo(3.14);
-      expect(row.active).toBe(true);
-      expect(row.big_count).toBe('9007199254740993');
-      expect(row.metadata).toEqual({ key: 'default' });
-      expect(row.tags).toEqual(['alpha', 'beta']);
+      expect(row).not.toBeNull();
+      expect(row!.id).toEqual(expect.any(Number));
+      expect(row!.label).toBe('draft');
+      expect(row!.score).toBe(0);
+      expect(row!.rating).toBeCloseTo(3.14);
+      expect(row!.active).toBe(true);
+      expect(row!.big_count).toBe('9007199254740993');
+      expect(row!.metadata).toEqual({ key: 'default' });
+      expect(row!.tags).toEqual(['alpha', 'beta']);
     });
   });
 
   it('supports typed jsonb/json values in insert and select clauses', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ tables, runtime, context }) => {
-      const userTable = tables.user!;
-      const postTable = tables.post!;
-      const builder = sql({ context });
-
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db }) => {
       const profile = {
         displayName: 'e2e',
         tags: ['typed', 'json'],
@@ -299,73 +170,30 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         verified: true,
       } as const;
 
-      const insertUserPlan = builder
-        .insert(userTable, {
-          email: param('email'),
-          profile: param('profile'),
+      await db.user.insert({ email: 'json@example.com', profile }).first();
+
+      const userRow = await db.user
+        .select('id', 'profile')
+        .where((f, fns) => fns.eq(f.email, 'json@example.com'))
+        .first();
+
+      expect(userRow).toMatchObject({ profile });
+
+      await db.post
+        .insert({
+          userId: userRow!.id,
+          title: 'Typed JSON post',
+          published: true,
+          meta,
         })
-        .returning(userTable.columns.id!, userTable.columns.profile!)
-        .build({
-          params: {
-            email: 'json@example.com',
-            profile,
-          },
-        });
+        .first();
 
-      const userRows = await executePlanAndCollect(runtime, insertUserPlan);
-      expect(userRows).toHaveLength(1);
-      expect(userRows[0]).toMatchObject({ profile });
+      const postRow = await db.post
+        .select('id', 'meta')
+        .where((f, fns) => fns.eq(f.title, 'Typed JSON post'))
+        .first();
 
-      const insertedUser = userRows[0];
-      if (!insertedUser) {
-        throw new Error('Expected inserted user row');
-      }
-
-      const insertPostPlan = builder
-        .insert(postTable, {
-          userId: param('userId'),
-          title: param('title'),
-          published: param('published'),
-          meta: param('meta'),
-        })
-        .returning(postTable.columns.id!, postTable.columns.meta!)
-        .build({
-          params: {
-            userId: insertedUser.id,
-            title: 'Typed JSON post',
-            published: true,
-            meta,
-          },
-        });
-
-      const postRows = await executePlanAndCollect(runtime, insertPostPlan);
-      expect(postRows).toHaveLength(1);
-      expect(postRows[0]).toMatchObject({ meta });
-
-      const insertedPost = postRows[0];
-      if (!insertedPost) {
-        throw new Error('Expected inserted post row');
-      }
-
-      const selectPlan = builder
-        .from(postTable)
-        .where(postTable.columns.id!.eq(param('postId')))
-        .select({
-          id: postTable.columns.id!,
-          meta: postTable.columns.meta!,
-        })
-        .build({ params: { postId: insertedPost.id } });
-
-      type SelectRow = ResultType<typeof selectPlan>;
-      expectTypeOf<SelectRow['meta']>().toExtend<{
-        readonly source: string;
-        readonly rank: number;
-        readonly verified: boolean;
-      } | null>();
-
-      const selectedRows = await executePlanAndCollect(runtime, selectPlan);
-      expect(selectedRows).toHaveLength(1);
-      expect(selectedRows[0]).toMatchObject({ meta });
+      expect(postRow).toMatchObject({ meta });
     });
   });
 });
