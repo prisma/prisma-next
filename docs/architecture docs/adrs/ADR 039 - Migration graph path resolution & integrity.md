@@ -39,9 +39,9 @@ Migrations are modeled as directed edges from `fromHash` to `toHash`. At apply t
 
 **Optional: Performance cache with `graph.index.json`**
 - maintain graph index JSON in repo: `migrations/graph.index.json`
-- Pre-materialized adjacency lists for faster pathfinding on large DAGs
+- Pre-materialized adjacency lists for faster pathfinding on large migration graphs
 - Purely a performance optimization - can be regenerated anytime from migration files
-- Under the squash-first policy (ADR 102), most teams maintain small DAGs (10-20 active edges) where reconstruction is fast and the index is unnecessary
+- Under the squash-first policy (ADR 102), most teams maintain small migration graphs (10-20 active edges) where reconstruction is fast and the index is unnecessary
 
 ### When to use a committed index (optional)
 
@@ -133,7 +133,7 @@ If labels are absent the order falls back to the remaining keys.
 
 ## Alternatives considered
 
-- **Pure reconstruction on every run (chosen as default)**: Works well with squash-first hygiene (ADR 102). Small DAGs make reconstruction negligible. Committed index available as opt-in for scale/compliance.
+- **Pure reconstruction on every run (chosen as default)**: Works well with squash-first hygiene (ADR 102). Small migration graphs make reconstruction negligible. Committed index available as opt-in for scale/compliance.
 - **Timestamp-only tie-breaking**: Sensitive to clock skew and FS semantics. Rejected in favor of multi-key deterministic sort.
 - **Always require committed index**: Adds complexity for teams that don't need it. Index remains available as performance optimization.
 

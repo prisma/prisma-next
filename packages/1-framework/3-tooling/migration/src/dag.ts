@@ -203,7 +203,7 @@ export function findPathWithDecision(
 }
 
 /**
- * Walk ancestors of each leaf back from the leaves to find the last node
+ * Walk ancestors of each branch tip back to find the last node
  * that appears on all paths. Returns `fromHash` if no shared ancestor is found.
  */
 function findDivergencePoint(
@@ -246,8 +246,8 @@ function findDivergencePoint(
 }
 
 /**
- * Find all leaf nodes reachable from `fromHash` via forward edges.
- * A leaf is a node with no outgoing edges in the graph.
+ * Find all branch tips (nodes with no outgoing edges) reachable from
+ * `fromHash` via forward edges.
  */
 export function findReachableLeaves(graph: MigrationGraph, fromHash: string): readonly string[] {
   const visited = new Set<string>();

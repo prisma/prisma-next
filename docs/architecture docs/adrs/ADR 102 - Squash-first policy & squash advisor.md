@@ -2,17 +2,17 @@
 
 ## Context
 
-Migration histories tend to accumulate branches and long paths, increasing pathfinding complexity and review burden. Our model supports baselines that collapse a set of edges into a single ∅ → H_latest edge embedding the destination contract. We want a default squash-first posture that nudges teams toward a small active migration history while keeping older history auditable
+Migration histories tend to accumulate branches and long paths, increasing pathfinding complexity and review burden. Our model supports baselines that collapse a set of edges into a single ∅ → H_latest edge embedding the destination contract. We want a default squash-first posture that nudges teams toward a small active migration history while keeping history auditable
 
 ## Problem
 
-- Long chains hurt determinism, performance, and comprehension
+- Long migration histories hurt determinism, performance, and comprehension
 - Parallel edges and orphans appear more often in large migration graphs
-- Teams need a gentle, configurable way to keep DAGs small without mandating a committed graph index
+- Teams need a gentle, configurable way to keep migration graphs small without mandating a committed graph index
 
 ## Goals
 
-- Encourage short active chains via regular baselines
+- Encourage short active migration histories via regular baselines
 - Provide clear, actionable suggestions and one-command automation
 - Keep policy flexible across teams and environments
 - Preserve safety and auditability
@@ -93,7 +93,7 @@ Technical enforcement of these rules is handled in ADR 028 (contract marker chec
 
 ### Positive
 
-- Keeps DAGs small and pathfinding simple without enforcing a graph index
+- Keeps migration graphs small and pathfinding simple without enforcing a graph index
 - Makes baseline creation predictable and auditable
 - Reduces CI noise and increases determinism
 
