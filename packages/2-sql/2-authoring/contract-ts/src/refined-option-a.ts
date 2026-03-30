@@ -17,12 +17,19 @@ export type NamingConfig = {
   readonly columns?: NamingStrategy;
 };
 
+type NamedStorageTypeRef = string | StorageTypeInstance;
+
 type NamedConstraintSpec<Name extends string | undefined = string | undefined> = {
   readonly name?: Name;
 };
 
+type NamedConstraintNameSpec<Name extends string = string> = {
+  readonly name: Name;
+};
+
 export type ScalarFieldState<
   CodecId extends string = string,
+  TypeRef extends NamedStorageTypeRef | undefined = undefined,
   Nullable extends boolean = boolean,
   ColumnName extends string | undefined = string | undefined,
   IdSpec extends NamedConstraintSpec | undefined = undefined,
@@ -30,7 +37,7 @@ export type ScalarFieldState<
 > = {
   readonly kind: 'scalar';
   readonly descriptor?: (ColumnTypeDescriptor & { readonly codecId: CodecId }) | undefined;
-  readonly typeRef?: string | undefined;
+  readonly typeRef?: TypeRef | undefined;
   readonly nullable: Nullable;
   readonly columnName?: ColumnName | undefined;
   readonly default?: ColumnDefault | undefined;
@@ -40,6 +47,72 @@ export type ScalarFieldState<
     ? { readonly unique: UniqueSpec }
     : { readonly unique?: undefined });
 
+type HasNamedConstraintId<State extends ScalarFieldState> =
+  State extends ScalarFieldState<
+    string,
+    NamedStorageTypeRef | undefined,
+    boolean,
+    string | undefined,
+    infer IdSpec,
+    NamedConstraintSpec | undefined
+  >
+    ? IdSpec extends NamedConstraintSpec
+      ? true
+      : false
+    : false;
+
+type HasNamedConstraintUnique<State extends ScalarFieldState> =
+  State extends ScalarFieldState<
+    string,
+    NamedStorageTypeRef | undefined,
+    boolean,
+    string | undefined,
+    NamedConstraintSpec | undefined,
+    infer UniqueSpec
+  >
+    ? UniqueSpec extends NamedConstraintSpec
+      ? true
+      : false
+    : false;
+
+type FieldSqlSpecForState<State extends ScalarFieldState> = {
+  readonly column?: string;
+} & (HasNamedConstraintId<State> extends true
+  ? { readonly id?: NamedConstraintNameSpec }
+  : Record<never, never>) &
+  (HasNamedConstraintUnique<State> extends true
+    ? { readonly unique?: NamedConstraintNameSpec }
+    : Record<never, never>);
+
+type ApplyFieldSqlSpec<
+  State extends ScalarFieldState,
+  Spec extends FieldSqlSpecForState<State>,
+> = State extends ScalarFieldState<
+  infer CodecId,
+  infer TypeRef,
+  infer Nullable,
+  infer ColumnName,
+  infer IdSpec,
+  infer UniqueSpec
+>
+  ? ScalarFieldState<
+      CodecId,
+      TypeRef,
+      Nullable,
+      Spec extends { readonly column: infer NextColumn extends string } ? NextColumn : ColumnName,
+      Spec extends { readonly id: { readonly name: infer IdName extends string } }
+        ? IdSpec extends NamedConstraintSpec
+          ? NamedConstraintSpec<IdName>
+          : IdSpec
+        : IdSpec,
+      Spec extends { readonly unique: { readonly name: infer UniqueName extends string } }
+        ? UniqueSpec extends NamedConstraintSpec
+          ? NamedConstraintSpec<UniqueName>
+          : UniqueSpec
+        : UniqueSpec
+    >
+  : never;
+
 export type GeneratedFieldSpec = {
   readonly type: ColumnTypeDescriptor;
   readonly typeParams?: Record<string, unknown>;
@@ -48,11 +121,66 @@ export type GeneratedFieldSpec = {
 
 type AnyScalarFieldState = ScalarFieldState<
   string,
+  NamedStorageTypeRef | undefined,
   boolean,
   string | undefined,
   NamedConstraintSpec | undefined,
   NamedConstraintSpec | undefined
 >;
+
+const SQL_TEXT_DESCRIPTOR = {
+  codecId: 'sql/text@1',
+  nativeType: 'text',
+} as const satisfies ColumnTypeDescriptor;
+
+const SQL_TIMESTAMP_DESCRIPTOR = {
+  codecId: 'sql/timestamp@1',
+  nativeType: 'timestamp',
+} as const satisfies ColumnTypeDescriptor;
+
+const SQL_CHARACTER_DESCRIPTOR = {
+  codecId: 'sql/char@1',
+  nativeType: 'character',
+} as const satisfies ColumnTypeDescriptor;
+
+const SQL_UUID_DESCRIPTOR = {
+  codecId: 'sql/char@1',
+  nativeType: 'character',
+  typeParams: { length: 36 },
+} as const satisfies ColumnTypeDescriptor;
+
+const ULID_DESCRIPTOR = {
+  codecId: 'sql/char@1',
+  nativeType: 'character',
+  typeParams: { length: 26 },
+} as const satisfies ColumnTypeDescriptor;
+
+const CUID2_DESCRIPTOR = {
+  codecId: 'sql/char@1',
+  nativeType: 'character',
+  typeParams: { length: 24 },
+} as const satisfies ColumnTypeDescriptor;
+
+const KSUID_DESCRIPTOR = {
+  codecId: 'sql/char@1',
+  nativeType: 'character',
+  typeParams: { length: 27 },
+} as const satisfies ColumnTypeDescriptor;
+
+type BuiltinIdGeneratorId = 'ulid' | 'nanoid' | 'uuidv7' | 'uuidv4' | 'cuid2' | 'ksuid';
+
+type NanoidGeneratorOptions = {
+  readonly size?: number;
+};
+
+type BuiltinIdGeneratorOptionsById = {
+  readonly ulid: undefined;
+  readonly nanoid: NanoidGeneratorOptions | undefined;
+  readonly uuidv7: undefined;
+  readonly uuidv4: undefined;
+  readonly cuid2: undefined;
+  readonly ksuid: undefined;
+};
 
 function isColumnDefault(value: unknown): value is ColumnDefault {
   if (typeof value !== 'object' || value === null) return false;
@@ -75,12 +203,13 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
   optional(): ScalarFieldBuilder<
     State extends ScalarFieldState<
       infer CodecId,
+      infer TypeRef,
       boolean,
       infer ColumnName,
       infer IdSpec,
       infer UniqueSpec
     >
-      ? ScalarFieldState<CodecId, true, ColumnName, IdSpec, UniqueSpec>
+      ? ScalarFieldState<CodecId, TypeRef, true, ColumnName, IdSpec, UniqueSpec>
       : never
   > {
     return new ScalarFieldBuilder({
@@ -88,12 +217,13 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
       nullable: true,
     } as unknown as State extends ScalarFieldState<
       infer CodecId,
+      infer TypeRef,
       boolean,
       infer ColumnName,
       infer IdSpec,
       infer UniqueSpec
     >
-      ? ScalarFieldState<CodecId, true, ColumnName, IdSpec, UniqueSpec>
+      ? ScalarFieldState<CodecId, TypeRef, true, ColumnName, IdSpec, UniqueSpec>
       : never);
   }
 
@@ -102,12 +232,13 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
   ): ScalarFieldBuilder<
     State extends ScalarFieldState<
       infer CodecId,
+      infer TypeRef,
       infer Nullable,
       string | undefined,
       infer IdSpec,
       infer UniqueSpec
     >
-      ? ScalarFieldState<CodecId, Nullable, ColumnName, IdSpec, UniqueSpec>
+      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, UniqueSpec>
       : never
   > {
     return new ScalarFieldBuilder({
@@ -115,12 +246,13 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
       columnName: name,
     } as unknown as State extends ScalarFieldState<
       infer CodecId,
+      infer TypeRef,
       infer Nullable,
       string | undefined,
       infer IdSpec,
       infer UniqueSpec
     >
-      ? ScalarFieldState<CodecId, Nullable, ColumnName, IdSpec, UniqueSpec>
+      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, UniqueSpec>
       : never);
   }
 
@@ -143,12 +275,20 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
   ): ScalarFieldBuilder<
     State extends ScalarFieldState<
       infer CodecId,
+      infer TypeRef,
       infer Nullable,
       infer ColumnName,
       NamedConstraintSpec | undefined,
       infer UniqueSpec
     >
-      ? ScalarFieldState<CodecId, Nullable, ColumnName, NamedConstraintSpec<Name>, UniqueSpec>
+      ? ScalarFieldState<
+          CodecId,
+          TypeRef,
+          Nullable,
+          ColumnName,
+          NamedConstraintSpec<Name>,
+          UniqueSpec
+        >
       : never
   > {
     return new ScalarFieldBuilder({
@@ -156,12 +296,20 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
       id: options?.name ? { name: options.name } : {},
     } as unknown as State extends ScalarFieldState<
       infer CodecId,
+      infer TypeRef,
       infer Nullable,
       infer ColumnName,
       NamedConstraintSpec | undefined,
       infer UniqueSpec
     >
-      ? ScalarFieldState<CodecId, Nullable, ColumnName, NamedConstraintSpec<Name>, UniqueSpec>
+      ? ScalarFieldState<
+          CodecId,
+          TypeRef,
+          Nullable,
+          ColumnName,
+          NamedConstraintSpec<Name>,
+          UniqueSpec
+        >
       : never);
   }
 
@@ -170,12 +318,13 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
   ): ScalarFieldBuilder<
     State extends ScalarFieldState<
       infer CodecId,
+      infer TypeRef,
       infer Nullable,
       infer ColumnName,
       infer IdSpec,
       NamedConstraintSpec | undefined
     >
-      ? ScalarFieldState<CodecId, Nullable, ColumnName, IdSpec, NamedConstraintSpec<Name>>
+      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, NamedConstraintSpec<Name>>
       : never
   > {
     return new ScalarFieldBuilder({
@@ -183,18 +332,221 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
       unique: options?.name ? { name: options.name } : {},
     } as unknown as State extends ScalarFieldState<
       infer CodecId,
+      infer TypeRef,
       infer Nullable,
       infer ColumnName,
       infer IdSpec,
       NamedConstraintSpec | undefined
     >
-      ? ScalarFieldState<CodecId, Nullable, ColumnName, IdSpec, NamedConstraintSpec<Name>>
+      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, NamedConstraintSpec<Name>>
       : never);
+  }
+
+  sql<const Spec extends FieldSqlSpecForState<State>>(
+    spec: Spec,
+  ): ScalarFieldBuilder<ApplyFieldSqlSpec<State, Spec>> {
+    if (spec.id && !this.state.id) {
+      throw new Error('field.sql({ id }) requires an existing inline .id(...) declaration.');
+    }
+    if (spec.unique && !this.state.unique) {
+      throw new Error(
+        'field.sql({ unique }) requires an existing inline .unique(...) declaration.',
+      );
+    }
+
+    return new ScalarFieldBuilder({
+      ...this.state,
+      ...(spec.column ? { columnName: spec.column } : {}),
+      ...(spec.id ? { id: { name: spec.id.name } } : {}),
+      ...(spec.unique ? { unique: { name: spec.unique.name } } : {}),
+    } as ApplyFieldSqlSpec<State, Spec>);
   }
 
   build(): State {
     return this.state;
   }
+}
+
+function columnField<Descriptor extends ColumnTypeDescriptor>(
+  descriptor: Descriptor,
+): ScalarFieldBuilder<ScalarFieldState<Descriptor['codecId'], undefined, false, undefined>> {
+  return new ScalarFieldBuilder({
+    kind: 'scalar',
+    descriptor,
+    nullable: false,
+  });
+}
+
+function generatedField<Descriptor extends ColumnTypeDescriptor>(
+  spec: GeneratedFieldSpec & { readonly type: Descriptor },
+): ScalarFieldBuilder<ScalarFieldState<Descriptor['codecId'], undefined, false, undefined>> {
+  return new ScalarFieldBuilder({
+    kind: 'scalar',
+    descriptor: {
+      ...spec.type,
+      ...(spec.typeParams ? { typeParams: spec.typeParams } : {}),
+    },
+    nullable: false,
+    executionDefault: spec.generated,
+  });
+}
+
+function namedTypeField<TypeRef extends string>(
+  typeRef: TypeRef,
+): ScalarFieldBuilder<ScalarFieldState<string, TypeRef, false, undefined>>;
+function namedTypeField<TypeRef extends StorageTypeInstance>(
+  typeRef: TypeRef,
+): ScalarFieldBuilder<ScalarFieldState<TypeRef['codecId'], TypeRef, false, undefined>>;
+function namedTypeField(
+  typeRef: NamedStorageTypeRef,
+): ScalarFieldBuilder<ScalarFieldState<string, NamedStorageTypeRef, false, undefined>> {
+  return new ScalarFieldBuilder({
+    kind: 'scalar',
+    typeRef,
+    nullable: false,
+  });
+}
+
+function textField(): ScalarFieldBuilder<
+  ScalarFieldState<typeof SQL_TEXT_DESCRIPTOR.codecId, undefined>
+> {
+  return columnField(SQL_TEXT_DESCRIPTOR);
+}
+
+function timestampField(): ScalarFieldBuilder<
+  ScalarFieldState<typeof SQL_TIMESTAMP_DESCRIPTOR.codecId, undefined>
+> {
+  return columnField(SQL_TIMESTAMP_DESCRIPTOR);
+}
+
+function createdAtField(): ScalarFieldBuilder<
+  ScalarFieldState<typeof SQL_TIMESTAMP_DESCRIPTOR.codecId, undefined>
+> {
+  return timestampField().defaultSql('CURRENT_TIMESTAMP');
+}
+
+function uuidField(): ScalarFieldBuilder<
+  ScalarFieldState<typeof SQL_UUID_DESCRIPTOR.codecId, undefined>
+> {
+  return columnField(SQL_UUID_DESCRIPTOR);
+}
+
+function ulidField(): ScalarFieldBuilder<
+  ScalarFieldState<typeof ULID_DESCRIPTOR.codecId, undefined>
+> {
+  return columnField(ULID_DESCRIPTOR);
+}
+
+function cuid2Field(): ScalarFieldBuilder<
+  ScalarFieldState<typeof CUID2_DESCRIPTOR.codecId, undefined>
+> {
+  return columnField(CUID2_DESCRIPTOR);
+}
+
+function ksuidField(): ScalarFieldBuilder<
+  ScalarFieldState<typeof KSUID_DESCRIPTOR.codecId, undefined>
+> {
+  return columnField(KSUID_DESCRIPTOR);
+}
+
+function assertValidNanoidSize(size: unknown): asserts size is number {
+  if (typeof size !== 'number' || !Number.isInteger(size) || size < 2 || size > 255) {
+    throw new Error('field.nanoid({ size }) requires an integer size between 2 and 255.');
+  }
+}
+
+function resolveNanoidLength(options?: NanoidGeneratorOptions): number {
+  const size = options?.size;
+  if (size === undefined) {
+    return 21;
+  }
+
+  assertValidNanoidSize(size);
+  return size;
+}
+
+function nanoidField(
+  options?: NanoidGeneratorOptions,
+): ScalarFieldBuilder<ScalarFieldState<typeof SQL_CHARACTER_DESCRIPTOR.codecId, undefined>> {
+  return columnField({
+    ...SQL_CHARACTER_DESCRIPTOR,
+    typeParams: {
+      length: resolveNanoidLength(options),
+    },
+  } as const satisfies ColumnTypeDescriptor);
+}
+
+function createBuiltinIdField<
+  GeneratorId extends BuiltinIdGeneratorId,
+  const Name extends string | undefined = undefined,
+>(
+  generatorId: GeneratorId,
+  generatorOptions: BuiltinIdGeneratorOptionsById[GeneratorId],
+  namedConstraintOptions?: NamedConstraintSpec<Name>,
+) {
+  const typeParams =
+    generatorId === 'nanoid'
+      ? { length: resolveNanoidLength(generatorOptions) }
+      : generatorId === 'ulid'
+        ? { length: 26 }
+        : generatorId === 'cuid2'
+          ? { length: 24 }
+          : generatorId === 'ksuid'
+            ? { length: 27 }
+            : { length: 36 };
+
+  return generatedField({
+    type: SQL_CHARACTER_DESCRIPTOR,
+    typeParams,
+    generated: {
+      kind: 'generator',
+      id: generatorId,
+      ...(generatorId === 'nanoid' && generatorOptions?.size !== undefined
+        ? {
+            params: {
+              size: generatorOptions.size,
+            },
+          }
+        : {}),
+    } as ExecutionMutationDefaultValue,
+  }).id(namedConstraintOptions);
+}
+
+function uuidv4IdField<const Name extends string | undefined = undefined>(
+  options?: NamedConstraintSpec<Name>,
+) {
+  return createBuiltinIdField('uuidv4', undefined, options);
+}
+
+function uuidv7IdField<const Name extends string | undefined = undefined>(
+  options?: NamedConstraintSpec<Name>,
+) {
+  return createBuiltinIdField('uuidv7', undefined, options);
+}
+
+function ulidIdField<const Name extends string | undefined = undefined>(
+  options?: NamedConstraintSpec<Name>,
+) {
+  return createBuiltinIdField('ulid', undefined, options);
+}
+
+function nanoidIdField<const Name extends string | undefined = undefined>(
+  options?: NanoidGeneratorOptions,
+  namedConstraintOptions?: NamedConstraintSpec<Name>,
+) {
+  return createBuiltinIdField('nanoid', options, namedConstraintOptions);
+}
+
+function cuid2IdField<const Name extends string | undefined = undefined>(
+  options?: NamedConstraintSpec<Name>,
+) {
+  return createBuiltinIdField('cuid2', undefined, options);
+}
+
+function ksuidIdField<const Name extends string | undefined = undefined>(
+  options?: NamedConstraintSpec<Name>,
+) {
+  return createBuiltinIdField('ksuid', undefined, options);
 }
 
 type LazyRelationModelName<ModelName extends string = string> = {
@@ -210,11 +562,13 @@ type BelongsToRelation<
   ToModel extends string = string,
   FromField extends string | readonly string[] = string | readonly string[],
   ToField extends string | readonly string[] = string | readonly string[],
+  SqlSpec extends BelongsToRelationSqlSpec | undefined = undefined,
 > = {
   readonly kind: 'belongsTo';
   readonly toModel: RelationModelSource<ToModel>;
   readonly from: FromField;
   readonly to: ToField;
+  readonly sql?: SqlSpec;
 };
 
 type HasManyRelation<
@@ -249,10 +603,61 @@ type ManyToManyRelation<
 };
 
 export type RelationState =
-  | BelongsToRelation
+  | BelongsToRelation<
+      string,
+      string | readonly string[],
+      string | readonly string[],
+      BelongsToRelationSqlSpec | undefined
+    >
   | HasManyRelation
   | HasOneRelation
   | ManyToManyRelation;
+
+type AnyRelationState = RelationState;
+type AnyRelationBuilder = RelationBuilder<AnyRelationState>;
+
+type ApplyBelongsToRelationSqlSpec<
+  State extends RelationState,
+  SqlSpec extends BelongsToRelationSqlSpec,
+> = State extends BelongsToRelation<
+  infer ToModel,
+  infer FromField,
+  infer ToField,
+  BelongsToRelationSqlSpec | undefined
+>
+  ? BelongsToRelation<ToModel, FromField, ToField, SqlSpec>
+  : never;
+
+export class RelationBuilder<State extends RelationState = AnyRelationState> {
+  declare readonly __state: State;
+
+  constructor(private readonly state: State) {}
+
+  sql<const SqlSpec extends BelongsToRelationSqlSpec>(
+    this: State extends BelongsToRelation<
+      string,
+      string | readonly string[],
+      string | readonly string[],
+      BelongsToRelationSqlSpec | undefined
+    >
+      ? RelationBuilder<State>
+      : never,
+    spec: SqlSpec,
+  ): RelationBuilder<ApplyBelongsToRelationSqlSpec<State, SqlSpec>> {
+    if (this.state.kind !== 'belongsTo') {
+      throw new Error('relation.sql(...) is only supported for belongsTo relations.');
+    }
+
+    return new RelationBuilder({
+      ...this.state,
+      sql: spec,
+    } as ApplyBelongsToRelationSqlSpec<State, SqlSpec>);
+  }
+
+  build(): State {
+    return this.state;
+  }
+}
 
 export type ColumnRef<FieldName extends string = string> = {
   readonly kind: 'columnRef';
@@ -272,20 +677,26 @@ export type ModelTokenRefs<
   readonly [K in keyof Fields]: TargetFieldRef<ModelName, K & string>;
 };
 
-type ConstraintOptions = {
-  readonly name?: string;
+type ConstraintOptions<Name extends string | undefined = string | undefined> = {
+  readonly name?: Name;
 };
 
-type IndexOptions = ConstraintOptions & {
-  readonly using?: string;
-  readonly config?: Record<string, unknown>;
-};
+type IndexOptions<Name extends string | undefined = string | undefined> =
+  ConstraintOptions<Name> & {
+    readonly using?: string;
+    readonly config?: Record<string, unknown>;
+  };
 
-type ForeignKeyOptions = ConstraintOptions & {
-  readonly onDelete?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
-  readonly onUpdate?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
-  readonly constraint?: boolean;
-  readonly index?: boolean;
+type ForeignKeyOptions<Name extends string | undefined = string | undefined> =
+  ConstraintOptions<Name> & {
+    readonly onDelete?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+    readonly onUpdate?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+    readonly constraint?: boolean;
+    readonly index?: boolean;
+  };
+
+type BelongsToRelationSqlSpec<Name extends string | undefined = string | undefined> = {
+  readonly fk?: ForeignKeyOptions<Name>;
 };
 
 export type IdConstraint<
@@ -303,10 +714,13 @@ export type UniqueConstraint<FieldNames extends readonly string[] = readonly str
   readonly name?: string;
 };
 
-export type IndexConstraint<FieldNames extends readonly string[] = readonly string[]> = {
+export type IndexConstraint<
+  FieldNames extends readonly string[] = readonly string[],
+  Name extends string | undefined = string | undefined,
+> = {
   readonly kind: 'index';
   readonly fields: FieldNames;
-  readonly name?: string;
+  readonly name?: Name;
   readonly using?: string;
   readonly config?: Record<string, unknown>;
 };
@@ -315,12 +729,13 @@ export type ForeignKeyConstraint<
   SourceFieldNames extends readonly string[] = readonly string[],
   TargetModelName extends string = string,
   TargetFieldNames extends readonly string[] = readonly string[],
+  Name extends string | undefined = string | undefined,
 > = {
   readonly kind: 'fk';
   readonly fields: SourceFieldNames;
   readonly targetModel: TargetModelName;
   readonly targetFields: TargetFieldNames;
-  readonly name?: string;
+  readonly name?: Name;
   readonly onDelete?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
   readonly onUpdate?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
   readonly constraint?: boolean;
@@ -399,14 +814,14 @@ function createConstraintsDsl() {
     };
   }
 
-  function index<FieldName extends string>(
+  function index<FieldName extends string, Name extends string | undefined = undefined>(
     field: ColumnRef<FieldName>,
-    options?: IndexOptions,
-  ): IndexConstraint<readonly [FieldName]>;
-  function index<FieldNames extends readonly string[]>(
+    options?: IndexOptions<Name>,
+  ): IndexConstraint<readonly [FieldName], Name>;
+  function index<FieldNames extends readonly string[], Name extends string | undefined = undefined>(
     fields: { readonly [K in keyof FieldNames]: ColumnRef<FieldNames[K] & string> },
-    options?: IndexOptions,
-  ): IndexConstraint<FieldNames>;
+    options?: IndexOptions<Name>,
+  ): IndexConstraint<FieldNames, Name>;
   function index(
     fieldOrFields: ColumnRef | readonly ColumnRef[],
     options?: IndexOptions,
@@ -424,15 +839,22 @@ function createConstraintsDsl() {
     SourceFieldName extends string,
     TargetModelName extends string,
     TargetFieldName extends string,
+    Name extends string | undefined = undefined,
   >(
     field: ColumnRef<SourceFieldName>,
     target: TargetFieldRef<TargetModelName, TargetFieldName>,
-    options?: ForeignKeyOptions,
-  ): ForeignKeyConstraint<readonly [SourceFieldName], TargetModelName, readonly [TargetFieldName]>;
+    options?: ForeignKeyOptions<Name>,
+  ): ForeignKeyConstraint<
+    readonly [SourceFieldName],
+    TargetModelName,
+    readonly [TargetFieldName],
+    Name
+  >;
   function foreignKey<
     SourceFieldNames extends readonly string[],
     TargetModelName extends string,
     TargetFieldNames extends readonly string[],
+    Name extends string | undefined = undefined,
   >(
     fields: { readonly [K in keyof SourceFieldNames]: ColumnRef<SourceFieldNames[K] & string> },
     target: {
@@ -441,8 +863,8 @@ function createConstraintsDsl() {
         TargetFieldNames[K] & string
       >;
     },
-    options?: ForeignKeyOptions,
-  ): ForeignKeyConstraint<SourceFieldNames, TargetModelName, TargetFieldNames>;
+    options?: ForeignKeyOptions<Name>,
+  ): ForeignKeyConstraint<SourceFieldNames, TargetModelName, TargetFieldNames, Name>;
   function foreignKey(
     fieldOrFields: ColumnRef | readonly ColumnRef[],
     target: TargetFieldRef | readonly TargetFieldRef[],
@@ -560,10 +982,97 @@ function createColumnRefs<Fields extends Record<string, ScalarFieldBuilder>>(
   return createFieldRefs(fields);
 }
 
+type StaticLiteralName<Name> = Name extends string ? (string extends Name ? never : Name) : never;
+
+type NamedConstraintLiteralName<Constraint> = Constraint extends { readonly name?: infer Name }
+  ? StaticLiteralName<Name>
+  : never;
+
+type DuplicateLiteralNames<
+  Items extends readonly unknown[],
+  Seen extends string = never,
+  Duplicates extends string = never,
+> = Items extends readonly [infer First, ...infer Rest extends readonly unknown[]]
+  ? NamedConstraintLiteralName<First> extends infer Name extends string
+    ? Name extends Seen
+      ? DuplicateLiteralNames<Rest, Seen, Duplicates | Name>
+      : DuplicateLiteralNames<Rest, Seen | Name, Duplicates>
+    : DuplicateLiteralNames<Rest, Seen, Duplicates>
+  : Duplicates;
+
+type InlineIdLiteralName<Fields extends Record<string, ScalarFieldBuilder>> = {
+  readonly [FieldName in keyof Fields]: FieldStateOf<Fields[FieldName]> extends {
+    readonly id: { readonly name?: infer Name };
+  }
+    ? StaticLiteralName<Name>
+    : never;
+}[keyof Fields];
+
+type AttributeIdLiteralName<AttributesSpec extends ModelAttributesSpec | undefined> =
+  AttributesSpec extends {
+    readonly id?: { readonly name?: infer Name };
+  }
+    ? StaticLiteralName<Name>
+    : never;
+
+type ModelIdLiteralName<
+  Fields extends Record<string, ScalarFieldBuilder>,
+  AttributesSpec extends ModelAttributesSpec | undefined,
+> = [AttributeIdLiteralName<AttributesSpec>] extends [never]
+  ? InlineIdLiteralName<Fields>
+  : AttributeIdLiteralName<AttributesSpec>;
+
+type SqlIndexes<SqlSpec extends SqlStageSpec> = SqlSpec extends {
+  readonly indexes?: infer Indexes extends readonly unknown[];
+}
+  ? Indexes
+  : readonly [];
+
+type SqlForeignKeys<SqlSpec extends SqlStageSpec> = SqlSpec extends {
+  readonly foreignKeys?: infer ForeignKeys extends readonly unknown[];
+}
+  ? ForeignKeys
+  : readonly [];
+
+type SqlNamedObjects<SqlSpec extends SqlStageSpec> = [
+  ...SqlIndexes<SqlSpec>,
+  ...SqlForeignKeys<SqlSpec>,
+];
+
+type ValidateSqlStageSpec<
+  Fields extends Record<string, ScalarFieldBuilder>,
+  AttributesSpec extends ModelAttributesSpec | undefined,
+  SqlSpec extends SqlStageSpec,
+> = [DuplicateLiteralNames<SqlNamedObjects<SqlSpec>>] extends [never]
+  ? [
+      Extract<
+        ModelIdLiteralName<Fields, AttributesSpec>,
+        NamedConstraintLiteralName<SqlNamedObjects<SqlSpec>[number]>
+      >,
+    ] extends [never]
+    ? SqlSpec
+    : never
+  : never;
+
+type ValidateAttributesStageSpec<
+  Fields extends Record<string, ScalarFieldBuilder>,
+  SqlSpec extends SqlStageSpec | undefined,
+  AttributesSpec extends ModelAttributesSpec,
+> = SqlSpec extends SqlStageSpec
+  ? [
+      Extract<
+        ModelIdLiteralName<Fields, AttributesSpec>,
+        NamedConstraintLiteralName<SqlNamedObjects<SqlSpec>[number]>
+      >,
+    ] extends [never]
+    ? AttributesSpec
+    : never
+  : AttributesSpec;
+
 export class RefinedModelBuilder<
   ModelName extends string | undefined,
   Fields extends Record<string, ScalarFieldBuilder>,
-  Relations extends Record<string, RelationState> = Record<never, never>,
+  Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
   AttributesSpec extends ModelAttributesSpec | undefined = undefined,
   SqlSpec extends SqlStageSpec | undefined = undefined,
 > {
@@ -606,7 +1115,7 @@ export class RefinedModelBuilder<
     } as TargetFieldRef<ModelName & string, FieldName>;
   }
 
-  relations<const NextRelations extends Record<string, RelationState>>(
+  relations<const NextRelations extends Record<string, AnyRelationBuilder>>(
     relations: NextRelations,
   ): RefinedModelBuilder<ModelName, Fields, Relations & NextRelations, AttributesSpec, SqlSpec> {
     return new RefinedModelBuilder(
@@ -623,13 +1132,19 @@ export class RefinedModelBuilder<
   }
 
   attributes<const NextAttributesSpec extends ModelAttributesSpec>(
-    specOrFactory: StageInput<AttributeContext<Fields>, NextAttributesSpec>,
+    specOrFactory: StageInput<
+      AttributeContext<Fields>,
+      ValidateAttributesStageSpec<Fields, SqlSpec, NextAttributesSpec>
+    >,
   ): RefinedModelBuilder<ModelName, Fields, Relations, NextAttributesSpec, SqlSpec> {
     return new RefinedModelBuilder(this.stageOne, specOrFactory, this.sqlFactory);
   }
 
   sql<const NextSqlSpec extends SqlStageSpec>(
-    specOrFactory: StageInput<SqlContext<Fields>, NextSqlSpec>,
+    specOrFactory: StageInput<
+      SqlContext<Fields>,
+      ValidateSqlStageSpec<Fields, AttributesSpec, NextSqlSpec>
+    >,
   ): RefinedModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
     return new RefinedModelBuilder(this.stageOne, this.attributesFactory, specOrFactory);
   }
@@ -745,7 +1260,7 @@ export type RefinedContractInput<
     RefinedModelBuilder<
       string | undefined,
       Record<string, ScalarFieldBuilder>,
-      Record<string, RelationState>,
+      Record<string, AnyRelationBuilder>,
       ModelAttributesSpec | undefined,
       SqlStageSpec | undefined
     >
@@ -766,7 +1281,7 @@ export type RefinedContractInput<
 export function model<
   const ModelName extends string,
   Fields extends Record<string, ScalarFieldBuilder>,
-  Relations extends Record<string, RelationState> = Record<never, never>,
+  Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
 >(
   modelName: ModelName,
   input: {
@@ -777,7 +1292,7 @@ export function model<
 
 export function model<
   Fields extends Record<string, ScalarFieldBuilder>,
-  Relations extends Record<string, RelationState> = Record<never, never>,
+  Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
 >(input: {
   readonly fields: Fields;
   readonly relations?: Relations;
@@ -786,7 +1301,7 @@ export function model<
 export function model<
   const ModelName extends string,
   Fields extends Record<string, ScalarFieldBuilder>,
-  Relations extends Record<string, RelationState> = Record<never, never>,
+  Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
 >(
   modelNameOrInput:
     | ModelName
@@ -819,7 +1334,7 @@ function belongsTo<
 >(
   toModel: Token | LazyNamedModelToken<Token>,
   options: { readonly from: FromField; readonly to: ToField },
-): BelongsToRelation<RelationModelName<Token>, FromField, ToField>;
+): RelationBuilder<BelongsToRelation<RelationModelName<Token>, FromField, ToField>>;
 function belongsTo<
   ToModel extends string,
   FromField extends string | readonly string[],
@@ -827,20 +1342,20 @@ function belongsTo<
 >(
   toModel: ToModel,
   options: { readonly from: FromField; readonly to: ToField },
-): BelongsToRelation<ToModel, FromField, ToField>;
+): RelationBuilder<BelongsToRelation<ToModel, FromField, ToField>>;
 function belongsTo(
   toModel: string | AnyNamedModelToken | LazyNamedModelToken,
   options: {
     readonly from: string | readonly string[];
     readonly to: string | readonly string[];
   },
-): BelongsToRelation {
-  return {
+): RelationBuilder<BelongsToRelation> {
+  return new RelationBuilder({
     kind: 'belongsTo',
     toModel: normalizeRelationModelSource(toModel),
     from: options.from,
     to: options.to,
-  };
+  });
 }
 
 function hasMany<
@@ -849,20 +1364,20 @@ function hasMany<
 >(
   toModel: Token | LazyNamedModelToken<Token>,
   options: { readonly by: ByField },
-): HasManyRelation<RelationModelName<Token>, ByField>;
+): RelationBuilder<HasManyRelation<RelationModelName<Token>, ByField>>;
 function hasMany<ToModel extends string, ByField extends string | readonly string[]>(
   toModel: ToModel,
   options: { readonly by: ByField },
-): HasManyRelation<ToModel, ByField>;
+): RelationBuilder<HasManyRelation<ToModel, ByField>>;
 function hasMany(
   toModel: string | AnyNamedModelToken | LazyNamedModelToken,
   options: { readonly by: string | readonly string[] },
-): HasManyRelation {
-  return {
+): RelationBuilder<HasManyRelation> {
+  return new RelationBuilder({
     kind: 'hasMany',
     toModel: normalizeRelationModelSource(toModel),
     by: options.by,
-  };
+  });
 }
 
 function hasOne<
@@ -871,20 +1386,20 @@ function hasOne<
 >(
   toModel: Token | LazyNamedModelToken<Token>,
   options: { readonly by: ByField },
-): HasOneRelation<RelationModelName<Token>, ByField>;
+): RelationBuilder<HasOneRelation<RelationModelName<Token>, ByField>>;
 function hasOne<ToModel extends string, ByField extends string | readonly string[]>(
   toModel: ToModel,
   options: { readonly by: ByField },
-): HasOneRelation<ToModel, ByField>;
+): RelationBuilder<HasOneRelation<ToModel, ByField>>;
 function hasOne(
   toModel: string | AnyNamedModelToken | LazyNamedModelToken,
   options: { readonly by: string | readonly string[] },
-): HasOneRelation {
-  return {
+): RelationBuilder<HasOneRelation> {
+  return new RelationBuilder({
     kind: 'hasOne',
     toModel: normalizeRelationModelSource(toModel),
     by: options.by,
-  };
+  });
 }
 
 function manyToMany<
@@ -899,11 +1414,13 @@ function manyToMany<
     readonly from: FromField;
     readonly to: ToField;
   },
-): ManyToManyRelation<
-  RelationModelName<ToToken>,
-  RelationModelName<ThroughToken>,
-  FromField,
-  ToField
+): RelationBuilder<
+  ManyToManyRelation<
+    RelationModelName<ToToken>,
+    RelationModelName<ThroughToken>,
+    FromField,
+    ToField
+  >
 >;
 function manyToMany<
   ToModel extends string,
@@ -917,7 +1434,7 @@ function manyToMany<
     readonly from: FromField;
     readonly to: ToField;
   },
-): ManyToManyRelation<ToModel, ThroughModel, FromField, ToField>;
+): RelationBuilder<ManyToManyRelation<ToModel, ThroughModel, FromField, ToField>>;
 function manyToMany(
   toModel: string | AnyNamedModelToken | LazyNamedModelToken,
   options: {
@@ -925,14 +1442,14 @@ function manyToMany(
     readonly from: string | readonly string[];
     readonly to: string | readonly string[];
   },
-): ManyToManyRelation {
-  return {
+): RelationBuilder<ManyToManyRelation> {
+  return new RelationBuilder({
     kind: 'manyToMany',
     toModel: normalizeRelationModelSource(toModel),
     through: normalizeRelationModelSource(options.through),
     from: options.from,
     to: options.to,
-  };
+  });
 }
 
 export const rel = {
@@ -943,38 +1460,24 @@ export const rel = {
 };
 
 export const field = {
-  column<Descriptor extends ColumnTypeDescriptor>(
-    descriptor: Descriptor,
-  ): ScalarFieldBuilder<ScalarFieldState<Descriptor['codecId'], false, undefined>> {
-    return new ScalarFieldBuilder({
-      kind: 'scalar',
-      descriptor,
-      nullable: false,
-    });
-  },
-
-  generated<Descriptor extends ColumnTypeDescriptor>(
-    spec: GeneratedFieldSpec & { readonly type: Descriptor },
-  ): ScalarFieldBuilder<ScalarFieldState<Descriptor['codecId'], false, undefined>> {
-    return new ScalarFieldBuilder({
-      kind: 'scalar',
-      descriptor: {
-        ...spec.type,
-        ...(spec.typeParams ? { typeParams: spec.typeParams } : {}),
-      },
-      nullable: false,
-      executionDefault: spec.generated,
-    });
-  },
-
-  namedType<TypeRef extends string>(
-    typeRef: TypeRef,
-  ): ScalarFieldBuilder<ScalarFieldState<string, false, undefined>> {
-    return new ScalarFieldBuilder({
-      kind: 'scalar',
-      typeRef,
-      nullable: false,
-    });
+  column: columnField,
+  generated: generatedField,
+  namedType: namedTypeField,
+  text: textField,
+  timestamp: timestampField,
+  createdAt: createdAtField,
+  uuid: uuidField,
+  ulid: ulidField,
+  nanoid: nanoidField,
+  cuid2: cuid2Field,
+  ksuid: ksuidField,
+  id: {
+    uuidv4: uuidv4IdField,
+    uuidv7: uuidv7IdField,
+    ulid: ulidIdField,
+    nanoid: nanoidIdField,
+    cuid2: cuid2IdField,
+    ksuid: ksuidIdField,
   },
 };
 
@@ -1026,12 +1529,13 @@ export function applyNaming(name: string, strategy: NamingStrategy | undefined):
 }
 
 export type FieldStateOf<T> = T extends ScalarFieldBuilder<infer State> ? State : never;
+export type RelationStateOf<T> = T extends RelationBuilder<infer State> ? State : never;
 
 export type ModelFieldsOf<T> =
   T extends RefinedModelBuilder<
     string | undefined,
     infer Fields,
-    Record<string, RelationState>,
+    Record<string, AnyRelationBuilder>,
     ModelAttributesSpec | undefined,
     SqlStageSpec | undefined
   >
@@ -1053,7 +1557,7 @@ export type ModelAttributesOf<T> =
   T extends RefinedModelBuilder<
     string | undefined,
     Record<string, ScalarFieldBuilder>,
-    Record<string, RelationState>,
+    Record<string, AnyRelationBuilder>,
     infer AttributesSpec,
     SqlStageSpec | undefined
   >
@@ -1064,7 +1568,7 @@ export type ModelSqlOf<T> =
   T extends RefinedModelBuilder<
     string | undefined,
     Record<string, ScalarFieldBuilder>,
-    Record<string, RelationState>,
+    Record<string, AnyRelationBuilder>,
     ModelAttributesSpec | undefined,
     infer SqlSpec
   >

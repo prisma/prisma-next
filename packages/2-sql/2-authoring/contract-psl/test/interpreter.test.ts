@@ -195,7 +195,7 @@ model Post {
   id Int @id
   userId Int
   title String
-  author User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: SetNull)
+  author User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   @@index([userId])
   @@unique([title, userId])
 }
@@ -244,7 +244,7 @@ model Post {
                 columns: ['id'],
               },
               onDelete: 'cascade',
-              onUpdate: 'setNull',
+              onUpdate: 'cascade',
             },
           ],
         },
@@ -872,6 +872,93 @@ model Document {
               codecId: 'pg/vector@1',
               nativeType: 'vector',
               typeParams: { length: 1536 },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('instantiates enum and pgvector descriptors from shared authoring contributions', () => {
+    const document = parsePslDocument({
+      schema: `enum Role {
+  USER
+  ADMIN
+}
+
+types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
+}
+
+model Document {
+  id Int @id
+  role Role
+  embedding Embedding1536
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      composedExtensionPacks: ['pgvector'],
+      authoringContributions: {
+        type: {
+          enum: {
+            kind: 'typeConstructor',
+            args: [{ kind: 'string' }, { kind: 'stringArray' }],
+            output: {
+              codecId: 'custom/enum@1',
+              nativeType: { kind: 'arg', index: 0 },
+              typeParams: {
+                values: { kind: 'arg', index: 1 },
+              },
+            },
+          },
+          pgvector: {
+            vector: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'number', integer: true, minimum: 1, maximum: 2000 }],
+              output: {
+                codecId: 'custom/vector@1',
+                nativeType: 'vector',
+                typeParams: {
+                  length: { kind: 'arg', index: 0 },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storage).toMatchObject({
+      types: {
+        Role: {
+          codecId: 'custom/enum@1',
+          nativeType: 'role',
+          typeParams: { values: ['USER', 'ADMIN'] },
+        },
+        Embedding1536: {
+          codecId: 'custom/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 1536 },
+        },
+      },
+      tables: {
+        document: {
+          columns: {
+            role: {
+              codecId: 'custom/enum@1',
+              nativeType: 'role',
+              typeRef: 'Role',
+            },
+            embedding: {
+              codecId: 'custom/vector@1',
+              nativeType: 'vector',
+              typeRef: 'Embedding1536',
             },
           },
         },

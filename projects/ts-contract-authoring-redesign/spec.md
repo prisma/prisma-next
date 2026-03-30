@@ -37,7 +37,7 @@ The chosen direction is still refined Option A, but with a sharper target shape 
 ```ts
 const User = model('User', {
   fields: {
-    id: field.id.uuid(),
+    id: field.id.uuidv7(),
     email: field.text().unique().sql({ unique: { name: 'app_user_email_key' } }),
   },
   relations: {
@@ -52,7 +52,7 @@ const User = model('User', {
 
 const Post = model('Post', {
   fields: {
-    id: field.id.uuid(),
+    id: field.id.uuidv7(),
     authorId: field.uuid(),
     title: field.text(),
   },
@@ -294,7 +294,7 @@ export const contract = defineContract({
   models: {
     Account: model({
       fields: {
-        id: field.id.uuid({ version: 7 }),
+        id: field.id.uuidv7(),
         email: field.namedType('Email').column('email_address'),
         role: field.namedType('Role').default('MEMBER'),
         displayName: field.text().column('display_name').optional(),
@@ -523,7 +523,7 @@ export const contract = defineContract({
   models: {
     User: model({
       fields: {
-        id: field.id.uuid(),
+        id: field.id.uuidv7(),
         email: field.text(),
         createdAt: field.createdAt(),
       },
@@ -543,7 +543,7 @@ export const contract = defineContract({
   models: {
     User: model({
       fields: {
-        id: field.id.uuid(),
+        id: field.id.uuidv7(),
         email: field.text(),
         createdAt: field.createdAt(),
       },
@@ -661,6 +661,6 @@ No product analytics are required for the authoring API itself.
 
 # Open Questions
 
-1. How much of the current high-level field vocabulary (`field.id.uuid()`, `field.createdAt()`, `field.json().schema(...)`) should ship in the first implementation slice versus follow-on slices that still use the refined structure?
+1. How much of the current high-level field vocabulary (`field.id.uuidv4()`, `field.id.uuidv7()`, `field.createdAt()`, `field.json().schema(...)`) should ship in the first implementation slice versus follow-on slices that still use the refined structure?
 2. Should cross-model `refs` be fully autocompleteable in the first implementation slice, or is it acceptable to ship opaque refs with weaker author-time guidance first and strengthen them later?
 3. Should the eventual explain/debug surface be a CLI command, a library helper, or both?

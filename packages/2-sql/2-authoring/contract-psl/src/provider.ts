@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type {
+  AuthoringContributions,
+  TargetPackRef,
+} from '@prisma-next/contract/framework-components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -11,6 +14,7 @@ import { interpretPslDocumentToSqlContractIR } from './interpreter';
 export interface PrismaContractOptions {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', 'postgres'>;
+  readonly authoringContributions?: AuthoringContributions;
   readonly scalarTypeDescriptors: ReadonlyMap<
     string,
     {
@@ -58,6 +62,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
       const interpreted = interpretPslDocumentToSqlContractIR({
         document,
         target: options.target,
+        ...ifDefined('authoringContributions', options.authoringContributions),
         scalarTypeDescriptors: options.scalarTypeDescriptors,
         ...ifDefined(
           'composedExtensionPacks',

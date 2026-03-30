@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { col, contract, fk, model, pk, storage, table } from '../src/factories';
+import { col, contract, fk, index, model, pk, storage, table, unique } from '../src/factories';
 import type { ReferentialAction } from '../src/types';
 import {
   validateModel,
@@ -602,6 +602,71 @@ describe('SQL contract validators', () => {
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(1);
       expect(errors[0]).toContain('setDefault');
+    });
+
+    it('rejects duplicate named objects within the same table', () => {
+      const s = storage({
+        user: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            email: col('text', 'pg/text@1'),
+          },
+          {
+            pk: { columns: ['id'], name: 'user_pkey' },
+            indexes: [{ columns: ['id'], name: 'user_pkey' }],
+          },
+        ),
+      });
+
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('user_pkey');
+      expect(errors[0]).toContain('primary key');
+      expect(errors[0]).toContain('index');
+    });
+
+    it('rejects duplicate unique and index definitions within the same table', () => {
+      const s = storage({
+        user: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            email: col('text', 'pg/text@1'),
+          },
+          {
+            uniques: [unique('email'), unique('email')],
+            indexes: [index('email'), index('email')],
+          },
+        ),
+      });
+
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toContain('duplicate unique constraint definition');
+      expect(errors[1]).toContain('duplicate index definition');
+    });
+
+    it('rejects duplicate foreign key definitions within the same table', () => {
+      const s = storage({
+        user: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            orgId: col('int4', 'pg/int4@1'),
+          },
+          {
+            foreignKeys: [
+              fk(['orgId'], { table: 'org', columns: ['id'] }, { onDelete: 'cascade' }),
+              fk(['orgId'], { table: 'org', columns: ['id'] }, { onDelete: 'cascade' }),
+            ],
+          },
+        ),
+        org: table({
+          id: col('int4', 'pg/int4@1'),
+        }),
+      });
+
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('duplicate foreign key definition');
     });
 
     it('returns no errors for storage without FKs', () => {

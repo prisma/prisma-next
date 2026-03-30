@@ -4,6 +4,7 @@ import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 
 const postgresPack = postgresTargetDescriptorMeta;
 
-export default postgresPack as TargetPackRef<'sql', 'postgres'> & {
-  readonly __codecTypes?: CodecTypes;
-};
+export default postgresPack as typeof postgresTargetDescriptorMeta &
+  TargetPackRef<'sql', 'postgres'> & {
+    readonly __codecTypes?: CodecTypes;
+  };

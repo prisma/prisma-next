@@ -36,7 +36,7 @@ The recommended end-state is:
 ```ts
 const User = model('User', {
   fields: {
-    id: field.id.uuid(),
+    id: field.id.uuidv7(),
     email: field.text().unique().sql({ unique: { name: 'app_user_email_key' } }),
   },
   relations: {
@@ -51,7 +51,7 @@ const User = model('User', {
 
 const Post = model('Post', {
   fields: {
-    id: field.id.uuid(),
+    id: field.id.uuidv7(),
     authorId: field.uuid(),
     title: field.text(),
   },

@@ -3,7 +3,15 @@ import type {
   ContractSourceDiagnosticSpan,
   ContractSourceDiagnostics,
 } from '@prisma-next/config/config-types';
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type {
+  AuthoringContributions,
+  AuthoringTypeConstructorDescriptor,
+  TargetPackRef,
+} from '@prisma-next/contract/framework-components';
+import {
+  instantiateAuthoringTypeConstructor,
+  isAuthoringTypeConstructorDescriptor,
+} from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
@@ -13,7 +21,15 @@ import type {
   PslModel,
   PslSpan,
 } from '@prisma-next/psl-parser';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlContractFromSemanticDefinition,
+  type SqlSemanticForeignKeyNode,
+  type SqlSemanticIndexNode,
+  type SqlSemanticModelNode,
+  type SqlSemanticRelationNode,
+  type SqlSemanticUniqueConstraintNode,
+} from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -32,12 +48,29 @@ type ColumnDescriptor = {
   readonly typeParams?: Record<string, unknown>;
 };
 
+function getAuthoringTypeConstructor(
+  contributions: AuthoringContributions | undefined,
+  path: readonly string[],
+): AuthoringTypeConstructorDescriptor | undefined {
+  let current: unknown = contributions?.type;
+
+  for (const segment of path) {
+    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
+}
+
 export interface InterpretPslDocumentToSqlContractIRInput {
   readonly document: ParsePslDocumentResult;
   readonly target: TargetPackRef<'sql', 'postgres'>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensionPacks?: readonly string[];
   readonly controlMutationDefaults?: ControlMutationDefaults;
+  readonly authoringContributions?: AuthoringContributions;
 }
 
 const REFERENTIAL_ACTION_MAP = {
@@ -91,22 +124,7 @@ type ModelBackrelationCandidate = {
   readonly relationName?: string;
 };
 
-type ModelRelationMetadata = {
-  readonly fieldName: string;
-  readonly toModel: string;
-  readonly toTable: string;
-  readonly cardinality: '1:N' | 'N:1';
-  readonly parentTable: string;
-  readonly parentColumns: readonly string[];
-  readonly childTable: string;
-  readonly childColumns: readonly string[];
-};
-
-type ResolvedModelEntry = {
-  readonly model: PslModel;
-  readonly mapping: ModelNameMapping;
-  readonly resolvedFields: readonly ResolvedField[];
-};
+type ModelRelationMetadata = SqlSemanticRelationNode;
 
 function fkRelationPairKey(declaringModelName: string, targetModelName: string): string {
   // NOTE: We assume PSL model identifiers do not contain the `::` separator.
@@ -117,65 +135,6 @@ type ModelNameMapping = {
   readonly model: PslModel;
   readonly tableName: string;
   readonly fieldColumns: Map<string, string>;
-};
-
-type DynamicTableBuilder = {
-  column(
-    name: string,
-    options: { type: ColumnDescriptor; nullable?: true; default?: ColumnDefault },
-  ): DynamicTableBuilder;
-  generated(
-    name: string,
-    options: { type: ColumnDescriptor; generated: ExecutionMutationDefaultValue },
-  ): DynamicTableBuilder;
-  unique(columns: readonly string[]): DynamicTableBuilder;
-  primaryKey(columns: readonly string[]): DynamicTableBuilder;
-  index(columns: readonly string[]): DynamicTableBuilder;
-  foreignKey(
-    columns: readonly string[],
-    references: { table: string; columns: readonly string[] },
-    options?: { name?: string; onDelete?: string; onUpdate?: string },
-  ): DynamicTableBuilder;
-};
-
-type DynamicModelBuilder = {
-  field(name: string, column: string): DynamicModelBuilder;
-  relation(
-    name: string,
-    options: {
-      toModel: string;
-      toTable: string;
-      cardinality: '1:1' | '1:N' | 'N:1';
-      on: {
-        parentTable: string;
-        parentColumns: readonly string[];
-        childTable: string;
-        childColumns: readonly string[];
-      };
-    },
-  ): DynamicModelBuilder;
-};
-
-type DynamicContractBuilder = {
-  target(target: TargetPackRef<'sql', 'postgres'>): DynamicContractBuilder;
-  storageType(
-    name: string,
-    typeInstance: {
-      codecId: string;
-      nativeType: string;
-      typeParams: Record<string, unknown>;
-    },
-  ): DynamicContractBuilder;
-  table(
-    name: string,
-    callback: (tableBuilder: DynamicTableBuilder) => DynamicTableBuilder,
-  ): DynamicContractBuilder;
-  model(
-    name: string,
-    table: string,
-    callback: (modelBuilder: DynamicModelBuilder) => DynamicModelBuilder,
-  ): DynamicContractBuilder;
-  build(): ContractIR;
 };
 
 function lowerFirst(value: string): string {
@@ -761,6 +720,7 @@ function collectResolvedFields(
   namedTypeBaseTypes: Map<string, string>,
   modelNames: Set<string>,
   composedExtensions: Set<string>,
+  authoringContributions: AuthoringContributions | undefined,
   defaultFunctionRegistry: ControlMutationDefaultRegistry,
   generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>,
   diagnostics: ContractSourceDiagnostic[],
@@ -768,6 +728,10 @@ function collectResolvedFields(
   scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
 ): ResolvedField[] {
   const resolvedFields: ResolvedField[] = [];
+  const pgvectorVectorConstructor = getAuthoringTypeConstructor(authoringContributions, [
+    'pgvector',
+    'vector',
+  ]);
 
   for (const field of model.fields) {
     if (field.list) {
@@ -850,11 +814,13 @@ function collectResolvedFields(
             sourceId,
           });
           if (length !== undefined) {
-            descriptor = {
-              codecId: 'pg/vector@1',
-              nativeType: 'vector',
-              typeParams: { length },
-            };
+            descriptor = pgvectorVectorConstructor
+              ? instantiateAuthoringTypeConstructor(pgvectorVectorConstructor, [length])
+              : {
+                  codecId: 'pg/vector@1',
+                  nativeType: 'vector',
+                  typeParams: { length },
+                };
           }
         }
       }
@@ -957,10 +923,12 @@ function indexFkRelations(input: { readonly fkRelationMetadata: readonly FkRelat
       toModel: relation.targetModelName,
       toTable: relation.targetTableName,
       cardinality: 'N:1',
-      parentTable: relation.declaringTableName,
-      parentColumns: relation.localColumns,
-      childTable: relation.targetTableName,
-      childColumns: relation.referencedColumns,
+      on: {
+        parentTable: relation.declaringTableName,
+        parentColumns: relation.localColumns,
+        childTable: relation.targetTableName,
+        childColumns: relation.referencedColumns,
+      },
     });
 
     const pairKey = fkRelationPairKey(relation.declaringModelName, relation.targetModelName);
@@ -1022,60 +990,14 @@ function applyBackrelationCandidates(input: {
       toModel: matched.declaringModelName,
       toTable: matched.declaringTableName,
       cardinality: '1:N',
-      parentTable: candidate.tableName,
-      parentColumns: matched.referencedColumns,
-      childTable: matched.declaringTableName,
-      childColumns: matched.localColumns,
+      on: {
+        parentTable: candidate.tableName,
+        parentColumns: matched.referencedColumns,
+        childTable: matched.declaringTableName,
+        childColumns: matched.localColumns,
+      },
     });
   }
-}
-
-function emitModelsWithRelations(input: {
-  readonly builder: DynamicContractBuilder;
-  readonly resolvedModels: ResolvedModelEntry[];
-  readonly modelRelations: Map<string, readonly ModelRelationMetadata[]>;
-}): DynamicContractBuilder {
-  let nextBuilder = input.builder;
-
-  const sortedModels = input.resolvedModels.sort((left, right) => {
-    const tableComparison = compareStrings(left.mapping.tableName, right.mapping.tableName);
-    if (tableComparison === 0) {
-      return compareStrings(left.model.name, right.model.name);
-    }
-    return tableComparison;
-  });
-
-  for (const entry of sortedModels) {
-    const relationEntries = [...(input.modelRelations.get(entry.model.name) ?? [])].sort(
-      (left, right) => compareStrings(left.fieldName, right.fieldName),
-    );
-    nextBuilder = nextBuilder.model(
-      entry.model.name,
-      entry.mapping.tableName,
-      (modelBuilder: DynamicModelBuilder) => {
-        let next = modelBuilder;
-        for (const resolvedField of entry.resolvedFields) {
-          next = next.field(resolvedField.field.name, resolvedField.columnName);
-        }
-        for (const relation of relationEntries) {
-          next = next.relation(relation.fieldName, {
-            toModel: relation.toModel,
-            toTable: relation.toTable,
-            cardinality: relation.cardinality,
-            on: {
-              parentTable: relation.parentTable,
-              parentColumns: relation.parentColumns,
-              childTable: relation.childTable,
-              childColumns: relation.childColumns,
-            },
-          });
-        }
-        return next;
-      },
-    );
-  }
-
-  return nextBuilder;
 }
 
 function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceDiagnostic[] {
@@ -1425,10 +1347,15 @@ export function interpretPslDocumentToSqlContractIR(
     generatorDescriptorById.set(descriptor.id, descriptor);
   }
 
-  let builder = defineContract().target(input.target) as DynamicContractBuilder;
+  const storageTypes: Record<string, StorageTypeInstance> = {};
   const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
   const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
   const namedTypeBaseTypes = new Map<string, string>();
+  const enumTypeConstructor = getAuthoringTypeConstructor(input.authoringContributions, ['enum']);
+  const pgvectorVectorConstructor = getAuthoringTypeConstructor(input.authoringContributions, [
+    'pgvector',
+    'vector',
+  ]);
 
   for (const enumDeclaration of input.document.ast.enums) {
     const nativeType = parseMapName({
@@ -1439,17 +1366,24 @@ export function interpretPslDocumentToSqlContractIR(
       entityLabel: `Enum "${enumDeclaration.name}"`,
       span: enumDeclaration.span,
     });
+    const enumStorageType = enumTypeConstructor
+      ? instantiateAuthoringTypeConstructor(enumTypeConstructor, [
+          nativeType,
+          enumDeclaration.values.map((value) => value.name),
+        ])
+      : {
+          codecId: 'pg/enum@1',
+          nativeType,
+          typeParams: { values: enumDeclaration.values.map((value) => value.name) },
+        };
     const descriptor: ColumnDescriptor = {
-      codecId: 'pg/enum@1',
-      nativeType,
+      codecId: enumStorageType.codecId,
+      nativeType: enumStorageType.nativeType,
       typeRef: enumDeclaration.name,
+      ...ifDefined('typeParams', enumStorageType.typeParams),
     };
     enumTypeDescriptors.set(enumDeclaration.name, descriptor);
-    builder = builder.storageType(enumDeclaration.name, {
-      codecId: 'pg/enum@1',
-      nativeType,
-      typeParams: { values: enumDeclaration.values.map((value) => value.name) },
-    });
+    storageTypes[enumDeclaration.name] = enumStorageType;
   }
 
   for (const declaration of input.document.ast.types?.declarations ?? []) {
@@ -1522,16 +1456,18 @@ export function interpretPslDocumentToSqlContractIR(
       if (length === undefined) {
         continue;
       }
+      const pgvectorStorageType = pgvectorVectorConstructor
+        ? instantiateAuthoringTypeConstructor(pgvectorVectorConstructor, [length])
+        : {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector',
+            typeParams: { length },
+          };
       namedTypeDescriptors.set(declaration.name, {
-        codecId: 'pg/vector@1',
-        nativeType: 'vector',
-        typeParams: { length },
+        ...pgvectorStorageType,
+        typeRef: declaration.name,
       });
-      builder = builder.storageType(declaration.name, {
-        codecId: 'pg/vector@1',
-        nativeType: 'vector',
-        typeParams: { length },
-      });
+      storageTypes[declaration.name] = pgvectorStorageType;
       continue;
     }
 
@@ -1565,19 +1501,15 @@ export function interpretPslDocumentToSqlContractIR(
       typeRef: declaration.name,
     };
     namedTypeDescriptors.set(declaration.name, descriptor);
-    builder = builder.storageType(declaration.name, {
+    storageTypes[declaration.name] = {
       codecId: baseDescriptor.codecId,
       nativeType: baseDescriptor.nativeType,
       typeParams: {},
-    });
+    };
   }
 
   const modelMappings = buildModelMappings(input.document.ast.models, diagnostics, sourceId);
-  const resolvedModels: Array<{
-    model: PslModel;
-    mapping: ModelNameMapping;
-    resolvedFields: ResolvedField[];
-  }> = [];
+  const semanticModels: SqlSemanticModelNode[] = [];
   const fkRelationMetadata: FkRelationMetadata[] = [];
   const backrelationCandidates: ModelBackrelationCandidate[] = [];
 
@@ -1595,13 +1527,13 @@ export function interpretPslDocumentToSqlContractIR(
       namedTypeBaseTypes,
       modelNames,
       composedExtensions,
+      input.authoringContributions,
       defaultFunctionRegistry,
       generatorDescriptorById,
       diagnostics,
       sourceId,
       input.scalarTypeDescriptors,
     );
-    resolvedModels.push({ model, mapping, resolvedFields });
 
     const primaryKeyColumns = resolvedFields
       .filter((field) => field.isId)
@@ -1680,218 +1612,205 @@ export function interpretPslDocumentToSqlContractIR(
       .filter((entry): entry is { field: PslField; relation: PslAttribute } =>
         Boolean(entry.relation),
       );
+    const uniqueConstraints: SqlSemanticUniqueConstraintNode[] = resolvedFields
+      .filter((field) => field.isUnique)
+      .map((field) => ({ columns: [field.columnName] }));
+    const indexNodes: SqlSemanticIndexNode[] = [];
+    const foreignKeyNodes: SqlSemanticForeignKeyNode[] = [];
 
-    builder = builder.table(tableName, (tableBuilder: DynamicTableBuilder) => {
-      let table = tableBuilder;
-
-      for (const resolvedField of resolvedFields) {
-        if (resolvedField.executionDefault) {
-          table = table.generated(resolvedField.columnName, {
-            type: resolvedField.descriptor,
-            generated: resolvedField.executionDefault,
-          });
-        } else {
-          const options: {
-            type: ColumnDescriptor;
-            nullable?: true;
-            default?: ColumnDefault;
-          } = {
-            type: resolvedField.descriptor,
-            ...ifDefined('nullable', resolvedField.field.optional ? (true as const) : undefined),
-            ...ifDefined('default', resolvedField.defaultValue),
-          };
-          table = table.column(resolvedField.columnName, options);
-        }
-
-        if (resolvedField.isUnique) {
-          table = table.unique([resolvedField.columnName]);
-        }
+    for (const modelAttribute of model.attributes) {
+      if (modelAttribute.name === 'map') {
+        continue;
       }
-
-      if (primaryKeyColumns.length > 0) {
-        table = table.primaryKey(primaryKeyColumns);
-      }
-
-      for (const modelAttribute of model.attributes) {
-        if (modelAttribute.name === 'map') {
-          continue;
-        }
-        if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
-          const fieldNames = parseAttributeFieldList({
-            attribute: modelAttribute,
-            sourceId,
-            diagnostics,
-            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            messagePrefix: `Model "${model.name}" @@${modelAttribute.name}`,
-          });
-          if (!fieldNames) {
-            continue;
-          }
-          const columnNames = mapFieldNamesToColumns({
-            modelName: model.name,
-            fieldNames,
-            mapping,
-            sourceId,
-            diagnostics,
-            span: modelAttribute.span,
-            contextLabel: `Model "${model.name}" @@${modelAttribute.name}`,
-          });
-          if (!columnNames) {
-            continue;
-          }
-          if (modelAttribute.name === 'unique') {
-            table = table.unique(columnNames);
-          } else {
-            table = table.index(columnNames);
-          }
-          continue;
-        }
-        if (modelAttribute.name.startsWith('pgvector.') && !composedExtensions.has('pgvector')) {
-          diagnostics.push({
-            code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-            message: `Attribute "@@${modelAttribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
-            sourceId,
-            span: modelAttribute.span,
-          });
-          continue;
-        }
-        diagnostics.push({
-          code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
-          message: `Model "${model.name}" uses unsupported attribute "@@${modelAttribute.name}"`,
-          sourceId,
-          span: modelAttribute.span,
-        });
-      }
-
-      for (const relationAttribute of relationAttributes) {
-        if (relationAttribute.field.list) {
-          continue;
-        }
-
-        if (!modelNames.has(relationAttribute.field.typeName)) {
-          diagnostics.push({
-            code: 'PSL_INVALID_RELATION_TARGET',
-            message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
-            sourceId,
-            span: relationAttribute.field.span,
-          });
-          continue;
-        }
-
-        const parsedRelation = parseRelationAttribute({
-          attribute: relationAttribute.relation,
-          modelName: model.name,
-          fieldName: relationAttribute.field.name,
+      if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
+        const fieldNames = parseAttributeFieldList({
+          attribute: modelAttribute,
           sourceId,
           diagnostics,
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          messagePrefix: `Model "${model.name}" @@${modelAttribute.name}`,
         });
-        if (!parsedRelation) {
+        if (!fieldNames) {
           continue;
         }
-        if (!parsedRelation.fields || !parsedRelation.references) {
-          diagnostics.push({
-            code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-            message: `Relation field "${model.name}.${relationAttribute.field.name}" requires fields and references arguments`,
-            sourceId,
-            span: relationAttribute.relation.span,
-          });
-          continue;
-        }
-
-        const targetMapping = modelMappings.get(relationAttribute.field.typeName);
-        if (!targetMapping) {
-          diagnostics.push({
-            code: 'PSL_INVALID_RELATION_TARGET',
-            message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
-            sourceId,
-            span: relationAttribute.field.span,
-          });
-          continue;
-        }
-
-        const localColumns = mapFieldNamesToColumns({
+        const columnNames = mapFieldNamesToColumns({
           modelName: model.name,
-          fieldNames: parsedRelation.fields,
+          fieldNames,
           mapping,
           sourceId,
           diagnostics,
-          span: relationAttribute.relation.span,
-          contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+          span: modelAttribute.span,
+          contextLabel: `Model "${model.name}" @@${modelAttribute.name}`,
         });
-        if (!localColumns) {
+        if (!columnNames) {
           continue;
         }
-        const referencedColumns = mapFieldNamesToColumns({
-          modelName: targetMapping.model.name,
-          fieldNames: parsedRelation.references,
-          mapping: targetMapping,
+        if (modelAttribute.name === 'unique') {
+          uniqueConstraints.push({ columns: columnNames });
+        } else {
+          indexNodes.push({ columns: columnNames });
+        }
+        continue;
+      }
+      if (modelAttribute.name.startsWith('pgvector.') && !composedExtensions.has('pgvector')) {
+        diagnostics.push({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          message: `Attribute "@@${modelAttribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
           sourceId,
-          diagnostics,
-          span: relationAttribute.relation.span,
-          contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+          span: modelAttribute.span,
         });
-        if (!referencedColumns) {
-          continue;
-        }
-        if (localColumns.length !== referencedColumns.length) {
-          diagnostics.push({
-            code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-            message: `Relation field "${model.name}.${relationAttribute.field.name}" must provide the same number of fields and references`,
-            sourceId,
-            span: relationAttribute.relation.span,
-          });
-          continue;
-        }
+        continue;
+      }
+      diagnostics.push({
+        code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
+        message: `Model "${model.name}" uses unsupported attribute "@@${modelAttribute.name}"`,
+        sourceId,
+        span: modelAttribute.span,
+      });
+    }
 
-        const onDelete = parsedRelation.onDelete
-          ? normalizeReferentialAction({
-              modelName: model.name,
-              fieldName: relationAttribute.field.name,
-              actionName: 'onDelete',
-              actionToken: parsedRelation.onDelete,
-              sourceId,
-              span: relationAttribute.field.span,
-              diagnostics,
-            })
-          : undefined;
-        const onUpdate = parsedRelation.onUpdate
-          ? normalizeReferentialAction({
-              modelName: model.name,
-              fieldName: relationAttribute.field.name,
-              actionName: 'onUpdate',
-              actionToken: parsedRelation.onUpdate,
-              sourceId,
-              span: relationAttribute.field.span,
-              diagnostics,
-            })
-          : undefined;
-
-        table = table.foreignKey(
-          localColumns,
-          {
-            table: targetMapping.tableName,
-            columns: referencedColumns,
-          },
-          {
-            ...ifDefined('name', parsedRelation.constraintName),
-            ...ifDefined('onDelete', onDelete),
-            ...ifDefined('onUpdate', onUpdate),
-          },
-        );
-
-        fkRelationMetadata.push({
-          declaringModelName: model.name,
-          declaringFieldName: relationAttribute.field.name,
-          declaringTableName: tableName,
-          targetModelName: targetMapping.model.name,
-          targetTableName: targetMapping.tableName,
-          ...ifDefined('relationName', parsedRelation.relationName),
-          localColumns,
-          referencedColumns,
-        });
+    for (const relationAttribute of relationAttributes) {
+      if (relationAttribute.field.list) {
+        continue;
       }
 
-      return table;
+      if (!modelNames.has(relationAttribute.field.typeName)) {
+        diagnostics.push({
+          code: 'PSL_INVALID_RELATION_TARGET',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
+          sourceId,
+          span: relationAttribute.field.span,
+        });
+        continue;
+      }
+
+      const parsedRelation = parseRelationAttribute({
+        attribute: relationAttribute.relation,
+        modelName: model.name,
+        fieldName: relationAttribute.field.name,
+        sourceId,
+        diagnostics,
+      });
+      if (!parsedRelation) {
+        continue;
+      }
+      if (!parsedRelation.fields || !parsedRelation.references) {
+        diagnostics.push({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" requires fields and references arguments`,
+          sourceId,
+          span: relationAttribute.relation.span,
+        });
+        continue;
+      }
+
+      const targetMapping = modelMappings.get(relationAttribute.field.typeName);
+      if (!targetMapping) {
+        diagnostics.push({
+          code: 'PSL_INVALID_RELATION_TARGET',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
+          sourceId,
+          span: relationAttribute.field.span,
+        });
+        continue;
+      }
+
+      const localColumns = mapFieldNamesToColumns({
+        modelName: model.name,
+        fieldNames: parsedRelation.fields,
+        mapping,
+        sourceId,
+        diagnostics,
+        span: relationAttribute.relation.span,
+        contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+      });
+      if (!localColumns) {
+        continue;
+      }
+      const referencedColumns = mapFieldNamesToColumns({
+        modelName: targetMapping.model.name,
+        fieldNames: parsedRelation.references,
+        mapping: targetMapping,
+        sourceId,
+        diagnostics,
+        span: relationAttribute.relation.span,
+        contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+      });
+      if (!referencedColumns) {
+        continue;
+      }
+      if (localColumns.length !== referencedColumns.length) {
+        diagnostics.push({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" must provide the same number of fields and references`,
+          sourceId,
+          span: relationAttribute.relation.span,
+        });
+        continue;
+      }
+
+      const onDelete = parsedRelation.onDelete
+        ? normalizeReferentialAction({
+            modelName: model.name,
+            fieldName: relationAttribute.field.name,
+            actionName: 'onDelete',
+            actionToken: parsedRelation.onDelete,
+            sourceId,
+            span: relationAttribute.field.span,
+            diagnostics,
+          })
+        : undefined;
+      const onUpdate = parsedRelation.onUpdate
+        ? normalizeReferentialAction({
+            modelName: model.name,
+            fieldName: relationAttribute.field.name,
+            actionName: 'onUpdate',
+            actionToken: parsedRelation.onUpdate,
+            sourceId,
+            span: relationAttribute.field.span,
+            diagnostics,
+          })
+        : undefined;
+
+      foreignKeyNodes.push({
+        columns: localColumns,
+        references: {
+          model: targetMapping.model.name,
+          table: targetMapping.tableName,
+          columns: referencedColumns,
+        },
+        ...ifDefined('name', parsedRelation.constraintName),
+        ...ifDefined('onDelete', onDelete),
+        ...ifDefined('onUpdate', onUpdate),
+      });
+
+      fkRelationMetadata.push({
+        declaringModelName: model.name,
+        declaringFieldName: relationAttribute.field.name,
+        declaringTableName: tableName,
+        targetModelName: targetMapping.model.name,
+        targetTableName: targetMapping.tableName,
+        ...ifDefined('relationName', parsedRelation.relationName),
+        localColumns,
+        referencedColumns,
+      });
+    }
+
+    semanticModels.push({
+      modelName: model.name,
+      tableName,
+      fields: resolvedFields.map((resolvedField) => ({
+        fieldName: resolvedField.field.name,
+        columnName: resolvedField.columnName,
+        descriptor: resolvedField.descriptor,
+        nullable: resolvedField.field.optional,
+        ...ifDefined('default', resolvedField.defaultValue),
+        ...ifDefined('executionDefault', resolvedField.executionDefault),
+      })),
+      ...(primaryKeyColumns.length > 0 ? { id: { columns: primaryKeyColumns } } : {}),
+      ...(uniqueConstraints.length > 0 ? { uniques: uniqueConstraints } : {}),
+      ...(indexNodes.length > 0 ? { indexes: indexNodes } : {}),
+      ...(foreignKeyNodes.length > 0 ? { foreignKeys: foreignKeyNodes } : {}),
     });
   }
 
@@ -1902,11 +1821,6 @@ export function interpretPslDocumentToSqlContractIR(
     modelRelations,
     diagnostics,
     sourceId,
-  });
-  builder = emitModelsWithRelations({
-    builder,
-    resolvedModels,
-    modelRelations,
   });
 
   if (diagnostics.length > 0) {
@@ -1928,6 +1842,19 @@ export function interpretPslDocumentToSqlContractIR(
     });
   }
 
-  const contract = builder.build() as ContractIR;
+  const contract = buildSqlContractFromSemanticDefinition({
+    target: input.target,
+    ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
+    models: semanticModels.map((model) => ({
+      ...model,
+      ...(modelRelations.has(model.modelName)
+        ? {
+            relations: [...(modelRelations.get(model.modelName) ?? [])].sort((left, right) =>
+              compareStrings(left.fieldName, right.fieldName),
+            ),
+          }
+        : {}),
+    })),
+  });
   return ok(contract);
 }

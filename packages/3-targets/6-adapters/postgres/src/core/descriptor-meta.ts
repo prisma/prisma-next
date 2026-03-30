@@ -25,6 +25,8 @@ import {
   SQL_CHAR_CODEC_ID,
   SQL_FLOAT_CODEC_ID,
   SQL_INT_CODEC_ID,
+  SQL_TEXT_CODEC_ID,
+  SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from './codec-ids';
 import { pgEnumControlHooks } from './enum-control-hooks';
@@ -192,6 +194,7 @@ export const postgresAdapterDescriptorMeta = {
       parameterized: {
         [SQL_CHAR_CODEC_ID]: 'Char<{{length}}>',
         [SQL_VARCHAR_CODEC_ID]: 'Varchar<{{length}}>',
+        [SQL_TIMESTAMP_CODEC_ID]: precisionRenderer('Timestamp'),
         [PG_CHAR_CODEC_ID]: 'Char<{{length}}>',
         [PG_VARCHAR_CODEC_ID]: 'Varchar<{{length}}>',
         [PG_NUMERIC_CODEC_ID]: {
@@ -253,6 +256,7 @@ export const postgresAdapterDescriptorMeta = {
       controlPlaneHooks: {
         [SQL_CHAR_CODEC_ID]: lengthHooks,
         [SQL_VARCHAR_CODEC_ID]: lengthHooks,
+        [SQL_TIMESTAMP_CODEC_ID]: precisionHooks,
         [PG_CHAR_CODEC_ID]: lengthHooks,
         [PG_VARCHAR_CODEC_ID]: lengthHooks,
         [PG_NUMERIC_CODEC_ID]: numericHooks,
@@ -270,6 +274,7 @@ export const postgresAdapterDescriptorMeta = {
     },
     storage: [
       { typeId: PG_TEXT_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'text' },
+      { typeId: SQL_TEXT_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'text' },
       { typeId: SQL_CHAR_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'character' },
       {
         typeId: SQL_VARCHAR_CODEC_ID,
@@ -279,6 +284,12 @@ export const postgresAdapterDescriptorMeta = {
       },
       { typeId: SQL_INT_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'int4' },
       { typeId: SQL_FLOAT_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'float8' },
+      {
+        typeId: SQL_TIMESTAMP_CODEC_ID,
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: 'timestamp',
+      },
       { typeId: PG_CHAR_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'character' },
       {
         typeId: PG_VARCHAR_CODEC_ID,

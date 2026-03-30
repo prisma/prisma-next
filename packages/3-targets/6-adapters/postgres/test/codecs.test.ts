@@ -24,6 +24,8 @@ describe('adapter-postgres codecs', () => {
       'json',
       'jsonb',
       'numeric',
+      'sql-text',
+      'sql-timestamp',
       'text',
       'time',
       'timestamp',
@@ -56,6 +58,24 @@ describe('adapter-postgres codecs', () => {
 
     it('encodes strings as-is', () => {
       expect(timestampCodec.encode('2024-01-15T10:30:00.000Z')).toBe('2024-01-15T10:30:00.000Z');
+    });
+  });
+
+  describe('sql-timestamp codec', () => {
+    const timestampCodec = codecDefinitions['sql-timestamp'].codec as {
+      encode: (value: string | Date) => string;
+      decode: (wire: string | Date) => string;
+    };
+
+    it('encodes Date values to ISO strings', () => {
+      const date = new Date('2024-01-15T10:30:00Z');
+      expect(timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
+    });
+
+    it('keeps string values stable', () => {
+      const wire = '2024-01-15T10:30:00.000Z';
+      expect(timestampCodec.encode(wire)).toBe(wire);
+      expect(timestampCodec.decode(wire)).toBe(wire);
     });
   });
 
@@ -119,6 +139,7 @@ describe('adapter-postgres codecs', () => {
 
   describe('scalar passthrough codecs', () => {
     it.each([
+      { scalar: 'sql-text', value: 'portable text' },
       { scalar: 'text', value: 'hello world' },
       { scalar: 'enum', value: 'ADMIN' },
     ] as const)('keeps $scalar values unchanged', ({ scalar, value }) => {
@@ -342,6 +363,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'character', hasParamsSchema: true },
       { scalar: 'character varying', hasParamsSchema: true },
       { scalar: 'numeric', hasParamsSchema: true },
+      { scalar: 'sql-timestamp', hasParamsSchema: true },
       { scalar: 'timestamp', hasParamsSchema: true },
       { scalar: 'timestamptz', hasParamsSchema: true },
       { scalar: 'time', hasParamsSchema: true },
@@ -349,6 +371,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'bit', hasParamsSchema: true },
       { scalar: 'bit varying', hasParamsSchema: true },
       { scalar: 'interval', hasParamsSchema: true },
+      { scalar: 'sql-text', hasParamsSchema: false },
       { scalar: 'text', hasParamsSchema: false },
       { scalar: 'enum', hasParamsSchema: false },
       { scalar: 'bool', hasParamsSchema: false },

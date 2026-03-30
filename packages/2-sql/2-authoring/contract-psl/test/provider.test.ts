@@ -277,11 +277,11 @@ model Document {
               codecId: 'pg/vector@1',
               nativeType: 'vector',
               typeParams: { length: 1536 },
+              typeRef: 'Embedding1536',
             },
           },
         },
       });
-      expect(storage.tables['document']!.columns['embedding']).not.toHaveProperty('typeRef');
     });
   });
 

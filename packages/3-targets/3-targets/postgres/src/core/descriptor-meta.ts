@@ -1,3 +1,5 @@
+import { postgresAuthoringFieldPresets, postgresAuthoringTypes } from './authoring';
+
 export const postgresTargetDescriptorMeta = {
   kind: 'target',
   familyId: 'sql',
@@ -5,4 +7,8 @@ export const postgresTargetDescriptorMeta = {
   id: 'postgres',
   version: '0.0.1',
   capabilities: {},
+  authoring: {
+    field: postgresAuthoringFieldPresets,
+    type: postgresAuthoringTypes,
+  },
 } as const;

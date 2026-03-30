@@ -64,29 +64,30 @@ This package is part of the package layering architecture:
 
 The refined surface keeps domain meaning close to the model:
 - field-level `id()` and `unique()` for the common single-field case
+- portable helper presets such as `field.id.uuidv4()`, `field.id.uuidv7()`, `field.id.nanoid({ size: 16 })`, `field.uuid()`, `field.nanoid({ size: 16 })`, `field.text()`, and `field.createdAt()`
+- field-local `.sql({ column | id | unique })` and belongsTo-local `.sql({ fk })` overlays for one-off storage detail
+- an optional integrated callback form where `defineContract(config, ({ type, field, model, rel }) => ...)` exposes composition-shaped `type.*` and pack-owned `field.*` helper namespaces
 - `.attributes(...)` for compound `id` and compound `unique`
 - optional staged `.relations(...)` for mutually recursive model graphs
-- `.sql(...)` for table naming, indexes, and foreign keys
+- model-level `.sql(...)` for table naming, indexes, and advanced fallback storage detail
 
 ```typescript
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
-import { textColumn, timestamptzColumn } from '@prisma-next/adapter-postgres/column-types';
-import { uuidv4 } from '@prisma-next/ids';
 
 const User = model('User', {
   fields: {
-    id: field.generated(uuidv4()).id({ name: 'app_user_pkey' }),
-    email: field.column(textColumn).unique({ name: 'app_user_email_key' }),
-    createdAt: field.column(timestamptzColumn).defaultSql('now()'),
+    id: field.id.uuidv7().sql({ id: { name: 'app_user_pkey' } }),
+    email: field.text().unique().sql({ unique: { name: 'app_user_email_key' } }),
+    createdAt: field.createdAt(),
   },
 });
 
 const Post = model('Post', {
   fields: {
-    id: field.generated(uuidv4()).id(),
-    userId: field.column(textColumn),
-    title: field.column(textColumn),
+    id: field.id.uuidv7(),
+    userId: field.uuid(),
+    title: field.text(),
   },
 });
 
@@ -100,12 +101,54 @@ export const contract = defineContract({
       table: 'app_user',
     }),
     Post: Post.relations({
-      user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+      user: rel
+        .belongsTo(User, { from: 'userId', to: 'id' })
+        .sql({ fk: { name: 'blog_post_user_id_fkey', onDelete: 'cascade' } }),
     }).sql({
       table: 'blog_post',
     }),
   },
 });
+```
+
+If you want the helper vocabulary to be wired directly into the contract shell, use the callback overload:
+
+```typescript
+import pgvector from '@prisma-next/extension-pgvector/pack';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
+
+export const contract = defineContract(
+  {
+    target: postgresPack,
+    extensionPacks: { pgvector },
+  },
+  ({ type, field, model, rel }) => {
+    const types = {
+      Role: type.enum('role', ['USER', 'ADMIN'] as const),
+      Embedding1536: type.pgvector.vector(1536),
+    } as const;
+
+    const User = model('User', {
+      fields: {
+        id: field.id.uuidv7().sql({ id: { name: 'user_pkey' } }),
+        role: field.namedType(types.Role),
+        embedding: field.namedType(types.Embedding1536).optional(),
+      },
+    }).sql({
+      table: 'user',
+    });
+
+    return {
+      types,
+      models: {
+        User: User.relations({
+          posts: rel.hasMany(() => Post, { by: 'authorId' }),
+        }),
+      },
+    };
+  },
+);
 ```
 
 Compound model-level constraints live in `.attributes(...)`:
@@ -129,15 +172,24 @@ const Membership = model('Membership', {
   .sql({ table: 'membership' });
 ```
 
-This first slice intentionally keeps the scalar vocabulary pack-driven:
+This first slice now includes a small portable helper vocabulary:
 
-- use pack-provided column descriptors with `field.column(...)`
-- use generated-column specs such as `uuidv4()` with `field.generated(...)`
-- use root `types` plus `field.namedType(...)` for `storage.types` references
+- use `field.id.uuidv4()` or `field.id.uuidv7()` for single-field UUID primary keys with explicit generator choice
+- use `field.id.nanoid({ size })`, `field.id.ulid()`, `field.id.cuid2()`, and `field.id.ksuid()` for other generated primary-key strategies
+- use `field.uuid()` for portable UUID-shaped foreign keys and other scalar fields
+- use `field.nanoid({ size })`, `field.ulid()`, `field.cuid2()`, and `field.ksuid()` when you want those scalar storage shapes without generation
+- use `field.text()`, `field.timestamp()`, and `field.createdAt()` for portable common SQL scalars
+- use `field.sql({ column | id | unique })` and belongsTo-local `.sql({ fk })` when the storage override belongs next to one field or one FK
+- use pack-provided column descriptors with `field.column(...)` when you need target-specific types
+- use generated-column specs with `field.generated(...)` when you want explicit generator control
+- use root `types` directly with `field.namedType(types.Role)` for `storage.types` references
+- `field.namedType('Role')` still works as a fallback, but when `types.Role` exists in the same contract the builder emits `PN_CONTRACT_TYPED_FALLBACK_AVAILABLE`; prefer `field.namedType(types.Role)` for autocomplete and typed local refs
+- use the callback overload when you want target- and extension-composed `type.*` and pack-owned `field.*` helper autocomplete inside `contract.ts`
 - use named model tokens plus `User.refs.id` or `User.ref('id')` for cross-model foreign-key targets
 - keep `constraints.ref('Model', 'field')` only as a fallback when you do not have a named token in scope
-- use `field.id()` for single-field identity and `.attributes(({ fields, constraints }) => ({ id: constraints.id([...]) }))` for compound identity
-- use `field.unique()` for single-field uniqueness and `.attributes(({ fields, constraints }) => ({ uniques: [constraints.unique([...])] }))` for compound uniqueness
+- use inline `.id()` for single-field identity and `.attributes(({ fields, constraints }) => ({ id: constraints.id([...]) }))` for compound identity
+- use inline `.unique()` for single-field uniqueness and `.attributes(({ fields, constraints }) => ({ uniques: [constraints.unique([...])] }))` for compound uniqueness
+- duplicate named primary keys, uniques, indexes, and foreign keys are rejected during build/validation instead of silently overriding each other
 
 #### Legacy Chain Builder
 

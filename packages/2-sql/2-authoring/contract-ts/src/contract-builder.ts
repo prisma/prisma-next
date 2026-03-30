@@ -1,4 +1,5 @@
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
@@ -41,7 +42,12 @@ import {
   type StorageTypeInstance,
   type TypeMaps,
 } from '@prisma-next/sql-contract/types';
+import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { ifDefined } from '@prisma-next/utils/defined';
+import {
+  type ComposedAuthoringHelpers,
+  createComposedAuthoringHelpers,
+} from './composed-authoring-helpers';
 import { computeMappings } from './contract';
 import {
   type AttributeStageIdFieldNames,
@@ -56,12 +62,25 @@ import {
   type RefinedContractInput,
   type RefinedModelBuilder,
   type RelationState as RefinedRelationState,
+  type RelationBuilder,
   rel,
   resolveRelationModelName,
   type ScalarFieldBuilder,
   type SqlStageSpec,
   type UniqueConstraint,
 } from './refined-option-a';
+import {
+  buildSemanticSqlContract,
+  type SqlSemanticContractBuilderLike,
+  type SqlSemanticContractDefinition,
+  type SqlSemanticFieldNode,
+  type SqlSemanticForeignKeyNode,
+  type SqlSemanticIndexNode,
+  type SqlSemanticModelNode,
+  type SqlSemanticPrimaryKeyNode,
+  type SqlSemanticRelationNode,
+  type SqlSemanticUniqueConstraintNode,
+} from './semantic-contract';
 
 type ColumnDefaultForCodec<
   CodecTypes extends Record<string, { output: unknown }>,
@@ -107,6 +126,13 @@ type SqlColumnOptions<
 > =
   | SqlNullableColumnOptions<Descriptor, CodecTypes>
   | SqlNonNullableColumnOptions<Descriptor, CodecTypes>;
+
+function assertStorageSemantics(storage: SqlStorage): void {
+  const semanticErrors = validateStorageSemantics(storage);
+  if (semanticErrors.length > 0) {
+    throw new Error(`Contract semantic validation failed: ${semanticErrors.join('; ')}`);
+  }
+}
 
 export interface SqlTableBuilder<
   Name extends string,
@@ -368,26 +394,46 @@ type DescriptorTypeRef<Descriptor> = Descriptor extends {
   ? TypeRef
   : undefined;
 
-type ResolveNamedStorageType<
-  Definition,
-  TypeRef extends string,
-> = TypeRef extends keyof RefinedDefinitionTypes<Definition>
-  ? RefinedDefinitionTypes<Definition>[TypeRef]
-  : StorageTypeInstance;
+type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageTypeInstance> = {
+  [TypeName in keyof RefinedDefinitionTypes<Definition> & string]: [TypeRef] extends [
+    RefinedDefinitionTypes<Definition>[TypeName],
+  ]
+    ? [RefinedDefinitionTypes<Definition>[TypeName]] extends [TypeRef]
+      ? TypeName
+      : never
+    : never;
+}[keyof RefinedDefinitionTypes<Definition> & string];
+
+type ResolveNamedStorageTypeKey<Definition, TypeRef> = TypeRef extends string
+  ? TypeRef
+  : TypeRef extends StorageTypeInstance
+    ? [LookupNamedStorageTypeKeyByValue<Definition, TypeRef>] extends [never]
+      ? string
+      : LookupNamedStorageTypeKeyByValue<Definition, TypeRef>
+    : never;
+
+type ResolveNamedStorageType<Definition, TypeRef> =
+  ResolveNamedStorageTypeKey<Definition, TypeRef> extends infer TypeName extends string
+    ? TypeName extends keyof RefinedDefinitionTypes<Definition>
+      ? RefinedDefinitionTypes<Definition>[TypeName]
+      : StorageTypeInstance
+    : StorageTypeInstance;
 
 type ResolveFieldDescriptor<Definition, FieldState> = [FieldDescriptorOf<FieldState>] extends [
   never,
 ]
-  ? ResolveNamedStorageType<Definition, FieldTypeRefOf<FieldState> & string>
+  ? ResolveNamedStorageType<Definition, FieldTypeRefOf<FieldState>>
   : FieldDescriptorOf<FieldState>;
 
-type ResolveFieldColumnTypeRef<FieldState> = [FieldTypeRefOf<FieldState>] extends [never]
-  ? DescriptorTypeRef<FieldDescriptorOf<FieldState>>
-  : FieldTypeRefOf<FieldState> & string;
-
-type ResolveFieldColumnTypeParams<FieldState> = [ResolveFieldColumnTypeRef<FieldState>] extends [
-  string,
+type ResolveFieldColumnTypeRef<Definition, FieldState> = [FieldTypeRefOf<FieldState>] extends [
+  never,
 ]
+  ? DescriptorTypeRef<FieldDescriptorOf<FieldState>>
+  : ResolveNamedStorageTypeKey<Definition, FieldTypeRefOf<FieldState>>;
+
+type ResolveFieldColumnTypeParams<Definition, FieldState> = [
+  ResolveFieldColumnTypeRef<Definition, FieldState>,
+] extends [string]
   ? undefined
   : DescriptorTypeParams<FieldDescriptorOf<FieldState>>;
 
@@ -513,8 +559,14 @@ type RefinedModelStorageColumn<
       DescriptorNativeType<
         ResolveFieldDescriptor<Definition, RefinedModelFieldState<Definition, ModelName, FieldName>>
       >,
-      ResolveFieldColumnTypeRef<RefinedModelFieldState<Definition, ModelName, FieldName>>,
-      ResolveFieldColumnTypeParams<RefinedModelFieldState<Definition, ModelName, FieldName>>
+      ResolveFieldColumnTypeRef<
+        Definition,
+        RefinedModelFieldState<Definition, ModelName, FieldName>
+      >,
+      ResolveFieldColumnTypeParams<
+        Definition,
+        RefinedModelFieldState<Definition, ModelName, FieldName>
+      >
     >
   : never;
 
@@ -775,7 +827,7 @@ function encodeColumnDefault(defaultInput: ColumnDefault): ColumnDefault {
 type RuntimeRefinedModel = RefinedModelBuilder<
   string | undefined,
   Record<string, ScalarFieldBuilder>,
-  Record<string, RefinedRelationState>,
+  Record<string, RelationBuilder<RefinedRelationState>>,
   ModelAttributesSpec | undefined,
   SqlStageSpec | undefined
 >;
@@ -784,7 +836,7 @@ type RefinedModelLike = {
   readonly stageOne: {
     readonly modelName?: string;
     readonly fields: Record<string, ScalarFieldBuilder>;
-    readonly relations: Record<string, RefinedRelationState>;
+    readonly relations: Record<string, RelationBuilder<RefinedRelationState>>;
   };
   readonly __attributes: ModelAttributesSpec | undefined;
   readonly __sql: SqlStageSpec | undefined;
@@ -797,34 +849,10 @@ type RuntimeModelSpec = {
   readonly tableName: string;
   readonly fieldBuilders: Record<string, ScalarFieldBuilder>;
   readonly fieldToColumn: Record<string, string>;
-  readonly relations: Record<string, RefinedRelationState>;
+  readonly relations: Record<string, RelationBuilder<RefinedRelationState>>;
   readonly attributesSpec: ModelAttributesSpec | undefined;
   readonly sqlSpec: SqlStageSpec | undefined;
 };
-
-type LooseTableState = TableBuilderState<
-  string,
-  Record<string, ColumnBuilderState<string, boolean, string>>,
-  readonly string[] | undefined
->;
-
-type LooseModelState = ModelBuilderState<
-  string,
-  string,
-  Record<string, string>,
-  Record<string, RelationDefinition>
->;
-
-type LooseSqlContractBuilder = SqlContractBuilder<
-  Record<string, { output: unknown }>,
-  string | undefined,
-  Record<string, LooseTableState>,
-  Record<string, LooseModelState>,
-  Record<string, StorageTypeInstance>,
-  string | undefined,
-  Record<string, unknown> | undefined,
-  Record<string, Record<string, boolean>> | undefined
->;
 
 function resolveFieldDescriptor(
   modelName: string,
@@ -836,22 +864,65 @@ function resolveFieldDescriptor(
     return fieldState.descriptor;
   }
 
-  if ('typeRef' in fieldState && typeof fieldState.typeRef === 'string') {
-    const referencedType = storageTypes[fieldState.typeRef];
+  if ('typeRef' in fieldState && fieldState.typeRef) {
+    const typeRef =
+      typeof fieldState.typeRef === 'string'
+        ? fieldState.typeRef
+        : Object.entries(storageTypes).find(
+            ([, storageType]) => storageType === fieldState.typeRef,
+          )?.[0];
+
+    if (!typeRef) {
+      throw new Error(
+        `Field "${modelName}.${fieldName}" references a storage type instance that is not present in definition.types`,
+      );
+    }
+
+    const referencedType = storageTypes[typeRef];
     if (!referencedType) {
       throw new Error(
-        `Field "${modelName}.${fieldName}" references unknown storage type "${fieldState.typeRef}"`,
+        `Field "${modelName}.${fieldName}" references unknown storage type "${typeRef}"`,
       );
     }
 
     return {
       codecId: referencedType.codecId,
       nativeType: referencedType.nativeType,
-      typeRef: fieldState.typeRef,
+      typeRef,
     };
   }
 
   throw new Error(`Field "${modelName}.${fieldName}" does not resolve to a storage descriptor`);
+}
+
+function emitTypedNamedTypeFallbackWarnings(
+  models: Record<string, RuntimeRefinedModel>,
+  storageTypes: Record<string, StorageTypeInstance>,
+): void {
+  const warnedFields = new Set<string>();
+
+  for (const [modelName, modelDefinition] of Object.entries(models)) {
+    for (const [fieldName, fieldBuilder] of Object.entries(modelDefinition.stageOne.fields)) {
+      const fieldState = fieldBuilder.build();
+      if (typeof fieldState.typeRef !== 'string' || !(fieldState.typeRef in storageTypes)) {
+        continue;
+      }
+
+      const warningKey = `${modelName}.${fieldName}`;
+      if (warnedFields.has(warningKey)) {
+        continue;
+      }
+      warnedFields.add(warningKey);
+
+      process.emitWarning(
+        `Refined contract field "${modelName}.${fieldName}" uses field.namedType('${fieldState.typeRef}'). ` +
+          `Use field.namedType(types.${fieldState.typeRef}) when the storage type is declared in the same contract to keep autocomplete and typed local refs.`,
+        {
+          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+        },
+      );
+    }
+  }
 }
 
 function mapFieldNamesToColumnNames(
@@ -951,6 +1022,43 @@ function resolveModelUniqueConstraints(spec: RuntimeModelSpec): readonly UniqueC
   return [...collectInlineUniqueConstraints(spec), ...attributeUniques];
 }
 
+function resolveRelationForeignKeys(
+  spec: RuntimeModelSpec,
+  allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+): readonly ForeignKeyConstraint[] {
+  const foreignKeys: ForeignKeyConstraint[] = [];
+
+  for (const [relationName, relationBuilder] of Object.entries(spec.relations)) {
+    const relation = relationBuilder.build();
+    if (relation.kind !== 'belongsTo' || !relation.sql?.fk) {
+      continue;
+    }
+
+    const targetModelName = resolveRelationModelName(relation.toModel);
+    if (!allSpecs.has(targetModelName)) {
+      throw new Error(
+        `Relation "${spec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
+      );
+    }
+
+    foreignKeys.push({
+      kind: 'fk',
+      fields: normalizeRelationFieldNames(relation.from),
+      targetModel: targetModelName,
+      targetFields: normalizeRelationFieldNames(relation.to),
+      ...(relation.sql.fk.name ? { name: relation.sql.fk.name } : {}),
+      ...(relation.sql.fk.onDelete ? { onDelete: relation.sql.fk.onDelete } : {}),
+      ...(relation.sql.fk.onUpdate ? { onUpdate: relation.sql.fk.onUpdate } : {}),
+      ...(relation.sql.fk.constraint !== undefined
+        ? { constraint: relation.sql.fk.constraint }
+        : {}),
+      ...(relation.sql.fk.index !== undefined ? { index: relation.sql.fk.index } : {}),
+    });
+  }
+
+  return foreignKeys;
+}
+
 function resolveRelationAnchorFields(spec: RuntimeModelSpec): readonly string[] {
   const idFields = resolveModelIdConstraint(spec)?.fields;
   if (idFields && idFields.length > 0) {
@@ -966,13 +1074,12 @@ function resolveRelationAnchorFields(spec: RuntimeModelSpec): readonly string[] 
   );
 }
 
-function appendRefinedRelation(
-  builder: ModelBuilder<string, string, Record<string, string>, Record<string, RelationDefinition>>,
+function resolveSemanticRelationNode(
   relationName: string,
   relation: RefinedRelationState,
   currentSpec: RuntimeModelSpec,
   allSpecs: Map<string, RuntimeModelSpec>,
-): ModelBuilder<string, string, Record<string, string>, Record<string, RelationDefinition>> {
+): SqlSemanticRelationNode {
   const targetModelName = resolveRelationModelName(relation.toModel);
   const targetSpec = allSpecs.get(targetModelName);
   if (!targetSpec) {
@@ -985,7 +1092,8 @@ function appendRefinedRelation(
     const fromFields = normalizeRelationFieldNames(relation.from);
     const toFields = normalizeRelationFieldNames(relation.to);
 
-    return builder.relation(relationName, {
+    return {
+      fieldName: relationName,
       toModel: targetModelName,
       toTable: targetSpec.tableName,
       cardinality: 'N:1',
@@ -1003,14 +1111,15 @@ function appendRefinedRelation(
           targetSpec.fieldToColumn,
         ),
       },
-    });
+    };
   }
 
   if (relation.kind === 'hasMany' || relation.kind === 'hasOne') {
     const parentFields = resolveRelationAnchorFields(currentSpec);
     const childFields = normalizeRelationFieldNames(relation.by);
 
-    return builder.relation(relationName, {
+    return {
+      fieldName: relationName,
       toModel: targetModelName,
       toTable: targetSpec.tableName,
       cardinality: relation.kind === 'hasMany' ? '1:N' : '1:1',
@@ -1028,7 +1137,7 @@ function appendRefinedRelation(
           targetSpec.fieldToColumn,
         ),
       },
-    });
+    };
   }
 
   const throughModelName = resolveRelationModelName(relation.through);
@@ -1043,7 +1152,8 @@ function appendRefinedRelation(
   const throughFromFields = normalizeRelationFieldNames(relation.from);
   const throughToFields = normalizeRelationFieldNames(relation.to);
 
-  return builder.relation(relationName, {
+  return {
+    fieldName: relationName,
     toModel: targetModelName,
     toTable: targetSpec.tableName,
     cardinality: 'N:M',
@@ -1074,7 +1184,141 @@ function appendRefinedRelation(
         throughSpec.fieldToColumn,
       ),
     },
+  };
+}
+
+function resolveSemanticForeignKeyNodes(
+  spec: RuntimeModelSpec,
+  allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+): readonly SqlSemanticForeignKeyNode[] {
+  const relationForeignKeys = resolveRelationForeignKeys(spec, allSpecs).map((foreignKey) => {
+    const targetSpec = allSpecs.get(foreignKey.targetModel);
+    if (!targetSpec) {
+      throw new Error(
+        `Foreign key on "${spec.modelName}" references unknown model "${foreignKey.targetModel}"`,
+      );
+    }
+
+    return {
+      columns: mapFieldNamesToColumnNames(spec.modelName, foreignKey.fields, spec.fieldToColumn),
+      references: {
+        model: targetSpec.modelName,
+        table: targetSpec.tableName,
+        columns: mapFieldNamesToColumnNames(
+          targetSpec.modelName,
+          foreignKey.targetFields,
+          targetSpec.fieldToColumn,
+        ),
+      },
+      ...(foreignKey.name ? { name: foreignKey.name } : {}),
+      ...(foreignKey.onDelete ? { onDelete: foreignKey.onDelete } : {}),
+      ...(foreignKey.onUpdate ? { onUpdate: foreignKey.onUpdate } : {}),
+      ...(foreignKey.constraint !== undefined ? { constraint: foreignKey.constraint } : {}),
+      ...(foreignKey.index !== undefined ? { index: foreignKey.index } : {}),
+    } satisfies SqlSemanticForeignKeyNode;
   });
+
+  const sqlForeignKeys = (spec.sqlSpec?.foreignKeys ?? []).map((foreignKey) => {
+    const targetSpec = allSpecs.get(foreignKey.targetModel);
+    if (!targetSpec) {
+      throw new Error(
+        `Foreign key on "${spec.modelName}" references unknown model "${foreignKey.targetModel}"`,
+      );
+    }
+
+    return {
+      columns: mapFieldNamesToColumnNames(spec.modelName, foreignKey.fields, spec.fieldToColumn),
+      references: {
+        model: targetSpec.modelName,
+        table: targetSpec.tableName,
+        columns: mapFieldNamesToColumnNames(
+          targetSpec.modelName,
+          foreignKey.targetFields,
+          targetSpec.fieldToColumn,
+        ),
+      },
+      ...(foreignKey.name ? { name: foreignKey.name } : {}),
+      ...(foreignKey.onDelete ? { onDelete: foreignKey.onDelete } : {}),
+      ...(foreignKey.onUpdate ? { onUpdate: foreignKey.onUpdate } : {}),
+      ...(foreignKey.constraint !== undefined ? { constraint: foreignKey.constraint } : {}),
+      ...(foreignKey.index !== undefined ? { index: foreignKey.index } : {}),
+    } satisfies SqlSemanticForeignKeyNode;
+  });
+
+  return [...relationForeignKeys, ...sqlForeignKeys];
+}
+
+function resolveSemanticModelNode(
+  spec: RuntimeModelSpec,
+  allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+  storageTypes: Record<string, StorageTypeInstance>,
+): SqlSemanticModelNode {
+  const fields: SqlSemanticFieldNode[] = [];
+
+  for (const [fieldName, fieldBuilder] of Object.entries(spec.fieldBuilders)) {
+    const fieldState = fieldBuilder.build();
+    const descriptor = resolveFieldDescriptor(spec.modelName, fieldName, fieldState, storageTypes);
+    const columnName = spec.fieldToColumn[fieldName];
+    if (!columnName) {
+      throw new Error(`Column name resolution failed for "${spec.modelName}.${fieldName}"`);
+    }
+
+    fields.push({
+      fieldName,
+      columnName,
+      descriptor,
+      nullable: fieldState.nullable,
+      ...(fieldState.default ? { default: fieldState.default } : {}),
+      ...(fieldState.executionDefault ? { executionDefault: fieldState.executionDefault } : {}),
+    });
+  }
+
+  const idConstraint = resolveModelIdConstraint(spec);
+  const uniques = resolveModelUniqueConstraints(spec).map((unique) => ({
+    columns: mapFieldNamesToColumnNames(spec.modelName, unique.fields, spec.fieldToColumn),
+    ...(unique.name ? { name: unique.name } : {}),
+  })) satisfies readonly SqlSemanticUniqueConstraintNode[];
+  const indexes = (spec.sqlSpec?.indexes ?? []).map((index) => ({
+    columns: mapFieldNamesToColumnNames(spec.modelName, index.fields, spec.fieldToColumn),
+    ...(index.name ? { name: index.name } : {}),
+    ...(index.using ? { using: index.using } : {}),
+    ...(index.config ? { config: index.config } : {}),
+  })) satisfies readonly SqlSemanticIndexNode[];
+  const foreignKeys = resolveSemanticForeignKeyNodes(spec, allSpecs);
+  const relations = Object.entries(spec.relations).map(([relationName, relationBuilder]) =>
+    resolveSemanticRelationNode(relationName, relationBuilder.build(), spec, allSpecs),
+  );
+
+  return {
+    modelName: spec.modelName,
+    tableName: spec.tableName,
+    fields,
+    ...(idConstraint
+      ? {
+          id: {
+            columns: mapFieldNamesToColumnNames(
+              spec.modelName,
+              idConstraint.fields,
+              spec.fieldToColumn,
+            ),
+            ...(idConstraint.name ? { name: idConstraint.name } : {}),
+          } satisfies SqlSemanticPrimaryKeyNode,
+        }
+      : {}),
+    ...(uniques.length > 0 ? { uniques } : {}),
+    ...(indexes.length > 0 ? { indexes } : {}),
+    ...(foreignKeys.length > 0 ? { foreignKeys } : {}),
+    ...(relations.length > 0 ? { relations } : {}),
+  };
+}
+
+export function buildSqlContractFromSemanticDefinition(
+  definition: SqlSemanticContractDefinition,
+): ContractIR {
+  return buildSemanticSqlContract(
+    definition,
+    () => new SqlContractBuilder() as unknown as SqlSemanticContractBuilderLike,
+  );
 }
 
 function buildRefinedContract<Definition extends RefinedContractInput>(
@@ -1083,30 +1327,7 @@ function buildRefinedContract<Definition extends RefinedContractInput>(
   const storageTypes = { ...(definition.types ?? {}) } as Record<string, StorageTypeInstance>;
   const models = { ...(definition.models ?? {}) } as Record<string, RuntimeRefinedModel>;
 
-  let builder = new SqlContractBuilder<
-    CodecTypesFromRefinedDefinition<Definition>
-  >() as unknown as LooseSqlContractBuilder;
-  builder = builder.target(definition.target);
-
-  if (definition.extensionPacks) {
-    builder = builder.extensionPacks(definition.extensionPacks);
-  }
-
-  if (definition.capabilities) {
-    builder = builder.capabilities(definition.capabilities);
-  }
-
-  if (definition.storageHash) {
-    builder = builder.storageHash(definition.storageHash);
-  }
-
-  if (definition.foreignKeyDefaults) {
-    builder = builder.foreignKeyDefaults(definition.foreignKeyDefaults);
-  }
-
-  for (const [typeName, storageType] of Object.entries(storageTypes)) {
-    builder = builder.storageType(typeName, storageType);
-  }
+  emitTypedNamedTypeFallbackWarnings(models, storageTypes);
 
   const modelSpecs = new Map<string, RuntimeModelSpec>();
   for (const [modelName, modelDefinition] of Object.entries(models)) {
@@ -1139,134 +1360,19 @@ function buildRefinedContract<Definition extends RefinedContractInput>(
     });
   }
 
-  for (const spec of modelSpecs.values()) {
-    builder = builder.table(spec.tableName, (tableBuilder: TableBuilder<string>) => {
-      let next = tableBuilder as TableBuilder<
-        string,
-        Record<string, ColumnBuilderState<string, boolean, string>>,
-        readonly string[] | undefined
-      >;
+  const semanticModels = Array.from(modelSpecs.values()).map((spec) =>
+    resolveSemanticModelNode(spec, modelSpecs, storageTypes),
+  );
 
-      for (const [fieldName, fieldBuilder] of Object.entries(spec.fieldBuilders)) {
-        const fieldState = fieldBuilder.build();
-        const descriptor = resolveFieldDescriptor(
-          spec.modelName,
-          fieldName,
-          fieldState,
-          storageTypes,
-        );
-        const columnName = spec.fieldToColumn[fieldName];
-        if (!columnName) {
-          throw new Error(`Column name resolution failed for "${spec.modelName}.${fieldName}"`);
-        }
-
-        if (fieldState.executionDefault) {
-          next = next.generated(columnName, {
-            type: descriptor,
-            generated: fieldState.executionDefault,
-          });
-          continue;
-        }
-
-        if (fieldState.nullable) {
-          next = next.column(columnName, {
-            type: descriptor,
-            nullable: true,
-            ...(fieldState.default ? { default: fieldState.default } : {}),
-          });
-          continue;
-        }
-
-        next = next.column(columnName, {
-          type: descriptor,
-          ...(fieldState.default ? { default: fieldState.default } : {}),
-        });
-      }
-
-      const idConstraint = resolveModelIdConstraint(spec);
-      if (idConstraint) {
-        next = next.primaryKey(
-          mapFieldNamesToColumnNames(spec.modelName, idConstraint.fields, spec.fieldToColumn),
-          idConstraint.name,
-        );
-      }
-
-      for (const unique of resolveModelUniqueConstraints(spec)) {
-        next = next.unique(
-          mapFieldNamesToColumnNames(spec.modelName, unique.fields, spec.fieldToColumn),
-          unique.name,
-        );
-      }
-
-      for (const index of spec.sqlSpec?.indexes ?? []) {
-        next = next.index(
-          mapFieldNamesToColumnNames(spec.modelName, index.fields, spec.fieldToColumn),
-          {
-            ...(index.name ? { name: index.name } : {}),
-            ...(index.using ? { using: index.using } : {}),
-            ...(index.config ? { config: index.config } : {}),
-          },
-        );
-      }
-
-      for (const foreignKey of spec.sqlSpec?.foreignKeys ?? []) {
-        const targetSpec = modelSpecs.get(foreignKey.targetModel);
-        if (!targetSpec) {
-          throw new Error(
-            `Foreign key on "${spec.modelName}" references unknown model "${foreignKey.targetModel}"`,
-          );
-        }
-
-        next = next.foreignKey(
-          mapFieldNamesToColumnNames(spec.modelName, foreignKey.fields, spec.fieldToColumn),
-          {
-            table: targetSpec.tableName,
-            columns: mapFieldNamesToColumnNames(
-              targetSpec.modelName,
-              foreignKey.targetFields,
-              targetSpec.fieldToColumn,
-            ),
-          },
-          {
-            ...(foreignKey.name ? { name: foreignKey.name } : {}),
-            ...(foreignKey.onDelete ? { onDelete: foreignKey.onDelete } : {}),
-            ...(foreignKey.onUpdate ? { onUpdate: foreignKey.onUpdate } : {}),
-            ...(foreignKey.constraint !== undefined ? { constraint: foreignKey.constraint } : {}),
-            ...(foreignKey.index !== undefined ? { index: foreignKey.index } : {}),
-          },
-        );
-      }
-
-      return next;
-    });
-  }
-
-  for (const spec of modelSpecs.values()) {
-    builder = builder.model(
-      spec.modelName,
-      spec.tableName,
-      (modelBuilder: ModelBuilder<string, string, Record<never, never>, Record<never, never>>) => {
-        let next = modelBuilder as ModelBuilder<
-          string,
-          string,
-          Record<string, string>,
-          Record<string, RelationDefinition>
-        >;
-
-        for (const [fieldName, columnName] of Object.entries(spec.fieldToColumn)) {
-          next = next.field(fieldName, columnName);
-        }
-
-        for (const [relationName, relation] of Object.entries(spec.relations)) {
-          next = appendRefinedRelation(next, relationName, relation, spec, modelSpecs);
-        }
-
-        return next;
-      },
-    );
-  }
-
-  return builder.build() as BuiltRefinedContract<Definition>;
+  return buildSqlContractFromSemanticDefinition({
+    target: definition.target,
+    ...(definition.extensionPacks ? { extensionPacks: definition.extensionPacks } : {}),
+    ...(definition.capabilities ? { capabilities: definition.capabilities } : {}),
+    ...(definition.storageHash ? { storageHash: definition.storageHash } : {}),
+    ...(definition.foreignKeyDefaults ? { foreignKeyDefaults: definition.foreignKeyDefaults } : {}),
+    ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
+    models: semanticModels,
+  }) as BuiltRefinedContract<Definition>;
 }
 
 class SqlContractBuilder<
@@ -1593,6 +1699,8 @@ class SqlContractBuilder<
       meta: {},
       sources: {},
     } as unknown as BuiltContract;
+
+    assertStorageSemantics(contract.storage as SqlStorage);
 
     return contract as unknown as ReturnType<
       SqlContractBuilder<
@@ -1926,6 +2034,32 @@ type RefinedContractDefinition<
   readonly models?: Models;
 };
 
+type RefinedContractScaffold<
+  Target extends TargetPackRef<'sql', string>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Capabilities extends Record<string, Record<string, boolean>> | undefined,
+  Naming extends RefinedContractInput['naming'] | undefined,
+  StorageHash extends string | undefined,
+  ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
+> = {
+  readonly target: Target;
+  readonly extensionPacks?: ExtensionPacks;
+  readonly naming?: Naming;
+  readonly storageHash?: StorageHash;
+  readonly foreignKeyDefaults?: ForeignKeyDefaults;
+  readonly capabilities?: Capabilities;
+};
+
+type RefinedContractFactory<
+  Target extends TargetPackRef<'sql', string>,
+  Types extends Record<string, StorageTypeInstance>,
+  Models extends Record<string, RefinedModelLike>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+> = (helpers: ComposedAuthoringHelpers<Target, ExtensionPacks>) => {
+  readonly types?: Types;
+  readonly models?: Models;
+};
+
 export function defineContract<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 >(): SqlContractBuilder<CodecTypes>;
@@ -1964,15 +2098,71 @@ export function defineContract<
   >
 >;
 export function defineContract<
+  const Target extends TargetPackRef<'sql', string>,
+  const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
+  const Models extends Record<string, RefinedModelLike> = Record<never, never>,
+  const ExtensionPacks extends
+    | Record<string, ExtensionPackRef<'sql', string>>
+    | undefined = undefined,
+  const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
+  const Naming extends RefinedContractInput['naming'] | undefined = undefined,
+  const StorageHash extends string | undefined = undefined,
+  const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
+>(
+  definition: RefinedContractScaffold<
+    Target,
+    ExtensionPacks,
+    Capabilities,
+    Naming,
+    StorageHash,
+    ForeignKeyDefaults
+  >,
+  factory: RefinedContractFactory<Target, Types, Models, ExtensionPacks>,
+): BuiltRefinedContract<
+  RefinedContractDefinition<
+    Target,
+    Types,
+    Models,
+    ExtensionPacks,
+    Capabilities,
+    Naming,
+    StorageHash,
+    ForeignKeyDefaults
+  >
+>;
+export function defineContract<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 >(
   definition?: RefinedContractInput,
+  factory?: RefinedContractFactory<
+    TargetPackRef<'sql', string>,
+    Record<string, StorageTypeInstance>,
+    Record<string, RefinedModelLike>,
+    Record<string, ExtensionPackRef<'sql', string>> | undefined
+  >,
 ): SqlContractBuilder<CodecTypes> | BuiltRefinedContract<RefinedContractInput> {
   if (definition && isRefinedContractInput(definition)) {
+    if (factory) {
+      const builtDefinition = {
+        ...definition,
+        ...factory(
+          createComposedAuthoringHelpers({
+            target: definition.target,
+            extensionPacks: definition.extensionPacks,
+          }),
+        ),
+      };
+      return buildRefinedContract(builtDefinition);
+    }
     return buildRefinedContract(definition);
   }
   return new SqlContractBuilder<CodecTypes>();
 }
 
 export { field, model, rel };
-export type { RefinedContractInput, RefinedModelBuilder, ScalarFieldBuilder };
+export type {
+  ComposedAuthoringHelpers,
+  RefinedContractInput,
+  RefinedModelBuilder,
+  ScalarFieldBuilder,
+};

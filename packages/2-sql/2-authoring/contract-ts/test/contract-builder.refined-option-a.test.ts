@@ -3,6 +3,8 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract, field, model, rel } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
 
+const typecheckOnly = process.env['PN_TYPECHECK_ONLY'] === 'true';
+
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
   id: 'postgres',
@@ -17,6 +19,14 @@ const timestamptzColumn = columnDescriptor('pg/timestamptz@1');
 
 describe('refined option A authoring surface', () => {
   it('lowers inline ids and uniques while keeping sql focused on table/index/fk concerns', () => {
+    const types = {
+      Role: {
+        codecId: 'pg/enum@1',
+        nativeType: 'role',
+        typeParams: { values: ['USER', 'ADMIN'] },
+      },
+    } as const;
+
     const User = model('User', {
       fields: {
         id: field
@@ -26,7 +36,7 @@ describe('refined option A authoring surface', () => {
           })
           .id({ name: 'app_user_pkey' }),
         email: field.column(textColumn).unique({ name: 'app_user_email_key' }),
-        role: field.namedType('Role'),
+        role: field.namedType(types.Role),
         createdAt: field.column(timestamptzColumn).column('created_at').defaultSql('now()'),
       },
       relations: {
@@ -60,13 +70,7 @@ describe('refined option A authoring surface', () => {
       target: postgresTargetPack,
       storageHash: 'sha256:refined-option-a',
       foreignKeyDefaults: { constraint: true, index: false },
-      types: {
-        Role: {
-          codecId: 'pg/enum@1',
-          nativeType: 'role',
-          typeParams: { values: ['USER', 'ADMIN'] },
-        },
-      },
+      types,
       models: {
         User,
         Post,
@@ -130,6 +134,86 @@ describe('refined option A authoring surface', () => {
         },
       },
     });
+  });
+
+  it('keeps field and belongsTo storage overrides local when possible', () => {
+    const User = model('User', {
+      fields: {
+        id: field
+          .column(textColumn)
+          .id()
+          .sql({ id: { name: 'app_user_pkey' } }),
+        email: field
+          .column(textColumn)
+          .unique()
+          .sql({ unique: { name: 'app_user_email_key' } }),
+      },
+    }).sql({
+      table: 'app_user',
+    });
+
+    const Post = model('Post', {
+      fields: {
+        id: field.column(int4Column).id({ name: 'blog_post_pkey' }),
+        authorId: field.column(textColumn).sql({ column: 'author_id' }),
+        createdAt: field.column(timestamptzColumn).sql({ column: 'created_at' }),
+      },
+      relations: {
+        author: rel
+          .belongsTo(User, { from: 'authorId', to: 'id' })
+          .sql({ fk: { name: 'blog_post_author_id_fkey', onDelete: 'cascade' } }),
+      },
+    }).sql({
+      table: 'blog_post',
+    });
+
+    const contract = defineContract({
+      target: postgresTargetPack,
+      foreignKeyDefaults: { constraint: true, index: false },
+      models: {
+        User,
+        Post,
+      },
+    });
+
+    expect(contract.storage.tables.app_user.primaryKey).toEqual({
+      columns: ['id'],
+      name: 'app_user_pkey',
+    });
+    expect(contract.storage.tables.app_user.uniques).toEqual([
+      {
+        columns: ['email'],
+        name: 'app_user_email_key',
+      },
+    ]);
+    expect(contract.storage.tables.blog_post.columns.author_id).toBeDefined();
+    expect(contract.storage.tables.blog_post.columns.created_at).toBeDefined();
+    expect(contract.storage.tables.blog_post.foreignKeys).toEqual([
+      {
+        columns: ['author_id'],
+        references: { table: 'app_user', columns: ['id'] },
+        name: 'blog_post_author_id_fkey',
+        onDelete: 'cascade',
+        constraint: true,
+        index: false,
+      },
+    ]);
+    expect(contract.models.Post.fields.authorId).toEqual({ column: 'author_id' });
+    expect(contract.models.Post.fields.createdAt).toEqual({ column: 'created_at' });
+  });
+
+  it('rejects field-local id and unique overlays without the semantic declaration', () => {
+    expect(() =>
+      field.column(textColumn).sql({
+        unique: { name: 'user_email_key' },
+      }),
+    ).toThrow(/field\.sql\(\{ unique \}\) requires an existing inline \.unique/);
+
+    expect(() =>
+      field.column(textColumn).sql({
+        id: { name: 'user_pkey' },
+      }),
+    ).toThrow(/field\.sql\(\{ id \}\) requires an existing inline \.id/);
   });
 
   it('supports token-based many-to-many relations with lazy through refs', () => {
@@ -205,6 +289,26 @@ describe('refined option A authoring surface', () => {
         },
       },
     });
+  });
+
+  it('rejects duplicate named storage objects in the refined sql overlay', () => {
+    const User = model('User', {
+      fields: {
+        id: field.column(textColumn).id({ name: 'app_user_pkey' }),
+      },
+    }).sql(({ cols, constraints }) => ({
+      table: 'app_user',
+      indexes: [constraints.index(cols.id, { name: 'app_user_pkey' })],
+    }));
+
+    expect(() =>
+      defineContract({
+        target: postgresTargetPack,
+        models: {
+          User,
+        },
+      }),
+    ).toThrow(/Contract semantic validation failed:.*app_user_pkey/);
   });
 
   it('supports compound ids and uniques in .attributes(...)', () => {
@@ -376,7 +480,7 @@ describe('refined option A authoring surface', () => {
         };
       });
 
-    if (false) {
+    if (typecheckOnly) {
       rel.belongsTo(User, { from: 'userId', to: 'id' });
       rel.hasMany(Post, { by: 'userId' });
 
@@ -397,7 +501,7 @@ describe('refined option A authoring surface', () => {
       },
     });
 
-    if (false) {
+    if (typecheckOnly) {
       // @ts-expect-error unnamed models must not expose token-based cross-model refs
       Anonymous.ref('id');
 

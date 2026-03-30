@@ -4,6 +4,17 @@ export type {
   // Instances
   AdapterInstance,
   AdapterPackRef,
+  AuthoringArgRef,
+  AuthoringArgumentDescriptor,
+  AuthoringColumnDefaultTemplate,
+  AuthoringContributions,
+  AuthoringFieldNamespace,
+  AuthoringFieldPresetDescriptor,
+  AuthoringFieldPresetOutput,
+  AuthoringStorageTypeTemplate,
+  AuthoringTemplateValue,
+  AuthoringTypeConstructorDescriptor,
+  AuthoringTypeNamespace,
   ComponentDescriptor,
   ComponentMetadata,
   ContractComponentRequirementsCheckInput,
@@ -30,6 +41,13 @@ export type {
 
 export {
   checkContractComponentRequirements,
+  instantiateAuthoringFieldPreset,
+  instantiateAuthoringTypeConstructor,
   interpolateTypeTemplate,
+  isAuthoringArgRef,
+  isAuthoringFieldPresetDescriptor,
+  isAuthoringTypeConstructorDescriptor,
   normalizeRenderer,
+  resolveAuthoringTemplateValue,
+  validateAuthoringHelperArguments,
 } from '../framework-components';

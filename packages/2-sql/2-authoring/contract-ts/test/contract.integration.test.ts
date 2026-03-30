@@ -56,6 +56,25 @@ describe('validateContract', () => {
     );
   });
 
+  it('throws on semantic validation failure for duplicate named storage objects', () => {
+    const invalid = {
+      ...validContract,
+      storage: {
+        tables: {
+          User: {
+            ...validContract.storage.tables['User'],
+            primaryKey: { columns: ['id'], name: 'user_pkey' },
+            indexes: [{ columns: ['id'], name: 'user_pkey' }],
+          },
+        },
+      },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /Contract semantic validation failed:.*user_pkey/,
+    );
+  });
+
   it('accepts type parameter for strict contract type', () => {
     // Simulate JSON import - TypeScript infers string types, not literal types
     // The type parameter provides the strict type from contract.d.ts

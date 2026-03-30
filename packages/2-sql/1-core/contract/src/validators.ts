@@ -281,6 +281,8 @@ export function validateSqlContract<T extends SqlContract<SqlStorage>>(value: un
  * Returns an array of human-readable error strings. Empty array = valid.
  *
  * Currently checks:
+ * - duplicate named primary key / unique / index / foreign key objects within a table
+ * - duplicate unique, index, or foreign key declarations within a table
  * - `setNull` referential action on a non-nullable FK column (would fail at runtime)
  * - `setDefault` referential action on a non-nullable FK column without a DEFAULT (would fail at runtime)
  */
@@ -288,6 +290,78 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
   const errors: string[] = [];
 
   for (const [tableName, table] of Object.entries(storage.tables)) {
+    const namedObjects = new Map<string, string[]>();
+    const registerNamedObject = (kind: string, name: string | undefined) => {
+      if (!name) return;
+      namedObjects.set(name, [...(namedObjects.get(name) ?? []), kind]);
+    };
+
+    registerNamedObject('primary key', table.primaryKey?.name);
+    for (const unique of table.uniques) {
+      registerNamedObject('unique constraint', unique.name);
+    }
+    for (const index of table.indexes) {
+      registerNamedObject('index', index.name);
+    }
+    for (const fk of table.foreignKeys) {
+      registerNamedObject('foreign key', fk.name);
+    }
+
+    for (const [name, kinds] of namedObjects) {
+      if (kinds.length > 1) {
+        errors.push(
+          `Table "${tableName}": named object "${name}" is declared multiple times (${kinds.join(', ')})`,
+        );
+      }
+    }
+
+    const seenUniqueDefinitions = new Set<string>();
+    for (const unique of table.uniques) {
+      const signature = JSON.stringify({ columns: unique.columns });
+      if (seenUniqueDefinitions.has(signature)) {
+        errors.push(
+          `Table "${tableName}": duplicate unique constraint definition on columns [${unique.columns.join(', ')}]`,
+        );
+        continue;
+      }
+      seenUniqueDefinitions.add(signature);
+    }
+
+    const seenIndexDefinitions = new Set<string>();
+    for (const index of table.indexes) {
+      const signature = JSON.stringify({
+        columns: index.columns,
+        using: index.using ?? null,
+        config: index.config ?? null,
+      });
+      if (seenIndexDefinitions.has(signature)) {
+        errors.push(
+          `Table "${tableName}": duplicate index definition on columns [${index.columns.join(', ')}]`,
+        );
+        continue;
+      }
+      seenIndexDefinitions.add(signature);
+    }
+
+    const seenForeignKeyDefinitions = new Set<string>();
+    for (const fk of table.foreignKeys) {
+      const signature = JSON.stringify({
+        columns: fk.columns,
+        references: fk.references,
+        onDelete: fk.onDelete ?? null,
+        onUpdate: fk.onUpdate ?? null,
+        constraint: fk.constraint,
+        index: fk.index,
+      });
+      if (seenForeignKeyDefinitions.has(signature)) {
+        errors.push(
+          `Table "${tableName}": duplicate foreign key definition on columns [${fk.columns.join(', ')}]`,
+        );
+        continue;
+      }
+      seenForeignKeyDefinitions.add(signature);
+    }
+
     for (const fk of table.foreignKeys) {
       for (const colName of fk.columns) {
         const column = table.columns[colName];

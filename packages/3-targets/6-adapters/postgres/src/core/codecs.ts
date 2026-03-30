@@ -84,6 +84,8 @@ const sqlCharCodec = sqlCodecDefinitions.char.codec;
 const sqlVarcharCodec = sqlCodecDefinitions.varchar.codec;
 const sqlIntCodec = sqlCodecDefinitions.int.codec;
 const sqlFloatCodec = sqlCodecDefinitions.float.codec;
+const sqlTextCodec = sqlCodecDefinitions.text.codec;
+const sqlTimestampCodec = sqlCodecDefinitions.timestamp.codec;
 
 export type JsonValue =
   | string
@@ -513,6 +515,8 @@ const codecs = defineCodecs()
   .add('varchar', sqlVarcharCodec)
   .add('int', sqlIntCodec)
   .add('float', sqlFloatCodec)
+  .add('sql-text', sqlTextCodec)
+  .add('sql-timestamp', sqlTimestampCodec)
   .add('text', pgTextCodec)
   .add('character', pgCharCodec)
   .add('character varying', pgVarcharCodec)
