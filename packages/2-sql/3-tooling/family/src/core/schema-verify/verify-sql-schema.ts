@@ -348,6 +348,7 @@ function verifyTableChildren(options: {
     tableName,
     tablePath,
     issues,
+    strict,
     typeMetadataRegistry,
     codecHooks,
     ...ifDefined('normalizeDefault', normalizeDefault),
@@ -418,9 +419,11 @@ function verifyTableChildren(options: {
     });
   }
 
-  // Verify FK constraints only for FKs with constraint: true
+  // Verify FK constraints only for FKs with constraint: true.
+  // Always call when strict mode is on so extra-FK detection runs even if
+  // the contract has no FKs for this table.
   const constraintFks = contractTable.foreignKeys.filter((fk) => fk.constraint === true);
-  if (constraintFks.length > 0) {
+  if (constraintFks.length > 0 || strict) {
     const fkStatuses = verifyForeignKeys(
       constraintFks,
       schemaTable.foreignKeys,
@@ -475,6 +478,7 @@ function collectContractColumnNodes(options: {
   tableName: string;
   tablePath: string;
   issues: SchemaIssue[];
+  strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
@@ -486,6 +490,7 @@ function collectContractColumnNodes(options: {
     tableName,
     tablePath,
     issues,
+    strict,
     typeMetadataRegistry,
     codecHooks,
     normalizeDefault,
@@ -526,6 +531,7 @@ function collectContractColumnNodes(options: {
         schemaColumn,
         columnPath,
         issues,
+        strict,
         typeMetadataRegistry,
         codecHooks,
         ...ifDefined('normalizeDefault', normalizeDefault),
@@ -576,6 +582,7 @@ function verifyColumn(options: {
   schemaColumn: SqlSchemaIR['tables'][string]['columns'][string];
   columnPath: string;
   issues: SchemaIssue[];
+  strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
@@ -588,6 +595,7 @@ function verifyColumn(options: {
     schemaColumn,
     columnPath,
     issues,
+    strict,
     codecHooks,
     normalizeDefault,
     normalizeNativeType,
@@ -728,6 +736,26 @@ function verifyColumn(options: {
       });
       columnStatus = 'fail';
     }
+  } else if (strict && schemaColumn.default) {
+    issues.push({
+      kind: 'extra_default',
+      table: tableName,
+      column: columnName,
+      actual: schemaColumn.default,
+      message: `Column "${tableName}"."${columnName}" has default ${schemaColumn.default} in database but contract specifies no default`,
+    });
+    columnChildren.push({
+      status: 'fail',
+      kind: 'default',
+      name: 'default',
+      contractPath: `${columnPath}.default`,
+      code: 'extra_default',
+      message: `Extra default: ${schemaColumn.default}`,
+      expected: undefined,
+      actual: schemaColumn.default,
+      children: [],
+    });
+    columnStatus = 'fail';
   }
 
   // Single-pass aggregation for better performance
