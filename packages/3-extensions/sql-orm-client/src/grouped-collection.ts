@@ -1,12 +1,11 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
+  type AnyWhereExpr,
   BinaryExpr,
   type BinaryOp,
-  type BoundWhereExpr,
   ColumnRef,
   LiteralExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { mapStorageRowToModelFields } from './collection-runtime';
@@ -21,14 +20,14 @@ import type {
   HavingBuilder,
   HavingComparisonMethods,
 } from './types';
-import { combinePlainWhereExprs } from './where-utils';
+import { combineWhereExprs } from './where-utils';
 
 interface GroupedCollectionInit {
   readonly tableName: string;
-  readonly baseFilters: readonly BoundWhereExpr[];
+  readonly baseFilters: readonly AnyWhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
-  readonly havingFilters: readonly WhereExpr[];
+  readonly havingFilters: readonly AnyWhereExpr[];
 }
 
 type GroupByFieldName<
@@ -44,10 +43,10 @@ export class GroupedCollection<
   readonly ctx: CollectionContext<TContract>;
   readonly modelName: ModelName;
   readonly tableName: string;
-  readonly baseFilters: readonly BoundWhereExpr[];
+  readonly baseFilters: readonly AnyWhereExpr[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
-  readonly havingFilters: readonly WhereExpr[];
+  readonly havingFilters: readonly AnyWhereExpr[];
 
   constructor(
     ctx: CollectionContext<TContract>,
@@ -64,7 +63,7 @@ export class GroupedCollection<
   }
 
   having(
-    predicate: (having: HavingBuilder<TContract, ModelName>) => WhereExpr,
+    predicate: (having: HavingBuilder<TContract, ModelName>) => AnyWhereExpr,
   ): GroupedCollection<TContract, ModelName, GroupFields> {
     const havingExpr = predicate(
       createHavingBuilder(this.ctx.contract, this.modelName, this.tableName),
@@ -101,7 +100,7 @@ export class GroupedCollection<
       this.baseFilters,
       this.groupByColumns,
       aggregateSpec,
-      combinePlainWhereExprs(this.havingFilters),
+      combineWhereExprs(this.havingFilters),
     );
     const rows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
@@ -154,7 +153,7 @@ function createHavingBuilder<TContract extends SqlContract<SqlStorage>, ModelNam
 function createHavingComparisonMethods<T extends number | null>(
   metric: AggregateExpr,
 ): HavingComparisonMethods<T> {
-  const buildBinaryExpr = (op: BinaryOp, value: unknown): WhereExpr =>
+  const buildBinaryExpr = (op: BinaryOp, value: unknown): AnyWhereExpr =>
     new BinaryExpr(op, metric, LiteralExpr.of(value));
 
   return {

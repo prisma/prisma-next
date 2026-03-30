@@ -1,9 +1,8 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { BinaryOp, JoinOnExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyWhereExpr, BinaryOp, JoinOnExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
   BinaryExpr,
-  ColumnRef,
+  type ColumnRef,
   EqColJoinOn,
   ListLiteralExpr,
   LiteralExpr,
@@ -26,52 +25,51 @@ import {
 } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
 import { isOperationNode, parseOrderByDirection } from './kysely-ast-types';
-import { addParamDescriptor, nextParamIndex, type TransformContext } from './transform-context';
+import { advanceParamCursor, type TransformContext } from './transform-context';
 import { resolveColumnRef } from './transform-validate';
+
+function resolveParamOptions(
+  ctx: TransformContext,
+  refs: { table: string; column: string },
+): { codecId: string } {
+  const colDef = ctx.contract.storage.tables[refs.table]?.columns[refs.column];
+  if (!colDef?.codecId) {
+    throw new KyselyTransformError(
+      `Cannot resolve codecId for parameter (${refs.table}.${refs.column})`,
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { nodeKind: 'value' },
+    );
+  }
+  return { codecId: colDef.codecId };
+}
 
 export function transformValue(
   node: unknown,
   ctx: TransformContext,
-  refs?: { table: string; column: string },
+  refs: { table: string; column: string },
 ): ParamRef | LiteralExpr {
-  const addDescriptorForCurrentParam = (): void => {
-    const colDef = refs ? ctx.contract.storage.tables[refs.table]?.columns[refs.column] : undefined;
-    const descriptor: Omit<ParamDescriptor, 'index' | 'source'> = {
-      ...(refs && { refs }),
-      ...(colDef?.codecId !== undefined && colDef.codecId !== '' && { codecId: colDef.codecId }),
-      ...(colDef?.nativeType !== undefined &&
-        colDef.nativeType !== '' && { nativeType: colDef.nativeType }),
-      ...(refs && colDef !== undefined && { nullable: colDef.nullable ?? false }),
-    };
-    addParamDescriptor(ctx, descriptor);
-  };
+  const options = resolveParamOptions(ctx, refs);
 
   if (!isOperationNode(node)) {
     if (ctx.parameters) {
       const nextCompiledParam = ctx.parameters[ctx.paramIndex];
       if (ctx.paramIndex < ctx.parameters.length && Object.is(nextCompiledParam, node)) {
-        const index = nextParamIndex(ctx);
-        ctx.params.push(node);
-        addDescriptorForCurrentParam();
-        return ParamRef.of(index);
+        advanceParamCursor(ctx);
+        return ParamRef.of(node, options);
       }
       return LiteralExpr.of(node);
     }
 
-    const index = nextParamIndex(ctx);
-    ctx.params.push(node);
-    addDescriptorForCurrentParam();
-    return ParamRef.of(index);
+    advanceParamCursor(ctx);
+    return ParamRef.of(node, options);
   }
 
   if (ValueNode.is(node)) {
     if (node.immediate === true) {
       return LiteralExpr.of(node.value);
     }
-    const index = nextParamIndex(ctx);
-    ctx.params.push(node.value);
-    addDescriptorForCurrentParam();
-    return ParamRef.of(index);
+    advanceParamCursor(ctx);
+    return ParamRef.of(node.value, options);
   }
 
   throw new KyselyTransformError(
@@ -113,7 +111,7 @@ function flattenLogical(
   logicalKind: 'and' | 'or',
   ctx: TransformContext,
   defaultTable: string | undefined,
-  out: WhereExpr[],
+  out: AnyWhereExpr[],
 ): void {
   const current = ParensNode.is(node) ? node.node : node;
   if (logicalKind === 'and' && AndNode.is(current)) {
@@ -159,7 +157,7 @@ export function transformWhereExpr(
   node: unknown,
   ctx: TransformContext,
   defaultTable?: string,
-): WhereExpr | undefined {
+): AnyWhereExpr | undefined {
   if (!node) {
     return undefined;
   }
@@ -173,7 +171,7 @@ export function transformWhereExpr(
   }
 
   if (AndNode.is(node)) {
-    const exprs: WhereExpr[] = [];
+    const exprs: AnyWhereExpr[] = [];
     flattenLogical(node, 'and', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];
@@ -181,7 +179,7 @@ export function transformWhereExpr(
   }
 
   if (OrNode.is(node)) {
-    const exprs: WhereExpr[] = [];
+    const exprs: AnyWhereExpr[] = [];
     flattenLogical(node, 'or', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];
@@ -252,10 +250,10 @@ export function transformJoinOn(
   }
 
   if (
-    expr instanceof BinaryExpr &&
+    expr.kind === 'binary' &&
     expr.op === 'eq' &&
-    expr.left instanceof ColumnRef &&
-    expr.right instanceof ColumnRef
+    expr.left.kind === 'column-ref' &&
+    expr.right.kind === 'column-ref'
   ) {
     return EqColJoinOn.of(expr.left, expr.right);
   }

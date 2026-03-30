@@ -1,6 +1,7 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
+  type AnyWhereExpr,
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
@@ -10,7 +11,6 @@ import {
   ProjectionItem,
   SelectAst,
   TableSource,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { and, not } from './filters';
 import type { ComparisonMethods, ModelAccessor, RelationFilterAccessor } from './types';
@@ -38,7 +38,7 @@ interface RelationMeta {
 }
 
 type RelationPredicateInput<TContract extends SqlContract<SqlStorage>, ModelName extends string> =
-  | ((model: ModelAccessor<TContract, ModelName>) => WhereExpr)
+  | ((model: ModelAccessor<TContract, ModelName>) => AnyWhereExpr)
   | Record<string, unknown>;
 
 /**
@@ -157,7 +157,7 @@ function buildExistsExpr<TContract extends SqlContract<SqlStorage>>(
     readonly mode: 'some' | 'every' | 'none';
     readonly predicate: RelationPredicateInput<TContract, string> | undefined;
   },
-): WhereExpr {
+): AnyWhereExpr {
   const joinWhere = buildJoinWhere(parentTableName, relatedTableName, relation);
   const childWhere = toRelationWhereExpr(contract, relatedModelName, options.predicate);
 
@@ -193,7 +193,7 @@ function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
   relatedModelName: string,
   predicate: RelationPredicateInput<TContract, string> | undefined,
-): WhereExpr | undefined {
+): AnyWhereExpr | undefined {
   if (!predicate) {
     return undefined;
   }
@@ -204,7 +204,7 @@ function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
     return predicate(accessor);
   }
 
-  const exprs: WhereExpr[] = [];
+  const exprs: AnyWhereExpr[] = [];
   for (const [fieldName, value] of Object.entries(predicate)) {
     if (value === undefined) {
       continue;
@@ -234,11 +234,11 @@ function buildJoinWhere(
   parentTableName: string,
   childTableName: string,
   relation: RelationMeta,
-): WhereExpr {
+): AnyWhereExpr {
   const parentCols = relation.on?.parentCols ?? [];
   const childCols = relation.on?.childCols ?? [];
 
-  const joinExprs: WhereExpr[] = [];
+  const joinExprs: AnyWhereExpr[] = [];
   const count = Math.min(parentCols.length, childCols.length);
 
   for (let i = 0; i < count; i++) {

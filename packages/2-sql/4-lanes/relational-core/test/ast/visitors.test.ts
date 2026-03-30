@@ -15,7 +15,7 @@ import {
   SelectAst,
   SubqueryExpr,
 } from '../../src/exports/ast';
-import { col, lit, lowerExpr, param, simpleSelect, table } from './test-helpers';
+import { col, lit, lowerExpr, param, shiftParamRef, simpleSelect, table } from './test-helpers';
 
 describe('ast/visitors', () => {
   it('rewrites expressions through node-level rewrite methods', () => {
@@ -31,11 +31,11 @@ describe('ast/visitors', () => {
 
     const rewrittenOperation = operation.rewrite({
       columnRef: (expr) => (expr.table === 'user' ? col('member', expr.column) : expr),
-      paramRef: (expr) => expr.withIndex(expr.index + 10),
+      paramRef: shiftParamRef(10),
       literal: (expr) => (expr.value === true ? lit('TRUE') : expr),
     });
     const rewrittenList = list.rewrite({
-      paramRef: (expr) => expr.withIndex(expr.index + 20),
+      paramRef: shiftParamRef(20),
       literal: () => lit('mapped'),
     });
     const rewrittenObject = objectExpr.rewrite({
@@ -87,7 +87,7 @@ describe('ast/visitors', () => {
     const rewritten = ast.rewrite({
       tableSource: (source) => (source.name === 'user' ? table('member') : source),
       columnRef: (expr) => (expr.table === 'user' ? col('member', expr.column) : expr),
-      paramRef: (expr) => expr.withIndex(expr.index + 1),
+      paramRef: shiftParamRef(1),
       literal: (expr) => (expr.value === true ? lit('TRUE') : expr),
       eqColJoinOn: (on) => EqColJoinOn.of(col('member', on.left.column), on.right),
       select: (select) => select.withLimit(select.limit ?? 25),
@@ -121,7 +121,7 @@ describe('ast/visitors', () => {
       empty: [],
       combine: (a, b) => [...a, ...b],
       columnRef: (expr) => [`${expr.table}.${expr.column}`],
-      paramRef: (expr) => [`$${expr.index}`],
+      paramRef: (expr) => [`$${expr.value}`],
       literal: (expr) => [`lit:${String(expr.value)}`],
       listLiteral: (expr) => [`list:${expr.values.length}`],
       select: (ast) => ast.collectColumnRefs().map((expr) => `${expr.table}.${expr.column}`),

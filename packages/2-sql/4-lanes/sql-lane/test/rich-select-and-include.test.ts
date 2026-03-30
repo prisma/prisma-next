@@ -5,9 +5,8 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   BinaryExpr,
   ColumnRef,
-  DerivedTableSource,
+  type DerivedTableSource,
   JoinAst,
-  JsonArrayAggExpr,
   ParamRef,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -53,7 +52,7 @@ describe('sql lane rich select and include ASTs', () => {
       })
       .orderBy(tables.user.columns.email.desc())
       .limit(5)
-      .build({ params: { userId: 'u1' } });
+      .build({ params: { userId: 1 } });
 
     expect(plan.ast).toBeInstanceOf(SelectAst);
     const ast = plan.ast as SelectAst;
@@ -65,7 +64,9 @@ describe('sql lane rich select and include ASTs', () => {
     expect(plan.meta.annotations).toMatchObject({ limit: 5 });
     expect(ast.orderBy?.[0]?.expr).toEqual(ColumnRef.of('user', 'email'));
     expect(ast.where).toBeInstanceOf(BinaryExpr);
-    expect((ast.where as BinaryExpr).right).toEqual(ParamRef.of(1, 'userId'));
+    expect((ast.where as BinaryExpr).right).toEqual(
+      ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1' }),
+    );
   });
 
   it('builds includeMany using derived-table rich AST nodes', () => {
@@ -94,16 +95,16 @@ describe('sql lane rich select and include ASTs', () => {
       })
       .build();
 
-    expect(plan.ast).toBeInstanceOf(SelectAst);
+    expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
     expect(ast.joins?.[0]).toBeInstanceOf(JoinAst);
     expect(ast.projection[1]?.expr).toEqual(ColumnRef.of('posts_lateral', 'posts'));
 
     const aggregateSource = ast.joins?.[0]?.source;
-    expect(aggregateSource).toBeInstanceOf(DerivedTableSource);
+    expect(aggregateSource?.kind).toBe('derived-table-source');
     const aggregateSelect = (aggregateSource as DerivedTableSource).query;
-    expect(aggregateSelect.projection[0]?.expr).toBeInstanceOf(JsonArrayAggExpr);
-    expect(aggregateSelect.from).toBeInstanceOf(DerivedTableSource);
+    expect(aggregateSelect.projection[0]?.expr.kind).toBe('json-array-agg');
+    expect(aggregateSelect.from.kind).toBe('derived-table-source');
     expect((aggregateSelect.from as DerivedTableSource).query.limit).toBe(2);
     expect(plan.meta.refs?.tables).toContain('post');
   });

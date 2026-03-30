@@ -1,11 +1,10 @@
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import {
   ColumnRef,
-  DerivedTableSource,
-  JsonArrayAggExpr,
-  JsonObjectExpr,
+  type DerivedTableSource,
+  type JsonArrayAggExpr,
   OrderByItem,
-  SubqueryExpr,
+  type SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
@@ -23,15 +22,24 @@ function expectSelectAst(ast: unknown): asserts ast is SelectAst {
 }
 
 function expectDerivedTableSource(source: unknown): asserts source is DerivedTableSource {
-  expect(source).toBeInstanceOf(DerivedTableSource);
+  expect(
+    typeof source === 'object' &&
+      source !== null &&
+      'kind' in source &&
+      source.kind === 'derived-table-source',
+  ).toBe(true);
 }
 
 function expectSubqueryExpr(expr: unknown): asserts expr is SubqueryExpr {
-  expect(expr).toBeInstanceOf(SubqueryExpr);
+  expect(
+    typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'subquery',
+  ).toBe(true);
 }
 
 function expectJsonArrayAggExpr(expr: unknown): asserts expr is JsonArrayAggExpr {
-  expect(expr).toBeInstanceOf(JsonArrayAggExpr);
+  expect(
+    typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'json-array-agg',
+  ).toBe(true);
 }
 
 function createUsersCollectionWithCapabilities(
@@ -344,7 +352,7 @@ describe('integration/include', () => {
         const includeJoin = ast.joins?.find(
           (join) =>
             join.lateral &&
-            join.source instanceof DerivedTableSource &&
+            join.source.kind === 'derived-table-source' &&
             join.source.alias === 'posts_lateral',
         );
         expect(includeJoin).toBeDefined();
@@ -353,7 +361,7 @@ describe('integration/include', () => {
         const includeAggregateProjection = includeJoin.source.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
-        expect(includeAggregateProjection.expr.expr).toBeInstanceOf(JsonObjectExpr);
+        expect(includeAggregateProjection.expr.expr.kind).toBe('json-object');
         expect(includeAggregateProjection.expr.orderBy).toEqual([
           OrderByItem.asc(ColumnRef.of('posts__rows', 'posts__order_0')),
         ]);
@@ -431,7 +439,7 @@ describe('integration/include', () => {
         const includeJoin = ast.joins?.find(
           (join) =>
             join.lateral &&
-            join.source instanceof DerivedTableSource &&
+            join.source.kind === 'derived-table-source' &&
             join.source.alias === 'invitedUsers_lateral',
         );
         expect(includeJoin).toBeDefined();
@@ -490,7 +498,7 @@ describe('integration/include', () => {
         const includeAggregateProjection = postsProjection.expr.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
-        expect(includeAggregateProjection.expr.expr).toBeInstanceOf(JsonObjectExpr);
+        expect(includeAggregateProjection.expr.expr.kind).toBe('json-object');
       });
     },
     timeouts.spinUpPpgDev,

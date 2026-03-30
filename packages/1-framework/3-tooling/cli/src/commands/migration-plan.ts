@@ -163,17 +163,23 @@ async function executeMigrationPlanCommand(
     const { bundles, graph } = await loadMigrationBundles(migrationsDir);
 
     if (options.from) {
-      fromHash = options.from;
-      const sourceBundle = bundles.find((p) => p.manifest.to === fromHash);
-      if (!sourceBundle) {
+      const resolved = resolveBundleByPrefix(bundles, options.from);
+      if (!resolved.ok) {
+        const f = resolved.failure;
         return notOk(
-          errorRuntime('Starting contract not found', {
-            why: `No migration with to="${fromHash}" exists in ${migrationsRelative}`,
-            fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration leaf.',
-          }),
+          f.reason === 'ambiguous'
+            ? errorRuntime('Multiple matching migrations found', {
+                why: `Prefix "${options.from}" matches ${f.count} migrations in ${migrationsRelative}`,
+                fix: 'Provide a longer prefix to disambiguate, or omit --from to use the latest migration leaf.',
+              })
+            : errorRuntime('Starting contract not found', {
+                why: `No migration with to hash matching "${options.from}" exists in ${migrationsRelative}`,
+                fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration leaf.',
+              }),
         );
       }
-      fromContract = sourceBundle.manifest.toContract;
+      fromHash = resolved.value.manifest.to;
+      fromContract = resolved.value.manifest.toContract;
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
@@ -413,4 +419,33 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   }
 
   return lines.join('\n');
+}
+
+export type PrefixResolutionFailure =
+  | { reason: 'ambiguous'; count: number }
+  | { reason: 'not-found' };
+
+/**
+ * Resolve a migration bundle by exact hash or prefix match.
+ *
+ * Tries exact match first, then prefix match (auto-prepending `sha256:` when
+ * the needle omits the scheme). Returns the matched bundle on success, or a
+ * discriminated failure indicating whether the prefix was ambiguous or simply
+ * not found.
+ *
+ * @internal Exported for testing only.
+ */
+export function resolveBundleByPrefix<T extends { manifest: { to: string } }>(
+  bundles: readonly T[],
+  needle: string,
+): Result<T, PrefixResolutionFailure> {
+  const exact = bundles.find((p) => p.manifest.to === needle);
+  if (exact) return ok(exact);
+
+  const prefixWithScheme = needle.startsWith('sha256:') ? needle : `sha256:${needle}`;
+  const candidates = bundles.filter((p) => p.manifest.to.startsWith(prefixWithScheme));
+
+  if (candidates.length === 1) return ok(candidates[0]!);
+  if (candidates.length > 1) return notOk({ reason: 'ambiguous', count: candidates.length });
+  return notOk({ reason: 'not-found' });
 }

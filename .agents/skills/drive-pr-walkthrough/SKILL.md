@@ -110,22 +110,32 @@ If you’re walking through a historical merge commit:
 
 ## Linking conventions (editor-friendly)
 
-Use **repo-relative markdown links** so they’re clickable from within the workspace:
+Use **repo-relative markdown links** so they’re clickable from within the workspace.
+
+### Cursor IDE (when detected)
+
+**Cursor** does not resolve `path:line` / `path:start-end` in markdown link targets to a useful location (links are effectively broken for navigation). When **any** of `CURSOR_AGENT`, `CURSOR_TRACE_ID`, or `CURSOR_CLI` is set in the environment—or when the user says the output is for Cursor—use **path-only** links:
+
+- Link: `[path/to/file.ts](path/to/file.ts)` (no `:line` suffix on the target).
+- When readers need a line hint, put it **outside** the link as plain text, e.g. ` — lines 12–34` or on the next line: `Lines 12–34.`
+
+Do **not** put `(L12–L34)` in the link text when using path-only targets (it implies a jump that will not work).
+
+### Other environments (not Cursor)
+
+When Cursor is **not** detected and the artifact is not Cursor-only:
 
 - Preferred format (encodes a range): `[path/to/file.ts (L12–L34)](path/to/file.ts:12-34)`
-  - Still put the full range in the link text.
-- Fallback formats:
-  - Start line only: `[path/to/file.ts (L12–L34)](path/to/file.ts:12)`
-  - No line jump: `[path/to/file.ts (L12–L34)](path/to/file.ts)`
+- Fallback: start line only `[...](path/to/file.ts:12)` or path only `[...](path/to/file.ts)`
 
-Notes on line-range links:
-- **Standard Markdown** has no portable “file link with line range” convention.
-- **GitHub** supports line anchors for blob pages, e.g. `[file.ts (L12–L34)](https://github.com/ORG/REPO/blob/SHA/file.ts#L12-L34)` (works on GitHub, not as a local workspace file link).
-- **VSCode/Cursor** may support `vscode://file/...` URIs (not portable, uses absolute paths).
+Notes:
 
-Default: use repo-relative links with `:start-end` in the link target; if the context is explicitly “on GitHub”, prefer GitHub `#Lx-Ly` anchors.
+- **GitHub** blob pages support `#L12-L34` anchors, e.g. `[file.ts (L12–L34)](https://github.com/ORG/REPO/blob/SHA/file.ts#L12-L34)`.
+- Avoid `vscode://file/...` (not portable).
 
-For the most important 1–3 snippets total, also include a small excerpt with precise line ranges (so the reader can immediately see the pivot of the change without hunting).
+### Snippets
+
+For the most important 1–3 snippets total, include a small fenced excerpt when it clarifies the change; line numbers in **snippet** fences remain fine. Prefer path-only file links in the narrative when running under Cursor as above.
 
 ## Output template (use this structure)
 
@@ -160,11 +170,13 @@ Use snippets only when they materially clarify the change.
 
 ## Change map
 - **Implementation**:
-  - [path/to/primary-file.ts (L12–L34)](path/to/primary-file.ts:12-34)
+  - [path/to/primary-file.ts](path/to/primary-file.ts) — lines 12–34
   - ...
 - **Tests (evidence)**:
-  - [path/to/test-file.test.ts (L12–L34)](path/to/test-file.test.ts:12-34)
+  - [path/to/test-file.test.ts](path/to/test-file.test.ts) — lines 12–34
   - ...
+
+(In Cursor, keep links path-only and put ranges after the link as above. Outside Cursor, you may use `[file (L12–L34)](file:12-34)` instead.)
 
 ## The story
 1. <Step 1: conceptual move; name the new guarantee/behavior>
@@ -175,9 +187,9 @@ Use snippets only when they materially clarify the change.
 - **Behavior change A**: <Additive statement (“Adds X that …”) OR Before → After statement>
   - **Why**: <rationale / constraint / trade-off>
   - **Implementation**:
-    - [path/to/file.ts (L12–L34)](path/to/file.ts:12-34)
+    - [path/to/file.ts](path/to/file.ts) — lines 12–34
   - **Tests**:
-    - [path/to/test.test.ts (L12–L34)](path/to/test.test.ts:12-34)
+    - [path/to/test.test.ts](path/to/test.test.ts) — lines 12–34
 
 - **Behavior change B**: ...
 
@@ -202,6 +214,7 @@ Use snippets only when they materially clarify the change.
 - [ ] Any compatibility/migration risk is called out (or explicitly noted as absent).
 - [ ] Follow-ups / open questions are captured when they meaningfully affect review or rollout.
 - [ ] The walkthrough is **written to disk**, and chat output is only a pointer (unless the user asked to inline it).
+- [ ] **Cursor**: file links are path-only with line ranges in plain text after the link (see Linking conventions). **Else**: line-range links are acceptable when they resolve for the reader.
 
 ## Examples
 
@@ -223,7 +236,7 @@ Tighten driver initialization so runtime instantiation is explicit and testable.
 ## Behavior changes & evidence
 - **Driver construction is deferred until runtime creation**: eager side effects → explicit instantiation
   - **Implementation**:
-    - [packages/foo/src/runtime.ts (L10–L42)](packages/foo/src/runtime.ts:10-42)
+    - [packages/foo/src/runtime.ts](packages/foo/src/runtime.ts) — lines 10–42
   - **Tests**:
-    - [packages/foo/test/runtime.test.ts (L15–L60)](packages/foo/test/runtime.test.ts:15-60)
+    - [packages/foo/test/runtime.test.ts](packages/foo/test/runtime.test.ts) — lines 15–60
 ````

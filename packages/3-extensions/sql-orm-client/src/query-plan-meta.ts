@@ -1,7 +1,23 @@
 import type { ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { type QueryAst, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { AnyQueryAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { ifDefined } from '@prisma-next/utils/defined';
+
+export function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }): {
+  params: unknown[];
+  paramDescriptors: ParamDescriptor[];
+} {
+  const collectedParams = [...new Set(ast.collectParamRefs())];
+  return {
+    params: collectedParams.map((p) => p.value),
+    paramDescriptors: collectedParams.map((p) => ({
+      ...ifDefined('name', p.name),
+      ...ifDefined('codecId', p.codecId),
+      source: 'dsl' as const,
+    })),
+  };
+}
 
 export function resolveTableColumns(
   contract: SqlContract<SqlStorage>,
@@ -30,12 +46,12 @@ export function buildOrmPlanMeta(
 
 export function buildOrmQueryPlan<Row>(
   contract: SqlContract<SqlStorage>,
-  ast: QueryAst,
+  ast: AnyQueryAst,
   params: readonly unknown[],
   paramDescriptors: readonly ParamDescriptor[] = [],
 ): SqlQueryPlan<Row> {
   const annotations =
-    ast instanceof SelectAst && typeof ast.limit === 'number' ? { limit: ast.limit } : undefined;
+    ast.kind === 'select' && ast.limit !== undefined ? { limit: ast.limit } : undefined;
 
   return Object.freeze({
     ast,

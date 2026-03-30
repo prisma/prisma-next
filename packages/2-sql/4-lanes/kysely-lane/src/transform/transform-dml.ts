@@ -5,7 +5,7 @@ import {
   InsertAst,
   InsertOnConflict,
   type InsertValue,
-  ParamRef,
+  type ParamRef,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -37,7 +37,7 @@ import { expandSelectAll } from './transform-select';
 import { resolveColumnRef, transformTableRef, validateColumn } from './transform-validate';
 
 function assertParamRef(value: ReturnType<typeof transformValue>): ParamRef {
-  if (!(value instanceof ParamRef)) {
+  if (value.kind !== 'param-ref') {
     throw new KyselyTransformError(
       'Only parameterized VALUES are supported in Kysely transform lane',
       KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,

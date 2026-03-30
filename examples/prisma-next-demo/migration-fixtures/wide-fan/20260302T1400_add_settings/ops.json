@@ -1,0 +1,34 @@
+[
+  {
+    "id": "table.settings",
+    "label": "Create table settings",
+    "summary": "Creates table settings with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "settings"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"settings\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"settings\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"settings\"",
+        "sql": "CREATE TABLE \"public\".\"settings\" (\n  \"id\" uuid NOT NULL,\n  \"userId\" uuid NOT NULL,\n  \"theme\" text,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"settings\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"settings\"') IS NOT NULL"
+      }
+    ]
+  }
+]

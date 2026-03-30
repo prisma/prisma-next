@@ -1,4 +1,5 @@
-import { BinaryExpr, ColumnRef, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { BinaryExpr, ColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { describe, expect, it } from 'vitest';
@@ -63,7 +64,7 @@ describe('select builder edge cases', () => {
       .select({ id: tables.user.columns.id })
       .build();
 
-    expect(selectPlan.ast).toBeInstanceOf(SelectAst);
+    expect(selectPlan.ast.kind).toBe('select');
     expect((selectPlan.ast as SelectAst).where).toEqual(
       BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'createdAt')),
     );

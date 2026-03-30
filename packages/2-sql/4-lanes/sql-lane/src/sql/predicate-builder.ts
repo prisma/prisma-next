@@ -1,15 +1,13 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
+import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  Expression,
+  AnyExpression,
+  AnySqlComparable,
+  AnyWhereExpr,
   NullCheckExpr,
-  ParamRef,
-  WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
-  ColumnRef,
-  Expression as ExpressionBase,
   NullCheckExpr as NullCheckExprNode,
   ParamRef as ParamRefNode,
 } from '@prisma-next/sql-relational-core/ast';
@@ -32,29 +30,22 @@ import {
 } from '../utils/errors';
 
 export interface BuildWhereExprResult {
-  expr: WhereExpr;
+  expr: AnyWhereExpr;
   codecId: string | undefined;
   paramName: string;
 }
 
-/**
- * Type guard to check if a builder is a NullCheckBuilder (unary).
- */
 function isNullCheckBuilder(builder: BinaryBuilder | UnaryBuilder): builder is NullCheckBuilder {
   return builder.kind === 'nullCheck';
 }
 
-/**
- * Builds a NullCheckExpr from a NullCheckBuilder.
- */
 function buildNullCheckExpr(
   contract: SqlContract<SqlStorage>,
   where: NullCheckBuilder,
 ): NullCheckExpr {
   const expr = where.expr;
 
-  // Validate column exists in contract if it's a ColumnRef
-  if (expr instanceof ColumnRef) {
+  if (expr.kind === 'column-ref') {
     const { table, column } = expr;
     const contractTable = contract.storage.tables[table];
     if (!contractTable) {
@@ -74,10 +65,7 @@ export function buildWhereExpr(
   contract: SqlContract<SqlStorage>,
   where: BinaryBuilder | UnaryBuilder,
   paramsMap: Record<string, unknown>,
-  descriptors: ParamDescriptor[],
-  values: unknown[],
 ): BuildWhereExprResult {
-  // Handle NullCheckBuilder (unary expression)
   if (isNullCheckBuilder(where)) {
     return {
       expr: buildNullCheckExpr(contract, where),
@@ -86,23 +74,14 @@ export function buildWhereExpr(
     };
   }
 
-  // Handle BinaryBuilder (binary expression)
-  let leftExpr: Expression;
+  let leftExpr: AnyExpression;
   let codecId: string | undefined;
-  let rightExpr: Expression | ParamRef;
+  let rightExpr: AnySqlComparable;
   let paramName: string;
 
-  // Validate where.left is a valid Expression (col or operation)
-  if (!(where.left instanceof ExpressionBase)) {
-    errorFailedToBuildWhereClause();
-  }
-
-  // where.left is an Expression (already converted at builder creation time)
-  // It could be a ColumnRef or OperationExpr
   leftExpr = where.left;
 
-  // If the left expression is a column reference, extract codecId for param descriptors
-  if (leftExpr instanceof ColumnRef) {
+  if (leftExpr.kind === 'column-ref') {
     const { table, column } = leftExpr;
     const contractTable = contract.storage.tables[table];
     if (!contractTable) {
@@ -115,11 +94,11 @@ export function buildWhereExpr(
     }
 
     codecId = columnMeta.codecId;
+  } else if (leftExpr.kind === 'operation') {
+    codecId = leftExpr.returns.kind === 'typeId' ? leftExpr.returns.type : leftExpr.forTypeId;
   }
 
-  // Handle where.right - can be ParamPlaceholder or ExpressionSource
   if (isParamPlaceholder(where.right)) {
-    // Handle param placeholder (existing logic)
     const placeholder: ParamPlaceholder = where.right;
     paramName = placeholder.name;
 
@@ -128,32 +107,18 @@ export function buildWhereExpr(
     }
 
     const value = paramsMap[paramName];
-    const index = values.push(value);
 
-    // Construct descriptor directly from validated StorageColumn if left is a column
-    if (leftExpr instanceof ColumnRef) {
-      const { table, column } = leftExpr;
-      const contractTable = contract.storage.tables[table];
-      const columnMeta = contractTable?.columns[column];
-      if (columnMeta) {
-        descriptors.push({
-          name: paramName,
-          source: 'dsl',
-          refs: { table, column },
-          nullable: columnMeta.nullable,
-          codecId: columnMeta.codecId,
-          nativeType: columnMeta.nativeType,
-        });
-      }
+    if (!codecId) {
+      throw planInvalid(`Cannot determine codecId for parameter '${paramName}'`);
     }
-
-    rightExpr = ParamRefNode.of(index, paramName);
+    rightExpr = ParamRefNode.of(value, {
+      name: paramName,
+      codecId,
+    });
   } else if (isColumnBuilder(where.right) || isExpressionBuilder(where.right)) {
-    // Handle ExpressionSource (ColumnBuilder or ExpressionBuilder) on the right
     rightExpr = where.right.toExpr();
 
-    // Validate column exists in contract if it's a ColumnRef
-    if (rightExpr instanceof ColumnRef) {
+    if (rightExpr.kind === 'column-ref') {
       const { table, column } = rightExpr;
       const contractTable = contract.storage.tables[table];
       if (!contractTable) {
@@ -166,10 +131,8 @@ export function buildWhereExpr(
       }
     }
 
-    // Use a placeholder paramName for expression references (not used for params)
     paramName = '';
   } else {
-    // where.right is neither ParamPlaceholder nor ExpressionSource - invalid state
     errorFailedToBuildWhereClause();
   }
 

@@ -1,6 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { AfterExecuteResult, Plugin, PluginContext } from '@prisma-next/runtime-executor';
-import { AggregateExpr, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { isQueryAst, type SelectAst } from '@prisma-next/sql-relational-core/ast';
 
 export interface BudgetsOptions {
   readonly maxRows?: number;
@@ -119,7 +119,7 @@ function hasAggregateWithoutGroupBy(ast: SelectAst): boolean {
   if (ast.groupBy !== undefined) {
     return false;
   }
-  return ast.projection.some((item) => item.expr instanceof AggregateExpr);
+  return ast.projection.some((item) => item.expr.kind === 'aggregate');
 }
 
 function estimateRowsFromAst(
@@ -194,7 +194,6 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
   const tableRows = options?.tableRows ?? {};
   const maxLatencyMs = options?.maxLatencyMs ?? 1_000;
   const rowSeverity = options?.severities?.rowCount ?? 'error';
-  const latencySeverity = options?.severities?.latency ?? 'warn';
 
   const observedRowsByPlan = new WeakMap<ExecutionPlan, { count: number }>();
 
@@ -204,11 +203,10 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
       observedRowsByPlan.set(plan, { count: 0 });
 
-      if (plan.ast instanceof SelectAst) {
-        return evaluateSelectAst(plan, plan.ast, ctx);
-      }
-
-      if (plan.ast) {
+      if (isQueryAst(plan.ast)) {
+        if (plan.ast.kind === 'select') {
+          return evaluateSelectAst(plan, plan.ast, ctx);
+        }
         return;
       }
 
@@ -239,7 +237,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     ) {
       const latencyMs = result.latencyMs;
       if (latencyMs > maxLatencyMs) {
-        const shouldBlock = latencySeverity === 'error' && ctx.mode === 'strict';
+        const shouldBlock = ctx.mode === 'strict';
         emitBudgetViolation(
           budgetError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
             latencyMs,

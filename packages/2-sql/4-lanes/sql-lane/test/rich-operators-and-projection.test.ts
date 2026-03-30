@@ -2,13 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import {
-  BinaryExpr,
-  ColumnRef,
-  DeleteAst,
-  NullCheckExpr,
-  SelectAst,
-} from '@prisma-next/sql-relational-core/ast';
+import type { DeleteAst, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { BinaryExpr, ColumnRef, NullCheckExpr } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
@@ -37,7 +32,7 @@ describe('sql lane rich operator interop', () => {
       })
       .build();
 
-    expect(selectPlan.ast).toBeInstanceOf(SelectAst);
+    expect(selectPlan.ast.kind).toBe('select');
     const where = (selectPlan.ast as SelectAst).where as BinaryExpr;
     expect(where).toEqual(
       BinaryExpr.eq(ColumnRef.of('user', 'id'), ColumnRef.of('user', 'createdAt')),
@@ -58,7 +53,7 @@ describe('sql lane rich operator interop', () => {
       .where(tables.user.columns.deletedAt.isNotNull())
       .build();
 
-    expect(deletePlan.ast).toBeInstanceOf(DeleteAst);
+    expect(deletePlan.ast.kind).toBe('delete');
     expect((deletePlan.ast as DeleteAst).where).toEqual(
       NullCheckExpr.isNotNull(ColumnRef.of('user', 'deletedAt')),
     );

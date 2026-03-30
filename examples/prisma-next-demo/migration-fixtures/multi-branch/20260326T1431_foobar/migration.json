@@ -1,0 +1,348 @@
+{
+  "from": "sha256:3ee5d20350ab67f9734959d63831148093a4141727fb67e42eea041674299768",
+  "to": "sha256:bdc08a63eb6c866a7d2aae2d9515c6081cd03bfaa3f42d56fa4a31378e1834b9",
+  "migrationId": "sha256:99ef9d8182529a4ff6c284a970ed4176e1bb50d7006ae77051e99980064b5f94",
+  "kind": "regular",
+  "fromContract": {
+    "schemaVersion": "1",
+    "target": "postgres",
+    "targetFamily": "sql",
+    "storageHash": "sha256:3ee5d20350ab67f9734959d63831148093a4141727fb67e42eea041674299768",
+    "profileHash": "sha256:4992f2487f13111da7833b870d999a7d7d3f1fc7bf70a5de719b2729fc38a1d4",
+    "storage": {
+      "tables": {
+        "user": {
+          "columns": {
+            "id": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "email": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": false
+            },
+            "phone": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": true
+            },
+            "bio": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": true
+            },
+            "createdAt": {
+              "nativeType": "timestamptz",
+              "codecId": "pg/timestamptz@1",
+              "nullable": false,
+              "default": {
+                "kind": "function",
+                "expression": "now()"
+              }
+            }
+          },
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
+        }
+      }
+    },
+    "models": {},
+    "relations": {},
+    "mappings": {},
+    "capabilities": {},
+    "extensionPacks": {},
+    "meta": {},
+    "sources": {}
+  },
+  "toContract": {
+    "schemaVersion": "1",
+    "targetFamily": "sql",
+    "target": "postgres",
+    "storageHash": "sha256:bdc08a63eb6c866a7d2aae2d9515c6081cd03bfaa3f42d56fa4a31378e1834b9",
+    "executionHash": "sha256:630618d96f7674c186a027d1295bfc5d688c4168c5a023a1aea01553820387dc",
+    "profileHash": "sha256:c54f610b4576f79290dede2b74376298ae75f3be3b60fcaf06b7e7cc19f76b7d",
+    "models": {
+      "Post": {
+        "fields": {
+          "createdAt": {
+            "column": "createdAt"
+          },
+          "embedding": {
+            "column": "embedding"
+          },
+          "id": {
+            "column": "id"
+          },
+          "title": {
+            "column": "title"
+          },
+          "userId": {
+            "column": "userId"
+          }
+        },
+        "relations": {},
+        "storage": {
+          "table": "post"
+        }
+      },
+      "User": {
+        "fields": {
+          "createdAt": {
+            "column": "createdAt"
+          },
+          "email": {
+            "column": "email"
+          },
+          "id": {
+            "column": "id"
+          },
+          "kind": {
+            "column": "kind"
+          }
+        },
+        "relations": {},
+        "storage": {
+          "table": "user"
+        }
+      }
+    },
+    "relations": {
+      "post": {
+        "user": {
+          "cardinality": "N:1",
+          "on": {
+            "childCols": ["id"],
+            "parentCols": ["userId"]
+          },
+          "to": "User"
+        }
+      },
+      "user": {
+        "posts": {
+          "cardinality": "1:N",
+          "on": {
+            "childCols": ["userId"],
+            "parentCols": ["id"]
+          },
+          "to": "Post"
+        }
+      }
+    },
+    "storage": {
+      "tables": {
+        "post": {
+          "columns": {
+            "createdAt": {
+              "codecId": "pg/timestamptz@1",
+              "default": {
+                "expression": "now()",
+                "kind": "function"
+              },
+              "nativeType": "timestamptz"
+            },
+            "embedding": {
+              "codecId": "pg/vector@1",
+              "nativeType": "vector",
+              "nullable": true
+            },
+            "id": {
+              "codecId": "sql/char@1",
+              "nativeType": "character",
+              "typeParams": {
+                "length": 36
+              }
+            },
+            "title": {
+              "codecId": "pg/text@1",
+              "nativeType": "text"
+            },
+            "userId": {
+              "codecId": "pg/text@1",
+              "nativeType": "text"
+            }
+          },
+          "foreignKeys": [
+            {
+              "columns": ["userId"],
+              "constraint": true,
+              "index": true,
+              "name": "post_userId_fkey",
+              "references": {
+                "columns": ["id"],
+                "table": "user"
+              }
+            }
+          ],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": []
+        },
+        "user": {
+          "columns": {
+            "age": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4"
+            },
+            "createdAt": {
+              "codecId": "pg/timestamptz@1",
+              "default": {
+                "expression": "now()",
+                "kind": "function"
+              },
+              "nativeType": "timestamptz"
+            },
+            "email": {
+              "codecId": "pg/text@1",
+              "nativeType": "text"
+            },
+            "id": {
+              "codecId": "sql/char@1",
+              "nativeType": "character",
+              "typeParams": {
+                "length": 36
+              }
+            },
+            "kind": {
+              "codecId": "pg/enum@1",
+              "nativeType": "user_type",
+              "typeRef": "user_type"
+            },
+            "name": {
+              "codecId": "pg/text@1",
+              "nativeType": "text"
+            },
+            "phone": {
+              "codecId": "pg/text@1",
+              "nativeType": "text"
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": []
+        }
+      },
+      "types": {
+        "user_type": {
+          "codecId": "pg/enum@1",
+          "nativeType": "user_type",
+          "typeParams": {
+            "values": ["admin", "user"]
+          }
+        }
+      }
+    },
+    "execution": {
+      "mutations": {
+        "defaults": [
+          {
+            "onCreate": {
+              "id": "uuidv4",
+              "kind": "generator"
+            },
+            "ref": {
+              "column": "id",
+              "table": "post"
+            }
+          },
+          {
+            "onCreate": {
+              "id": "uuidv4",
+              "kind": "generator"
+            },
+            "ref": {
+              "column": "id",
+              "table": "user"
+            }
+          }
+        ]
+      }
+    },
+    "capabilities": {
+      "postgres": {
+        "defaults.now": true,
+        "jsonAgg": true,
+        "lateral": true,
+        "limit": true,
+        "orderBy": true,
+        "pgvector/cosine": true,
+        "returning": true
+      },
+      "sql": {
+        "enums": true
+      }
+    },
+    "extensionPacks": {
+      "pgvector": {
+        "capabilities": {
+          "postgres": {
+            "pgvector/cosine": true
+          }
+        },
+        "familyId": "sql",
+        "id": "pgvector",
+        "kind": "extension",
+        "targetId": "postgres",
+        "types": {
+          "codecTypes": {
+            "import": {
+              "alias": "PgVectorTypes",
+              "named": "CodecTypes",
+              "package": "@prisma-next/extension-pgvector/codec-types"
+            },
+            "parameterized": {
+              "pg/vector@1": "Vector<{{length}}>"
+            },
+            "typeImports": [
+              {
+                "alias": "Vector",
+                "named": "Vector",
+                "package": "@prisma-next/extension-pgvector/codec-types"
+              }
+            ]
+          },
+          "operationTypes": {
+            "import": {
+              "alias": "PgVectorOperationTypes",
+              "named": "OperationTypes",
+              "package": "@prisma-next/extension-pgvector/operation-types"
+            }
+          },
+          "storage": [
+            {
+              "familyId": "sql",
+              "nativeType": "vector",
+              "targetId": "postgres",
+              "typeId": "pg/vector@1"
+            }
+          ]
+        },
+        "version": "0.0.1"
+      }
+    },
+    "meta": {},
+    "_generated": {
+      "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+      "message": "This file is automatically generated by \"prisma-next contract emit\".",
+      "regenerate": "To regenerate, run: prisma-next contract emit"
+    }
+  },
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "1.0.0",
+    "planningStrategy": "diff"
+  },
+  "labels": [],
+  "createdAt": "2026-03-26T14:31:28.414Z"
+}

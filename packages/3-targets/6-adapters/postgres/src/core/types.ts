@@ -5,6 +5,7 @@ import type {
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type {
+  AnyQueryAst,
   BinaryExpr,
   ColumnRef,
   DefaultValueExpr,
@@ -16,7 +17,6 @@ import type {
   LoweredStatement,
   OperationExpr,
   ParamRef,
-  QueryAst,
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -47,7 +47,7 @@ export type {
   LiteralExpr,
   OperationExpr,
   ParamRef,
-  QueryAst,
+  AnyQueryAst,
   SelectAst,
   StorageColumn,
   StorageTable,

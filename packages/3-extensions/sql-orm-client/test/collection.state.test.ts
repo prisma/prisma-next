@@ -1,59 +1,20 @@
 import {
   AndExpr,
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
+  LiteralExpr,
   NullCheckExpr,
   ParamRef,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import { bindWhereExpr } from '../src/where-binding';
 import {
   baseContract,
   createCollection,
   createCollectionFor,
   createReturningCollectionFor,
 } from './collection-fixtures';
-
-function bound(
-  expr: BoundWhereExpr['expr'],
-  params: readonly unknown[] = [],
-  paramDescriptors = params.map((_, index) => ({ source: 'lane' as const, index: index + 1 })),
-): BoundWhereExpr {
-  return {
-    expr,
-    params,
-    paramDescriptors,
-  };
-}
-
-function dslBound(
-  expr: BoundWhereExpr['expr'],
-  params: readonly unknown[],
-  refs: ReadonlyArray<{ table: string; column: string }>,
-): BoundWhereExpr {
-  return {
-    expr,
-    params,
-    paramDescriptors: refs.map((ref, index) => {
-      const columnMeta = (
-        baseContract.storage.tables as Record<
-          string,
-          { columns: Record<string, { codecId: string; nativeType: string; nullable: boolean }> }
-        >
-      )[ref.table]!.columns[ref.column]!;
-      return {
-        index: index + 1,
-        name: ref.column,
-        source: 'dsl' as const,
-        refs: ref,
-        codecId: columnMeta.codecId,
-        nativeType: columnMeta.nativeType,
-        nullable: columnMeta.nullable,
-      };
-    }),
-  };
-}
 
 describe('Collection', () => {
   describe('chain methods', () => {
@@ -62,52 +23,59 @@ describe('Collection', () => {
 
       const filtered = collection.where((user) => user.name.eq('Alice'));
       expect(filtered.state.filters).toEqual([
-        dslBound(
-          BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
-          ['Alice'],
-          [{ table: 'users', column: 'name' }],
+        bindWhereExpr(
+          baseContract,
+          BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
         ),
       ]);
       expect(collection.state.filters).toEqual([]);
 
       const chained = filtered.where((user) => user.email.neq('old@example.com'));
       expect(chained.state.filters).toEqual([
-        dslBound(
-          BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
-          ['Alice'],
-          [{ table: 'users', column: 'name' }],
+        bindWhereExpr(
+          baseContract,
+          BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
         ),
-        dslBound(
-          BinaryExpr.neq(ColumnRef.of('users', 'email'), ParamRef.of(1, 'email')),
-          ['old@example.com'],
-          [{ table: 'users', column: 'email' }],
+        bindWhereExpr(
+          baseContract,
+          BinaryExpr.neq(ColumnRef.of('users', 'email'), LiteralExpr.of('old@example.com')),
         ),
       ]);
     });
 
-    it('where() accepts ToWhereExpr payloads and rejects bare ParamRef expressions', () => {
+    it('where() accepts ToWhereExpr payloads and bare ParamRef expressions', () => {
       const { collection } = createCollection();
 
       const filtered = collection.where(
         (_user) =>
           ({
-            toWhereExpr: () => ({
-              expr: BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
-              params: ['Alice'],
-              paramDescriptors: [{ source: 'lane' as const }],
-            }),
+            toWhereExpr: () =>
+              BinaryExpr.eq(
+                ColumnRef.of('users', 'name'),
+                ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+              ),
           }) satisfies ToWhereExpr,
       );
 
       expect(filtered.state.filters).toEqual([
-        bound(BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')), ['Alice']),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+        ),
       ]);
 
-      expect(() =>
-        collection.where((_user) =>
-          BinaryExpr.eq(ColumnRef.of('users', 'id'), ParamRef.of(1, 'id')),
+      const bare = collection.where((_user) =>
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(7, { name: 'id', codecId: 'pg/int4@1' }),
         ),
-      ).toThrow(/bare WhereExpr.*ParamRef/i);
+      );
+      expect(bare.state.filters).toEqual([
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(7, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      ]);
     });
 
     it('where() accepts shorthand filters, handles null and undefined, and treats {} as identity', () => {
@@ -120,13 +88,12 @@ describe('Collection', () => {
       });
 
       expect(filtered.state.filters).toEqual([
-        dslBound(
+        bindWhereExpr(
+          baseContract,
           AndExpr.of([
-            BinaryExpr.eq(ColumnRef.of('users', 'name'), ParamRef.of(1, 'name')),
+            BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
             NullCheckExpr.isNull(ColumnRef.of('users', 'email')),
           ]),
-          ['Alice'],
-          [{ table: 'users', column: 'name' }],
         ),
       ]);
 
@@ -186,10 +153,9 @@ describe('Collection', () => {
         cardinality: '1:N',
       });
       expect(withPosts.state.includes[0]?.nested.filters).toEqual([
-        dslBound(
-          BinaryExpr.gt(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'views')),
-          [100],
-          [{ table: 'posts', column: 'views' }],
+        bindWhereExpr(
+          baseContract,
+          BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
         ),
       ]);
       expect(withPosts.state.includes[0]?.nested.limit).toBe(5);
@@ -203,10 +169,9 @@ describe('Collection', () => {
         fn: 'count',
       });
       expect(withPostCount.state.includes[0]?.scalar?.state.filters).toEqual([
-        dslBound(
-          BinaryExpr.gt(ColumnRef.of('posts', 'views'), ParamRef.of(1, 'views')),
-          [100],
-          [{ table: 'posts', column: 'views' }],
+        bindWhereExpr(
+          baseContract,
+          BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
         ),
       ]);
 

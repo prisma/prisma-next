@@ -513,7 +513,6 @@ describe('Codecs Integration Tests', () => {
       expect(selectPlan.meta.annotations).toBeDefined();
       expect(selectPlan.meta.annotations?.codecs).toEqual({
         name: 'pg/text@1',
-        id: 'pg/int4@1',
       });
 
       const rows = await executePlanAndCollect(runtime, selectPlan);
