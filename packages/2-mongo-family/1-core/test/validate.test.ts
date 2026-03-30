@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import ormContractJson from '../../5-runtime/test/fixtures/orm-contract.json';
 import { validateMongoContract } from '../src/validate';
+import ormContractJson from './fixtures/orm-contract.json';
 
 function validContractJson() {
   return {

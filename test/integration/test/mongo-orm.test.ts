@@ -1,13 +1,14 @@
 import { validateMongoContract } from '@prisma-next/mongo-core';
+import { mongoOrm } from '@prisma-next/mongo-orm';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../../5-runtime/test/fixtures/orm-contract';
-import ormContractJson from '../../5-runtime/test/fixtures/orm-contract.json';
-import { mongoOrm } from '../src/mongo-orm';
-import { withMongod } from './setup';
+import type { Contract } from './fixtures/mongo-orm-contract';
+import ormContractJson from './fixtures/mongo-orm-contract.json';
+import { withMongod } from './utils/mongo-setup';
 
 const { contract } = validateMongoContract<Contract>(ormContractJson);
 
-describe('mongoOrm integration', () => {
+describe('mongoOrm integration', { timeout: timeouts.spinUpDbServer }, () => {
   it('findMany on a non-polymorphic root returns typed results', async () => {
     await withMongod(async (ctx) => {
       const db = ctx.client.db(ctx.dbName);
