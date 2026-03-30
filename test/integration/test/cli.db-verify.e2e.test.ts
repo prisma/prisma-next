@@ -484,8 +484,9 @@ withTempDir(({ createTempDir }) => {
           await withClient(connectionString, async (client) => {
             await client.query(`
               CREATE TABLE IF NOT EXISTS "user" (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL
+                id integer NOT NULL,
+                email text NOT NULL,
+                PRIMARY KEY ("id")
               )
             `);
           });

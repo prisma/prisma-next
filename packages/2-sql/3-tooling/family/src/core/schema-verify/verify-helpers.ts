@@ -236,6 +236,7 @@ export function verifyForeignKeys(
         issues.push({
           kind: 'extra_foreign_key',
           table: tableName,
+          indexOrConstraint: schemaFK.name ?? `fk(${schemaFK.columns.join(',')})`,
           message: `Extra foreign key found in database (not in contract): ${schemaFK.columns.join(', ')} -> ${schemaFK.referencedTable}(${schemaFK.referencedColumns.join(', ')})`,
         });
         nodes.push({
@@ -338,6 +339,7 @@ export function verifyUniqueConstraints(
         issues.push({
           kind: 'extra_unique_constraint',
           table: tableName,
+          indexOrConstraint: schemaUnique.name ?? `unique(${schemaUnique.columns.join(',')})`,
           message: `Extra unique constraint found in database (not in contract): ${schemaUnique.columns.join(', ')}`,
         });
         nodes.push({
@@ -445,6 +447,7 @@ export function verifyIndexes(
         issues.push({
           kind: 'extra_index',
           table: tableName,
+          indexOrConstraint: schemaIndex.name ?? `idx(${schemaIndex.columns.join(',')})`,
           message: `Extra index found in database (not in contract): ${schemaIndex.columns.join(', ')}`,
         });
         nodes.push({
