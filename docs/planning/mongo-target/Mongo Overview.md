@@ -86,18 +86,20 @@ The full step-by-step plan, including architectural risks mapped to design quest
 
 ### Scope and status
 
-This work stream is [workstream 4](../april-milestone.md#4-mongodb-poc--validate-the-second-database-family) of the [April milestone](../april-milestone.md). Phases 1–3 of the PoC are complete:
+This work stream is [workstream 4](../april-milestone.md#4-mongodb-poc--validate-the-second-database-family) of the [April milestone](../april-milestone.md). **The PoC is complete.** The architecture generalizes; remaining work is integration. See [mongo-poc-plan.md § PoC conclusion](1-design-docs/mongo-poc-plan.md#poc-conclusion) for the full assessment.
 
-- **Phase 1** (execution pipeline): `MongoQueryPlan`, `MongoDriver`, `MongoRuntimeCore`, codecs, test infrastructure. See [mongo-execution-poc](../../projects/mongo-execution-poc/spec.md).
+Completed:
+
+- **Phase 1** (execution pipeline): `MongoQueryPlan`, `MongoDriver`, `MongoRuntimeCore`, codecs, test infrastructure.
 - **Phase 2** (contract redesign): Domain/storage separation, polymorphism, aggregate roots. See [ADRs](adrs/).
-- **Phase 3** (minimal ORM client + contract validation): `validateMongoContract()`, `mongoOrm()` with typed `findMany`, equality filters, `$lookup` includes, embedded document projection, polymorphic queries. All acceptance criteria met. See [mongo-orm-poc](../../projects/mongo-orm-poc/spec.md) and [code review](../../projects/mongo-orm-poc/reviews/code-review.md).
+- **Phase 3** (minimal ORM client + contract validation): `validateMongoContract()`, `mongoOrm()` with typed `findMany`, equality filters, `$lookup` includes, embedded document projection, polymorphic queries. All acceptance criteria met.
 
-The following are in-scope for April but not yet planned in detail:
+Next steps are integration, not further PoC phases:
 
-- **Emitter pipeline generalization** — the authoring surfaces and emission process are coupled to SQL; this must be proven for Mongo before end of April
-- **ORM client with shared Collection interface** — reimplement the Mongo ORM with the SQL ORM's fluent chaining API (`.where().select().include().take().all()`), following [ADR 4](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md). The Phase 3 options-bag API proved the contract shape; Phase 4 adopts the target API pattern.
-- **Shared ORM interface extraction** — after both families have working Collection implementations, extract the shared interface. Spike then extract per [ADR 4](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md).
-- **Cross-family consumer validation** — a consumer library working against both SQL and Mongo contracts without family-specific code
+- **Contract shape transition** — update the emitter and `validateContract()` to produce the new contract shape. Mechanical, not risky.
+- **Authoring surface alignment** — coordinate with the PSL/TS DSL workstream so authoring concepts (`roots`, `discriminator`/`variants`, embed/reference strategy) align with the contract. Not a synchronous dependency, but the longer the gap grows the more expensive it becomes.
+- **ORM client structure** — pin the SQL ORM to the new contract shape (where `model.fields` carries `codecId` and `nullable` directly). Requires coordination with the ORM workstream.
+- **`ContractBase` extraction** — extract the shared domain-level contract type from the two family-specific implementations. Prerequisite for cross-family consumer validation.
 
 ## Testing strategy
 
