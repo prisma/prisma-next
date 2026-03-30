@@ -1,5 +1,6 @@
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { type BinaryExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import {
   type CompiledQuery,
   DummyDriver,
@@ -69,15 +70,9 @@ function createSelectWithoutWhereCompiledQuery(): CompiledQuery<{ id: string }> 
 describe('buildKyselyWhereExpr', () => {
   it('returns ToWhereExpr payload for select where filters', () => {
     const whereArg = buildKyselyWhereExpr(contract, createSelectWithWhereCompiledQuery());
-    const bound = whereArg.toWhereExpr();
-    expect(bound.params).toEqual(['admin']);
-    expect(bound.paramDescriptors).toHaveLength(1);
-    const descriptor = bound.paramDescriptors[0];
-    if (!descriptor) {
-      throw new Error('expected parameter descriptor');
-    }
-    expect(descriptor.index).toBe(1);
-    expect(descriptor.source).toBe('lane');
+    const expr = whereArg.toWhereExpr();
+    expect(expr.kind).toBe('binary');
+    expect((expr as BinaryExpr).right).toEqual(ParamRef.of('admin', { codecId: 'string' }));
   });
 
   it('throws when select query has no where clause', () => {

@@ -1,5 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyWhereExpr } from '@prisma-next/sql-relational-core/ast';
 import type { Collection } from './collection';
 import type {
   CollectionContext,
@@ -110,7 +110,7 @@ export type IncludeRefinementValue<
   : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
 
 export type WhereInput<TContract extends SqlContract<SqlStorage>, ModelName extends string> =
-  | ((model: ModelAccessor<TContract, ModelName>) => WhereExpr)
+  | ((model: ModelAccessor<TContract, ModelName>) => AnyWhereExpr)
   | ShorthandWhereFilter<TContract, ModelName>;
 
 export interface IncludeRefinementEvaluation {

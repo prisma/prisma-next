@@ -41,10 +41,10 @@ describe('include AST shapes', () => {
       ]);
 
     expect(selectAst.joins?.[0]?.lateral).toBe(true);
-    expect(selectAst.joins?.[0]?.source).toBeInstanceOf(DerivedTableSource);
+    expect(selectAst.joins?.[0]?.source?.kind).toBe('derived-table-source');
     expect(
-      (selectAst.joins?.[0]?.source as DerivedTableSource).query.projection[0]?.expr,
-    ).toBeInstanceOf(JsonArrayAggExpr);
+      (selectAst.joins?.[0]?.source as DerivedTableSource).query.projection[0]?.expr?.kind,
+    ).toBe('json-array-agg');
   });
 
   it('represents scalar include subqueries as subquery expressions', () => {
@@ -57,7 +57,7 @@ describe('include AST shapes', () => {
       ProjectionItem.of('posts', SubqueryExpr.of(childQuery)),
     ]);
 
-    expect(selectAst.projection[1]?.expr).toBeInstanceOf(SubqueryExpr);
+    expect(selectAst.projection[1]?.expr?.kind).toBe('subquery');
     expect((selectAst.projection[1]?.expr as SubqueryExpr).query.where).toEqual(
       BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')),
     );

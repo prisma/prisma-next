@@ -1,0 +1,230 @@
+{
+  "from": "sha256:a94b7b4182e84e872afd95caf7921f565c22be691e2fc907c4bdbe2aa429282a",
+  "to": "sha256:0276f92b0ae09640ad6738313c4342a30a25071e2e401ea9fe588ab62ac35fce",
+  "migrationId": "sha256:33fda651d5b2a684e1acd5722cc8086cd26ee0c18e3e2ee8fd58be4256b6dad1",
+  "kind": "regular",
+  "fromContract": {
+    "schemaVersion": "1",
+    "target": "postgres",
+    "targetFamily": "sql",
+    "storageHash": "sha256:a94b7b4182e84e872afd95caf7921f565c22be691e2fc907c4bdbe2aa429282a",
+    "profileHash": "sha256:f761e7fd57fb0db12693e6d64c74ddd354bf9ef48a828b9c0624e6591d65e7d9",
+    "storage": {
+      "tables": {
+        "user": {
+          "columns": {
+            "id": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "email": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": false
+            },
+            "createdAt": {
+              "nativeType": "timestamptz",
+              "codecId": "pg/timestamptz@1",
+              "nullable": false,
+              "default": {
+                "kind": "function",
+                "expression": "now()"
+              }
+            }
+          },
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
+        },
+        "post": {
+          "columns": {
+            "id": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "title": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": false
+            },
+            "userId": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "createdAt": {
+              "nativeType": "timestamptz",
+              "codecId": "pg/timestamptz@1",
+              "nullable": false,
+              "default": {
+                "kind": "function",
+                "expression": "now()"
+              }
+            }
+          },
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
+        }
+      }
+    },
+    "models": {},
+    "relations": {},
+    "mappings": {},
+    "capabilities": {},
+    "extensionPacks": {},
+    "meta": {},
+    "sources": {}
+  },
+  "toContract": {
+    "schemaVersion": "1",
+    "target": "postgres",
+    "targetFamily": "sql",
+    "storageHash": "sha256:0276f92b0ae09640ad6738313c4342a30a25071e2e401ea9fe588ab62ac35fce",
+    "profileHash": "sha256:9b12e1ae7cbf9084c7594bdc23847f4d9a8861c7f5fc2b065bccbfe58432b3fe",
+    "storage": {
+      "tables": {
+        "user": {
+          "columns": {
+            "id": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "email": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": false
+            },
+            "phone": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": true
+            },
+            "bio": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": true
+            },
+            "avatarUrl": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": true
+            },
+            "createdAt": {
+              "nativeType": "timestamptz",
+              "codecId": "pg/timestamptz@1",
+              "nullable": false,
+              "default": {
+                "kind": "function",
+                "expression": "now()"
+              }
+            }
+          },
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
+        },
+        "post": {
+          "columns": {
+            "id": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "title": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": false
+            },
+            "userId": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "createdAt": {
+              "nativeType": "timestamptz",
+              "codecId": "pg/timestamptz@1",
+              "nullable": false,
+              "default": {
+                "kind": "function",
+                "expression": "now()"
+              }
+            }
+          },
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
+        },
+        "comment": {
+          "columns": {
+            "id": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "body": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": false
+            },
+            "postId": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "userId": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "createdAt": {
+              "nativeType": "timestamptz",
+              "codecId": "pg/timestamptz@1",
+              "nullable": false,
+              "default": {
+                "kind": "function",
+                "expression": "now()"
+              }
+            }
+          },
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
+        }
+      }
+    },
+    "models": {},
+    "relations": {},
+    "mappings": {},
+    "capabilities": {},
+    "extensionPacks": {},
+    "meta": {},
+    "sources": {}
+  },
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "1.0.0",
+    "planningStrategy": "diff"
+  },
+  "labels": [],
+  "createdAt": "2026-03-24T15:13:45.654Z"
+}

@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
+    "@dagrejs/dagre": "^3.0.0",
     "@prisma-next/config": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",

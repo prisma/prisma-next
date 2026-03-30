@@ -4,8 +4,8 @@ import { planInvalid } from '@prisma-next/plan';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
+  type AnyOperationArg,
   type BinaryOp,
-  type Expression,
   type ExpressionSource,
   LiteralExpr,
   OperationExpr,
@@ -17,9 +17,8 @@ import type {
   ColumnBuilder,
   ExpressionBuilder,
   OperationTypes,
-  ParamPlaceholder,
+  ValueSource,
 } from './types';
-import { isParamPlaceholder } from './utils/guards';
 
 /**
  * Type guard to check if a value is an ExpressionSource (has toExpr method).
@@ -64,10 +63,9 @@ function executeOperation(
     );
   }
 
-  // Get the Expression from the self builder using toExpr()
-  const selfExpr: Expression = selfBuilder.toExpr();
+  const selfExpr = selfBuilder.toExpr();
 
-  const operationArgs: Array<Expression | ParamRef | LiteralExpr> = [];
+  const operationArgs: AnyOperationArg[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     const argSpec = signature.args[i];
@@ -76,10 +74,7 @@ function executeOperation(
     }
 
     if (argSpec.kind === 'param') {
-      if (!isParamPlaceholder(arg)) {
-        throw planInvalid(`Argument ${i} must be a parameter placeholder`);
-      }
-      operationArgs.push(new ParamRef(0, arg.name));
+      operationArgs.push(ParamRef.of(arg, { name: `arg_${i}`, codecId: columnMeta.codecId }));
     } else if (argSpec.kind === 'typeId') {
       // Accept ExpressionSource (ColumnBuilder or ExpressionBuilder)
       if (!isExpressionSource(arg)) {
@@ -113,7 +108,7 @@ function executeOperation(
 
   const createComparisonMethod =
     (op: BinaryOp) =>
-    (value: ParamPlaceholder | ExpressionSource): AnyBinaryBuilder =>
+    (value: ValueSource): AnyBinaryBuilder =>
       Object.freeze({
         kind: 'binary' as const,
         op,

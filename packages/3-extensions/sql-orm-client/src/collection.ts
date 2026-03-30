@@ -1,6 +1,6 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { type ToWhereExpr, type WhereArg, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import { isWhereExpr, type ToWhereExpr, type WhereArg } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import {
@@ -91,13 +91,8 @@ import type {
 } from './types';
 import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
-import { createBoundWhereExpr } from './where-utils';
 
 type WhereDirectInput = WhereArg;
-
-function isWhereExprInput(value: unknown): value is WhereExpr {
-  return value instanceof WhereExpr;
-}
 
 function isToWhereExprInput(value: unknown): value is ToWhereExpr {
   return (
@@ -109,7 +104,10 @@ function isToWhereExprInput(value: unknown): value is ToWhereExpr {
 }
 
 function isWhereDirectInput(value: unknown): value is WhereDirectInput {
-  return isWhereExprInput(value) || isToWhereExprInput(value);
+  return (
+    (isWhereExpr(value) && typeof (value as { accept?: unknown }).accept === 'function') ||
+    isToWhereExprInput(value)
+  );
 }
 
 export class Collection<
@@ -916,7 +914,7 @@ export class Collection<
 
     const resultState: CollectionState = {
       ...emptyState(),
-      filters: [createBoundWhereExpr(whereExpr)],
+      filters: [whereExpr],
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       limit: 1,

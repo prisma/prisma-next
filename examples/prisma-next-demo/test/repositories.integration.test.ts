@@ -9,6 +9,7 @@ import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
 import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
 import { ormClientCreateUser } from '../src/orm-client/create-user';
+import { ormClientDeleteUser } from '../src/orm-client/delete-user';
 import { ormClientFindUserByEmail } from '../src/orm-client/find-user-by-email';
 import { ormClientFindUserById } from '../src/orm-client/find-user-by-id';
 import { ormClientGetAdminUsers } from '../src/orm-client/get-admin-users';
@@ -19,6 +20,7 @@ import { ormClientGetUserInsights } from '../src/orm-client/get-user-insights';
 import { ormClientGetUserKindBreakdown } from '../src/orm-client/get-user-kind-breakdown';
 import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
 import { ormClientGetUsers } from '../src/orm-client/get-users';
+import { ormClientGetUsersBackwardCursor } from '../src/orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
 import { ormClientGetUsersViaWhereArg } from '../src/orm-client/get-users-via-wherearg';
 import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
@@ -169,10 +171,6 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
   }
 }
 
-function asId(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : String(value);
-}
-
 describe('ORM client integration examples', () => {
   it(
     'ormClientGetUsers returns limited rows',
@@ -210,10 +208,9 @@ describe('ORM client integration examples', () => {
           await seedOrmClientData(runtime);
           const users = await ormClientGetAdminUsers(10, runtime);
 
-          const userRecords = users as Array<Record<string, unknown>>;
-          expect(userRecords).toHaveLength(2);
-          expect(userRecords.every((user) => user['kind'] === 'admin')).toBe(true);
-          expect(userRecords.map((user) => asId(user['id'])).sort()).toEqual([
+          expect(users).toHaveLength(2);
+          expect(users.every((user) => user.kind === 'admin')).toBe(true);
+          expect(users.map((user) => user.id).sort()).toEqual([
             seededUserIds.admin,
             seededUserIds.adminTwo,
           ]);
@@ -235,13 +232,12 @@ describe('ORM client integration examples', () => {
         try {
           await seedOrmClientData(runtime);
           const users = await ormClientGetUsersViaWhereArg('admin', 10, runtime);
-          const userRecords = users as Array<Record<string, unknown>>;
-          const ids = userRecords.map((user) => asId(user['id']));
+          const ids = users.map((user) => user.id);
           expect(ids).toEqual(
             expect.arrayContaining([seededUserIds.admin, seededUserIds.adminTwo]),
           );
           expect(ids).toHaveLength(2);
-          expect(userRecords.every((user) => user['kind'] === 'admin')).toBe(true);
+          expect(users.every((user) => user.kind === 'admin')).toBe(true);
         } finally {
           await runtime.close();
         }
@@ -266,7 +262,7 @@ describe('ORM client integration examples', () => {
             email: 'member@example.com',
             kind: 'user',
           });
-          expect(asId((user as Record<string, unknown>)['id'])).toBe(seededUserIds.member);
+          expect(user!.id).toBe(seededUserIds.member);
           expect(missing).toBeNull();
         } finally {
           await runtime.close();
@@ -291,7 +287,7 @@ describe('ORM client integration examples', () => {
             runtime,
           );
 
-          expect(asId((user as Record<string, unknown>)['id'])).toBe(seededUserIds.admin);
+          expect(user!.id).toBe(seededUserIds.admin);
           expect(missing).toBeNull();
         } finally {
           await runtime.close();
@@ -375,15 +371,9 @@ describe('ORM client integration examples', () => {
         try {
           await seedOrmClientData(runtime);
           const posts = await ormClientGetUserPosts(seededUserIds.admin, 10, runtime);
-          const postRecords = posts as Array<Record<string, unknown>>;
 
-          expect(postRecords.map((post) => asId(post['id']))).toEqual([
-            seededPostIds.newer,
-            seededPostIds.older,
-          ]);
-          expect(postRecords.every((post) => asId(post['userId']) === seededUserIds.admin)).toBe(
-            true,
-          );
+          expect(posts.map((post) => post.id)).toEqual([seededPostIds.newer, seededPostIds.older]);
+          expect(posts.every((post) => post.userId === seededUserIds.admin)).toBe(true);
         } finally {
           await runtime.close();
         }
@@ -402,17 +392,20 @@ describe('ORM client integration examples', () => {
         try {
           await seedOrmClientData(runtime);
           const users = await ormClientGetDashboardUsers('example.com', 'post', 10, 1, runtime);
-          const records = users as Array<Record<string, unknown>>;
 
-          expect(records.map((user) => asId(user['id']))).toEqual([
+          expect(users.map((user) => user.id)).toEqual([
             seededUserIds.adminTwo,
             seededUserIds.admin,
           ]);
-          expect(records.map((user) => user['kind'])).toEqual(['admin', 'admin']);
+          expect(users.map((user) => user.kind)).toEqual(['admin', 'admin']);
+          // TODO(TML-2120): IncludeRelationValue incorrectly omits included relations
+          // from the result type, requiring this manual type assertion. Remove once
+          // the ORM client's include type inference is fixed.
+          type UserWithPosts = (typeof users)[number] & {
+            posts: Array<{ id: string }>;
+          };
           expect(
-            records.map((user) =>
-              (user['posts'] as Array<Record<string, unknown>>).map((post) => asId(post['id'])),
-            ),
+            (users as UserWithPosts[]).map((user) => user.posts.map((post) => post.id)),
           ).toEqual([[seededPostIds.adminZebra], [seededPostIds.newer]]);
         } finally {
           await runtime.close();
@@ -432,17 +425,20 @@ describe('ORM client integration examples', () => {
         try {
           await seedOrmClientData(runtime);
           const posts = await ormClientGetPostFeed('post', 3, runtime);
-          const postRecords = posts as Array<Record<string, unknown>>;
 
-          expect(postRecords.map((post) => asId(post['id']))).toEqual([
+          expect(posts.map((post) => post.id)).toEqual([
             seededPostIds.adminZebra,
             seededPostIds.adminDeepDive,
             seededPostIds.newer,
           ]);
-          expect(postRecords.every((post) => 'embedding' in post === false)).toBe(true);
-          expect(
-            postRecords.map((post) => asId((post['user'] as Record<string, unknown>)['id'])),
-          ).toEqual([seededUserIds.adminTwo, seededUserIds.adminTwo, seededUserIds.admin]);
+          expect(posts.every((post) => 'embedding' in post === false)).toBe(true);
+          // TODO(TML-2120): non-null assert works around IncludeRelationValue
+          // incorrectly marking the included to-one relation as nullable.
+          expect(posts.map((post) => post.user!.id)).toEqual([
+            seededUserIds.adminTwo,
+            seededUserIds.adminTwo,
+            seededUserIds.admin,
+          ]);
         } finally {
           await runtime.close();
         }
@@ -463,12 +459,14 @@ describe('ORM client integration examples', () => {
           const firstPage = await ormClientGetUsersByIdCursor(null, 2, runtime);
           const secondPage = await ormClientGetUsersByIdCursor(seededUserIds.member, 2, runtime);
 
-          expect(
-            (firstPage as Array<Record<string, unknown>>).map((user) => asId(user['id'])),
-          ).toEqual([seededUserIds.admin, seededUserIds.member]);
-          expect(
-            (secondPage as Array<Record<string, unknown>>).map((user) => asId(user['id'])),
-          ).toEqual([seededUserIds.adminTwo, seededUserIds.reader]);
+          expect(firstPage.map((user) => user.id)).toEqual([
+            seededUserIds.admin,
+            seededUserIds.member,
+          ]);
+          expect(secondPage.map((user) => user.id)).toEqual([
+            seededUserIds.adminTwo,
+            seededUserIds.reader,
+          ]);
         } finally {
           await runtime.close();
         }
@@ -487,14 +485,13 @@ describe('ORM client integration examples', () => {
         try {
           await seedOrmClientData(runtime);
           const users = await ormClientGetLatestUserPerKind(runtime);
-          const records = users as Array<Record<string, unknown>>;
 
-          expect(records).toHaveLength(2);
-          expect(records.map((user) => asId(user['id']))).toEqual([
+          expect(users).toHaveLength(2);
+          expect(users.map((user) => user.id)).toEqual([
             seededUserIds.adminTwo,
             seededUserIds.reader,
           ]);
-          expect(records.map((user) => user['kind'])).toEqual(['admin', 'user']);
+          expect(users.map((user) => user.kind)).toEqual(['admin', 'user']);
         } finally {
           await runtime.close();
         }
@@ -513,22 +510,21 @@ describe('ORM client integration examples', () => {
         try {
           await seedOrmClientData(runtime);
           const users = await ormClientGetUserInsights(4, runtime);
-          const records = users as Array<Record<string, unknown>>;
 
-          expect(records.map((user) => asId(user['id']))).toEqual([
+          expect(users.map((user) => user.id)).toEqual([
             seededUserIds.reader,
             seededUserIds.adminTwo,
             seededUserIds.member,
             seededUserIds.admin,
           ]);
 
-          const postMetrics = records.map(
-            (user) => user['posts'] as { totalPosts: number; latestPost: Array<{ id: string }> },
-          );
-          expect(postMetrics.map((posts) => posts.totalPosts)).toEqual([0, 2, 1, 2]);
-          expect(postMetrics.map((posts) => posts.latestPost.map((post) => asId(post.id)))).toEqual(
-            [[], [seededPostIds.adminZebra], [seededPostIds.memberNote], [seededPostIds.newer]],
-          );
+          expect(users.map((user) => user.posts.totalPosts)).toEqual([0, 2, 1, 2]);
+          expect(users.map((user) => user.posts.latestPost.map((post) => post.id))).toEqual([
+            [],
+            [seededPostIds.adminZebra],
+            [seededPostIds.memberNote],
+            [seededPostIds.newer],
+          ]);
         } finally {
           await runtime.close();
         }
@@ -601,7 +597,7 @@ describe('ORM client integration examples', () => {
             email: 'inserted-upsert@example.com',
             kind: 'user',
           });
-          expect((inserted as Record<string, unknown>)['createdAt']).toBeTruthy();
+          expect(inserted.createdAt).toBeTruthy();
 
           const insertedUser = await ormClientFindUserById(insertedId, runtime);
           expect(insertedUser).toMatchObject({
@@ -609,6 +605,63 @@ describe('ORM client integration examples', () => {
             email: 'inserted-upsert@example.com',
             kind: 'user',
           });
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientDeleteUser removes a user by id',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const before = await ormClientFindUserById(seededUserIds.reader, runtime);
+          expect(before).not.toBeNull();
+
+          await ormClientDeleteUser(seededUserIds.reader, runtime);
+
+          const after = await ormClientFindUserById(seededUserIds.reader, runtime);
+          expect(after).toBeNull();
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientGetUsersBackwardCursor returns rows before cursor in descending id order',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+
+          const page = await ormClientGetUsersBackwardCursor(seededUserIds.reader, 2, runtime);
+          expect(page.map((user) => user.id)).toEqual([
+            seededUserIds.adminTwo,
+            seededUserIds.member,
+          ]);
+
+          const partialPage = await ormClientGetUsersBackwardCursor(
+            seededUserIds.member,
+            10,
+            runtime,
+          );
+          expect(partialPage.map((user) => user.id)).toEqual([seededUserIds.admin]);
+
+          const emptyPage = await ormClientGetUsersBackwardCursor(seededUserIds.admin, 2, runtime);
+          expect(emptyPage).toHaveLength(0);
         } finally {
           await runtime.close();
         }

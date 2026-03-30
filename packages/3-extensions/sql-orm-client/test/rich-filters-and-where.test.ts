@@ -1,36 +1,26 @@
 import {
-  AndExpr,
+  type AnyWhereExpr,
   BinaryExpr,
-  type BoundWhereExpr,
   ColumnRef,
-  ExistsExpr,
+  type ExistsExpr,
   LiteralExpr,
   NullCheckExpr,
-  OrExpr,
   ParamRef,
-  SelectAst,
-  TableSource,
-  type ToWhereExpr,
-  type WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
 import { normalizeWhereArg } from '../src/where-interop';
-import {
-  combineWhereFilters,
-  createBoundWhereExpr,
-  offsetBoundWhereExpr,
-} from '../src/where-utils';
+import { combineWhereExprs } from '../src/where-utils';
 import { getTestContract } from './helpers';
 
-function collectParamIndexes(expr: WhereExpr): number[] {
-  return expr.fold<number[]>({
+function collectParamValues(expr: AnyWhereExpr): unknown[] {
+  return expr.fold<unknown[]>({
     empty: [],
     combine: (a, b) => [...a, ...b],
-    paramRef: (param) => [param.index],
+    paramRef: (param) => [param.value],
     listLiteral: (list) =>
-      list.values.flatMap((value) => (value instanceof ParamRef ? [value.index] : [])),
+      list.values.flatMap((value) => (value instanceof ParamRef ? [value.value] : [])),
   });
 }
 
@@ -44,49 +34,50 @@ describe('SQL ORM rich AST filters', () => {
       user['posts']!.some((post) => post['views']!.gt(10)),
     );
 
-    expect(expr).toBeInstanceOf(AndExpr);
+    expect(expr.kind).toBe('and');
     const [nameFilter, postsFilter] = expr.exprs;
-    expect(nameFilter).toBeInstanceOf(BinaryExpr);
+    expect(nameFilter?.kind).toBe('binary');
     expect(nameFilter).toMatchObject({
       op: 'eq',
       left: ColumnRef.of('users', 'name'),
       right: LiteralExpr.of('Alice'),
     });
 
-    expect(postsFilter).toBeInstanceOf(ExistsExpr);
+    expect(postsFilter?.kind).toBe('exists');
     const exists = postsFilter as ExistsExpr;
-    expect(exists.subquery).toBeInstanceOf(SelectAst);
-    expect(exists.subquery.from).toBeInstanceOf(TableSource);
-    expect(exists.subquery.where).toBeInstanceOf(AndExpr);
+    expect(exists.subquery.kind).toBe('select');
+    expect(exists.subquery.from.kind).toBe('table-source');
+    expect(exists.subquery.where?.kind).toBe('and');
   });
 
-  it('normalizes, offsets, combines, and negates bound filters', () => {
-    const normalized = normalizeWhereArg({
-      toWhereExpr: () => ({
-        expr: BinaryExpr.eq(ColumnRef.of('users', 'id'), ParamRef.of(1, 'id')),
-        params: [1],
-        paramDescriptors: [{ index: 1, source: 'dsl' as const }],
-      }),
-    } satisfies ToWhereExpr) as BoundWhereExpr;
+  it('normalizes, combines, and negates bound filters', () => {
+    const normalized = normalizeWhereArg(
+      {
+        toWhereExpr: () =>
+          BinaryExpr.eq(
+            ColumnRef.of('users', 'id'),
+            ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ),
+      },
+      { contract },
+    );
 
-    expect(normalized.expr).toBeInstanceOf(BinaryExpr);
-    expect(normalized.params).toEqual([1]);
+    expect(normalized.kind).toBe('binary');
+    expect(collectParamValues(normalized as BinaryExpr)).toEqual([1]);
 
-    const shifted = offsetBoundWhereExpr(normalized, 2);
-    expect(collectParamIndexes(shifted.expr as BinaryExpr)).toEqual([3]);
-
-    const combined = combineWhereFilters([
-      createBoundWhereExpr(BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice'))),
-      shifted,
+    const combined = combineWhereExprs([
+      BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+      BinaryExpr.eq(
+        ColumnRef.of('users', 'id'),
+        ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+      ),
     ]);
-    expect(combined?.expr).toBeInstanceOf(AndExpr);
+    expect(combined?.kind).toBe('and');
 
     expect(not(NullCheckExpr.isNull(ColumnRef.of('users', 'email')))).toEqual(
       NullCheckExpr.isNotNull(ColumnRef.of('users', 'email')),
     );
-    expect(or(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)))).toBeInstanceOf(
-      OrExpr,
-    );
-    expect(all()).toBeInstanceOf(AndExpr);
+    expect(or(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))).kind).toBe('or');
+    expect(all().kind).toBe('and');
   });
 });

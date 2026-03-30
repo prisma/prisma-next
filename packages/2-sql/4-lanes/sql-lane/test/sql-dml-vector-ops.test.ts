@@ -2,18 +2,15 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type {
   Adapter,
+  BinaryExpr,
+  DeleteAst,
   InsertAst,
   LoweredStatement,
+  OperationExpr,
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
-import {
-  BinaryExpr,
-  createCodecRegistry,
-  DeleteAst,
-  OperationExpr,
-  ParamRef,
-} from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
@@ -117,24 +114,24 @@ describe('delete with vector operations', () => {
       vectorColumn as unknown as {
         cosineDistance: (arg: unknown) => { eq: (value: unknown) => unknown };
       }
-    ).cosineDistance(param('other'));
+    ).cosineDistance([1, 2, 3]);
     const binary = distance.eq(param('threshold')) as BinaryBuilder;
 
     const plan = sql({ context: contextWithOps })
       .delete(userTableWithOps)
       .where(binary)
-      .build({ params: { other: [1, 2, 3], threshold: 0.5 } });
+      .build({ params: { threshold: 0.5 } });
 
-    expect(plan.ast).toBeInstanceOf(DeleteAst);
+    expect(plan.ast.kind).toBe('delete');
     const ast = plan.ast as DeleteAst;
     expect(ast.table.name).toBe('user');
-    expect(ast.where).toBeInstanceOf(BinaryExpr);
-    const where = ast.where as BinaryExpr;
+    expect(ast.where!.kind).toBe('binary');
+    const where = ast.where! as BinaryExpr;
     expect(where.op).toBe('eq');
-    expect(where.left).toBeInstanceOf(OperationExpr);
+    expect(where.left.kind).toBe('operation');
     const left = where.left as OperationExpr;
     expect(left.method).toBe('cosineDistance');
-    expect(left.args).toEqual([ParamRef.of(0, 'other')]);
+    expect(left.args).toEqual([ParamRef.of([1, 2, 3], { name: 'arg_0', codecId: 'pg/vector@1' })]);
     expect(plan.params).toContain(0.5);
   });
 });

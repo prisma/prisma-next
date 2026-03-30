@@ -1,4 +1,5 @@
-import { ColumnRef, InsertAst } from '@prisma-next/sql-relational-core/ast';
+import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
+import { ColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { describe, expect, it } from 'vitest';
@@ -63,7 +64,7 @@ describe('returning() capability gating', () => {
       .returning(tables.user.columns.id, tables.user.columns.email)
       .build({ params: { email: 'test@example.com' } });
 
-    expect(insertPlan.ast).toBeInstanceOf(InsertAst);
+    expect(insertPlan.ast.kind).toBe('insert');
     expect((insertPlan.ast as InsertAst).returning).toEqual([
       ColumnRef.of('user', 'id'),
       ColumnRef.of('user', 'email'),

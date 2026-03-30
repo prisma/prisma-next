@@ -6,9 +6,10 @@ import {
   ExistsExpr,
   JoinAst,
   OrderByItem,
+  ProjectionItem,
   SelectAst,
 } from '../../src/exports/ast';
-import { col, lowerExpr, param, simpleSelect, table } from './test-helpers';
+import { col, lowerExpr, param, shiftParamRef, simpleSelect, table } from './test-helpers';
 
 describe('ast/select', () => {
   it('creates select ASTs with from and project', () => {
@@ -69,7 +70,6 @@ describe('ast/select', () => {
       .withWhere(ExistsExpr.exists(subquery));
 
     expect(selectAst.projection[0]?.expr).toEqual(lowerExpr(col('user', 'email')));
-    expect(selectAst.where).toBeInstanceOf(ExistsExpr);
     expect((selectAst.where as ExistsExpr).subquery).toEqual(subquery);
   });
 
@@ -85,14 +85,14 @@ describe('ast/select', () => {
     const rewritten = selectAst.rewrite({
       tableSource: (source) => (source.name === 'user' ? table('member') : source),
       columnRef: (expr) => (expr.table === 'user' ? col('member', expr.column) : expr),
-      paramRef: (expr) => expr.withIndex(expr.index + 1),
+      paramRef: shiftParamRef(1),
     });
 
     expect(rewritten.from).toEqual(table('member'));
     expect(rewritten.projection[0]?.expr).toEqual(lowerExpr(col('member', 'email')));
     expect(rewritten.where).toEqual(BinaryExpr.eq(col('member', 'id'), param(1, 'userId')));
     expect((rewritten.joins?.[0]?.source as DerivedTableSource).query.projection).toEqual([
-      { alias: 'userId', expr: col('post', 'userId') },
+      ProjectionItem.of('userId', col('post', 'userId')),
     ]);
   });
 
@@ -110,5 +110,49 @@ describe('ast/select', () => {
       distinctOn: undefined,
       groupBy: undefined,
     });
+  });
+
+  it('collectParamRefs returns params from where clause', () => {
+    const whereParam = param(42, 'userId');
+    const selectAst = SelectAst.from(table('user'))
+      .addProjection('id', col('user', 'id'))
+      .withWhere(BinaryExpr.eq(col('user', 'id'), whereParam));
+
+    expect(selectAst.collectParamRefs()).toEqual([whereParam]);
+  });
+
+  it('collectParamRefs returns empty array without where', () => {
+    const selectAst = SelectAst.from(table('user')).addProjection('id', col('user', 'id'));
+
+    expect(selectAst.collectParamRefs()).toEqual([]);
+  });
+
+  it('collectParamRefs traverses in deterministic clause order: from, where, having, joins', () => {
+    const fromParam = param('from_val', 'from_p');
+    const whereParam = param('where_val', 'where_p');
+    const havingParam = param('having_val', 'having_p');
+    const joinParam = param('join_val', 'join_p');
+
+    const subquery = SelectAst.from(table('post'))
+      .addProjection('id', col('post', 'id'))
+      .withWhere(BinaryExpr.eq(col('post', 'id'), fromParam));
+
+    const joinSubquery = SelectAst.from(table('comment'))
+      .addProjection('id', col('comment', 'id'))
+      .withWhere(BinaryExpr.eq(col('comment', 'postId'), joinParam));
+
+    const ast = SelectAst.from(DerivedTableSource.as('sub', subquery))
+      .addProjection('id', col('sub', 'id'))
+      .withWhere(BinaryExpr.eq(col('sub', 'id'), whereParam))
+      .withHaving(BinaryExpr.gt(col('sub', 'id'), havingParam))
+      .withGroupBy([col('sub', 'id')])
+      .withJoins([
+        JoinAst.left(
+          DerivedTableSource.as('comments', joinSubquery),
+          EqColJoinOn.of(col('sub', 'id'), col('comments', 'id')),
+        ),
+      ]);
+
+    expect(ast.collectParamRefs()).toEqual([fromParam, whereParam, havingParam, joinParam]);
   });
 });

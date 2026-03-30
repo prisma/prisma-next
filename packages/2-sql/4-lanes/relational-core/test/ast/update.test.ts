@@ -49,4 +49,24 @@ describe('ast/update', () => {
     });
     expect(UpdateAst.table(table('user')).withSet({}).set).toEqual({});
   });
+
+  it('collectParamRefs returns set params then where params', () => {
+    const emailParam = param('new@example.com', 'email');
+    const whereParam = param(42, 'userId');
+    const updateAst = UpdateAst.table(table('user'))
+      .withSet({ email: emailParam })
+      .withWhere(BinaryExpr.eq(col('user', 'id'), whereParam));
+
+    expect(updateAst.collectParamRefs()).toEqual([emailParam, whereParam]);
+  });
+
+  it('collectParamRefs skips ColumnRef set values', () => {
+    const emailParam = param('new@example.com', 'email');
+    const updateAst = UpdateAst.table(table('user')).withSet({
+      id: col('user', 'id'),
+      email: emailParam,
+    });
+
+    expect(updateAst.collectParamRefs()).toEqual([emailParam]);
+  });
 });

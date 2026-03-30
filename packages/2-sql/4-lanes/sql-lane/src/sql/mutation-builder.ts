@@ -1,4 +1,3 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   ColumnRef,
@@ -20,6 +19,7 @@ import type {
   SqlBuilderOptions,
   UnaryBuilder,
 } from '@prisma-next/sql-relational-core/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { checkReturningCapability } from '../utils/capabilities';
 import {
   errorFailedToBuildWhereClause,
@@ -32,6 +32,18 @@ import {
 import type { ProjectionState } from '../utils/state';
 import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
+
+function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }) {
+  const collected = [...new Set(ast.collectParamRefs())];
+  return {
+    paramValues: collected.map((p) => p.value),
+    paramDescriptors: collected.map((p) => ({
+      ...ifDefined('name', p.name),
+      source: 'dsl' as const,
+      ...ifDefined('codecId', p.codecId),
+    })),
+  };
+}
 
 export interface InsertBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
@@ -109,9 +121,6 @@ export class InsertBuilderImpl<
 
   build(options?: BuildOptions): SqlQueryPlan<Row> {
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
-    const paramDescriptors: ParamDescriptor[] = [];
-    const paramValues: unknown[] = [];
-    const paramCodecs: Record<string, string> = {};
 
     const contractTable = this.contract.storage.tables[this.table.name];
     if (!contractTable) {
@@ -120,7 +129,8 @@ export class InsertBuilderImpl<
 
     const values: Record<string, ColumnRef | ParamRef> = {};
     for (const [columnName, placeholder] of Object.entries(this.values)) {
-      if (!contractTable.columns[columnName]) {
+      const columnMeta = contractTable.columns[columnName];
+      if (!columnMeta) {
         errorUnknownColumn(columnName, this.table.name);
       }
 
@@ -130,24 +140,10 @@ export class InsertBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      const index = paramValues.push(value);
-
-      const columnMeta = contractTable.columns[columnName];
-      const codecId = columnMeta?.codecId;
-      if (paramName && codecId) {
-        paramCodecs[paramName] = codecId;
-      }
-
-      paramDescriptors.push({
+      values[columnName] = ParamRef.of(value, {
         name: paramName,
-        source: 'dsl',
-        refs: { table: this.table.name, column: columnName },
-        ...(codecId ? { codecId } : {}),
-        ...(columnMeta?.nativeType ? { nativeType: columnMeta.nativeType } : {}),
-        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+        codecId: columnMeta.codecId,
       });
-
-      values[columnName] = ParamRef.of(index, paramName);
     }
 
     const appliedDefaults = this.context.applyMutationDefaults({
@@ -162,21 +158,13 @@ export class InsertBuilderImpl<
         errorUnknownColumn(defaultValue.column, this.table.name);
       }
 
-      const index = paramValues.push(defaultValue.value);
-      paramCodecs[defaultValue.column] = columnMeta.codecId;
-      paramDescriptors.push({
+      values[defaultValue.column] = ParamRef.of(defaultValue.value, {
         name: defaultValue.column,
-        source: 'dsl',
-        refs: { table: this.table.name, column: defaultValue.column },
         codecId: columnMeta.codecId,
-        nativeType: columnMeta.nativeType,
-        nullable: columnMeta.nullable,
       });
-      values[defaultValue.column] = ParamRef.of(index, defaultValue.column);
     }
 
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
-      // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
       return ColumnRef.of(c.table, c.column);
     });
@@ -186,9 +174,10 @@ export class InsertBuilderImpl<
       ast = ast.withReturning(returning);
     }
 
+    const { paramValues, paramDescriptors } = deriveParamsFromAst(ast);
+
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
-        // TypeScript can't narrow ColumnBuilder properly
         const c = col as unknown as { column: string };
         return c.column;
       }),
@@ -200,7 +189,6 @@ export class InsertBuilderImpl<
       table: this.table,
       projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
     });
 
     const queryPlan: SqlQueryPlan<Row> = Object.freeze({
@@ -283,9 +271,6 @@ export class UpdateBuilderImpl<
     }
 
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
-    const paramDescriptors: ParamDescriptor[] = [];
-    const paramValues: unknown[] = [];
-    const paramCodecs: Record<string, string> = {};
 
     const contractTable = this.contract.storage.tables[this.table.name];
     if (!contractTable) {
@@ -294,7 +279,8 @@ export class UpdateBuilderImpl<
 
     const set: Record<string, ColumnRef | ParamRef> = {};
     for (const [columnName, placeholder] of Object.entries(this.set)) {
-      if (!contractTable.columns[columnName]) {
+      const columnMeta = contractTable.columns[columnName];
+      if (!columnMeta) {
         errorUnknownColumn(columnName, this.table.name);
       }
 
@@ -304,24 +290,10 @@ export class UpdateBuilderImpl<
       }
 
       const value = paramsMap[paramName];
-      const index = paramValues.push(value);
-
-      const columnMeta = contractTable.columns[columnName];
-      const codecId = columnMeta?.codecId;
-      if (paramName && codecId) {
-        paramCodecs[paramName] = codecId;
-      }
-
-      paramDescriptors.push({
+      set[columnName] = ParamRef.of(value, {
         name: paramName,
-        source: 'dsl',
-        refs: { table: this.table.name, column: columnName },
-        ...(codecId ? { codecId } : {}),
-        ...(columnMeta?.nativeType ? { nativeType: columnMeta.nativeType } : {}),
-        ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
+        codecId: columnMeta.codecId,
       });
-
-      set[columnName] = ParamRef.of(index, paramName);
     }
 
     const appliedDefaults = this.context.applyMutationDefaults({
@@ -336,37 +308,19 @@ export class UpdateBuilderImpl<
         errorUnknownColumn(defaultValue.column, this.table.name);
       }
 
-      const index = paramValues.push(defaultValue.value);
-      paramCodecs[defaultValue.column] = columnMeta.codecId;
-      paramDescriptors.push({
+      set[defaultValue.column] = ParamRef.of(defaultValue.value, {
         name: defaultValue.column,
-        source: 'dsl',
-        refs: { table: this.table.name, column: defaultValue.column },
         codecId: columnMeta.codecId,
-        nativeType: columnMeta.nativeType,
-        nullable: columnMeta.nullable,
       });
-      set[defaultValue.column] = ParamRef.of(index, defaultValue.column);
     }
 
-    const whereResult = buildWhereExpr(
-      this.contract,
-      this.wherePredicate,
-      paramsMap,
-      paramDescriptors,
-      paramValues,
-    );
+    const whereResult = buildWhereExpr(this.contract, this.wherePredicate, paramsMap);
     const whereExpr = whereResult.expr;
     if (!whereExpr) {
       errorFailedToBuildWhereClause();
     }
 
-    if (whereResult.codecId && whereResult.paramName) {
-      paramCodecs[whereResult.paramName] = whereResult.codecId;
-    }
-
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
-      // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
       return ColumnRef.of(c.table, c.column);
     });
@@ -376,9 +330,10 @@ export class UpdateBuilderImpl<
       ast = ast.withReturning(returning);
     }
 
+    const { paramValues, paramDescriptors } = deriveParamsFromAst(ast);
+
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
-        // TypeScript can't narrow ColumnBuilder properly
         const c = col as unknown as { column: string };
         return c.column;
       }),
@@ -390,7 +345,6 @@ export class UpdateBuilderImpl<
       table: this.table,
       projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
       where: this.wherePredicate,
     });
 
@@ -467,33 +421,19 @@ export class DeleteBuilderImpl<
     }
 
     const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
-    const paramDescriptors: ParamDescriptor[] = [];
-    const paramValues: unknown[] = [];
-    const paramCodecs: Record<string, string> = {};
 
     const contractTable = this.contract.storage.tables[this.table.name];
     if (!contractTable) {
       errorUnknownTable(this.table.name);
     }
 
-    const whereResult = buildWhereExpr(
-      this.contract,
-      this.wherePredicate,
-      paramsMap,
-      paramDescriptors,
-      paramValues,
-    );
+    const whereResult = buildWhereExpr(this.contract, this.wherePredicate, paramsMap);
     const whereExpr = whereResult.expr;
     if (!whereExpr) {
       errorFailedToBuildWhereClause();
     }
 
-    if (whereResult.codecId && whereResult.paramName) {
-      paramCodecs[whereResult.paramName] = whereResult.codecId;
-    }
-
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
-      // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
       return ColumnRef.of(c.table, c.column);
     });
@@ -503,9 +443,10 @@ export class DeleteBuilderImpl<
       ast = ast.withReturning(returning);
     }
 
+    const { paramValues, paramDescriptors } = deriveParamsFromAst(ast);
+
     const returningProjection: ProjectionState = {
       aliases: this.returningColumns.map((col) => {
-        // TypeScript can't narrow ColumnBuilder properly
         const c = col as unknown as { column: string };
         return c.column;
       }),
@@ -517,7 +458,6 @@ export class DeleteBuilderImpl<
       table: this.table,
       projection: returning.length > 0 ? returningProjection : { aliases: [], columns: [] },
       paramDescriptors,
-      ...(Object.keys(paramCodecs).length > 0 ? { paramCodecs } : {}),
       where: this.wherePredicate,
     });
 

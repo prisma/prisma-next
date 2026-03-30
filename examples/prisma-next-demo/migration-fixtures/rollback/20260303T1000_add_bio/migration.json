@@ -1,0 +1,123 @@
+{
+  "from": "sha256:73e3abef69c5c5b9566ad1bf0e267d86863556fae8f9fdefdc46002ee3b308a9",
+  "to": "sha256:3ee5d20350ab67f9734959d63831148093a4141727fb67e42eea041674299768",
+  "migrationId": "sha256:19b746a7cc08793b20c18706e4e621187b619953c86e2f0d5d9e69f75b882e74",
+  "kind": "regular",
+  "fromContract": {
+    "schemaVersion": "1",
+    "target": "postgres",
+    "targetFamily": "sql",
+    "storageHash": "sha256:73e3abef69c5c5b9566ad1bf0e267d86863556fae8f9fdefdc46002ee3b308a9",
+    "profileHash": "sha256:da118e16f759ae073ce0901cc8229fce5191f03f76365e94d670562f93de858f",
+    "storage": {
+      "tables": {
+        "user": {
+          "columns": {
+            "id": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "email": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": false
+            },
+            "phone": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": true
+            },
+            "createdAt": {
+              "nativeType": "timestamptz",
+              "codecId": "pg/timestamptz@1",
+              "nullable": false,
+              "default": {
+                "kind": "function",
+                "expression": "now()"
+              }
+            }
+          },
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
+        }
+      }
+    },
+    "models": {},
+    "relations": {},
+    "mappings": {},
+    "capabilities": {},
+    "extensionPacks": {},
+    "meta": {},
+    "sources": {}
+  },
+  "toContract": {
+    "schemaVersion": "1",
+    "target": "postgres",
+    "targetFamily": "sql",
+    "storageHash": "sha256:3ee5d20350ab67f9734959d63831148093a4141727fb67e42eea041674299768",
+    "profileHash": "sha256:4992f2487f13111da7833b870d999a7d7d3f1fc7bf70a5de719b2729fc38a1d4",
+    "storage": {
+      "tables": {
+        "user": {
+          "columns": {
+            "id": {
+              "nativeType": "uuid",
+              "codecId": "pg/uuid@1",
+              "nullable": false
+            },
+            "email": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": false
+            },
+            "phone": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": true
+            },
+            "bio": {
+              "nativeType": "text",
+              "codecId": "pg/text@1",
+              "nullable": true
+            },
+            "createdAt": {
+              "nativeType": "timestamptz",
+              "codecId": "pg/timestamptz@1",
+              "nullable": false,
+              "default": {
+                "kind": "function",
+                "expression": "now()"
+              }
+            }
+          },
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
+        }
+      }
+    },
+    "models": {},
+    "relations": {},
+    "mappings": {},
+    "capabilities": {},
+    "extensionPacks": {},
+    "meta": {},
+    "sources": {}
+  },
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "1.0.0",
+    "planningStrategy": "diff"
+  },
+  "labels": [],
+  "createdAt": "2026-03-24T15:13:45.637Z"
+}

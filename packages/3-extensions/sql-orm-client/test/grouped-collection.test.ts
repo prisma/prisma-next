@@ -1,4 +1,4 @@
-import { AggregateExpr, BinaryExpr, ColumnRef } from '@prisma-next/sql-relational-core/ast';
+import { AggregateExpr, type BinaryExpr } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createCollectionFor } from './collection-fixtures';
 import { getTestContract, isSelectAst } from './helpers';
@@ -33,15 +33,13 @@ describe('GroupedCollection', () => {
     if (!isSelectAst(firstAst)) {
       throw new Error('Expected first execution plan to be a select SQL query plan');
     }
-    expect(firstAst.having).toBeInstanceOf(BinaryExpr);
-    if (firstAst.having instanceof BinaryExpr) {
-      expect(firstAst.having.left).toEqual(AggregateExpr.count());
+    expect(firstAst.having?.kind).toBe('binary');
+    if (firstAst.having?.kind === 'binary') {
+      expect((firstAst.having as BinaryExpr).left).toEqual(AggregateExpr.count());
     }
     const totalViewsProjection = firstAst.projection.find((item) => item.alias === 'totalViews');
-    expect(totalViewsProjection?.expr).toBeInstanceOf(AggregateExpr);
-    if (totalViewsProjection?.expr instanceof AggregateExpr) {
-      expect(totalViewsProjection.expr.fn).toBe('sum');
-    }
+    expect(totalViewsProjection?.expr.kind).toBe('aggregate');
+    expect((totalViewsProjection?.expr as AggregateExpr).fn).toBe('sum');
   });
 
   it('groupBy().aggregate() validates selector shape and non-empty spec', async () => {
@@ -102,7 +100,7 @@ describe('GroupedCollection', () => {
           return undefined;
         }
         const having = entry.plan.ast.having;
-        if (!(having instanceof BinaryExpr) || !(having.left instanceof AggregateExpr)) {
+        if (having?.kind !== 'binary' || having.left.kind !== 'aggregate') {
           return undefined;
         }
         return `${having.left.fn}:${having.op}`;
@@ -219,11 +217,12 @@ describe('GroupedCollection', () => {
           return undefined;
         }
         const having = entry.plan.ast.having;
-        if (!(having instanceof BinaryExpr) || !(having.left instanceof AggregateExpr)) {
+        if (having?.kind !== 'binary' || having.left.kind !== 'aggregate') {
           return undefined;
         }
-        return having.left.expr instanceof ColumnRef
-          ? `${having.left.expr.table}:${having.left.expr.column}`
+        const aggExpr = having.left;
+        return aggExpr.expr?.kind === 'column-ref'
+          ? `${aggExpr.expr.table}:${aggExpr.expr.column}`
           : undefined;
       })
       .filter((column): column is string => column !== undefined);

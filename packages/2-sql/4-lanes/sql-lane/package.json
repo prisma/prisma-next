@@ -18,7 +18,8 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/plan": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
-    "@prisma-next/sql-relational-core": "workspace:*"
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/sql-contract-ts": "workspace:*",

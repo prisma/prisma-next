@@ -6,7 +6,7 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
-import type { BoundWhereExpr, WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyWhereExpr } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 import type { RowSelection } from './collection-internal-types';
@@ -66,7 +66,7 @@ export interface IncludeExpr {
 // ---------------------------------------------------------------------------
 
 export interface CollectionState {
-  readonly filters: readonly BoundWhereExpr[];
+  readonly filters: readonly AnyWhereExpr[];
   readonly includes: readonly IncludeExpr[];
   readonly orderBy: readonly OrderExpr[] | undefined;
   readonly cursor: Readonly<Record<string, unknown>> | undefined;
@@ -140,18 +140,18 @@ export interface CollectionContext<TContract extends SqlContract<SqlStorage>> {
 // ---------------------------------------------------------------------------
 
 export type ComparisonMethods<T> = {
-  eq(value: T): WhereExpr;
-  neq(value: T): WhereExpr;
-  gt(value: T): WhereExpr;
-  lt(value: T): WhereExpr;
-  gte(value: T): WhereExpr;
-  lte(value: T): WhereExpr;
-  like(pattern: string): WhereExpr;
-  ilike(pattern: string): WhereExpr;
-  in(values: readonly T[]): WhereExpr;
-  notIn(values: readonly T[]): WhereExpr;
-  isNull(): WhereExpr;
-  isNotNull(): WhereExpr;
+  eq(value: T): AnyWhereExpr;
+  neq(value: T): AnyWhereExpr;
+  gt(value: T): AnyWhereExpr;
+  lt(value: T): AnyWhereExpr;
+  gte(value: T): AnyWhereExpr;
+  lte(value: T): AnyWhereExpr;
+  like(pattern: string): AnyWhereExpr;
+  ilike(pattern: string): AnyWhereExpr;
+  in(values: readonly T[]): AnyWhereExpr;
+  notIn(values: readonly T[]): AnyWhereExpr;
+  isNull(): AnyWhereExpr;
+  isNotNull(): AnyWhereExpr;
   asc(): OrderByDirective;
   desc(): OrderByDirective;
 };
@@ -159,7 +159,7 @@ export type ComparisonMethods<T> = {
 export type RelationPredicate<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
-> = (model: ModelAccessor<TContract, ModelName>) => WhereExpr;
+> = (model: ModelAccessor<TContract, ModelName>) => AnyWhereExpr;
 
 export type RelationPredicateInput<
   TContract extends SqlContract<SqlStorage>,
@@ -170,9 +170,9 @@ export type RelationFilterAccessor<
   TContract extends SqlContract<SqlStorage>,
   RelatedModelName extends string,
 > = {
-  some(predicate?: RelationPredicateInput<TContract, RelatedModelName>): WhereExpr;
-  every(predicate: RelationPredicateInput<TContract, RelatedModelName>): WhereExpr;
-  none(predicate?: RelationPredicateInput<TContract, RelatedModelName>): WhereExpr;
+  some(predicate?: RelationPredicateInput<TContract, RelatedModelName>): AnyWhereExpr;
+  every(predicate: RelationPredicateInput<TContract, RelatedModelName>): AnyWhereExpr;
+  none(predicate?: RelationPredicateInput<TContract, RelatedModelName>): AnyWhereExpr;
 };
 
 type ScalarModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {

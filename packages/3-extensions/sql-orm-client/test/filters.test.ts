@@ -2,7 +2,6 @@ import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
-  ExistsExpr,
   ListLiteralExpr,
   LiteralExpr,
   NullCheckExpr,
@@ -38,7 +37,7 @@ describe('filters', () => {
     expect(not(user['name']!.eq('Alice'))).toEqual(
       BinaryExpr.neq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
     );
-    expect(not(user['posts']!.some())).toBeInstanceOf(ExistsExpr);
+    expect(not(user['posts']!.some()).kind).toBe('exists');
     expect(not(user['email']!.isNull())).toEqual(
       NullCheckExpr.isNotNull(ColumnRef.of('users', 'email')),
     );

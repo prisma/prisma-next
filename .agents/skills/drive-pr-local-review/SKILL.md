@@ -7,7 +7,7 @@ description: Generate local PR/branch review artifacts for the current branch vs
   PR/branch review, a code review, a system design review, to "review this branch", or to produce
   written review docs. Do not modify implementation code.
 metadata:
-  version: "2026.2.24.4"
+  version: "2026.3.26.1"
 ---
 
 # Local PR Review
@@ -190,7 +190,7 @@ All findings must have a **unique, unambiguous ID** so they can be referenced fr
 - Preferred format: `F<NN>` (e.g. `F01`, `F02`, …), optionally with a section prefix for readability (e.g. `BLOCK-F01`, `NB-F02`, `NIT-F03`), but keep IDs globally unique.
 
 For each finding, include:
-- **Location**: repo-relative path + line range
+- **Location**: repo-relative path, and line range **as plain text** (not inside a `path:line` markdown link). In **Cursor** (`CURSOR_AGENT`, `CURSOR_TRACE_ID`, or `CURSOR_CLI` set, or user says output is for Cursor): use a path-only markdown link `[path](path)` and put the range after it, e.g. ` — lines 12–34`. Outside Cursor, you may use `[path (L12–L34)](path:12-34)` if links resolve for the reader.
 - **Issue**: concise description of the problem and why it matters
 - **Suggestion**: concrete fix or improvement
 - **Code example** (when helpful): suggested change

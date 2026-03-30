@@ -1,7 +1,7 @@
 import { planInvalid } from '@prisma-next/plan';
 import type { AnyColumnBuilder, JoinOnBuilder, JoinOnPredicate } from '../types';
 import { isColumnBuilder } from '../types';
-import { EqColJoinOn, type FromSource, JoinAst } from './types';
+import { EqColJoinOn, JoinAst } from './types';
 
 class JoinOnBuilderImpl implements JoinOnBuilder {
   eqCol(left: AnyColumnBuilder, right: AnyColumnBuilder): JoinOnPredicate {
@@ -27,7 +27,7 @@ class JoinOnBuilderImpl implements JoinOnBuilder {
   }
 }
 
-export { EqColJoinOn, JoinAst, type FromSource };
+export { EqColJoinOn, JoinAst };
 
 export function createJoinOnBuilder(): JoinOnBuilder {
   return new JoinOnBuilderImpl();

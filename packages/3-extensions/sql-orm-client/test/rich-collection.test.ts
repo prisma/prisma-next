@@ -1,5 +1,4 @@
 import {
-  AggregateExpr,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
@@ -8,24 +7,32 @@ import {
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { createCollectionFor } from './collection-fixtures';
+import { bindWhereExpr } from '../src/where-binding';
+import { baseContract, createCollectionFor } from './collection-fixtures';
 
 describe('SQL ORM collections with rich AST plans', () => {
   it('stores direct where expressions and bound where payloads in collection state', () => {
     const { collection } = createCollectionFor('User');
 
     const direct = collection.where(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)));
-    expect(direct.state.filters[0]?.expr).toBeInstanceOf(BinaryExpr);
-    expect(direct.state.filters[0]?.params).toEqual([1]);
+    expect(direct.state.filters[0]).toBeInstanceOf(BinaryExpr);
+    expect(
+      bindWhereExpr(baseContract, BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
+    ).toEqual(direct.state.filters[0]);
 
     const bound = collection.where({
-      toWhereExpr: () => ({
-        expr: BinaryExpr.eq(ColumnRef.of('users', 'email'), ParamRef.of(1, 'email')),
-        params: ['a@example.com'],
-        paramDescriptors: [{ index: 1, source: 'dsl' as const }],
-      }),
+      toWhereExpr: () =>
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'email'),
+          ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+        ),
     } satisfies ToWhereExpr);
-    expect(bound.state.filters[0]?.params).toEqual(['a@example.com']);
+    expect(bound.state.filters[0]).toEqual(
+      BinaryExpr.eq(
+        ColumnRef.of('users', 'email'),
+        ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+      ),
+    );
   });
 
   it('dispatches select plans with SelectAst limits and annotations', async () => {
@@ -58,7 +65,7 @@ describe('SQL ORM collections with rich AST plans', () => {
     const plan = runtime.executions[0]?.plan;
     expect(plan?.ast).toBeInstanceOf(SelectAst);
     const ast = plan?.ast as SelectAst;
-    expect(ast.having).toBeInstanceOf(BinaryExpr);
-    expect((ast.having as BinaryExpr).left).toBeInstanceOf(AggregateExpr);
+    expect(ast.having?.kind).toBe('binary');
+    expect((ast.having as BinaryExpr).left.kind).toBe('aggregate');
   });
 });

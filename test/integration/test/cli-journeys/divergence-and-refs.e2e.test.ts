@@ -2,13 +2,13 @@
  * Same-Base Divergence (Journey L — spec scenario P-4/S-4)
  *
  * Tests that divergent migration branches (two edges from the same source)
- * produce AMBIGUOUS_LEAF and that refs resolve the ambiguity. Creates:
+ * are handled gracefully. Creates:
  *   C1 → C2 (add-phone, on disk but not applied)
  *   C1 → C3 (add-bio, via --from C1)
- * Without --ref, status errors. With ref production=C3, apply routes via C1→C3.
+ * Without --ref, status auto-resolves to the contract hash if it matches
+ * a graph node. With ref production=C3, apply routes via C1→C3.
  */
 
-import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
@@ -30,7 +30,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'divergent branches → AMBIGUOUS_LEAF → ref-based resolution',
+      'divergent branches → status resolves via contract hash → ref-based apply',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -69,13 +69,12 @@ withTempDir(({ createTempDir }) => {
         const c3Hash = parseJsonOutput<{ to: string }>(plan2).to;
         expect(c3Hash, 'L.03: C3 differs from C2').not.toBe(c2Hash);
 
-        // L.04: status without --ref fails with AMBIGUOUS_LEAF
-        const statusFail = await runMigrationStatus(ctx, ['--json']);
-        expect(statusFail.exitCode, 'L.04: status fails').toBe(1);
-        const failOutput = stripAnsi(statusFail.stdout);
-        expect(failOutput, 'L.04: mentions ambiguous leaf').toMatch(
-          /ambiguous|AMBIGUOUS_LEAF|multiple.*leaf/i,
-        );
+        // L.04: status without --ref succeeds — auto-resolves to contract hash (C3)
+        const statusAuto = await runMigrationStatus(ctx, ['--json']);
+        expect(statusAuto.exitCode, 'L.04: status succeeds').toBe(0);
+        const statusData = parseJsonOutput<{ ok: boolean; targetHash: string }>(statusAuto);
+        expect(statusData.ok, 'L.04: ok').toBe(true);
+        expect(statusData.targetHash, 'L.04: target is C3 (contract hash)').toBe(c3Hash);
 
         // L.05: set ref production=C3
         const refSet = await runMigrationRef(ctx, ['set', 'production', c3Hash]);

@@ -6,8 +6,6 @@ export type { BudgetFinding, LintFinding, RawGuardrailResult } from '../guardrai
 export { evaluateRawGuardrails } from '../guardrails/raw';
 export type { ContractMarkerRecord } from '../marker';
 export { parseContractMarkerRow } from '../marker';
-export type { BudgetsOptions } from '../plugins/budgets';
-export { budgets } from '../plugins/budgets';
 export type {
   AfterExecuteResult,
   Log,

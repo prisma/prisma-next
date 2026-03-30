@@ -1,6 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { Adapter, LoweredStatement, QueryAst } from '@prisma-next/sql-relational-core/ast';
+import type { Adapter, AnyQueryAst, LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 
 /**
@@ -12,7 +12,7 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
  * @returns Fully executable Plan with SQL string
  */
 export function lowerSqlPlan<Row>(
-  adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>,
+  adapter: Adapter<AnyQueryAst, SqlContract<SqlStorage>, LoweredStatement>,
   contract: SqlContract<SqlStorage>,
   queryPlan: SqlQueryPlan<Row>,
 ): ExecutionPlan<Row> {

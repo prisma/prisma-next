@@ -1,0 +1,98 @@
+[
+  {
+    "id": "table.post",
+    "label": "Create table post",
+    "summary": "Creates table post with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"post\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"post\"",
+        "sql": "CREATE TABLE \"public\".\"post\" (\n  \"id\" uuid NOT NULL,\n  \"title\" text NOT NULL,\n  \"userId\" uuid NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"post\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "column.user.avatarUrl",
+    "label": "Add column avatarUrl to user",
+    "summary": "Adds column avatarUrl to table user",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"avatarUrl\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'avatarUrl'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"avatarUrl\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD COLUMN \"avatarUrl\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"avatarUrl\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'avatarUrl'\n)"
+      }
+    ]
+  },
+  {
+    "id": "column.user.bio",
+    "label": "Add column bio to user",
+    "summary": "Adds column bio to table user",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"bio\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'bio'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"bio\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD COLUMN \"bio\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"bio\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'bio'\n)"
+      }
+    ]
+  }
+]
