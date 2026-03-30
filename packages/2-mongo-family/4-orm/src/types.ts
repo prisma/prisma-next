@@ -61,7 +61,8 @@ type EmbedRelationFields<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
 > = EmbedRelationKeys<TContract, ModelName> extends never
-  ? {}
+  ? // biome-ignore lint/complexity/noBannedTypes: empty intersection identity for models with no embeds
+    {}
   : {
       -readonly [K in EmbedRelationKeys<TContract, ModelName> &
         keyof TContract['models'][ModelName]['relations']]: EmbedRelationRowType<
@@ -150,7 +151,7 @@ export type MongoIncludeSpec<
 export interface MongoFindManyOptions<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
-  TInclude extends MongoIncludeSpec<TContract, ModelName> = {},
+  TInclude extends MongoIncludeSpec<TContract, ModelName> = Record<string, never>,
 > {
   readonly where?: MongoWhereFilter<TContract, ModelName>;
   readonly include?: TInclude;
@@ -171,7 +172,7 @@ export interface MongoCollection<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
 > {
-  findMany<TInclude extends MongoIncludeSpec<TContract, ModelName> = {}>(
+  findMany<TInclude extends MongoIncludeSpec<TContract, ModelName> = Record<string, never>>(
     options?: MongoFindManyOptions<TContract, ModelName, TInclude>,
   ): AsyncIterableResult<
     InferRootRow<TContract, ModelName> & IncludeResultFields<TContract, ModelName, TInclude>
