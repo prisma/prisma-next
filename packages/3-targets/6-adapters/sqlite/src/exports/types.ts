@@ -1,1 +1,1 @@
-export type { SqliteTarget } from '../core/types';
+export type { SqliteContract, SqliteLoweredStatement } from '../core/types';
