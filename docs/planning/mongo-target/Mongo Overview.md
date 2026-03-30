@@ -1,5 +1,7 @@
 # MongoDB in Prisma Next
 
+> **Reference archive.** The PoC is complete. The durable architecture docs are in [10. MongoDB Family.md](../../architecture%20docs/subsystems/10.%20MongoDB%20Family.md) and [ADRs 172-175](../../architecture%20docs/adrs/). The April plan is in [april-milestone.md](../april-milestone.md) WS4. This directory is retained as detailed reference material.
+
 ## Why MongoDB?
 
 Prisma Next's architecture was built for SQL. Every interface a consumer touches today — contracts, query plans, plugins, the ORM client — assumes a relational database with SQL as its query language. But PN's ambition is broader: a contract-first data layer that works across database families.
@@ -52,7 +54,7 @@ Several key architectural questions have been answered through analysis of the e
 
 **Streaming subscriptions are a separate operation type, not a variant of `execute()`.** Both Mongo change streams and SQL logical replication have real-time streaming models, but subscriptions don't complete — they run until closed. This is a different lifecycle from request-response queries and needs its own operation type with its own plugin hooks. The Mongo PoC doesn't implement subscriptions but must not prevent them. Streaming is validated in the SQL runtime workstream via Supabase Realtime ([VP5](../april-milestone.md#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)); the patterns established there will inform Mongo change stream support later.
 
-**The ORM Collection chaining API is a shared pattern across families.** The Phase 3 Mongo ORM client proved the contract carries enough information for typed queries, polymorphism, embedded documents, and referenced relations. A comparative analysis with the SQL ORM revealed that the consumer-facing surface — `Collection` class with fluent chaining (`.where().select().include().take().all()`), `CollectionState` as the accumulated query state, row type inference from `model.fields[f].codecId`, custom collection subclasses — is fundamentally the same pattern. Family-specific concerns are cleanly bounded to terminal method compilation (`CollectionState` → `SqlQueryPlan` vs `MongoQueryPlan`) and include resolution strategy (lateral joins vs `$lookup`). The Mongo ORM will adopt the same chaining API as the SQL ORM, with shared interface extraction following the "spike then extract" approach. See [ADR 4](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md) and [cross-cutting-learnings.md § 6](cross-cutting-learnings.md).
+**The ORM Collection chaining API is a shared pattern across families.** The Phase 3 Mongo ORM client proved the contract carries enough information for typed queries, polymorphism, embedded documents, and referenced relations. A comparative analysis with the SQL ORM revealed that the consumer-facing surface — `Collection` class with fluent chaining (`.where().select().include().take().all()`), `CollectionState` as the accumulated query state, row type inference from `model.fields[f].codecId`, custom collection subclasses — is fundamentally the same pattern. Family-specific concerns are cleanly bounded to terminal method compilation (`CollectionState` → `SqlQueryPlan` vs `MongoQueryPlan`) and include resolution strategy (lateral joins vs `$lookup`). The Mongo ORM will adopt the same chaining API as the SQL ORM, with shared interface extraction following the "spike then extract" approach. See [ADR 175](../../architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md) and [cross-cutting-learnings.md § 6](cross-cutting-learnings.md).
 
 ## What we don't know yet
 
@@ -91,7 +93,7 @@ This work stream is [workstream 4](../april-milestone.md#4-mongodb-poc--validate
 Completed:
 
 - **Phase 1** (execution pipeline): `MongoQueryPlan`, `MongoDriver`, `MongoRuntimeCore`, codecs, test infrastructure.
-- **Phase 2** (contract redesign): Domain/storage separation, polymorphism, aggregate roots. See [ADRs](adrs/).
+- **Phase 2** (contract redesign): Domain/storage separation, polymorphism, aggregate roots. See [ADRs](../../architecture%20docs/adrs/).
 - **Phase 3** (minimal ORM client + contract validation): `validateMongoContract()`, `mongoOrm()` with typed `findMany`, equality filters, `$lookup` includes, embedded document projection, polymorphic queries. All acceptance criteria met.
 
 Next steps are integration, not further PoC phases:
@@ -138,11 +140,11 @@ Package boundaries are enforced by `pnpm lint:deps` — layering enforcement mus
 - [contract-symmetry.md](1-design-docs/contract-symmetry.md) — where Mongo and SQL contracts converge and diverge
 - [design-questions.md](1-design-docs/design-questions.md) — all 14 open architectural questions with full analysis
 
-**ADRs** — architectural decisions with full reasoning and rejected alternatives (scoped to mongo-target for now; will be promoted to `docs/architecture docs/adrs/` when implemented across families):
-- [ADR 1 — Contract domain-storage separation](adrs/ADR%201%20-%20Contract%20domain-storage%20separation.md) — separating `model.fields` (domain) from `model.storage` (family-specific bridge)
-- [ADR 2 — Polymorphism via discriminator and variants](adrs/ADR%202%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — emergent persistence strategy, rejected alternatives (`extends`, strategy labels)
-- [ADR 3 — Aggregate roots and relation strategies](adrs/ADR%203%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — explicit `roots` section, embedding as a relation property
-- [ADR 4 — Shared ORM Collection interface](adrs/ADR%204%20-%20Shared%20ORM%20Collection%20interface.md) — fluent chaining as the shared ORM API, family-specific compilation at terminal methods
+**ADRs** — architectural decisions with full reasoning and rejected alternatives:
+- [ADR 172 — Contract domain-storage separation](../../architecture%20docs/adrs/ADR%20172%20-%20Contract%20domain-storage%20separation.md) — separating `model.fields` (domain) from `model.storage` (family-specific bridge)
+- [ADR 173 — Polymorphism via discriminator and variants](../../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — emergent persistence strategy, rejected alternatives (`extends`, strategy labels)
+- [ADR 174 — Aggregate roots and relation strategies](../../architecture%20docs/adrs/ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — explicit `roots` section, embedding as a relation property
+- [ADR 175 — Shared ORM Collection interface](../../architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md) — fluent chaining as the shared ORM API, family-specific compilation at terminal methods
 
 **Cross-cutting learnings** — insights that affect the framework core:
 - [cross-cutting-learnings.md](cross-cutting-learnings.md) — design principles, domain model concepts, open contract design questions
@@ -158,13 +160,11 @@ Package boundaries are enforced by `pnpm lint:deps` — layering enforcement mus
 
 ## Maintaining these docs
 
-This overview is the source of truth for "what do we know and what don't we know." Keep it current as the work stream progresses.
+This directory is a **reference archive** for the Mongo PoC. Active planning now happens in:
 
-- **Design question resolved**: Update the narrative in "What we know so far" (or remove from "What we don't know yet"), update the full analysis in [design-questions.md](1-design-docs/design-questions.md) with the resolution and rationale, and link any new analysis document (as was done for [mongo-execution-components.md](1-design-docs/mongo-execution-components.md) when question #3 was resolved).
-- **Design question added**: Add to [design-questions.md](1-design-docs/design-questions.md) first, then mention in "What we don't know yet" if it's consequential.
-- **Plan scope changes**: Update [mongo-poc-plan.md](1-design-docs/mongo-poc-plan.md) and the "Scope and status" section above to match.
-- **Implementation begins**: Create a Drive project spec under `projects/`. These research docs are the design reference, not task trackers.
-- **Cross-cutting insight discovered**: If a milestone reveals something that affects the framework core or another family (not just Mongo), add it to [cross-cutting-learnings.md](cross-cutting-learnings.md). Cross-reference from the relevant design doc so readers discover the insight in context. Remove entries from cross-cutting-learnings when the learning has been fully applied (code landed, docs updated across all affected domains).
-- **Milestone completed**: Review what was learned during implementation. Update the relevant design docs (this overview, design questions, execution components, contract symmetry) with resolved questions, new constraints, and refined understanding. Add any cross-cutting learnings per the rule above.
-- **Architectural decision made**: Write an ADR under `adrs/` capturing context, problem, alternatives considered (with reasons for rejection), decision, and consequences. Cross-reference from the relevant design question and cross-cutting learnings. These are scoped locally for now; promote to `docs/architecture docs/adrs/` when the decision is implemented across families.
-- **Reference material** (files under `9-references/`, plus `1-design-docs/example-schemas.md`) is stable context and rarely needs updates.
+- [april-milestone.md](../april-milestone.md) WS4 — current priorities and scope
+- [10. MongoDB Family.md](../../architecture%20docs/subsystems/10.%20MongoDB%20Family.md) — durable subsystem doc
+- [ADRs 172-175](../../architecture%20docs/adrs/) — promoted architectural decisions
+- `projects/` — implementation specs and plans (transient, per the Drive workflow)
+
+If new design questions arise during implementation, add them to [design-questions.md](1-design-docs/design-questions.md) and update the subsystem doc. New architectural decisions should be recorded as ADRs in `docs/architecture docs/adrs/` directly (not under this directory).

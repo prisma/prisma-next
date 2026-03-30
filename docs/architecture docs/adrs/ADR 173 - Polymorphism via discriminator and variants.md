@@ -1,6 +1,4 @@
-# ADR 2 — Polymorphism via discriminator and variants
-
-> **Scope**: Mongo-target local ADR. Will be promoted to the repo-wide ADR directory when the contract redesign is implemented across both families.
+# ADR 173 — Polymorphism via discriminator and variants
 
 ## At a glance
 
@@ -55,7 +53,7 @@ A polymorphic Task model with Bug and Feature variants. Task declares which fiel
 }
 ```
 
-Notice that the domain declaration (`discriminator`, `variants`, `base`, `fields`) is the same regardless of persistence strategy. Bug shares Task's table (single-table inheritance); Feature has its own table (multi-table inheritance). The ORM derives the query strategy from the storage mappings — the contract doesn't label it. See [ADR 1](ADR%201%20-%20Contract%20domain-storage%20separation.md) for why `model.fields` carries `nullable` and `codecId`.
+Notice that the domain declaration (`discriminator`, `variants`, `base`, `fields`) is the same regardless of persistence strategy. Bug shares Task's table (single-table inheritance); Feature has its own table (multi-table inheritance). The ORM derives the query strategy from the storage mappings — the contract doesn't label it. See [ADR 172](ADR%20172%20-%20Contract%20domain-storage%20separation.md) for why `model.fields` carries `nullable` and `codecId`.
 
 ## Context
 
@@ -79,7 +77,7 @@ How does the contract represent the relationship between a base model (Task) and
 
 ## Constraints
 
-- **The domain model must be self-describing.** Reading the `models` section should reveal the polymorphic structure without consulting `storage` (see [ADR 1](ADR%201%20-%20Contract%20domain-storage%20separation.md)).
+- **The domain model must be self-describing.** Reading the `models` section should reveal the polymorphic structure without consulting `storage` (see [ADR 172](ADR%20172%20-%20Contract%20domain-storage%20separation.md)).
 - **Persistence strategy must be emergent.** The contract states facts; the ORM derives behavior. Whether the ORM queries one table (STI) or joins two (MTI) should follow from the storage mappings, not from a label.
 - **The representation must be extensible.** Adding new persistence strategies for polymorphism (concrete table inheritance, materialized views, etc.) should not require changing the contract schema.
 - **All models are siblings.** Base models, variants, and embedded models all appear as top-level entries in the `models` dictionary. This keeps enumeration and lookup simple.
@@ -125,7 +123,7 @@ On each variant:
 
 Each variant appears as a sibling in the `models` dictionary with its own fields and storage. Refer to the [At a glance](#at-a-glance) example for the complete structure.
 
-The `base` ↔ `variants` relationship is bidirectional: the base model answers "what are Task's specializations?" and each variant answers "what model does Bug specialize?" This is redundant (the emitter writes both sides), but each direction serves a different traversal — see [ADR 1](ADR%201%20-%20Contract%20domain-storage%20separation.md) for why redundancy in an emitted artifact is acceptable.
+The `base` ↔ `variants` relationship is bidirectional: the base model answers "what are Task's specializations?" and each variant answers "what model does Bug specialize?" This is redundant (the emitter writes both sides), but each direction serves a different traversal — see [ADR 172](ADR%20172%20-%20Contract%20domain-storage%20separation.md) for why redundancy in an emitted artifact is acceptable.
 
 ### Variant fields are thin
 
@@ -188,7 +186,7 @@ These are independent properties. This composability is why we rejected labeled 
 
 ## Related
 
-- [ADR 1 — Contract domain-storage separation](ADR%201%20-%20Contract%20domain-storage%20separation.md) — why `model.fields` carries `nullable` and `codecId`
-- [ADR 3 — Aggregate roots and relation strategies](ADR%203%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — `roots`, `reference` vs `embed`
-- [design-questions.md § DQ #6](../1-design-docs/design-questions.md)
-- [cross-cutting-learnings.md § learning #4](../cross-cutting-learnings.md)
+- [ADR 172 — Contract domain-storage separation](ADR%20172%20-%20Contract%20domain-storage%20separation.md) — why `model.fields` carries `nullable` and `codecId`
+- [ADR 174 — Aggregate roots and relation strategies](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — `roots`, `reference` vs `embed`
+- [design-questions.md § DQ #6](../../planning/mongo-target/1-design-docs/design-questions.md)
+- [cross-cutting-learnings.md § learning #4](../../planning/mongo-target/cross-cutting-learnings.md)
