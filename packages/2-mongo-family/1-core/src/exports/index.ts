@@ -35,14 +35,14 @@ export type { MongoDriver } from '../driver-types';
 export { MongoParamRef } from '../param-ref';
 export type { MongoExecutionPlan, MongoQueryPlan } from '../plan';
 export type { DeleteOneResult, InsertOneResult, UpdateOneResult } from '../results';
-export type { MongoContractIndices, ValidatedMongoContract } from '../validate';
-export { validateMongoContract } from '../validate';
 export type {
   DomainContractShape,
   DomainModelShape,
   DomainValidationResult,
 } from '../validate-domain';
 export { validateContractDomain } from '../validate-domain';
+export type { MongoContractIndices, ValidatedMongoContract } from '../validate-mongo-contract';
+export { validateMongoContract } from '../validate-mongo-contract';
 export { validateMongoStorage } from '../validate-storage';
 export type {
   Document,
