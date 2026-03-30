@@ -141,6 +141,30 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     });
   });
 
+  it('discriminator narrows variant types', async () => {
+    const db = ctx.client.db(ctx.dbName);
+    await db.collection('tasks').insertOne({
+      title: 'Fix crash',
+      type: 'bug',
+      assigneeId: 'u1',
+      severity: 'critical',
+      comments: [],
+    });
+
+    const orm = mongoOrm({ contract, executor: ctx.runtime });
+    const results = await orm.tasks.findMany();
+    const r0 = results[0]!;
+
+    switch (r0.type) {
+      case 'bug':
+        expect(r0.severity).toBe('critical');
+        break;
+      case 'feature':
+        expect(r0.priority).toBeDefined();
+        break;
+    }
+  });
+
   it('full flow: ORM -> command -> runtime -> driver -> typed results', async () => {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('users').insertOne({

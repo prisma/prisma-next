@@ -77,12 +77,14 @@ type VariantRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
 > = TContract['models'][ModelName] extends {
+  readonly discriminator: { readonly field: infer DiscField extends string };
   readonly variants: infer V;
 }
-  ? V extends Record<string, unknown>
+  ? V extends Record<string, { readonly value: string }>
     ? {
         [VK in keyof V]: VK extends string & keyof TContract['models']
-          ? InferFullRow<TContract, ModelName> & InferFullRow<TContract, VK>
+          ? InferFullRow<TContract, ModelName> &
+              InferFullRow<TContract, VK> & { readonly [F in DiscField]: V[VK]['value'] }
           : never;
       }[keyof V]
     : InferFullRow<TContract, ModelName>
