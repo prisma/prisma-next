@@ -4,6 +4,8 @@ import {
   ColumnRef,
   LiteralExpr,
   NullCheckExpr,
+  OperationExpr,
+  OrderByItem,
   ParamRef,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -116,10 +118,46 @@ describe('Collection', () => {
       const ordered = postCollection.orderBy((post) => post.userId.asc());
       const reordered = ordered.orderBy((post) => post.id.desc());
 
-      expect(ordered.state.orderBy).toEqual([{ column: 'user_id', direction: 'asc' }]);
+      expect(ordered.state.orderBy).toEqual([OrderByItem.asc(ColumnRef.of('posts', 'user_id'))]);
       expect(reordered.state.orderBy).toEqual([
-        { column: 'user_id', direction: 'asc' },
-        { column: 'id', direction: 'desc' },
+        OrderByItem.asc(ColumnRef.of('posts', 'user_id')),
+        OrderByItem.desc(ColumnRef.of('posts', 'id')),
+      ]);
+    });
+
+    it('orderBy() accepts expression-based orders', () => {
+      const { collection: postCollection } = createCollectionFor('Post', baseContract);
+
+      const opExpr = new OperationExpr({
+        method: 'cosineDistance',
+        self: ColumnRef.of('posts', 'embedding'),
+        args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+        returns: { codecId: 'builtin/float8', nullable: false },
+        lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
+      });
+
+      const ordered = postCollection.orderBy(() => OrderByItem.asc(opExpr));
+      expect(ordered.state.orderBy).toEqual([OrderByItem.asc(opExpr)]);
+    });
+
+    it('orderBy() mixes column-based and expression-based orders', () => {
+      const { collection: postCollection } = createCollectionFor('Post', baseContract);
+
+      const opExpr = new OperationExpr({
+        method: 'cosineDistance',
+        self: ColumnRef.of('posts', 'embedding'),
+        args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+        returns: { codecId: 'builtin/float8', nullable: false },
+        lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
+      });
+
+      const ordered = postCollection
+        .orderBy((p) => p.id.asc())
+        .orderBy(() => OrderByItem.desc(opExpr));
+
+      expect(ordered.state.orderBy).toEqual([
+        OrderByItem.asc(ColumnRef.of('posts', 'id')),
+        OrderByItem.desc(opExpr),
       ]);
     });
 
@@ -127,7 +165,7 @@ describe('Collection', () => {
       const { collection: postCollection } = createCollectionFor('Post', baseContract);
 
       const ordered = postCollection.orderBy((post) => post.userId.asc());
-      expect(ordered.state.orderBy).toEqual([{ column: 'user_id', direction: 'asc' }]);
+      expect(ordered.state.orderBy).toEqual([OrderByItem.asc(ColumnRef.of('posts', 'user_id'))]);
 
       const paged = ordered.cursor({ userId: 7 }).take(10).skip(5);
       expect(paged.state.cursor).toEqual({ user_id: 7 });

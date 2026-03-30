@@ -107,6 +107,13 @@
     },
     "Post": {
       "fields": {
+        "embedding": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/vector@1",
+            "kind": "scalar"
+          }
+        },
         "id": {
           "nullable": false,
           "type": {
@@ -164,6 +171,9 @@
       },
       "storage": {
         "fields": {
+          "embedding": {
+            "column": "embedding"
+          },
           "id": {
             "column": "id"
           },
@@ -401,7 +411,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:02cdff7f8d501bb78f0687a20ede35d9a7397239ea1bb503f1f58d035ad3cb72",
+    "storageHash": "sha256:319804686c1aba50fc4508c05ecc509bfdc2f250324fb929ea313eceafc650c0",
     "tables": {
       "articles": {
         "columns": {
@@ -473,6 +483,11 @@
       },
       "posts": {
         "columns": {
+          "embedding": {
+            "codecId": "pg/vector@1",
+            "nativeType": "vector",
+            "nullable": true
+          },
           "id": {
             "codecId": "pg/int4@1",
             "nativeType": "int4",
@@ -668,6 +683,7 @@
       "lateral": true,
       "limit": true,
       "orderBy": true,
+      "pgvector/cosine": true,
       "returning": true
     },
     "sql": {
@@ -675,7 +691,58 @@
       "returning": true
     }
   },
-  "extensionPacks": {},
+  "extensionPacks": {
+    "pgvector": {
+      "capabilities": {
+        "postgres": {
+          "pgvector/cosine": true
+        }
+      },
+      "familyId": "sql",
+      "id": "pgvector",
+      "kind": "extension",
+      "targetId": "postgres",
+      "types": {
+        "codecTypes": {
+          "import": {
+            "alias": "PgVectorTypes",
+            "named": "CodecTypes",
+            "package": "@prisma-next/extension-pgvector/codec-types"
+          },
+          "typeImports": [
+            {
+              "alias": "Vector",
+              "named": "Vector",
+              "package": "@prisma-next/extension-pgvector/codec-types"
+            }
+          ]
+        },
+        "operationTypes": {
+          "import": {
+            "alias": "PgVectorOperationTypes",
+            "named": "OperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
+        "queryOperationTypes": {
+          "import": {
+            "alias": "PgVectorQueryOperationTypes",
+            "named": "QueryOperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
+        "storage": [
+          {
+            "familyId": "sql",
+            "nativeType": "vector",
+            "targetId": "postgres",
+            "typeId": "pg/vector@1"
+          }
+        ]
+      },
+      "version": "0.0.1"
+    }
+  },
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",

@@ -31,6 +31,10 @@
  *                              upsert() example for id conflict
  * - repo-create-user-address <id> <email> <kind>
  *                              Create user with embedded Address value object
+ * - repo-similar-posts <postId> [limit]
+ *                              Cosine-distance similarity search via ORM client
+ * - repo-search-posts <embedding> <maxDistance> [limit]
+ *                              Vector similarity search via ORM client
  * - users-paginate [cursor]    Cursor-based pagination
  * - similarity-search <vec>    Vector similarity search (pgvector)
  * - budget-violation           Demo budget enforcement error
@@ -43,6 +47,7 @@
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';
 import { ormClientCreateUserWithAddress } from './orm-client/create-user-with-address';
+import { ormClientFindSimilarPosts } from './orm-client/find-similar-posts';
 import { ormClientFindUserByEmail } from './orm-client/find-user-by-email';
 import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from './orm-client/get-dashboard-users';
@@ -54,6 +59,7 @@ import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { ormClientGetUsers } from './orm-client/get-users';
 import { ormClientGetUsersBackwardCursor } from './orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
+import { ormClientSearchPostsByEmbedding } from './orm-client/search-posts-by-embedding';
 import { ormClientUpsertUser } from './orm-client/upsert-user';
 import { db } from './prisma/db';
 import { deleteWithoutWhere } from './queries/delete-without-where';
@@ -208,6 +214,50 @@ async function main() {
       );
 
       console.log(JSON.stringify(user, null, 2));
+    } else if (cmd === 'repo-similar-posts') {
+      const [postId, limitStr] = args;
+      if (!postId) {
+        console.error('Usage: pnpm start -- repo-similar-posts <postId> [limit]');
+        process.exit(1);
+      }
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const posts = await ormClientFindSimilarPosts(postId, limit, runtime);
+
+      console.log(JSON.stringify(posts, null, 2));
+    } else if (cmd === 'repo-search-posts') {
+      const [embeddingStr, maxDistanceStr, limitStr] = args;
+      if (!embeddingStr || !maxDistanceStr) {
+        console.error('Usage: pnpm start -- repo-search-posts <embedding> <maxDistance> [limit]');
+        console.error('  embedding: JSON array of numbers, e.g., "[0.1,0.2,0.3]"');
+        process.exit(1);
+      }
+      let searchEmbedding: number[];
+      try {
+        searchEmbedding = JSON.parse(embeddingStr) as number[];
+        if (
+          !Array.isArray(searchEmbedding) ||
+          !searchEmbedding.every((v) => typeof v === 'number')
+        ) {
+          throw new Error('embedding must be an array of numbers');
+        }
+      } catch (error) {
+        console.error(
+          'Error parsing embedding:',
+          error instanceof Error ? error.message : String(error),
+        );
+        console.error('Expected JSON array of numbers, e.g., "[0.1,0.2,0.3]"');
+        process.exit(1);
+      }
+      const maxDistance = Number.parseFloat(maxDistanceStr);
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const posts = await ormClientSearchPostsByEmbedding(
+        searchEmbedding,
+        maxDistance,
+        limit,
+        runtime,
+      );
+
+      console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'users-paginate') {
       const [cursorStr, limitStr] = args;
       const cursor = cursorStr ?? null;
@@ -300,9 +350,9 @@ async function main() {
           'repo-post-feed <postTitleTerm> [limit] | repo-users-cursor [cursor] [limit] | ' +
           'repo-latest-per-kind | repo-user-insights [limit] | repo-kind-breakdown [minUsers] | ' +
           'repo-upsert-user <id> <email> <kind> | repo-create-user-address <id> <email> <kind> | ' +
-          'users-paginate [cursor] [limit] | ' +
-          'users-paginate-back <cursor> [limit] | similarity-search <vec> [limit] | ' +
-          'budget-violation | guardrail-delete]',
+          'repo-similar-posts <postId> [limit] | repo-search-posts <embedding> <maxDistance> [limit] | ' +
+          'users-paginate [cursor] [limit] | users-paginate-back <cursor> [limit] | ' +
+          'similarity-search <vec> [limit] | budget-violation | guardrail-delete]',
       );
       process.exit(1);
     }

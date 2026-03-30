@@ -23,11 +23,13 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
-import type { CollectionState, IncludeExpr, OrderExpr } from './types';
+import type { CollectionState, IncludeExpr } from './types';
 import { bindWhereExpr } from './where-binding';
 import { combineWhereExprs } from './where-utils';
 
-type CursorOrderEntry = OrderExpr & {
+type CursorOrderEntry = {
+  readonly column: string;
+  readonly direction: 'asc' | 'desc';
   readonly value: unknown;
 };
 
@@ -43,19 +45,6 @@ function buildProjection(
       : resolveTableColumns(contract, tableName);
 
   return columns.map((column) => ProjectionItem.of(column, ColumnRef.of(tableRef, column)));
-}
-
-function toOrderBy(
-  tableName: string,
-  orderBy: readonly OrderExpr[] | undefined,
-): ReadonlyArray<OrderByItem> | undefined {
-  if (!orderBy || orderBy.length === 0) {
-    return undefined;
-  }
-
-  return orderBy.map(
-    (entry) => new OrderByItem(ColumnRef.of(tableName, entry.column), entry.direction),
-  );
 }
 
 function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): AnyExpression {
@@ -100,7 +89,7 @@ function buildLexicographicCursorWhere(
 
 function buildCursorWhere(
   tableName: string,
-  orderBy: readonly OrderExpr[] | undefined,
+  orderBy: readonly OrderByItem[] | undefined,
   cursor: Readonly<Record<string, unknown>> | undefined,
 ): AnyExpression | undefined {
   if (!cursor || !orderBy || orderBy.length === 0) {
@@ -109,12 +98,15 @@ function buildCursorWhere(
 
   const entries: CursorOrderEntry[] = [];
   for (const order of orderBy) {
-    const value = cursor[order.column];
+    if (order.expr.kind !== 'column-ref') continue;
+    const column = order.expr.column;
+    const value = cursor[column];
     if (value === undefined) {
-      throw new Error(`Missing cursor value for orderBy column "${order.column}"`);
+      throw new Error(`Missing cursor value for orderBy column "${column}"`);
     }
     entries.push({
-      ...order,
+      column,
+      direction: order.dir,
       value,
     });
   }
@@ -172,15 +164,13 @@ function buildStateWhere(
 
 function buildIncludeOrderArtifacts(
   relationName: string,
-  childTableRef: string,
   rowAlias: string,
-  orderBy: readonly OrderExpr[] | undefined,
+  childOrderBy: readonly OrderByItem[] | undefined,
 ): {
   readonly childOrderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly hiddenOrderProjection: ReadonlyArray<ProjectionItem>;
   readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
 } {
-  const childOrderBy = toOrderBy(childTableRef, orderBy);
   if (!childOrderBy || childOrderBy.length === 0) {
     return {
       childOrderBy: undefined,
@@ -230,7 +220,6 @@ function buildIncludeChildRowsSelect(
   );
   const { childOrderBy, hiddenOrderProjection, aggregateOrderBy } = buildIncludeOrderArtifacts(
     include.relationName,
-    childTableRef,
     rowsAlias,
     childState.orderBy,
   );
@@ -354,14 +343,13 @@ function buildSelectAst(
   const scalarProjection = buildProjection(contract, tableName, state.selectedFields);
   const projection = [...scalarProjection, ...(options.includeProjection ?? [])];
   const where = options.where ?? buildStateWhere(contract, tableName, state);
-  const orderBy = toOrderBy(tableName, state.orderBy);
 
   let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
   if (where) {
     ast = ast.withWhere(where);
   }
-  if (orderBy) {
-    ast = ast.withOrderBy(orderBy);
+  if (state.orderBy) {
+    ast = ast.withOrderBy(state.orderBy);
   }
   if (state.selectedFields === undefined) {
     ast = ast.withSelectAllIntent({ table: tableName });

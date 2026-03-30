@@ -17,8 +17,6 @@ export type {
   DefaultModelRow,
   IncludeExpr,
   ModelAccessor,
-  OrderByDirective,
-  OrderExpr,
   RelatedModelName,
   RelationFilterAccessor,
   RelationMutator,
