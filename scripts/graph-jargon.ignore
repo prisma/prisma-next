@@ -14,7 +14,20 @@ dist/
 **/graph-migration-mapper.ts
 **/test-graphs.ts
 
+# Internal graph algorithm code (leaf/chain are implementation terms)
+**/dag.ts
+**/migration-status.ts
+
+# Verify formatter (leaf/root refer to tree rendering, not migration jargon)
+**/verify.ts
+
+# ESLint plugin (chain refers to builder call chains)
+**/eslint-plugin/
+
 # This script and transient project artifacts
 scripts/check-graph-jargon.sh
 scripts/graph-jargon.ignore
 projects/
+
+# Terminal graph rendering (DAG is technically precise for decomposition algorithm)
+terminal-graph-rendering.md
