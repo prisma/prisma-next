@@ -128,6 +128,8 @@ The persistence strategy is **emergent**: if Bug's storage points to the same ta
 
 Polymorphism is **orthogonal to aggregate root / embedded** — any model can be polymorphic, whether it's a root, a variant, or embedded.
 
+**Mongo-specific constraint: STI only.** Because MongoDB has no joins, all variants of a base model must share the same collection (single-table inheritance). Multi-table inheritance (variants in different collections) is a valid SQL persistence strategy but not supported in Mongo. This is enforced by `validateMongoStorage()` — it is a storage constraint, not a domain-level one. The domain declaration (`discriminator` + `variants` + `base`) is family-agnostic; only the storage validation differs.
+
 **Where to apply**: Contract type system, emitter, ORM client, PSL authoring. This is a cross-family concern — SQL STI and Mongo polymorphic collections use the same representation.
 
 ---
@@ -157,6 +159,16 @@ A `Comment` can belong to either a `Post` or a `Video`, distinguished by a `comm
 ### Many-to-many without a join model
 
 In Mongo, `student.courseIds: ObjectId[]` represents a many-to-many without a junction collection. In SQL, the junction table exists but has no domain identity — it's pure storage machinery, not a domain entity.
+
+### Row type naming: `InferFullRow` vs `DefaultModelRow`
+
+The Mongo ORM introduces `InferFullRow` (scalar fields + embedded relation fields) which corresponds to SQL's `DefaultModelRow`. The naming asymmetry is intentional but needs resolution before the shared contract base is extracted:
+
+- `InferFullRow` uses "Row" vocabulary which is SQL-native — Mongo deals in documents, not rows.
+- SQL's `DefaultModelRow` uses "default" which is ambiguous ("default compared to what?").
+- Options: `InferFullModel` (clearer for Mongo, breaks Row symmetry), keep `InferFullRow` with documented rationale, or introduce a family-agnostic name like `InferModelShape`.
+
+This should be resolved when extracting the shared contract base type.
 
 ### Relation storage details
 
