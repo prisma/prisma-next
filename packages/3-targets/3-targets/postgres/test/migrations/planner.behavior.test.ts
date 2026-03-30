@@ -6,10 +6,8 @@ import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/famil
 import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import {
-  buildBuiltinIdentityValue,
-  createPostgresMigrationPlanner,
-} from '../../src/core/migrations/planner';
+import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import { buildBuiltinIdentityValue } from '../../src/core/migrations/planner-identity-values';
 
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   const planner = createPostgresMigrationPlanner();
@@ -212,6 +210,19 @@ describe('NOT NULL column without default uses temporary default', () => {
     expect(addCol.execute.map((step) => step.sql)).toEqual([
       `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "searchDocument" tsvector DEFAULT ''::tsvector NOT NULL`,
       `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "searchDocument" DROP DEFAULT`,
+    ]);
+  });
+
+  it('uses a json-typed identity literal for NOT NULL json columns', () => {
+    const addCol = planAddColumn('metadata', {
+      nativeType: 'json',
+      codecId: 'pg/json@1',
+      nullable: false,
+    });
+
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "metadata" json DEFAULT '{}'::json NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "metadata" DROP DEFAULT`,
     ]);
   });
 
@@ -435,7 +446,7 @@ describe('buildBuiltinIdentityValue (built-in fallback)', () => {
     ['bool', undefined, 'false'],
     ['boolean', undefined, 'false'],
     ['uuid', undefined, "'00000000-0000-0000-0000-000000000000'"],
-    ['json', undefined, "'{}'::jsonb"],
+    ['json', undefined, "'{}'::json"],
     ['jsonb', undefined, "'{}'::jsonb"],
     ['date', undefined, "'epoch'"],
     ['timestamp', undefined, "'epoch'"],

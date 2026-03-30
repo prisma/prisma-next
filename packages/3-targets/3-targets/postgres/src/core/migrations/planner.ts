@@ -4,7 +4,6 @@ import {
   parsePostgresDefault,
   quoteIdentifier,
 } from '@prisma-next/adapter-postgres/control';
-import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
@@ -23,17 +22,28 @@ import {
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type {
-  ForeignKey,
-  ReferentialAction,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import type { ForeignKey, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { PostgresColumnDefault } from '../types';
+import { resolveIdentityValue } from './planner-identity-values';
+import {
+  buildAddColumnOperationIdentity,
+  buildAddNotNullColumnWithTemporaryDefaultOperation,
+} from './planner-recipes';
 import { buildReconciliationPlan } from './planner-reconciliation';
+import {
+  buildAddColumnSql,
+  buildCreateTableSql,
+  buildForeignKeySql,
+  columnExistsCheck,
+  columnNullabilityCheck,
+  constraintExistsCheck,
+  qualifyTableName,
+  tableIsEmptyCheck,
+  toRegclassLiteral,
+} from './planner-sql';
+import { buildTargetDetails } from './planner-target-details';
 
 export type OperationClass =
   | 'dependency'
@@ -733,25 +743,6 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   }
 }
 
-function buildAddColumnOperationIdentity(
-  schema: string,
-  tableName: string,
-  columnName: string,
-): Pick<
-  SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
-  'id' | 'label' | 'summary' | 'target'
-> {
-  return {
-    id: `column.${tableName}.${columnName}`,
-    label: `Add column ${columnName} to ${tableName}`,
-    summary: `Adds column ${columnName} to table ${tableName}`,
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails('table', tableName, schema),
-    },
-  };
-}
-
 function canUseSharedTemporaryDefaultStrategy(options: {
   readonly table: StorageTable;
   readonly schemaTable: SqlSchemaIR['tables'][string];
@@ -787,58 +778,6 @@ function canUseSharedTemporaryDefaultStrategy(options: {
   return true;
 }
 
-function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
-  readonly schema: string;
-  readonly tableName: string;
-  readonly columnName: string;
-  readonly column: StorageColumn;
-  readonly codecHooks: Map<string, CodecControlHooks>;
-  readonly temporaryDefault: string;
-}): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  const { schema, tableName, columnName, column, codecHooks, temporaryDefault } = options;
-  const qualified = qualifyTableName(schema, tableName);
-
-  return {
-    ...buildAddColumnOperationIdentity(schema, tableName, columnName),
-    operationClass: 'additive',
-    precheck: [
-      {
-        description: `ensure column "${columnName}" is missing`,
-        sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
-      },
-    ],
-    execute: [
-      {
-        description: `add column "${columnName}"`,
-        sql: buildAddColumnSql(qualified, columnName, column, codecHooks, temporaryDefault),
-      },
-      {
-        description: `drop temporary default from column "${columnName}"`,
-        sql: `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
-      },
-      {
-        description: `verify column "${columnName}" is NOT NULL`,
-        sql: columnNullabilityCheck({
-          schema,
-          table: tableName,
-          column: columnName,
-          nullable: false,
-        }),
-      },
-      {
-        description: `verify column "${columnName}" has no default after temporary default removal`,
-        sql: columnHasNoDefaultCheck({ schema, table: tableName, column: columnName }),
-      },
-    ],
-  };
-}
-
 function sortDependencies(
   dependencies: ReadonlyArray<PlannerDatabaseDependency>,
 ): ReadonlyArray<PlannerDatabaseDependency> {
@@ -851,442 +790,8 @@ function isPostgresPlannerDependency(
   return dependency.install.every((operation) => operation.target.id === 'postgres');
 }
 
-function buildCreateTableSql(
-  qualifiedTableName: string,
-  table: StorageTable,
-  codecHooks: Map<string, CodecControlHooks>,
-): string {
-  const columnDefinitions = Object.entries(table.columns).map(
-    ([columnName, column]: [string, StorageColumn]) => {
-      const parts = [
-        quoteIdentifier(columnName),
-        buildColumnTypeSql(column, codecHooks),
-        buildColumnDefaultSql(column.default, column),
-        column.nullable ? '' : 'NOT NULL',
-      ].filter(Boolean);
-      return parts.join(' ');
-    },
-  );
-
-  const constraintDefinitions: string[] = [];
-  if (table.primaryKey) {
-    constraintDefinitions.push(
-      `PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
-    );
-  }
-
-  const allDefinitions = [...columnDefinitions, ...constraintDefinitions];
-  return `CREATE TABLE ${qualifiedTableName} (\n  ${allDefinitions.join(',\n  ')}\n)`;
-}
-
-/**
- * Pattern for safe PostgreSQL type names.
- * Allows letters, digits, underscores, spaces (for "double precision", "character varying"),
- * and trailing [] for array types.
- */
-const SAFE_NATIVE_TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_ ]*(\[\])?$/;
-
-function assertSafeNativeType(nativeType: string): void {
-  if (!SAFE_NATIVE_TYPE_PATTERN.test(nativeType)) {
-    throw new Error(
-      `Unsafe native type name in contract: "${nativeType}". ` +
-        'Native type names must match /^[a-zA-Z][a-zA-Z0-9_ ]*(\\[\\])?$/',
-    );
-  }
-}
-
-/**
- * Sanity check against accidental SQL injection from malformed contract files.
- * Rejects semicolons, SQL comment tokens, and dollar-quoting.
- * Not a comprehensive security boundary — the contract is developer-authored.
- */
-function assertSafeDefaultExpression(expression: string): void {
-  if (expression.includes(';') || /--|\/\*|\$\$|\bSELECT\b/i.test(expression)) {
-    throw new Error(
-      `Unsafe default expression in contract: "${expression}". ` +
-        'Default expressions must not contain semicolons, SQL comment tokens, dollar-quoting, or subqueries.',
-    );
-  }
-}
-
-export function buildColumnTypeSql(
-  column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
-): string {
-  const columnDefault = column.default;
-
-  if (columnDefault?.kind === 'function' && columnDefault.expression === 'autoincrement()') {
-    if (column.nativeType === 'int4' || column.nativeType === 'integer') {
-      return 'SERIAL';
-    }
-    if (column.nativeType === 'int8' || column.nativeType === 'bigint') {
-      return 'BIGSERIAL';
-    }
-    if (column.nativeType === 'int2' || column.nativeType === 'smallint') {
-      return 'SMALLSERIAL';
-    }
-  }
-
-  if (column.typeRef) {
-    return quoteIdentifier(column.nativeType);
-  }
-
-  assertSafeNativeType(column.nativeType);
-  return renderParameterizedTypeSql(column, codecHooks) ?? column.nativeType;
-}
-
-function renderParameterizedTypeSql(
-  column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
-): string | null {
-  if (!column.typeParams) {
-    return null;
-  }
-
-  if (!column.codecId) {
-    throw new Error(
-      `Column declares typeParams for nativeType "${column.nativeType}" but has no codecId. ` +
-        'Ensure the column is associated with a codec.',
-    );
-  }
-
-  const hooks = codecHooks.get(column.codecId);
-  if (!hooks?.expandNativeType) {
-    throw new Error(
-      `Column declares typeParams for nativeType "${column.nativeType}" ` +
-        `but no expandNativeType hook is registered for codecId "${column.codecId}". ` +
-        'Ensure the extension providing this codec is included in extensionPacks.',
-    );
-  }
-
-  const expanded = hooks.expandNativeType({
-    nativeType: column.nativeType,
-    codecId: column.codecId,
-    typeParams: column.typeParams,
-  });
-
-  return expanded !== column.nativeType ? expanded : null;
-}
-
-/**
- * Builds the DEFAULT clause for a column definition.
- * Returns empty string if no default is defined.
- *
- * Note: autoincrement is handled specially via SERIAL types, so we skip it here.
- */
-function buildColumnDefaultSql(
-  columnDefault: PostgresColumnDefault | undefined,
-  column?: StorageColumn,
-): string {
-  if (!columnDefault) {
-    return '';
-  }
-
-  switch (columnDefault.kind) {
-    case 'literal':
-      return `DEFAULT ${renderDefaultLiteral(columnDefault.value, column)}`;
-    case 'function': {
-      // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
-      if (columnDefault.expression === 'autoincrement()') {
-        return '';
-      }
-      assertSafeDefaultExpression(columnDefault.expression);
-      return `DEFAULT (${columnDefault.expression})`;
-    }
-    case 'sequence':
-      // Sequence names use quoteIdentifier for safe identifier handling
-      return `DEFAULT nextval(${quoteIdentifier(columnDefault.name)}::regclass)`;
-  }
-}
-
-export function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
-  const isJsonColumn = column?.nativeType === 'json' || column?.nativeType === 'jsonb';
-
-  if (value instanceof Date) {
-    return `'${escapeLiteral(value.toISOString())}'`;
-  }
-  if (!isJsonColumn && isTaggedBigInt(value)) {
-    if (!/^-?\d+$/.test(value.value)) {
-      throw new Error(`Invalid tagged bigint value: "${value.value}" is not a valid integer`);
-    }
-    return value.value;
-  }
-  if (typeof value === 'bigint') {
-    return value.toString();
-  }
-  if (typeof value === 'string') {
-    return `'${escapeLiteral(value)}'`;
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  if (value === null) {
-    return 'NULL';
-  }
-  const json = JSON.stringify(value);
-  if (isJsonColumn) {
-    return `'${escapeLiteral(json)}'::${column.nativeType}`;
-  }
-  return `'${escapeLiteral(json)}'`;
-}
-
-export function buildTargetDetails(
-  objectType: OperationClass,
-  name: string,
-  schema: string,
-  table?: string,
-): PostgresPlanTargetDetails {
-  return {
-    schema,
-    objectType,
-    name,
-    ...ifDefined('table', table),
-  };
-}
-
-export function qualifyTableName(schema: string, table: string): string {
-  return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
-}
-
-export function toRegclassLiteral(schema: string, name: string): string {
-  const regclass = `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
-  return `'${escapeLiteral(regclass)}'`;
-}
-
 function sortedEntries<V>(record: Readonly<Record<string, V>>): Array<[string, V]> {
   return Object.entries(record).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, V]>;
-}
-
-export function constraintExistsCheck({
-  constraintName,
-  schema,
-  exists = true,
-}: {
-  constraintName: string;
-  schema: string;
-  exists?: boolean;
-}): string {
-  const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
-  return `SELECT ${existsClause} (
-  SELECT 1 FROM pg_constraint c
-  JOIN pg_namespace n ON c.connamespace = n.oid
-  WHERE c.conname = '${escapeLiteral(constraintName)}'
-  AND n.nspname = '${escapeLiteral(schema)}'
-)`;
-}
-
-export function columnExistsCheck({
-  schema,
-  table,
-  column,
-  exists = true,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  exists?: boolean;
-}): string {
-  const existsClause = exists ? '' : 'NOT ';
-  return `SELECT ${existsClause}EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-)`;
-}
-
-export function columnNullabilityCheck({
-  schema,
-  table,
-  column,
-  nullable,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  nullable: boolean;
-}): string {
-  const expected = nullable ? 'YES' : 'NO';
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-    AND is_nullable = '${expected}'
-)`;
-}
-
-function tableIsEmptyCheck(qualifiedTableName: string): string {
-  return `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedTableName} LIMIT 1)`;
-}
-
-function columnHasNoDefaultCheck(opts: { schema: string; table: string; column: string }): string {
-  return `SELECT NOT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(opts.schema)}'
-    AND table_name = '${escapeLiteral(opts.table)}'
-    AND column_name = '${escapeLiteral(opts.column)}'
-    AND column_default IS NOT NULL
-)`;
-}
-
-/**
- * Resolves the identity value (monoid neutral element) as a SQL literal for a column's type.
- * Checks codec hooks first (extensions can provide type-specific identity values),
- * then falls back to the built-in map.
- */
-function resolveIdentityValue(
-  column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
-): string | null {
-  if (column.codecId) {
-    const hookDefault = codecHooks.get(column.codecId)?.resolveIdentityValue?.({
-      nativeType: column.nativeType,
-      codecId: column.codecId,
-      ...ifDefined('typeParams', column.typeParams),
-    });
-    if (hookDefault !== undefined) {
-      return hookDefault;
-    }
-  }
-
-  return buildBuiltinIdentityValue(column.nativeType, column.typeParams);
-}
-
-/**
- * Returns the built-in identity value (monoid neutral element) as a SQL literal for the given
- * PostgreSQL native type — e.g. 0 for integers, '' for text, false for booleans.
- *
- * This is the planner's fallback when no codec hook provides a type-specific identity value.
- *
- * Returns null for unrecognized types (for example enums and extension-owned types without a
- * hook), which causes the planner to fall back to the empty-table precheck.
- *
- * @internal Exported for testing only.
- */
-export function buildBuiltinIdentityValue(
-  nativeType: string,
-  typeParams?: Record<string, unknown>,
-): string | null {
-  const normalizedNativeType = normalizeIdentityValueNativeType(nativeType);
-
-  if (normalizedNativeType.endsWith('[]')) {
-    return "'{}'";
-  }
-
-  switch (normalizedNativeType) {
-    // String types
-    case 'text':
-    case 'character':
-    case 'bpchar':
-    case 'character varying':
-    case 'varchar':
-      return "''";
-
-    // Numeric types (integer, float, decimal)
-    case 'int2':
-    case 'int4':
-    case 'int8':
-    case 'integer':
-    case 'bigint':
-    case 'smallint':
-    case 'float4':
-    case 'float8':
-    case 'real':
-    case 'double precision':
-    case 'numeric':
-    case 'decimal':
-      return '0';
-
-    // Boolean
-    case 'bool':
-    case 'boolean':
-      return 'false';
-
-    // UUID
-    case 'uuid':
-      return "'00000000-0000-0000-0000-000000000000'";
-
-    // JSON types — use empty object rather than JSON null to avoid
-    // ambiguity with JS null when drivers deserialize the value.
-    case 'json':
-    case 'jsonb':
-      return "'{}'::jsonb";
-
-    // Date and timestamp types
-    case 'date':
-    case 'timestamp':
-    case 'timestamptz':
-    case 'timestamp with time zone':
-    case 'timestamp without time zone':
-      return "'epoch'";
-
-    // Time types
-    case 'time':
-    case 'time without time zone':
-      return "'00:00:00'";
-    case 'timetz':
-    case 'time with time zone':
-      return "'00:00:00+00'";
-
-    // Interval
-    case 'interval':
-      return "'0'";
-
-    // Binary / text search types
-    case 'bytea':
-      return "''::bytea";
-    case 'tsvector':
-      return "''::tsvector";
-
-    // Bit types
-    case 'bit':
-      return buildBitIdentityValue(typeParams);
-    case 'bit varying':
-    case 'varbit':
-      return "B''";
-
-    default:
-      return null;
-  }
-}
-
-function normalizeIdentityValueNativeType(nativeType: string): string {
-  return nativeType.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function buildBitIdentityValue(typeParams?: Record<string, unknown>): string | null {
-  const length = typeParams?.['length'];
-  if (length === undefined) {
-    return "B'0'";
-  }
-  if (typeof length !== 'number' || !Number.isInteger(length) || length <= 0) {
-    return null;
-  }
-  return `B'${'0'.repeat(length)}'`;
-}
-
-function buildAddColumnSql(
-  qualifiedTableName: string,
-  columnName: string,
-  column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
-  temporaryDefault?: string | null,
-): string {
-  const typeSql = buildColumnTypeSql(column, codecHooks);
-  const defaultSql =
-    buildColumnDefaultSql(column.default, column) ||
-    (temporaryDefault ? `DEFAULT ${temporaryDefault}` : '');
-  const parts = [
-    `ALTER TABLE ${qualifiedTableName}`,
-    `ADD COLUMN ${quoteIdentifier(columnName)} ${typeSql}`,
-    defaultSql,
-    column.nullable ? '' : 'NOT NULL',
-  ].filter(Boolean);
-  return parts.join(' ');
 }
 
 function tableHasPrimaryKeyCheck(
@@ -1359,43 +864,4 @@ function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
   return lookup.fkKeys.has(
     `${fk.columns.join(',')}|${fk.references.table}|${fk.references.columns.join(',')}`,
   );
-}
-
-const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
-  noAction: 'NO ACTION',
-  restrict: 'RESTRICT',
-  cascade: 'CASCADE',
-  setNull: 'SET NULL',
-  setDefault: 'SET DEFAULT',
-};
-
-function buildForeignKeySql(
-  schemaName: string,
-  tableName: string,
-  fkName: string,
-  foreignKey: ForeignKey,
-): string {
-  let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ADD CONSTRAINT ${quoteIdentifier(fkName)}
-FOREIGN KEY (${foreignKey.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${foreignKey.references.columns
-    .map(quoteIdentifier)
-    .join(', ')})`;
-
-  if (foreignKey.onDelete !== undefined) {
-    const action = REFERENTIAL_ACTION_SQL[foreignKey.onDelete];
-    if (!action) {
-      throw new Error(`Unknown referential action for onDelete: ${String(foreignKey.onDelete)}`);
-    }
-    sql += `\nON DELETE ${action}`;
-  }
-  if (foreignKey.onUpdate !== undefined) {
-    const action = REFERENTIAL_ACTION_SQL[foreignKey.onUpdate];
-    if (!action) {
-      throw new Error(`Unknown referential action for onUpdate: ${String(foreignKey.onUpdate)}`);
-    }
-    sql += `\nON UPDATE ${action}`;
-  }
-
-  return sql;
 }
