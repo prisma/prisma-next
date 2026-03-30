@@ -10,140 +10,6 @@ Data migrations solve this by allowing users to attach executable code to graph 
 
 The primary user is a backend developer who knows SQL but doesn't think about migration theory. They want to describe what should happen and have the system handle safety. The system should detect when data migrations are needed, scaffold the file, and let the user fill in the logic.
 
-# Requirements
-
-## Functional Requirements
-
-### Authoring
-
-- **FR-1**: A data migration is defined in a `data-migration.ts` file inside a migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(db), run(db) })` API.
-- **FR-1a**: `check(db)` is **required**. It returns `true` if the data migration has already been applied (skip `run`), `false` if it still needs to run. The runner calls `check` before `run` on every execution, enabling idempotent retries without a separate completion marker. Users who don't need a meaningful check can `return true` (always skip — use with caution) or `return false` (always run).
-- **FR-2**: The `db` parameter provides a minimal raw SQL interface: `db.execute(sql, params?)` (returns rows affected) and `db.query(sql, params?)` (returns rows). Parameterized queries only.
-- **FR-3**: `data-migration.ts` is compiled at apply time using the project's existing TypeScript execution tooling (tsx/esbuild). Source `.ts` files are committed; compiled JS is not.
-- **FR-4**: Each migration edge supports at most one data migration (single `data-migration.ts` per package).
-
-### Detection and scaffolding
-
-- **FR-5**: The planner detects structural changes that imply a data migration is needed:
-  - NOT NULL column added without a default
-  - Non-widening type change (e.g., FLOAT → INTEGER)
-  - Existing nullable column becoming NOT NULL
-- **FR-6**: Detection works offline (no database connection required). The planner scaffolds when the structural diff *could* need a data migration, even if affected tables might be empty at runtime.
-- **FR-7**: When detection triggers, the planner generates a `data-migration.ts` with a `throw new Error('Data migration not implemented')` in the `run` function, plus a comment describing what was detected. The user fills in the logic and removes the throw.
-- **FR-7a**: For non-widening type changes on the same column (e.g., `price FLOAT` → `price BIGINT`), the planner uses a **temp column strategy**: it emits an additive op to create a temporary column with the target type, places the data migration slot after it, and emits destructive ops to drop the original column and rename the temp column. This gives the user a writable column of the correct target type during the data migration, since values can't be written in the new type to the old column and the type can't be changed before the data is converted. The temp column name is deterministic (e.g., `_price_migration_temp`) and referenced in the scaffold comment.
-
-### Execution
-
-- **FR-8**: When a data migration is present on an edge, the planner emits a `data_migration` operation entry interleaved with structural ops. The planner partitions structural ops into phases by operation class:
-  - Phase 1: all `additive` and `widening` ops
-  - Phase 2: `data_migration` operation (references the user's `data-migration.ts`)
-  - Phase 3: all `destructive` ops
-- **FR-9**: This partitioning is implemented as a generic framework-level function over operation classes. Target planners produce structural ops as they do today; the framework inserts the data migration entry and orders the result. For v1, the ordering is a simple class-based partition. When a proper operation dependency model lands (with `dependsOn` and topological sort), the data migration operation should integrate with that — depending on all additive/widening ops, with all destructive ops depending on it.
-- **FR-10**: The data migration declares one of three transaction modes:
-  - `inline` — runs inside the structural migration's transaction (default)
-  - `isolated` — gets its own transaction; phase 1 commits, data migration runs in separate transaction, phase 3 runs in a third transaction
-  - `unmanaged` — no transaction wrapping; user handles batching/commits
-- **FR-11**: In `isolated` and `unmanaged` modes, phase 1 ops are skipped on retry via existing idempotency checks (postchecks pass because columns/tables already exist). The data migration step is skipped on retry if `check(db)` returns `true`, eliminating the need for a separate completion marker.
-
-### Graph integration
-
-- **FR-13**: The invariant carried by the system is "named data migration X was applied." This is recorded in the ledger when the migration edge completes successfully.
-- **FR-14**: A content hash is computed from the data migration source code. If a migration has been applied to one environment and the code has since changed, the system emits a **warning** (not a blocking error) when applying to another environment. Drift detection only.
-- **FR-15**: The router finds candidate paths via DFS, collecting data migration names along each path. Path selection:
-  1. Filter to paths that satisfy required invariants (from environment refs)
-  2. Prefer paths with more invariants (do the most complete migration)
-  3. Tie-break by shortest path / deterministic ordering
-- **FR-16**: Environment refs declare desired state as target contract hash + required data migration names. A ref update is explicit and reviewable.
-
-### Rollback
-
-- **FR-17**: No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S1 — an ordinary graph edge that can carry its own data migration if needed.
-
-## Non-Functional Requirements
-
-- **NFR-1**: The framework-level op partitioning function must not depend on target-specific knowledge — it operates solely on operation classes.
-- **NFR-2**: Data migration code runs in-process with the migration runner. No separate process, container, or sandbox.
-- **NFR-3**: The `db` interface must enforce parameterized queries to prevent SQL injection in user-authored migration code.
-- **NFR-4**: User-authored data migration code should be idempotent. The required `check(db)` function provides the primary retry-safety mechanism, but truly idempotent `run(db)` code is the safest approach for `isolated`/`unmanaged` modes where `check` might not cover all edge cases.
-
-## Non-goals
-
-- **Multiple data migrations per edge**: Requires a dependency model between operations. Future work.
-- **Pure data migrations (A→A)**: Data-only transformations with no schema change. The model extends naturally to self-edges later.
-- **Smart scaffolding / recipe templates**: Pre-filled SQL for common patterns (backfill, type conversion, extraction). Future DX layer.
-- **Typed `db` interface**: Query interface typed to the intermediate schema state. Significant complexity for uncertain value.
-- **Runtime no-op detection**: Mock-style verification that migration code actually executed meaningful work. Future safety layer.
-- **Operator algebra**: Composable migration operators with commutativity analysis. Useful design thinking but the invariant model handles correctness without it.
-- ~~**Postcondition checks**~~: **Resolved.** `check(db)` is required on every data migration. Serves as both postcondition and retry-safety mechanism.
-- **Question-tree UX**: Interactive workflow where the system asks the user targeted questions about ambiguous diffs and compiles answers into migration code. Future authoring layer.
-
-# Acceptance Criteria
-
-## Authoring
-
-- [ ] A `data-migration.ts` file using `defineMigration` is recognized by the runner when present in a migration package
-- [ ] `check(db)` is required — `defineMigration` without `check` is a type error
-- [ ] Runner calls `check(db)` before `run(db)` — if `check` returns `true`, `run` is skipped
-- [ ] `db.execute(sql, params)` runs parameterized SQL and returns affected row count
-- [ ] `db.query(sql, params)` runs parameterized SQL and returns result rows
-- [ ] The `data-migration.ts` file is compiled from TypeScript at apply time without requiring a pre-build step
-
-## Detection and scaffolding
-
-- [ ] `migration plan` scaffolds a `data-migration.ts` with a throw when it detects a NOT NULL column added without a default
-- [ ] `migration plan` scaffolds when it detects a non-widening type change
-- [ ] `migration plan` scaffolds when it detects a nullable → NOT NULL change
-- [ ] Scaffolded file includes a comment describing the detected change
-- [ ] `migration apply` fails with a clear error when the scaffolded throw is still present
-
-## Execution
-
-- [ ] With a data migration present, structural ops execute in order: additive/widening → data migration → destructive
-- [ ] `inline` mode: data migration runs in the same transaction as structural ops; failure rolls back everything
-- [ ] `isolated` mode: phase 1 commits, data migration runs in own transaction, phase 3 runs in own transaction
-- [ ] `unmanaged` mode: data migration runs without transaction wrapping
-- [ ] On retry after partial failure in `isolated`/`unmanaged` modes, phase 1 ops are skipped via existing idempotency checks
-- [ ] On retry, `check(db)` is called — if it returns `true`, the data migration `run` is skipped
-
-## Graph integration
-
-- [ ] Data migration name is recorded in ledger on successful edge completion
-- [ ] Content hash drift produces a warning (not error) when code changed since last apply to a different environment
-- [ ] Router selects path satisfying required invariants from environment ref
-- [ ] When no invariants are required, router prefers path with more data migrations over path with fewer
-- [ ] Environment ref can declare required data migration names alongside target contract hash
-
-## Rollback
-
-- [ ] A migration S2→S1 with a data migration works identically to S1→S2 — no special rollback machinery
-
-# Other Considerations
-
-## Security
-
-- The `db` interface enforces parameterized queries. String interpolation for SQL construction is not exposed.
-- Data migration code runs with the same database permissions as the migration runner. No privilege escalation.
-- **Assumption:** Data migration files are trusted code committed to the repository, same as structural migration definitions. No sandboxing is applied.
-
-## Cost
-
-Not applicable — data migrations are a development-time tool. No runtime infrastructure cost beyond the existing migration runner.
-
-## Observability
-
-- The runner logs data migration start/completion/failure with the migration name and transaction mode.
-- The ledger records which named data migrations have been applied to which database instance.
-- Content hash drift warnings are surfaced in `migration status` output.
-
-## Data Protection
-
-- Data migrations operate directly on database contents. Users are responsible for ensuring their migration code handles PII appropriately.
-- **Assumption:** No additional data protection controls are needed beyond what the database and migration runner already provide.
-
-## Analytics
-
-Not applicable for v1. Future work could track data migration adoption patterns (how often scaffolded, how often custom-authored, common transaction modes).
-
 # Key Decisions
 
 ## D1. Code-first over operator algebra
@@ -158,11 +24,11 @@ Not applicable for v1. Future work could track data migration adoption patterns 
 
 ## D2. Name + hash over semantic postconditions; honest about what invariants are
 
-**Decision**: The system tracks data migrations by **name** (identity, human-readable) and **content hash** (integrity, drift detection). The invariant is "named data migration X was applied."
+**Decision**: The system tracks data migrations by **name** (identity, human-readable). The invariant is "named data migration X was applied." Content hash drift detection is deferred (see FR-14).
 
 **What this actually is**: Functionally, this is the same as carrying around proof that specific migrations ran. For any path segment that has data migrations, the model degenerates to "you must take this specific path" — which is linear history for that segment. Data migrations are inherently path-dependent; we're not trying to make them path-independent. The graph's flexibility only helps for structural-only segments.
 
-**Why name + hash rather than hash alone**: The name is stable under code changes (fixing a bug in the migration doesn't change its identity), human-readable in CLI output and ref files, and serves as the primary key for invariant requirements. The hash detects drift ("this code was modified since it was applied to staging"). Together they separate identity from integrity.
+**Why name rather than hash**: The name is stable under code changes (fixing a bug in the migration doesn't change its identity), human-readable in CLI output and ref files, and serves as the primary key for invariant requirements. Content hash drift detection is a future layer — see FR-14 for why it's deferred.
 
 **Alternative considered — semantic postconditions**: Carry checkable predicates about data state ("all phone numbers match E.164"). Problem: we can't exhaustively cover all possible postcondition checks with a typed representation. Any typed system eventually needs an escape hatch that's just code, at which point the postcondition is opaque anyway. The required `check(db)` function (D3) gives us user-authored postconditions for retry safety without pretending the system can reason about them.
 
@@ -217,17 +83,149 @@ Not applicable for v1. Future work could track data migration adoption patterns 
 
 **Future refinement — `USING` clause for common conversions**: Many type changes can be expressed as a single SQL expression in an `ALTER COLUMN TYPE ... USING` clause (e.g., `USING (price * 100)::bigint`, `USING created_at AT TIME ZONE 'America/New_York'`, `USING CASE status WHEN 1 THEN 'active' END`). When the conversion is a SQL expression, the `USING` approach is simpler — no temp column, no data migration file, just a single structural op. The planner could offer common conversion patterns (multiply, cast, round, timezone, enum lookup) and generate the `USING` clause directly, falling back to the temp column strategy only when the user needs imperative logic (loops, external libraries, cross-table lookups). This fits into the deferred "smart scaffolding / recipe templates" layer.
 
+## D8. Planner detects, scaffolds with context, and prevents accidental no-ops
 
-## D8. Planner detects and scaffolds with `throw`
+**Decision**: The planner auto-detects structural changes that imply a data migration is needed (NOT NULL without default, non-widening type change, nullable → NOT NULL) and scaffolds a `data-migration.ts` that: (a) provides the full `defineMigration` boilerplate so the user starts from a working structure, (b) includes comments describing what was detected and what the user needs to provide, and (c) ensures the user cannot accidentally forget to fill in the logic — the scaffold must fail at apply time if left unmodified.
 
-**Decision**: The planner auto-detects structural changes that imply a data migration is needed (NOT NULL without default, non-widening type change, nullable → NOT NULL) and scaffolds a `data-migration.ts` with `throw new Error('Data migration not implemented')`.
+The `throw` in the scaffold is one way to achieve (c), but the key property is that the runner rejects unimplemented data migrations, not the specific mechanism.
 
 **Alternatives considered**:
-- Warn only — planner flags the need, user creates the file manually
-- Block — planner refuses to create the migration package until user provides a data migration
-- Smart scaffolding — pre-fill the `run` function with likely SQL based on the detected pattern
+- Warn only — planner flags the need, user creates the file manually. Problem: easy to miss the warning and proceed without a data migration.
+- Block — planner refuses to create the migration package until user provides a data migration. Problem: blocks the plan workflow; user can't see the structural plan until they've written data migration code they don't yet understand.
+- Smart scaffolding — pre-fill the `run` function with likely SQL based on the detected pattern. Future DX layer; minimal scaffolding proves the model first.
 
-**Why scaffold with throw**: The system takes responsibility for detection and gives the user a starting point. The `throw` ensures the migration can't accidentally run without the user filling in the logic — it fails loudly at apply time. Smart scaffolding (pre-filled SQL) is a future DX layer; minimal scaffolding proves the model first.
+**Why this approach**: The system takes responsibility for detection and gives the user a starting point with enough context to understand what's needed. The safety property — unimplemented scaffolds fail loudly — prevents data loss from accidentally skipping a required transformation.
+
+# Requirements
+
+## Functional Requirements
+
+### Authoring
+
+- **FR-1**: A data migration is defined in a `data-migration.ts` file inside a migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(db), run(db) })` API.
+- **FR-1a**: `check(db)` is **required**. It returns `true` if the data migration has already been applied (skip `run`), `false` if it still needs to run. The runner calls `check` before `run` on every execution, enabling idempotent retries without a separate completion marker. Users who don't need a meaningful check can `return true` (always skip — use with caution) or `return false` (always run).
+- **FR-2**: The `db` parameter provides a minimal raw SQL interface: `db.execute(sql, params?)` (returns rows affected) and `db.query(sql, params?)` (returns rows). Parameterized queries only.
+- **FR-3**: `data-migration.ts` is compiled at apply time using the project's existing TypeScript execution tooling (tsx/esbuild). Source `.ts` files are committed; compiled JS is not.
+- **FR-4**: Each migration edge supports at most one data migration (single `data-migration.ts` per package).
+
+### Detection and scaffolding
+
+- **FR-5**: The planner detects structural changes that imply a data migration is needed:
+  - NOT NULL column added without a default
+  - Non-widening type change (e.g., FLOAT → INTEGER)
+  - Existing nullable column becoming NOT NULL
+- **FR-6**: Detection works offline (no database connection required). The planner scaffolds when the structural diff *could* need a data migration, even if affected tables might be empty at runtime.
+- **FR-7**: When detection triggers, the planner generates a `data-migration.ts` with a `throw new Error('Data migration not implemented')` in the `run` function, plus a comment describing what was detected. The user fills in the logic and removes the throw.
+- **FR-7a**: For non-widening type changes on the same column (e.g., `price FLOAT` → `price BIGINT`), the planner uses a **temp column strategy**: it emits an additive op to create a temporary column with the target type, places the data migration slot after it, and emits destructive ops to drop the original column and rename the temp column. This gives the user a writable column of the correct target type during the data migration, since values can't be written in the new type to the old column and the type can't be changed before the data is converted. The temp column name is deterministic (e.g., `_price_migration_temp`) and referenced in the scaffold comment.
+
+### Execution
+
+- **FR-8**: When a data migration is present on an edge, the planner emits a `data_migration` operation entry interleaved with structural ops. The planner partitions structural ops into phases by operation class:
+  - Phase 1: all `additive` and `widening` ops
+  - Phase 2: `data_migration` operation (references the user's `data-migration.ts`)
+  - Phase 3: all `destructive` ops
+- **FR-9**: This partitioning is implemented as a generic framework-level function over operation classes. Target planners produce structural ops as they do today; the framework inserts the data migration entry and orders the result. For v1, the ordering is a simple class-based partition. When a proper operation dependency model lands (with `dependsOn` and topological sort), the data migration operation should integrate with that — depending on all additive/widening ops, with all destructive ops depending on it.
+- **FR-10**: The data migration declares one of three transaction modes:
+  - `inline` — runs inside the structural migration's transaction (default)
+  - `isolated` — gets its own transaction; phase 1 commits, data migration runs in separate transaction, phase 3 runs in a third transaction
+  - `unmanaged` — no transaction wrapping; user handles batching/commits
+- **FR-11**: In `isolated` and `unmanaged` modes, phase 1 ops are skipped on retry via existing idempotency checks (postchecks pass because columns/tables already exist). The data migration step is skipped on retry if `check(db)` returns `true`, eliminating the need for a separate completion marker.
+
+### Graph integration
+
+- **FR-13**: The invariant carried by the system is "named data migration X was applied." This is recorded in the ledger when the migration edge completes successfully.
+- **FR-15**: The router finds candidate paths via DFS, collecting data migration names along each path. Path selection:
+  1. Filter to paths that satisfy required invariants (from environment refs)
+  2. Prefer paths with more invariants (do the most complete migration)
+  3. Tie-break by shortest path / deterministic ordering
+- **FR-16**: Environment refs declare desired state as target contract hash + required data migration names. A ref update is explicit and reviewable.
+
+### Rollback
+
+- **FR-17**: No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S1 — an ordinary graph edge that can carry its own data migration if needed.
+
+## Non-Functional Requirements
+
+- **NFR-1**: The framework-level op partitioning function must not depend on target-specific knowledge — it operates solely on operation classes.
+- **NFR-2**: Data migration code runs in-process with the migration runner. No separate process, container, or sandbox.
+- **NFR-3**: The `db` interface must enforce parameterized queries to prevent SQL injection in user-authored migration code.
+- **NFR-4**: User-authored data migration code should be idempotent. The required `check(db)` function provides the primary retry-safety mechanism, but truly idempotent `run(db)` code is the safest approach for `isolated`/`unmanaged` modes where `check` might not cover all edge cases.
+
+## Non-goals
+
+- **Multiple data migrations per edge**: Requires a dependency model between operations. Future work.
+- **Pure data migrations (A→A)**: Data-only transformations with no schema change. The model extends naturally to self-edges later.
+- **Smart scaffolding / recipe templates**: Pre-filled SQL for common patterns (backfill, type conversion, extraction). Future DX layer.
+- **Typed `db` interface**: Query interface typed to the intermediate schema state. Significant complexity for uncertain value.
+- **Runtime no-op detection**: Mock-style verification that migration code actually executed meaningful work. Future safety layer.
+- **Operator algebra**: Composable migration operators with commutativity analysis. Useful design thinking but the invariant model handles correctness without it.
+- **Content hash drift detection**: Warn when data migration code has been modified since it was applied to another environment. Descoped because: (1) storing the hash in the migration manifest requires re-attestation every time the user edits the scaffolded file — the natural workflow is plan → scaffold → user edits → apply, but the manifest is sealed at plan time so the hash is immediately stale after the user fills in the scaffold; (2) storing in the ledger only enables per-database comparison, not cross-environment drift detection (you can't query staging's ledger from production); (3) a separate metadata file adds complexity for uncertain value. Revisit when we have a clearer picture of multi-environment workflows.
+- **Question-tree UX**: Interactive workflow where the system asks the user targeted questions about ambiguous diffs and compiles answers into migration code. Future authoring layer.
+
+# Acceptance Criteria
+
+## Authoring
+
+- [ ] A `data-migration.ts` file using `defineMigration` is recognized by the runner when present in a migration package
+- [ ] `check(db)` is required — `defineMigration` without `check` is a type error
+- [ ] Runner calls `check(db)` before `run(db)` — if `check` returns `true`, `run` is skipped
+- [ ] `db.execute(sql, params)` runs parameterized SQL and returns affected row count
+- [ ] `db.query(sql, params)` runs parameterized SQL and returns result rows
+- [ ] The `data-migration.ts` file is compiled from TypeScript at apply time without requiring a pre-build step
+
+## Detection and scaffolding
+
+- [ ] `migration plan` scaffolds a `data-migration.ts` with a throw when it detects a NOT NULL column added without a default
+- [ ] `migration plan` scaffolds when it detects a non-widening type change
+- [ ] `migration plan` scaffolds when it detects a nullable → NOT NULL change
+- [ ] Scaffolded file includes a comment describing the detected change
+- [ ] `migration apply` fails with a clear error when the scaffolded throw is still present
+
+## Execution
+
+- [ ] With a data migration present, structural ops execute in order: additive/widening → data migration → destructive
+- [ ] `inline` mode: data migration runs in the same transaction as structural ops; failure rolls back everything
+- [ ] `isolated` mode: phase 1 commits, data migration runs in own transaction, phase 3 runs in own transaction
+- [ ] `unmanaged` mode: data migration runs without transaction wrapping
+- [ ] On retry after partial failure in `isolated`/`unmanaged` modes, phase 1 ops are skipped via existing idempotency checks
+- [ ] On retry, `check(db)` is called — if it returns `true`, the data migration `run` is skipped
+
+## Graph integration
+
+- [ ] Data migration name is recorded in ledger on successful edge completion
+- [ ] Router selects path satisfying required invariants from environment ref
+- [ ] When no invariants are required, router prefers path with more data migrations over path with fewer
+- [ ] Environment ref can declare required data migration names alongside target contract hash
+
+## Rollback
+
+- [ ] A migration S2→S1 with a data migration works identically to S1→S2 — no special rollback machinery
+
+# Other Considerations
+
+## Security
+
+- The `db` interface enforces parameterized queries. String interpolation for SQL construction is not exposed.
+- Data migration code runs with the same database permissions as the migration runner. No privilege escalation.
+- **Assumption:** Data migration files are trusted code committed to the repository, same as structural migration definitions. No sandboxing is applied.
+
+## Cost
+
+Not applicable — data migrations are a development-time tool. No runtime infrastructure cost beyond the existing migration runner.
+
+## Observability
+
+- The runner logs data migration start/completion/failure with the migration name and transaction mode.
+- The ledger records which named data migrations have been applied to which database instance.
+
+## Data Protection
+
+- Data migrations operate directly on database contents. Users are responsible for ensuring their migration code handles PII appropriately.
+- **Assumption:** No additional data protection controls are needed beyond what the database and migration runner already provide.
+
+## Analytics
+
+Not applicable for v1. Future work could track data migration adoption patterns (how often scaffolded, how often custom-authored, common transaction modes).
 
 # References
 
