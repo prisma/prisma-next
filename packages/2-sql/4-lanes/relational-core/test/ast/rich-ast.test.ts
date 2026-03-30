@@ -15,8 +15,9 @@ import {
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
+  NotExpr,
   NullCheckExpr,
   OperationExpr,
   OrderByItem,
@@ -38,8 +39,7 @@ function lowerEmail(column: ColumnRef, ...args: Array<AnyOperationArg>) {
     self: column,
     args,
     returns: stringReturn,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-    template: 'lower(${self})',
+    template: 'lower({{self}})',
   });
 }
 
@@ -190,7 +190,7 @@ describe('rich SQL AST', () => {
       BinaryExpr.eq(op, LiteralExpr.of('alice@example.com')),
       BinaryExpr.in(
         ColumnRef.of('user', 'status'),
-        ListLiteralExpr.of([ParamRef.of(4, { codecId: 'pg/text@1' }), LiteralExpr.of('active')]),
+        ListExpression.of([ParamRef.of(4, { codecId: 'pg/text@1' }), LiteralExpr.of('active')]),
       ),
     ]);
 
@@ -200,7 +200,7 @@ describe('rich SQL AST', () => {
       columnRef: (expr) => [`${expr.table}.${expr.column}`],
       paramRef: (expr) => [`$${expr.name ?? String(expr.value)}`],
       literal: (expr) => [`lit:${String(expr.value)}`],
-      listLiteral: (expr) => [`list:${expr.values.length}`],
+      list: (expr) => [`list:${expr.values.length}`],
       select: (ast) => ast.collectColumnRefs().map((expr) => `${expr.table}.${expr.column}`),
     });
 
@@ -224,24 +224,30 @@ describe('rich SQL AST', () => {
   it('negates where expressions through not()', () => {
     expect(
       BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })).not(),
-    ).toEqual(BinaryExpr.neq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })));
+    ).toEqual(
+      new NotExpr(
+        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
+      ),
+    );
     expect(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
         NullCheckExpr.isNull(ColumnRef.of('user', 'deletedAt')),
       ]).not(),
     ).toEqual(
-      OrExpr.of([
-        BinaryExpr.neq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
-        NullCheckExpr.isNotNull(ColumnRef.of('user', 'deletedAt')),
-      ]),
+      new NotExpr(
+        AndExpr.of([
+          BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
+          NullCheckExpr.isNull(ColumnRef.of('user', 'deletedAt')),
+        ]),
+      ),
     );
     expect(ExistsExpr.exists(SelectAst.from(TableSource.named('user'))).not()).toEqual(
-      ExistsExpr.notExists(SelectAst.from(TableSource.named('user'))),
+      new NotExpr(ExistsExpr.exists(SelectAst.from(TableSource.named('user')))),
     );
-    expect(() =>
-      BinaryExpr.like(ColumnRef.of('user', 'email'), LiteralExpr.of('%a%')).not(),
-    ).toThrow('Operator "like" is not negatable without explicit NOT support in the AST');
+    expect(BinaryExpr.like(ColumnRef.of('user', 'email'), LiteralExpr.of('%a%')).not()).toEqual(
+      new NotExpr(BinaryExpr.like(ColumnRef.of('user', 'email'), LiteralExpr.of('%a%'))),
+    );
   });
 
   it('collects plan refs across select, insert, update, and delete ASTs', () => {

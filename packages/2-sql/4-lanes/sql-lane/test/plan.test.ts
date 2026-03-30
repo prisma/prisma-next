@@ -70,8 +70,7 @@ describe('buildMeta', () => {
       self: ColumnRef.of('user', 'id'),
       args: [],
       returns: { kind: 'typeId', type: 'pg/vector@1' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'normalize(${self})',
+      template: 'normalize({{self}})',
     });
 
     const meta = buildMeta({
@@ -132,8 +131,7 @@ describe('buildMeta', () => {
       self: ColumnRef.of('user', 'id'),
       args: [],
       returns: { kind: 'builtin', type: 'number' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'vector_length(${self})',
+      template: 'vector_length({{self}})',
     });
 
     const meta = buildMeta({

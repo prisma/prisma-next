@@ -1,7 +1,7 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
-  type AnyWhereExpr,
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
@@ -10,19 +10,19 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { ShorthandWhereFilter } from './types';
 
-export function and(...exprs: AnyWhereExpr[]): AndExpr {
+export function and(...exprs: AnyExpression[]): AndExpr {
   return AndExpr.of(exprs);
 }
 
-export function or(...exprs: AnyWhereExpr[]): OrExpr {
+export function or(...exprs: AnyExpression[]): OrExpr {
   return OrExpr.of(exprs);
 }
 
-export function not(expr: AnyWhereExpr): AnyWhereExpr {
+export function not(expr: AnyExpression): AnyExpression {
   return expr.not();
 }
 
-export function all(): AnyWhereExpr {
+export function all(): AnyExpression {
   return AndExpr.true();
 }
 
@@ -33,7 +33,7 @@ export function shorthandToWhereExpr<
   contract: TContract,
   modelName: ModelName,
   filters: ShorthandWhereFilter<TContract, ModelName>,
-): AnyWhereExpr | undefined {
+): AnyExpression | undefined {
   const models = contract.models as Record<
     string,
     {
@@ -46,7 +46,7 @@ export function shorthandToWhereExpr<
     contract.mappings.modelToTable?.[modelName] ?? models[modelName]?.storage?.table ?? modelName;
   const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
 
-  const exprs: AnyWhereExpr[] = [];
+  const exprs: AnyExpression[] = [];
   for (const [fieldName, value] of Object.entries(filters)) {
     if (value === undefined) {
       continue;

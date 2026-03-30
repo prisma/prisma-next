@@ -126,8 +126,7 @@ describe('Postgres rich AST lowering', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     });
 

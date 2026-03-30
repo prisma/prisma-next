@@ -51,8 +51,7 @@ describe('Operation lowering', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-        template: '${self} <=> ${arg0}',
+        template: '{{self}} <=> {{arg0}}',
       },
     });
   }
@@ -79,8 +78,7 @@ describe('Operation lowering', () => {
         LiteralExpr.of(42),
       ],
       returns: { kind: 'builtin', type: 'number' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'cosine_similarity(${self}, ${arg0}, ${arg1}, ${arg2})',
+      template: 'cosine_similarity({{self}}, {{arg0}}, {{arg1}}, {{arg2}})',
     });
     const ast = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('similarity', operationExpr),
@@ -119,8 +117,7 @@ describe('Operation lowering', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-        template: 'contains(${self}, ${arg0})',
+        template: 'contains({{self}}, {{arg0}})',
       },
     });
     const ast = SelectAst.from(TableSource.named('user')).withProjection([

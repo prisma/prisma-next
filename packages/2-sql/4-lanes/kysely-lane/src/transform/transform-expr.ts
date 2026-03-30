@@ -1,10 +1,10 @@
-import type { AnyWhereExpr, BinaryOp, JoinOnExpr } from '@prisma-next/sql-relational-core/ast';
+import type { AnyExpression, BinaryOp, JoinOnExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
   BinaryExpr,
   type ColumnRef,
   EqColJoinOn,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   OrderByItem,
   OrExpr,
@@ -111,7 +111,7 @@ function flattenLogical(
   logicalKind: 'and' | 'or',
   ctx: TransformContext,
   defaultTable: string | undefined,
-  out: AnyWhereExpr[],
+  out: AnyExpression[],
 ): void {
   const current = ParensNode.is(node) ? node.node : node;
   if (logicalKind === 'and' && AndNode.is(current)) {
@@ -137,17 +137,17 @@ function transformRightOperand(
   ctx: TransformContext,
   defaultTable: string | undefined,
   refs: { table: string; column: string },
-): ColumnRef | ParamRef | LiteralExpr | ListLiteralExpr {
+): ColumnRef | ParamRef | LiteralExpr | ListExpression {
   if (ReferenceNode.is(node)) {
     return resolveColumnRef(node, ctx, defaultTable);
   }
 
   if (PrimitiveValueListNode.is(node)) {
-    return ListLiteralExpr.of(node.values.map((value) => transformValue(value, ctx, refs)));
+    return ListExpression.of(node.values.map((value) => transformValue(value, ctx, refs)));
   }
 
   if (ValueListNode.is(node)) {
-    return ListLiteralExpr.of(node.values.map((value) => transformValue(value, ctx, refs)));
+    return ListExpression.of(node.values.map((value) => transformValue(value, ctx, refs)));
   }
 
   return transformValue(node, ctx, refs);
@@ -157,7 +157,7 @@ export function transformWhereExpr(
   node: unknown,
   ctx: TransformContext,
   defaultTable?: string,
-): AnyWhereExpr | undefined {
+): AnyExpression | undefined {
   if (!node) {
     return undefined;
   }
@@ -171,7 +171,7 @@ export function transformWhereExpr(
   }
 
   if (AndNode.is(node)) {
-    const exprs: AnyWhereExpr[] = [];
+    const exprs: AnyExpression[] = [];
     flattenLogical(node, 'and', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];
@@ -179,7 +179,7 @@ export function transformWhereExpr(
   }
 
   if (OrNode.is(node)) {
-    const exprs: AnyWhereExpr[] = [];
+    const exprs: AnyExpression[] = [];
     flattenLogical(node, 'or', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];

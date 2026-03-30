@@ -42,8 +42,7 @@ describe('buildWhereExpr', () => {
       self: ColumnRef.of('user', 'id'),
       args: [],
       returns: vectorReturn,
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'normalize(${self})',
+      template: 'normalize({{self}})',
     });
     const opResult = buildWhereExpr(
       contract,

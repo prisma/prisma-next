@@ -1,9 +1,10 @@
 import {
-  type AnyWhereExpr,
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   type ExistsExpr,
   LiteralExpr,
+  NotExpr,
   NullCheckExpr,
   ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
@@ -14,12 +15,12 @@ import { normalizeWhereArg } from '../src/where-interop';
 import { combineWhereExprs } from '../src/where-utils';
 import { getTestContract } from './helpers';
 
-function collectParamValues(expr: AnyWhereExpr): unknown[] {
+function collectParamValues(expr: AnyExpression): unknown[] {
   return expr.fold<unknown[]>({
     empty: [],
     combine: (a, b) => [...a, ...b],
     paramRef: (param) => [param.value],
-    listLiteral: (list) =>
+    list: (list) =>
       list.values.flatMap((value) => (value instanceof ParamRef ? [value.value] : [])),
   });
 }
@@ -75,7 +76,7 @@ describe('SQL ORM rich AST filters', () => {
     expect(combined?.kind).toBe('and');
 
     expect(not(NullCheckExpr.isNull(ColumnRef.of('users', 'email')))).toEqual(
-      NullCheckExpr.isNotNull(ColumnRef.of('users', 'email')),
+      new NotExpr(NullCheckExpr.isNull(ColumnRef.of('users', 'email'))),
     );
     expect(or(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))).kind).toBe('or');
     expect(all().kind).toBe('and');

@@ -9,7 +9,7 @@ import {
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
-  ListLiteralExpr,
+  ListExpression,
   NullCheckExpr,
   OrderByItem,
   SelectAst,
@@ -20,7 +20,7 @@ import { col, lit, lowerExpr, param, shiftParamRef, simpleSelect, table } from '
 describe('ast/visitors', () => {
   it('rewrites expressions through node-level rewrite methods', () => {
     const operation = lowerExpr(col('user', 'email'), param(0, 'email'), lit(true));
-    const list = ListLiteralExpr.of([param(1, 'firstId'), lit(2)]);
+    const list = ListExpression.of([param(1, 'firstId'), lit(2)]);
     const objectExpr = JsonObjectExpr.fromEntries([
       JsonObjectExpr.entry('email', operation),
       JsonObjectExpr.entry('active', lit(false)),
@@ -48,7 +48,7 @@ describe('ast/visitors', () => {
     expect(rewrittenOperation).toEqual(
       lowerExpr(col('member', 'email'), param(10, 'email'), lit('TRUE')),
     );
-    expect(rewrittenList).toEqual(ListLiteralExpr.of([param(21, 'firstId'), lit('mapped')]));
+    expect(rewrittenList).toEqual(ListExpression.of([param(21, 'firstId'), lit('mapped')]));
     expect(rewrittenObject).toEqual(
       JsonObjectExpr.fromEntries([
         JsonObjectExpr.entry('email', operation),
@@ -113,7 +113,7 @@ describe('ast/visitors', () => {
   it('folds expression and where trees through node-level fold methods', () => {
     const where = AndExpr.of([
       BinaryExpr.eq(lowerExpr(col('user', 'email')), lit('a@example.com')),
-      BinaryExpr.in(col('user', 'status'), ListLiteralExpr.of([param(1), lit('active')])),
+      BinaryExpr.in(col('user', 'status'), ListExpression.of([param(1), lit('active')])),
       ExistsExpr.exists(simpleSelect('post', ['id'])),
     ]);
 
@@ -123,7 +123,7 @@ describe('ast/visitors', () => {
       columnRef: (expr) => [`${expr.table}.${expr.column}`],
       paramRef: (expr) => [`$${expr.value}`],
       literal: (expr) => [`lit:${String(expr.value)}`],
-      listLiteral: (expr) => [`list:${expr.values.length}`],
+      list: (expr) => [`list:${expr.values.length}`],
       select: (ast) => ast.collectColumnRefs().map((expr) => `${expr.table}.${expr.column}`),
     });
 

@@ -4,6 +4,7 @@ import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { Adapter, CodecRegistry, LoweredStatement, SelectAst } from '../src/exports/ast';
 import { createCodecRegistry } from '../src/exports/ast';
 import type { ExecutionContext } from '../src/exports/query-lane-context';
+import { createQueryOperationRegistry } from '../src/query-operation-registry';
 
 /**
  * Creates a stub adapter for testing.
@@ -74,6 +75,7 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
     contract,
     codecs: codecRegistry,
     operations: operationRegistry,
+    queryOperations: createQueryOperationRegistry(),
     types: {},
     applyMutationDefaults: () => [],
   };

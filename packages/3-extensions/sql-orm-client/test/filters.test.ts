@@ -2,8 +2,9 @@ import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
+  NotExpr,
   NullCheckExpr,
   OrExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -35,54 +36,60 @@ describe('filters', () => {
     );
 
     expect(not(user['name']!.eq('Alice'))).toEqual(
-      BinaryExpr.neq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+      new NotExpr(BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice'))),
     );
-    expect(not(user['posts']!.some()).kind).toBe('exists');
+    expect(not(user['posts']!.some()).kind).toBe('not');
     expect(not(user['email']!.isNull())).toEqual(
-      NullCheckExpr.isNotNull(ColumnRef.of('users', 'email')),
+      new NotExpr(NullCheckExpr.isNull(ColumnRef.of('users', 'email'))),
     );
     expect(
       not(and(user['name']!.eq('Alice'), or(user['email']!.eq('a'), user['email']!.eq('b')))),
     ).toEqual(
-      OrExpr.of([
-        BinaryExpr.neq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+      new NotExpr(
         AndExpr.of([
-          BinaryExpr.neq(ColumnRef.of('users', 'email'), LiteralExpr.of('a')),
-          BinaryExpr.neq(ColumnRef.of('users', 'email'), LiteralExpr.of('b')),
+          BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+          OrExpr.of([
+            BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('a')),
+            BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('b')),
+          ]),
         ]),
-      ]),
+      ),
     );
     expect(all()).toEqual(AndExpr.true());
   });
 
-  it('negates supported scalar binary operators', () => {
+  it('wraps scalar binary operators in NotExpr', () => {
     const user = createModelAccessor(contract, 'User');
 
     expect(not(user['id']!.neq(1))).toEqual(
-      BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)),
+      new NotExpr(BinaryExpr.neq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
     );
     expect(not(user['id']!.lt(1))).toEqual(
-      BinaryExpr.gte(ColumnRef.of('users', 'id'), LiteralExpr.of(1)),
+      new NotExpr(BinaryExpr.lt(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
     );
     expect(not(user['id']!.gte(1))).toEqual(
-      BinaryExpr.lt(ColumnRef.of('users', 'id'), LiteralExpr.of(1)),
+      new NotExpr(BinaryExpr.gte(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
     );
     expect(not(user['id']!.lte(1))).toEqual(
-      BinaryExpr.gt(ColumnRef.of('users', 'id'), LiteralExpr.of(1)),
+      new NotExpr(BinaryExpr.lte(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
     );
     expect(not(user['id']!.in([1, 2]))).toEqual(
-      BinaryExpr.notIn(ColumnRef.of('users', 'id'), ListLiteralExpr.fromValues([1, 2])),
+      new NotExpr(BinaryExpr.in(ColumnRef.of('users', 'id'), ListExpression.fromValues([1, 2]))),
     );
     expect(not(user['id']!.notIn([1, 2]))).toEqual(
-      BinaryExpr.in(ColumnRef.of('users', 'id'), ListLiteralExpr.fromValues([1, 2])),
+      new NotExpr(BinaryExpr.notIn(ColumnRef.of('users', 'id'), ListExpression.fromValues([1, 2]))),
     );
   });
 
-  it('throws when negating like or ilike operators', () => {
+  it('wraps like and ilike in NotExpr', () => {
     const user = createModelAccessor(contract, 'User');
 
-    expect(() => not(user['name']!.like('%a%'))).toThrow(/not negatable/i);
-    expect(() => not(user['name']!.ilike('%a%'))).toThrow(/not negatable/i);
+    expect(not(user['name']!.like('%a%'))).toEqual(
+      new NotExpr(BinaryExpr.like(ColumnRef.of('users', 'name'), LiteralExpr.of('%a%'))),
+    );
+    expect(not(user['name']!.ilike('%a%'))).toEqual(
+      new NotExpr(BinaryExpr.ilike(ColumnRef.of('users', 'name'), LiteralExpr.of('%a%'))),
+    );
   });
 
   it('shorthandToWhereExpr() maps nulls, skips undefined, and combines multiple fields', () => {
