@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { validateMongoContract } from '../src/validate';
+import { validateMongoContract } from '../src/validate-mongo-contract';
 import ormContractJson from './fixtures/orm-contract.json';
 
-function validContractJson() {
+function makeValidContractJson() {
   return {
     targetFamily: 'mongo',
     roots: { items: 'Item' },
@@ -24,20 +24,20 @@ describe('validateMongoContract()', () => {
     });
 
     it('rejects missing targetFamily', () => {
-      const json = validContractJson();
+      const json = makeValidContractJson();
       // biome-ignore lint/performance/noDelete: test needs to remove a property
       delete (json as Record<string, unknown>)['targetFamily'];
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects wrong targetFamily', () => {
-      const json = { ...validContractJson(), targetFamily: 'sql' };
+      const json = { ...makeValidContractJson(), targetFamily: 'sql' };
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects model with invalid field shape', () => {
       const json = {
-        ...validContractJson(),
+        ...makeValidContractJson(),
         models: {
           Item: {
             fields: { _id: { codecId: 123 } },
@@ -51,7 +51,7 @@ describe('validateMongoContract()', () => {
 
     it('rejects relation with invalid strategy', () => {
       const json = {
-        ...validContractJson(),
+        ...makeValidContractJson(),
         models: {
           Item: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -66,7 +66,7 @@ describe('validateMongoContract()', () => {
     });
 
     it('rejects unexpected top-level properties', () => {
-      const json = { ...validContractJson(), extra: true };
+      const json = { ...makeValidContractJson(), extra: true };
       expect(() => validateMongoContract(json)).toThrow();
     });
   });
@@ -74,7 +74,7 @@ describe('validateMongoContract()', () => {
   describe('domain validation passthrough', () => {
     it('rejects dangling root reference', () => {
       const json = {
-        ...validContractJson(),
+        ...makeValidContractJson(),
         roots: { items: 'Item', ghosts: 'Ghost' },
       };
       expect(() => validateMongoContract(json)).toThrow(/Ghost.*not exist/i);
@@ -133,7 +133,7 @@ describe('validateMongoContract()', () => {
     });
 
     it('returns typed contract', () => {
-      const result = validateMongoContract(validContractJson());
+      const result = validateMongoContract(makeValidContractJson());
       expect(result.contract.targetFamily).toBe('mongo');
       expect(result.contract.roots).toEqual({ items: 'Item' });
     });

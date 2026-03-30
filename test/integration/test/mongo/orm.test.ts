@@ -2,9 +2,9 @@ import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from './fixtures/mongo-orm-contract';
-import ormContractJson from './fixtures/mongo-orm-contract.json';
-import { withMongod } from './utils/mongo-setup';
+import type { Contract } from './fixtures/orm-contract';
+import ormContractJson from './fixtures/orm-contract.json';
+import { withMongod } from './setup';
 
 const { contract } = validateMongoContract<Contract>(ormContractJson);
 

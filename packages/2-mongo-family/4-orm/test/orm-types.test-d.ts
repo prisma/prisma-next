@@ -22,16 +22,16 @@ test('ORM client has root accessors matching roots section', () => {
 
 test('root accessors are MongoCollection instances', () => {
   type Client = MongoOrmClient<Contract>;
-  expectTypeOf<Client['tasks']>().toMatchTypeOf<MongoCollection<Contract, 'Task'>>();
-  expectTypeOf<Client['users']>().toMatchTypeOf<MongoCollection<Contract, 'User'>>();
+  expectTypeOf<Client['tasks']>().toExtend<MongoCollection<Contract, 'Task'>>();
+  expectTypeOf<Client['users']>().toExtend<MongoCollection<Contract, 'User'>>();
 });
 
 // --- findMany return type ---
 
-test('findMany returns AsyncIterableResult, not Promise', () => {
+test('findMany returns AsyncIterableResult', () => {
   type Client = MongoOrmClient<Contract>;
   type Result = ReturnType<Client['users']['findMany']>;
-  expectTypeOf<Result>().toMatchTypeOf<AsyncIterableResult<unknown>>();
+  expectTypeOf<Result>().toExtend<AsyncIterableResult<unknown>>();
 });
 
 // --- Default row includes embedded fields ---
@@ -47,7 +47,7 @@ test('InferFullRow for User includes embedded addresses', () => {
 test('embedded 1:N relation is an array of the embedded model row', () => {
   type UserRow = InferFullRow<Contract, 'User'>;
   type AddressRow = { street: string; city: string; zip: string };
-  expectTypeOf<UserRow['addresses']>().toMatchTypeOf<AddressRow[]>();
+  expectTypeOf<UserRow['addresses']>().toExtend<AddressRow[]>();
 });
 
 test('InferFullRow for Task includes embedded comments', () => {
@@ -102,7 +102,7 @@ test('InferRootRow for polymorphic model returns union of base+variant rows', ()
   type BugRowPart = { severity: string };
   type FeatureRowPart = { priority: string; targetRelease: string };
 
-  expectTypeOf<TaskRow>().toMatchTypeOf<
+  expectTypeOf<TaskRow>().toExtend<
     | ({ _id: string; title: string; type: string; assigneeId: string } & BugRowPart)
     | ({ _id: string; title: string; type: string; assigneeId: string } & FeatureRowPart)
   >();

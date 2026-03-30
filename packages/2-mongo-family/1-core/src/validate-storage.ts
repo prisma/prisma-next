@@ -10,6 +10,8 @@ export function validateMongoStorage(contract: MongoContract): void {
       );
     }
 
+    // Mongo does not support multi-table inheritance (ADR 2): all variants of a base
+    // must share the same collection (single-table inheritance only).
     if (model.base) {
       const baseModel = contract.models[model.base];
       if (baseModel) {
@@ -17,7 +19,7 @@ export function validateMongoStorage(contract: MongoContract): void {
         const baseCollection = baseModel.storage.collection;
         if (variantCollection !== baseCollection) {
           errors.push(
-            `Variant "${modelName}" has collection "${variantCollection ?? '(none)'}" but its base "${model.base}" has collection "${baseCollection ?? '(none)'}" — they must match`,
+            `Mongo does not support multi-table inheritance; variant "${modelName}" must share its base's collection ("${baseCollection ?? '(none)'}"), but has "${variantCollection ?? '(none)'}"`,
           );
         }
       }

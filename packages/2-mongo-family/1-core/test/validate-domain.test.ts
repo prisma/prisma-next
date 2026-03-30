@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateContractDomain } from '../src/validate-domain';
 
-function minimalModel(overrides: Record<string, unknown> = {}) {
+function makeMinimalModel(overrides: Record<string, unknown> = {}) {
   return {
     fields: {},
     relations: {},
@@ -9,11 +9,11 @@ function minimalModel(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function validContract(overrides: Record<string, unknown> = {}) {
+function makeValidContract(overrides: Record<string, unknown> = {}) {
   return {
     roots: { items: 'Item' },
     models: {
-      Item: minimalModel({
+      Item: makeMinimalModel({
         fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
       }),
     },
@@ -24,18 +24,18 @@ function validContract(overrides: Record<string, unknown> = {}) {
 describe('validateContractDomain()', () => {
   describe('root validation', () => {
     it('accepts valid roots', () => {
-      expect(() => validateContractDomain(validContract())).not.toThrow();
+      expect(() => validateContractDomain(makeValidContract())).not.toThrow();
     });
 
     it('rejects duplicate root values', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item', things: 'Item' },
       });
       expect(() => validateContractDomain(contract)).toThrow(/duplicate root.*Item/i);
     });
 
     it('rejects root referencing non-existent model', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item', ghosts: 'Ghost' },
       });
       expect(() => validateContractDomain(contract)).toThrow(/root.*ghosts.*Ghost.*not exist/i);
@@ -44,24 +44,24 @@ describe('validateContractDomain()', () => {
 
   describe('variant-base bidirectional consistency', () => {
     it('accepts consistent variant-base relationships', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item' },
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             fields: { type: { codecId: 'mongo/string@1', nullable: false } },
             discriminator: { field: 'type' },
             variants: { SpecialItem: { value: 'special' } },
           }),
-          SpecialItem: minimalModel({ base: 'Item' }),
+          SpecialItem: makeMinimalModel({ base: 'Item' }),
         },
       });
       expect(() => validateContractDomain(contract)).not.toThrow();
     });
 
     it('rejects variant referencing non-existent model', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             fields: { type: { codecId: 'mongo/string@1', nullable: false } },
             discriminator: { field: 'type' },
             variants: { Ghost: { value: 'ghost' } },
@@ -72,20 +72,20 @@ describe('validateContractDomain()', () => {
     });
 
     it('rejects variant whose base does not match the declaring model', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item' },
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             fields: { type: { codecId: 'mongo/string@1', nullable: false } },
             discriminator: { field: 'type' },
             variants: { Child: { value: 'child' } },
           }),
-          Other: minimalModel({
+          Other: makeMinimalModel({
             fields: { type: { codecId: 'mongo/string@1', nullable: false } },
             discriminator: { field: 'type' },
             variants: {},
           }),
-          Child: minimalModel({ base: 'Other' }),
+          Child: makeMinimalModel({ base: 'Other' }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(
@@ -94,15 +94,15 @@ describe('validateContractDomain()', () => {
     });
 
     it('rejects model with base that does not list it as a variant', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item' },
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             fields: { type: { codecId: 'mongo/string@1', nullable: false } },
             discriminator: { field: 'type' },
             variants: {},
           }),
-          Orphan: minimalModel({ base: 'Item' }),
+          Orphan: makeMinimalModel({ base: 'Item' }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(
@@ -111,9 +111,9 @@ describe('validateContractDomain()', () => {
     });
 
     it('rejects model with base referencing non-existent model', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         models: {
-          Item: minimalModel({ base: 'Ghost' }),
+          Item: makeMinimalModel({ base: 'Ghost' }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(/base.*Ghost.*not exist/i);
@@ -122,10 +122,10 @@ describe('validateContractDomain()', () => {
 
   describe('relation target validation', () => {
     it('accepts relations with valid targets', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item' },
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             relations: {
               owner: {
                 to: 'User',
@@ -135,16 +135,16 @@ describe('validateContractDomain()', () => {
               },
             },
           }),
-          User: minimalModel(),
+          User: makeMinimalModel(),
         },
       });
       expect(() => validateContractDomain(contract)).not.toThrow();
     });
 
     it('rejects relation targeting non-existent model', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             relations: {
               owner: {
                 to: 'Ghost',
@@ -164,9 +164,9 @@ describe('validateContractDomain()', () => {
 
   describe('discriminator invariants', () => {
     it('rejects model with discriminator but no variants', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             fields: { type: { codecId: 'mongo/string@1', nullable: false } },
             discriminator: { field: 'type' },
           }),
@@ -178,14 +178,14 @@ describe('validateContractDomain()', () => {
     });
 
     it('rejects model with discriminator field not in fields', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             discriminator: { field: 'kind' },
             variants: { Special: { value: 'special' } },
           }),
-          Special: minimalModel({ base: 'Item' }),
+          Special: makeMinimalModel({ base: 'Item' }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(
@@ -194,15 +194,15 @@ describe('validateContractDomain()', () => {
     });
 
     it('rejects model with base that also has discriminator', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item' },
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             fields: { type: { codecId: 'mongo/string@1', nullable: false } },
             discriminator: { field: 'type' },
             variants: { Child: { value: 'child' } },
           }),
-          Child: minimalModel({
+          Child: makeMinimalModel({
             base: 'Item',
             discriminator: { field: 'type' },
           }),
@@ -214,15 +214,15 @@ describe('validateContractDomain()', () => {
     });
 
     it('rejects model with base that also has variants', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item' },
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             fields: { type: { codecId: 'mongo/string@1', nullable: false } },
             discriminator: { field: 'type' },
             variants: { Child: { value: 'child' } },
           }),
-          Child: minimalModel({
+          Child: makeMinimalModel({
             base: 'Item',
             variants: { Grandchild: { value: 'grandchild' } },
           }),
@@ -236,11 +236,11 @@ describe('validateContractDomain()', () => {
 
   describe('orphaned model warnings', () => {
     it('returns warnings for orphaned models', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item' },
         models: {
-          Item: minimalModel(),
-          Orphan: minimalModel(),
+          Item: makeMinimalModel(),
+          Orphan: makeMinimalModel(),
         },
       });
       const result = validateContractDomain(contract);
@@ -248,10 +248,10 @@ describe('validateContractDomain()', () => {
     });
 
     it('does not warn for models referenced by relations', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item' },
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             relations: {
               tag: {
                 to: 'Tag',
@@ -261,7 +261,7 @@ describe('validateContractDomain()', () => {
               },
             },
           }),
-          Tag: minimalModel(),
+          Tag: makeMinimalModel(),
         },
       });
       const result = validateContractDomain(contract);
@@ -269,15 +269,15 @@ describe('validateContractDomain()', () => {
     });
 
     it('does not warn for models listed as variants', () => {
-      const contract = validContract({
+      const contract = makeValidContract({
         roots: { items: 'Item' },
         models: {
-          Item: minimalModel({
+          Item: makeMinimalModel({
             fields: { type: { codecId: 'mongo/string@1', nullable: false } },
             discriminator: { field: 'type' },
             variants: { Special: { value: 'special' } },
           }),
-          Special: minimalModel({ base: 'Item' }),
+          Special: makeMinimalModel({ base: 'Item' }),
         },
       });
       const result = validateContractDomain(contract);
@@ -290,7 +290,7 @@ describe('validateContractDomain()', () => {
       const contract = {
         roots: { tasks: 'Task', users: 'User' },
         models: {
-          Task: minimalModel({
+          Task: makeMinimalModel({
             fields: {
               _id: { codecId: 'mongo/objectId@1', nullable: false },
               title: { codecId: 'mongo/string@1', nullable: false },
@@ -317,18 +317,18 @@ describe('validateContractDomain()', () => {
               Feature: { value: 'feature' },
             },
           }),
-          Bug: minimalModel({
+          Bug: makeMinimalModel({
             fields: { severity: { codecId: 'mongo/string@1', nullable: false } },
             base: 'Task',
           }),
-          Feature: minimalModel({
+          Feature: makeMinimalModel({
             fields: {
               priority: { codecId: 'mongo/string@1', nullable: false },
               targetRelease: { codecId: 'mongo/string@1', nullable: false },
             },
             base: 'Task',
           }),
-          User: minimalModel({
+          User: makeMinimalModel({
             fields: {
               _id: { codecId: 'mongo/objectId@1', nullable: false },
               name: { codecId: 'mongo/string@1', nullable: false },
@@ -343,14 +343,14 @@ describe('validateContractDomain()', () => {
               },
             },
           }),
-          Address: minimalModel({
+          Address: makeMinimalModel({
             fields: {
               street: { codecId: 'mongo/string@1', nullable: false },
               city: { codecId: 'mongo/string@1', nullable: false },
               zip: { codecId: 'mongo/string@1', nullable: false },
             },
           }),
-          Comment: minimalModel({
+          Comment: makeMinimalModel({
             fields: {
               _id: { codecId: 'mongo/objectId@1', nullable: false },
               text: { codecId: 'mongo/string@1', nullable: false },
