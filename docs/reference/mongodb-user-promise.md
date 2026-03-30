@@ -2,9 +2,9 @@
 
 What does Prisma Next offer a MongoDB user, and why would they choose it over the `mongodb` driver or Mongoose? This document articulates the value proposition from the user's perspective — what they get, what they give up, and where PN sits in the spectrum between "raw driver" and "full ORM."
 
-See also: [design-questions.md](design-questions.md), [MongoDB primitives reference](../../../reference/mongodb-primitives-reference.md)
+See also: [design-questions.md](../planning/mongo-target/1-design-docs/design-questions.md), [MongoDB primitives reference](mongodb-primitives-reference.md)
 
-**External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](../../../reference/mongodb-feature-support-priorities.md) and a [user journey narrative](../../../reference/mongodb-user-journey.md) that informed this document.
+**External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](mongodb-feature-support-priorities.md) and a [user journey narrative](mongodb-user-journey.md) that informed this document.
 
 ---
 
@@ -82,11 +82,11 @@ The distinction between embedded and referenced is a **data modeling decision** 
 
 #### Bringing structure to existing databases (introspection)
 
-Many MongoDB users have existing databases with no formal schema. The [user journey](../../../reference/mongodb-user-journey.md) from the MongoDB team describes a developer introspecting an existing database and hitting friction: plural collection names, manually defining every relationship, and polymorphic fields falling back to untyped `Json`.
+Many MongoDB users have existing databases with no formal schema. The [user journey](mongodb-user-journey.md) from the MongoDB team describes a developer introspecting an existing database and hitting friction: plural collection names, manually defining every relationship, and polymorphic fields falling back to untyped `Json`.
 
 PN should offer introspection that generates a contract from an existing MongoDB database — sampling documents to infer field types, detecting embedded subdocuments, and normalizing collection names to model names. Relationships can't be fully inferred (MongoDB has no foreign keys), but conventions (fields ending in `Id`, arrays of `ObjectId`) can suggest candidates. The generated contract is a starting point that the user refines, not a finished artifact.
 
-This is out of scope for the PoC but is table-stakes for real Mongo adoption. See [design question #11](design-questions.md#11-introspection-generating-a-contract-from-an-existing-database).
+This is out of scope for the PoC but is table-stakes for real Mongo adoption. See [design question #11](../planning/mongo-target/1-design-docs/design-questions.md#11-introspection-generating-a-contract-from-an-existing-database).
 
 ---
 
@@ -206,7 +206,7 @@ A type-safe aggregation pipeline builder (the Mongo equivalent of the SQL DSL) i
 
 #### MongoDB-specific capabilities via extension packs
 
-PN's extension pack architecture (the same system that delivers pgvector for Postgres) enables MongoDB-specific capabilities without bloating the core ORM. The [MongoDB feature support priorities](../../../reference/mongodb-feature-support-priorities.md) identifies several candidates:
+PN's extension pack architecture (the same system that delivers pgvector for Postgres) enables MongoDB-specific capabilities without bloating the core ORM. The [MongoDB feature support priorities](mongodb-feature-support-priorities.md) identifies several candidates:
 
 - **Vector Search** (`$vectorSearch`) — contributes a vector field type, similarity search operators, and vector search index definitions. Analogous to pgvector for Postgres.
 - **Atlas Search** (`$search`) — full-text search via MongoDB Atlas. Contributes search index definitions and search query operators.
@@ -214,7 +214,7 @@ PN's extension pack architecture (the same system that delivers pgvector for Pos
 
 These are delivered as extension packs that the user adds to their configuration, just as a Postgres user adds pgvector. The ORM and query surfaces then expose the contributed types and operations with full type safety.
 
-This is out of scope for the PoC but is a key part of the longer-term Mongo-native story. See [design question #12](design-questions.md#12-mongodb-specific-extension-packs).
+This is out of scope for the PoC but is a key part of the longer-term Mongo-native story. See [design question #12](../planning/mongo-target/1-design-docs/design-questions.md#12-mongodb-specific-extension-packs).
 
 ---
 
@@ -247,9 +247,9 @@ PN validates data at the application layer:
 
 In SQL, schema evolution is split cleanly: structural migrations change the DDL (add a column, change a type), and data migrations transform content (populate the new column). In MongoDB, **that distinction collapses**. There's no DDL — collections don't have enforced schemas. "Adding a field" means updating documents to include it. "Splitting `name` into `firstName` + `lastName`" is a data migration. "Moving data from embedded to referenced" is a data migration. In Mongo, schema evolution IS data migration.
 
-The [user journey](../../../reference/mongodb-user-journey.md) from the MongoDB team confirms this is a pain point: "The lack of an automated data migration feature for this common MongoDB evolution made him feel disappointed."
+The [user journey](mongodb-user-journey.md) from the MongoDB team confirms this is a pain point: "The lack of an automated data migration feature for this common MongoDB evolution made him feel disappointed."
 
-PN's data invariant model — being built for the SQL migration workstream (see [ADR 176 — Data migrations as invariant-guarded transitions](../../../architecture%20docs/adrs/ADR%20176%20-%20Data%20migrations%20as%20invariant-guarded%20transitions.md)) — is a natural foundation for Mongo schema evolution. The model treats data migrations as guarded transitions with machine-checkable postconditions:
+PN's data invariant model — being built for the SQL migration workstream (see [ADR 176 — Data migrations as invariant-guarded transitions](../architecture%20docs/adrs/ADR%20176%20-%20Data%20migrations%20as%20invariant-guarded%20transitions.md)) — is a natural foundation for Mongo schema evolution. The model treats data migrations as guarded transitions with machine-checkable postconditions:
 
 - **"Done"** = the contract describes v2 + the invariant "all documents migrated to v2" holds
 - **Postcondition check** = a Mongo query: `db.users.countDocuments({ schemaVersion: { $ne: 2 } }) === 0`
@@ -258,7 +258,7 @@ PN's data invariant model — being built for the SQL migration workstream (see 
 
 This gives Mongo users something no other ODM provides: managed, verifiable schema evolution with the same invariant-based model PN uses for SQL, but expressed entirely as data transforms rather than DDL + data transforms.
 
-This is out of scope for the PoC but is a cross-workstream connection worth tracking. See [design question #14](design-questions.md#14-schema-evolution-as-data-migration-cross-workstream).
+This is out of scope for the PoC but is a cross-workstream connection worth tracking. See [design question #14](../planning/mongo-target/1-design-docs/design-questions.md#14-schema-evolution-as-data-migration-cross-workstream).
 
 #### Runtime guardrails
 
@@ -278,7 +278,7 @@ Clarity about what's out of scope is as important as the promises:
 - **Portability between SQL and Mongo.** The shared ORM interface means the *patterns* are consistent, but a SQL contract and a Mongo contract are not interchangeable. You can't swap your Postgres database for MongoDB by changing a config line. The domain model transfers; the storage strategy and query capabilities do not.
 - **Full MongoDB feature coverage.** PN covers the common CRUD and relation patterns. Advanced features (sharding configuration, capped collections, GridFS, time-series collections) are out of scope for the ORM client. Users who need these use the raw driver through PN's escape hatch.
 - **Hiding that it's MongoDB.** PN is mongo-native, not mongo-agnostic. Embedded documents, `ObjectId`, array operations, and aggregation pipelines are all concepts the user will encounter. PN makes them type-safe and ergonomic, not invisible.
-- **Field-level encryption management.** MongoDB's CSFLE and Queryable Encryption are driver-level concerns. PN can pass encryption configuration through to the MongoDB driver, but it doesn't implement encryption itself. This is a future adapter-level capability, not an ORM concern. See [design question #13](design-questions.md#13-client-side-field-level-encryption-csfle-and-queryable-encryption).
+- **Field-level encryption management.** MongoDB's CSFLE and Queryable Encryption are driver-level concerns. PN can pass encryption configuration through to the MongoDB driver, but it doesn't implement encryption itself. This is a future adapter-level capability, not an ORM concern. See [design question #13](../planning/mongo-target/1-design-docs/design-questions.md#13-client-side-field-level-encryption-csfle-and-queryable-encryption).
 
 ---
 
