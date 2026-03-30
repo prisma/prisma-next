@@ -52,15 +52,15 @@ export type OperationTypes = {
 export type QueryOperationTypes = SqlQueryOperationTypes<{
   readonly cosineDistance: {
     readonly args: readonly [
-      { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
-      { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
+      { readonly codecId: 'pg/vector@1'; readonly nullable: false },
+      { readonly codecId: 'pg/vector@1'; readonly nullable: false },
     ];
     readonly returns: { readonly codecId: 'pg/float8@1'; readonly nullable: false };
   };
   readonly cosineSimilarity: {
     readonly args: readonly [
-      { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
-      { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
+      { readonly codecId: 'pg/vector@1'; readonly nullable: false },
+      { readonly codecId: 'pg/vector@1'; readonly nullable: false },
     ];
     readonly returns: { readonly codecId: 'pg/float8@1'; readonly nullable: false };
   };

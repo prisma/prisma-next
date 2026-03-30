@@ -7,9 +7,10 @@ import {
   createCodecRegistry,
   ExistsExpr,
   ListExpression,
-  LiteralExpr,
   NotExpr,
   NullCheckExpr,
+  OperationExpr,
+  ParamRef,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -21,45 +22,66 @@ import { getTestContext, getTestContract } from './helpers';
 describe('createModelAccessor', () => {
   const context = getTestContext();
 
-  function expectBinaryLiteral(
+  function paramRef(table: string, column: string, value: unknown): ParamRef {
+    const tables = context.contract.storage.tables as Record<
+      string,
+      { columns: Record<string, { codecId?: string }> } | undefined
+    >;
+    const codecId = tables[table]?.columns[column]?.codecId;
+    return codecId ? ParamRef.of(value, { codecId }) : ParamRef.of(value);
+  }
+
+  function expectBinaryParam(
     actual: unknown,
     table: string,
     column: string,
     op: BinaryExpr['op'],
     value: unknown,
   ) {
-    expect(actual).toEqual(new BinaryExpr(op, ColumnRef.of(table, column), LiteralExpr.of(value)));
+    expect(actual).toEqual(
+      new BinaryExpr(op, ColumnRef.of(table, column), paramRef(table, column, value)),
+    );
   }
 
   it('creates scalar comparison operators and maps fields to columns', () => {
     const user = createModelAccessor(context, 'User');
     const post = createModelAccessor(context, 'Post');
 
-    expectBinaryLiteral(user['name']!.eq('Alice'), 'users', 'name', 'eq', 'Alice');
-    expectBinaryLiteral(
+    expectBinaryParam(user['name']!.eq('Alice'), 'users', 'name', 'eq', 'Alice');
+    expectBinaryParam(
       user['email']!.neq('test@example.com'),
       'users',
       'email',
       'neq',
       'test@example.com',
     );
-    expectBinaryLiteral(post['views']!.gt(1000), 'posts', 'views', 'gt', 1000);
-    expectBinaryLiteral(post['views']!.lt(100), 'posts', 'views', 'lt', 100);
-    expectBinaryLiteral(post['id']!.gte(5), 'posts', 'id', 'gte', 5);
-    expectBinaryLiteral(post['id']!.lte(10), 'posts', 'id', 'lte', 10);
-    expectBinaryLiteral(post['userId']!.eq(42), 'posts', 'user_id', 'eq', 42);
-    expectBinaryLiteral(user['name']!.like('%Ali%'), 'users', 'name', 'like', '%Ali%');
-    expectBinaryLiteral(user['name']!.ilike('%ali%'), 'users', 'name', 'ilike', '%ali%');
+    expectBinaryParam(post['views']!.gt(1000), 'posts', 'views', 'gt', 1000);
+    expectBinaryParam(post['views']!.lt(100), 'posts', 'views', 'lt', 100);
+    expectBinaryParam(post['id']!.gte(5), 'posts', 'id', 'gte', 5);
+    expectBinaryParam(post['id']!.lte(10), 'posts', 'id', 'lte', 10);
+    expectBinaryParam(post['userId']!.eq(42), 'posts', 'user_id', 'eq', 42);
+    expectBinaryParam(user['name']!.like('%Ali%'), 'users', 'name', 'like', '%Ali%');
+    expectBinaryParam(user['name']!.ilike('%ali%'), 'users', 'name', 'ilike', '%ali%');
   });
 
   it('creates list literal, null check, and order directive helpers', () => {
     const accessor = createModelAccessor(context, 'Post');
 
     expect(accessor['id']!.in([1, 2, 3])).toEqual(
-      BinaryExpr.in(ColumnRef.of('posts', 'id'), ListExpression.fromValues([1, 2, 3])),
+      BinaryExpr.in(
+        ColumnRef.of('posts', 'id'),
+        ListExpression.of([
+          paramRef('posts', 'id', 1),
+          paramRef('posts', 'id', 2),
+          paramRef('posts', 'id', 3),
+        ]),
+      ),
     );
     expect(accessor['id']!.notIn([4, 5])).toEqual(
-      BinaryExpr.notIn(ColumnRef.of('posts', 'id'), ListExpression.fromValues([4, 5])),
+      BinaryExpr.notIn(
+        ColumnRef.of('posts', 'id'),
+        ListExpression.of([paramRef('posts', 'id', 4), paramRef('posts', 'id', 5)]),
+      ),
     );
     expect(accessor['id']!.asc()).toEqual({ column: 'id', direction: 'asc' });
     expect(accessor['id']!.desc()).toEqual({ column: 'id', direction: 'desc' });
@@ -91,7 +113,7 @@ describe('createModelAccessor', () => {
     expect(noneExpr.subquery.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
-        BinaryExpr.eq(ColumnRef.of('posts', 'views'), LiteralExpr.of(10)),
+        BinaryExpr.eq(ColumnRef.of('posts', 'views'), paramRef('posts', 'views', 10)),
       ]),
     );
 
@@ -100,7 +122,7 @@ describe('createModelAccessor', () => {
     expect(everyExpr.subquery.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
-        new NotExpr(BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(10))),
+        new NotExpr(BinaryExpr.gt(ColumnRef.of('posts', 'views'), paramRef('posts', 'views', 10))),
       ]),
     );
   });
@@ -313,8 +335,8 @@ describe('createModelAccessor', () => {
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
         AndExpr.of([
-          BinaryExpr.eq(ColumnRef.of('posts', 'title'), LiteralExpr.of('A')),
-          BinaryExpr.eq(ColumnRef.of('posts', 'views'), LiteralExpr.of(1)),
+          BinaryExpr.eq(ColumnRef.of('posts', 'title'), paramRef('posts', 'title', 'A')),
+          BinaryExpr.eq(ColumnRef.of('posts', 'views'), paramRef('posts', 'views', 1)),
         ]),
       ]),
     );
@@ -419,6 +441,73 @@ describe('createModelAccessor', () => {
       expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
         /does not support equality comparisons/,
       );
+    });
+  });
+
+  describe('extension operations', () => {
+    it('attaches cosineDistance to vector field, not to text field', () => {
+      const accessor = createModelAccessor(context, 'Post');
+      const embedding = accessor['embedding'] as unknown as Record<string, unknown>;
+      const title = accessor['title'] as unknown as Record<string, unknown>;
+
+      expect(typeof embedding['cosineDistance']).toBe('function');
+      expect(title['cosineDistance']).toBeUndefined();
+    });
+
+    it('cosineDistance() returns expression result with comparison and ordering methods', () => {
+      const accessor = createModelAccessor(context, 'Post');
+      const embedding = accessor['embedding'] as unknown as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
+      const result = embedding['cosineDistance']!([1, 2, 3]) as Record<string, unknown>;
+
+      expect(typeof result['lt']).toBe('function');
+      expect(typeof result['gt']).toBe('function');
+      expect(typeof result['eq']).toBe('function');
+      expect(typeof result['asc']).toBe('function');
+      expect(typeof result['desc']).toBe('function');
+      expect(typeof result['isNull']).toBe('function');
+      expect(result['like']).toBeUndefined();
+    });
+
+    it('cosineDistance().lt() produces BinaryExpr(lt, OperationExpr, ParamRef)', () => {
+      const accessor = createModelAccessor(context, 'Post');
+      const embedding = accessor['embedding'] as unknown as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
+      const result = embedding['cosineDistance']!([1, 2, 3]) as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
+      const expr = result['lt']!(0.2);
+
+      expect(expr).toBeInstanceOf(BinaryExpr);
+      const binary = expr as unknown as BinaryExpr;
+      expect(binary.op).toBe('lt');
+      expect(binary.left).toBeInstanceOf(OperationExpr);
+      expect(binary.right).toBeInstanceOf(ParamRef);
+
+      const opExpr = binary.left as unknown as OperationExpr;
+      expect(opExpr.method).toBe('cosineDistance');
+      expect(opExpr.forTypeId).toBe('pg/vector@1');
+      expect(opExpr.self).toEqual(ColumnRef.of('posts', 'embedding'));
+      expect(opExpr.args[0]).toEqual(ParamRef.of([1, 2, 3], { codecId: 'pg/vector@1' }));
+    });
+
+    it('cosineDistance().asc() produces ExpressionOrderBy', () => {
+      const accessor = createModelAccessor(context, 'Post');
+      const embedding = accessor['embedding'] as unknown as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
+      const result = embedding['cosineDistance']!([1, 2, 3]) as Record<string, () => unknown>;
+      const order = result['asc']!() as { expr: OperationExpr; direction: string };
+
+      expect(order.direction).toBe('asc');
+      expect(order.expr).toBeInstanceOf(OperationExpr);
+      expect(order.expr.method).toBe('cosineDistance');
     });
   });
 });

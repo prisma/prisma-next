@@ -2,19 +2,21 @@ import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type {
   ExtractCodecTypes,
+  ExtractQueryOperationTypes,
   SqlContract,
   SqlStorage,
   StorageColumn,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
-import type { AnyExpression } from '@prisma-next/sql-relational-core/ast';
 import {
+  type AnyExpression,
   BinaryExpr,
+  type BinaryOp,
   type CodecTrait,
-  type ColumnRef,
+  ColumnRef,
   ListExpression,
-  LiteralExpr,
   NullCheckExpr,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -25,12 +27,24 @@ import type { RowSelection } from './collection-internal-types';
 // Comparison / Filter / Order / Include
 // ---------------------------------------------------------------------------
 
-export interface OrderExpr {
+export interface ColumnOrderBy {
   readonly column: string;
   readonly direction: 'asc' | 'desc';
 }
 
-export type OrderByDirective = OrderExpr;
+export interface ExpressionOrderBy {
+  readonly expr: AnyExpression;
+  readonly direction: 'asc' | 'desc';
+}
+
+export type AnyOrderBy = ColumnOrderBy | ExpressionOrderBy;
+
+export function isColumnOrderBy(order: AnyOrderBy): order is ColumnOrderBy {
+  return 'column' in order;
+}
+
+export type OrderExpr = ColumnOrderBy;
+export type OrderByDirective = ColumnOrderBy;
 
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
@@ -78,7 +92,7 @@ export interface IncludeExpr {
 export interface CollectionState {
   readonly filters: readonly AnyExpression[];
   readonly includes: readonly IncludeExpr[];
-  readonly orderBy: readonly OrderExpr[] | undefined;
+  readonly orderBy: readonly AnyOrderBy[] | undefined;
   readonly cursor: Readonly<Record<string, unknown>> | undefined;
   readonly distinct: readonly string[] | undefined;
   readonly distinctOn: readonly string[] | undefined;
@@ -179,30 +193,122 @@ export type ComparisonMethods<T, Traits> = {
 };
 
 // ---------------------------------------------------------------------------
+// Extension operation result — returned by calling an extension method
+// ---------------------------------------------------------------------------
+
+type QueryOperationReturnTraits<
+  Returns,
+  TCodecTypes extends Record<string, unknown>,
+> = Returns extends { readonly codecId: infer Id extends string }
+  ? Id extends keyof TCodecTypes
+    ? TCodecTypes[Id] extends { readonly traits: infer Traits }
+      ? Traits
+      : never
+    : never
+  : never;
+
+type QueryOperationReturnJsType<
+  Returns,
+  TCodecTypes extends Record<string, unknown>,
+> = Returns extends { readonly codecId: infer Id extends string; readonly nullable: infer N }
+  ? Id extends keyof TCodecTypes
+    ? TCodecTypes[Id] extends { readonly output: infer O }
+      ? N extends true
+        ? O | null
+        : O
+      : unknown
+    : unknown
+  : unknown;
+
+export type ExpressionResult<T, Traits> = Omit<ComparisonMethods<T, Traits>, 'asc' | 'desc'> & {
+  asc(): ExpressionOrderBy;
+  desc(): ExpressionOrderBy;
+  isNull(): AnyExpression;
+  isNotNull(): AnyExpression;
+};
+
+type CodecArgJsType<Arg, TCodecTypes extends Record<string, unknown>> = Arg extends {
+  readonly codecId: infer CId extends string;
+  readonly nullable: infer N;
+}
+  ? CId extends keyof TCodecTypes
+    ? TCodecTypes[CId] extends { readonly output: infer O }
+      ? N extends true
+        ? O | null
+        : O
+      : unknown
+    : unknown
+  : unknown;
+
+type MapArgsToJsTypes<
+  Args extends readonly unknown[],
+  TCodecTypes extends Record<string, unknown>,
+> = Args extends readonly [infer Head, ...infer Tail]
+  ? [CodecArgJsType<Head, TCodecTypes>, ...MapArgsToJsTypes<Tail, TCodecTypes>]
+  : [];
+
+type QueryOperationMethod<Op, TCodecTypes extends Record<string, unknown>> = Op extends {
+  readonly args: readonly [unknown, ...infer UserArgs];
+  readonly returns: infer Returns;
+}
+  ? (
+      ...args: MapArgsToJsTypes<UserArgs, TCodecTypes>
+    ) => ExpressionResult<
+      QueryOperationReturnJsType<Returns, TCodecTypes>,
+      QueryOperationReturnTraits<Returns, TCodecTypes>
+    >
+  : never;
+
+type FieldOperations<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = FieldCodecId<TContract, ModelName, FieldName> extends infer CodecId extends string
+  ? ExtractQueryOperationTypes<TContract> extends infer AllOps
+    ? {
+        [OpName in keyof AllOps & string as AllOps[OpName] extends {
+          readonly args: readonly [{ readonly codecId: CodecId }, ...(readonly unknown[])];
+        }
+          ? OpName
+          : never]: QueryOperationMethod<AllOps[OpName], ExtractCodecTypes<TContract>>;
+      }
+    : unknown
+  : unknown;
+
+// ---------------------------------------------------------------------------
 // COMPARISON_METHODS_META — single source of truth for traits + factories
 // ---------------------------------------------------------------------------
 
-function literal(value: unknown): LiteralExpr {
-  return LiteralExpr.of(value);
+function param(codecId: string | undefined, value: unknown): ParamRef {
+  return codecId ? ParamRef.of(value, { codecId }) : ParamRef.of(value);
 }
 
-function listLiteral(values: readonly unknown[]): ListExpression {
-  return ListExpression.fromValues(values);
-}
-
-function bin(op: BinaryExpr['op'], column: ColumnRef, right: BinaryExpr['right']): BinaryExpr {
-  return new BinaryExpr(op, column, right);
+function paramList(codecId: string | undefined, values: readonly unknown[]): ListExpression {
+  return ListExpression.of(values.map((value) => param(codecId, value)));
 }
 
 // never[] is intentional: factories have heterogeneous signatures (value: unknown,
 // values: readonly unknown[], pattern: string, etc.) but are only called through
 // the typed ComparisonMethodFns interface, never through this type directly.
-type MethodFactory = (column: ColumnRef) => (...args: never[]) => unknown;
+type MethodFactory = (
+  left: AnyExpression,
+  codecId: string | undefined,
+) => (...args: never[]) => unknown;
 
 type ComparisonMethodMeta = {
   readonly traits: readonly CodecTrait[];
   readonly create: MethodFactory;
 };
+
+function scalarComparisonMethod(op: BinaryOp) {
+  return ((left, codecId) => (value: unknown) =>
+    new BinaryExpr(op, left, param(codecId, value))) satisfies MethodFactory;
+}
+
+function listComparisonMethod(op: BinaryOp) {
+  return ((left, codecId) => (values: readonly unknown[]) =>
+    new BinaryExpr(op, left, paramList(codecId, values))) satisfies MethodFactory;
+}
 
 /**
  * Declares trait requirements and runtime factory for each comparison method.
@@ -213,59 +319,65 @@ type ComparisonMethodMeta = {
 export const COMPARISON_METHODS_META = {
   eq: {
     traits: ['equality'],
-    create: (column) => (value: unknown) => bin('eq', column, literal(value)),
+    create: scalarComparisonMethod('eq'),
   },
   neq: {
     traits: ['equality'],
-    create: (column) => (value: unknown) => bin('neq', column, literal(value)),
+    create: scalarComparisonMethod('neq'),
   },
   in: {
     traits: ['equality'],
-    create: (column) => (values: readonly unknown[]) => bin('in', column, listLiteral(values)),
+    create: listComparisonMethod('in'),
   },
   notIn: {
     traits: ['equality'],
-    create: (column) => (values: readonly unknown[]) => bin('notIn', column, listLiteral(values)),
+    create: listComparisonMethod('notIn'),
   },
   gt: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('gt', column, literal(value)),
+    create: scalarComparisonMethod('gt'),
   },
   lt: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('lt', column, literal(value)),
+    create: scalarComparisonMethod('lt'),
   },
   gte: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('gte', column, literal(value)),
+    create: scalarComparisonMethod('gte'),
   },
   lte: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('lte', column, literal(value)),
+    create: scalarComparisonMethod('lte'),
   },
   like: {
     traits: ['textual'],
-    create: (column) => (pattern: string) => bin('like', column, literal(pattern)),
+    create: scalarComparisonMethod('like'),
   },
   ilike: {
     traits: ['textual'],
-    create: (column) => (pattern: string) => bin('ilike', column, literal(pattern)),
+    create: scalarComparisonMethod('ilike'),
   },
   asc: {
     traits: ['order'],
-    create: (column) => () => ({ column: column.column, direction: 'asc' as const }),
+    create: (left) => (): AnyOrderBy =>
+      left instanceof ColumnRef
+        ? { column: left.column, direction: 'asc' }
+        : { expr: left, direction: 'asc' },
   },
   desc: {
     traits: ['order'],
-    create: (column) => () => ({ column: column.column, direction: 'desc' as const }),
+    create: (left) => (): AnyOrderBy =>
+      left instanceof ColumnRef
+        ? { column: left.column, direction: 'desc' }
+        : { expr: left, direction: 'desc' },
   },
   isNull: {
     traits: [],
-    create: (column) => () => NullCheckExpr.isNull(column),
+    create: (left) => () => NullCheckExpr.isNull(left),
   },
   isNotNull: {
     traits: [],
-    create: (column) => () => NullCheckExpr.isNotNull(column),
+    create: (left) => () => NullCheckExpr.isNotNull(left),
   },
 } as const satisfies Record<keyof ComparisonMethodFns<unknown>, ComparisonMethodMeta>;
 
@@ -294,7 +406,8 @@ type ScalarModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName ex
   [K in keyof FieldsOf<TContract, ModelName> & string]: ComparisonMethods<
     FieldJsType<TContract, ModelName, K>,
     FieldTraits<TContract, ModelName, K>
-  >;
+  > &
+    FieldOperations<TContract, ModelName, K>;
 };
 
 type RelationModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {

@@ -33,8 +33,8 @@ describe('integration/nested-mutations', () => {
           email: 'nested@example.com',
           invitedById: null,
           posts: [
-            { id: 10, title: 'First nested post', userId: 1, views: 100 },
-            { id: 11, title: 'Second nested post', userId: 1, views: 200 },
+            { id: 10, title: 'First nested post', userId: 1, views: 100, embedding: null },
+            { id: 11, title: 'Second nested post', userId: 1, views: 200, embedding: null },
           ],
         });
 
@@ -70,6 +70,7 @@ describe('integration/nested-mutations', () => {
           title: 'Connected Post',
           userId: 5,
           views: 7,
+          embedding: null,
         });
 
         const rows = await runtime.query<{ id: number; user_id: number | null }>(
@@ -126,6 +127,7 @@ describe('integration/nested-mutations', () => {
               title: 'Deep Post',
               userId: 1,
               views: 300,
+              embedding: null,
               comments: [{ id: 40, body: 'Deep Comment', postId: 30 }],
             },
           ],
@@ -159,7 +161,7 @@ describe('integration/nested-mutations', () => {
           name: 'Alice',
           email: 'alice@example.com',
           invitedById: null,
-          posts: [{ id: 10, title: 'Keep', userId: 1, views: 10 }],
+          posts: [{ id: 10, title: 'Keep', userId: 1, views: 10, embedding: null }],
         });
 
         const rows = await runtime.query<{ id: number; user_id: number | null }>(

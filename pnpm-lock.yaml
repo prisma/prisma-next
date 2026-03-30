@@ -1614,12 +1614,18 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/contract
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/operations
       '@prisma-next/runtime-executor':
         specifier: workspace:*
         version: link:../../1-framework/4-runtime-executor
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../2-sql/1-core/contract
+      '@prisma-next/sql-operations':
+        specifier: workspace:*
+        version: link:../../2-sql/1-core/operations
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../2-sql/4-lanes/relational-core
@@ -1636,6 +1642,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/cli
+      '@prisma-next/extension-pgvector':
+        specifier: workspace:*
+        version: link:../pgvector
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../2-sql/3-tooling/family

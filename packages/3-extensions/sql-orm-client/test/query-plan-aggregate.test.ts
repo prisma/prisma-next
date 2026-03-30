@@ -191,7 +191,6 @@ describe('query plan aggregate', () => {
     expect(plan.params).toEqual([100]);
     expect(plan.meta.paramDescriptors).toEqual([
       {
-        name: 'views',
         source: 'dsl',
         codecId: 'pg/int4@1',
       },

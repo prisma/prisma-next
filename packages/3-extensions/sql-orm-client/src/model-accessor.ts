@@ -5,11 +5,14 @@ import {
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
+  OperationExpr,
+  ParamRef,
   ProjectionItem,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { QueryOperationEntry } from '@prisma-next/sql-relational-core/query-operations';
 import {
   getFieldToColumnMap,
   resolveFieldToColumn,
@@ -60,7 +63,12 @@ export function createModelAccessor<
 
       const columnName = fieldToColumn[prop] ?? prop;
       const traits = resolveFieldTraits(contract, modelName, prop, context);
-      return createScalarFieldAccessor(tableName, columnName, traits);
+      const codecId = resolveFieldCodecId(contract, tableName, columnName);
+      const allQueryOps = context.queryOperations.entries();
+      const operations = codecId
+        ? Object.entries(allQueryOps).filter(([, entry]) => entry.args[0]?.codecId === codecId)
+        : [];
+      return createScalarFieldAccessor(tableName, columnName, codecId, traits, operations, context);
     },
   });
 }
@@ -80,10 +88,22 @@ function resolveFieldTraits(
   return context.codecs.traitsOf(codecId);
 }
 
+function resolveFieldCodecId(
+  contract: SqlContract<SqlStorage>,
+  tableName: string,
+  columnName: string,
+): string | undefined {
+  const table = contract.storage.tables?.[tableName];
+  return table?.columns?.[columnName]?.codecId;
+}
+
 function createScalarFieldAccessor(
   tableName: string,
   columnName: string,
+  codecId: string | undefined,
   traits: readonly string[],
+  operations: ReadonlyArray<[string, QueryOperationEntry]>,
+  context: ExecutionContext,
 ): Partial<ComparisonMethodFns<unknown>> {
   const column = ColumnRef.of(tableName, columnName);
   const methods: Record<string, unknown> = {};
@@ -92,10 +112,49 @@ function createScalarFieldAccessor(
     if (meta.traits.some((t) => !traits.includes(t))) {
       continue;
     }
-    methods[name] = meta.create(column);
+    methods[name] = meta.create(column, codecId);
+  }
+
+  for (const [name, entry] of operations) {
+    methods[name] = createExtensionMethodFactory(column, name, entry, context);
   }
 
   return methods as Partial<ComparisonMethodFns<unknown>>;
+}
+
+function createExtensionMethodFactory(
+  column: ColumnRef,
+  name: string,
+  entry: QueryOperationEntry,
+  context: ExecutionContext,
+): (...args: unknown[]) => Partial<ComparisonMethodFns<unknown>> {
+  return (...args: unknown[]) => {
+    const userArgSpecs = entry.args.slice(1);
+    const astArgs = userArgSpecs.map((argSpec, i) => {
+      return ParamRef.of(args[i], { codecId: argSpec.codecId });
+    });
+
+    const opExpr = new OperationExpr({
+      method: name,
+      forTypeId: entry.args[0]?.codecId ?? 'unknown',
+      self: column,
+      args: astArgs,
+      returns: { kind: 'typeId', type: entry.returns.codecId },
+      lowering: entry.lowering,
+    });
+
+    const returnTraits = context.codecs.traitsOf(entry.returns.codecId);
+    const methods: Record<string, unknown> = {};
+
+    for (const [name, meta] of Object.entries(COMPARISON_METHODS_META)) {
+      if (meta.traits.some((t) => !returnTraits.includes(t))) {
+        continue;
+      }
+      methods[name] = meta.create(opExpr, entry.returns.codecId);
+    }
+
+    return methods;
+  };
 }
 
 function createRelationFilterAccessor<

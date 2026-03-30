@@ -62,33 +62,33 @@ import {
   compileUpdateReturning,
   compileUpsertReturning,
 } from './query-plan';
-import type {
-  AggregateBuilder,
-  AggregateResult,
-  AggregateSpec,
-  CollectionContext,
-  CollectionState,
-  CollectionTypeState,
-  CreateInput,
-  DefaultCollectionTypeState,
-  DefaultModelRow,
-  IncludeCombine,
-  IncludeCombineBranch,
-  IncludeExpr,
-  IncludeScalar,
-  ModelAccessor,
-  MutationCreateInput,
-  MutationCreateInputWithRelations,
-  MutationUpdateInput,
-  NumericFieldNames,
-  OrderByDirective,
-  OrderExpr,
-  RelatedModelName,
-  RelationNames,
-  ShorthandWhereFilter,
-  UniqueConstraintCriterion,
+import {
+  type AggregateBuilder,
+  type AggregateResult,
+  type AggregateSpec,
+  type AnyOrderBy,
+  type CollectionContext,
+  type CollectionState,
+  type CollectionTypeState,
+  type CreateInput,
+  type DefaultCollectionTypeState,
+  type DefaultModelRow,
+  emptyState,
+  type IncludeCombine,
+  type IncludeCombineBranch,
+  type IncludeExpr,
+  type IncludeScalar,
+  isColumnOrderBy,
+  type ModelAccessor,
+  type MutationCreateInput,
+  type MutationCreateInputWithRelations,
+  type MutationUpdateInput,
+  type NumericFieldNames,
+  type RelatedModelName,
+  type RelationNames,
+  type ShorthandWhereFilter,
+  type UniqueConstraintCriterion,
 } from './types';
-import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
 
 function applyCreateDefaults(
@@ -347,17 +347,17 @@ export class Collection<
 
   orderBy(
     selection:
-      | ((model: ModelAccessor<TContract, ModelName>) => OrderByDirective)
-      | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByDirective>,
+      | ((model: ModelAccessor<TContract, ModelName>) => AnyOrderBy)
+      | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => AnyOrderBy>,
   ): Collection<TContract, ModelName, Row, WithOrderByState<State>> {
     const accessor = createModelAccessor(this.ctx.context, this.modelName);
     const selectors = Array.isArray(selection) ? selection : [selection];
-    const nextOrders: OrderExpr[] = selectors.map((selector) => {
+    const nextOrders: AnyOrderBy[] = selectors.map((selector) => {
       const order = selector(accessor as ModelAccessor<TContract, ModelName>);
-      return {
-        column: order.column,
-        direction: order.direction,
-      };
+      if (isColumnOrderBy(order)) {
+        return { column: order.column, direction: order.direction };
+      }
+      return { expr: order.expr, direction: order.direction };
     });
     const existing = this.state.orderBy ?? [];
     return this.#clone<WithOrderByState<State>>({

@@ -1,5 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
@@ -28,7 +29,7 @@ const testContext: ExecutionContext<TestContract> = createExecutionContext({
   stack: createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    extensionPacks: [],
+    extensionPacks: [pgvectorRuntime],
   }),
 });
 

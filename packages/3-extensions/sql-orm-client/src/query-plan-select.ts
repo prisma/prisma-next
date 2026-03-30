@@ -22,11 +22,13 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
-import type { CollectionState, IncludeExpr, OrderExpr } from './types';
+import { type AnyOrderBy, type CollectionState, type IncludeExpr, isColumnOrderBy } from './types';
 import { bindWhereExpr } from './where-binding';
 import { combineWhereExprs } from './where-utils';
 
-type CursorOrderEntry = OrderExpr & {
+type CursorOrderEntry = {
+  readonly column: string;
+  readonly direction: 'asc' | 'desc';
   readonly value: unknown;
 };
 
@@ -46,14 +48,16 @@ function buildProjection(
 
 function toOrderBy(
   tableName: string,
-  orderBy: readonly OrderExpr[] | undefined,
+  orderBy: readonly AnyOrderBy[] | undefined,
 ): ReadonlyArray<OrderByItem> | undefined {
   if (!orderBy || orderBy.length === 0) {
     return undefined;
   }
 
-  return orderBy.map(
-    (entry) => new OrderByItem(ColumnRef.of(tableName, entry.column), entry.direction),
+  return orderBy.map((entry) =>
+    isColumnOrderBy(entry)
+      ? new OrderByItem(ColumnRef.of(tableName, entry.column), entry.direction)
+      : new OrderByItem(entry.expr, entry.direction),
   );
 }
 
@@ -99,7 +103,7 @@ function buildLexicographicCursorWhere(
 
 function buildCursorWhere(
   tableName: string,
-  orderBy: readonly OrderExpr[] | undefined,
+  orderBy: readonly AnyOrderBy[] | undefined,
   cursor: Readonly<Record<string, unknown>> | undefined,
 ): AnyExpression | undefined {
   if (!cursor || !orderBy || orderBy.length === 0) {
@@ -108,6 +112,7 @@ function buildCursorWhere(
 
   const entries: CursorOrderEntry[] = [];
   for (const order of orderBy) {
+    if (!isColumnOrderBy(order)) continue;
     const value = cursor[order.column];
     if (value === undefined) {
       throw new Error(`Missing cursor value for orderBy column "${order.column}"`);
@@ -173,7 +178,7 @@ function buildIncludeOrderArtifacts(
   relationName: string,
   childTableRef: string,
   rowAlias: string,
-  orderBy: readonly OrderExpr[] | undefined,
+  orderBy: readonly AnyOrderBy[] | undefined,
 ): {
   readonly childOrderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly hiddenOrderProjection: ReadonlyArray<ProjectionItem>;

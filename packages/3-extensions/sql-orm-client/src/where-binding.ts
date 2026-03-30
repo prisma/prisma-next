@@ -124,7 +124,7 @@ function createParamRef(
   if (!codecId) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
-  return ParamRef.of(value, { name: columnRef.column, codecId });
+  return ParamRef.of(value, { codecId });
 }
 
 function createExpressionBinder(contract: SqlContract<SqlStorage>): ExpressionRewriter {
