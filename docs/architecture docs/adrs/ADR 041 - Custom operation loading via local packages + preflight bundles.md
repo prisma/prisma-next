@@ -19,7 +19,7 @@ Adopt a local-only ops model plus a deterministic migration bundle for hosted pr
 - Installed packages in the repo (e.g. node_modules) or repo-local files under a configured ops/ directory
 - No WASM engines and no network egress from ops
 - Ops are shipped as self-contained ESM JavaScript with all runtime deps inlined
-- For PPg preflight and CI cloud workers, users submit a migration bundle artifact that contains the contract, the DAG of edges, and the compiled ops
+- For PPg preflight and CI cloud workers, users submit a migration bundle artifact that contains the contract, the migration graph edges, and the compiled ops
 - PPg never resolves your repo or package manager
 
 ## Scope

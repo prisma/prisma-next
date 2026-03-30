@@ -41,7 +41,7 @@ Tooling such as the migration planner, preflight, ledger utilities, Studio, and 
 
 The following components must accept canonical JSON and must not evaluate TS
 
-- Migration planner and migration DAG utilities
+- Migration planner and migration graph utilities
 - Migration runner and ledger management
 - Preflight and CI integrations, including shadow DB and EXPLAIN-only modes
 - PPg contract-aware services and visualizations

@@ -2,12 +2,12 @@
 
 ## Context
 
-Migration histories tend to accumulate branches and long chains, increasing pathfinding complexity and review burden. Our model supports baselines that collapse a set of edges into a single ∅ → H_latest edge embedding the destination contract. We want a default squash-first posture that nudges teams toward a small active chain while keeping history auditable
+Migration histories tend to accumulate branches and long paths, increasing pathfinding complexity and review burden. Our model supports baselines that collapse a set of edges into a single ∅ → H_latest edge embedding the destination contract. We want a default squash-first posture that nudges teams toward a small active migration history while keeping older history auditable
 
 ## Problem
 
 - Long chains hurt determinism, performance, and comprehension
-- Parallel edges and orphans appear more often in large DAGs
+- Parallel edges and orphans appear more often in large migration graphs
 - Teams need a gentle, configurable way to keep DAGs small without mandating a committed graph index
 
 ## Goals
@@ -30,14 +30,14 @@ Adopt a squash-first default posture with a Squash Advisor implemented on the Ad
 **Relationship to ADR 028:**
 - ADR 028 defines the migration structure (file model, schemas, on-disk formats) and available operations (squash, rebase, prune)
 - This ADR defines the policy layer: when, why, and how teams should use those operations
-- Together, these ADRs implement DAG hygiene as composable primitives (structure + policy)
+- Together, these ADRs implement graph hygiene as composable primitives (structure + policy)
 
 ### Policy defaults
 
 - Suggest squashing when the newest edge since the last baseline is older than 14 days
 - Suggest squashing when >20 edges exist since the last baseline
 - Do not suggest until there are at least 5 edges since the last baseline
-- Require green preflight on a shadow DB and shadow proof that applying the current chain yields the same destination contract as the proposed baseline before suggesting automation
+- Require green preflight on a shadow DB and shadow proof that applying the current migration history yields the same destination contract as the proposed baseline before suggesting automation
 
 Teams can tune or disable these defaults
 
@@ -87,7 +87,7 @@ Technical enforcement of these rules is handled in ADR 028 (contract marker chec
 
 - **ADR 028** defines: migration structure, file formats, and available operations (squash, rebase, prune)
 - **This ADR** defines: the policy layer that recommends when and how to use those operations
-- **Together**: they form a complete DAG hygiene system where 028 provides mechanisms and 102 provides policy
+- **Together**: they form a complete graph hygiene system where 028 provides mechanisms and 102 provides policy
 
 ## Consequences
 
@@ -131,5 +131,5 @@ Technical enforcement of these rules is handled in ADR 028 (contract marker chec
 
 - ADR 101 — Advisors framework
 - ADR 028 — Migration ledger & squash semantics
-- ADR 039 — DAG path resolution & integrity
+- ADR 039 — Migration graph path resolution & integrity
 - ADR 051 — PPg preflight-as-a-service contract

@@ -14,19 +14,19 @@ Migrations are defined as directed edges in a graph, with rich metadata supporti
 - Baseline migrations can subsume a contiguous path of regular migrations
 
 **Operations (Secondary):**
-- Migration operations enable DAG management: squash to baseline, rebase, prune
+- Migration operations enable graph management: squash to baseline, rebase, prune
 - All operations work directly on migration files without requiring an on-disk ledger
 - Tooling validates reachability, detects orphans and cycles, and enforces integrity
 
 **Scope and Relationship:**
 - This ADR defines the migration structure (model, on-disk formats, schemas) and the operations that work with that structure
-- See ADR 102 for the policy framework that guides when teams should use these operations and how to maintain healthy DAGs
+- See ADR 102 for the policy framework that guides when teams should use these operations and how to maintain healthy migration graphs
 
-**Note**: ADR 102 defines the squash-first policy and DAG hygiene strategy. ADR 101 provides the Advisors framework. ADR 039 defines DAG path resolution. This ADR focuses on defining what migrations are and what operations can be performed on them.
+**Note**: ADR 102 defines the squash-first policy and graph hygiene strategy. ADR 101 provides the Advisors framework. ADR 039 defines migration graph path resolution. This ADR focuses on defining what migrations are and what operations can be performed on them.
 
 This ADR complements:
 - ADR 021 Contract marker storage & verification modes
-- ADR 039 DAG path resolution & integrity
+- ADR 039 Migration graph path resolution & integrity
 - ADR 037 Transactional DDL fallback & compensation
 - ADR 038 Operation idempotency classification & enforcement
 - ADR 044 Pre/post check vocabulary v1
@@ -42,7 +42,7 @@ This ADR defines the **structure** of migrations and the **operations** that wor
 
 ADR 102 (Squash-first policy & squash advisor) defines the **policy layer** that guides when and how to use these operations:
 
-- **Policy**: When to squash, thresholds, advisor rules, DAG hygiene strategies
+- **Policy**: When to squash, thresholds, advisor rules, graph hygiene strategies
 - **Composition**: How to recommend and automate the use of these operations
 
 Together, they form composable primitives: ADR 028 provides the mechanisms, ADR 102 provides the policy for using those mechanisms.
@@ -173,7 +173,7 @@ edgeId = sha256(canonicalize([
 - Archived migrations preserved for provenance/audit but ignored during pathfinding
 - Baseline migrations eligible only when all included edges verified or policy allows soft baselines
 
-See ADR 102 for policy decisions on when to squash and DAG hygiene strategies. Line 170 explicitly references ADR 102 for guidance on when parallel edges matter for DAG hygiene.
+See ADR 102 for policy decisions on when to squash and graph hygiene strategies.
 
 ### Rebase and prune
 - If a branch diverges, recompute a migration from current main to branch target
@@ -256,9 +256,9 @@ Hosted preflight MUST reject unsigned edges; local policy MAY allow unsigned but
 - Override: require explicit parallel-ok label with justification
 
 **Rationale:**
-This is an integrity rule, not a hygiene policy. It encourages simpler DAG structures and rebase workflows.
+This is an integrity rule, not a hygiene policy. It encourages simpler graph structures and rebase workflows.
 
-See ADR 102 for how parallel edges matter in the context of DAG hygiene policy.
+See ADR 102 for how parallel edges matter in the context of graph hygiene policy.
 
 ## Concurrency and locking
 - Local dev uses file-level atomic writes with temp files and rename
@@ -282,7 +282,7 @@ See ADR 102 for how parallel edges matter in the context of DAG hygiene policy.
 See ADR 102 for policy decisions on:
 - When to create baselines (development vs. production)
 - When baselines should be applied
-- DAG hygiene strategies
+- Graph hygiene strategies
 
 ## Contract reconstruction and splitting
 - Stored contracts in migration.json files enable reconstruction of any historical state
@@ -306,7 +306,7 @@ See ADR 102 for policy decisions on:
 ## Observability
 - Emit events when migrations are added, squashed, superseded, or pruned
 - Surface counts of reachable nodes, orphan migrations, and longest path length
-- Expose a simple migrations graph command to render the DAG for reviews
+- Expose a simple migrations graph command to render the migration graph for reviews
 
 ## Backward and forward compatibility
 - graph.index.json is versioned
@@ -320,7 +320,7 @@ See ADR 102 for policy decisions on:
 
 ## Alternatives considered
 - **Pure file-order migrations with applied history in DB**: Simpler but loses determinism, is fragile under branching, and complicates squashing
-- **Embedding the full DAG in each edge package**: Bloats artifacts and complicates edits, single ledger is simpler and auditable
+- **Embedding the full graph in each edge package**: Bloats artifacts and complicates edits, single ledger is simpler and auditable
 
 ## Open questions
 - Do we support multiple ledgers per repo for multi-service monorepos or enforce one ledger per contract root

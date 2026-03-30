@@ -1,4 +1,4 @@
-# ADR 039 — DAG path resolution & integrity
+# ADR 039 — Migration graph path resolution & integrity
 
 ## Context
 
@@ -47,7 +47,7 @@ Migrations are modeled as directed edges from `fromHash` to `toHash`. At apply t
 
 The graph index is a lockfile optimization that teams can adopt later. **Most teams won't need this initially** when following squash-first hygiene (ADR 102).
 
-The index acts like a lockfile for the migration DAG. It's helpful if you have:
+The index acts like a lockfile for the migration graph. It's helpful if you have:
 - Large migration histories you haven't squashed yet
 - Lots of concurrent branches and frequent parallel edges
 - Compliance requirements for reviewable "graph diff" artifacts
@@ -69,7 +69,7 @@ Not a conflict with reconstruction:
 
 ### Integrity checks on load
 
-- **Self-loop check**: reject `from == to` with `ERR_MIG_GRAPH_SELF_LOOP`
+- **Same source and target check**: reject `from == to` with `MIGRATION.SAME_SOURCE_AND_TARGET`
 - **Cycle detection**: DFS with color marking, reported as `WARN_MIG_GRAPH_CYCLE` for diagnostics. Cycles are tolerated at runtime — BFS pathfinding uses visited-node tracking to avoid infinite loops. See ADR 169 §3.
 - **Parallel edge policy**: two edges with same `(from, to)` but different `opsHash` require label `parallel-ok`, else `ERR_MIG_GRAPH_PARALLEL_EDGE`
 - **Orphan edge detection**: edges unreachable from any genesis or that lead to no declared target are flagged as `WARN_MIG_ORPHAN_EDGE` (excludes edges marked `archived: true`)
@@ -120,7 +120,7 @@ If labels are absent the order falls back to the remaining keys.
 - Reviewable, portable graph state for CI/PPg
 - Simple performance characteristics
 - Simple default: no index overhead for small/medium repos
-- Squash-first policy (ADR 102) keeps DAG small, reducing need for index
+- Squash-first policy (ADR 102) keeps migration graph small, reducing need for index
 
 ### Negative
 - Optional index adds maintenance overhead if enabled

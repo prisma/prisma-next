@@ -3,7 +3,7 @@
 
 ## Context
 
-We added a "squash advisor" concept to nudge teams toward keeping a small active migration DAG. The same pattern appears in other areas like graph hygiene, preflight effectiveness, and drift hygiene. Rather than hard-coding warnings in individual commands, we want a thin, reusable Advisors framework that evaluates project state and emits actionable, low-noise suggestions
+We added a "squash advisor" concept to nudge teams toward keeping a small active migration graph. The same pattern appears in other areas like graph hygiene, preflight effectiveness, and drift hygiene. Rather than hard-coding warnings in individual commands, we want a thin, reusable Advisors framework that evaluates project state and emits actionable, low-noise suggestions
 
 ## Problem
 
@@ -99,7 +99,7 @@ type Advisor = (ctx: AdvisorContext) => Promise<Advisory[]>
 
 ## Scope and performance guardrails
 
-- Advisors must run in O(V+E) over the active DAG and use summaries for preflight
+- Advisors must run in O(V+E) over the active migration graph and use summaries for preflight
 - No heavy SQL parsing, DB sampling, or network calls beyond local context
 - Advisors produce small JSON payloads and avoid logging raw params or PII
 
@@ -147,5 +147,5 @@ type Advisor = (ctx: AdvisorContext) => Promise<Advisory[]>
 - ADR 047 — Diagnostics artifacts & formats
 - ADR 051 — PPg preflight-as-a-service contract
 - ADR 028 — Migration structure & operations
-- ADR 039 — DAG path resolution & integrity
+- ADR 039 — Migration graph path resolution & integrity
 

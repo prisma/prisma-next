@@ -67,10 +67,10 @@ This document provides a comprehensive index of all Architectural Decision Recor
 
 | ADR | Title | Description | Link |
 |-----|-------|-------------|------|
-| 028 | Migration Structure & Operations | Defines migration file structure, on-disk formats, schemas, and operations for working with migration DAGs | [ADR 028 - Migration Structure & Operations.md](adrs/ADR%20028%20-%20Migration%20Structure%20%26%20Operations.md) |
+| 028 | Migration Structure & Operations | Defines migration file structure, on-disk formats, schemas, and operations for working with migration graphs | [ADR 028 - Migration Structure & Operations.md](adrs/ADR%20028%20-%20Migration%20Structure%20%26%20Operations.md) |
 | 037 | Transactional DDL Fallback | Specifies fallback behavior when adapters lack full transactional DDL support | [ADR 037 - Transactional DDL Fallback.md](adrs/ADR%20037%20-%20Transactional%20DDL%20Fallback.md) |
 | 038 | Operation idempotency classification & enforcement | Defines idempotency classification and enforcement for migration operations | [ADR 038 - Operation idempotency classification & enforcement.md](adrs/ADR%20038%20-%20Operation%20idempotency%20classification%20&%20enforcement.md) |
-| 039 | DAG path resolution & integrity | Specifies DAG path computation, cycle detection, and deterministic tie-breaking | [ADR 039 - DAG path resolution & integrity.md](adrs/ADR%20039%20-%20DAG%20path%20resolution%20&%20integrity.md) |
+| 039 | Migration graph path resolution & integrity | Specifies migration graph path computation, cycle detection, and deterministic tie-breaking | [ADR 039 - Migration graph path resolution & integrity.md](adrs/ADR%20039%20-%20Migration%20graph%20path%20resolution%20&%20integrity.md) |
 | 040 | Node task execution environment & sandboxing | Defines execution environment and sandboxing for migration node tasks | [ADR 040 - Node task execution environment & sandboxing.md](adrs/ADR%20040%20-%20Node%20task%20execution%20environment%20&%20sandboxing.md) |
 | 041 | Custom operation loading via local packages + preflight bundles | Establishes custom operation loading with security constraints and bundle support | [ADR 041 - Custom operation loading via local packages + preflight bundles.md](adrs/ADR%20041%20-%20Custom%20operation%20loading%20via%20local%20packages%20+%20preflight%20bundles.md) |
 | 043 | Advisory lock domain & key strategy | Defines advisory locking strategy for migration coordination and collision prevention | [ADR 043 - Advisory lock domain & key strategy.md](adrs/ADR%20043%20-%20Advisory%20lock%20domain%20&%20key%20strategy.md) |
@@ -140,9 +140,9 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | ADR | Title | Description | Link |
 |-----|-------|-------------|------|
 | 101 | Advisors Framework | Establishes uniform API for computing and surfacing migration advisories | [ADR 101 - Advisors Framework.md](adrs/ADR%20101%20-%20Advisors%20Framework.md) |
-| 102 | Squash-first policy & squash advisor | Defines policy for keeping migration DAGs small through regular baselines | [ADR 102 - Squash-first policy & squash advisor.md](adrs/ADR%20102%20-%20Squash-first%20policy%20&%20squash%20advisor.md) |
+| 102 | Squash-first policy & squash advisor | Defines policy for keeping migration graphs small through regular baselines | [ADR 102 - Squash-first policy & squash advisor.md](adrs/ADR%20102%20-%20Squash-first%20policy%20&%20squash%20advisor.md) |
 | 122 | Database Initialization & Adoption | Covers greenfield, brownfield-conservative, and brownfield-incremental adoption strategies including introspection, multi-service namespacing, and incremental contract expansion | [ADR 122 - Database Initialization & Adoption.md](adrs/ADR%20122%20-%20Database%20Initialization%20%26%20Adoption.md) |
-| 123 | Drift Detection, Recovery & Reconciliation | Comprehensive drift taxonomy (marker, schema, DAG, capability, transactional, cache, canonicalization), detection mechanisms, and recovery strategies with idempotency patterns | [ADR 123 - Drift Detection, Recovery & Reconciliation.md](adrs/ADR%20123%20-%20Drift%20Detection%2C%20Recovery%20%26%20Reconciliation.md) |
+| 123 | Drift Detection, Recovery & Reconciliation | Comprehensive drift taxonomy (marker, schema, graph, capability, transactional, cache, canonicalization), detection mechanisms, and recovery strategies with idempotency patterns | [ADR 123 - Drift Detection, Recovery & Reconciliation.md](adrs/ADR%20123%20-%20Drift%20Detection%2C%20Recovery%20%26%20Reconciliation.md) |
 
 ## Notes
 

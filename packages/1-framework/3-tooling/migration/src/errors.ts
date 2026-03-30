@@ -3,7 +3,7 @@
  *
  * Follows the NAMESPACE.SUBCODE convention from ADR 027. All codes live under
  * the MIGRATION namespace. These are tooling-time errors (file I/O, attestation,
- * migration-chain reconstruction), distinct from the runtime MIGRATION.* codes for apply-time
+ * migration history reconstruction), distinct from the runtime MIGRATION.* codes for apply-time
  * failures (PRECHECK_FAILED, POSTCHECK_FAILED, etc.).
  *
  * Fields:
