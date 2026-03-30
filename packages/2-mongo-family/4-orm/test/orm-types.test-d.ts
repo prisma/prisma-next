@@ -96,16 +96,30 @@ test('MongoIncludeSpec has no includable keys for models with only embed relatio
 
 // --- Polymorphic root returns discriminated union ---
 
-test('InferRootRow for polymorphic model returns union of base+variant rows', () => {
+test('InferRootRow for polymorphic model returns union with literal discriminator values', () => {
   type TaskRow = InferRootRow<Contract, 'Task'>;
 
   type BugRowPart = { severity: string };
   type FeatureRowPart = { priority: string; targetRelease: string };
 
   expectTypeOf<TaskRow>().toExtend<
-    | ({ _id: string; title: string; type: string; assigneeId: string } & BugRowPart)
-    | ({ _id: string; title: string; type: string; assigneeId: string } & FeatureRowPart)
+    | ({ _id: string; title: string; type: 'bug'; assigneeId: string } & BugRowPart)
+    | ({ _id: string; title: string; type: 'feature'; assigneeId: string } & FeatureRowPart)
   >();
+});
+
+test('discriminator field narrows variant types in switch', () => {
+  type TaskRow = InferRootRow<Contract, 'Task'>;
+
+  const r = {} as TaskRow;
+  if (r.type === 'bug') {
+    expectTypeOf(r).toHaveProperty('severity');
+    expectTypeOf(r.severity).toBeString();
+  } else {
+    expectTypeOf(r).toHaveProperty('priority');
+    expectTypeOf(r.priority).toBeString();
+    expectTypeOf(r).toHaveProperty('targetRelease');
+  }
 });
 
 test('InferRootRow for non-polymorphic model returns plain row', () => {
