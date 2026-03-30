@@ -69,8 +69,8 @@ withTempDir(({ createTempDir }) => {
         const status = await runMigrationStatus(ctx);
         expect(status.exitCode, 'P4.01: status reports error').not.toBe(0);
         const statusOutput = stripAnsi(status.stdout);
-        expect(statusOutput, 'P4.01: mentions orphan, broken chain, or disconnected graph').toMatch(
-          /orphan|broken|disconnect|no.*root|no.*path|unreachable/i,
+        expect(statusOutput, 'P4.01: reports broken migration history').toMatch(
+          /Cannot reconstruct migration history/,
         );
 
         // P4.02: migration plan detects the broken graph (does NOT silently
@@ -81,8 +81,8 @@ withTempDir(({ createTempDir }) => {
         // The critical assertion: the planner must NOT succeed and silently
         // create a new init migration as if no migrations existed
         expect(planAgain.exitCode, 'P4.02: plan fails on broken graph').not.toBe(0);
-        expect(planOutput, 'P4.02: mentions orphan, broken chain, or disconnected graph').toMatch(
-          /orphan|broken|disconnect|no.*root|no.*path|unreachable/i,
+        expect(planOutput, 'P4.02: reports missing initial migration').toMatch(
+          /No initial migration found/,
         );
       },
       timeouts.spinUpPpgDev,
