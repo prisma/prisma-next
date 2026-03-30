@@ -46,7 +46,7 @@ Prisma Next supports three adoption paths:
 **Characteristics:**
 - Requires validation post-introspection (triggers, constraints, application-level invariants may be missing)
 - One-time adoption cost
-- Historical migrations discarded (not tracked in Prisma Next DAG)
+- Historical migrations discarded (not tracked in Prisma Next migration graph)
 - Future migrations start from H0
 
 **Safety Considerations:**
@@ -346,7 +346,7 @@ const db_b = connect({
 ```
 
 **Semantics:**
-- Each service maintains independent contract, migrations, DAG
+- Each service maintains independent contract, migrations, migration graph
 - Marker location: service_a.prisma_contract.marker
 - Ledger location: service_a.prisma_contract.ledger
 - Each service treats its schema as complete database

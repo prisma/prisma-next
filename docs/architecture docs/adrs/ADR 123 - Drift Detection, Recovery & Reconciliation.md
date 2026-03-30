@@ -84,14 +84,14 @@ These affect the actual database schema structure.
 - **Implications:** Database in unknown state; queries may fail
 - **Recovery:** Coordinate deployments to be sequential; use advisory locks (ADR 043)
 
-### DAG-Level Drifts
+### Graph-Level Drifts
 
 These affect the migration graph and reachability.
 
 **dag/orphan-database**
-- **Description:** Database has structure but no path to it in migration DAG
-- **Detection:** Introspection; marker hash doesn't match any DAG node
-- **Cause:** Database created outside Prisma Next; adopted without baseline; DAG lost/deleted
+- **Description:** Database has structure but no path to it in migration graph
+- **Detection:** Introspection; marker hash doesn't match any graph node
+- **Cause:** Database created outside Prisma Next; adopted without baseline; migration graph lost/deleted
 - **Recoverability:** Recoverable (initialization or edge creation)
 - **Implications:** Cannot plan migrations; application stuck
 - **Recovery:**
@@ -101,7 +101,7 @@ These affect the migration graph and reachability.
 **dag/no-path**
 - **Description:** No migration path exists from current state to target
 - **Detection:** Pathfinding fails; no edges connect current marker hash to target
-- **Cause:** Target contract doesn't exist in DAG; parallel edge prevents reachability
+- **Cause:** Target contract doesn't exist in migration graph; parallel edge prevents reachability
 - **Recoverability:** Not recoverable without new migration
 - **Implications:** Cannot migrate to target; must write new migration or add edge
 - **Recovery:** Create new migration from current state to target
@@ -115,9 +115,9 @@ These affect the migration graph and reachability.
 - **Recovery:** Restore edge from backup or recreate from contract diff
 
 **dag/circular-dependency**
-- **Description:** Cycles detected in migration DAG (A → B → C → A)
+- **Description:** Cycles detected in migration graph (A → B → C → A)
 - **Detection:** Pathfinding; cycle detection
-- **Cause:** Incorrect edge definitions; manual DAG manipulation
+- **Cause:** Incorrect edge definitions; manual graph manipulation
 - **Recoverability:** Requires correction
 - **Implications:** Pathfinding algorithm may fail or behave unexpectedly
 - **Recovery:** Remove or redefine edges to break cycle
@@ -364,17 +364,17 @@ Developers can manually run introspection:
    - Determine current schema structure
    - Generate potential contract that matches
 
-2. **Search DAG for Matching Contract**
+2. **Search Migration Graph for Matching Contract**
    - Compare introspected schema to known contracts
    - If match found: use that hash as baseline
 
 3. **If No Match:**
    - Create new baseline for current state
-   - Add adoption baseline to DAG
+   - Add adoption baseline to migration graph
    - Initialize marker with baseline hash
 
 4. **Proceed with Migrations**
-   - Now database is connected to DAG
+   - Now database is connected to migration graph
    - Can plan migrations normally
 
 ### dag/no-path Recovery
@@ -385,7 +385,7 @@ Developers can manually run introspection:
 
 1. **Determine Goal**
    - What target contract do you want?
-   - Verify target contract exists in DAG
+   - Verify target contract exists in migration graph
 
 2. **Create New Migration**
    - From: marker's current hash
@@ -592,7 +592,7 @@ Operations fall into three categories:
 
 ## Related Concepts
 
-- **ADR 001** — Migrations as Edges (foundation for DAG-level drifts)
+- **ADR 001** — Migrations as Edges (foundation for graph-level drifts)
 - **ADR 021** — Contract Marker Storage (marker drifts, verification modes)
 - **ADR 029** — Shadow DB Preflight Semantics (preflight for corrective migrations)
 - **ADR 037** — Transactional DDL Fallback (atomic marker updates, transaction drifts)
