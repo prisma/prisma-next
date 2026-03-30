@@ -43,6 +43,20 @@ The divergence is scoped to `model.storage` — and it's narrow. With `codecId` 
 | **`model.storage` overall** | `{ "table": "users", "fields": { ... } }` — table name + column mappings | `{ "collection": "users" }` — collection name only | SQL has a storage schema to indirect through; Mongo's model is the schema |
 | **Top-level `storage` detail** | Rich: tables, columns, native types, defaults, constraints, indexes, foreign keys | Sparse: collections with metadata (indexes, validators) | SQL storage describes what the database enforces; Mongo collections hold orthogonal config |
 
+## Validation
+
+SQL's `validateContract<TContract>(json)` returns `TContract` directly. Mongo's `validateMongoContract<TContract>(json)` returns a `ValidatedMongoContract<TContract>` wrapper containing `{ contract, indices, warnings }`.
+
+This is an intentional divergence:
+
+| Aspect | SQL | Mongo | Rationale |
+|---|---|---|---|
+| **Return type** | `TContract` | `ValidatedMongoContract<TContract>` | Mongo needs computed indices |
+| **Computed indices** | None | `variantToBase`, `modelToVariants` | Polymorphism requires reverse-lookup maps for runtime query dispatch |
+| **Warnings** | Not returned | `warnings: string[]` | Domain validation produces non-fatal warnings (e.g. orphaned models) |
+
+The Mongo wrapper exists because Mongo contracts carry richer structural metadata (polymorphism indices) that consumers need at runtime. If SQL adds polymorphism support via the same `discriminator`/`variants`/`base` primitives, it will likely need a similar wrapper. The domain validation layer (`validateContractDomain`) already produces warnings — SQL would need to surface them too.
+
 ## Toward a shared contract base
 
 The contract redesign demonstrates that a shared base IS viable — at the domain level. The `roots`, `models` (with `fields` carrying `nullable` and `codecId`, `discriminator`/`variants`/`base`), and `relations` sections are structurally identical between families. Only `model.storage` differs, and it's scoped. For Mongo, `model.storage` is minimal (collection name only); for SQL, it carries field-to-column mappings. This remaining divergence is justified — it reflects a real structural difference between the families, not an arbitrary placement choice.
