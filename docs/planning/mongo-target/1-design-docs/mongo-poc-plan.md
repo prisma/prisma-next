@@ -165,6 +165,6 @@ The [design questions](design-questions.md) document has the full analysis and [
 - [Cross-cutting learnings](../cross-cutting-learnings.md) — design principles and insights affecting the framework core
 - [Example schemas](example-schemas.md) — concrete MongoDB schemas with speculative PSL and query patterns
 - [Design questions](design-questions.md) — open architectural questions
-- [User promise](user-promise.md) — what we're promising Mongo users
+- [User promise](../../../reference/mongodb-user-promise.md) — what we're promising Mongo users
 - [MongoDB idioms](../../../reference/mongodb-idioms.md) — patterns the PoC should accommodate
 - [MongoDB primitives reference](../../../reference/mongodb-primitives-reference.md) — data model and query semantics

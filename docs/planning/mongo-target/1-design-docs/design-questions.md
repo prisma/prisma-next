@@ -2,7 +2,7 @@
 
 Design questions surfaced during the exploration of MongoDB primitives and their mapping to Prisma Next's architecture. These are questions where the answer is non-obvious, involves real trade-offs, or requires spiking to resolve. Grouped by theme.
 
-See also: [MongoDB primitives reference](../../../reference/mongodb-primitives-reference.md), [mongo-poc-plan.md](mongo-poc-plan.md), [user-promise.md](user-promise.md)
+See also: [MongoDB primitives reference](../../../reference/mongodb-primitives-reference.md), [mongo-poc-plan.md](mongo-poc-plan.md), [user-promise.md](../../../reference/mongodb-user-promise.md)
 
 **External input**: The MongoDB Node.js Driver team provided a [feature gap analysis](../../../reference/mongodb-feature-support-priorities.md) and a [user journey narrative](../../../reference/mongodb-user-journey.md). Where their priorities or observations surface new tensions, they're noted inline.
 
