@@ -12,7 +12,6 @@ import {
 } from '@prisma-next/mongo-core';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type {
-  MongoCollection,
   MongoFindManyOptions,
   MongoIncludeSpec,
   MongoOrmClient,
@@ -45,6 +44,13 @@ function buildLookupStages(
     if (!relation || relation.strategy !== 'reference') continue;
 
     const refRelation = relation as MongoReferenceRelation;
+
+    if (refRelation.on.localFields.length !== 1 || refRelation.on.targetFields.length !== 1) {
+      throw new Error(
+        `Compound references are not yet supported: relation "${relName}" has ${refRelation.on.localFields.length} local field(s) and ${refRelation.on.targetFields.length} target field(s)`,
+      );
+    }
+
     const targetModel = contract.models[refRelation.to];
     if (!targetModel) continue;
 
@@ -75,8 +81,7 @@ function buildLookupStages(
 class MongoCollectionImpl<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
-> implements MongoCollection<TContract, ModelName>
-{
+> {
   readonly #contract: TContract;
   readonly #modelName: ModelName;
   readonly #executor: MongoQueryExecutor;
@@ -89,8 +94,7 @@ class MongoCollectionImpl<
 
   findMany<TInclude extends MongoIncludeSpec<TContract, ModelName> = Record<string, never>>(
     options?: MongoFindManyOptions<TContract, ModelName, TInclude>,
-    // biome-ignore lint/suspicious/noExplicitAny: runtime returns untyped rows; the interface provides correct types to consumers
-  ): AsyncIterableResult<any> {
+  ): AsyncIterableResult<unknown> {
     const model = this.#contract.models[this.#modelName] as MongoModelDefinition;
     const collection = resolveCollection(model, this.#modelName as string);
     const filter = options?.where ? (options.where as unknown as MongoExpr) : undefined;

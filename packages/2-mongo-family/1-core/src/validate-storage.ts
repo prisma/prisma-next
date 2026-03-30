@@ -10,6 +10,19 @@ export function validateMongoStorage(contract: MongoContract): void {
       );
     }
 
+    if (model.base) {
+      const baseModel = contract.models[model.base];
+      if (baseModel) {
+        const variantCollection = model.storage.collection;
+        const baseCollection = baseModel.storage.collection;
+        if (variantCollection !== baseCollection) {
+          errors.push(
+            `Variant "${modelName}" has collection "${variantCollection ?? '(none)'}" but its base "${model.base}" has collection "${baseCollection ?? '(none)'}" — they must match`,
+          );
+        }
+      }
+    }
+
     for (const [relName, relation] of Object.entries(model.relations)) {
       if (relation.strategy === 'embed') {
         const target = contract.models[relation.to];

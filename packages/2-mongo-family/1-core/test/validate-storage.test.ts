@@ -163,6 +163,60 @@ describe('validateMongoStorage()', () => {
     });
   });
 
+  describe('variant collection must match base', () => {
+    it('rejects variant with a different collection than its base', () => {
+      const contract = minimalContract({
+        storage: { collections: { items: {}, other: {} } },
+        models: {
+          Item: {
+            fields: {
+              _id: { codecId: 'mongo/objectId@1', nullable: false },
+              type: { codecId: 'mongo/string@1', nullable: false },
+            },
+            storage: { collection: 'items' },
+            relations: {},
+            discriminator: { field: 'type' },
+            variants: { SpecialItem: { value: 'special' } },
+          },
+          SpecialItem: {
+            fields: { extra: { codecId: 'mongo/string@1', nullable: false } },
+            storage: { collection: 'other' },
+            relations: {},
+            base: 'Item',
+          },
+        },
+      });
+      expect(() => validateMongoStorage(contract)).toThrow(
+        /variant.*SpecialItem.*collection.*other.*base.*Item.*collection.*items.*must match/i,
+      );
+    });
+
+    it('accepts variant with same collection as its base', () => {
+      const contract = minimalContract({
+        storage: { collections: { items: {} } },
+        models: {
+          Item: {
+            fields: {
+              _id: { codecId: 'mongo/objectId@1', nullable: false },
+              type: { codecId: 'mongo/string@1', nullable: false },
+            },
+            storage: { collection: 'items' },
+            relations: {},
+            discriminator: { field: 'type' },
+            variants: { SpecialItem: { value: 'special' } },
+          },
+          SpecialItem: {
+            fields: { extra: { codecId: 'mongo/string@1', nullable: false } },
+            storage: { collection: 'items' },
+            relations: {},
+            base: 'Item',
+          },
+        },
+      });
+      expect(() => validateMongoStorage(contract)).not.toThrow();
+    });
+  });
+
   describe('collection-model consistency', () => {
     it('rejects model referencing a collection not in storage.collections', () => {
       const contract = minimalContract({

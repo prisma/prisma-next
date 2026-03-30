@@ -1,10 +1,11 @@
+import { validateMongoContract } from '@prisma-next/mongo-core';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../../5-runtime/test/fixtures/orm-contract';
 import ormContractJson from '../../5-runtime/test/fixtures/orm-contract.json';
 import { mongoOrm } from '../src/mongo-orm';
 import { withMongod } from './setup';
 
-const contract = ormContractJson as unknown as Contract;
+const { contract } = validateMongoContract<Contract>(ormContractJson);
 
 describe('mongoOrm integration', () => {
   it('findMany on a non-polymorphic root returns typed results', async () => {
