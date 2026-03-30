@@ -13,7 +13,7 @@ import {
   errorDriverRequired,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { maskConnectionUrl } from '../utils/command-helpers';
+import { maskConnectionUrl, sanitizeErrorMessage } from '../utils/command-helpers';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions, GlobalFlags } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
@@ -155,9 +155,14 @@ export async function inspectLiveSchema(
       return notOk(error);
     }
 
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const safeMessage = sanitizeErrorMessage(
+      rawMessage,
+      typeof dbConnection === 'string' ? dbConnection : undefined,
+    );
     return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Unexpected error during ${context.commandName}: ${error instanceof Error ? error.message : String(error)}`,
+      errorUnexpected(safeMessage, {
+        why: `Unexpected error during ${context.commandName}: ${safeMessage}`,
       }),
     );
   } finally {
