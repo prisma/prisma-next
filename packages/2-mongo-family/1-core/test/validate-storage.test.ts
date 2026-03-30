@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MongoContract } from '../src/contract-types';
 import { validateMongoStorage } from '../src/validate-storage';
 
-function minimalContract(overrides: Partial<MongoContract> = {}): MongoContract {
+function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContract {
   return {
     targetFamily: 'mongo',
     roots: { items: 'Item' },
@@ -20,12 +20,12 @@ function minimalContract(overrides: Partial<MongoContract> = {}): MongoContract 
 
 describe('validateMongoStorage()', () => {
   it('accepts a valid contract', () => {
-    expect(() => validateMongoStorage(minimalContract())).not.toThrow();
+    expect(() => validateMongoStorage(makeMinimalContract())).not.toThrow();
   });
 
   describe('embed relation targets', () => {
     it('rejects embed target with a collection', () => {
-      const contract = minimalContract({
+      const contract = makeMinimalContract({
         models: {
           Item: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -50,7 +50,7 @@ describe('validateMongoStorage()', () => {
     });
 
     it('accepts embed target with empty storage', () => {
-      const contract = minimalContract({
+      const contract = makeMinimalContract({
         models: {
           Item: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -77,7 +77,7 @@ describe('validateMongoStorage()', () => {
 
   describe('reference relation field existence', () => {
     it('rejects reference relation with localFields not in source model', () => {
-      const contract = minimalContract({
+      const contract = makeMinimalContract({
         models: {
           Item: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -104,7 +104,7 @@ describe('validateMongoStorage()', () => {
     });
 
     it('rejects reference relation with targetFields not in target model', () => {
-      const contract = minimalContract({
+      const contract = makeMinimalContract({
         models: {
           Item: {
             fields: {
@@ -134,7 +134,7 @@ describe('validateMongoStorage()', () => {
     });
 
     it('accepts reference relation with valid fields', () => {
-      const contract = minimalContract({
+      const contract = makeMinimalContract({
         storage: { collections: { items: {}, users: {} } },
         models: {
           Item: {
@@ -165,7 +165,7 @@ describe('validateMongoStorage()', () => {
 
   describe('variant collection must match base', () => {
     it('rejects variant with a different collection than its base', () => {
-      const contract = minimalContract({
+      const contract = makeMinimalContract({
         storage: { collections: { items: {}, other: {} } },
         models: {
           Item: {
@@ -187,12 +187,12 @@ describe('validateMongoStorage()', () => {
         },
       });
       expect(() => validateMongoStorage(contract)).toThrow(
-        /variant.*SpecialItem.*collection.*other.*base.*Item.*collection.*items.*must match/i,
+        /multi-table inheritance.*variant.*SpecialItem.*must share.*base.*collection/i,
       );
     });
 
     it('accepts variant with same collection as its base', () => {
-      const contract = minimalContract({
+      const contract = makeMinimalContract({
         storage: { collections: { items: {} } },
         models: {
           Item: {
@@ -219,7 +219,7 @@ describe('validateMongoStorage()', () => {
 
   describe('collection-model consistency', () => {
     it('rejects model referencing a collection not in storage.collections', () => {
-      const contract = minimalContract({
+      const contract = makeMinimalContract({
         storage: { collections: {} },
         models: {
           Item: {

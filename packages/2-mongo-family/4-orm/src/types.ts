@@ -57,13 +57,12 @@ type EmbedRelationRowType<
     : InferModelRow<TContract, To>
   : never;
 
-type EmbedRelationFields<
+export type InferFullRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
 > = EmbedRelationKeys<TContract, ModelName> extends never
-  ? // biome-ignore lint/complexity/noBannedTypes: empty intersection identity for models with no embeds
-    {}
-  : {
+  ? InferModelRow<TContract, ModelName>
+  : InferModelRow<TContract, ModelName> & {
       -readonly [K in EmbedRelationKeys<TContract, ModelName> &
         keyof TContract['models'][ModelName]['relations']]: EmbedRelationRowType<
         TContract,
@@ -71,11 +70,6 @@ type EmbedRelationFields<
         K
       >;
     };
-
-export type InferFullRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
-> = InferModelRow<TContract, ModelName> & EmbedRelationFields<TContract, ModelName>;
 
 // --- Polymorphic row type ---
 
