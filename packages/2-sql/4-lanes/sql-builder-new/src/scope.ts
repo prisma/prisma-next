@@ -1,8 +1,9 @@
 import type { QueryOperationTypesBase, StorageTable } from '@prisma-next/sql-contract/types';
+import type { AnyFromSource, SelectAst } from '@prisma-next/sql-relational-core/ast';
 
-export type CapabilityGated<Capabilities, Required, TrueBranch> = Capabilities extends Required
-  ? TrueBranch
-  : Record<string, never>;
+export type GatedMethod<Capabilities, Required, Method> = Capabilities extends Required
+  ? Method
+  : never;
 
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 export declare const ExpressionType: unique symbol;
@@ -21,10 +22,13 @@ export type Scope = {
 };
 
 export type JoinSource<Row extends ScopeTable, Alias extends string> = {
-  [JoinOuterScope]: {
+  readonly [JoinOuterScope]: {
     topLevel: Row;
     namespaces: Record<Alias, Row>;
   };
+
+  getJoinOuterScope(): Scope;
+  buildAst(): AnyFromSource;
 };
 
 export type DefaultScope<Name extends string, Table extends StorageTable> = {
@@ -66,6 +70,8 @@ export type NullableScope<S extends Scope> = {
 
 export type Subquery<RowType extends Record<string, ScopeField>> = {
   [SubqueryMarker]: RowType;
+  buildAst(): SelectAst;
+  getRowFields(): Record<string, ScopeField>;
 };
 
 export type QueryContext = {

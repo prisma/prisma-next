@@ -42,8 +42,7 @@ export function lowerExpr(column: ColumnRef, ...args: Array<AnyOperationArg>): O
     self: column,
     args,
     returns: stringReturn,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-    template: 'lower(${self})',
+    template: 'lower({{self}})',
   });
 }
 

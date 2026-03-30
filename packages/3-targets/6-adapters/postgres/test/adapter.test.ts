@@ -11,7 +11,7 @@ import {
   InsertAst,
   InsertOnConflict,
   JsonObjectExpr,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   NullCheckExpr,
   OperationExpr,
@@ -169,8 +169,7 @@ describe('Postgres adapter', () => {
       self: ColumnRef.of('user', 'vector'),
       args: [],
       returns: { kind: 'builtin', type: 'number' },
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-      template: 'vector_length(${self})',
+      template: 'vector_length({{self}})',
     });
     const scalarSubquery = SelectAst.from(TableSource.named('post'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
@@ -191,8 +190,8 @@ describe('Postgres adapter', () => {
             ColumnRef.of('user', 'metadata'),
             ParamRef.of({ source: 'test' }, { name: 'metadata', codecId: 'pg/json@1' }),
           ),
-          BinaryExpr.in(ColumnRef.of('user', 'id'), ListLiteralExpr.fromValues([])),
-          BinaryExpr.notIn(ColumnRef.of('user', 'id'), ListLiteralExpr.fromValues([])),
+          BinaryExpr.in(ColumnRef.of('user', 'id'), ListExpression.fromValues([])),
+          BinaryExpr.notIn(ColumnRef.of('user', 'id'), ListExpression.fromValues([])),
         ]),
       );
 

@@ -1,5 +1,5 @@
 import {
-  type AnyWhereExpr,
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
@@ -49,9 +49,9 @@ function withConnection(runtime: MockRuntime, onRelease: () => void) {
   });
 }
 
-const postIdFilter: AnyWhereExpr = BinaryExpr.eq(ColumnRef.of('posts', 'id'), LiteralExpr.of(1));
+const postIdFilter: AnyExpression = BinaryExpr.eq(ColumnRef.of('posts', 'id'), LiteralExpr.of(1));
 
-const userIdFilter: AnyWhereExpr = BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1));
+const userIdFilter: AnyExpression = BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1));
 
 describe('mutation-executor', () => {
   it('hasNestedMutationCallbacks() detects callbacks only on relation fields', () => {

@@ -10,6 +10,7 @@ export default defineConfig({
     'src/exports/errors.ts',
     'src/exports/ast.ts',
     'src/exports/plan.ts',
+    'src/exports/query-operations.ts',
     'src/exports/query-lane-context.ts',
     'src/exports/guards.ts',
     'src/exports/utils/guards.ts',

@@ -27,8 +27,7 @@ function normalize(column: ColumnRef): OperationExpr {
     self: column,
     args: [],
     returns: vectorReturn,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-    template: 'normalize(${self})',
+    template: 'normalize({{self}})',
   });
 }
 
@@ -95,7 +94,10 @@ describe('guards', () => {
   it('rejects plain values as builders or sources', () => {
     expect(isColumnBuilder({ kind: 'operation' })).toBe(false);
     expect(isExpressionBuilder({ kind: 'column' })).toBe(false);
-    expect(isExpressionSource(LiteralExpr.of('x'))).toBe(false);
-    expect(isValueSource(ParamRef.of('val1', { name: 'id', codecId: 'pg/text@1' }))).toBe(false);
+  });
+
+  it('LiteralExpr and ParamRef are expression sources', () => {
+    expect(isExpressionSource(LiteralExpr.of('x'))).toBe(true);
+    expect(isValueSource(ParamRef.of('val1', { name: 'id', codecId: 'pg/text@1' }))).toBe(true);
   });
 });

@@ -92,8 +92,7 @@ function createNestedWhereAst(): SelectAst {
     self: ColumnRef.of('matching_posts', 'title'),
     args: [ParamRef.of('untitled', { name: 'fallback', codecId: 'pg/text@1' })],
     returns: { kind: 'builtin', type: 'string' },
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template
-    template: 'lower(${self}, ${arg0})',
+    template: 'lower({{self}}, {{arg0}})',
   });
 
   const existsSubquery = SelectAst.from(DerivedTableSource.as('matching_users', derivedUsers))

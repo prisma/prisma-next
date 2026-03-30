@@ -2,25 +2,45 @@
 
 ## What exists
 
-A type-level-only SQL query builder DSL with no runtime implementation. Validates the API shape and type inference of a fluent SQL query builder via TypeScript types and `expectTypeOf` tests.
+A fluent SQL query builder DSL with both type-level inference and a runtime implementation that produces `relational-core` AST nodes and `SqlQueryPlan` objects for execution through the standard runtime pipeline.
 
-### Covered
+### Type-level
+
+Type-safe builder interfaces validated via `expectTypeOf` tests in `test/playground/`.
+
+### Runtime
+
+- **`sql({ context, runtime })`** — factory returning `Db<Contract>` with table proxies
+- **`TableProxy`** — `.select()`, `.as()`, all join methods, lateral joins
+- **`SelectQuery`** — `.select()`, `.where()`, `.orderBy()`, `.groupBy()`, `.limit()`, `.offset()`, `.distinct()`, `.distinctOn()`, `.as()`, `.first()`, `.firstOrThrow()`, `.all()`
+- **`GroupedQuery`** — `.groupBy()`, `.having()`, `.orderBy()`, `.limit()`, `.offset()`, `.distinct()`, `.distinctOn()`, `.as()`, `.first()`, `.firstOrThrow()`, `.all()`
+- **Execution** — `.first()`, `.firstOrThrow()`, `.all()` build `SqlQueryPlan` and delegate to `Runtime`
+- **Extension functions** — derived from `QueryOperationRegistry` (e.g., pgvector `cosineDistance`)
+- **`IdentifierRef`** AST node — for top-level field references without table qualification
+
+### Covered clauses
 
 - **FROM** (table)
 - **SELECT** (column names, aliased expressions, callback returning record)
 - **WHERE**
-- **JOIN** (INNER, LEFT OUTER, RIGHT OUTER, FULL OUTER, LATERAL, LATERAL LEFT — lateral joins are capability-enabled)
+- **JOIN** (INNER, LEFT OUTER, RIGHT OUTER, FULL OUTER, LATERAL, LATERAL LEFT — lateral joins are capability-gated)
 - **ORDER BY** (with direction, nulls first/last)
 - **GROUP BY**
 - **HAVING**
-- **LIMIT / OFFSET** (number or expression)
+- **LIMIT / OFFSET** (numeric literals only)
 - **Subqueries as join sources** (via `.as()`)
 - **Self-joins** (via `.as()`)
 - **Aggregate functions**: `count`, `sum`, `avg`, `min`, `max`
 - **Comparison operators**: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`
 - **Logical operators**: `and`, `or`
 - **Subquery predicates**: `exists`, `notExists`, `in` (subquery or array), `notIn` (subquery or array)
-- **DISTINCT** / **DISTINCT ON (expr, ...)** (DISTINCT ON is capability-enabled)
+- **DISTINCT** / **DISTINCT ON (expr, ...)** (DISTINCT ON is capability-gated)
+- **Extension functions** (e.g., pgvector `cosineDistance`)
+
+### Tests
+
+- 72 unit tests (expressions, field proxy, functions, builders)
+- 33 integration tests against PGlite (SELECT, WHERE, JOIN, ORDER BY, GROUP BY, HAVING, LIMIT/OFFSET, DISTINCT, subqueries, execution methods, extension functions)
 
 ## What's missing
 
@@ -41,6 +61,10 @@ A type-level-only SQL query builder DSL with no runtime implementation. Validate
 - **VALUES** as a row source
 - **USING** join condition (shorthand for equi-join on same-named columns)
 - **generate_series()** and other set-returning functions as FROM sources
+
+### Pagination
+
+- **Expression-based LIMIT / OFFSET** (currently only numeric literals; expressions and parameter placeholders are not supported)
 
 ### Expressions & operators
 

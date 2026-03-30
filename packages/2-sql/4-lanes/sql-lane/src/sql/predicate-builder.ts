@@ -1,11 +1,6 @@
 import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
-import type {
-  AnyExpression,
-  AnySqlComparable,
-  AnyWhereExpr,
-  NullCheckExpr,
-} from '@prisma-next/sql-relational-core/ast';
+import type { AnyExpression, NullCheckExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
   NullCheckExpr as NullCheckExprNode,
@@ -30,7 +25,7 @@ import {
 } from '../utils/errors';
 
 export interface BuildWhereExprResult {
-  expr: AnyWhereExpr;
+  expr: AnyExpression;
   codecId: string | undefined;
   paramName: string;
 }
@@ -76,7 +71,7 @@ export function buildWhereExpr(
 
   let leftExpr: AnyExpression;
   let codecId: string | undefined;
-  let rightExpr: AnySqlComparable;
+  let rightExpr: AnyExpression;
   let paramName: string;
 
   leftExpr = where.left;

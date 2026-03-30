@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  AndExpr,
   BinaryExpr,
   ExistsExpr,
-  ListLiteralExpr,
+  ListExpression,
+  NotExpr,
   NullCheckExpr,
   OrExpr,
 } from '../../src/ast/types';
@@ -12,7 +12,7 @@ import { col, lit, lowerExpr, param, simpleSelect } from './test-helpers';
 describe('ast/predicate', () => {
   it('creates binary expressions across comparable operands', () => {
     const left = lowerExpr(col('user', 'email'));
-    const list = ListLiteralExpr.of([param(0, 'firstId'), param(1, 'secondId')]);
+    const list = ListExpression.of([param(0, 'firstId'), param(1, 'secondId')]);
 
     expect(BinaryExpr.eq(col('user', 'id'), param(2, 'userId'))).toEqual(
       new BinaryExpr('eq', col('user', 'id'), param(2, 'userId')),
@@ -38,24 +38,14 @@ describe('ast/predicate', () => {
     expect(expr.right).toEqual(col('post', 'userId'));
   });
 
-  it('negates binary, null-check, and composite predicates through not()', () => {
-    expect(BinaryExpr.eq(col('user', 'id'), param(0)).not()).toEqual(
-      BinaryExpr.neq(col('user', 'id'), param(0)),
-    );
-    expect(NullCheckExpr.isNull(col('user', 'deletedAt')).not()).toEqual(
-      NullCheckExpr.isNotNull(col('user', 'deletedAt')),
-    );
-    expect(
-      AndExpr.of([
-        BinaryExpr.eq(col('user', 'id'), param(0)),
-        NullCheckExpr.isNull(col('user', 'deletedAt')),
-      ]).not(),
-    ).toEqual(
-      OrExpr.of([
-        BinaryExpr.neq(col('user', 'id'), param(0)),
-        NullCheckExpr.isNotNull(col('user', 'deletedAt')),
-      ]),
-    );
+  it('not() wraps predicates in NotExpr', () => {
+    const eq = BinaryExpr.eq(col('user', 'id'), param(0));
+    expect(eq.not()).toBeInstanceOf(NotExpr);
+    expect(eq.not().expr).toBe(eq);
+
+    const nullCheck = NullCheckExpr.isNull(col('user', 'deletedAt'));
+    expect(nullCheck.not()).toBeInstanceOf(NotExpr);
+    expect(nullCheck.not().expr).toBe(nullCheck);
   });
 
   it('creates exists and not-exists predicates around select subqueries', () => {
@@ -67,7 +57,8 @@ describe('ast/predicate', () => {
     expect(existsExpr.subquery).toEqual(subquery);
     expect(existsExpr.notExists).toBe(false);
     expect(notExistsExpr.notExists).toBe(true);
-    expect(notExistsExpr.not()).toEqual(existsExpr);
+    expect(notExistsExpr.not()).toBeInstanceOf(NotExpr);
+    expect(notExistsExpr.not().expr).toBe(notExistsExpr);
   });
 
   it('collects refs across nested predicate trees', () => {

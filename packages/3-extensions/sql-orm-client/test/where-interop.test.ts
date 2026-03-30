@@ -5,7 +5,7 @@ import {
   EqColJoinOn,
   ExistsExpr,
   JoinAst,
-  ListLiteralExpr,
+  ListExpression,
   LiteralExpr,
   NullCheckExpr,
   OperationExpr,
@@ -95,7 +95,7 @@ describe('where interop', () => {
         ])
         .withProjection([ProjectionItem.of('id', col('users', 'id'))])
         .withWhere(
-          BinaryExpr.in(col('users', 'id'), ListLiteralExpr.of([literal('u1'), literal('u2')])),
+          BinaryExpr.in(col('users', 'id'), ListExpression.of([literal('u1'), literal('u2')])),
         ),
     );
 
@@ -113,7 +113,7 @@ describe('where interop', () => {
         op(col('users', 'email'), [param('prefix', 'lhs'), literal('@example.com')]),
         op(col('users', 'email'), [param('rhs', 'rhs')]),
       ),
-      BinaryExpr.in(col('users', 'id'), ListLiteralExpr.of([param('u1', 'first'), literal('u2')])),
+      BinaryExpr.in(col('users', 'id'), ListExpression.of([param('u1', 'first'), literal('u2')])),
     ]);
 
     expect(normalizeWhereArg(expr)).toEqual(expr);
