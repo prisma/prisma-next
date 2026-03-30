@@ -61,7 +61,62 @@ Which specific database you're using — Postgres, MySQL, etc. Each target belon
 
 ### Family
 
-A category of databases that share fundamental characteristics. SQL is a family — Postgres, MySQL, and SQLite are all SQL targets that share concepts like tables, columns, and joins. Prisma Next defines shared behavior at the family level so individual targets only need to handle what's specific to them.
+A category of databases that share fundamental characteristics. SQL is a family — Postgres, MySQL, and SQLite are all SQL targets that share concepts like tables, columns, and joins. MongoDB is its own family (not a target under a generic "document" family). Prisma Next defines shared behavior at the family level so individual targets only need to handle what's specific to them.
+
+---
+
+## Domain Modeling
+
+### Aggregate Root
+
+A model that owns its own storage unit (table or collection) and serves as an ORM entry point. In the contract, aggregate roots are declared in the `roots` section, which maps ORM accessor names to model names (e.g., `"users": "User"` produces `db.users`). Models not in `roots` are only reachable through a parent — either via an embedded relation or as a polymorphic variant.
+
+### Model (Entity)
+
+A data description with unique identity and a lifecycle. Models appear in the contract's `models` section. Each model has one canonical storage location — either its own table/collection (aggregate root) or inside another model's storage (embedded). The distinction from value types is identity: two Posts with the same title are still different Posts.
+
+### Value Type (Composite)
+
+A named field structure with no identity. Two instances with the same field values are interchangeable — an Address defined by street/city/state has no separate identity beyond its content. Value types are a future concept in the contract (a `types`/`composites` section); currently they're represented as models with empty storage.
+
+> **Status:** Not yet implemented in the contract. Tracked as an open question.
+
+### Relation Strategy
+
+How a relation between two models is persisted. Each relation in the contract declares one of two strategies:
+
+- **`reference`** — the related model lives in its own storage unit (table or collection). Resolved at query time via JOIN (SQL) or `$lookup` / application-level stitching (MongoDB).
+- **`embed`** — the related model is nested inside the parent's document (MongoDB) or JSON column (SQL). No join needed; the data comes back in the same read.
+
+Embedding is a property of the *relation*, not the model. The same model can be embedded in one parent and referenced from another.
+
+### Discriminator
+
+The field on a base model that distinguishes between variant shapes in a polymorphic model. The contract records the field name and the possible values: e.g., `"discriminator": { "field": "type" }` with variants mapping to values like `"bug"`, `"feature"`.
+
+### Variant
+
+A specialized model distinguished by a discriminator value. Variants appear as sibling models in the contract's `models` section, each with a `base` property pointing back to the base model. Variants carry only their type-specific fields; shared fields live on the base.
+
+### Base (Model)
+
+The model that a variant specializes. Chosen over "parent" or "superclass" to describe a structural relationship without implying OOP inheritance semantics. The contract says "Bug's base is Task" — a domain fact about the data, not a statement about class hierarchies.
+
+### Specialization / Generalization
+
+The terminology used instead of "inheritance" or "subclassing" for polymorphic models. A variant *specializes* a base model (adds type-specific fields). A base model *generalizes* its variants (captures shared structure). This framing describes data relationships without OOP baggage.
+
+---
+
+## Contract Structure
+
+### Domain / Storage Separation
+
+The contract's two-layer design. The domain layer (`roots`, `models` with `fields`/`relations`/`discriminator`/`variants`) describes what the application models. The storage layer (`model.storage`, top-level `storage`) describes how things persist. The domain structure is family-agnostic; family-specific details are scoped to storage. See [ADR 172](architecture%20docs/adrs/ADR%20172%20-%20Contract%20domain-storage%20separation.md).
+
+### ContractBase
+
+The shared domain-level contract type consumed by family-agnostic code (ORM clients, validation, tooling). Contains `roots`, `models` (with fields, relations, discriminator/variants). Family-specific contracts (`SqlContract`, `MongoContract`) extend it with their own storage types.
 
 ---
 
@@ -81,6 +136,10 @@ Future: **Typed SQL query builder** — write queries in `.sql` files and get fu
 ### ORM Client
 
 A higher-level query interface that coordinates multiple queries on your behalf. Unlike query builders, the ORM client is **not** bound by the one-query-one-statement rule — operations like `findMany` with `include` may issue several queries behind the scenes to load related data. Provides `findMany`, `create`, `update`, `delete` and relation loading (`include`, `select`).
+
+### Collection
+
+The primary ORM abstraction for querying a model. Each aggregate root gets a `Collection` instance (e.g., `db.users` is a `Collection<Contract, 'User'>`). Collections use immutable fluent chaining — each method call (`.where()`, `.include()`, `.take()`) returns a new Collection with accumulated state. Nothing executes until a terminal method (`.all()`, `.first()`) compiles the state into a family-specific query plan. The Collection interface is shared across families; only the terminal compilation differs. See [ADR 175](architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md).
 
 ---
 
