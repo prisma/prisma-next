@@ -536,8 +536,6 @@ export const sqlTargetFamilyHook = {
       return 'Record<string, never>';
     }
 
-    const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
-
     const modelTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models)) {
       const fields: string[] = [];
