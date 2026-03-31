@@ -158,7 +158,12 @@ No verification at authoring time. Post-apply schema verification (R12) catches 
 - **`false`**: always run. For seeding, idempotent-by-construction cases, or when a meaningful check isn't worth writing.
 - **`true`**: always skip. Use with caution.
 
-At apply time, the runner executes the serialized check query (or interprets the literal boolean) to decide whether to skip the `run` step.
+The check executes at the same point in the migration — between phase 1 (additive/widening) and phase 3 (destructive) — in two roles:
+
+- **Before `run` (retry)**: determines whether to skip `run`. If the check returns no violations, the data migration is already complete.
+- **After `run` (validation)**: confirms that `run` did its job. If violations remain, the migration fails *before* phase 3 tightens constraints — producing a meaningful diagnostic ("47 rows still have first_name IS NULL") instead of a cryptic database error from phase 3 ("cannot set NOT NULL, column contains nulls").
+
+This dual role means the execution within phase 2 is: check → (skip or run) → check again → (fail or proceed to phase 3).
 
 ## Detection and scaffolding (R4, R11)
 
