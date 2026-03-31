@@ -65,6 +65,7 @@ describe('sql-target-family-hook', () => {
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('export type Contract');
     expect(types).toContain('CodecTypes');
+    expect(types).toContain('readonly roots:');
   });
 
   describe('Contract and TypeMaps shape', () => {
@@ -584,8 +585,12 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain("readonly name: CodecTypes['pg/text@1']['output'] | null");
-    expect(types).toContain("readonly email: CodecTypes['pg/text@1']['output']");
+    expect(types).toContain(
+      "readonly name: { readonly column: 'name'; readonly nullable: true; readonly codecId: 'pg/text@1' }",
+    );
+    expect(types).toContain(
+      "readonly email: { readonly column: 'email'; readonly nullable: false; readonly codecId: 'pg/text@1' }",
+    );
   });
 
   it('generates contract types with model field missing column reference', () => {
@@ -617,7 +622,9 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain("readonly email: { readonly column: 'nonexistent' }");
+    expect(types).toContain(
+      "readonly email: { readonly column: 'nonexistent'; readonly nullable: false; readonly codecId: '' }",
+    );
   });
 
   it('generates contract types with model referencing missing table', () => {
@@ -647,7 +654,9 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain("readonly id: { readonly column: 'id' }");
+    expect(types).toContain(
+      "readonly id: { readonly column: 'id'; readonly nullable: false; readonly codecId: '' }",
+    );
   });
 
   it('generates contract types with undefined models', () => {
@@ -704,9 +713,12 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    // When nullable is undefined, it should default to false (not nullable)
-    expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
-    expect(types).not.toContain("readonly id: CodecTypes['pg/int4@1']['output'] | null");
+    expect(types).toContain(
+      "readonly id: { readonly column: 'id'; readonly nullable: false; readonly codecId: 'pg/int4@1' }",
+    );
+    expect(types).not.toContain(
+      "readonly id: { readonly column: 'id'; readonly nullable: true; readonly codecId: 'pg/int4@1' }",
+    );
   });
 
   it('renders parameterized type when column has typeParams and renderer exists', () => {
@@ -754,10 +766,12 @@ describe('sql-target-family-hook', () => {
       parameterizedRenderers,
     });
 
-    // The parameterized renderer should be used for the vector column
-    expect(types).toContain('readonly vector: Vector<1536>');
-    // The scalar codec should still use CodecTypes lookup
-    expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
+    expect(types).toContain(
+      "readonly vector: { readonly column: 'vector'; readonly nullable: false; readonly codecId: 'pg/vector@1' }",
+    );
+    expect(types).toContain(
+      "readonly id: { readonly column: 'id'; readonly nullable: false; readonly codecId: 'pg/int4@1' }",
+    );
   });
 
   it('falls back to CodecTypes when column has typeParams but no renderer', () => {
@@ -790,11 +804,11 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    // No parameterized renderers provided
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
-    // Should fall back to CodecTypes lookup since no renderer exists
-    expect(types).toContain("readonly vector: CodecTypes['pg/vector@1']['output']");
+    expect(types).toContain(
+      "readonly vector: { readonly column: 'vector'; readonly nullable: false; readonly codecId: 'pg/vector@1' }",
+    );
     expect(types).not.toContain('Vector<1536>');
   });
 

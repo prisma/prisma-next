@@ -46,9 +46,12 @@ describe('sql-target-family-hook', () => {
           },
           relations: {
             posts: {
+              to: 'Post',
+              cardinality: '1:N',
+              strategy: 'reference',
               on: {
-                parentCols: ['id'],
-                childCols: ['userId'],
+                localFields: ['id'],
+                targetFields: ['userId'],
               },
             },
           },
@@ -90,7 +93,7 @@ describe('sql-target-family-hook', () => {
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('relations: {');
     expect(types).toContain(
-      "readonly posts: { readonly on: { readonly parentCols: readonly ['id']; readonly childCols: readonly ['userId'] } }",
+      "readonly posts: { readonly to: 'Post'; readonly cardinality: '1:N'; readonly strategy: 'reference'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
     );
   });
 
@@ -354,15 +357,21 @@ describe('sql-target-family-hook', () => {
           },
           relations: {
             posts: {
+              to: 'Post',
+              cardinality: '1:N',
+              strategy: 'reference',
               on: {
-                parentCols: ['id'],
-                childCols: ['userId'],
+                localFields: ['id'],
+                targetFields: ['userId'],
               },
             },
             comments: {
+              to: 'Comment',
+              cardinality: '1:N',
+              strategy: 'reference',
               on: {
-                parentCols: ['id'],
-                childCols: ['authorId'],
+                localFields: ['id'],
+                targetFields: ['authorId'],
               },
             },
           },
@@ -403,11 +412,12 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('export type Relations');
-    // Relations type is table-based, not model-based
-    // The test data doesn't include ir.relations, so Relations will be Record<string, never>
-    // But we can verify that relations are embedded in the Models type
-    expect(types).toContain('readonly posts: { readonly on:');
-    expect(types).toContain('readonly comments: { readonly on:');
+    expect(types).toContain(
+      "readonly posts: { readonly to: 'Post'; readonly cardinality: '1:N'; readonly strategy: 'reference'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
+    );
+    expect(types).toContain(
+      "readonly comments: { readonly to: 'Comment'; readonly cardinality: '1:N'; readonly strategy: 'reference'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['authorId'] } }",
+    );
   });
 
   it('generates relations type as empty when no relations', () => {
@@ -561,10 +571,8 @@ describe('sql-target-family-hook', () => {
           storage: { table: 'user' },
           fields: {},
           relations: {
-            // Missing 'on'
-            invalidRel1: { to: 'Post' },
-            // Missing 'parentCols'
-            invalidRel2: { on: { childCols: ['id'] } },
+            partialRel: { to: 'Post' },
+            invalidRel: { on: { childCols: ['id'] } },
           },
         },
       },
@@ -581,9 +589,8 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    // Should run without error and not generate relations output for invalid ones
-    expect(types).not.toContain('invalidRel1');
-    expect(types).not.toContain('invalidRel2');
+    expect(types).toContain("readonly partialRel: { readonly to: 'Post' }");
+    expect(types).not.toContain('invalidRel');
   });
 
   it('generates mappings type with models that have no fields', () => {
@@ -761,7 +768,9 @@ describe('sql-target-family-hook', () => {
       parameterizedRenderers,
     });
 
-    expect(types).toContain("CodecTypes['pg/vector@1']['output'] & { length: 1536 }");
+    expect(types).toContain(
+      "readonly vector: { readonly column: 'vector'; readonly nullable: false; readonly codecId: 'pg/vector@1' }",
+    );
   });
 
   it('renders column type using typeRef with parameterized renderer', () => {
@@ -815,6 +824,8 @@ describe('sql-target-family-hook', () => {
       parameterizedRenderers,
     });
 
-    expect(types).toContain("CodecTypes['pg/vector@1']['output'] & { length: 1536 }");
+    expect(types).toContain(
+      "readonly vector: { readonly column: 'vector'; readonly nullable: false; readonly codecId: 'pg/vector@1' }",
+    );
   });
 });

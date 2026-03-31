@@ -24,6 +24,7 @@ export interface ContractIR<
   readonly schemaVersion: string;
   readonly targetFamily: string;
   readonly target: string;
+  readonly roots?: Record<string, string>;
   readonly models: TModels;
   readonly relations: TRelations;
   readonly storage: TStorage;
@@ -110,17 +111,18 @@ export function contractIR<
     readonly meta: Record<string, unknown>;
     readonly sources: Record<string, unknown>;
   };
+  roots?: Record<string, string>;
   storage: TStorage;
   models: TModels;
   relations: TRelations;
   execution?: TExecution;
 }): ContractIR<TStorage, TModels, TRelations, TExecution> {
-  // ContractIR doesn't include storageHash/executionHash or profileHash (those are computed by emitter)
   return {
     schemaVersion: opts.header.schemaVersion,
     target: opts.header.target,
     targetFamily: opts.header.targetFamily,
     ...opts.meta,
+    ...ifDefined('roots', opts.roots),
     storage: opts.storage,
     models: opts.models,
     relations: opts.relations,

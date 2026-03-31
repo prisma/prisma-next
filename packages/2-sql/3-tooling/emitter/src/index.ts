@@ -297,6 +297,7 @@ export const sqlTargetFamilyHook = {
     const modelsType = this.generateModelsType(models, storage, parameterizedRenderers);
     const relationsType = this.generateRelationsType(ir.relations);
     const mappingsType = this.generateMappingsType(models, storage);
+    const rootsType = this.generateRootsType(ir.roots);
 
     const executionHashType = hashes.executionHash
       ? `ExecutionHashBase<'${hashes.executionHash}'>`
@@ -348,6 +349,7 @@ export const sqlTargetFamilyHook = {
   ProfileHash
   > & {
     readonly target: ${this.serializeValue(ir.target)};
+    readonly roots: ${rootsType};
     readonly capabilities: ${this.serializeValue(ir.capabilities)};
     readonly extensionPacks: ${this.serializeValue(ir.extensionPacks)};
     readonly execution: ${this.serializeValue(ir.execution)};
@@ -359,6 +361,16 @@ export const sqlTargetFamilyHook = {
   export type Models = Contract['models'];
   export type Relations = Contract['relations'];
   `;
+  },
+
+  generateRootsType(roots: Record<string, string> | undefined): string {
+    if (!roots || Object.keys(roots).length === 0) {
+      return 'Record<string, string>';
+    }
+    const entries = Object.entries(roots)
+      .map(([key, value]) => `readonly ${key}: '${value}'`)
+      .join('; ');
+    return `{ ${entries} }`;
   },
 
   generateStorageType(storage: SqlStorage): string {
@@ -522,58 +534,57 @@ export const sqlTargetFamilyHook = {
       return 'Record<string, never>';
     }
 
-    const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
-
     const modelTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models)) {
       const fields: string[] = [];
+      const storageFieldParts: string[] = [];
       const tableName = model.storage.table;
       const table = storage.tables[tableName];
 
-      if (table) {
-        for (const [fieldName, field] of Object.entries(model.fields)) {
-          const column = table.columns[field.column];
-          if (!column) {
-            fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
-            continue;
-          }
-
-          const jsType = this.generateColumnType(
-            column,
-            storage,
-            parameterizedRenderers,
-            renderCtx,
-          );
-          fields.push(`readonly ${fieldName}: ${jsType}`);
-        }
-      } else {
-        for (const [fieldName, field] of Object.entries(model.fields)) {
-          fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
-        }
+      for (const [fieldName, field] of Object.entries(model.fields)) {
+        const colName = field.column;
+        const column = table?.columns[colName];
+        const nullable = column?.nullable ?? false;
+        const codecId = column?.codecId ?? '';
+        fields.push(
+          `readonly ${fieldName}: { readonly column: '${colName}'; readonly nullable: ${nullable}; readonly codecId: '${codecId}' }`,
+        );
+        storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${colName}' }`);
       }
 
       const relations: string[] = [];
-      for (const [relName, rel] of Object.entries(model.relations)) {
-        if (typeof rel === 'object' && rel !== null && 'on' in rel) {
-          const on = rel.on as { parentCols?: string[]; childCols?: string[] };
-          if (on.parentCols && on.childCols) {
-            const parentCols = on.parentCols.map((c) => `'${c}'`).join(', ');
-            const childCols = on.childCols.map((c) => `'${c}'`).join(', ');
-            relations.push(
-              `readonly ${relName}: { readonly on: { readonly parentCols: readonly [${parentCols}]; readonly childCols: readonly [${childCols}] } }`,
-            );
-          }
+      const modelRels = model.relations as Record<string, unknown>;
+      for (const [relName, rel] of Object.entries(modelRels)) {
+        if (typeof rel !== 'object' || rel === null) continue;
+        const relObj = rel as Record<string, unknown>;
+        const relParts: string[] = [];
+        if (relObj['to']) relParts.push(`readonly to: '${relObj['to']}'`);
+        if (relObj['cardinality'])
+          relParts.push(`readonly cardinality: '${relObj['cardinality']}'`);
+        if (relObj['strategy']) relParts.push(`readonly strategy: '${relObj['strategy']}'`);
+        const on = relObj['on'] as { localFields?: string[]; targetFields?: string[] } | undefined;
+        if (on?.localFields && on.targetFields) {
+          const localFields = on.localFields.map((f) => `'${f}'`).join(', ');
+          const targetFields = on.targetFields.map((f) => `'${f}'`).join(', ');
+          relParts.push(
+            `readonly on: { readonly localFields: readonly [${localFields}]; readonly targetFields: readonly [${targetFields}] }`,
+          );
+        }
+        if (relParts.length > 0) {
+          relations.push(`readonly ${relName}: { ${relParts.join('; ')} }`);
         }
       }
 
-      const modelParts: string[] = [
-        `storage: { readonly table: '${tableName}' }`,
-        `fields: { ${fields.join('; ')} }`,
-      ];
-
-      if (relations.length > 0) {
-        modelParts.push(`relations: { ${relations.join('; ')} }`);
+      const storageParts = [`readonly table: '${tableName}'`];
+      if (storageFieldParts.length > 0) {
+        storageParts.push(`readonly fields: { ${storageFieldParts.join('; ')} }`);
       }
+
+      const modelParts: string[] = [
+        `storage: { ${storageParts.join('; ')} }`,
+        `fields: { ${fields.join('; ')} }`,
+        `relations: { ${relations.join('; ')} }`,
+      ];
 
       modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
     }
