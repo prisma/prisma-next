@@ -25,7 +25,6 @@
             "localFields": ["userId"],
             "targetFields": ["id"]
           },
-          "strategy": "reference",
           "to": "User"
         }
       },
@@ -54,7 +53,6 @@
             "localFields": ["id"],
             "targetFields": ["userId"]
           },
-          "strategy": "reference",
           "to": "Post"
         }
       },

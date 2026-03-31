@@ -40,7 +40,6 @@
               "id"
             ]
           },
-          "strategy": "reference",
           "to": "User"
         }
       },
@@ -91,7 +90,6 @@
               "userId"
             ]
           },
-          "strategy": "reference",
           "to": "Post"
         }
       },
