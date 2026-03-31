@@ -29,13 +29,9 @@ function toAggregateExpr(tableName: string, selector: AggregateSelector<unknown>
   return new AggregateExpr(selector.fn, ColumnRef.of(tableName, selector.column));
 }
 
-// ORM HAVING filters use literal binding (values inlined at plan-build time),
-// not parameterized binding. ParamRef is rejected because the ORM's grouped
-// collection API always produces literal comparisons for having() predicates.
 function validateGroupedComparable(value: AnyExpression): AnyExpression {
   switch (value.kind) {
     case 'param-ref':
-      throw new Error('ParamRef is not supported in grouped having expressions');
     case 'literal':
     case 'column-ref':
     case 'identifier-ref':
@@ -43,9 +39,6 @@ function validateGroupedComparable(value: AnyExpression): AnyExpression {
     case 'operation':
       return value;
     case 'list':
-      if (value.values.some((entry) => entry.kind === 'param-ref')) {
-        throw new Error('ParamRef is not supported in grouped having expressions');
-      }
       return value;
     default:
       throw new Error(`Unsupported comparable kind in grouped having: "${value.kind}"`);

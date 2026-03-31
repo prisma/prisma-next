@@ -12,8 +12,8 @@ import {
   type CodecTrait,
   type ColumnRef,
   ListExpression,
-  LiteralExpr,
   NullCheckExpr,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -181,12 +181,12 @@ export type ComparisonMethods<T, Traits> = {
 // COMPARISON_METHODS_META — single source of truth for traits + factories
 // ---------------------------------------------------------------------------
 
-function literal(value: unknown): LiteralExpr {
-  return LiteralExpr.of(value);
+function param(column: ColumnRef, codecId: string, value: unknown): ParamRef {
+  return ParamRef.of(value, { name: column.column, codecId });
 }
 
-function listLiteral(values: readonly unknown[]): ListExpression {
-  return ListExpression.fromValues(values);
+function paramList(column: ColumnRef, codecId: string, values: readonly unknown[]): ListExpression {
+  return ListExpression.of(values.map((v) => param(column, codecId, v)));
 }
 
 function bin(op: BinaryExpr['op'], column: ColumnRef, right: BinaryExpr['right']): BinaryExpr {
@@ -196,7 +196,7 @@ function bin(op: BinaryExpr['op'], column: ColumnRef, right: BinaryExpr['right']
 // never[] is intentional: factories have heterogeneous signatures (value: unknown,
 // values: readonly unknown[], pattern: string, etc.) but are only called through
 // the typed ComparisonMethodFns interface, never through this type directly.
-type MethodFactory = (column: ColumnRef) => (...args: never[]) => unknown;
+type MethodFactory = (column: ColumnRef, codecId: string) => (...args: never[]) => unknown;
 
 type ComparisonMethodMeta = {
   readonly traits: readonly CodecTrait[];
@@ -212,43 +212,53 @@ type ComparisonMethodMeta = {
 export const COMPARISON_METHODS_META = {
   eq: {
     traits: ['equality'],
-    create: (column) => (value: unknown) => bin('eq', column, literal(value)),
+    create: (column, codecId) => (value: unknown) =>
+      bin('eq', column, param(column, codecId, value)),
   },
   neq: {
     traits: ['equality'],
-    create: (column) => (value: unknown) => bin('neq', column, literal(value)),
+    create: (column, codecId) => (value: unknown) =>
+      bin('neq', column, param(column, codecId, value)),
   },
   in: {
     traits: ['equality'],
-    create: (column) => (values: readonly unknown[]) => bin('in', column, listLiteral(values)),
+    create: (column, codecId) => (values: readonly unknown[]) =>
+      bin('in', column, paramList(column, codecId, values)),
   },
   notIn: {
     traits: ['equality'],
-    create: (column) => (values: readonly unknown[]) => bin('notIn', column, listLiteral(values)),
+    create: (column, codecId) => (values: readonly unknown[]) =>
+      bin('notIn', column, paramList(column, codecId, values)),
   },
   gt: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('gt', column, literal(value)),
+    create: (column, codecId) => (value: unknown) =>
+      bin('gt', column, param(column, codecId, value)),
   },
   lt: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('lt', column, literal(value)),
+    create: (column, codecId) => (value: unknown) =>
+      bin('lt', column, param(column, codecId, value)),
   },
   gte: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('gte', column, literal(value)),
+    create: (column, codecId) => (value: unknown) =>
+      bin('gte', column, param(column, codecId, value)),
   },
   lte: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('lte', column, literal(value)),
+    create: (column, codecId) => (value: unknown) =>
+      bin('lte', column, param(column, codecId, value)),
   },
   like: {
     traits: ['textual'],
-    create: (column) => (pattern: string) => bin('like', column, literal(pattern)),
+    create: (column, codecId) => (pattern: string) =>
+      bin('like', column, param(column, codecId, pattern)),
   },
   ilike: {
     traits: ['textual'],
-    create: (column) => (pattern: string) => bin('ilike', column, literal(pattern)),
+    create: (column, codecId) => (pattern: string) =>
+      bin('ilike', column, param(column, codecId, pattern)),
   },
   asc: {
     traits: ['order'],

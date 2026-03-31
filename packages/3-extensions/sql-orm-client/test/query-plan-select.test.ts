@@ -4,8 +4,8 @@ import {
   ColumnRef,
   DerivedTableSource,
   ListExpression,
-  LiteralExpr,
   OrExpr,
+  ParamRef,
   type SelectAst,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -15,7 +15,6 @@ import {
   compileSelect,
   compileSelectWithIncludeStrategy,
 } from '../src/query-plan-select';
-import { bindWhereExpr } from '../src/where-binding';
 import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
 import { isSelectAst } from './helpers';
 
@@ -62,9 +61,9 @@ describe('compileSelectWithIncludeStrategy', () => {
     expectSelectAst(plan.ast);
 
     expect(plan.ast.where).toEqual(
-      bindWhereExpr(
-        baseContract,
-        BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+      BinaryExpr.eq(
+        ColumnRef.of('users', 'name'),
+        ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
       ),
     );
 
@@ -78,9 +77,9 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(childRowsSource.query.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
-        bindWhereExpr(
-          baseContract,
-          BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+        BinaryExpr.gte(
+          ColumnRef.of('posts', 'views'),
+          ParamRef.of(100, { name: 'views', codecId: 'pg/int4@1' }),
         ),
       ]),
     );
@@ -106,17 +105,17 @@ describe('compileSelectWithIncludeStrategy', () => {
       dslDescriptor('users', 'id'),
     ]);
 
-    const gtName = bindWhereExpr(
-      baseContract,
-      BinaryExpr.gt(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+    const gtName = BinaryExpr.gt(
+      ColumnRef.of('users', 'name'),
+      ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
     );
-    const eqName = bindWhereExpr(
-      baseContract,
-      BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+    const eqName = BinaryExpr.eq(
+      ColumnRef.of('users', 'name'),
+      ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
     );
-    const ltId = bindWhereExpr(
-      baseContract,
-      BinaryExpr.lt(ColumnRef.of('users', 'id'), LiteralExpr.of(7)),
+    const ltId = BinaryExpr.lt(
+      ColumnRef.of('users', 'id'),
+      ParamRef.of(7, { name: 'id', codecId: 'pg/int4@1' }),
     );
 
     expect(plan.ast.where).toEqual(OrExpr.of([gtName, AndExpr.of([eqName, ltId])]));
@@ -134,7 +133,10 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(plan.params).toEqual([9]);
     expect(plan.meta.paramDescriptors).toEqual([dslDescriptor('users', 'id')]);
     expect(plan.ast.where).toEqual(
-      bindWhereExpr(baseContract, BinaryExpr.gt(ColumnRef.of('users', 'id'), LiteralExpr.of(9))),
+      BinaryExpr.gt(
+        ColumnRef.of('users', 'id'),
+        ParamRef.of(9, { name: 'id', codecId: 'pg/int4@1' }),
+      ),
     );
 
     const invalidState = {
@@ -162,13 +164,16 @@ describe('compileSelectWithIncludeStrategy', () => {
       dslDescriptor('posts', 'title'),
     ]);
 
-    const inWhere = bindWhereExpr(
-      baseContract,
-      BinaryExpr.in(ColumnRef.of('posts', 'user_id'), ListExpression.fromValues([1, 2])),
+    const inWhere = BinaryExpr.in(
+      ColumnRef.of('posts', 'user_id'),
+      ListExpression.of([
+        ParamRef.of(1, { name: 'user_id', codecId: 'pg/int4@1' }),
+        ParamRef.of(2, { name: 'user_id', codecId: 'pg/int4@1' }),
+      ]),
     );
-    const titleWhere = bindWhereExpr(
-      baseContract,
-      BinaryExpr.eq(ColumnRef.of('posts', 'title'), LiteralExpr.of('Hello')),
+    const titleWhere = BinaryExpr.eq(
+      ColumnRef.of('posts', 'title'),
+      ParamRef.of('Hello', { name: 'title', codecId: 'pg/text@1' }),
     );
 
     expect(plan.ast.where).toEqual(AndExpr.of([inWhere, titleWhere]));

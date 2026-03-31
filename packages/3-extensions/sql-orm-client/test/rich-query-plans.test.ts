@@ -5,7 +5,6 @@ import {
   ColumnRef,
   type DerivedTableSource,
   type InsertAst,
-  LiteralExpr,
   ParamRef,
   type SelectAst,
   type SubqueryExpr,
@@ -87,7 +86,12 @@ describe('SQL ORM rich AST query plans', () => {
       baseContract,
       'users',
       { email: 'b@example.com' },
-      [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
+      [
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      ],
       ['id'],
     );
     expect(updatePlan.ast.kind).toBe('update');
@@ -96,7 +100,12 @@ describe('SQL ORM rich AST query plans', () => {
     const deletePlan = compileDeleteReturning(
       baseContract,
       'users',
-      [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
+      [
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      ],
       ['id'],
     );
     expect(deletePlan.ast.kind).toBe('delete');
@@ -110,7 +119,7 @@ describe('SQL ORM rich AST query plans', () => {
         postCount: { kind: 'aggregate', fn: 'count' },
         totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' },
       },
-      BinaryExpr.gt(AggregateExpr.count(), LiteralExpr.of(1)),
+      BinaryExpr.gt(AggregateExpr.count(), ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' })),
     );
     expect(groupedPlan.ast.kind).toBe('select');
     const groupedAst = groupedPlan.ast as SelectAst;

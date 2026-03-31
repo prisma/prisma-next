@@ -7,9 +7,9 @@ import {
   createCodecRegistry,
   ExistsExpr,
   ListExpression,
-  LiteralExpr,
   NotExpr,
   NullCheckExpr,
+  ParamRef,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -21,45 +21,66 @@ import { getTestContext, getTestContract } from './helpers';
 describe('createModelAccessor', () => {
   const context = getTestContext();
 
-  function expectBinaryLiteral(
+  function expectBinaryParam(
     actual: unknown,
     table: string,
     column: string,
     op: BinaryExpr['op'],
     value: unknown,
+    codecId: string,
   ) {
-    expect(actual).toEqual(new BinaryExpr(op, ColumnRef.of(table, column), LiteralExpr.of(value)));
+    expect(actual).toEqual(
+      new BinaryExpr(
+        op,
+        ColumnRef.of(table, column),
+        ParamRef.of(value, { name: column, codecId }),
+      ),
+    );
   }
 
   it('creates scalar comparison operators and maps fields to columns', () => {
     const user = createModelAccessor(context, 'User');
     const post = createModelAccessor(context, 'Post');
 
-    expectBinaryLiteral(user['name']!.eq('Alice'), 'users', 'name', 'eq', 'Alice');
-    expectBinaryLiteral(
+    expectBinaryParam(user['name']!.eq('Alice'), 'users', 'name', 'eq', 'Alice', 'pg/text@1');
+    expectBinaryParam(
       user['email']!.neq('test@example.com'),
       'users',
       'email',
       'neq',
       'test@example.com',
+      'pg/text@1',
     );
-    expectBinaryLiteral(post['views']!.gt(1000), 'posts', 'views', 'gt', 1000);
-    expectBinaryLiteral(post['views']!.lt(100), 'posts', 'views', 'lt', 100);
-    expectBinaryLiteral(post['id']!.gte(5), 'posts', 'id', 'gte', 5);
-    expectBinaryLiteral(post['id']!.lte(10), 'posts', 'id', 'lte', 10);
-    expectBinaryLiteral(post['userId']!.eq(42), 'posts', 'user_id', 'eq', 42);
-    expectBinaryLiteral(user['name']!.like('%Ali%'), 'users', 'name', 'like', '%Ali%');
-    expectBinaryLiteral(user['name']!.ilike('%ali%'), 'users', 'name', 'ilike', '%ali%');
+    expectBinaryParam(post['views']!.gt(1000), 'posts', 'views', 'gt', 1000, 'pg/int4@1');
+    expectBinaryParam(post['views']!.lt(100), 'posts', 'views', 'lt', 100, 'pg/int4@1');
+    expectBinaryParam(post['id']!.gte(5), 'posts', 'id', 'gte', 5, 'pg/int4@1');
+    expectBinaryParam(post['id']!.lte(10), 'posts', 'id', 'lte', 10, 'pg/int4@1');
+    expectBinaryParam(post['userId']!.eq(42), 'posts', 'user_id', 'eq', 42, 'pg/int4@1');
+    expectBinaryParam(user['name']!.like('%Ali%'), 'users', 'name', 'like', '%Ali%', 'pg/text@1');
+    expectBinaryParam(user['name']!.ilike('%ali%'), 'users', 'name', 'ilike', '%ali%', 'pg/text@1');
   });
 
   it('creates list literal, null check, and order directive helpers', () => {
     const accessor = createModelAccessor(context, 'Post');
 
     expect(accessor['id']!.in([1, 2, 3])).toEqual(
-      BinaryExpr.in(ColumnRef.of('posts', 'id'), ListExpression.fromValues([1, 2, 3])),
+      BinaryExpr.in(
+        ColumnRef.of('posts', 'id'),
+        ListExpression.of([
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(2, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(3, { name: 'id', codecId: 'pg/int4@1' }),
+        ]),
+      ),
     );
     expect(accessor['id']!.notIn([4, 5])).toEqual(
-      BinaryExpr.notIn(ColumnRef.of('posts', 'id'), ListExpression.fromValues([4, 5])),
+      BinaryExpr.notIn(
+        ColumnRef.of('posts', 'id'),
+        ListExpression.of([
+          ParamRef.of(4, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(5, { name: 'id', codecId: 'pg/int4@1' }),
+        ]),
+      ),
     );
     expect(accessor['id']!.asc()).toEqual({ column: 'id', direction: 'asc' });
     expect(accessor['id']!.desc()).toEqual({ column: 'id', direction: 'desc' });
@@ -91,7 +112,10 @@ describe('createModelAccessor', () => {
     expect(noneExpr.subquery.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
-        BinaryExpr.eq(ColumnRef.of('posts', 'views'), LiteralExpr.of(10)),
+        BinaryExpr.eq(
+          ColumnRef.of('posts', 'views'),
+          ParamRef.of(10, { name: 'views', codecId: 'pg/int4@1' }),
+        ),
       ]),
     );
 
@@ -100,7 +124,12 @@ describe('createModelAccessor', () => {
     expect(everyExpr.subquery.where).toEqual(
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
-        new NotExpr(BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(10))),
+        new NotExpr(
+          BinaryExpr.gt(
+            ColumnRef.of('posts', 'views'),
+            ParamRef.of(10, { name: 'views', codecId: 'pg/int4@1' }),
+          ),
+        ),
       ]),
     );
   });
@@ -342,8 +371,14 @@ describe('createModelAccessor', () => {
       AndExpr.of([
         BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
         AndExpr.of([
-          BinaryExpr.eq(ColumnRef.of('posts', 'title'), LiteralExpr.of('A')),
-          BinaryExpr.eq(ColumnRef.of('posts', 'views'), LiteralExpr.of(1)),
+          BinaryExpr.eq(
+            ColumnRef.of('posts', 'title'),
+            ParamRef.of('A', { name: 'title', codecId: 'pg/text@1' }),
+          ),
+          BinaryExpr.eq(
+            ColumnRef.of('posts', 'views'),
+            ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' }),
+          ),
         ]),
       ]),
     );

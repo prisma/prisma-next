@@ -2,13 +2,11 @@ import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
-  LiteralExpr,
   NullCheckExpr,
   ParamRef,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { bindWhereExpr } from '../src/where-binding';
 import {
   baseContract,
   createCollection,
@@ -23,22 +21,22 @@ describe('Collection', () => {
 
       const filtered = collection.where((user) => user.name.eq('Alice'));
       expect(filtered.state.filters).toEqual([
-        bindWhereExpr(
-          baseContract,
-          BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
         ),
       ]);
       expect(collection.state.filters).toEqual([]);
 
       const chained = filtered.where((user) => user.email.neq('old@example.com'));
       expect(chained.state.filters).toEqual([
-        bindWhereExpr(
-          baseContract,
-          BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
         ),
-        bindWhereExpr(
-          baseContract,
-          BinaryExpr.neq(ColumnRef.of('users', 'email'), LiteralExpr.of('old@example.com')),
+        BinaryExpr.neq(
+          ColumnRef.of('users', 'email'),
+          ParamRef.of('old@example.com', { name: 'email', codecId: 'pg/text@1' }),
         ),
       ]);
     });
@@ -88,13 +86,13 @@ describe('Collection', () => {
       });
 
       expect(filtered.state.filters).toEqual([
-        bindWhereExpr(
-          baseContract,
-          AndExpr.of([
-            BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
-            NullCheckExpr.isNull(ColumnRef.of('users', 'email')),
-          ]),
-        ),
+        AndExpr.of([
+          BinaryExpr.eq(
+            ColumnRef.of('users', 'name'),
+            ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+          ),
+          NullCheckExpr.isNull(ColumnRef.of('users', 'email')),
+        ]),
       ]);
 
       expect(collection.where({})).toBe(collection);
@@ -153,9 +151,9 @@ describe('Collection', () => {
         cardinality: '1:N',
       });
       expect(withPosts.state.includes[0]?.nested.filters).toEqual([
-        bindWhereExpr(
-          baseContract,
-          BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+        BinaryExpr.gt(
+          ColumnRef.of('posts', 'views'),
+          ParamRef.of(100, { name: 'views', codecId: 'pg/int4@1' }),
         ),
       ]);
       expect(withPosts.state.includes[0]?.nested.limit).toBe(5);
@@ -169,9 +167,9 @@ describe('Collection', () => {
         fn: 'count',
       });
       expect(withPostCount.state.includes[0]?.scalar?.state.filters).toEqual([
-        bindWhereExpr(
-          baseContract,
-          BinaryExpr.gt(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+        BinaryExpr.gt(
+          ColumnRef.of('posts', 'views'),
+          ParamRef.of(100, { name: 'views', codecId: 'pg/int4@1' }),
         ),
       ]);
 

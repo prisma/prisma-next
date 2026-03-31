@@ -10,6 +10,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import { resolveColumnCodecId } from './collection-contract';
 import { and, not } from './filters';
 import {
   COMPARISON_METHODS_META,
@@ -59,40 +60,43 @@ export function createModelAccessor<
       }
 
       const columnName = fieldToColumn[prop] ?? prop;
-      const traits = resolveFieldTraits(contract, tableName, columnName, context);
-      return createScalarFieldAccessor(tableName, columnName, traits);
+      const columnMeta = resolveColumnMeta(contract, tableName, columnName, context);
+      return createScalarFieldAccessor(tableName, columnName, columnMeta);
     },
   });
 }
 
-function resolveFieldTraits(
+interface ColumnMeta {
+  readonly codecId: string;
+  readonly traits: readonly string[];
+}
+
+function resolveColumnMeta(
   contract: SqlContract<SqlStorage>,
   tableName: string,
   columnName: string,
   context: ExecutionContext,
-): readonly string[] {
-  const tables = contract.storage?.tables as
-    | Record<string, { columns?: Record<string, { codecId?: string }> }>
-    | undefined;
-  const codecId = tables?.[tableName]?.columns?.[columnName]?.codecId;
-  // unknown columns get no trait-gated methods
-  if (!codecId) return [];
-  return context.codecs.traitsOf(codecId);
+): ColumnMeta | undefined {
+  const codecId = resolveColumnCodecId(contract, tableName, columnName);
+  if (!codecId) return undefined;
+  return { codecId, traits: context.codecs.traitsOf(codecId) };
 }
 
 function createScalarFieldAccessor(
   tableName: string,
   columnName: string,
-  traits: readonly string[],
+  columnMeta: ColumnMeta | undefined,
 ): Partial<ComparisonMethodFns<unknown>> {
   const column = ColumnRef.of(tableName, columnName);
   const methods: Record<string, unknown> = {};
+  const traits = columnMeta?.traits ?? [];
+  const codecId = columnMeta?.codecId ?? '';
 
   for (const [name, meta] of Object.entries(COMPARISON_METHODS_META)) {
     if (meta.traits.some((t) => !traits.includes(t))) {
       continue;
     }
-    methods[name] = meta.create(column);
+    methods[name] = meta.create(column, codecId);
   }
 
   return methods as Partial<ComparisonMethodFns<unknown>>;

@@ -5,7 +5,7 @@ import {
   BinaryExpr,
   type BinaryOp,
   ColumnRef,
-  LiteralExpr,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { mapStorageRowToModelFields } from './collection-runtime';
@@ -156,7 +156,7 @@ function createHavingComparisonMethods<T extends number | null>(
   metric: AggregateExpr,
 ): HavingComparisonMethods<T> {
   const buildBinaryExpr = (op: BinaryOp, value: unknown): AnyExpression =>
-    new BinaryExpr(op, metric, LiteralExpr.of(value));
+    new BinaryExpr(op, metric, ParamRef.of(value));
 
   return {
     eq(value) {

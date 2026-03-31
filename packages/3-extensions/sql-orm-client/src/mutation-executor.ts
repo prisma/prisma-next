@@ -3,10 +3,14 @@ import {
   type AnyExpression,
   BinaryExpr,
   ColumnRef,
-  LiteralExpr,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
-import { resolveModelTableName, resolvePrimaryKeyColumn } from './collection-contract';
+import {
+  resolveColumnCodecId,
+  resolveModelTableName,
+  resolvePrimaryKeyColumn,
+} from './collection-contract';
 import {
   acquireRuntimeScope,
   mapModelDataToStorageRow,
@@ -486,7 +490,7 @@ async function applyChildOwnedMutation(
   }
 
   if (!mutation.criteria || mutation.criteria.length === 0) {
-    const parentJoinWhere = buildChildJoinWhere(relation, parentValues);
+    const parentJoinWhere = buildChildJoinWhere(contract, relation, parentValues);
     await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
       parentJoinWhere,
     ]);
@@ -505,7 +509,7 @@ async function applyChildOwnedMutation(
       );
     }
 
-    const parentJoinWhere = buildChildJoinWhere(relation, parentValues);
+    const parentJoinWhere = buildChildJoinWhere(contract, relation, parentValues);
     await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
       and(parentJoinWhere, criterionWhere),
     ]);
@@ -542,16 +546,19 @@ function readParentColumnValues(
 }
 
 function buildChildJoinWhere(
+  contract: SqlContract<SqlStorage>,
   relation: RelationDefinition,
   childValues: Map<string, unknown>,
 ): AnyExpression {
   const exprs: AnyExpression[] = [];
+  const tableName = relation.relatedTableName;
 
   for (const [childColumn, parentValue] of childValues.entries()) {
+    const codecId = resolveColumnCodecId(contract, tableName, childColumn);
     exprs.push(
       BinaryExpr.eq(
-        ColumnRef.of(relation.relatedTableName, childColumn),
-        LiteralExpr.of(parentValue),
+        ColumnRef.of(tableName, childColumn),
+        ParamRef.of(parentValue, { name: childColumn, ...(codecId ? { codecId } : {}) }),
       ),
     );
   }

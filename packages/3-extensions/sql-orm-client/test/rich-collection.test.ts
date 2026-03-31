@@ -7,8 +7,7 @@ import {
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { bindWhereExpr } from '../src/where-binding';
-import { baseContract, createCollectionFor } from './collection-fixtures';
+import { createCollectionFor } from './collection-fixtures';
 
 describe('SQL ORM collections with rich AST plans', () => {
   it('stores direct where expressions and bound where payloads in collection state', () => {
@@ -16,9 +15,9 @@ describe('SQL ORM collections with rich AST plans', () => {
 
     const direct = collection.where(BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)));
     expect(direct.state.filters[0]).toBeInstanceOf(BinaryExpr);
-    expect(
-      bindWhereExpr(baseContract, BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
-    ).toEqual(direct.state.filters[0]);
+    expect(direct.state.filters[0]).toEqual(
+      BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1)),
+    );
 
     const bound = collection.where({
       toWhereExpr: () =>

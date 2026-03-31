@@ -3,10 +3,10 @@ import {
   BinaryExpr,
   ColumnRef,
   ListExpression,
-  LiteralExpr,
   NotExpr,
   NullCheckExpr,
   OrExpr,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or, shorthandToWhereExpr } from '../src/filters';
@@ -23,21 +23,38 @@ describe('filters', () => {
     const andExpr = and(user['name']!.eq('Alice'), user['email']!.neq('bob@example.com'));
     expect(andExpr).toEqual(
       AndExpr.of([
-        BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
-        BinaryExpr.neq(ColumnRef.of('users', 'email'), LiteralExpr.of('bob@example.com')),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+        ),
+        BinaryExpr.neq(
+          ColumnRef.of('users', 'email'),
+          ParamRef.of('bob@example.com', { name: 'email', codecId: 'pg/text@1' }),
+        ),
       ]),
     );
 
     const orExpr = or(user['name']!.eq('Alice'), user['name']!.eq('Bob'));
     expect(orExpr).toEqual(
       OrExpr.of([
-        BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
-        BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Bob')),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+        ),
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Bob', { name: 'name', codecId: 'pg/text@1' }),
+        ),
       ]),
     );
 
     expect(not(user['name']!.eq('Alice'))).toEqual(
-      new NotExpr(BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice'))),
+      new NotExpr(
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+        ),
+      ),
     );
     expect(not(user['posts']!.some()).kind).toBe('not');
     expect(not(user['email']!.isNull())).toEqual(
@@ -48,10 +65,19 @@ describe('filters', () => {
     ).toEqual(
       new NotExpr(
         AndExpr.of([
-          BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
+          BinaryExpr.eq(
+            ColumnRef.of('users', 'name'),
+            ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+          ),
           OrExpr.of([
-            BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('a')),
-            BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('b')),
+            BinaryExpr.eq(
+              ColumnRef.of('users', 'email'),
+              ParamRef.of('a', { name: 'email', codecId: 'pg/text@1' }),
+            ),
+            BinaryExpr.eq(
+              ColumnRef.of('users', 'email'),
+              ParamRef.of('b', { name: 'email', codecId: 'pg/text@1' }),
+            ),
           ]),
         ]),
       ),
@@ -63,22 +89,58 @@ describe('filters', () => {
     const user = createModelAccessor(context, 'User');
 
     expect(not(user['id']!.neq(1))).toEqual(
-      new NotExpr(BinaryExpr.neq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
+      new NotExpr(
+        BinaryExpr.neq(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      ),
     );
     expect(not(user['id']!.lt(1))).toEqual(
-      new NotExpr(BinaryExpr.lt(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
+      new NotExpr(
+        BinaryExpr.lt(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      ),
     );
     expect(not(user['id']!.gte(1))).toEqual(
-      new NotExpr(BinaryExpr.gte(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
+      new NotExpr(
+        BinaryExpr.gte(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      ),
     );
     expect(not(user['id']!.lte(1))).toEqual(
-      new NotExpr(BinaryExpr.lte(ColumnRef.of('users', 'id'), LiteralExpr.of(1))),
+      new NotExpr(
+        BinaryExpr.lte(
+          ColumnRef.of('users', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      ),
     );
     expect(not(user['id']!.in([1, 2]))).toEqual(
-      new NotExpr(BinaryExpr.in(ColumnRef.of('users', 'id'), ListExpression.fromValues([1, 2]))),
+      new NotExpr(
+        BinaryExpr.in(
+          ColumnRef.of('users', 'id'),
+          ListExpression.of([
+            ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+            ParamRef.of(2, { name: 'id', codecId: 'pg/int4@1' }),
+          ]),
+        ),
+      ),
     );
     expect(not(user['id']!.notIn([1, 2]))).toEqual(
-      new NotExpr(BinaryExpr.notIn(ColumnRef.of('users', 'id'), ListExpression.fromValues([1, 2]))),
+      new NotExpr(
+        BinaryExpr.notIn(
+          ColumnRef.of('users', 'id'),
+          ListExpression.of([
+            ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+            ParamRef.of(2, { name: 'id', codecId: 'pg/int4@1' }),
+          ]),
+        ),
+      ),
     );
   });
 
@@ -86,10 +148,20 @@ describe('filters', () => {
     const user = createModelAccessor(context, 'User');
 
     expect(not(user['name']!.like('%a%'))).toEqual(
-      new NotExpr(BinaryExpr.like(ColumnRef.of('users', 'name'), LiteralExpr.of('%a%'))),
+      new NotExpr(
+        BinaryExpr.like(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('%a%', { name: 'name', codecId: 'pg/text@1' }),
+        ),
+      ),
     );
     expect(not(user['name']!.ilike('%a%'))).toEqual(
-      new NotExpr(BinaryExpr.ilike(ColumnRef.of('users', 'name'), LiteralExpr.of('%a%'))),
+      new NotExpr(
+        BinaryExpr.ilike(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('%a%', { name: 'name', codecId: 'pg/text@1' }),
+        ),
+      ),
     );
   });
 
@@ -102,7 +174,10 @@ describe('filters', () => {
 
     expect(expr).toEqual(
       AndExpr.of([
-        BinaryExpr.eq(ColumnRef.of('posts', 'id'), LiteralExpr.of(1)),
+        BinaryExpr.eq(
+          ColumnRef.of('posts', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
         NullCheckExpr.isNull(ColumnRef.of('posts', 'user_id')),
       ]),
     );
@@ -124,7 +199,12 @@ describe('filters', () => {
       shorthandToWhereExpr({ ...context, contract: withoutModelToTable } as never, 'User', {
         email: 'alice@example.com',
       }),
-    ).toEqual(BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('alice@example.com')));
+    ).toEqual(
+      BinaryExpr.eq(
+        ColumnRef.of('users', 'email'),
+        ParamRef.of('alice@example.com', { name: 'email', codecId: 'pg/text@1' }),
+      ),
+    );
 
     const withoutMappings = {
       ...contract,

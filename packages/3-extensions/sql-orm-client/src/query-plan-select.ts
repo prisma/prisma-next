@@ -12,18 +12,18 @@ import {
   JsonArrayAggExpr,
   JsonObjectExpr,
   ListExpression,
-  LiteralExpr,
   OrderByItem,
   OrExpr,
+  ParamRef,
   ProjectionItem,
   SelectAst,
   SubqueryExpr,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { resolveColumnCodecId } from './collection-contract';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr, OrderExpr } from './types';
-import { bindWhereExpr } from './where-binding';
 import { combineWhereExprs } from './where-utils';
 
 type CursorOrderEntry = OrderExpr & {
@@ -57,16 +57,31 @@ function toOrderBy(
   );
 }
 
-function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): AnyExpression {
+function columnParam(
+  contract: SqlContract<SqlStorage>,
+  tableName: string,
+  column: string,
+  value: unknown,
+): ParamRef {
+  const codecId = resolveColumnCodecId(contract, tableName, column);
+  return ParamRef.of(value, { name: column, ...(codecId ? { codecId } : {}) });
+}
+
+function createBoundaryExpr(
+  contract: SqlContract<SqlStorage>,
+  tableName: string,
+  entry: CursorOrderEntry,
+): AnyExpression {
   const comparator: BinaryOp = entry.direction === 'asc' ? 'gt' : 'lt';
   return new BinaryExpr(
     comparator,
     ColumnRef.of(tableName, entry.column),
-    LiteralExpr.of(entry.value),
+    columnParam(contract, tableName, entry.column, entry.value),
   );
 }
 
 function buildLexicographicCursorWhere(
+  contract: SqlContract<SqlStorage>,
   tableName: string,
   entries: readonly CursorOrderEntry[],
 ): AnyExpression {
@@ -77,12 +92,12 @@ function buildLexicographicCursorWhere(
       branchExprs.push(
         BinaryExpr.eq(
           ColumnRef.of(tableName, prefixEntry.column),
-          LiteralExpr.of(prefixEntry.value),
+          columnParam(contract, tableName, prefixEntry.column, prefixEntry.value),
         ),
       );
     }
 
-    branchExprs.push(createBoundaryExpr(tableName, entry));
+    branchExprs.push(createBoundaryExpr(contract, tableName, entry));
     if (branchExprs.length === 1) {
       return branchExprs[0] as AnyExpression;
     }
@@ -98,6 +113,7 @@ function buildLexicographicCursorWhere(
 }
 
 function buildCursorWhere(
+  contract: SqlContract<SqlStorage>,
   tableName: string,
   orderBy: readonly OrderExpr[] | undefined,
   cursor: Readonly<Record<string, unknown>> | undefined,
@@ -120,10 +136,10 @@ function buildCursorWhere(
 
   const firstEntry = entries[0];
   if (entries.length === 1 && firstEntry !== undefined) {
-    return createBoundaryExpr(tableName, firstEntry);
+    return createBoundaryExpr(contract, tableName, firstEntry);
   }
 
-  return buildLexicographicCursorWhere(tableName, entries);
+  return buildLexicographicCursorWhere(contract, tableName, entries);
 }
 
 function createTableRefRemapper(fromTable: string, toTable: string): AstRewriter {
@@ -153,18 +169,17 @@ function buildStateWhere(
 ): AnyExpression | undefined {
   const filterTableName = options?.filterTableName;
   const cursorTableName = filterTableName ?? tableName;
-  const cursorWhere = buildCursorWhere(cursorTableName, state.orderBy, state.cursor);
+  const cursorWhere = buildCursorWhere(contract, cursorTableName, state.orderBy, state.cursor);
   const remappedFilters =
     filterTableName && filterTableName !== tableName
       ? state.filters.map((filter) =>
           filter.rewrite(createTableRefRemapper(filterTableName, tableName)),
         )
       : state.filters;
-  const boundCursorWhere = cursorWhere ? bindWhereExpr(contract, cursorWhere) : undefined;
   const remappedCursorWhere =
-    boundCursorWhere && filterTableName && filterTableName !== tableName
-      ? boundCursorWhere.rewrite(createTableRefRemapper(filterTableName, tableName))
-      : boundCursorWhere;
+    cursorWhere && filterTableName && filterTableName !== tableName
+      ? cursorWhere.rewrite(createTableRefRemapper(filterTableName, tableName))
+      : cursorWhere;
   const filters = remappedCursorWhere ? [...remappedFilters, remappedCursorWhere] : remappedFilters;
   return combineWhereExprs(filters);
 }
@@ -406,7 +421,7 @@ export function compileRelationSelect(
 ): SqlQueryPlan<Record<string, unknown>> {
   const inFilter: AnyExpression = BinaryExpr.in(
     ColumnRef.of(relatedTableName, fkColumn),
-    ListExpression.fromValues(parentPks),
+    ListExpression.of(parentPks.map((pk) => columnParam(contract, relatedTableName, fkColumn, pk))),
   );
 
   return compileSelect(contract, relatedTableName, {
@@ -414,7 +429,7 @@ export function compileRelationSelect(
     includes: [],
     limit: undefined,
     offset: undefined,
-    filters: [bindWhereExpr(contract, inFilter), ...nestedState.filters],
+    filters: [inFilter, ...nestedState.filters],
   });
 }
 

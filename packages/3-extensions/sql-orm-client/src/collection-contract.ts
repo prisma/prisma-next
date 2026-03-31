@@ -179,6 +179,14 @@ export function resolvePrimaryKeyColumn(
   return contract.storage.tables[tableName]?.primaryKey?.columns[0] ?? 'id';
 }
 
+export function resolveColumnCodecId(
+  contract: SqlContract<SqlStorage>,
+  tableName: string,
+  columnName: string,
+): string | undefined {
+  return contract.storage.tables[tableName]?.columns[columnName]?.codecId;
+}
+
 export function assertReturningCapability(contract: SqlContract<SqlStorage>, action: string): void {
   if (hasContractCapability(contract, 'returning')) {
     return;

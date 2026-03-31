@@ -4,11 +4,12 @@ import {
   type AnyExpression,
   BinaryExpr,
   ColumnRef,
-  LiteralExpr,
   NullCheckExpr,
   OrExpr,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import { resolveColumnCodecId } from './collection-contract';
 import type { ShorthandWhereFilter } from './types';
 
 export function and(...exprs: AnyExpression[]): AndExpr {
@@ -62,8 +63,8 @@ export function shorthandToWhereExpr<
       continue;
     }
 
-    assertFieldHasEqualityTrait(context, tableName, columnName, modelName, fieldName);
-    exprs.push(BinaryExpr.eq(left, LiteralExpr.of(value)));
+    const codecId = assertEqualityCodecId(context, tableName, columnName, modelName, fieldName);
+    exprs.push(BinaryExpr.eq(left, ParamRef.of(value, { name: columnName, codecId })));
   }
 
   if (exprs.length === 0) {
@@ -73,21 +74,24 @@ export function shorthandToWhereExpr<
   return exprs.length === 1 ? exprs[0] : and(...exprs);
 }
 
-function assertFieldHasEqualityTrait(
+function assertEqualityCodecId(
   context: ExecutionContext,
   tableName: string,
   columnName: string,
   modelName: string,
   fieldName: string,
-): void {
-  const tables = context.contract.storage?.tables as
-    | Record<string, { columns?: Record<string, { codecId?: string }> }>
-    | undefined;
-  const codecId = tables?.[tableName]?.columns?.[columnName]?.codecId;
+): string {
+  const codecId = resolveColumnCodecId(context.contract, tableName, columnName);
   const traits = codecId ? context.codecs.traitsOf(codecId) : [];
   if (!traits.includes('equality')) {
     throw new Error(
       `Shorthand filter on "${modelName}.${fieldName}": field does not support equality comparisons`,
     );
   }
+  if (!codecId) {
+    throw new Error(
+      `Shorthand filter on "${modelName}.${fieldName}": column "${columnName}" has no codec`,
+    );
+  }
+  return codecId;
 }

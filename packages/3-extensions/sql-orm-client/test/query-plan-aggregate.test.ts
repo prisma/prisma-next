@@ -22,7 +22,6 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { compileAggregate, compileGroupedAggregate } from '../src/query-plan';
-import { bindWhereExpr } from '../src/where-binding';
 import { baseContract } from './collection-fixtures';
 
 const defaultAggSpec = {
@@ -34,9 +33,9 @@ function compileWithHaving(having: AnyExpression) {
 }
 
 describe('query plan aggregate', () => {
-  const filteredViews = bindWhereExpr(
-    baseContract,
-    BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+  const filteredViews = BinaryExpr.gte(
+    ColumnRef.of('posts', 'views'),
+    ParamRef.of(100, { name: 'views', codecId: 'pg/int4@1' }),
   );
 
   it('rejects empty aggregate specs and selectors without required fields', () => {
@@ -67,38 +66,61 @@ describe('query plan aggregate', () => {
     ).toThrow('groupBy().aggregate() requires at least one aggregation selector');
   });
 
-  it('validates grouped having expressions before lowering them', () => {
+  it('parameterizes ParamRef values in HAVING comparables', () => {
+    const plan = compileGroupedAggregate(
+      baseContract,
+      'posts',
+      [],
+      ['user_id'],
+      { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
+      BinaryExpr.gte(
+        AggregateExpr.sum(ColumnRef.of('posts', 'views')),
+        ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' }),
+      ),
+    );
+
+    const ast = plan.ast as SelectAst;
+    expect(ast.having).toEqual(
+      BinaryExpr.gte(
+        AggregateExpr.sum(ColumnRef.of('posts', 'views')),
+        ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' }),
+      ),
+    );
+    expect(plan.params).toEqual([1]);
+    expect(plan.meta.paramDescriptors).toContainEqual({
+      name: 'views',
+      codecId: 'pg/int4@1',
+      source: 'dsl',
+    });
+  });
+
+  it('parameterizes ParamRef values inside list HAVING comparables', () => {
+    const plan = compileGroupedAggregate(
+      baseContract,
+      'posts',
+      [],
+      ['user_id'],
+      { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
+      BinaryExpr.in(
+        AggregateExpr.sum(ColumnRef.of('posts', 'views')),
+        ListExpression.of([ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' })]),
+      ),
+    );
+
+    const ast = plan.ast as SelectAst;
+    expect(ast.having).toEqual(
+      BinaryExpr.in(
+        AggregateExpr.sum(ColumnRef.of('posts', 'views')),
+        ListExpression.of([ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' })]),
+      ),
+    );
+    expect(plan.params).toEqual([1]);
+  });
+
+  it('rejects EXISTS and non-aggregate metrics in HAVING', () => {
     const scalarSubquery = SelectAst.from(TableSource.named('posts')).withProjection([
       ProjectionItem.of('id', ColumnRef.of('posts', 'id')),
     ]);
-
-    expect(() =>
-      compileGroupedAggregate(
-        baseContract,
-        'posts',
-        [],
-        ['user_id'],
-        { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
-        BinaryExpr.gte(
-          AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' }),
-        ),
-      ),
-    ).toThrow('ParamRef is not supported in grouped having expressions');
-
-    expect(() =>
-      compileGroupedAggregate(
-        baseContract,
-        'posts',
-        [],
-        ['user_id'],
-        { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
-        BinaryExpr.in(
-          AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ListExpression.of([ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' })]),
-        ),
-      ),
-    ).toThrow('ParamRef is not supported in grouped having expressions');
 
     expect(() =>
       compileGroupedAggregate(
@@ -136,7 +158,7 @@ describe('query plan aggregate', () => {
       AndExpr.of([
         BinaryExpr.in(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ListExpression.fromValues([1, 2]),
+          ListExpression.of([ParamRef.of(1), ParamRef.of(2)]),
         ),
         NullCheckExpr.isNotNull(AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
       ]),
@@ -149,7 +171,7 @@ describe('query plan aggregate', () => {
       AndExpr.of([
         BinaryExpr.in(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ListExpression.of([LiteralExpr.of(1), LiteralExpr.of(2)]),
+          ListExpression.of([ParamRef.of(1), ParamRef.of(2)]),
         ),
         NullCheckExpr.isNotNull(AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
       ]),
@@ -171,7 +193,7 @@ describe('query plan aggregate', () => {
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
           ColumnRef.of('posts', 'views'),
         ),
-        BinaryExpr.gte(AggregateExpr.count(), LiteralExpr.of(5)),
+        BinaryExpr.gte(AggregateExpr.count(), ParamRef.of(5)),
       ]),
     );
 
@@ -282,7 +304,7 @@ describe('query plan aggregate', () => {
       expect(() =>
         compileWithHaving(
           AndExpr.of([
-            BinaryExpr.gte(AggregateExpr.count(), LiteralExpr.of(5)),
+            BinaryExpr.gte(AggregateExpr.count(), ParamRef.of(5)),
             ColumnRef.of('posts', 'views'),
           ]),
         ),
@@ -292,10 +314,7 @@ describe('query plan aggregate', () => {
     it('rejects invalid expression inside OR', () => {
       expect(() =>
         compileWithHaving(
-          OrExpr.of([
-            BinaryExpr.gte(AggregateExpr.count(), LiteralExpr.of(5)),
-            LiteralExpr.of(true),
-          ]),
+          OrExpr.of([BinaryExpr.gte(AggregateExpr.count(), ParamRef.of(5)), LiteralExpr.of(true)]),
         ),
       ).toThrow('Unsupported grouped having expression kind "literal"');
     });
@@ -310,7 +329,7 @@ describe('query plan aggregate', () => {
   describe('validateGroupedHavingExpr accepts valid predicate expressions', () => {
     it('accepts NOT wrapping a valid binary', () => {
       const plan = compileWithHaving(
-        new NotExpr(BinaryExpr.gte(AggregateExpr.count(), LiteralExpr.of(5))),
+        new NotExpr(BinaryExpr.gte(AggregateExpr.count(), ParamRef.of(5))),
       );
       expect((plan.ast as SelectAst).having).toBeInstanceOf(NotExpr);
     });
@@ -326,8 +345,8 @@ describe('query plan aggregate', () => {
       const plan = compileWithHaving(
         new NotExpr(
           AndExpr.of([
-            BinaryExpr.gte(AggregateExpr.count(), LiteralExpr.of(1)),
-            BinaryExpr.lte(AggregateExpr.sum(ColumnRef.of('posts', 'views')), LiteralExpr.of(100)),
+            BinaryExpr.gte(AggregateExpr.count(), ParamRef.of(1)),
+            BinaryExpr.lte(AggregateExpr.sum(ColumnRef.of('posts', 'views')), ParamRef.of(100)),
           ]),
         ),
       );
