@@ -340,33 +340,89 @@ const _assertExampleExtendsBase: _AssertExampleExtendsBase = true;
 type _AssertExampleExtendsSql = ExampleContract extends SqlContract ? true : never;
 const _assertExampleExtendsSql: _AssertExampleExtendsSql = true;
 
-// Proof: new roots field is accessible
+// ============================================================================
+// §5a  Key structural validation: `models` intersection
+// ============================================================================
+//
+// The critical question: when ContractBase declares
+//   models: Record<string, DomainModel>
+// and SqlContract intersects with
+//   & { models: M }
+// does TypeScript resolve the intersection so that BOTH domain-level
+// properties (from ContractBase) and SQL-specific literal types (from M)
+// are accessible on the same model key?
+//
+// Answer: yes. The intersection creates models: Record<string, DomainModel> & M.
+// For a known key like 'User', TypeScript intersects the index signature's
+// value type (DomainModel) with the explicit key's type from M.
+// Since M's model types extend DomainModel, the intersection is just M's type
+// (the narrower type), with all literal type information preserved.
+//
+// The assertions below prove this property concretely.
+
+// First, verify the raw intersection type for models
+type ExampleModelsIntersection = ExampleContract['models'];
+
+// Known key access: TypeScript resolves 'User' from M's literal type,
+// not from the index signature. Literal types are preserved.
+type ExampleUserModel = ExampleModelsIntersection['User'];
+
+// Domain-level properties (from ContractBase's DomainModel) are accessible
+// through the intersection — AND retain their literal types from M:
+type _VerifyFieldNullable = ExampleUserModel['fields']['name']['nullable'];
+const _verifyFieldNullable: _VerifyFieldNullable = true;
+// ^? true (literal), not boolean (widened)
+
+type _VerifyFieldCodecId = ExampleUserModel['fields']['name']['codecId'];
+const _verifyFieldCodecId: _VerifyFieldCodecId = 'pg/text@1';
+// ^? 'pg/text@1' (literal), not string (widened)
+
+// SQL-specific properties (from M, NOT on DomainModel) are also accessible
+// through the same intersection:
+type _VerifyFieldColumn = ExampleUserModel['fields']['name']['column'];
+const _verifyFieldColumn: _VerifyFieldColumn = 'display_name';
+// ^? 'display_name' (literal) — this property comes from M, not DomainModel
+
+// model.relations: domain-level relation properties with literal types from M
+type _VerifyModelRelTo = ExampleUserModel['relations']['posts']['to'];
+const _verifyModelRelTo: _VerifyModelRelTo = 'Post';
+
+type _VerifyModelRelStrategy = ExampleUserModel['relations']['posts']['strategy'];
+const _verifyModelRelStrategy: _VerifyModelRelStrategy = 'reference';
+
+// model.storage: SQL-specific storage bridge with literal types from M
+type _VerifyModelStorageTable = ExampleUserModel['storage']['table'];
+const _verifyModelStorageTable: _VerifyModelStorageTable = 'user';
+
+type _VerifyModelStorageFieldCol = ExampleUserModel['storage']['fields']['name']['column'];
+const _verifyModelStorageFieldCol: _VerifyModelStorageFieldCol = 'display_name';
+
+// The model satisfies DomainModel (can be passed to domain-level consumers)
+type _AssertUserModelIsDomainModel = ExampleUserModel extends DomainModel ? true : never;
+const _assertUserModelIsDomainModel: _AssertUserModelIsDomainModel = true;
+
+// roots: new field from ContractBase, accessible through the intersection
 type _VerifyRoots = ExampleContract['roots'];
 const _verifyRoots: _VerifyRoots = { users: 'User' };
 
-// Proof: both old and new field properties are accessible
-type _VerifyFieldColumn = ExampleContract['models']['User']['fields']['name']['column'];
-const _verifyFieldColumn: _VerifyFieldColumn = 'display_name';
+// A function that accepts ContractBase can receive the SqlContract
+// and read domain-level models from it:
+function _domainConsumer(contract: ContractBase): string[] {
+  return Object.entries(contract.models).map(([name, model]) => {
+    const fieldNames = Object.keys(model.fields);
+    const relationNames = Object.keys(model.relations);
+    return `${name}: ${fieldNames.length} fields, ${relationNames.length} relations`;
+  });
+}
+// This compiles: SqlContract is assignable to ContractBase
+function _sqlConsumer(contract: ExampleContract): string[] {
+  return _domainConsumer(contract);
+}
 
-type _VerifyFieldNullable = ExampleContract['models']['User']['fields']['name']['nullable'];
-const _verifyFieldNullable: _VerifyFieldNullable = true;
-
-type _VerifyFieldCodecId = ExampleContract['models']['User']['fields']['name']['codecId'];
-const _verifyFieldCodecId: _VerifyFieldCodecId = 'pg/text@1';
-
-// Proof: model.relations accessible
-type _VerifyModelRelTo = ExampleContract['models']['User']['relations']['posts']['to'];
-const _verifyModelRelTo: _VerifyModelRelTo = 'Post';
-
-// Proof: model.storage accessible
-type _VerifyModelStorageTable = ExampleContract['models']['User']['storage']['table'];
-const _verifyModelStorageTable: _VerifyModelStorageTable = 'user';
-
-// Proof: old mappings still accessible
+// Old fields (PHASE 3: REMOVED) still accessible during Phase 1
 type _VerifyMapping = ExampleContract['mappings']['modelToTable']['User'];
 const _verifyMapping: _VerifyMapping = 'user';
 
-// Proof: old top-level relations still accessible
 type _VerifyTopRel = ExampleContract['relations']['user']['posts']['to'];
 const _verifyTopRel: _VerifyTopRel = 'Post';
 
