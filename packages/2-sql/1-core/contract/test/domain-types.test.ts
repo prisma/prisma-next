@@ -68,7 +68,7 @@ describe('domain type compatibility', () => {
               readonly codecId: 'pg/text@1';
             };
           };
-          readonly relations: {};
+          readonly relations: Record<string, never>;
           readonly storage: { readonly table: 'user' };
         };
       };
