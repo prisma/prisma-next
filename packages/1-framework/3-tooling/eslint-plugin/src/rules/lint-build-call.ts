@@ -4,7 +4,7 @@ import {
   type BuilderCall,
   extractCallChain,
   getTypeScriptServices,
-  isPrismaNextQueryBuildCall,
+  isPrismaNextQueryExecutionCall,
 } from '../utils';
 
 const DEFAULT_OPTIONS = {
@@ -70,7 +70,7 @@ export const lintBuildCall = ESLintUtils.RuleCreator.withoutDocs<Options, Messag
 
     return {
       CallExpression(node: TSESTree.CallExpression) {
-        if (!isPrismaNextQueryBuildCall(node, services)) {
+        if (!isPrismaNextQueryExecutionCall(node, services)) {
           return;
         }
         lintQuery(node, extractCallChain(node));

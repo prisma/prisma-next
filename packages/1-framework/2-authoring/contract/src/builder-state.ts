@@ -14,8 +14,8 @@ export type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' 
  * carries codec-owned parameters that affect both TypeScript type generation
  * and native DDL output.
  */
-export type ColumnTypeDescriptor = {
-  readonly codecId: string;
+export type ColumnTypeDescriptor<TCodecId extends string = string> = {
+  readonly codecId: TCodecId;
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown>;
   readonly typeRef?: string;

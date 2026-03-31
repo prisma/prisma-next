@@ -29,12 +29,15 @@
     "src"
   ],
   "exports": {
-    "./pack": "./dist/pack.mjs",
+    ".": "./dist/pack.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/3-mongo-target/1-mongo-target"
-  }
+  },
+  "main": "./dist/pack.mjs",
+  "module": "./dist/pack.mjs",
+  "types": "./dist/pack.d.mts"
 }

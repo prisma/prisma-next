@@ -1,6 +1,4 @@
-import { sql } from '@prisma-next/sql-builder';
-import { param } from '@prisma-next/sql-relational-core/param';
-import { schema } from '@prisma-next/sql-relational-core/schema';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import type { Contract } from '../../fixtures/user';
 import { loadContract } from '../../utils';
@@ -8,9 +6,10 @@ import { loadContract } from '../../utils';
 const contract = loadContract<Contract>('user');
 const adapter = createStubAdapter();
 const context = createTestContext(contract, adapter);
-const tables = schema(context).tables;
+const runtime = {} as Parameters<typeof sql>[0]['runtime'];
+const db = sql<typeof contract>({ context, runtime });
 
-sql<typeof contract>({ context })
-  .delete(tables.user)
-  .where(tables.user.columns.id.eq(param('userId')))
-  .build({ params: { userId: 123 } });
+db.user
+  .delete()
+  .where((f, fns) => fns.eq(f.id, 123))
+  .first();

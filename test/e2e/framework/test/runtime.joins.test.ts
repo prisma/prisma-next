@@ -38,7 +38,7 @@ describe('end-to-end JOIN queries', () => {
 
         expect(rows.length).toBe(3);
         expect(rows[0]).toMatchObject({
-          id: expect.any(Number),
+          userId: expect.any(Number),
           email: expect.any(String),
           postId: expect.any(Number),
           title: expect.any(String),

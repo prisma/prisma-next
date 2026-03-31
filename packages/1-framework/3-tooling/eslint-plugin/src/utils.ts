@@ -8,8 +8,6 @@ const PRISMA_NEXT_SQL_PACKAGES = [
   'packages/2-sql/4-lanes/sql-builder',
 ] as const;
 
-const PLAN_TYPE_PATTERNS = [/^SqlQueryPlan$/] as const;
-
 export type BuilderCall = { method: string; args: TSESTree.CallExpressionArgument[] };
 
 // Types
@@ -55,19 +53,26 @@ export function isMethodCall(node: TSESTree.CallExpression, methodName: string):
   );
 }
 
+const EXECUTION_METHODS = ['first', 'firstOrThrow', 'all'] as const;
+
 /**
- * Check if a call expression is a query builder build() call
- * Uses type information to verify it's actually our query builder's build method
+ * Check if a call expression is a query builder execution call (.build(), .first(), .all(), .firstOrThrow())
+ * Uses type information to verify it's actually our query builder's method
  */
-export function isPrismaNextQueryBuildCall(
+export function isPrismaNextQueryExecutionCall(
   node: TSESTree.CallExpression,
   services?: TypeScriptServices | null,
 ): boolean {
-  if (!isMethodCall(node, 'build') || node.arguments.length > 1 || !services) {
+  if (!services || node.callee.type !== 'MemberExpression') {
     return false;
   }
 
-  if (node.callee.type !== 'MemberExpression') {
+  const methodName =
+    node.callee.property.type === 'Identifier' ? node.callee.property.name : undefined;
+  if (
+    !methodName ||
+    !EXECUTION_METHODS.includes(methodName as (typeof EXECUTION_METHODS)[number])
+  ) {
     return false;
   }
 
@@ -76,12 +81,7 @@ export function isPrismaNextQueryBuildCall(
     return false;
   }
 
-  if (!isTypeFromPackages(objectType, PRISMA_NEXT_SQL_PACKAGES)) {
-    return false;
-  }
-
-  const returnType = getTypeOfNode(node, services);
-  return returnType ? isPrismaNextQueryPlanType(returnType) : false;
+  return isTypeFromPackages(objectType, PRISMA_NEXT_SQL_PACKAGES);
 }
 
 /**
@@ -110,13 +110,6 @@ export function typeHasProperty(
   } catch {
     return false;
   }
-}
-
-/**
- * Check if type is a Prisma Next query plan type by name and origin
- */
-export function isPrismaNextQueryPlanType(type: ts.Type): boolean {
-  return PLAN_TYPE_PATTERNS.some((pattern) => pattern.test(type.symbol.name));
 }
 
 /**
@@ -154,6 +147,13 @@ export function extractCallChain(node: TSESTree.CallExpression): BuilderCall[] {
  * Helper to check if a type originates from specific packages
  */
 function isTypeFromPackages(type: ts.Type, packages: readonly string[]): boolean {
-  const fileName = type.getSymbol()?.valueDeclaration?.getSourceFile().fileName;
-  return fileName ? packages.some((pkg) => fileName.includes(`${pkg}/`)) : false;
+  const symbol = type.getSymbol() ?? type.aliasSymbol;
+  const declarations = symbol?.getDeclarations?.() ?? [];
+  for (const decl of declarations) {
+    const fileName = decl.getSourceFile().fileName;
+    if (packages.some((pkg) => fileName.includes(`${pkg}/`))) {
+      return true;
+    }
+  }
+  return false;
 }
