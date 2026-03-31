@@ -68,6 +68,15 @@ Reverting a migration is just another migration in the opposite direction. The s
 
 # Solution
 
+## Constraints
+
+These apply across the entire solution:
+
+- The framework-level op partitioning function must not depend on target-specific knowledge — it operates solely on operation classes.
+- Data migration code runs in-process with the migration runner. No separate process, container, or sandbox.
+- The `db` interface must enforce parameterized queries to prevent SQL injection in user-authored migration code.
+- User-authored data migration code should be idempotent. The required `check(db)` function provides the primary retry-safety mechanism, but truly idempotent `run(db)` code is the safest approach for `isolated`/`unmanaged` modes where `check` might not cover all edge cases.
+
 ## Data migration authoring (R1, R2, R9, R10)
 
 A data migration is defined in a `data-migration.ts` file inside a migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(db), run(db) })` API.
