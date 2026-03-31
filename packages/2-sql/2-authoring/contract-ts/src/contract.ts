@@ -281,7 +281,8 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
 
   // Validate models
   for (const [modelName, modelUnknown] of Object.entries(models)) {
-    const model = modelUnknown as ModelDefinition;
+    // normalizeContract() ensures models have both domain (DomainModel) and SQL-specific (ModelDefinition) properties
+    const model = modelUnknown as unknown as ModelDefinition;
     // Validate model has storage.table
     if (!model.storage?.table) {
       /* c8 ignore next */
