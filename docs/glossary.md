@@ -85,7 +85,7 @@ Value objects are a future concept in the contract; currently they're represente
 
 ### Owner
 
-A domain-level property on a model declaring aggregate membership. If Address says `"owner": "User"`, it means Address is a component of User's aggregate — its data is co-located within User's storage (embedded document in MongoDB, JSONB column in SQL). Owned models don't appear in `roots` and have empty `storage` blocks. The parent's `storage.relations` maps the relation to its physical location. See [ADR 177](architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md).
+A domain-level property on a model declaring aggregate membership. If Address says `"owner": "User"`, it means Address is a component of User's aggregate — its data is co-located within User's storage (embedded document in MongoDB, JSONB column in SQL). Owned models don't appear in `roots` and have no independent storage unit (they may still include `storage.relations` for nested owned children). The parent's `storage.relations` maps the relation to its physical location. See [ADR 177](architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md).
 
 ### Relation
 

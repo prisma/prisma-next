@@ -181,7 +181,7 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 ### What this requires
 
 **Implemented in this PR (Mongo PoC):**
-- `MongoContract` adopts the domain-storage separation with `model.fields` carrying `{ nullable, codecId }`, `model.relations` with strategy, and `model.storage` scoped per model.
+- `MongoContract` adopts the domain-storage separation with `model.fields` carrying `{ nullable, codecId }`, `model.relations` as plain graph edges (cardinality + optional join details), and `model.storage` scoped per model.
 - `validateContractDomain()` validates domain-level invariants (roots, variants, relations, discriminators) in a family-agnostic way.
 - `validateMongoStorage()` validates Mongo-specific storage rules.
 
