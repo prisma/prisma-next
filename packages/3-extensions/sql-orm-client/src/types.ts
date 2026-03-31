@@ -414,12 +414,23 @@ type FieldValueType<
   ? FieldsOf<TContract, ModelName>[FieldName]
   : unknown;
 
+type ModelStorageFields<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelDef<TContract, ModelName> extends {
+  readonly storage: { readonly fields: infer Fields };
+}
+  ? Fields extends Record<string, { readonly column: string }>
+    ? Fields
+    : never
+  : never;
+
 type ModelFieldToColumnMap<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
-> = TContract['mappings']['fieldToColumn'] extends Record<string, Record<string, string>>
-  ? ModelName extends keyof TContract['mappings']['fieldToColumn']
-    ? TContract['mappings']['fieldToColumn'][ModelName]
+> = ModelStorageFields<TContract, ModelName> extends infer Fields
+  ? Fields extends Record<string, { readonly column: string }>
+    ? { readonly [F in keyof Fields]: Fields[F]['column'] }
     : never
   : never;
 
@@ -430,47 +441,24 @@ type FieldToColumnMapSafe<
   ? ModelFieldToColumnMap<TContract, ModelName>
   : never;
 
-type ModelTableFromMappings<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-> = TContract['mappings']['modelToTable'] extends Record<string, string>
-  ? ModelName extends keyof TContract['mappings']['modelToTable']
-    ? TContract['mappings']['modelToTable'][ModelName]
-    : never
-  : never;
-
-type ModelTableFromModel<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-> = ModelDef<TContract, ModelName> extends {
+type ModelTableName<TContract extends SqlContract<SqlStorage>, ModelName extends string> = ModelDef<
+  TContract,
+  ModelName
+> extends {
   readonly storage: { readonly table: infer T extends string };
 }
   ? T
   : never;
-
-type ModelTableName<TContract extends SqlContract<SqlStorage>, ModelName extends string> = [
-  ModelTableFromMappings<TContract, ModelName>,
-] extends [never]
-  ? ModelTableFromModel<TContract, ModelName>
-  : ModelTableFromMappings<TContract, ModelName>;
 
 type FieldColumnName<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
 > = (FieldToColumnMapSafe<TContract, ModelName> extends never
-  ? FieldValueType<TContract, ModelName, FieldName> extends {
-      readonly column: infer ColName extends string;
-    }
-    ? ColName
-    : FieldName
+  ? FieldName
   : FieldName extends keyof FieldToColumnMapSafe<TContract, ModelName>
     ? FieldToColumnMapSafe<TContract, ModelName>[FieldName]
-    : FieldValueType<TContract, ModelName, FieldName> extends {
-          readonly column: infer ColName extends string;
-        }
-      ? ColName
-      : FieldName) &
+    : FieldName) &
   string;
 
 type FieldStorageJsType<
@@ -813,42 +801,34 @@ type RelationMutationFields<
   [K in RelationNames<TContract, ModelName>]: RelationMutationCallback<TContract, ModelName, K>;
 }>;
 
-type RelationDefWithChildColumns = {
+type AllModelRelationEntries<TContract extends SqlContract<SqlStorage>> = {
+  [M in keyof ModelsOf<TContract>]: ModelsOf<TContract>[M] extends {
+    readonly relations: infer R extends Record<string, unknown>;
+  }
+    ? R[keyof R]
+    : never;
+}[keyof ModelsOf<TContract>];
+
+type RelationDefWithTargetFields = {
   readonly to: string;
   readonly on: {
-    readonly childCols: readonly string[];
+    readonly targetFields: readonly string[];
   };
 };
-
-type ContractRelationEntries<TContract extends SqlContract<SqlStorage>> =
-  ContractRelations<TContract>[keyof ContractRelations<TContract>] extends infer TableRelations
-    ? TableRelations extends Record<string, infer Relation>
-      ? Relation
-      : never
-    : never;
-
-type ChildRelationColumnsForModel<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-> = Extract<ContractRelationEntries<TContract>, RelationDefWithChildColumns> extends infer Relation
-  ? Relation extends {
-      readonly to: ModelName;
-      readonly on: {
-        readonly childCols: infer Columns extends readonly string[];
-      };
-    }
-    ? Columns[number]
-    : never
-  : never;
 
 type ChildForeignKeyFieldNames<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
-> = FieldNameForColumn<
-  TContract,
-  ModelName,
-  ChildRelationColumnsForModel<TContract, ModelName> & string
->;
+> = Extract<AllModelRelationEntries<TContract>, RelationDefWithTargetFields> extends infer Relation
+  ? Relation extends {
+      readonly to: ModelName;
+      readonly on: {
+        readonly targetFields: infer Fields extends readonly string[];
+      };
+    }
+    ? Fields[number]
+    : never
+  : never;
 
 type NestedOptionalCreateFieldNames<
   TContract extends SqlContract<SqlStorage>,
@@ -905,17 +885,12 @@ export type MutationUpdateInput<
 // Relation helpers
 // ---------------------------------------------------------------------------
 
-type ContractRelations<TContract extends SqlContract<SqlStorage>> =
-  TContract['relations'] extends Record<string, unknown>
-    ? TContract['relations']
-    : Record<string, never>;
-
-type TableRelations<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-> = ModelTableName<TContract, ModelName> extends infer TableName extends string
-  ? TableName extends keyof ContractRelations<TContract>
-    ? ContractRelations<TContract>[TableName]
+type ModelRelations<TContract extends SqlContract<SqlStorage>, ModelName extends string> = ModelDef<
+  TContract,
+  ModelName
+> extends { readonly relations: infer R }
+  ? R extends Record<string, unknown>
+    ? R
     : Record<string, never>
   : Record<string, never>;
 
@@ -929,7 +904,7 @@ type ExactRecord<T> =
 export type RelationsOf<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
-> = ExactRecord<TableRelations<TContract, ModelName>>;
+> = ExactRecord<ModelRelations<TContract, ModelName>>;
 
 export type RelationNames<
   TContract extends SqlContract<SqlStorage>,
@@ -941,9 +916,7 @@ export type RelationNames<
 
 type RelationModelName<Relation> = Relation extends { readonly to: infer To extends string }
   ? To
-  : Relation extends { readonly model: infer Model extends string }
-    ? Model
-    : never;
+  : never;
 
 export type RelatedModelName<
   TContract extends SqlContract<SqlStorage>,

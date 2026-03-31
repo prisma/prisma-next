@@ -5,6 +5,13 @@
   "storageHash": "sha256:3e6baed937240f07b4df3fcfef21dbf122f6220c8540576ab0545a442de52613",
   "executionHash": "sha256:f744c820f5efe500202b9a1d30dff6243359b10bee2ac27753411f386c7052e0",
   "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
+  "roots": {
+    "User": "User",
+    "Post": "Post",
+    "Comment": "Comment",
+    "Profile": "Profile",
+    "Tag": "Tag"
+  },
   "models": {
     "Article": {
       "fields": {
@@ -25,90 +32,134 @@
     },
     "Comment": {
       "fields": {
-        "body": {
-          "column": "body"
-        },
-        "id": {
-          "column": "id"
-        },
-        "postId": {
-          "column": "post_id"
-        }
+        "body": { "codecId": "pg/text@1" },
+        "id": { "codecId": "pg/int4@1" },
+        "postId": { "codecId": "pg/int4@1" }
       },
       "relations": {},
       "storage": {
-        "table": "comments"
+        "table": "comments",
+        "fields": {
+          "body": { "column": "body" },
+          "id": { "column": "id" },
+          "postId": { "column": "post_id" }
+        }
       }
     },
     "Post": {
       "fields": {
-        "id": {
-          "column": "id"
+        "id": { "codecId": "pg/int4@1" },
+        "title": { "codecId": "pg/text@1" },
+        "userId": { "codecId": "pg/int4@1" },
+        "views": { "codecId": "pg/int4@1" }
+      },
+      "relations": {
+        "comments": {
+          "to": "Comment",
+          "cardinality": "1:N",
+          "on": {
+            "localFields": ["id"],
+            "targetFields": ["postId"]
+          }
         },
-        "title": {
-          "column": "title"
-        },
-        "userId": {
-          "column": "user_id"
-        },
-        "views": {
-          "column": "views"
+        "author": {
+          "to": "User",
+          "cardinality": "N:1",
+          "on": {
+            "localFields": ["userId"],
+            "targetFields": ["id"]
+          }
         }
       },
-      "relations": {},
       "storage": {
-        "table": "posts"
+        "table": "posts",
+        "fields": {
+          "id": { "column": "id" },
+          "title": { "column": "title" },
+          "userId": { "column": "user_id" },
+          "views": { "column": "views" }
+        }
       }
     },
     "Profile": {
       "fields": {
-        "bio": {
-          "column": "bio"
-        },
-        "id": {
-          "column": "id"
-        },
-        "userId": {
-          "column": "user_id"
-        }
+        "bio": { "codecId": "pg/text@1" },
+        "id": { "codecId": "pg/int4@1" },
+        "userId": { "codecId": "pg/int4@1" }
       },
       "relations": {},
       "storage": {
-        "table": "profiles"
+        "table": "profiles",
+        "fields": {
+          "bio": { "column": "bio" },
+          "id": { "column": "id" },
+          "userId": { "column": "user_id" }
+        }
       }
     },
     "Tag": {
       "fields": {
-        "id": {
-          "column": "id"
-        },
-        "name": {
-          "column": "name"
-        }
+        "id": { "codecId": "pg/text@1" },
+        "name": { "codecId": "pg/text@1" }
       },
       "relations": {},
       "storage": {
-        "table": "tags"
+        "table": "tags",
+        "fields": {
+          "id": { "column": "id" },
+          "name": { "column": "name" }
+        }
       }
     },
     "User": {
       "fields": {
-        "email": {
-          "column": "email"
+        "email": { "codecId": "pg/text@1" },
+        "id": { "codecId": "pg/int4@1" },
+        "invitedById": { "codecId": "pg/int4@1", "nullable": true },
+        "name": { "codecId": "pg/text@1" }
+      },
+      "relations": {
+        "invitedUsers": {
+          "to": "User",
+          "cardinality": "1:N",
+          "on": {
+            "localFields": ["id"],
+            "targetFields": ["invitedById"]
+          }
         },
-        "id": {
-          "column": "id"
+        "invitedBy": {
+          "to": "User",
+          "cardinality": "N:1",
+          "on": {
+            "localFields": ["invitedById"],
+            "targetFields": ["id"]
+          }
         },
-        "invitedById": {
-          "column": "invited_by_id"
+        "posts": {
+          "to": "Post",
+          "cardinality": "1:N",
+          "on": {
+            "localFields": ["id"],
+            "targetFields": ["userId"]
+          }
         },
-        "name": {
-          "column": "name"
+        "profile": {
+          "to": "Profile",
+          "cardinality": "1:1",
+          "on": {
+            "localFields": ["id"],
+            "targetFields": ["userId"]
+          }
         }
       },
-      "relations": {},
       "storage": {
-        "table": "users"
+        "table": "users",
+        "fields": {
+          "email": { "column": "email" },
+          "id": { "column": "id" },
+          "invitedById": { "column": "invited_by_id" },
+          "name": { "column": "name" }
+        }
       }
     }
   },
@@ -130,26 +181,12 @@
     "posts": {
       "author": {
         "cardinality": "N:1",
-        "on": {
-          "childCols": [
-            "id"
-          ],
-          "parentCols": [
-            "user_id"
-          ]
-        },
+        "on": { "childCols": ["id"], "parentCols": ["user_id"] },
         "to": "User"
       },
       "comments": {
         "cardinality": "1:N",
-        "on": {
-          "childCols": [
-            "post_id"
-          ],
-          "parentCols": [
-            "id"
-          ]
-        },
+        "on": { "childCols": ["post_id"], "parentCols": ["id"] },
         "to": "Comment"
       }
     },
@@ -170,52 +207,42 @@
     "users": {
       "invitedBy": {
         "cardinality": "N:1",
-        "on": {
-          "childCols": [
-            "id"
-          ],
-          "parentCols": [
-            "invited_by_id"
-          ]
-        },
+        "on": { "childCols": ["id"], "parentCols": ["invited_by_id"] },
         "to": "User"
       },
       "invitedUsers": {
         "cardinality": "1:N",
-        "on": {
-          "childCols": [
-            "invited_by_id"
-          ],
-          "parentCols": [
-            "id"
-          ]
-        },
+        "on": { "childCols": ["invited_by_id"], "parentCols": ["id"] },
         "to": "User"
       },
       "posts": {
         "cardinality": "1:N",
-        "on": {
-          "childCols": [
-            "user_id"
-          ],
-          "parentCols": [
-            "id"
-          ]
-        },
+        "on": { "childCols": ["user_id"], "parentCols": ["id"] },
         "to": "Post"
       },
       "profile": {
         "cardinality": "1:1",
-        "on": {
-          "childCols": [
-            "user_id"
-          ],
-          "parentCols": [
-            "id"
-          ]
-        },
+        "on": { "childCols": ["user_id"], "parentCols": ["id"] },
         "to": "Profile"
       }
+    }
+  },
+  "mappings": {
+    "modelToTable": { "User": "users", "Post": "posts", "Comment": "comments", "Profile": "profiles", "Tag": "tags" },
+    "tableToModel": { "users": "User", "posts": "Post", "comments": "Comment", "profiles": "Profile", "tags": "Tag" },
+    "fieldToColumn": {
+      "User": { "id": "id", "name": "name", "email": "email", "invitedById": "invited_by_id" },
+      "Post": { "id": "id", "title": "title", "userId": "user_id", "views": "views" },
+      "Comment": { "id": "id", "body": "body", "postId": "post_id" },
+      "Profile": { "id": "id", "userId": "user_id", "bio": "bio" },
+      "Tag": { "id": "id", "name": "name" }
+    },
+    "columnToField": {
+      "users": { "id": "id", "name": "name", "email": "email", "invited_by_id": "invitedById" },
+      "posts": { "id": "id", "title": "title", "user_id": "userId", "views": "views" },
+      "comments": { "id": "id", "body": "body", "post_id": "postId" },
+      "profiles": { "id": "id", "user_id": "userId", "bio": "bio" },
+      "tags": { "id": "id", "name": "name" }
     }
   },
   "storage": {
@@ -246,18 +273,9 @@
       },
       "comments": {
         "columns": {
-          "body": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
-          },
-          "id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          },
-          "post_id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          }
+          "body": { "codecId": "pg/text@1", "nativeType": "text" },
+          "id": { "codecId": "pg/int4@1", "nativeType": "int4" },
+          "post_id": { "codecId": "pg/int4@1", "nativeType": "int4" }
         },
         "foreignKeys": [
           {
@@ -275,31 +293,15 @@
           }
         ],
         "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
+        "primaryKey": { "columns": ["id"] },
         "uniques": []
       },
       "posts": {
         "columns": {
-          "id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          },
-          "title": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
-          },
-          "user_id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          },
-          "views": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          }
+          "id": { "codecId": "pg/int4@1", "nativeType": "int4" },
+          "title": { "codecId": "pg/text@1", "nativeType": "text" },
+          "user_id": { "codecId": "pg/int4@1", "nativeType": "int4" },
+          "views": { "codecId": "pg/int4@1", "nativeType": "int4" }
         },
         "foreignKeys": [
           {
@@ -317,27 +319,14 @@
           }
         ],
         "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
+        "primaryKey": { "columns": ["id"] },
         "uniques": []
       },
       "profiles": {
         "columns": {
-          "bio": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
-          },
-          "id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          },
-          "user_id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          }
+          "bio": { "codecId": "pg/text@1", "nativeType": "text" },
+          "id": { "codecId": "pg/int4@1", "nativeType": "int4" },
+          "user_id": { "codecId": "pg/int4@1", "nativeType": "int4" }
         },
         "foreignKeys": [
           {
@@ -355,58 +344,25 @@
           }
         ],
         "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
+        "primaryKey": { "columns": ["id"] },
         "uniques": []
       },
       "tags": {
         "columns": {
-          "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
-          },
-          "name": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
-          }
+          "id": { "codecId": "pg/text@1", "nativeType": "text" },
+          "name": { "codecId": "pg/text@1", "nativeType": "text" }
         },
         "foreignKeys": [],
         "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": [
-          {
-            "columns": [
-              "name"
-            ]
-          }
-        ]
+        "primaryKey": { "columns": ["id"] },
+        "uniques": [{ "columns": ["name"] }]
       },
       "users": {
         "columns": {
-          "email": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
-          },
-          "id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
-          },
-          "invited_by_id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4",
-            "nullable": true
-          },
-          "name": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
-          }
+          "email": { "codecId": "pg/text@1", "nativeType": "text" },
+          "id": { "codecId": "pg/int4@1", "nativeType": "int4" },
+          "invited_by_id": { "codecId": "pg/int4@1", "nativeType": "int4", "nullable": true },
+          "name": { "codecId": "pg/text@1", "nativeType": "text" }
         },
         "foreignKeys": [
           {
@@ -424,18 +380,8 @@
           }
         ],
         "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": [
-          {
-            "columns": [
-              "email"
-            ]
-          }
-        ]
+        "primaryKey": { "columns": ["id"] },
+        "uniques": [{ "columns": ["email"] }]
       }
     }
   },
@@ -443,29 +389,15 @@
     "mutations": {
       "defaults": [
         {
-          "onCreate": {
-            "id": "uuidv4",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "table": "tags"
-          }
+          "onCreate": { "id": "uuidv4", "kind": "generator" },
+          "ref": { "column": "id", "table": "tags" }
         }
       ]
     }
   },
   "capabilities": {
-    "postgres": {
-      "jsonAgg": true,
-      "lateral": true,
-      "limit": true,
-      "orderBy": true,
-      "returning": true
-    },
-    "sql": {
-      "enums": true
-    }
+    "postgres": { "jsonAgg": true, "lateral": true, "limit": true, "orderBy": true, "returning": true },
+    "sql": { "enums": true }
   },
   "extensionPacks": {},
   "meta": {},

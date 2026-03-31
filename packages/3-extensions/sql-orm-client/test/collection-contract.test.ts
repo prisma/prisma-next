@@ -58,7 +58,7 @@ describe('collection-contract capability detection', () => {
     );
   });
 
-  it('resolveIncludeRelation() reads relation metadata from contract.relations', () => {
+  it('resolveIncludeRelation() reads relation metadata from model.relations', () => {
     const contract = getTestContract();
 
     expect(resolveIncludeRelation(contract, 'User', 'posts')).toEqual({
@@ -70,74 +70,6 @@ describe('collection-contract capability detection', () => {
     });
   });
 
-  it('resolveIncludeRelation() falls back to legacy model relation metadata', () => {
-    const contract = getTestContract();
-    const legacyContract = {
-      ...contract,
-      relations: {
-        ...contract.relations,
-        users: {},
-      },
-      models: {
-        ...contract.models,
-        User: {
-          ...contract.models.User,
-          relations: {
-            posts: {
-              model: 'Post',
-              foreignKey: 'user_id',
-            },
-          },
-        },
-      },
-    } as unknown as typeof contract;
-
-    expect(resolveIncludeRelation(legacyContract, 'User', 'posts')).toEqual({
-      relatedModelName: 'Post',
-      relatedTableName: 'posts',
-      fkColumn: 'user_id',
-      parentPkColumn: 'id',
-      cardinality: '1:N',
-    });
-  });
-
-  it('resolveIncludeRelation() legacy fallback uses "id" when parent primary key is unavailable', () => {
-    const contract = getTestContract();
-    const legacyWithoutPk = {
-      ...contract,
-      relations: {
-        ...contract.relations,
-        users: {},
-      },
-      models: {
-        ...contract.models,
-        User: {
-          ...contract.models.User,
-          relations: {
-            posts: {
-              model: 'Post',
-              foreignKey: 'user_id',
-            },
-          },
-        },
-      },
-      storage: {
-        ...contract.storage,
-        tables: {
-          ...contract.storage.tables,
-          users: {
-            ...contract.storage.tables.users,
-            primaryKey: undefined,
-          },
-        },
-      },
-    } as unknown as typeof contract;
-
-    expect(resolveIncludeRelation(legacyWithoutPk, 'User', 'posts')).toMatchObject({
-      parentPkColumn: 'id',
-    });
-  });
-
   it('resolveIncludeRelation() throws for missing or malformed relations', () => {
     const contract = getTestContract();
 
@@ -145,12 +77,15 @@ describe('collection-contract capability detection', () => {
 
     const malformed = {
       ...contract,
-      relations: {
-        ...contract.relations,
-        users: {
-          posts: {
-            to: 'Post',
-            on: { parentCols: 'id', childCols: ['user_id'] },
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          relations: {
+            posts: {
+              to: 'Post',
+              on: { localFields: 'id', targetFields: ['userId'] },
+            },
           },
         },
       },
@@ -159,32 +94,23 @@ describe('collection-contract capability detection', () => {
     expect(() => resolveIncludeRelation(malformed, 'User', 'posts')).toThrow(/not found/);
   });
 
-  it('resolveIncludeRelation() handles incomplete relation metadata and malformed legacy relations', () => {
+  it('resolveIncludeRelation() handles incomplete relation metadata', () => {
     const contract = getTestContract();
 
     const incompleteRelation = {
       ...contract,
-      relations: {
-        ...contract.relations,
-        users: {
-          posts: {
-            to: 'Post',
-            cardinality: 'unsupported',
-            on: {
-              parentCols: [],
-              childCols: [],
-            },
-          },
-        },
-      },
       models: {
         ...contract.models,
         User: {
           ...contract.models.User,
           relations: {
             posts: {
-              model: 123,
-              foreignKey: null,
+              to: 'Post',
+              cardinality: 'unsupported',
+              on: {
+                localFields: [],
+                targetFields: [],
+              },
             },
           },
         },
@@ -225,19 +151,16 @@ describe('collection-contract capability detection', () => {
     expect(resolvePrimaryKeyColumn(contract, 'unknown_table')).toBe('id');
   });
 
-  it('resolveModelTableName() falls back to model storage metadata when mapping is missing', () => {
+  it('resolveModelTableName() falls back to lowercase model name when storage.table is missing', () => {
     const contract = getTestContract();
     const withStorageFallback = {
       ...contract,
-      mappings: {
-        ...contract.mappings,
-        modelToTable: {},
-      },
       models: {
         ...contract.models,
         User: {
           ...contract.models.User,
           storage: {
+            ...contract.models.User.storage,
             table: 'users_from_storage',
           },
         },
@@ -247,11 +170,11 @@ describe('collection-contract capability detection', () => {
     expect(resolveModelTableName(withStorageFallback, 'User')).toBe('users_from_storage');
 
     const invalidStorageTable = {
-      ...withStorageFallback,
+      ...contract,
       models: {
-        ...withStorageFallback.models,
+        ...contract.models,
         User: {
-          ...withStorageFallback.models.User,
+          ...contract.models.User,
           storage: {
             table: 123,
           },

@@ -57,7 +57,16 @@ type GeneratedLikeContractBase = SqlContract<
   },
   {
     User: {
-      storage: { table: 'user' };
+      storage: {
+        table: 'user';
+        fields: {
+          id: { column: 'id' };
+          name: { column: 'name' };
+          email: { column: 'email' };
+          active: { column: 'active' };
+          metadata: { column: 'metadata' };
+        };
+      };
       fields: {
         id: string;
         name: string;
@@ -65,14 +74,32 @@ type GeneratedLikeContractBase = SqlContract<
         active: boolean;
         metadata: unknown;
       };
+      relations: {
+        posts: {
+          to: 'Post';
+          cardinality: '1:N';
+          on: {
+            localFields: readonly ['id'];
+            targetFields: readonly ['userId'];
+          };
+        };
+      };
     };
     Post: {
-      storage: { table: 'post' };
+      storage: {
+        table: 'post';
+        fields: {
+          id: { column: 'id' };
+          userId: { column: 'userId' };
+          title: { column: 'title' };
+        };
+      };
       fields: {
         id: string;
         userId: string;
         title: string;
       };
+      relations: Record<string, never>;
     };
   },
   {

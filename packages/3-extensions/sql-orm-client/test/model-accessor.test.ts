@@ -154,46 +154,27 @@ describe('createModelAccessor', () => {
   });
 
   it('throws when relation metadata is incomplete', () => {
-    const missingToContract = {
-      ...getTestContract(),
-      relations: {
-        ...getTestContract().relations,
-        users: {
-          posts: {
-            on: {
-              parentCols: ['id'],
-              childCols: ['user_id'],
-            },
-          },
-        },
-      },
-    };
-
+    const base = getTestContract();
     const brokenJoinContract = {
-      ...getTestContract(),
-      relations: {
-        ...getTestContract().relations,
-        users: {
-          posts: {
-            to: 'Post',
-            cardinality: '1:N',
-            on: {
-              parentCols: [],
-              childCols: [],
+      ...base,
+      models: {
+        ...base.models,
+        User: {
+          ...base.models.User,
+          relations: {
+            posts: {
+              to: 'Post',
+              cardinality: '1:N',
+              on: {
+                localFields: [],
+                targetFields: [],
+              },
             },
           },
         },
       },
     };
 
-    expect(() =>
-      (
-        createModelAccessor(
-          { ...context, contract: missingToContract } as never,
-          'User',
-        ) as unknown as Record<string, { some: () => unknown }>
-      )['posts']!.some(),
-    ).toThrow(/missing the "to" model reference/);
     expect(() =>
       (
         createModelAccessor(
@@ -204,34 +185,27 @@ describe('createModelAccessor', () => {
     ).toThrow(/missing join columns/);
   });
 
-  it('supports composite relation joins and first-child fallback projection', () => {
+  it('supports composite relation joins and first-target fallback projection', () => {
+    const base = getTestContract();
     const compositeContract = {
-      ...getTestContract(),
-      mappings: {
-        ...getTestContract().mappings,
-        modelToTable: {
-          ...getTestContract().mappings.modelToTable,
-          User: 'users_alt',
-        },
-      },
+      ...base,
       models: {
-        ...getTestContract().models,
+        ...base.models,
         User: {
-          ...getTestContract().models.User,
+          ...base.models.User,
           storage: {
+            ...base.models.User.storage,
             table: 'users_alt',
           },
-        },
-      },
-      relations: {
-        ...getTestContract().relations,
-        users_alt: {
-          posts: {
-            to: 'Post',
-            cardinality: '1:N',
-            on: {
-              parentCols: ['id', 'email'],
-              childCols: ['user_id', 'title'],
+          relations: {
+            ...base.models.User.relations,
+            posts: {
+              to: 'Post',
+              cardinality: '1:N',
+              on: {
+                localFields: ['id', 'email'],
+                targetFields: ['userId', 'title'],
+              },
             },
           },
         },
@@ -254,17 +228,25 @@ describe('createModelAccessor', () => {
       ]),
     );
 
-    const noChildColsContract = {
-      ...compositeContract,
-      relations: {
-        ...compositeContract.relations,
-        users_alt: {
-          posts: {
-            to: 'Post',
-            cardinality: '1:N',
-            on: {
-              parentCols: ['id', 'name'],
-              childCols: [undefined, 'title'],
+    const noTargetFieldsContract = {
+      ...base,
+      models: {
+        ...base.models,
+        User: {
+          ...base.models.User,
+          storage: {
+            ...base.models.User.storage,
+            table: 'users_alt',
+          },
+          relations: {
+            ...base.models.User.relations,
+            posts: {
+              to: 'Post',
+              cardinality: '1:N',
+              on: {
+                localFields: ['id', 'name'],
+                targetFields: [undefined, 'title'],
+              },
             },
           },
         },
@@ -273,7 +255,7 @@ describe('createModelAccessor', () => {
 
     const fallbackExpr = (
       createModelAccessor(
-        { ...context, contract: noChildColsContract } as never,
+        { ...context, contract: noTargetFieldsContract } as never,
         'User',
       ) as unknown as Record<string, { some: () => unknown }>
     )['posts']!.some() as ExistsExpr;
@@ -286,23 +268,18 @@ describe('createModelAccessor', () => {
     const base = getTestContract();
     const storageFallbackContract = {
       ...base,
-      mappings: {
-        ...base.mappings,
-        modelToTable: {},
-      },
       models: {
         ...base.models,
         User: {
           ...base.models.User,
           storage: {
+            ...base.models.User.storage,
             table: 'users_storage',
           },
         },
       },
     };
 
-    // Table name falls back to models.User.storage.table ('users_storage').
-    // isNull is always available (traits: []) regardless of codec resolution.
     expect(
       createModelAccessor({ ...context, contract: storageFallbackContract } as never, 'User')[
         'name'
@@ -311,27 +288,21 @@ describe('createModelAccessor', () => {
 
     const modelNameFallbackContract = {
       ...base,
-      mappings: {
-        ...base.mappings,
-        modelToTable: {},
-        fieldToColumn: {},
-      },
       models: {
         ...base.models,
         User: {
           ...base.models.User,
           storage: {},
+          relations: {},
         },
       },
-      relations: {},
     };
 
-    // Table name falls back to model name ('User') when no storage.table exists.
     expect(
       createModelAccessor({ ...context, contract: modelNameFallbackContract } as never, 'User')[
         'name'
       ]!.isNull(),
-    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('User', 'name')));
+    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('user', 'name')));
   });
 
   it('combines relation shorthand fields with and() and rejects missing join arrays', () => {
@@ -351,12 +322,15 @@ describe('createModelAccessor', () => {
     const base = getTestContract();
     const contractWithoutJoinArrays = {
       ...base,
-      relations: {
-        ...base.relations,
-        users: {
-          posts: {
-            to: 'Post',
-            cardinality: '1:N',
+      models: {
+        ...base.models,
+        User: {
+          ...base.models.User,
+          relations: {
+            posts: {
+              to: 'Post',
+              cardinality: '1:N',
+            },
           },
         },
       },

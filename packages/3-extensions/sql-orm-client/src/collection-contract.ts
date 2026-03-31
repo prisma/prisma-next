@@ -80,18 +80,15 @@ export function resolveIncludeRelation(
   relationName: string,
 ): ResolvedIncludeRelation {
   const relation = resolveModelRelation(contract, modelName, relationName);
-  if (!relation) {
+  const localField = relation?.on.localFields[0];
+  const targetField = relation?.on.targetFields[0];
+  if (!relation || !localField || !targetField) {
     throw new Error(`Relation '${relationName}' not found on model '${modelName}'`);
   }
 
   const relatedTableName = resolveModelTableName(contract, relation.to);
-
-  const localColumn = resolveFieldToColumn(contract, modelName, relation.on.localFields[0] ?? '');
-  const targetColumn = resolveFieldToColumn(
-    contract,
-    relation.to,
-    relation.on.targetFields[0] ?? '',
-  );
+  const localColumn = resolveFieldToColumn(contract, modelName, localField);
+  const targetColumn = resolveFieldToColumn(contract, relation.to, targetField);
 
   return {
     relatedModelName: relation.to,
