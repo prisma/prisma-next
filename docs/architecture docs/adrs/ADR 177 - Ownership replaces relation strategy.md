@@ -246,7 +246,7 @@ All three are domain facts, stated on the model itself, self-describing.
 ### Open questions
 
 - ~~**Nested ownership.**~~ **Resolved.** An owned model can itself own other models (e.g., User → Order → LineItem, where Order is `owner: "User"` and LineItem is `owner: "Order"`). Each owned model in the chain uses `storage.relations` to map where its children go within its subdocument. Self-referential ownership (Comment owns Comment) is correctly rejected as circular — the anchor must be a non-self owner. See [design-questions.md § Q19](../../planning/mongo-target/1-design-docs/design-questions.md#19-self-referential-models).
-- **Value objects vs owned entities.** An owned Address with an `_id` is an entity. An owned Address without identity is a value object. The contract doesn't yet distinguish these. See the open question in [ADR 174](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md).
+- ~~**Value objects vs owned entities.**~~ **Resolved.** An owned Address with an `_id` is an entity (in `models` with `owner`). An Address without identity is a value object (in `valueObjects`). See [ADR 178 — Value objects in the contract](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md).
 
 ## Related
 

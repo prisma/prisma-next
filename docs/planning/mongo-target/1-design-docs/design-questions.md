@@ -16,7 +16,7 @@ Relations to owned models are plain graph edges: `{ "to": "Address", "cardinalit
 
 This is a cross-family concern: SQL typed JSON/JSONB columns are the same contract-level problem (structured data nested in a parent entity). Both families need type-safe dot-notation queries, TypeScript type generation, and reusability across models. The difference is convention (Mongo: embedding is idiomatic; SQL: JSON columns are an escape hatch), not capability.
 
-Value objects (Address, GeoPoint) without identity are a separate concept — they belong in a dedicated value objects section, not `models`. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the entity vs value object distinction.
+Value objects (Address, GeoPoint) without identity are a separate concept — they belong in a dedicated `valueObjects` section, not `models`. See [ADR 178 — Value objects in the contract](../../../architecture%20docs/adrs/ADR%20178%20-%20Value%20objects%20in%20the%20contract.md) for the full design and [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the entity vs value object distinction.
 
 See [ADR 177 — Ownership replaces relation strategy](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) for the full rationale.
 
@@ -59,25 +59,30 @@ See [mongo-execution-components.md](mongo-execution-components.md) for the compo
 
 ---
 
-## 4. Update operators: shared ORM surface vs. Mongo-native operations
+## 4. Update operators: shared ORM surface vs. Mongo-native operations *(resolved)*
 
-SQL updates are "set field = value" operations. MongoDB updates use operators (`$set`, `$inc`, `$push`, `$pull`, `$addToSet`, etc.) that express field-level mutations.
+**Answer**: The dot-path field accessor provides type-safe access to Mongo-native update operators through a shared mutation API. Three mutation forms cover the spectrum from simple to Mongo-native:
 
-**The question**: How does the ORM mutation surface accommodate Mongo's update operators?
+```typescript
+// Plain object — partial update (shared surface)
+db.users.where({ id }).update({ name: "Bob" })
+// Compiles to: $set: { name: "Bob" }
 
-Layers:
-- **Basic updates map naturally.** `db.users.where({ id }).update({ name: "Bob" })` → `{ $set: { name: "Bob" } }`. This works today with the shared ORM interface.
-- **Atomic operators are Mongo-native.** `$inc` (increment without read-modify-write), `$push` (append to array), `$pull` (remove from array), `$addToSet` (append unique) — these have no SQL equivalent and express operations that are fundamentally different from "set field = value."
+// Field accessor — per-field Mongo-native operations
+db.users.where({ id }).update(u => [
+  u("stats.views").inc(1),
+  u("tags").push("featured"),
+])
+// Compiles to: { $inc: { "stats.views": 1 }, $push: { "tags": "featured" } }
+```
 
-Options:
-- **Shared ORM surface only**: The ORM's `update()` method always takes a plain data object. The Mongo adapter translates `{ views: 1 }` into `{ $set: { views: 1 } }`. Atomic operators are not exposed — users who want `$inc` must use a lower-level escape hatch (raw commands or a document query DSL).
-- **Family-specific ORM extensions**: The document ORM client's `update()` accepts an extended input type with operator helpers: `{ views: { $inc: 1 }, tags: { $push: "new" } }`. The shared interface still accepts plain data; the extensions are additive.
-- **Separate mutation methods**: `db.users.where({ id }).increment({ views: 1 })`, `db.users.where({ id }).push("tags", "new")`. Mongo-native operations become explicit ORM methods.
+The key design principle is that **the verb determines the behaviour**: `create()` applies defaults for omitted fields; `update()` with a plain object is always partial (omitted fields untouched); field accessor operations are explicit per-field mutations.
 
-Tensions:
-- Atomic operators are a major part of the Mongo-native experience. `$inc` avoids a read-modify-write cycle and is one of Mongo's key advantages for high-contention data. Not exposing these through the ORM would be a significant DX gap.
-- But extending the shared ORM interface with Mongo-specific operators means the interface is no longer truly shared. Consumer libraries that generate mutations would need to know about document-specific update shapes.
-- The SQL ORM already has family-specific behavior (e.g. `RETURNING` clause, upsert conflict resolution). Update operators may be another case of "shared interface, family-specific extensions."
+Mutation operators are **capability-gated by target**: Mongo gets the full suite (`inc`, `push`, `pull`, `addToSet`, `pop`, etc.); SQL is limited to `set` and `unset` for JSONB paths.
+
+This resolved the original tension: the shared ORM interface (`update()` with plain objects) remains truly shared, while Mongo-native atomic operators are exposed through the field accessor pattern — which is itself a shared mechanism (it works for SQL JSONB too, just with fewer operators).
+
+See [ADR 180 — Dot-path field accessor](../../../architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) for the full rationale and backend translation tables.
 
 ---
 
@@ -228,7 +233,7 @@ For the PoC: Out of scope. The architecture constraints are:
 - **`model.storage`** — family-specific extension point (SQL: field → column; Mongo: field → codec)
 - **`relations`** — with cardinality and optional join details (`on`)
 - **`owner`** — model-level declaration of aggregate membership (see [ADR 177](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md))
-- **value objects** — named field structures without identity (not yet designed)
+- **value objects** — named field structures without identity, defined in a top-level `valueObjects` section (see [ADR 178](../../../architecture%20docs/adrs/ADR%20178%20-%20Value%20objects%20in%20the%20contract.md))
 
 This is not a mechanical extraction from either contract — it's a new abstraction rooted in domain modeling concepts:
 
@@ -236,7 +241,7 @@ This is not a mechanical extraction from either contract — it's a new abstract
 |---|---|
 | **Aggregate root** | Entry in `roots`, model with storage containing table/collection |
 | **Entity** | Entry in `models` |
-| **Value object** | Dedicated contract section (not yet designed) |
+| **Value object** | Top-level `valueObjects` section ([ADR 178](../../../architecture%20docs/adrs/ADR%20178%20-%20Value%20objects%20in%20the%20contract.md)) |
 | **Owned model** | Model with `"owner": "ParentModel"` — co-located storage |
 | **Reference** | Relation with `on` join details to an independent model |
 | **Polymorphism** | `discriminator` + `variants` on any model |
@@ -394,48 +399,9 @@ Not yet designed. Not blocking for April — but should be designed before the c
 
 ---
 
-## 16. Union field types (mixed-type fields)
+## 16. Union field types (mixed-type fields) *(resolved)*
 
-A MongoDB document field can hold values of different BSON types — a field `score` might be an `Int32` in some documents and a `String` in others. This is common in untyped or evolving collections.
-
-**The question**: How does the contract represent a field that can hold one of several types?
-
-### The current model
-
-Today, a field has a single `codecId`:
-
-```json
-{ "nullable": false, "codecId": "mongo/int32@1" }
-```
-
-This assumes every value in the field is the same type. For SQL, this is always true (columns are typed). For MongoDB, it's an aspiration — many real-world collections have mixed-type fields, either by design or from schema evolution.
-
-### Where this matters
-
-- **Introspection**: Introspecting an existing MongoDB collection will encounter mixed-type fields. The introspector needs to either pick one type and warn, or represent the union.
-- **Schema evolution**: Migrating a field from `string` to `int` means documents will contain both types until migration completes. The contract should be able to describe this transitional state.
-- **Intentional unions**: Some schemas intentionally use mixed types — a `metadata` field that can be a string or an object, a `value` field that can be a number or a string.
-- **TypeScript type inference**: If a field can be `int | string`, the generated TypeScript type should be `number | string`. The codec layer needs to handle multiple possible BSON types for the same field.
-
-### Options
-
-**A. Array of codec IDs**
-
-```json
-{ "nullable": false, "codecId": ["mongo/int32@1", "mongo/string@1"] }
-```
-
-Simple, but changes `codecId` from `string` to `string | string[]` everywhere it's consumed. Every consumer must handle the array case.
-
-**B. Dedicated union codec**
-
-```json
-{ "nullable": false, "codecId": "mongo/union@1", "codecParams": { "types": ["int32", "string"] } }
-```
-
-Keeps `codecId` as a single string. The union codec is itself parameterised. More complex codec implementation, but the contract field shape doesn't change.
-
-**C. Discriminated field union (inline polymorphism)**
+**Answer**: The `union` property on fields — a third mutually exclusive field type descriptor alongside `codecId` (scalar) and `type` (value object). Each union member carries either `codecId` or `type`:
 
 ```json
 {
@@ -445,21 +411,22 @@ Keeps `codecId` as a single string. The union codec is itself parameterised. Mor
       { "codecId": "mongo/int32@1" },
       { "codecId": "mongo/string@1" }
     ]
+  },
+  "location": {
+    "nullable": false,
+    "union": [
+      { "type": "Address" },
+      { "type": "GeoPoint" }
+    ]
   }
 }
 ```
 
-Extends the field shape with a `union` property. Most explicit, but changes the field schema.
+This was Option C from the original analysis. It extends the field shape with a `union` property while keeping `codecId` as a single string on non-union fields. The field type system is now: `codecId` (one scalar), `type` (one value object), `union` (multiple types — any mix of scalars and value objects). All three are mutually exclusive.
 
-### Relationship to polymorphic models
+Polymorphic value objects ([ADR 173](../../../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)) handle *structured* unions with a discriminator and shared base. `union` handles *unstructured* unions with no discriminator.
 
-Model-level polymorphism (ADR 173) and field-level unions are different granularities of the same idea: "this location can hold one of several shapes." Model polymorphism uses a discriminator field to distinguish shapes; field unions typically don't have a discriminator (the type is inspected at runtime). This is analogous to TypeScript's discriminated unions vs. plain unions.
-
-### SQL relevance
-
-This applies directly to SQL via `JSON`/`JSONB` columns. A JSON column can hold arbitrary structures, and the content may have mixed types at any level. If the contract represents typed JSON column content (which is a natural extension of the value objects work), the same union question applies. This is not a hypothetical future concern — SQL JSON columns are widely used today, and typed access to their contents is a common request.
-
-Not yet designed. Not blocking for April — the PoC contracts all have single-type fields. But this is a prerequisite for MongoDB introspection, for accurately modeling real-world Mongo collections, and for typed SQL JSON column access.
+See [ADR 179 — Union field types](../../../architecture%20docs/adrs/ADR%20179%20-%20Union%20field%20types.md) for the full rationale.
 
 ---
 
