@@ -11,79 +11,63 @@ The pipeline has three components. Each is family-specific — the Mongo version
 | Component | Role | SQL equivalent |
 |---|---|---|
 | **MongoQueryPlan** | Describes a database operation: what collection, what operation, what filter/document/pipeline | `ExecutionPlan` (SQL string + params) |
-| **MongoRuntimeCore** | Orchestrates execution: validates the plan, runs plugin hooks, calls the driver, wraps results | `RuntimeCoreImpl` |
+| **MongoRuntime** | Orchestrates execution: lowers via adapter, calls the driver, wraps results in `AsyncIterableResult`. Plugin hooks (`beforeExecute`/`onRow`/`afterExecute`) are planned but not yet implemented. | `RuntimeCoreImpl` |
 | **MongoDriver** | Talks to MongoDB: dispatches commands to the `mongodb` Node.js driver, returns results as `AsyncIterable` | `Queryable` (sends SQL to Postgres) |
 
 Data flows top-down:
 
-```
+```text
 MongoQueryPlan { command, meta }
   │
   ▼
-MongoRuntimeCore
-  validates plan, runs beforeExecute hooks
+MongoRuntime
+  lowers via adapter (resolves params, produces wire command)
   │
   ▼
 MongoDriver
-  dispatches command to mongodb driver
+  dispatches wire command to mongodb driver
   returns AsyncIterable<Document>
   │
   ▼
-MongoRuntimeCore
-  decodes via codecs, runs onRow / afterExecute hooks
+MongoRuntime
   wraps in AsyncIterableResult<Row>
+  (planned: codec decode, plugin hooks)
 ```
 
 A **query plan** is the complete description of a database operation — everything the driver needs to execute it. In SQL, this is an SQL string + parameters, and there's a lowering step from the ORM's internal representation (`SqlQueryPlan`) to the wire format (`ExecutionPlan`). In Mongo, the adapter performs a similar lowering step (`adapter.lower()`) that resolves parameter references and converts `MongoCommand` objects into `MongoWireCommand` objects for the driver.
 
-What's shared across families: `PlanMeta` (operation name, model, lane, target, storageHash), the plugin lifecycle pattern (`beforeExecute → onRow → afterExecute`), and `AsyncIterableResult<Row>`.
+What's shared across families: `PlanMeta` (operation name, model, lane, target, storageHash), the plugin lifecycle pattern (`beforeExecute → onRow → afterExecute`, planned for Mongo), and `AsyncIterableResult<Row>`.
 
 ---
 
 ## MongoQueryPlan
 
-**Status: speculative shape, needs validation against real queries**
+**Status: implemented**
 
 A query plan pairs a command (what to do) with metadata (context for plugins and telemetry):
 
 ```typescript
 interface MongoQueryPlan<Row = unknown> {
-  readonly command: MongoCommand;
+  readonly command: AnyMongoCommand;
   readonly meta: PlanMeta;
-  readonly _row?: Row;  // phantom type for result type extraction
 }
 ```
 
-The command carries everything the driver needs:
+Commands are a discriminated union on `kind`:
 
 ```typescript
-interface MongoCommand {
-  readonly collection: string;
-  readonly operation: 'find' | 'insertOne' | 'insertMany' | 'updateOne' | 'updateMany' | 'deleteOne' | 'deleteMany' | 'aggregate';
-  readonly filter?: Document;
-  readonly update?: Document;
-  readonly document?: Document;
-  readonly documents?: Document[];
-  readonly pipeline?: Document[];
-  readonly options?: {
-    readonly projection?: Document;
-    readonly sort?: Document;
-    readonly limit?: number;
-    readonly skip?: number;
-  };
-}
+type AnyMongoCommand = FindCommand | InsertOneCommand | UpdateOneCommand | DeleteOneCommand | AggregateCommand;
 ```
 
-### Open questions
+Each command class carries exactly the fields it needs (e.g. `FindCommand` has `collection`, `filter`, `projection`, `sort`, `limit`, `skip`; `AggregateCommand` has `collection` and `pipeline`). All command classes share `readonly kind` and `readonly collection`.
 
-**Does `PlanMeta` work as-is?** Several `PlanMeta` fields assume SQL:
-- `paramDescriptors` — positional parameter metadata (`$1`, `$2`). Mongo values are inline in the filter. Empty array, or split `PlanMeta` into shared + family-specific?
-- `refs.tables` / `refs.columns` — maps to collections/fields, but the naming assumes SQL. Semantic mismatch or cosmetic?
-- `projection` / `projectionTypes` — Mongo projection is `{ field: 1 }` inclusion/exclusion, not SQL column aliases. Compatible or different concept?
+### Resolved questions
 
-**Should `MongoCommand` be a discriminated union?** The shape above uses a string `operation` with optional properties. A union type (`FindCommand`, `InsertCommand`, etc.) where each variant has exactly the fields it needs is more precise but more verbose.
+**`MongoCommand` as a discriminated union**: Yes — implemented as concrete classes with a `kind` discriminant. This gives precise typing per command type and enables exhaustive `switch` dispatch in both adapter and driver.
 
-**What about mutations that return data?** `insertOne` returns `{ insertedId }`, `updateOne` returns `{ matchedCount, modifiedCount }`, `findOneAndUpdate` returns the document. The `Row` phantom type needs to handle both document results and mutation acknowledgments. Does the plan distinguish these, or does the driver normalize returns?
+**`PlanMeta` compatibility**: Works as-is with `paramDescriptors` as an empty array and unused SQL-specific fields. A future cleanup may split `PlanMeta` into shared + family-specific.
+
+**Mutation return types**: Each mutation command yields its own result shape (e.g., `InsertOneResult`, `UpdateOneResult`, `DeleteOneResult`), wrapped in `AsyncIterable`.
 
 ---
 
@@ -91,14 +75,16 @@ interface MongoCommand {
 
 **Status: straightforward wrapping of the `mongodb` Node.js driver**
 
-The driver wraps `MongoClient` and dispatches commands:
+The driver wraps `MongoClient` and dispatches wire commands:
 
 ```typescript
-interface MongoDriverInterface {
-  execute<Row = Record<string, unknown>>(command: MongoCommand): AsyncIterable<Row>;
+interface MongoDriver {
+  execute<Row>(wireCommand: AnyMongoWireCommand): AsyncIterable<Row>;
   close(): Promise<void>;
 }
 ```
+
+Wire commands mirror the command structure but carry resolved values (no `MongoParamRef` instances). The adapter's `lower()` step converts `MongoCommand` → `MongoWireCommand`.
 
 Dispatch is a switch on `wireCommand.kind`:
 - `find` → `collection.find(filter, options)` → returns a `FindCursor` (already `AsyncIterable`)
@@ -118,19 +104,17 @@ The `mongodb` driver's cursors are already `AsyncIterable`, so the interface is 
 
 ---
 
-## MongoRuntimeCore
+## MongoRuntime
 
-**Status: pattern is well-understood, implementation is new**
+**Status: implemented (minimal PoC)**
 
-The runtime core orchestrates execution with the same lifecycle as the SQL runtime:
+The runtime orchestrates execution:
 
-1. Validate the plan (target match, storage hash match)
-2. Run `beforeExecute` plugin hooks
-3. Call the driver
-4. Yield rows/documents, running `onRow` hooks and decoding via codecs
-5. Run `afterExecute` hooks with timing/count metadata
+1. Lower the query plan via the adapter (`adapter.lower()` resolves `MongoParamRef` values and produces wire commands)
+2. Call the driver with the wire command
+3. Wrap the driver's `AsyncIterable<Row>` in `AsyncIterableResult<Row>`
 
-It wraps the driver's `AsyncIterable<Document>` in `AsyncIterableResult<Row>` (already family-agnostic).
+Plugin hooks (`beforeExecute`, `onRow`, `afterExecute`), plan validation, and codec decode are planned but not yet implemented. The current PoC uses identity codecs and skips hooks.
 
 ### Open questions
 
@@ -159,13 +143,13 @@ Despite this, the codec abstraction earns its keep as an **extension point**:
 
 These can be added transparently as target codecs without modifying the core — the same pattern as SQL extensions.
 
-The codec abstraction (`MongoCodec` interface, `mongoCodec()` factory, `MongoCodecRegistry`) lives in the family core (`2-mongo/1-core/`). Concrete codecs live in the target adapter (`3-targets/6-adapters/mongo/`). This separation follows the architectural rule: family defines abstractions, target provides concretions.
+The codec abstraction (`MongoCodec` interface, `mongoCodec()` factory, `MongoCodecRegistry`) lives in the family core (`packages/2-mongo-family/1-core/`). Concrete codecs live in the target adapter (`packages/3-mongo-target/2-mongo-adapter/`). This separation follows the architectural rule: family defines abstractions, target provides concretions.
 
 ### Resolved questions
 
 **ObjectId representation**: Normalized to `string` (hex). The `objectId@1` codec decodes `ObjectId` to hex string and encodes back. This keeps contract types JSON-friendly and avoids leaking the driver's `ObjectId` class into the contract type system.
 
-**Base codecs**: `objectId`, `string`, `int32`, `boolean`, `date` — implemented in `3-targets/6-adapters/mongo/src/core/codecs.ts`.
+**Base codecs**: `objectId`, `string`, `int32`, `boolean`, `date` — implemented in `packages/3-mongo-target/2-mongo-adapter/src/core/codecs.ts`.
 
 ### Remaining open questions
 
