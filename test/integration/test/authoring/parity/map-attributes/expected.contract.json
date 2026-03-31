@@ -12,12 +12,10 @@
     "Member": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
-          "column": "member_id"
+          "codecId": "pg/int4@1"
         },
         "teamId": {
-          "codecId": "pg/int4@1",
-          "column": "team_ref"
+          "codecId": "pg/int4@1"
         }
       },
       "relations": {
@@ -46,8 +44,7 @@
     "Team": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
-          "column": "team_id"
+          "codecId": "pg/int4@1"
         }
       },
       "relations": {},

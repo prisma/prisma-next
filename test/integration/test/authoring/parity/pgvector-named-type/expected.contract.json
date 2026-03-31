@@ -11,12 +11,10 @@
     "Document": {
       "fields": {
         "embedding": {
-          "codecId": "pg/vector@1",
-          "column": "embedding"
+          "codecId": "pg/vector@1"
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "column": "id"
+          "codecId": "pg/int4@1"
         }
       },
       "relations": {},
