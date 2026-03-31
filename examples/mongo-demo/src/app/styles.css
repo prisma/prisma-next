@@ -14,7 +14,7 @@
   --medium: #f59e0b;
   --low: #22c55e;
   --radius: 8px;
-  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --font: "Inter", system-ui, -apple-system, sans-serif;
 }
 
 * {
@@ -324,7 +324,7 @@ footer {
 }
 
 .legend li::before {
-  content: '→';
+  content: "→";
   position: absolute;
   left: 0;
   color: var(--accent);

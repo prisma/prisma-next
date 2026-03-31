@@ -22,6 +22,18 @@ import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types
 import type { RowSelection } from './collection-internal-types';
 
 // ---------------------------------------------------------------------------
+// SimplifyDeep — recursive type prettifier for IDE tooltips
+// ---------------------------------------------------------------------------
+
+export type SimplifyDeep<T> = T extends readonly (infer Element)[]
+  ? SimplifyDeep<Element>[]
+  : T extends string | number | boolean | bigint | symbol | Date | Uint8Array
+    ? T
+    : T extends object
+      ? { [K in keyof T]: SimplifyDeep<T[K]> }
+      : T;
+
+// ---------------------------------------------------------------------------
 // Comparison / Filter / Order / Include
 // ---------------------------------------------------------------------------
 
