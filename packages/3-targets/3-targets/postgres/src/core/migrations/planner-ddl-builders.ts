@@ -154,7 +154,7 @@ export function buildColumnDefaultSql(
     }
     case 'sequence':
       // Sequence names use quoteIdentifier for safe identifier handling
-      return `DEFAULT nextval(${quoteIdentifier(columnDefault.name)}::regclass)`;
+      return `DEFAULT nextval('${escapeLiteral(quoteIdentifier(columnDefault.name))}'::regclass)`;
   }
 }
 
