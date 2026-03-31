@@ -252,6 +252,10 @@ Traits are **declared by the codec** and are immutable after registration. There
 - Type-level trait resolution from `CodecTypes` for query surfaces
 - Replace `NumericNativeType` in ORM with trait-based check
 
+### Trait-gating extends to value object dot-path access
+
+Trait-gating is not limited to direct column access. The dot-path field accessor ([ADR 180](ADR%20180%20-%20Dot-path%20field%20accessor.md)) navigates into value objects and returns an `Expression` at the leaf. That expression carries the same trait-gated operators as a direct column — a text field reached via `u("homeAddress.city")` has `eq`, `gt`, `like` (the same methods as `u.email`), and a vector field reached via `u("specs.featureVector")` has `cosineDistance`. The trait resolution is the same: the leaf field's `codecId` determines which traits apply.
+
 ### Non-goals
 
 - Custom user-defined traits (trait vocabulary is fixed in framework)
@@ -304,4 +308,5 @@ Model traits as TypeScript interfaces that codecs extend (e.g., `interface Order
 - ADR 114 — Extension codecs & branded types
 - ADR 117 — Extension capability keys
 - ADR 113 — Extension function & operator registry
+- [ADR 180 — Dot-path field accessor](ADR%20180%20-%20Dot-path%20field%20accessor.md) — trait-gating applies to expressions returned by the dot-path accessor
 - PR #247 — feat: Introduce codec trait system

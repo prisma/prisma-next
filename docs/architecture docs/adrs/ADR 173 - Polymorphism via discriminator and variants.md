@@ -162,6 +162,43 @@ A model can be simultaneously:
 
 These are independent properties. This composability is why we rejected labeled strategies — they create a false choice between roles that are actually orthogonal.
 
+### Value objects use the same mechanism
+
+The `discriminator`/`variants`/`base` pattern applies identically to value objects in the `valueObjects` section ([ADR 178](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md)). A base value object declares a discriminator and variants; each variant declares its base and adds type-specific fields:
+
+```json
+"valueObjects": {
+  "ContactInfo": {
+    "discriminator": { "field": "channel" },
+    "variants": {
+      "EmailContact": { "value": "email" },
+      "PhoneContact": { "value": "phone" }
+    },
+    "fields": {
+      "channel": { "nullable": false, "codecId": "mongo/string@1" }
+    }
+  },
+  "EmailContact": {
+    "base": "ContactInfo",
+    "fields": {
+      "address": { "nullable": false, "codecId": "mongo/string@1" }
+    }
+  },
+  "PhoneContact": {
+    "base": "ContactInfo",
+    "fields": {
+      "number": { "nullable": false, "codecId": "mongo/string@1" }
+    }
+  }
+}
+```
+
+The structural mechanism is identical — `discriminator`, `variants`, `base`, thin variant fields. The difference is purely in framework commitment: polymorphic value objects don't get identity, lifecycle hooks, or referential integrity. TypeScript inference produces `ContactInfo = EmailContact | PhoneContact`, narrowed by the `channel` discriminator — the same narrowing pattern the ORM already uses for model polymorphism.
+
+Real-world examples: `ContactInfo` (email vs phone vs push), `PaymentMethod` (card vs bank), `MediaAttachment` (image vs video), form field definitions (text vs select vs number).
+
+For *unstructured* unions (no discriminator, no shared fields), see [ADR 179 — Union field types](ADR%20179%20-%20Union%20field%20types.md).
+
 ## Consequences
 
 ### Benefits
@@ -171,6 +208,7 @@ These are independent properties. This composability is why we rejected labeled 
 - **Extensible**: new persistence strategies are expressed through storage mappings, not contract schema changes.
 - **Cross-family**: the same representation works for SQL STI/MTI and Mongo polymorphic collections.
 - **Neutral terminology**: `base`/`variants` describes structural facts (specialization/generalization) without prescribing OOP patterns.
+- **Reusable across models and value objects**: the same mechanism works in both `models` and `valueObjects` sections, reducing cognitive overhead.
 
 ### Costs
 
@@ -188,5 +226,7 @@ These are independent properties. This composability is why we rejected labeled 
 
 - [ADR 172 — Contract domain-storage separation](ADR%20172%20-%20Contract%20domain-storage%20separation.md) — why `model.fields` carries `nullable` and `codecId`
 - [ADR 174 — Aggregate roots and relation strategies](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — `roots`, `reference` vs `embed`
+- [ADR 178 — Value objects in the contract](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md) — polymorphic value objects use the same discriminator/variants/base mechanism
+- [ADR 179 — Union field types](ADR%20179%20-%20Union%20field%20types.md) — unstructured unions as an alternative to discriminated polymorphism
 - [design-questions.md § DQ #6](../../planning/mongo-target/1-design-docs/design-questions.md)
 - [cross-cutting-learnings.md § learning #4](../../planning/mongo-target/cross-cutting-learnings.md)
