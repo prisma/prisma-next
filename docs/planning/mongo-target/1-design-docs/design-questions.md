@@ -86,24 +86,52 @@ See [ADR 180 — Dot-path field accessor](../../../architecture%20docs/adrs/ADR%
 
 ---
 
-## 5. Schema validation and read-time guarantees
+## 5. Schema validation and read-time guarantees *(resolved — cross-family concern)*
 
-MongoDB doesn't enforce types — a field declared as `number` in the contract might contain a string in the database. Documents may not match the contract for many reasons: pre-existing data, direct writes bypassing PN, schema evolution.
+**Answer**: Read validation is configurable via the contract's existing `execution` section. Write validation is always on (non-configurable framework guarantee). Coercion is dropped — it silently changes semantics and causes subtle bugs when other consumers read the same data without coercing.
 
-**The question**: What does PN guarantee about data returned from reads?
+The fundamental problem generalizes beyond MongoDB's schemaless nature: any codec can encounter data it can't decode — a column type altered outside PN, corrupt data, schema evolution in progress. The question is always: what does the runtime do when the data doesn't match what the contract promised?
 
-Options:
-- **Validate on read, error on mismatch (strict)**: Reject documents that don't match the contract. Consistent with the runtime's existing `mode: 'strict'`. Risk: breaks reads on legacy data.
-- **Validate on read, warn on mismatch (permissive)**: Return the data but emit a diagnostic. The user sees their data, but gets notified of schema drift. The diagnostic channel is the runtime's log infrastructure — whether it pipes to error monitoring is the user's concern.
-- **Validate on write only**: Trust reads, validate writes. PN guarantees what it writes is correct; existing data is the user's problem. Lightest approach.
-- **Coerce where possible**: If the contract says `age: Int` and the doc has `age: "30"`, coerce it. This is what Mongoose does.
+**Three read validation strategies:**
 
-Tensions:
-- Strict validation on reads is the most correct behavior but may be impractical for users migrating from untyped Mongo usage — their existing data won't match the contract.
-- The runtime already has `mode: 'strict' | 'permissive'`. This is a natural place to control read validation behavior.
-- Coercion is convenient but lossy — it silently changes semantics. A string `"30"` and an integer `30` behave differently in comparisons, sorting, and aggregation.
+| Strategy | Behaviour | Use case |
+|---|---|---|
+| **`reject`** | Throw/error, row is not returned | Production, data you fully control |
+| **`warn`** | Return the raw/partial value, emit a diagnostic | Migration, data cleanup in progress |
+| **`passthrough`** | Return whatever came back, no validation | Performance-critical reads, "I know what I'm doing" |
 
-Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB collections? This would give database-level write enforcement, complementing application-level validation.
+**Configuration lives in `execution`, not `models`.** The domain section (`models`) describes *what the data model is*; the execution section describes *how the runtime behaves*. This follows the same separation principle as domain/storage — execution is a third concern. The `execution` section already exists and carries mutation defaults and generated values; read validation is a new key in the same section.
+
+**Per-model and per-codec overrides within `execution`:**
+
+```json
+{
+  "execution": {
+    "readValidation": "reject",
+    "models": {
+      "LegacyEvent": { "readValidation": "warn" }
+    },
+    "codecs": {
+      "mongo/legacy_date@1": { "readValidation": "warn" }
+    },
+    "mutations": { ... }
+  }
+}
+```
+
+- **Contract-level default** (`execution.readValidation`): applies to all models. Default when omitted: `reject` (the framework protects you by default).
+- **Per-model override** (`execution.models.<Model>.readValidation`): override for a specific model. Useful during migration — flip models from `warn` to `reject` as you clean up collections.
+- **Per-codec override** (`execution.codecs.<codecId>.readValidation`): override for a specific codec type. Useful when a codec is known to encounter undecable values (e.g., a best-effort legacy decoder, or a union codec facing type ambiguity).
+
+Resolution order: model-level > codec-level > contract default.
+
+**Design principles:**
+
+- **Write validation is non-configurable.** The framework always rejects invalid writes. This is a guarantee, not a policy. No execution config for that.
+- **Coercion is dropped.** It silently changes semantics — a string `"30"` and an integer `30` sort differently, compare differently, and aggregate differently. Coercing on read means the application sees data that doesn't match what's in the database. If coercion is needed, it belongs in a custom codec, not in the runtime's validation policy.
+- **`executionHash` implications.** Changing `readValidation` changes the `executionHash`. Switching from `warn` to `reject` is a meaningful change that could break reads at runtime — the team should be aware of it.
+- **Cross-family.** This applies to SQL too — JSONB columns can contain anything, and value objects stored in JSONB face the same validation question. Any codec encountering undecable data hits this problem regardless of family.
+- **`$jsonSchema` is complementary.** Optionally pushing `$jsonSchema` validation rules to MongoDB collections provides database-level write enforcement, catching writes that bypass PN. This is an additional layer, not a replacement for application-level validation.
 
 ---
 
