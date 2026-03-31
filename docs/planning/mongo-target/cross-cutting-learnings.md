@@ -89,7 +89,7 @@ The co-location of table name with field-to-column mappings in SQL is intentiona
 
 Embedded documents in Mongo and typed JSON columns in SQL are the same contract-level problem: structured data nested within a parent entity. Both need type-safe dot-notation queries, TypeScript type generation, and reusability across models.
 
-**Embedding is a relation property, not a model property.** The parent model's relation declares the embedding strategy (`"strategy": "embed"`); the embedded model doesn't know where it's embedded. An embedded model has its own `fields` and `storage` (field-to-codec mappings) but no table/collection name — it doesn't own a storage unit.
+**Embedding is expressed via model ownership.** An owned model declares `"owner": "ParentModel"` — a domain-level fact about aggregate membership. The parent's `storage.relations` maps the relation to its physical location. Relations to owned models are plain graph edges with no storage annotations. See [ADR 177](../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md). An owned model has its own `fields` but no table/collection name — it doesn't own a storage unit.
 
 The entity vs value object distinction matters: an embedded **entity** (e.g., a Post with `_id` embedded in User) has identity and lifecycle. An embedded **value object** (e.g., Address) has no identity — it belongs in a dedicated value objects section, not `models`.
 
@@ -211,9 +211,9 @@ The Mongo ORM introduces `InferFullRow` (scalar fields + embedded relation field
 
 This should be resolved when extracting the shared contract base type.
 
-### Relation storage details
+### Relation storage details *(resolved)*
 
-Relations with `"strategy": "reference"` need family-specific join details (SQL: foreign key columns; Mongo: which field holds the ObjectId). Relations with `"strategy": "embed"` need to know which field in the parent document holds the embedded data.
+Reference relations carry `on: { localFields, targetFields }` for join details. Owned relations use `storage.relations` on the parent model to map relations to physical locations (e.g., `"addresses": { "field": "addresses" }` in Mongo, `"addresses": { "column": "address_data" }` in SQL). See [ADR 177](../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md).
 
 ### `nullable` and `codecId` location *(resolved)*
 

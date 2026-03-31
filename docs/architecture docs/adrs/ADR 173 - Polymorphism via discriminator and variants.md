@@ -21,7 +21,7 @@ A polymorphic Task model with Bug and Feature variants. Task declares which fiel
         "Feature": { "value": "feature" }
       },
       "relations": {
-        "assignee": { "to": "User", "cardinality": "N:1", "strategy": "reference" }
+        "assignee": { "to": "User", "cardinality": "N:1", "on": { "localFields": ["assigneeId"], "targetFields": ["id"] } }
       },
       "storage": {
         "table": "tasks",
@@ -157,7 +157,7 @@ All persistence-level polymorphism reduces to "multiple shapes in the same stora
 
 A model can be simultaneously:
 - Polymorphic (has `discriminator` + `variants`) AND an aggregate root (appears in `roots`)
-- A variant AND embedded (parent has `"strategy": "embed"`)
+- A variant AND owned (has `"owner": "ParentModel"`)
 - Polymorphic AND embedded
 
 These are independent properties. This composability is why we rejected labeled strategies — they create a false choice between roles that are actually orthogonal.

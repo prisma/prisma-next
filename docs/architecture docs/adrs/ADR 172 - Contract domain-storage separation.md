@@ -130,7 +130,7 @@ Each model's domain section should give a reader a complete picture of the field
 
 The contract has three levels, each serving a different consumer:
 
-1. **Domain level** (`roots`, `model.fields`, `model.relations`, `model.discriminator`/`variants`) — what the application models. Family-agnostic structure. Consumed by the ORM for type inference, by agents for understanding the data model, by any tool that doesn't need to know about storage.
+1. **Domain level** (`roots`, `model.fields`, `model.relations`, `model.owner`, `model.discriminator`/`variants`) — what the application models. Family-agnostic structure. Consumed by the ORM for type inference, by agents for understanding the data model, by any tool that doesn't need to know about storage.
 2. **Model storage bridge** (`model.storage`) — how domain fields connect to persistence. Sits on the model to preserve co-location. SQL carries field-to-column mappings because field names and column names can differ; Mongo carries only the collection name. `model.storage.fields` is available to Mongo should field name remapping ever be needed (e.g., `createdAt` → `_created_at`), but typically Mongo doesn't need it.
 3. **Top-level storage** (`storage`) — the database schema itself. SQL: every table, every column with its native type, nullability constraint, default, plus indexes and foreign keys. Mongo: collection metadata (indexes, validators). Consumed by migration tooling, schema introspection, and DDL generation.
 
@@ -158,7 +158,8 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 
 ### Other domain-level properties
 
-- **`model.relations`** — connections to other models with cardinality and strategy (see [ADR 174](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)).
+- **`model.relations`** — connections to other models with cardinality and optional join details (see [ADR 174](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)).
+- **`model.owner`** — declares aggregate membership: an owned model's data is co-located with its owner's storage (see [ADR 177](ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md)).
 - **`model.discriminator`** + **`model.variants`** — optional polymorphism declaration (see [ADR 173](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)).
 
 **Note — relations placement is a change from the current contract.** The current SQL emitter produces a top-level `relations` block as a sibling of `models`, keyed by model name (e.g., `contract.relations.user.posts`). The SQL ORM client consumes relations from this top-level block. This ADR moves relations onto each model (`model.relations`) because a model's relationships are part of its domain description — a reader should be able to understand a model completely without consulting a separate section. The current top-level placement was not a deliberate design choice; it diverged from the test fixtures (which use the nested form) during emitter development. The SQL emitter and ORM client will need to be updated to match.
@@ -167,7 +168,7 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 
 ### Benefits
 
-- **Shared contract base is viable.** The domain level (`roots`, `models` with `fields`/`discriminator`/`variants`, `relations`) is structurally identical between families. A `ContractBase` type can capture this, with `model.storage` as a generic/family-specific extension point.
+- **Shared contract base is viable.** The domain level (`roots`, `models` with `fields`/`discriminator`/`variants`/`owner`, `relations`) is structurally identical between families. A `ContractBase` type can capture this, with `model.storage` as a generic/family-specific extension point.
 - **Consumer libraries can be family-agnostic** for domain-level operations (listing models, traversing relations, finding aggregate roots).
 - **Each family controls its own storage representation** without compromising the other.
 - **The storage divergence is narrower.** Moving `codecId` to the domain level means Mongo's `model.storage` is just a collection name. The remaining divergence (SQL's field-to-column mappings) reflects a genuine structural difference.
@@ -194,6 +195,7 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 
 - [ADR 173 — Polymorphism via discriminator and variants](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)
 - [ADR 174 — Aggregate roots and relation strategies](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)
+- [ADR 177 — Ownership replaces relation strategy](ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) — `owner` on models replaces `strategy` on relations
 - [Data Contract subsystem doc](../subsystems/1.%20Data%20Contract.md) — contract structure and semantics
 - [MongoDB Family subsystem doc](../subsystems/10.%20MongoDB%20Family.md) — Mongo contract, ORM, and execution pipeline
 

@@ -39,7 +39,7 @@ The friction points map directly to PN's design priorities:
 | Friction point | PN's response |
 |---|---|
 | Polymorphic fields typed as `Json` | `discriminator` + `variants` in the contract ([ADR 173](../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)) |
-| Manual relationship definition | Contract declares relations with `strategy: "reference" \| "embed"` ([ADR 174](../architecture%20docs/adrs/ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)) |
+| Manual relationship definition | Contract declares relations and model ownership (`owner` for embedded, `on` for referenced). See [ADR 177](../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) |
 | No data migration support | Data invariant model for schema evolution ([ADR 176](../architecture%20docs/adrs/ADR%20176%20-%20Data%20migrations%20as%20invariant-guarded%20transitions.md)) |
 | Advanced features require raw queries | Aggregation pipeline DSL as a typed escape hatch (planned) |
 | Schema introspection friction | Improved introspection with convention-based normalization (planned) |

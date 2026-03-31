@@ -100,7 +100,7 @@ The PoC has achieved its goal: **validating that the Prisma Next architecture ca
 
 **Polymorphism works end-to-end (Phase 3).** `discriminator` + `variants` + `base` in the contract, polymorphic return types as discriminated unions with literal narrowing, and STI enforcement in Mongo storage validation — all validated with type-level and integration tests.
 
-**Embedded documents work without loading (Phase 3).** Relations with `"strategy": "embed"` auto-project into the parent row. No `include` needed, no separate query, correct type inference.
+**Embedded documents work without loading (Phase 3).** Owned models auto-project into the parent row. No `include` needed, no separate query, correct type inference.
 
 ### What remains — open design questions
 
@@ -139,7 +139,7 @@ The [design questions](design-questions.md) document has the full analysis and [
 ### Resolved
 
 - **[#10 — Shared contract surface](design-questions.md#10-shared-contract-surface-what-goes-in-contractbase)**: **Resolved** via [ADR 172](../../../architecture%20docs/adrs/ADR%20172%20-%20Contract%20domain-storage%20separation.md). The domain level (`roots`, `models`, `relations`) is the shared surface. Divergence is scoped to `model.storage`.
-- **[#1 — Embedded documents](design-questions.md#1-embedded-documents-relation-field-or-distinct-concept)**: **Resolved** via [ADR 174](../../../architecture%20docs/adrs/ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md). Embedding is a relation property (`"strategy": "embed"`). Remaining detail: relation storage specifics for embedding.
+- **[#1 — Embedded documents](design-questions.md#1-embedded-documents-relation-field-or-distinct-concept)**: **Resolved** via [ADR 177](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md). Embedding is expressed via `owner` on the owned model. Physical location mapped in parent's `storage.relations`.
 - **[#6 — Polymorphism](design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april)**: **Resolved** via [ADR 173](../../../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md). `discriminator` + `variants` on base models, `base` on variants (bidirectional navigation), emergent persistence strategy. Uses specialization/generalization terminology. Remaining: polymorphic associations. **Validated in Phase 3** — discriminator narrowing, polymorphic return types, and STI constraint all proven.
 - **[#3 — ExecutionPlan generalization](design-questions.md#3-execution-plan-generalization)**: **Resolved.** Each family gets its own plan type, plugin interface, and runtime. See [mongo-execution-components.md](mongo-execution-components.md).
 - **[#7 — Relation loading](design-questions.md#7-relation-loading-application-level-joining-vs-lookup)**: **Resolved in Phase 3.** Referenced relations use `$lookup` aggregation pipeline stages with `$unwind` for to-one cardinalities. Embedded relations are auto-projected — they're always present in the document, so no loading is needed. The `include` interface is shared across families; the resolution strategy differs (SQL: lateral joins / correlated subqueries; Mongo: `$lookup`).

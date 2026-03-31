@@ -78,7 +78,7 @@ This project widens `ContractBase` to carry the shared domain structure, updates
       },
       "relations": {
         "posts": {
-          "to": "Post", "cardinality": "1:N", "strategy": "reference",
+          "to": "Post", "cardinality": "1:N",
           "on": { "localFields": ["id"], "targetFields": ["userId"] }
         }
       },
@@ -354,6 +354,7 @@ This phase is independent of Phase 4 (IR alignment) and can be done before or af
 - [ ] Generated `contract.d.ts` output is identical before and after the refactor (regression-tested against demo and parity fixtures)
 - [ ] A new family emitter (e.g., Mongo) would not need to duplicate domain-level type generation logic
 
+
 # Other Considerations
 
 ## Security
@@ -392,5 +393,5 @@ No observability changes needed. The contract structure is a build-time artifact
 1. `**model.storage.fields` shape for SQL.** ADR 172 shows `"fields": { "id": { "column": "id" } }`. Should `model.storage.fields` carry any additional info beyond the column name (e.g., the nativeType, to avoid a second lookup into the top-level storage section)? **Default assumption:** Keep it minimal — just `{ column: string }`. The top-level `storage.tables` section is the source of truth for column metadata.
 2. **Relation join details in `model.relations`.** The current top-level relations use `childCols`/`parentCols`. ADR 172 uses `on: { localFields, targetFields }`. Should the new `model.relations` use the ADR 172 naming (`localFields`/`targetFields`) or keep the existing naming for continuity during migration? **Default assumption:** Use the ADR 172 naming. The old top-level block coexists during Phase 2, so consumers can migrate at their own pace.
 3. **Where does `roots` come from during emission?** Currently, every model with a `storage.table` is implicitly a root. Should the emitter derive `roots` automatically (every model → a root entry with pluralized name), or should the authoring surface declare them? **Default assumption:** The emitter derives `roots` from the existing model/table mapping for now. Explicit authoring-level `roots` is a DSL concern for Phase 4 / Alberto's workstream.
-4. `**model.relations` with `strategy`.** The new relations include `"strategy": "reference" | "embed"`. For SQL, all relations are `"reference"` (no embedding). Should the SQL emitter include `"strategy": "reference"` on every relation, or omit it since it's the only option? **Default assumption:** Include it explicitly — the domain structure should be self-describing, and consumers shouldn't need to know "SQL means reference."
+4. `**model.relations` shape.** Per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), relations are plain graph edges: `{ to, cardinality, on? }` — no `strategy`. Owned models declare `"owner": "ParentModel"` on the model itself. For SQL in Phase 1, all relations are references (with `on` join details) and no models have `owner`. Ownership becomes relevant when SQL introduces JSONB-column embedding.
 
