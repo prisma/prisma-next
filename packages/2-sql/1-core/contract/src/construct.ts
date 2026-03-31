@@ -174,7 +174,7 @@ export function constructContract<TContract extends SqlContract<SqlStorage>>(
   const contractWithMappings = {
     ...stripped,
     mappings,
-    roots: (stripped as Record<string, unknown>)['roots'] ?? {},
+    roots: stripped.roots,
   };
 
   return contractWithMappings as TContract;
