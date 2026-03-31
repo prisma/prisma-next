@@ -192,22 +192,18 @@ A `Comment` that can belong to either a `Post` or a `Video` (distinguished by `c
 
 ---
 
-## 7. Relation loading: application-level joining vs. `$lookup`
+## 7. Relation loading: application-level joining vs. `$lookup` *(resolved)*
 
-When the user asks to load a `User` and include their `Posts` (a referenced 1:N relation), there are two strategies.
+**Answer**: Use `$lookup` in aggregation pipelines for referenced relation loading. Application-level joining (multi-query + JS stitching) is simpler to implement but strictly inferior — it moves more data over the wire, requires multiple round trips, and is what Prisma ORM already does for Mongo (a known pain point). There's no point building the easy-but-dumb solution when `$lookup` is the correct approach.
 
-**The question**: Which strategy does the PN document ORM use, and when?
+This means the ORM's query compilation must target aggregation pipelines (not just `find()`) whenever a query involves `include` on a referenced relation. For embedded relations, no join is needed — the data comes back in the parent document's `find()` result.
 
-Options:
-- **Application-level joining**: Issue `find()` for users, then `find()` for posts where `authorId` is in the user ID set, stitch in JS. This is what the SQL ORM already does for includes, and what Prisma ORM does for Mongo.
-- **`$lookup` in aggregation pipeline**: Build a pipeline with a `$lookup` stage that joins users and posts server-side. More efficient for large result sets, but requires the ORM to compile to aggregation pipelines rather than simple `find()` calls.
+The Mongo ORM compilation target is:
+- **Basic CRUD without includes**: `find()` / `insertOne()` / `updateOne()` / `deleteOne()`
+- **Queries with referenced includes**: Aggregation pipeline with `$lookup` stages
+- **Queries with embedded includes**: `find()` with projection (data is already in the document)
 
-Tensions:
-- Application-level joining is simpler to implement and reuses existing patterns. But it requires N+1 queries (or 2 queries with an `$in` batch) and moves data over the wire that `$lookup` would handle server-side.
-- `$lookup` is more efficient but forces the ORM's query compilation to target aggregation pipelines for any query involving includes. This is a bigger implementation surface.
-- For embedded relations, neither approach is needed — the data comes back in the parent document's `find()` result. The ORM needs to know which relations are embedded and which are referenced to choose the right strategy.
-
-For the PoC: application-level joining is sufficient. But the architecture should not *prevent* `$lookup` optimization later.
+This also resolves part of [Q8](#8-aggregation-pipeline-as-the-mongo-query-builder-lane): the ORM needs pipeline compilation as a minimum for `$lookup`-based includes, which validates that building aggregation pipeline support is not optional.
 
 ---
 
