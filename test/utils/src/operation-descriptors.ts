@@ -37,6 +37,15 @@ export type PgVectorOperations = {
         readonly template: string;
       };
     };
+    readonly cosineSimilarity: {
+      readonly args: ReadonlyArray<{ readonly kind: 'typeId'; readonly type: 'pg/vector@1' }>;
+      readonly returns: { readonly kind: 'builtin'; readonly type: 'number' };
+      readonly lowering: {
+        readonly targetFamily: 'sql';
+        readonly strategy: 'function';
+        readonly template: string;
+      };
+    };
     readonly l2Distance: {
       readonly args: ReadonlyArray<{ readonly kind: 'typeId'; readonly type: 'pg/vector@1' }>;
       readonly returns: { readonly kind: 'builtin'; readonly type: 'number' };

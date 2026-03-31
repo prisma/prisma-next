@@ -273,6 +273,57 @@ test('ResultType infers Vector<1536> for parameterized non-nullable vector colum
   expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
+test('cosineSimilarity remains available on parameterized vector columns', () => {
+  const contractWithVector = validateContract<ContractWithNonNullableVector>({
+    target: 'postgres',
+    targetFamily: 'sql' as const,
+    storageHash: 'sha256:test-core',
+    profileHash: 'sha256:test-profile',
+    storage: {
+      tables: {
+        post: {
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            embedding: {
+              nativeType: 'vector',
+              codecId: 'pg/vector@1',
+              nullable: false,
+              typeParams: { length: 1536 },
+            },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+    models: {},
+    relations: {},
+    mappings: {},
+  });
+
+  const adapter = createPostgresAdapter();
+  const context = createTestContext(contractWithVector, adapter, {
+    extensionPacks: [pgvectorDescriptor],
+  });
+  const tables = schema<ContractWithNonNullableVector>(context).tables;
+  const postTable = tables['post'];
+  if (!postTable) throw new Error('post table not found');
+  const postColumns = postTable.columns;
+
+  const _plan = sql<ContractWithNonNullableVector>({ context })
+    .from(postTable)
+    .select({
+      similarity: postColumns['embedding']!.cosineSimilarity(param('queryVector')),
+    })
+    .build({ params: { queryVector: [0, 1, 2] } });
+
+  type Row = ResultType<typeof _plan>;
+  const similarityValue = 0 as Row['similarity'];
+  const similarityAsExpected: number = similarityValue;
+  void similarityAsExpected;
+});
+
 test('cosineDistance remains available on parameterized vector columns', () => {
   const contractWithVector = validateContract<ContractWithNonNullableVector>({
     target: 'postgres',

@@ -32,7 +32,7 @@ describe('pgvector descriptor', () => {
 
   it('has cosineDistance operation via operationSignatures()', () => {
     const operations = pgvectorExtensionDescriptor.operationSignatures();
-    expect(operations.length).toBeGreaterThan(0);
+    expect(operations.length).toBe(2);
 
     const cosineDistanceOp = operations.find(
       (op) => op.forTypeId === 'pg/vector@1' && op.method === 'cosineDistance',
@@ -45,6 +45,23 @@ describe('pgvector descriptor', () => {
       targetFamily: 'sql',
       strategy: 'function',
       template: '{{self}} <=> {{arg0}}',
+    });
+  });
+
+  it('has cosineSimilarity operation via operationSignatures()', () => {
+    const operations = pgvectorExtensionDescriptor.operationSignatures();
+
+    const cosineSimilarityOp = operations.find(
+      (op) => op.forTypeId === 'pg/vector@1' && op.method === 'cosineSimilarity',
+    );
+
+    expect(cosineSimilarityOp).toBeDefined();
+    expect(cosineSimilarityOp?.args).toEqual([{ kind: 'param' }]);
+    expect(cosineSimilarityOp?.returns).toEqual({ kind: 'builtin', type: 'number' });
+    expect(cosineSimilarityOp?.lowering).toEqual({
+      targetFamily: 'sql',
+      strategy: 'function',
+      template: '1 - ({{self}} <=> {{arg0}})',
     });
   });
 
