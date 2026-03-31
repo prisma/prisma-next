@@ -107,6 +107,22 @@ The `throw` in the scaffold is one way to achieve (c), but the key property is t
 - **FR-2**: The `db` parameter provides a minimal raw SQL interface: `db.execute(sql, params?)` (returns rows affected) and `db.query(sql, params?)` (returns rows). Parameterized queries only.
 - **FR-3**: `data-migration.ts` is compiled at apply time using the project's existing TypeScript execution tooling (tsx/esbuild). Source `.ts` files are committed; compiled JS is not.
 - **FR-4**: Each migration edge supports at most one data migration (single `data-migration.ts` per package).
+- **FR-4a**: A `readSql(filename)` helper is provided that reads a `.sql` file relative to the migration package directory and returns a function compatible with `check` or `run`. This allows SQL-first users to write plain SQL files while using `data-migration.ts` only as a thin wrapper:
+  ```typescript
+  import { defineMigration, readSql } from '@prisma-next/migration'
+  export default defineMigration({
+    name: 'custom-migration',
+    transaction: 'inline',
+    check: readSql('check.sql'),
+    run: readSql('migration.sql'),
+  })
+  ```
+
+### Manual authoring (`migration new`)
+
+- **FR-4b**: `migration new` scaffolds a migration package with a `data-migration.ts` and empty (or no) `ops.json`. The user writes all SQL in the `run(db)` function or via `readSql`. This is the escape hatch for when the planner's structural output is wrong, insufficient, or the user needs full control.
+- **FR-4c**: `migration new` derives `from` hash from the current migration graph state (same logic as `migration plan`) and `to` hash from the current emitted contract. Both can be overridden with `--from` and `--to` flags.
+- **FR-4d**: No verification at authoring time — the system trusts the user's SQL. Post-apply schema verification (introspect database, compare against destination contract) catches mismatches at `migration apply` time.
 
 ### Detection and scaffolding
 
