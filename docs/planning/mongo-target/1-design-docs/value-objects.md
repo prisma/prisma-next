@@ -349,21 +349,76 @@ Both produce TypeScript union types. The polymorphic pattern is stronger (compil
 
 This also resolves [design-questions.md § Q16](design-questions.md#16-union-field-types-mixed-type-fields) — union field types are handled by the `union` property, which subsumes all three options previously considered.
 
-## Open design questions
+### 10. Querying through value objects: string accessor with type-checked dot-paths
 
-### 2. Querying through value objects
-
-Dot-notation filtering through value object fields:
+Scalar fields on a model are accessed as direct properties on the expression proxy (`u.email`, `u.age`), returning an `Expression` with trait-gated operators. Value object fields use a **string accessor** — the proxy is callable with a dot-path string that navigates into nested value objects:
 
 ```typescript
-db.users.where(u => u.homeAddress.city.eq("NYC"))
+// Scalar field — direct property access (existing pattern)
+u.email.eq("alice@example.com")
+u.age.gte(18)
+
+// Value object field — string accessor, returns typed Expression
+u("homeAddress.city").eq("NYC")
+u("homeAddress.location.lat").gte(40.0)
+
+// Extension operations work through value objects too
+u("specs.featureVector").cosineDistance([1, 0, 0]).lt(0.5)
+
+// Nullable value object — whole-object null check
+u("workAddress").isNull()
+
+// Combining scalar and value object conditions
+fns.and(
+  u.age.gte(18),
+  u("homeAddress.city").eq("NYC"),
+)
 ```
 
-- Mongo: `{ "homeAddress.city": "NYC" }`
-- SQL JSONB: `address_data->>'city' = 'NYC'`
-- SQL flattened: `address_city = 'NYC'`
+The returned `Expression` carries the same trait-gated operators and extension methods as any scalar expression. A text field reached via `u("homeAddress.city")` has `eq`, `gt`, `like` — the same methods as `u.email`. A vector field reached via `u("specs.featureVector")` has `cosineDistance` — the same methods as a direct vector column.
 
-The query builder needs the value object's field structure to offer type-safe dot-notation access.
+**Why a string accessor, not property chaining (`u.homeAddress.city`)?**
+
+Property chaining creates a **namespace collision problem**: intermediate proxy objects for value objects would need both field accessors (the value object's fields) and operator methods (`eq`, `gt`, etc.) on the same object. If a value object has a field named `eq`, `gt`, or any operator name, the API breaks. This is the same collision problem that Prisma ORM encountered with its proxy-based approach.
+
+The string accessor eliminates collision entirely:
+- Scalar fields and operator methods never share a namespace
+- Scalar fields are properties on the model proxy (`u.email`)
+- Operators are methods on the returned `Expression` (`...eq("NYC")`)
+- Value object traversal uses the call signature (`u("path")`)
+
+**Type safety without autocomplete:**
+
+The dot-path string is type-checked at compile time using TypeScript template literal inference:
+
+```typescript
+type ResolvePath<T, Path extends string> =
+  Path extends `${infer Head}.${infer Rest}`
+    ? Head extends keyof T
+      ? ResolvePath<T[Head], Rest>
+      : never
+    : Path extends keyof T
+      ? T[Path]
+      : never;
+```
+
+This validates paths lazily — `u("homeAddress.city")` compiles, `u("homeAddress.typo")` is a type error — without eagerly expanding all possible paths. This handles self-referential value objects (like `NavItem` with `children: NavItem[]`) without type explosion.
+
+The trade-off: no IDE autocomplete inside the string. Unlike property chaining where each `.` triggers suggestions, the dot-path string is typed manually. This is acceptable because:
+- Dot-path strings are familiar (MongoDB native syntax, Lodash `_.get`, etc.)
+- Invalid paths are caught at compile time — you get a type error, not a runtime crash
+- The API surface is small — this only applies to value object field access, not the entire query API
+- Autocomplete improvements can be explored later without changing the API shape
+
+**Backend translation:**
+
+| Target | `u("homeAddress.city").eq("NYC")` |
+|---|---|
+| **Mongo** | `{ "homeAddress.city": "NYC" }` — native dot-notation |
+| **SQL JSONB** | `home_address->>'city' = 'NYC'` — JSON path extraction |
+| **SQL flattened** | `home_address_city = 'NYC'` — if stored as separate column |
+
+## Open design questions
 
 ### 3. Mutation semantics
 
