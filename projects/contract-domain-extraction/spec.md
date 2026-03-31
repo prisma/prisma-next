@@ -109,7 +109,7 @@ This project widens `ContractBase` to carry the shared domain structure, updates
 Key changes in the JSON:
 - `roots` is new — declares ORM entry points
 - `model.fields` carries `{ nullable, codecId }` instead of `{ column }`
-- `model.relations` is model-keyed with `strategy` and `on: { localFields, targetFields }`
+- `model.relations` is model-keyed with `on: { localFields, targetFields }` (no `strategy` — per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), relations are plain graph edges)
 - `model.storage.fields` carries the field-to-column mapping (moved from `model.fields`)
 - Top-level `relations` and `mappings` are gone — their information now lives on the model
 
@@ -164,13 +164,13 @@ interface ContractBase<
     readonly relations: Record<string, {
       readonly to: string;
       readonly cardinality: string;
-      readonly strategy: 'reference' | 'embed';
       readonly on?: { readonly localFields: readonly string[]; readonly targetFields: readonly string[] };
     }>;
     readonly storage: Record<string, unknown>;
     readonly discriminator?: { readonly field: string };
     readonly variants?: Record<string, unknown>;
     readonly base?: string;
+    readonly owner?: string;
   }>;
 }
 ```
@@ -240,13 +240,13 @@ This phase changes the emitted JSON to match ADR 172's target structure, widens 
 
 **Emitted JSON (can change freely):**
 
-1. **Update the SQL emitter to produce ADR 172's JSON structure.** The emitter produces `contract.json` matching the target layout: `roots`, `models` with `{ nullable, codecId }` fields, `model.relations` (model-keyed, with `strategy` and `on: { localFields, targetFields }`), `model.storage` (with `table` and field-to-column mappings). The old top-level `relations`, `mappings`, and `model.fields: { column }` shape can be removed from the JSON or retained — consumers don't read the JSON directly.
+1. **Update the SQL emitter to produce ADR 172's JSON structure.** The emitter produces `contract.json` matching the target layout: `roots`, `models` with `{ nullable, codecId }` fields, `model.relations` (model-keyed, with `on: { localFields, targetFields }`), `model.storage` (with `table` and field-to-column mappings). Per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), relations are plain graph edges — no `strategy` field. The old top-level `relations`, `mappings`, and `model.fields: { column }` shape can be removed from the JSON or retained — consumers don't read the JSON directly.
 
 2. **Update demo and test contract fixtures.** The demo app's `contract.json`, and contract fixtures embedded in tests across multiple packages (e.g., inline contract objects, fixture files, test helpers that construct contracts), all encode the current JSON structure. These must be audited and updated to match the new structure. This is likely the most labour-intensive part of Phase 1.
 
 **Types (widen, don't contract):**
 
-3. **Widen `ContractBase` to include domain structure.** Add `roots`, typed `models` (with `fields: Record<string, { nullable: boolean, codecId: string }>`, `relations`, optional `discriminator`/`variants`/`base`), and a generic storage extension point. `ContractBase` constrains family contracts via `extends ContractBase`, not `ContractBase<StorageType>` — storage details appear at multiple attachment points (model.storage, top-level storage, relation join details).
+3. **Widen `ContractBase` to include domain structure.** Add `roots`, typed `models` (with `fields: Record<string, { nullable: boolean, codecId: string }>`, `relations`, optional `discriminator`/`variants`/`base`/`owner`), and a generic storage extension point. Per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), relations are plain graph edges (`{ to, cardinality, on? }`) and component membership is declared on the model via `owner`. `ContractBase` constrains family contracts via `extends ContractBase`, not `ContractBase<StorageType>` — storage details appear at multiple attachment points (model.storage, top-level storage, relation join details).
 
 4. **Widen `SqlContract` to include new fields alongside old.** `SqlContract extends ContractBase` and adds SQL-specific storage. During this phase, `SqlContract` carries *both* the new domain fields (from `ContractBase`) and the old SQL-specific ones (`mappings`, top-level `relations`, `model.fields` with `{ column }` shape). This is what makes the transition non-breaking — existing consumers continue reading the old fields on the TypeScript type.
 
@@ -256,7 +256,7 @@ This phase changes the emitted JSON to match ADR 172's target structure, widens 
 
 6. **Update `validateContract()` to parse the new JSON and return the widened type.** `validateContract()` reads the new JSON structure and populates *both* the new domain fields and the old consumer-facing fields (e.g., deriving `mappings` from `model.storage`, deriving top-level `relations` from `model.relations`). Consumers see no change in the returned object.
 
-7. **Extract shared domain validation.** Move the family-agnostic validation logic from `packages/2-mongo-family/1-core/src/validate-domain.ts` into the framework layer (`packages/1-framework/`). This covers: roots → model references, variant ↔ base bidirectional consistency, relation target existence, discriminator field existence, single-level polymorphism enforcement, orphaned model detection. SQL's `validateContract()` calls this as a first pass before SQL-specific storage validation.
+7. **Extract shared domain validation.** Move the family-agnostic validation logic from `packages/2-mongo-family/1-core/src/validate-domain.ts` into the framework layer (`packages/1-framework/`). This covers: roots → model references, variant ↔ base bidirectional consistency, relation target existence, discriminator field existence, single-level polymorphism enforcement, ownership validation (owner references valid model, owned models not in roots, no self-ownership), orphaned model detection. SQL's `validateContract()` calls this as a first pass before SQL-specific storage validation.
 
 ### Phase 2: Migrate consumers to new type fields
 
@@ -379,6 +379,7 @@ No observability changes needed. The contract structure is a build-time artifact
 
 - [ADR 172 — Contract domain-storage separation](../../docs/architecture%20docs/adrs/ADR%20172%20-%20Contract%20domain-storage%20separation.md) — the target contract structure
 - [ADR 174 — Aggregate roots and relation strategies](../../docs/architecture%20docs/adrs/ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — `roots` section design
+- [ADR 177 — Ownership replaces relation strategy](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) — `owner` on models, no `strategy` on relations
 - [10. MongoDB Family](../../docs/architecture%20docs/subsystems/10.%20MongoDB%20Family.md) — design principles, contract examples
 - [cross-cutting-learnings.md](../../docs/planning/mongo-target/cross-cutting-learnings.md) — domain model design principles
 - [contract-symmetry.md](../../docs/planning/mongo-target/1-design-docs/contract-symmetry.md) — Mongo/SQL convergence analysis
@@ -393,5 +394,5 @@ No observability changes needed. The contract structure is a build-time artifact
 1. `**model.storage.fields` shape for SQL.** ADR 172 shows `"fields": { "id": { "column": "id" } }`. Should `model.storage.fields` carry any additional info beyond the column name (e.g., the nativeType, to avoid a second lookup into the top-level storage section)? **Default assumption:** Keep it minimal — just `{ column: string }`. The top-level `storage.tables` section is the source of truth for column metadata.
 2. **Relation join details in `model.relations`.** The current top-level relations use `childCols`/`parentCols`. ADR 172 uses `on: { localFields, targetFields }`. Should the new `model.relations` use the ADR 172 naming (`localFields`/`targetFields`) or keep the existing naming for continuity during migration? **Default assumption:** Use the ADR 172 naming. The old top-level block coexists during Phase 2, so consumers can migrate at their own pace.
 3. **Where does `roots` come from during emission?** Currently, every model with a `storage.table` is implicitly a root. Should the emitter derive `roots` automatically (every model → a root entry with pluralized name), or should the authoring surface declare them? **Default assumption:** The emitter derives `roots` from the existing model/table mapping for now. Explicit authoring-level `roots` is a DSL concern for Phase 4 / Alberto's workstream.
-4. `**model.relations` shape.** Per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), relations are plain graph edges: `{ to, cardinality, on? }` — no `strategy`. Owned models declare `"owner": "ParentModel"` on the model itself. For SQL in Phase 1, all relations are references (with `on` join details) and no models have `owner`. Ownership becomes relevant when SQL introduces JSONB-column embedding.
+4. ~~`**model.relations` shape.~~** **Resolved.** Per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), relations are plain graph edges: `{ to, cardinality, on? }` — no `strategy`. Owned models declare `"owner": "ParentModel"` on the model itself. For SQL in Phase 1, all relations are references (with `on` join details) and no models have `owner`. Ownership becomes relevant when SQL introduces JSONB-column embedding.
 

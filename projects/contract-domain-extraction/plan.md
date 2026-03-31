@@ -28,7 +28,7 @@ Delivers the ADR 172 contract JSON structure, widened TypeScript types, and `val
 
 #### 1.1 Type foundation
 
-- **1.1.1** Add domain types to framework contract package: `DomainField` (`{ nullable: boolean; codecId: string }`), `DomainRelation` (`{ to: string; cardinality: string; strategy: 'reference' | 'embed'; on?: { localFields: string[]; targetFields: string[] } }`), `DomainModel` (with `fields`, `relations`, optional `discriminator`/`variants`/`base`, and generic `storage` extension point). Define in `packages/1-framework/1-core/shared/contract/src/`.
+- **1.1.1** Add domain types to framework contract package: `DomainField` (`{ nullable: boolean; codecId: string }`), `DomainRelation` (`{ to: string; cardinality: string; on?: { localFields: string[]; targetFields: string[] } }` — no `strategy`, per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md)), `DomainModel` (with `fields`, `relations`, optional `discriminator`/`variants`/`base`/`owner`, and generic `storage` extension point). Define in `packages/1-framework/1-core/shared/contract/src/`.
 - **1.1.2** Widen `ContractBase` to include `roots: Record<string, string>` and `models: Record<string, DomainModel>`. Existing type parameters unchanged; new fields added alongside existing ones.
 - **1.1.3** Widen `SqlContract` to include new domain fields from `ContractBase` alongside existing `mappings`, top-level `relations`, and current `model.fields` shape. The intersection type carries both old and new fields — consumers can read from either.
 - **1.1.4** Write type tests verifying: (a) `SqlContract extends ContractBase`, (b) new domain fields are accessible on `SqlContract`, (c) old consumer-facing fields (`mappings`, `relations`, `model.fields.*.column`) remain accessible.
@@ -36,7 +36,7 @@ Delivers the ADR 172 contract JSON structure, widened TypeScript types, and `val
 #### 1.2 Domain validation extraction
 
 - **1.2.1** Extract `validateContractDomain()` from `packages/2-mongo-family/1-core/src/validate-domain.ts` into `packages/1-framework/1-core/shared/contract/src/validate-domain.ts`. Move the `DomainContractShape`, `DomainModelShape`, and `DomainValidationResult` types alongside it.
-- **1.2.2** Port the existing tests from `packages/2-mongo-family/1-core/test/validate-domain.test.ts` to the framework package. Verify all validation rules: root→model references, variant↔base symmetry, relation target existence, discriminator field existence, single-level polymorphism, orphaned model warnings.
+- **1.2.2** Port the existing tests from `packages/2-mongo-family/1-core/test/validate-domain.test.ts` to the framework package. Verify all validation rules: root→model references, variant↔base symmetry, relation target existence, discriminator field existence, single-level polymorphism, ownership validation (owner references valid model, no self-ownership, owned models not in roots), orphaned model warnings.
 - **1.2.3** Update Mongo's `validate-domain.ts` to re-import from the framework package instead of defining its own copy. Verify Mongo tests still pass.
 
 #### 1.3 Validation bridge (`validateContract`)
@@ -50,7 +50,7 @@ Delivers the ADR 172 contract JSON structure, widened TypeScript types, and `val
 
 #### 1.4 SQL emitter update
 
-- **1.4.1** Update the SQL emitter hook (`packages/2-sql/3-tooling/emitter/src/index.ts`) to produce ADR 172 JSON: `roots` (derived from models with `storage.table`), `models` with `{ nullable, codecId }` fields, `model.relations` (model-keyed, with `strategy: "reference"` and `on: { localFields, targetFields }`), `model.storage` (with `table` and `fields` field-to-column mappings). Remove top-level `relations` and `mappings` from the emitted JSON.
+- **1.4.1** Update the SQL emitter hook (`packages/2-sql/3-tooling/emitter/src/index.ts`) to produce ADR 172 JSON: `roots` (derived from models with `storage.table`), `models` with `{ nullable, codecId }` fields, `model.relations` (model-keyed, with `on: { localFields, targetFields }` — no `strategy`, per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md)), `model.storage` (with `table` and `fields` field-to-column mappings). Remove top-level `relations` and `mappings` from the emitted JSON.
 - **1.4.2** Update the emitter's `validateStructure()` to validate the new JSON shape (e.g., every model has `fields`, `relations`, `storage`; every `model.storage.table` exists in `storage.tables`).
 - **1.4.3** Update `generateContractTypes()` to emit `contract.d.ts` with both old and new type fields. The `Contract` type must include `roots`, `models` with domain fields, plus `mappings`, top-level `relations`, and old `model.fields` shape for backward compatibility.
 - **1.4.4** Update emitter tests (`packages/2-sql/3-tooling/emitter/test/`) to assert the new JSON structure and new `.d.ts` content.
@@ -131,7 +131,7 @@ Independent of Milestone 4 (IR alignment) — can be done before or after.
 
 - **5.2.1** Move `generateRootsType()` to the framework emitter.
 - **5.2.2** Move model domain field type generation (`generateColumnType()`, the codec → TypeScript type logic, parameterized renderer dispatch) to the framework emitter.
-- **5.2.3** Move model relation type generation (ADR 172 `to`/`cardinality`/`strategy`/`on` serialization) to the framework emitter.
+- **5.2.3** Move model relation type generation (ADR 172 `to`/`cardinality`/`on` serialization) to the framework emitter.
 - **5.2.4** Move import deduplication, hash type aliases, codec/operation type intersections, `DefaultLiteralValue`, `TypeMaps`, and the `.d.ts` template skeleton to the framework emitter.
 - **5.2.5** The framework emitter calls the hook's storage-specific methods to fill in the storage sections, then assembles the complete `.d.ts`.
 
@@ -188,7 +188,7 @@ Independent of Milestone 4 (IR alignment) — can be done before or after.
   - `model.storage.fields` shape: just `{ column: string }` (minimal). Top-level `storage.tables` is source of truth for column metadata.
   - Relation join naming: use ADR 172 naming (`localFields`/`targetFields`), not old naming (`childCols`/`parentCols`).
   - `roots` derivation: emitter derives from existing model/table mapping. Explicit authoring-level roots is Phase 4 / DSL concern.
-  - `strategy` on relations: include `"strategy": "reference"` explicitly on all SQL relations.
+  - ~~`strategy` on relations~~: **Resolved.** Per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), relations are plain graph edges — no `strategy` field. Owned models declare `"owner"` on the model itself.
 3. **Phase 2 coordination with Alexey.** The ORM client migration (tasks 2.1–2.5) touches core ORM internals. This must be sequenced to avoid conflicts with Alexey's active ORM development. The widened types from Phase 1 allow him to migrate incrementally.
 4. `**paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
 5. **Unresolved spec open questions** carried forward from spec (see spec § Open Questions for full context).
