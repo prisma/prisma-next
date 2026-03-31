@@ -30,6 +30,8 @@ The operation builder API exists, builders produce AST objects, and `migration v
 - [ ] Implement `dataTransform(name, { check, run })` builder — accepts query builder callbacks, captures ASTs at verify time
 - [ ] Implement transaction annotations: `transaction([...ops])`, `noTransaction(op)`
 - [ ] Write tests for each builder: produces correct operation shape, correct `operationClass`, correct `id` pattern
+  - User note: don't write unit tests for every builder if the type we return trivially proves their shape correctness.
+  - only write tests for the ones that actually contain logic
 - [ ] Implement the serialization step in `migration verify`: evaluate `migration.ts` via tsx, call the exported function, serialize resulting operation list as JSON into `ops.json`
 - [ ] Implement draft detection: `dataTransform` ops with null `check`/`run` in ops.json = draft state
 - [ ] Ensure `migration verify` fails on unimplemented `dataTransform` callbacks (throw or return invalid ASTs)

@@ -90,6 +90,7 @@ export async function evaluateMigrationTs(packageDir: string): Promise<readonly 
 
   // Verify the file exists before attempting import
   try {
+    // TODO: readFile to verify?
     await readFile(filePath, 'utf-8');
   } catch {
     throw new Error(`migration.ts not found at "${filePath}"`);
@@ -111,6 +112,7 @@ export async function evaluateMigrationTs(packageDir: string): Promise<readonly 
       `migration.ts default export must return an array of operations. Got: ${typeof result}`,
     );
   }
+  // TODO: Maybe we should consider using arktype schemas for validation here, otherwise we can't really safely cast the result?
 
   return result;
 }
