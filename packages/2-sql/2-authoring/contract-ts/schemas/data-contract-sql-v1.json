@@ -544,6 +544,26 @@
         "column": {
           "type": "string",
           "description": "Column name in the model's backing table"
+        },
+        "codecId": {
+          "type": "string",
+          "description": "Codec identifier for the field (derived from storage column)"
+        },
+        "nullable": {
+          "type": "boolean",
+          "description": "Whether the field allows NULL values (derived from storage column)"
+        }
+      },
+      "required": ["column"]
+    },
+    "ModelStorageField": {
+      "type": "object",
+      "description": "Per-field storage mapping",
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "type": "string",
+          "description": "Column name in the model's backing table"
         }
       },
       "required": ["column"]
@@ -560,6 +580,11 @@
           "type": "string",
           "enum": ["1:1", "1:N", "N:1", "N:M"],
           "description": "Relation cardinality"
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["reference", "embed"],
+          "description": "Relation strategy"
         },
         "on": {
           "type": "object",

@@ -165,28 +165,28 @@ Migrates the SQL emitter hook onto the shared domain-level generation utilities 
 ## Test Coverage
 
 
-| Acceptance Criterion                                                                                                  | Test Type          | Task/Milestone | Notes                                                 |
-| --------------------------------------------------------------------------------------------------------------------- | ------------------ | -------------- | ----------------------------------------------------- |
-| SQL emitter produces ADR 172 JSON: `roots`, `models` with `{ nullable, codecId }`, `model.relations`, `model.storage` | Unit + Integration | 1.4.4, 1.5.7   | Emitter tests + integration artifact shape test       |
-| Demo and test fixture `contract.json` files reflect new structure                                                     | Integration        | 1.5.1–1.5.7    | All existing tests pass with updated fixtures         |
-| `ContractBase` has typed `roots`, `models` (with domain fields)                                                       | Type test          | 1.1.4          | `test-d.ts` assertions                                |
-| `SqlContract extends ContractBase` with SQL storage + retains old fields                                              | Type test          | 1.1.4          | `test-d.ts` assertions                                |
-| Emitted `contract.d.ts` includes both old and new field shapes                                                        | Unit               | 1.4.4          | Emitter generation tests                              |
-| `validateContract()` parses new JSON and returns widened type with old fields                                         | Unit               | 1.3.5          | Bridge round-trip tests                               |
-| Shared domain validation runs as part of SQL `validateContract()`                                                     | Unit               | 1.3.2, 1.2.2   | Domain validation tests ported from mongo             |
-| ORM client, query builder, authoring surfaces not modified in M1                                                      | Manual/CI          | 1.6.3          | Git diff verification — no changes to consumer `src/` |
-| All existing tests pass without modification (M1)                                                                     | CI                 | 1.5.7, 1.6.2   | Full test suite                                       |
-| ORM client reads from domain fields (M2)                                                                              | Unit + Integration | 2.1–2.4        | ORM client test suite                                 |
-| No consumer reads `mappings` or top-level `relations` (M2)                                                            | Manual + grep      | 2.8            | Code search verification                              |
-| Mongo emitter produces ADR 172/177 contract JSON and `.d.ts` (M3)                                                     | Unit               | 3.4            | Mongo emitter tests                                   |
-| Shared domain-level generation utilities used by Mongo hook (M3)                                                      | Unit + Regression  | 3.5            | SQL output unchanged after shared extraction          |
-| `mappings` removed from `SqlContract` (M4)                                                                            | Type test + CI     | 4.1, 4.7       | Compile-time verification                             |
-| Top-level `relations` removed (M4)                                                                                    | Type test + CI     | 4.2, 4.7       | Compile-time verification                             |
-| Old field shape removed (M4)                                                                                          | Type test + CI     | 4.3, 4.7       | Compile-time verification                             |
-| `contract.d.ts` reflects final shape (M4)                                                                             | Unit               | 4.4            | Emitter generation tests                              |
-| `ContractIR` mirrors emitted JSON (M5)                                                                                | Unit + Integration | 5.5            | IR tests                                              |
+| Acceptance Criterion                                                                                                  | Test Type          | Task/Milestone | Notes                                                  |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------ | -------------- | ------------------------------------------------------ |
+| SQL emitter produces ADR 172 JSON: `roots`, `models` with `{ nullable, codecId }`, `model.relations`, `model.storage` | Unit + Integration | 1.4.4, 1.5.7   | Emitter tests + integration artifact shape test        |
+| Demo and test fixture `contract.json` files reflect new structure                                                     | Integration        | 1.5.1–1.5.7    | All existing tests pass with updated fixtures          |
+| `ContractBase` has typed `roots`, `models` (with domain fields)                                                       | Type test          | 1.1.4          | `test-d.ts` assertions                                 |
+| `SqlContract extends ContractBase` with SQL storage + retains old fields                                              | Type test          | 1.1.4          | `test-d.ts` assertions                                 |
+| Emitted `contract.d.ts` includes both old and new field shapes                                                        | Unit               | 1.4.4          | Emitter generation tests                               |
+| `validateContract()` parses new JSON and returns widened type with old fields                                         | Unit               | 1.3.5          | Bridge round-trip tests                                |
+| Shared domain validation runs as part of SQL `validateContract()`                                                     | Unit               | 1.3.2, 1.2.2   | Domain validation tests ported from mongo              |
+| ORM client, query builder, authoring surfaces not modified in M1                                                      | Manual/CI          | 1.6.3          | Git diff verification — no changes to consumer `src/`  |
+| All existing tests pass without modification (M1)                                                                     | CI                 | 1.5.7, 1.6.2   | Full test suite                                        |
+| ORM client reads from domain fields (M2)                                                                              | Unit + Integration | 2.1–2.4        | ORM client test suite                                  |
+| No consumer reads `mappings` or top-level `relations` (M2)                                                            | Manual + grep      | 2.8            | Code search verification                               |
+| Mongo emitter produces ADR 172/177 contract JSON and `.d.ts` (M3)                                                     | Unit               | 3.4            | Mongo emitter tests                                    |
+| Shared domain-level generation utilities used by Mongo hook (M3)                                                      | Unit + Regression  | 3.5            | SQL output unchanged after shared extraction           |
+| `mappings` removed from `SqlContract` (M4)                                                                            | Type test + CI     | 4.1, 4.7       | Compile-time verification                              |
+| Top-level `relations` removed (M4)                                                                                    | Type test + CI     | 4.2, 4.7       | Compile-time verification                              |
+| Old field shape removed (M4)                                                                                          | Type test + CI     | 4.3, 4.7       | Compile-time verification                              |
+| `contract.d.ts` reflects final shape (M4)                                                                             | Unit               | 4.4            | Emitter generation tests                               |
+| `ContractIR` mirrors emitted JSON (M5)                                                                                | Unit + Integration | 5.5            | IR tests                                               |
 | SQL hook uses shared domain-level generation (M6)                                                                     | Unit + Regression  | 6.3.1–6.3.3    | Byte-identical `.d.ts` output; updated hook unit tests |
-| `TargetFamilyHook` interface narrowed (M6)                                                                            | Interface test     | 6.2.1–6.2.2    | Both hooks conform to narrowed interface              |
+| `TargetFamilyHook` interface narrowed (M6)                                                                            | Interface test     | 6.2.1–6.2.2    | Both hooks conform to narrowed interface               |
 
 
 ## Open Items
@@ -198,6 +198,6 @@ Migrates the SQL emitter hook onto the shared domain-level generation utilities 
   - `roots` derivation: emitter derives for now; IR supplies in M5.
   - `model.relations` shape: per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), plain graph edges — no `strategy`. Owned models declare `"owner"` on the model itself.
 3. **M2 coordination with Alexey.** The ORM client migration (tasks 2.1–2.5) touches core ORM internals. This must be sequenced to avoid conflicts with Alexey's active ORM development. The widened types from M1 allow him to migrate incrementally.
-4. **`paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
+4. `**paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
 5. **M3 sequencing.** The Mongo emitter hook (M3) can run in parallel with M2 since it doesn't touch the SQL emitter. It establishes the shared domain-level generation API that M6 later migrates the SQL hook onto.
 
