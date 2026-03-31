@@ -277,6 +277,19 @@ The JSON already lacks the old fields (removed in Phase 1). This phase removes t
 
 1. **Align `ContractIR` with the new contract JSON structure.** Update the internal representation used during emission so it more closely mirrors the emitted JSON. This reduces impedance mismatch and makes it easier for the DSL layer to target the IR. Coordinate timing with Alberto.
 
+### Phase 5: Emitter generalization
+
+With ADR 172's domain-storage separation, most of the `.d.ts` generation logic in `sqlTargetFamilyHook.generateContractTypes()` is now family-agnostic: roots, model domain fields (`nullable`, `codecId` → TypeScript types), model relations, import deduplication, hash type aliases, codec/operation type intersections, the `.d.ts` skeleton. Only the storage-level type generation (tables, columns, PKs, FKs, indexes, named type instances) and backward-compat types (`mappings`, old top-level `relations`) are genuinely SQL-specific.
+
+This phase refactors the `TargetFamilyHook` interface so the framework `emit()` generates domain-level `.d.ts` content and the family hook provides only storage-specific type blocks. This eliminates the need for each family to duplicate ~60–70% of the type generation logic when implementing a new family emitter (e.g., Mongo).
+
+1. **Refactor `TargetFamilyHook` interface.** Replace the monolithic `generateContractTypes()` method with a narrower interface. The framework generates domain-level sections (roots type, model domain fields, model relations, imports, hashes, codec types, `.d.ts` skeleton). The hook provides: `generateStorageType(storage)`, `generateModelStorageType(model)`, and any family-specific type blocks.
+2. **Move domain-level type generation to the framework emitter.** Extract `generateRootsType()`, model field type generation (`generateColumnType()`), model relation type generation, import deduplication, hash aliases, and the `.d.ts` template from the SQL hook into the framework's `emit()`.
+3. **Update SQL hook to implement the narrower interface.** The SQL hook retains `generateStorageType()` (tables/columns/PKs/FKs/indexes), `generateStorageTypesType()` (named type instances), and validation methods. It no longer owns the `.d.ts` skeleton or domain-level type generation.
+4. **Verify emitter output is identical.** The generated `contract.d.ts` must be byte-identical before and after the refactor (modulo formatting). Use the demo contract and parity fixtures as regression tests.
+
+This phase is independent of Phase 4 (IR alignment) and can be done before or after it.
+
 ## Non-Functional Requirements
 
 - **Zero breakage during Phase 1.** All existing tests, the demo app, and downstream consumers must continue working without modification when Phase 1 lands. `validateContract()` bridges the new JSON structure to the old consumer-facing type.
@@ -333,6 +346,13 @@ The JSON already lacks the old fields (removed in Phase 1). This phase removes t
 ### Phase 4: IR alignment
 
 - [ ] `ContractIR` mirrors the emitted contract JSON structure (domain/storage separation, model-level relations, `roots`)
+
+### Phase 5: Emitter generalization
+
+- [ ] `TargetFamilyHook` no longer has a monolithic `generateContractTypes()` — domain-level type generation lives in the framework `emit()`
+- [ ] The SQL hook provides only storage-specific type generation (`generateStorageType`, `generateModelStorageType`) and family-specific validation
+- [ ] Generated `contract.d.ts` output is identical before and after the refactor (regression-tested against demo and parity fixtures)
+- [ ] A new family emitter (e.g., Mongo) would not need to duplicate domain-level type generation logic
 
 # Other Considerations
 
