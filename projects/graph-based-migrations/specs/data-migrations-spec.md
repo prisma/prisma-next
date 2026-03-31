@@ -14,6 +14,10 @@ The primary user is a backend developer who knows SQL but doesn't think about mi
 
 These are the problems the system must solve. The Solution section describes how each is addressed.
 
+## R0: Hard requirement - running a data migration cannot involve executing arbitrary code at apply time
+
+Instead of giving the user to a db client with arbitrary sql, we give them some sort of ORM-ish client that lets them author data migrations using ORM-like syntax, but the result should be some sort of SQL query AST that we then run at apply time.
+
 ## R1. Users can transform data during schema migration
 
 Schema evolution often requires data transformations that the database cannot perform automatically: backfilling computed values, converting between types with ambiguous mappings, splitting/merging columns or tables, resolving constraint violations, seeding reference data. The system must provide a way for users to run arbitrary data transformation code as part of a migration. See [data-migration-scenarios.md](./data-migration-scenarios.md) for the full scenario enumeration.
@@ -98,21 +102,23 @@ export default defineMigration({
   name: 'split-user-name',
   transaction: 'inline',
 
-  async check(db) {
-    const result = await db.query(
-      `SELECT COUNT(*) as count FROM "users" WHERE "first_name" IS NULL`
-    )
-    return result[0].count === 0
+  check(client) {
+    // const result = await db.query(
+    //   `SELECT COUNT(*) as count FROM "users" WHERE "first_name" IS NULL`
+    // )
+    // return result[0].count === 0
+    return client.users.aggregate({ /* .. */}).where({ first_name: null });
   },
-
-  async run(db) {
-    await db.execute(
-      `UPDATE "users"
-       SET "first_name" = split_part("name", $1, 1),
-           "last_name"  = split_part("name", $1, 2)
-       WHERE "first_name" IS NULL`,
-      [' ']
-    )
+  run(db, doMigration: () => Promise<void>) {
+    const foo = await db.users.all();
+    // await db.execute(
+    //   `UPDATE "users"
+    //    SET "first_name" = split_part("name", $1, 1),
+    //        "last_name"  = split_part("name", $1, 2)
+    //    WHERE "first_name" IS NULL`,
+    //   [' ']
+    // )
+    return db.users.update(...) // -> AST;
   }
 })
 ```
