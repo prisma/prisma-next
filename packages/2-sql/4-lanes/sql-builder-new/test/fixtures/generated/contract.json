@@ -2,9 +2,24 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:09fd32ad8b0c75e83d46508cfaeca1ff1a9813e4615e7ed23ffc742cfa190710",
-  "profileHash": "sha256:eb014c98c4ba6a3e1ddd72bb170d48c49a4e8d5d411e473b80b9c16b57d0469b",
+  "storageHash": "sha256:66156b32794cfd2e278065ac87508e4dc6a3157e778f83c36fd976b65d973579",
+  "executionHash": "sha256:b667fade3a4d71590247b5a1fc013558869bc7f4a54e27060a0242faae3619f2",
+  "profileHash": "sha256:a246c1ceb7b2680efaf1e28032a46faa765c06f898f2fea1687b107b68b8340f",
   "models": {
+    "Article": {
+      "fields": {
+        "id": {
+          "column": "id"
+        },
+        "title": {
+          "column": "title"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "articles"
+      }
+    },
     "Comment": {
       "fields": {
         "body": {
@@ -160,6 +175,29 @@
   },
   "storage": {
     "tables": {
+      "articles": {
+        "columns": {
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "title": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
       "comments": {
         "columns": {
           "body": {
@@ -272,6 +310,22 @@
       }
     }
   },
+  "execution": {
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "articles"
+          }
+        }
+      ]
+    }
+  },
   "capabilities": {
     "pgvector": {
       "hnsw": true,
@@ -281,7 +335,13 @@
     "postgres": {
       "deferrableConstraints": true,
       "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
       "partialIndex": true,
+      "pgvector/cosine": true,
+      "returning": true,
       "savepoints": true,
       "transactionalDDL": true
     },
@@ -294,7 +354,59 @@
     }
   },
   "extensionPacks": {
-    "pgvector": {}
+    "pgvector": {
+      "capabilities": {
+        "postgres": {
+          "pgvector/cosine": true
+        }
+      },
+      "familyId": "sql",
+      "id": "pgvector",
+      "kind": "extension",
+      "targetId": "postgres",
+      "types": {
+        "codecTypes": {
+          "import": {
+            "alias": "PgVectorTypes",
+            "named": "CodecTypes",
+            "package": "@prisma-next/extension-pgvector/codec-types"
+          },
+          "parameterized": {
+            "pg/vector@1": "Vector<{{length}}>"
+          },
+          "typeImports": [
+            {
+              "alias": "Vector",
+              "named": "Vector",
+              "package": "@prisma-next/extension-pgvector/codec-types"
+            }
+          ]
+        },
+        "operationTypes": {
+          "import": {
+            "alias": "PgVectorOperationTypes",
+            "named": "OperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
+        "queryOperationTypes": {
+          "import": {
+            "alias": "PgVectorQueryOperationTypes",
+            "named": "QueryOperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
+        "storage": [
+          {
+            "familyId": "sql",
+            "nativeType": "vector",
+            "targetId": "postgres",
+            "typeId": "pg/vector@1"
+          }
+        ]
+      },
+      "version": "0.0.1"
+    }
   },
   "meta": {},
   "_generated": {

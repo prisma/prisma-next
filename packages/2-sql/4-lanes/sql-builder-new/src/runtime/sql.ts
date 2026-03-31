@@ -18,6 +18,7 @@ export function sql<C extends SqlContract<SqlStorage>>(options: SqlOptions<C>): 
     runtime,
     target: context.contract.target ?? 'unknown',
     storageHash: context.contract.storageHash ?? 'unknown',
+    applyMutationDefaults: (options) => context.applyMutationDefaults(options),
   };
 
   return new Proxy({} as Db<C>, {
