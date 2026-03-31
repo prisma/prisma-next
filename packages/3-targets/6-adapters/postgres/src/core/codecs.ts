@@ -282,7 +282,7 @@ const pgTimestampCodec = codec<
   typeof PG_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
   string | Date,
-  string
+  string | Date
 >({
   typeId: PG_TIMESTAMP_CODEC_ID,
   targetTypes: ['timestamp'],
@@ -312,7 +312,7 @@ const pgTimestamptzCodec = codec<
   typeof PG_TIMESTAMPTZ_CODEC_ID,
   readonly ['equality', 'order'],
   string | Date,
-  string
+  string | Date
 >({
   typeId: PG_TIMESTAMPTZ_CODEC_ID,
   targetTypes: ['timestamptz'],

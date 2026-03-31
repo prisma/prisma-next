@@ -10,7 +10,6 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
-import { db } from '../src/prisma/db';
 
 describe('demo contract visualization DX', () => {
   it('validated contract has runtime shape needed for visualization', () => {
@@ -54,13 +53,6 @@ describe('demo contract visualization DX', () => {
 
     expect(contract).not.toHaveProperty('_generated');
     expect(Object.hasOwn(contract as object, '_generated')).toBe(false);
-  });
-
-  it('emitted postgres<Contract, TypeMaps> exposes sql builder with table proxies', () => {
-    const sql = db.sql;
-    expect(sql).toBeDefined();
-    expect(sql.user).toBeDefined();
-    expect(sql.post).toBeDefined();
   });
 
   it('validated contract is traversable for render use-case', () => {

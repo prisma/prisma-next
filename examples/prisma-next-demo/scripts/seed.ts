@@ -19,7 +19,7 @@ async function main() {
     await db.sql.user
       .insert({
         email: 'alice@example.com',
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(),
         kind: 'admin',
       })
       .first();
@@ -27,7 +27,7 @@ async function main() {
     await db.sql.user
       .insert({
         email: 'bob@example.com',
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(),
         kind: 'user',
       })
       .first();
@@ -64,7 +64,7 @@ async function main() {
         title: 'First Post',
         userId: alice.id,
         embedding: generateEmbedding(1),
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(),
       })
       .first();
 
@@ -73,7 +73,7 @@ async function main() {
         title: 'Second Post',
         userId: alice.id,
         embedding: generateEmbedding(2),
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(),
       })
       .first();
 
@@ -82,7 +82,7 @@ async function main() {
         title: 'Third Post',
         userId: bob.id,
         embedding: generateEmbedding(3),
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(),
       })
       .first();
 

@@ -80,25 +80,25 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
     {
       id: seededUserIds.admin,
       email: 'admin@example.com',
-      createdAt: '2024-01-01T00:00:00.000Z',
+      createdAt: new Date('2024-01-01T00:00:00.000Z'),
       kind: 'admin' as const,
     },
     {
       id: seededUserIds.member,
       email: 'member@example.com',
-      createdAt: '2024-01-02T00:00:00.000Z',
+      createdAt: new Date('2024-01-02T00:00:00.000Z'),
       kind: 'user' as const,
     },
     {
       id: seededUserIds.adminTwo,
       email: 'admin2@example.org',
-      createdAt: '2024-01-03T00:00:00.000Z',
+      createdAt: new Date('2024-01-03T00:00:00.000Z'),
       kind: 'admin' as const,
     },
     {
       id: seededUserIds.reader,
       email: 'reader@example.com',
-      createdAt: '2024-01-04T00:00:00.000Z',
+      createdAt: new Date('2024-01-04T00:00:00.000Z'),
       kind: 'user' as const,
     },
   ];
@@ -112,31 +112,31 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
       id: seededPostIds.older,
       title: 'Older post',
       userId: seededUserIds.admin,
-      createdAt: '2024-01-01T10:00:00.000Z',
+      createdAt: new Date('2024-01-01T10:00:00.000Z'),
     },
     {
       id: seededPostIds.newer,
       title: 'Newer post',
       userId: seededUserIds.admin,
-      createdAt: '2024-01-02T10:00:00.000Z',
+      createdAt: new Date('2024-01-02T10:00:00.000Z'),
     },
     {
       id: seededPostIds.memberNote,
       title: 'Other user note',
       userId: seededUserIds.member,
-      createdAt: '2024-01-03T10:00:00.000Z',
+      createdAt: new Date('2024-01-03T10:00:00.000Z'),
     },
     {
       id: seededPostIds.adminDeepDive,
       title: 'Admin deep dive post',
       userId: seededUserIds.adminTwo,
-      createdAt: '2024-01-04T10:00:00.000Z',
+      createdAt: new Date('2024-01-04T10:00:00.000Z'),
     },
     {
       id: seededPostIds.adminZebra,
       title: 'Zebra post note',
       userId: seededUserIds.adminTwo,
-      createdAt: '2024-01-05T10:00:00.000Z',
+      createdAt: new Date('2024-01-05T10:00:00.000Z'),
     },
   ];
 
@@ -284,7 +284,7 @@ describe('ORM client integration examples', () => {
               id: '00000000-0000-0000-0000-000000000099',
               email: 'created@example.com',
               kind: 'user',
-              createdAt: '2024-02-01T00:00:00.000Z',
+              createdAt: new Date('2024-02-01T00:00:00.000Z'),
             },
             runtime,
           );
@@ -549,7 +549,7 @@ describe('ORM client integration examples', () => {
               id: insertedId,
               email: 'inserted-upsert@example.com',
               kind: 'user',
-              createdAt: '2024-02-01T00:00:00.000Z',
+              createdAt: new Date('2024-02-01T00:00:00.000Z'),
             },
             runtime,
           );
