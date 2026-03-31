@@ -568,3 +568,99 @@ The resolution:
 The pattern mirrors `base` for polymorphism: just as a variant says `"base": "Task"`, an owned model says `"owner": "User"`.
 
 See [ADR 177 — Ownership replaces relation strategy](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) for the full rationale and examples.
+
+---
+
+## 19. Self-referential models
+
+A model that has a relation to itself — a tree, a hierarchy, a threaded comment chain. Three cases arise, each testing the contract design differently.
+
+### Case 1: Self-referential reference
+
+An Employee whose manager is also an Employee. This is a plain FK to self:
+
+```json
+"Employee": {
+  "fields": {
+    "id": { "nullable": false, "codecId": "pg/int4@1" },
+    "name": { "nullable": false, "codecId": "pg/text@1" },
+    "managerId": { "nullable": true, "codecId": "pg/int4@1" }
+  },
+  "relations": {
+    "manager": {
+      "to": "Employee", "cardinality": "N:1",
+      "on": { "localFields": ["managerId"], "targetFields": ["id"] }
+    },
+    "directReports": {
+      "to": "Employee", "cardinality": "1:N",
+      "on": { "localFields": ["id"], "targetFields": ["managerId"] }
+    }
+  },
+  "storage": { "table": "employees", "fields": { ... } }
+}
+```
+
+No issues. Both sides of the relation point to Employee. The model is an aggregate root with its own table/collection. Works identically in SQL and Mongo.
+
+### Case 2: Self-referential embedding (recursive nesting)
+
+Threaded comments in Mongo, where replies are embedded subdocuments inside their parent comment, recursively:
+
+```json
+{ "_id": ..., "text": "Top-level", "replies": [
+  { "_id": ..., "text": "Reply", "replies": [
+    { "_id": ..., "text": "Nested reply", "replies": [] }
+  ] }
+] }
+```
+
+Can Comment have `owner: "Comment"`? No — that's circular. If Comment is owned by Comment, it has no independent storage, but the root of the chain needs to live somewhere. There's no anchor.
+
+The way this works: Comment is owned by the *parent entity* (e.g., Post), and the self-referential `replies` relation is just a graph edge that happens to point to the same model type:
+
+```json
+"Post": {
+  "fields": { "_id": { ... }, "title": { ... } },
+  "relations": {
+    "comments": { "to": "Comment", "cardinality": "1:N" }
+  },
+  "storage": {
+    "collection": "posts",
+    "relations": { "comments": { "field": "comments" } }
+  }
+},
+"Comment": {
+  "owner": "Post",
+  "fields": { "_id": { ... }, "text": { ... } },
+  "relations": {
+    "replies": { "to": "Comment", "cardinality": "1:N" }
+  },
+  "storage": {
+    "relations": { "replies": { "field": "replies" } }
+  }
+}
+```
+
+The model appears once in the contract, but the physical structure is arbitrarily deep. Each Comment subdocument has its own `replies` field, and each reply is also a Comment with the same structure. The ORM would need to detect the cycle in the model graph to handle type projections and stop infinite recursion.
+
+Note that the owned Comment has a non-empty `storage` block — it needs `storage.relations` to describe where *its* owned children go within its own subdocument. This extends the pattern from ADR 177 where owned models had `"storage": {}`.
+
+**Status**: Logically sound but unvalidated. Needs implementation to confirm the ORM can untangle recursive self-referential embedding. Practical contracts will almost certainly use references (Case 1) for tree structures.
+
+### Case 3: Mixed root/embedded for the same model
+
+A Category tree where top-level categories own their collection but subcategories are embedded inside their parent.
+
+This violates design principle #5 (one canonical storage location). A Category can't be both an aggregate root with `storage.collection: "categories"` AND an embedded model with `owner: "Category"`. The contract correctly prevents this — `owner` is mutually exclusive with being an aggregate root.
+
+Resolutions:
+- **All categories are roots** with a `parentId` reference (Case 1). Most common in practice.
+- **Two models**: `Category` (root, has collection) and `Subcategory` (owned by Category, embedded). Honest about the structural difference, but forces a modeling decision about hierarchy depth.
+
+### Summary
+
+| Case | Pattern | Works? | Notes |
+|---|---|---|---|
+| Self-referential reference | FK to self | Yes | Trivial. Employee → manager. |
+| Self-referential embedding | Owned model with relation to self | In theory | Needs a non-self owner as anchor. Unvalidated in ORM. |
+| Mixed root/embedded | Same model as both root and owned | No | Correctly prevented by design principle #5. |
