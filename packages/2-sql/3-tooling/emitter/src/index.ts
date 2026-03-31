@@ -368,7 +368,9 @@ export const sqlTargetFamilyHook = {
       return 'Record<string, string>';
     }
     const entries = Object.entries(roots)
-      .map(([key, value]) => `readonly ${key}: '${value}'`)
+      .map(
+        ([key, value]) => `readonly ${this.serializeObjectKey(key)}: ${this.serializeValue(value)}`,
+      )
       .join('; ');
     return `{ ${entries} }`;
   },
@@ -600,6 +602,10 @@ export const sqlTargetFamilyHook = {
         `fields: { ${fields.join('; ')} }`,
         `relations: { ${relations.join('; ')} }`,
       ];
+
+      if (model.owner) {
+        modelParts.push(`owner: ${this.serializeValue(model.owner)}`);
+      }
 
       modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
     }
