@@ -20,16 +20,16 @@ A verifiable agreement between an application and its database. The application 
 
 Users author schemas; the system emits contracts. The contract is a build artifact like `package-lock.json`, not something users typically edit directly.
 
-### Schema Provider
+### Contract Provider
 
-The part of your config that tells Prisma Next where your schema lives and what format it's in. Prisma Next ships two built-in providers:
+The part of your config that tells Prisma Next where your contract source lives and what format it's in. Prisma Next ships two built-in providers:
 
-| Provider | Description |
-|---|---|
-| `prismaSchema()` | Reads a `.prisma` PSL file |
-| `typescriptSchema()` | Accepts a TypeScript-defined schema |
+| Provider               | Description                              |
+| ---------------------- | ---------------------------------------- |
+| `prismaContract()`     | Reads a `.prisma` PSL file               |
+| `typescriptContract()` | Accepts a TypeScript-defined contract    |
 
-> **Divergence:** Currently named `prismaContract()` and `typescriptContract()` in code, and the config property is `contract:` instead of `schema:`. These use "contract" where they should use "schema", since they specify the schema source (not the contract artifact). **Status: pending refactor.**
+Configured via the `contract:` property in `prisma-next.config.ts`.
 
 ### Extension
 
@@ -172,10 +172,6 @@ Planned refactors to bring internal naming in line with user-facing terminology:
 | ------------------------- | ----------------------------------- | ----------------------------------------------------------------- | ------- |
 | extension / `extensions`  | extension pack / `extensionPacks`   | Config property, types, docs, CLI output, error messages          | Pending |
 | middleware / `middleware` | plugin / `plugins`                  | Runtime options, types, docs                                      | Pending |
-| `prismaSchema()`          | `prismaContract()`                  | `@prisma-next/sql-contract-psl/provider` export                   | Pending |
-| `typescriptSchema()`      | `typescriptContract()`              | `@prisma-next/sql-contract-ts/config-types` export                | Pending |
-| `schema:` config property | `contract:` config property         | `PrismaNextConfig`, `defineConfig`, examples, CLI internals, docs | Pending |
-| schema provider           | contract provider / contract source | Config types, docs, internal naming                               | Pending |
 | query builder             | query lane / lane                   | Architecture docs, package names, internal naming                 | Pending |
 
 
