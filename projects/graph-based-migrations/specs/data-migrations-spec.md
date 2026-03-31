@@ -97,7 +97,31 @@ The `data-migration.ts` file remains in the package as source code for reference
 
 ### Representation in ops.json
 
-The serialized data migration is a first-class operation in `ops.json` — a `data_migration` entry alongside the structural operations, containing the JSON-serialized query ASTs produced by the ORM/query builder. The target adapter renders these to SQL at apply time, same as structural operations. The runner processes it sequentially like any other operation.
+The data migration is a first-class operation in `ops.json` with two states:
+
+**Draft** (after scaffolding, before verification):
+```json
+{
+  "id": "data_migration.split-user-name",
+  "operationClass": "data",
+  "source": "data-migration.ts",
+  "check": null,
+  "run": null
+}
+```
+
+**Attested** (after verification):
+```json
+{
+  "id": "data_migration.split-user-name",
+  "operationClass": "data",
+  "source": "data-migration.ts",
+  "check": { /* serialized query AST */ },
+  "run": [{ /* serialized query AST */ }]
+}
+```
+
+`migration verify` detects the placeholder (null check/run), evaluates the TS source, captures the ASTs, and fills them in. The `source` field stays for traceability but is not part of the `edgeId` computation. The target adapter renders the ASTs to SQL at apply time. The runner processes it sequentially like any other operation.
 
 ```typescript
 import { defineMigration } from '@prisma-next/migration'
