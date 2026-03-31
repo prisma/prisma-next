@@ -67,10 +67,10 @@ Collections carry server-side configuration:
 - **Change stream pre/post images**: `{ changeStreamPreAndPostImages: { enabled: true } }`
 - **Collation**: `{ collation: { locale: "en", strength: 2 } }` — affects sorting and comparison
 
-### What is NOT server-side
+### What is NOT server-side (but still lives in the contract)
 
-- **Client-side field-level encryption (CSFLE)**: the encryption schema map (which fields to encrypt, with which keys/algorithms) is a client-side driver configuration (`AutoEncryptionOpts`). The key vault collection is stored in MongoDB, but the per-field encryption policy is passed to the driver at connection time. This is an adapter/driver concern, not a migration concern.
-- **Queryable Encryption** (MongoDB 6.0+): has some server-side encrypted collection metadata, but the configuration is primarily client-side. Still a driver concern.
+- **Client-side field-level encryption (CSFLE)**: the encryption schema map (which fields to encrypt, with which keys/algorithms) is a client-side driver configuration (`AutoEncryptionOpts`). The key vault collection is stored in MongoDB, but the per-field encryption policy is passed to the driver at connection time. This is an adapter/driver concern, not a migration concern — it lives in the contract's `execution` section, not `storage`. See [Q13](design-questions.md#13-client-side-field-level-encryption-csfle-and-queryable-encryption) for the full analysis, including the insight that encryption algorithm constrains which query operators are available on a field (via trait intersection with the codec trait system).
+- **Queryable Encryption** (MongoDB 6.0+): has some server-side encrypted collection metadata, but the configuration is primarily client-side. Also lives in the `execution` section.
 
 ## Contract representation
 
