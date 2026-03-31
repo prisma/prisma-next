@@ -74,6 +74,17 @@ export async function writeMigrationPackage(
   await writeFile(join(dir, OPS_FILE), JSON.stringify(ops, null, 2), { flag: 'wx' });
 }
 
+export async function writeMigrationManifest(
+  dir: string,
+  manifest: MigrationManifest,
+): Promise<void> {
+  await writeFile(join(dir, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise<void> {
+  await writeFile(join(dir, OPS_FILE), `${JSON.stringify(ops, null, 2)}\n`);
+}
+
 export async function readMigrationPackage(dir: string): Promise<MigrationBundle> {
   const manifestPath = join(dir, MANIFEST_FILE);
   const opsPath = join(dir, OPS_FILE);

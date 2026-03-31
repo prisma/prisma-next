@@ -1,9 +1,7 @@
 import { createHash } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
 import { canonicalizeContract } from '@prisma-next/core-control-plane/emission';
-import { join } from 'pathe';
 import { canonicalizeJson } from './canonicalize-json';
-import { readMigrationPackage } from './io';
+import { readMigrationPackage, writeMigrationManifest } from './io';
 import type { MigrationManifest, MigrationOps } from './types';
 
 export interface VerifyResult {
@@ -49,7 +47,7 @@ export async function attestMigration(dir: string): Promise<string> {
   const migrationId = computeMigrationId(pkg.manifest, pkg.ops);
 
   const updated = { ...pkg.manifest, migrationId };
-  await writeFile(join(dir, 'migration.json'), JSON.stringify(updated, null, 2));
+  await writeMigrationManifest(dir, updated);
 
   return migrationId;
 }

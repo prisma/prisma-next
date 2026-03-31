@@ -1,12 +1,10 @@
-import { writeFile } from 'node:fs/promises';
 import { attestMigration, verifyMigration } from '@prisma-next/migration-tools/attestation';
-import { readMigrationPackage } from '@prisma-next/migration-tools/io';
+import { readMigrationPackage, writeMigrationOps } from '@prisma-next/migration-tools/io';
 import { evaluateMigrationTs, hasMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { join } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import {
@@ -90,7 +88,7 @@ async function executeMigrationVerifyCommand(
           toContract: pkg.manifest.toContract,
         });
 
-        await writeFile(join(dir, 'ops.json'), JSON.stringify(resolvedOps, null, 2));
+        await writeMigrationOps(dir, resolvedOps);
       }
 
       const migrationId = await attestMigration(dir);
