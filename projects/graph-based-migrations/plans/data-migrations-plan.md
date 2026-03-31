@@ -40,11 +40,11 @@ The core data migration lifecycle works end-to-end: author a `data-migration.ts`
 **Tasks:**
 
 - [ ] Define `defineMigration` API types in `packages/1-framework/3-tooling/migration/`: `DataMigrationDefinition { name: string; transaction: 'inline' | 'isolated' | 'unmanaged'; check(client): QueryAST | boolean; run(client): QueryAST | QueryAST[] }`
-- [ ] Add `data_migration` operation type to framework-level operation types (`packages/1-framework/1-core/migration/control-plane/src/migrations.ts`) — carries serialized JSON ASTs for check and run
+- [ ] Add `data_migration` operation type to framework-level operation types (`packages/1-framework/1-core/migration/control-plane/src/migrations.ts`) — two-state model: draft has `source` pointing to `data-migration.ts` with null `check`/`run`; attested has serialized JSON ASTs filled in by `migration verify`
 - [ ] Implement framework-level op interleaving function: given ops array + data migration entry, partition into `[additive/widening, data_migration, destructive]` by operation class
 - [ ] Write tests for op interleaving: ops correctly partitioned, data migration slot inserted at the right position, edge cases (all additive, all destructive, mixed)
 - [ ] Implement serialization in `migration verify`: evaluate `data-migration.ts` via tsx, call `check(client)` and `run(client)` with a recording query builder client that captures ASTs, serialize the ASTs as JSON into the `data_migration` ops entry
-- [ ] Implement draft detection: migration package with `data-migration.ts` but no serialized ASTs in ops → draft state (no `edgeId`)
+- [ ] Implement draft detection: `data_migration` op with null `check`/`run` = not yet serialized = draft state (no `edgeId`)
 - [ ] Ensure `migration verify` fails on unimplemented scaffolds (functions that throw or return invalid ASTs)
 - [ ] Extend the runner to handle `data_migration` ops: render ASTs to SQL via target adapter, execute check → (skip or run) → check → (fail or proceed)
 - [ ] Implement `inline` transaction mode: data migration SQL runs inside the existing structural transaction
