@@ -1,6 +1,7 @@
 import type {
   ColumnDefault,
   ContractBase,
+  DomainRelationOn,
   ExecutionHashBase,
   ExecutionSection,
   ProfileHashBase,
@@ -131,6 +132,22 @@ export type ModelDefinition = {
   readonly storage: ModelStorage;
   readonly fields: Record<string, ModelField>;
   readonly relations: Record<string, unknown>;
+};
+
+export type SqlModelFieldStorage = {
+  readonly column: string;
+};
+
+export type SqlModelStorage = {
+  readonly table: string;
+  readonly fields: Record<string, SqlModelFieldStorage>;
+};
+
+export type SqlRelation = {
+  readonly to: string;
+  readonly cardinality: '1:1' | '1:N' | 'N:1';
+  readonly strategy: 'reference';
+  readonly on: DomainRelationOn;
 };
 
 export type SqlMappings = {
