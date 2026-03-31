@@ -112,7 +112,7 @@ describe('buildColumnDefaultSql', () => {
 
   it('renders sequence default', () => {
     expect(buildColumnDefaultSql({ kind: 'sequence', name: 'user_id_seq' })).toBe(
-      'DEFAULT nextval("user_id_seq"::regclass)',
+      `DEFAULT nextval('"user_id_seq"'::regclass)`,
     );
   });
 
