@@ -247,6 +247,12 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
       codecs() {
         return codecRegistry;
       },
+      readMarkerStatement() {
+        return {
+          sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta from prisma_contract.marker where id = $1',
+          params: [1],
+        };
+      },
     },
     lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);

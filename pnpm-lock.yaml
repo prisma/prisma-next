@@ -1644,6 +1644,12 @@ importers:
         specifier: workspace:*
         version: link:../../3-targets/3-targets/sqlite
     devDependencies:
+      '@prisma-next/sql-builder-new':
+        specifier: workspace:*
+        version: link:../../2-sql/4-lanes/sql-builder-new
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../2-sql/2-authoring/contract-ts
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils

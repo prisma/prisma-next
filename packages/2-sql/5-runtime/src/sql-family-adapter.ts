@@ -1,18 +1,8 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type {
-  MarkerReader,
-  MarkerStatement,
-  RuntimeFamilyAdapter,
-} from '@prisma-next/runtime-executor';
+import type { MarkerReader, RuntimeFamilyAdapter } from '@prisma-next/runtime-executor';
 import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { readContractMarker } from './sql-marker';
-
-class SqlMarkerReader implements MarkerReader {
-  readMarkerStatement(): MarkerStatement {
-    return readContractMarker();
-  }
-}
+import type { AdapterProfile } from '@prisma-next/sql-relational-core/ast';
 
 export class SqlFamilyAdapter<TContract extends SqlContract<SqlStorage>>
   implements RuntimeFamilyAdapter<TContract>
@@ -20,9 +10,9 @@ export class SqlFamilyAdapter<TContract extends SqlContract<SqlStorage>>
   readonly contract: TContract;
   readonly markerReader: MarkerReader;
 
-  constructor(contract: TContract) {
+  constructor(contract: TContract, adapterProfile: AdapterProfile) {
     this.contract = contract;
-    this.markerReader = new SqlMarkerReader();
+    this.markerReader = adapterProfile;
   }
 
   validatePlan(plan: ExecutionPlan, contract: TContract): void {

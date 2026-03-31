@@ -190,7 +190,7 @@ export default function sqlite<
   };
 
   const orm: OrmClient<TContract> = ormBuilder({
-    contract,
+    context,
     runtime: {
       execute(plan) {
         return getRuntime().execute(plan);

@@ -26,6 +26,8 @@
     "@prisma-next/target-sqlite": "workspace:*"
   },
   "devDependencies": {
+    "@prisma-next/sql-builder-new": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",

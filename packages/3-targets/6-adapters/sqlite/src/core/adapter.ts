@@ -61,6 +61,10 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
       target: 'sqlite',
       capabilities: defaultCapabilities,
       codecs: () => this.codecRegistry,
+      readMarkerStatement: () => ({
+        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta from prisma_contract_marker where id = ?',
+        params: [1],
+      }),
     });
   }
 
