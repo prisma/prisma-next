@@ -29,12 +29,35 @@ export type OperationTypes = {
         readonly template: string;
       };
     };
+    readonly cosineSimilarity: {
+      readonly args: readonly [
+        {
+          readonly kind: 'param';
+        },
+      ];
+      readonly returns: {
+        readonly kind: 'builtin';
+        readonly type: 'number';
+      };
+      readonly lowering: {
+        readonly targetFamily: 'sql';
+        readonly strategy: 'function';
+        readonly template: string;
+      };
+    };
   };
 };
 
 /** Flat operation signatures for the query builder. */
 export type QueryOperationTypes = SqlQueryOperationTypes<{
   readonly cosineDistance: {
+    readonly args: readonly [
+      { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
+      { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
+    ];
+    readonly returns: { readonly codecId: 'pg/float8@1'; readonly nullable: false };
+  };
+  readonly cosineSimilarity: {
     readonly args: readonly [
       { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },
       { readonly codecId: 'pg/vector@1'; readonly nullable: boolean },

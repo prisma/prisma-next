@@ -154,6 +154,7 @@ The extension provides an `OperationTypes` export for vector operations:
 import type { OperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
 // OperationTypes['pg/vector@1']['cosineDistance'] = (rhs: number[] | vector) => number
+// OperationTypes['pg/vector@1']['cosineSimilarity'] = (rhs: number[] | vector) => number
 ```
 
 ## Operations
@@ -171,11 +172,24 @@ Computes the cosine distance between two vectors.
 const distance = tables.post.columns.embedding.cosineDistance(param('queryVector'));
 ```
 
+### cosineSimilarity
+
+Computes the cosine similarity between two vectors (1 minus cosine distance).
+
+**Signature**: `cosineSimilarity(rhs: number[] | vector): number`
+
+**SQL**: Uses the pgvector `<=>` operator: `1 - (vector1 <=> vector2)`
+
+**Example**:
+```typescript
+const similarity = tables.post.columns.embedding.cosineSimilarity(param('queryVector'));
+```
+
 ## Capabilities
 
 The extension declares the following capabilities:
 
-- `pgvector/cosine`: Indicates support for cosine distance operations
+- `pgvector/cosine`: Indicates support for cosine distance and similarity operations
 
 ## References
 

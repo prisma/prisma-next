@@ -3,7 +3,7 @@ import type {
   ComponentDatabaseDependencies,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
-import { pgvectorOperationSignature, pgvectorPackMeta } from '../core/descriptor-meta';
+import { pgvectorOperationSignatures, pgvectorPackMeta } from '../core/descriptor-meta';
 
 const PGVECTOR_CODEC_ID = 'pg/vector@1' as const;
 
@@ -75,7 +75,7 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
       },
     },
   },
-  operationSignatures: () => [pgvectorOperationSignature],
+  operationSignatures: () => pgvectorOperationSignatures,
   databaseDependencies: pgvectorDatabaseDependencies,
   create: () => ({
     familyId: 'sql' as const,
