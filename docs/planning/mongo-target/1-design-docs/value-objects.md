@@ -49,21 +49,127 @@ Each is a level of framework commitment, not a structural restriction on what fi
 
 **Money** — `{ amount: 100, currency: "USD" }`. Pure data. Two Money instances with the same amount and currency are the same thing.
 
-## Open design questions
+## Decisions
 
-### 1. Where do value objects live in the contract?
+### 1. Value objects are a top-level contract section
 
-**Option A — top-level `valueObjects` section alongside `models`:**
+Value objects are described as independent data structures in a top-level `valueObjects` section alongside `models`. They use the same field shape (`{ nullable, codecId }`) as model fields:
 
 ```json
 {
-  "roots": { ... },
+  "roots": { "users": "User" },
   "models": { ... },
+  "valueObjects": {
+    "GeoPoint": {
+      "fields": {
+        "lat": { "nullable": false, "codecId": "mongo/double@1" },
+        "lng": { "nullable": false, "codecId": "mongo/double@1" }
+      }
+    },
+    "Address": {
+      "fields": {
+        "street": { "nullable": false, "codecId": "mongo/string@1" },
+        "city": { "nullable": false, "codecId": "mongo/string@1" },
+        "location": { "nullable": true, "type": "GeoPoint" }
+      }
+    }
+  }
+}
+```
+
+The exact key name (`valueObjects` vs something else) is cosmetic and can be decided later. The important point: value objects are not models. They belong in a separate section because they carry a fundamentally different level of framework commitment.
+
+**Why not inside `models`?** Conflates two concepts with different framework guarantees. Consumers iterating `models` would need to filter by kind. The `models` section carries an implicit promise: everything here is a full framework citizen with identity, lifecycle, and integrity guarantees. Value objects don't get that promise.
+
+**Why not a lightweight type alias?** Loses the `{ nullable, codecId }` structure. Value objects need the same field descriptors as models — nullability and type information are just as important for type inference and validation.
+
+### 2. Fields are either scalar or composite — mutually exclusive
+
+A field that holds a scalar value has `codecId`. A field that holds a value object has `type`. Never both:
+
+```json
+"User": {
+  "fields": {
+    "email":   { "nullable": false, "codecId": "mongo/string@1" },
+    "address": { "nullable": false, "type": "Address" },
+    "addresses": { "nullable": false, "type": "Address", "many": true }
+  }
+}
+```
+
+`codecId` identifies a scalar type (encoded/decoded by a codec). `type` references a value object definition. A value object is a structured composite, not a single encoded value — it doesn't have a codec.
+
+This applies uniformly: value object fields can appear on models *and* on other value objects. An Address can reference a GeoPoint. A NavItem can reference itself:
+
+```json
+"NavItem": {
+  "fields": {
+    "label": { "nullable": false, "codecId": "mongo/string@1" },
+    "url": { "nullable": false, "codecId": "mongo/string@1" },
+    "children": { "nullable": false, "type": "NavItem", "many": true }
+  }
+}
+```
+
+### 3. Cardinality: `many` on value objects, `cardinality` on relations
+
+Two orthogonal dimensions apply to value object references: **nullability** (`nullable`) and **cardinality** (`many`):
+
+```json
+"address":   { "type": "Address", "nullable": false }
+"address":   { "type": "Address", "nullable": true }
+"addresses": { "type": "Address", "nullable": false, "many": true }
+"addresses": { "type": "Address", "nullable": true, "many": true }
+```
+
+`nullable` means "can this value be null/absent" — applies to both singular values and lists. A nullable list (`nullable: true, many: true`) means the list itself can be null, which is semantically different from an empty list.
+
+Relations keep `cardinality: "1:N" | "N:1" | "1:1"` because they encode bidirectional semantics — "I have one manager" (`N:1`) is different from "I have one passport" (`1:1`) even though both are "one from my side." Value object references have no "other side," so `many: true/false` is sufficient.
+
+Relations also gain `nullable` (a new property, resolving the open question from [ADR 174](../../../architecture%20docs/adrs/ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)). A User's manager relation is `N:1` but may be null (no manager assigned).
+
+### 4. Fixed-length lists don't need contract representation
+
+If the positions have semantic meaning — and they almost always do — use named fields:
+
+```json
+"BoundingBox": {
+  "fields": {
+    "topLeft": { "type": "GeoPoint", "nullable": false },
+    "bottomRight": { "type": "GeoPoint", "nullable": false }
+  }
+}
+```
+
+This is more expressive than a fixed-length list. You say `boundingBox.topLeft`, not `boundingBox[0]`. The domain meaning is in the contract, not inferred from position. Length constraints on homogeneous lists (rare in domain modeling) are a validation concern, not a structural one.
+
+## Complete example
+
+Putting it all together — a Mongo contract with value objects:
+
+```json
+{
+  "roots": {
+    "users": "User"
+  },
+  "models": {
+    "User": {
+      "fields": {
+        "_id": { "nullable": false, "codecId": "mongo/objectId@1" },
+        "email": { "nullable": false, "codecId": "mongo/string@1" },
+        "homeAddress": { "nullable": true, "type": "Address" },
+        "previousAddresses": { "nullable": false, "type": "Address", "many": true }
+      },
+      "relations": { ... },
+      "storage": { "collection": "users" }
+    }
+  },
   "valueObjects": {
     "Address": {
       "fields": {
         "street": { "nullable": false, "codecId": "mongo/string@1" },
-        "city": { "nullable": false, "codecId": "mongo/string@1" }
+        "city": { "nullable": false, "codecId": "mongo/string@1" },
+        "location": { "nullable": true, "type": "GeoPoint" }
       }
     },
     "GeoPoint": {
@@ -76,69 +182,20 @@ Each is a level of framework commitment, not a structural restriction on what fi
 }
 ```
 
-Clear separation. A consumer can enumerate all value objects without filtering models. The `fields` shape is identical to `model.fields` — same `{ nullable, codecId }` structure.
+The resulting TypeScript row type:
 
-**Option B — inside `models` with a discriminating property:**
-
-```json
-"Address": {
-  "kind": "valueObject",
-  "fields": { ... }
+```typescript
+type UserRow = {
+  _id: ObjectId;
+  email: string;
+  homeAddress: { street: string; city: string; location: { lat: number; lng: number } | null } | null;
+  previousAddresses: { street: string; city: string; location: { lat: number; lng: number } | null }[];
 }
 ```
 
-Keeps everything in one dictionary. But conflates two fundamentally different concepts — models have identity guarantees, value objects don't. Consumers that iterate `models` would need to filter by `kind`.
+## Open design questions
 
-**Option C — a lightweight type alias section:**
-
-```json
-"types": {
-  "Address": { "street": "mongo/string@1", "city": "mongo/string@1" }
-}
-```
-
-Simpler shape, but loses the `{ nullable, codecId }` structure that the rest of the contract uses. Would need its own field format.
-
-### 2. How does a model reference a value object?
-
-Currently `model.fields` has scalar entries (`{ nullable, codecId }`) and `model.relations` has graph edges to other models. A value object is composite data — neither a scalar field nor a model relation.
-
-**Option A — value objects as a special codecId:**
-
-```json
-"fields": {
-  "address": { "nullable": false, "codecId": "valueObject/Address" }
-}
-```
-
-Keeps the field shape uniform. But overloads `codecId` — codecs encode/decode scalar values; a value object is a structured composite, not a single encoded value.
-
-**Option B — a dedicated section on the model:**
-
-```json
-"User": {
-  "fields": { ... },
-  "relations": { ... },
-  "embeds": {
-    "address": { "type": "Address", "cardinality": "1:1" },
-    "previousAddresses": { "type": "Address", "cardinality": "1:N" }
-  }
-}
-```
-
-Clear separation. But the model now has three different kinds of properties (fields, relations, embeds) that all contribute to the ORM's row type.
-
-**Option C — value objects as relation targets:**
-
-```json
-"relations": {
-  "address": { "to": "Address", "cardinality": "1:1" }
-}
-```
-
-Where `Address` is defined in `valueObjects`, not `models`. Reuses existing relation machinery. But blurs the model/value-object boundary — the ORM would need to check whether the relation target is a model or a value object to determine behavior.
-
-### 3. How do value objects map to storage?
+### 1. How do value objects map to storage?
 
 The physical representation is family-specific:
 
@@ -146,86 +203,49 @@ The physical representation is family-specific:
 - **SQL JSONB**: Serialized into a single JSON column.
 - **SQL flattened columns**: Each value object field maps to a separate column with a prefix convention (`address_street`, `address_city`).
 
-The storage mapping probably lives on the parent model's `storage` section, parallel to `storage.fields` and `storage.relations`:
+Value object fields appear in the model's domain-level `fields` section (decided above). The storage mapping for where that data physically lives probably goes in the parent model's `storage` section, parallel to `storage.fields` and `storage.relations`. The exact shape isn't designed yet.
 
-**Mongo:**
-
-```json
-"storage": {
-  "collection": "users",
-  "embeds": {
-    "address": { "field": "address" }
-  }
-}
-```
-
-**SQL (JSONB):**
-
-```json
-"storage": {
-  "table": "users",
-  "embeds": {
-    "address": { "column": "address_data" }
-  }
-}
-```
-
-**SQL (flattened):** Open question — how to represent column-per-field mapping for a value object.
-
-### 4. How do value objects affect the ORM row type?
-
-A User with an Address and a list of previous Addresses should produce:
-
-```typescript
-type UserRow = {
-  id: string;
-  email: string;
-  address: { street: string; city: string };
-  previousAddresses: { street: string; city: string }[];
-}
-```
-
-Value object fields are always inlined into the parent row — there's no `include` step, because the data is always co-located. This is different from owned models, which may require explicit include resolution.
-
-### 5. Can value objects contain other value objects?
-
-An Address might contain a GeoPoint. A DateRange might contain two Date scalars. If value objects can nest, the type inference and storage mapping need to handle recursion — similar to the self-referential embedding question (Q19), but without the identity complication.
-
-### 6. Querying through value objects
+### 2. Querying through value objects
 
 Dot-notation filtering through value object fields:
 
 ```typescript
-db.users.where(u => u.address.city.eq("NYC"))
+db.users.where(u => u.homeAddress.city.eq("NYC"))
 ```
 
-- Mongo: `{ "address.city": "NYC" }`
+- Mongo: `{ "homeAddress.city": "NYC" }`
 - SQL JSONB: `address_data->>'city' = 'NYC'`
 - SQL flattened: `address_city = 'NYC'`
 
 The query builder needs the value object's field structure to offer type-safe dot-notation access.
 
-### 7. Mutation semantics
+### 3. Mutation semantics
 
 Value objects are replaced, not patched by identity:
 
 ```typescript
 db.users.where({ id }).update({
-  address: { street: "456 Oak Ave", city: "LA" }
+  homeAddress: { street: "456 Oak Ave", city: "LA", location: null }
 })
 ```
 
-This replaces the entire address. There's no "update the address where `_id` = X" because the framework doesn't track value object identity. In Mongo, this compiles to `$set: { address: { street: "456 Oak Ave", city: "LA" } }` (whole-document replacement, not field-level merge).
+This replaces the entire address. There's no "update the address where `_id` = X" because the framework doesn't track value object identity. In Mongo, this compiles to `$set: { homeAddress: { street: "456 Oak Ave", city: "LA", location: null } }`.
 
-Whether partial updates of value object fields are supported (`update({ address: { city: "LA" } })` meaning "change only the city") is a UX question — it's technically possible (`$set: { "address.city": "LA" }`) but may violate the "value objects are replaced wholesale" semantics.
+Whether partial updates of value object fields are supported (`update({ homeAddress: { city: "LA" } })` meaning "change only the city") is a UX question — it's technically possible (`$set: { "homeAddress.city": "LA" }`) but may violate the "value objects are replaced wholesale" semantics.
 
-### 8. Can value objects be polymorphic?
+### 4. Can value objects be polymorphic?
 
 A `ContactInfo` that's either `{ type: "email", address: "..." }` or `{ type: "phone", number: "..." }`. This intersects with Q16 (union field types) and ADR 173 (discriminators). Probably out of scope for the initial design.
+
+### 5. Contract key naming
+
+The exact key name for the value objects section (`valueObjects`, `types`, `composites`, etc.) is a cosmetic decision that should be made before the contract shape stabilises. `valueObjects` is the working name.
 
 ## Related
 
 - [ADR 177 — Ownership replaces relation strategy](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) — owned models vs value objects
+- [ADR 174 — Aggregate roots and relation strategies](../../../architecture%20docs/adrs/ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — nullable relations open question
 - [design-questions.md § Q16](design-questions.md#16-union-field-types-mixed-type-fields) — union field types
+- [design-questions.md § Q19](design-questions.md#19-self-referential-models) — self-referential models (parallel concept for value objects)
 - [Glossary — Value Object](../../../glossary.md#value-object) — current definition
 - [cross-cutting-learnings.md § learning #5](../cross-cutting-learnings.md) — models are entities, not just data descriptions
