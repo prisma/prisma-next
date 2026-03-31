@@ -1,4 +1,11 @@
 export type {
+  DomainDiscriminator,
+  DomainField,
+  DomainModel,
+  DomainRelation,
+  DomainRelationOn,
+} from '../domain-types';
+export type {
   $,
   Brand,
   ColumnDefault,
