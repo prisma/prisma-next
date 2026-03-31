@@ -243,5 +243,5 @@ ACCEPTED → QUEUED → PROVISIONING (shadow only) → EXECUTING → COMPLETED |
 - ADR 027 — Error envelope & stable codes
 - ADR 031 — Adapter capability discovery
 - ADR 013 — Lane-agnostic Plan identity and hashing
-- ADR 039 — DAG path resolution & integrity
+- ADR 039 — Migration graph path resolution & integrity
 - ADR 024 — Telemetry schema & privacy

@@ -139,7 +139,7 @@ The storage overhead is minimal (contracts are small JSON files) while providing
 ## Backwards compatibility and migration
 
 ### From the current Prisma ORM
-- provide a one-time converter that reads existing migration history and emits a linear chain of edges between inferred contract hashes
+- provide a one-time converter that reads existing migration history and emits a linear sequence of edges between inferred contract hashes
 - custom SQL migrations become node tasks with explicit pre and post checks
 - recommend squashing once teams adopt the new model for clean baselines
 

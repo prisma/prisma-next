@@ -3,7 +3,7 @@
  *
  * Follows the NAMESPACE.SUBCODE convention from ADR 027. All codes live under
  * the MIGRATION namespace. These are tooling-time errors (file I/O, attestation,
- * migration-chain reconstruction), distinct from the runtime MIGRATION.* codes for apply-time
+ * migration history reconstruction), distinct from the runtime MIGRATION.* codes for apply-time
  * failures (PRECHECK_FAILED, POSTCHECK_FAILED, etc.).
  *
  * Fields:
@@ -84,40 +84,44 @@ export function errorInvalidSlug(slug: string): MigrationToolsError {
   });
 }
 
-export function errorSelfLoop(dirName: string, hash: string): MigrationToolsError {
-  return new MigrationToolsError('MIGRATION.SELF_LOOP', 'Self-loop in migration graph', {
-    why: `Migration "${dirName}" has from === to === "${hash}". A migration must transition between two different contract states.`,
-    fix: 'Delete the invalid migration directory and re-run migration plan.',
-    details: { dirName, hash },
-  });
+export function errorSameSourceAndTarget(dirName: string, hash: string): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.SAME_SOURCE_AND_TARGET',
+    'Migration has same source and target',
+    {
+      why: `Migration "${dirName}" has from === to === "${hash}". A migration must transition between two different contract states.`,
+      fix: 'Delete the invalid migration directory and re-run migration plan.',
+      details: { dirName, hash },
+    },
+  );
 }
 
-export function errorAmbiguousLeaf(
-  leaves: readonly string[],
+export function errorAmbiguousTarget(
+  branchTips: readonly string[],
   context?: {
     divergencePoint: string;
     branches: readonly {
-      leaf: string;
+      tip: string;
       edges: readonly { dirName: string; from: string; to: string }[];
     }[];
   },
 ): MigrationToolsError {
   const divergenceInfo = context
-    ? `\nDivergence point: ${context.divergencePoint}\nBranches:\n${context.branches.map((b) => `  → ${b.leaf} (${b.edges.length} edge(s): ${b.edges.map((e) => e.dirName).join(' → ') || 'direct'})`).join('\n')}`
+    ? `\nDivergence point: ${context.divergencePoint}\nBranches:\n${context.branches.map((b) => `  → ${b.tip} (${b.edges.length} edge(s): ${b.edges.map((e) => e.dirName).join(' → ') || 'direct'})`).join('\n')}`
     : '';
-  return new MigrationToolsError('MIGRATION.AMBIGUOUS_LEAF', 'Ambiguous migration graph', {
-    why: `Multiple leaf nodes found: ${leaves.join(', ')}. The migration graph has diverged — this typically happens when two developers plan migrations from the same starting point.${divergenceInfo}`,
+  return new MigrationToolsError('MIGRATION.AMBIGUOUS_TARGET', 'Ambiguous migration target', {
+    why: `The migration history has diverged into multiple branches: ${branchTips.join(', ')}. This typically happens when two developers plan migrations from the same starting point.${divergenceInfo}`,
     fix: 'Use `migration ref set <name> <hash>` to target a specific branch, delete one of the conflicting migration directories and re-run `migration plan`, or use --from <hash> to explicitly select a starting point.',
     details: {
-      leaves,
+      branchTips,
       ...(context ? { divergencePoint: context.divergencePoint, branches: context.branches } : {}),
     },
   });
 }
 
-export function errorNoRoot(nodes: readonly string[]): MigrationToolsError {
-  return new MigrationToolsError('MIGRATION.NO_ROOT', 'Migration graph has no root', {
-    why: `No root migration found in the migration graph (nodes: ${nodes.join(', ')}). No migration starts from the empty contract hash, or all edges form a disconnected subgraph.`,
+export function errorNoInitialMigration(nodes: readonly string[]): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.NO_INITIAL_MIGRATION', 'No initial migration found', {
+    why: `No migration starts from the empty contract state (known hashes: ${nodes.join(', ')}). At least one migration must originate from the empty state.`,
     fix: 'Inspect the migrations directory for corrupted migration.json files. At least one migration must start from the empty contract hash.',
     details: { nodes },
   });
@@ -139,16 +143,12 @@ export function errorInvalidRefName(refName: string): MigrationToolsError {
   });
 }
 
-export function errorNoResolvableLeaf(reachableNodes: readonly string[]): MigrationToolsError {
-  return new MigrationToolsError(
-    'MIGRATION.NO_RESOLVABLE_LEAF',
-    'Migration graph has no resolvable leaf',
-    {
-      why: `The migration graph contains cycles and no node has zero outgoing edges (reachable nodes: ${reachableNodes.join(', ')}). This typically happens after rollback migrations (e.g., C1→C2→C1).`,
-      fix: 'Use --from <hash> to specify the planning origin explicitly.',
-      details: { reachableNodes },
-    },
-  );
+export function errorNoTarget(reachableHashes: readonly string[]): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.NO_TARGET', 'No migration target could be resolved', {
+    why: `The migration history contains cycles and no target can be resolved automatically (reachable hashes: ${reachableHashes.join(', ')}). This typically happens after rollback migrations (e.g., C1→C2→C1).`,
+    fix: 'Use --from <hash> to specify the planning origin explicitly.',
+    details: { reachableHashes },
+  });
 }
 
 export function errorInvalidRefValue(value: string): MigrationToolsError {

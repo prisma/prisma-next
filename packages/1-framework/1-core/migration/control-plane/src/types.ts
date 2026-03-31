@@ -408,7 +408,8 @@ export interface SchemaIssue {
     | 'index_mismatch'
     | 'dependency_missing'
     | 'default_missing'
-    | 'default_mismatch';
+    | 'default_mismatch'
+    | 'extra_default';
   readonly table?: string;
   readonly column?: string;
   readonly indexOrConstraint?: string;

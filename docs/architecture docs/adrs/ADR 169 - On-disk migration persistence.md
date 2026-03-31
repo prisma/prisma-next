@@ -9,7 +9,7 @@ Prisma Next models migrations as directed edges between contract hashes (ADR 001
 - **Sequential apply**: Applying a specific, reviewed set of migrations in order, with resume-after-failure semantics.
 - **Collaboration**: Detecting when two developers plan migrations from the same starting point and requiring explicit resolution.
 
-ADR 028 defined the on-disk format (migration packages, attestation, graph structure). ADR 039 defined DAG path resolution. This ADR records the decisions made while implementing the on-disk persistence system, where the implementation diverged from or refined those earlier ADRs.
+ADR 028 defined the on-disk format (migration packages, attestation, graph structure). ADR 039 defined migration graph path resolution. This ADR records the decisions made while implementing the on-disk persistence system, where the implementation diverged from or refined those earlier ADRs.
 
 ## Problem
 
@@ -25,7 +25,7 @@ Key tensions:
 - **ADR 001**: Migrations are directed edges from `fromHash` to `toHash`, applicable only when the DB marker equals `fromHash`.
 - **ADR 010**: Canonicalization rules applied before all hashing.
 - **ADR 028**: On-disk format with `migration.json` + `ops.json`, content-addressed `migrationId`.
-- **ADR 039**: DAG path resolution, cycle/orphan detection.
+- **ADR 039**: Migration graph path resolution, cycle/orphan detection.
 - **ADR 140**: Package layering — CLI cannot import SQL-domain code directly.
 
 ## Decision
@@ -44,11 +44,11 @@ Migrations are directed edges in a graph where nodes are contract hashes and edg
 
 **Ordering**: `findPath(graph, source, target)` uses BFS shortest-path to determine the migration sequence between any two contract hashes. This tolerates cycles (e.g., `C1 → C2 → C1 → C3`) — the pathfinder selects the shortest route.
 
-**Leaf resolution**: `findLeaf(graph)` finds the unique node reachable from `EMPTY_CONTRACT_HASH` that has no outgoing edges. If the graph has multiple leaves (divergent branches), `findLeaf` throws `AMBIGUOUS_LEAF`. If the graph has cycles with no exit node (e.g., `C1 ↔ C2`), it throws `NO_RESOLVABLE_LEAF` with guidance to use `--from`.
+**Target resolution**: `findLeaf(graph)` finds the unique node reachable from `EMPTY_CONTRACT_HASH` that has no outgoing edges. If the graph has multiple branch tips (divergent branches), `findLeaf` throws `AMBIGUOUS_TARGET`. If the graph has cycles with no exit node (e.g., `C1 ↔ C2`), it throws `NO_TARGET` with guidance to use `--from`.
 
-**Branch detection**: Two migrations sharing the same `from` hash that target different `to` hashes create divergent leaves, detected as `AMBIGUOUS_LEAF`. This is a hard error requiring explicit resolution — the system never silently picks a winner.
+**Branch detection**: Two migrations sharing the same `from` hash that target different `to` hashes create divergent branches, detected as `AMBIGUOUS_TARGET`. This is a hard error requiring explicit resolution — the system never silently picks a winner.
 
-**Ref-based targeting**: Named refs (`migrations/refs.json`) map environment names (e.g., `staging`, `production`) to contract hashes. When a ref is provided via `--ref`, `migration status` and `migration apply` use the ref hash as the target, bypassing leaf resolution entirely. This allows commands to work on divergent graphs by selecting a specific branch.
+**Ref-based targeting**: Named refs (`migrations/refs.json`) map environment names (e.g., `staging`, `production`) to contract hashes. When a ref is provided via `--ref`, `migration status` and `migration apply` use the ref hash as the target, bypassing target resolution entirely. This allows commands to work on divergent graphs by selecting a specific branch.
 
 ### 3. Content-addressed migration identity
 
@@ -83,13 +83,13 @@ If migration N fails, migrations 1..N-1 are already committed. Re-running `migra
 
 ### 6. "From" contract resolution
 
-`migration plan` determines the "from" contract by resolving the graph leaf:
+`migration plan` determines the "from" contract by resolving the latest migration target:
 - **No migrations**: Assume `sha256:empty` (new project). The converted schema IR is empty.
-- **Linear history**: The leaf is unambiguous — the one reachable node with no outgoing edges.
-- **Branching**: `findLeaf` throws `AMBIGUOUS_LEAF` listing both leaves. The user must resolve manually (delete one branch, re-plan) or pass `--from <hash>`.
-- **Cycles without exit**: `findLeaf` throws `NO_RESOLVABLE_LEAF`. The user must pass `--from <hash>` to specify the planning origin explicitly.
+- **Linear history**: The target is unambiguous — the one reachable node with no outgoing edges.
+- **Branching**: `findLeaf` throws `AMBIGUOUS_TARGET` listing both branch tips. The user must resolve manually (delete one branch, re-plan) or pass `--from <hash>`.
+- **Cycles without exit**: `findLeaf` throws `NO_TARGET`. The user must pass `--from <hash>` to specify the planning origin explicitly.
 
-When `--from` is provided, graph reconstruction and leaf resolution are skipped entirely — the specified hash is used directly as the planning origin.
+When `--from` is provided, graph reconstruction and target resolution are skipped entirely — the specified hash is used directly as the planning origin.
 
 ### 7. Full contracts embedded in migration packages
 
@@ -117,7 +117,7 @@ When `--from` is provided, graph reconstruction and leaf resolution are skipped 
 
 ### Timestamp-based ordering
 
-Use `createdAt` to determine migration ordering and leaf selection.
+Use `createdAt` to determine migration ordering and target selection.
 
 Rejected because: timestamps cannot detect branches (two developers plan at 10:01 and 10:02 — looks like a valid sequence but was planned independently). Clock skew between machines produces incorrect ordering. Timestamps are metadata for human readability, not an ordering primitive.
 
@@ -132,7 +132,7 @@ Rejected because: sequence numbers require coordination (who assigns the next nu
 - [ADR 001 — Migrations as Edges](ADR%20001%20-%20Migrations%20as%20Edges.md)
 - [ADR 010 — Canonicalization Rules](ADR%20010%20-%20Canonicalization%20Rules.md)
 - [ADR 028 — Migration Structure & Operations](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md)
-- [ADR 039 — DAG path resolution & integrity](ADR%20039%20-%20DAG%20path%20resolution%20&%20integrity.md)
+- [ADR 039 — Migration graph path resolution & integrity](ADR%20039%20-%20Migration%20graph%20path%20resolution%20&%20integrity.md)
 - [ADR 044 — Pre & post check vocabulary v1](ADR%20044%20-%20Pre%20&%20post%20check%20vocabulary%20v1.md)
 - [ADR 122 — Database Initialization & Adoption](ADR%20122%20-%20Database%20Initialization%20&%20Adoption.md)
 - PR #184: feat(migrations): on-disk migration planning, serialization, and apply

@@ -116,8 +116,8 @@ NAMESPACE.SUBCODE where NAMESPACE ∈ { PLAN, RUNTIME, ADAPTER, BUDGET, LINT, MI
 - **MIGRATION.INVALID_JSON**: migration file contains malformed JSON
 - **MIGRATION.INVALID_MANIFEST**: migration manifest missing required fields or has invalid values
 - **MIGRATION.INVALID_NAME**: migration name/slug empty after sanitization
-- **MIGRATION.SELF_LOOP**: migration edge has from === to (graph invariant violation)
-- **MIGRATION.AMBIGUOUS_LEAF**: multiple leaf nodes in DAG (diverged branches)
+- **MIGRATION.SAME_SOURCE_AND_TARGET**: migration edge has from === to (graph invariant violation)
+- **MIGRATION.AMBIGUOUS_TARGET**: multiple branch tips in migration graph (diverged branches)
 
 #### PREFLIGHT
 - **PREFLIGHT.SHADOW_FAILED**: shadow DB provision or migrate failed

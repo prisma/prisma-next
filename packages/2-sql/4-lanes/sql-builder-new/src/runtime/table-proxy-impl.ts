@@ -12,6 +12,7 @@ import type {
 import type {
   EmptyRow,
   Expand,
+  JoinOuterScope,
   JoinSource,
   MergeScopes,
   NullableScope,
@@ -23,7 +24,6 @@ import type {
   StorageTableToScopeTable,
   Subquery,
 } from '../scope';
-import { JoinOuterScope } from '../scope';
 import type { TableProxyContract } from '../types/db';
 import type { JoinedTables } from '../types/joined-tables';
 import type { DeleteQuery, InsertQuery, UpdateQuery } from '../types/mutation-query';

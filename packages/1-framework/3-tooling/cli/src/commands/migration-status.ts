@@ -409,7 +409,7 @@ async function executeMigrationStatusCommand(
     }
     const header = formatStyledHeader({
       command: 'migration status',
-      description: 'Show migration chain and applied status',
+      description: 'Show migration history and applied status',
       details,
       flags,
     });
@@ -546,7 +546,7 @@ async function executeMigrationStatusCommand(
       );
     }
     diagnostics.push({
-      code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
+      code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
       severity: 'warn',
       message:
         'Database was updated outside the migration system (marker does not match any migration)',
@@ -612,7 +612,7 @@ async function executeMigrationStatusCommand(
 
   if (!chain) {
     return notOk(
-      errorRuntime('Cannot reconstruct migration chain', {
+      errorRuntime('Cannot reconstruct migration history', {
         why: `No path from ${EMPTY_CONTRACT_HASH} to target ${targetHash}`,
         fix: 'The migration history may have gaps. Check the migrations directory for missing or corrupted packages.',
       }),
@@ -645,7 +645,7 @@ async function executeMigrationStatusCommand(
   if (mode === 'online') {
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       diagnostics.push({
-        code: 'MIGRATION.MARKER_NOT_IN_GRAPH',
+        code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
         severity: 'warn',
         message:
           'Database matches the current contract but was updated directly (not via migration apply)',
@@ -700,10 +700,10 @@ export function createMigrationStatusCommand(): Command {
   const command = new Command('status');
   setCommandDescriptions(
     command,
-    'Show migration chain and applied status',
-    'Displays the migration chain in order. When a database connection\n' +
+    'Show migration history and applied status',
+    'Displays the migration history in order. When a database connection\n' +
       'is available, shows which migrations are applied and which are pending.\n' +
-      'Without a database connection, shows the chain from disk only.',
+      'Without a database connection, shows the history from disk only.',
   );
   setCommandExamples(command, [
     'prisma-next migration status',

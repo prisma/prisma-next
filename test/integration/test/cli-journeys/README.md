@@ -31,13 +31,13 @@ pnpm test:journeys
 
 | File | What it covers |
 |---|---|
-| `rollback-cycle.e2e.test.ts` | **Rollback cycle (P-2)**: C1→C2→C1 creates a cycle. `findLeaf` fails with `NO_RESOLVABLE_LEAF`. Plan with `--from` bypasses cycle, apply recovers |
+| `rollback-cycle.e2e.test.ts` | **Rollback cycle (P-2)**: C1→C2→C1 creates a cycle. `findLeaf` fails with `NO_TARGET`. Plan with `--from` bypasses cycle, apply recovers |
 | `converging-paths.e2e.test.ts` | **Converging paths (P-3)**: two paths to the same target (C1→C2→C3 and C1→C3 direct). Pathfinder selects shortest path (2 steps not 3) |
-| `divergence-and-refs.e2e.test.ts` | **Same-base divergence (P-4)**: two edges from C1 (C1→C2, C1→C3). Status without `--ref` fails with `AMBIGUOUS_LEAF`. Ref-based resolution routes apply to the correct branch |
+| `divergence-and-refs.e2e.test.ts` | **Same-base divergence (P-4)**: two edges from C1 (C1→C2, C1→C3). Status without `--ref` fails with `AMBIGUOUS_TARGET`. Ref-based resolution routes apply to the correct branch |
 | `ref-routing.e2e.test.ts` | **Staging ahead via refs (P-5)**: production=C1, staging=C2 on same DB. Apply `--ref staging` advances staging; production unaffected. **Marker ahead of ref (P-6)**: after staging apply, DB at C2 but production ref at C1 — apply fails, status reports ahead-of-ref |
 | `adopt-migrations.e2e.test.ts` | **Adopting migrations (P-9)**: DB managed via `db update` (at C2). Baseline migration EMPTY→C2 is no-op. Incremental C2→C3 applies normally. Status shows both migrations applied |
 | `diamond-convergence.e2e.test.ts` | **Diamond convergence**: Two environments (staging, production) diverge from C1 via independent branches (C1→C2→C3 and C1→C4), then converge to C5. Uses two PGlite instances with separate configs sharing the same migration graph on disk. Verifies both DBs reach C5 via their respective merge migrations and status shows 0 pending for both refs |
-| `interleaved-db-update.e2e.test.ts` | **Interleaved db update + migrations**: User on migrations (∅→C1→C2) runs `db update` to C3 instead of `migration plan`. Retroactive `migration plan` creates the C2→C3 edge, `migration apply` is a noop (DB already at C3). Future migrations (C3→C4) resume normally. Documents that `migration plan` is offline (uses graph leaf, not DB marker) |
+| `interleaved-db-update.e2e.test.ts` | **Interleaved db update + migrations**: User on migrations (∅→C1→C2) runs `db update` to C3 instead of `migration plan`. Retroactive `migration plan` creates the C2→C3 edge, `migration apply` is a noop (DB already at C3). Future migrations (C3→C4) resume normally. Documents that `migration plan` is offline (uses latest migration target, not DB marker) |
 
 ### Drift detection and recovery
 
@@ -45,7 +45,7 @@ pnpm test:journeys
 |---|---|
 | `drift-schema.e2e.test.ts` | **Manual schema change with unchanged marker**: a DBA drops a column; `db verify` now fails by default because it runs schema verification, while `db verify --marker-only` reproduces marker-only verification. **Extra column drift**: DBA adds a column via manual DDL; tolerant `db verify` / `db verify --schema-only` pass, strict `db verify` fails; recover by expanding the contract and running `db update` |
 | `drift-marker.e2e.test.ts` | **Missing marker**: contract emitted but `db init` never run — `db verify` fails, `db verify --schema-only` shows the schema mismatch, init recovers. **Stale marker**: contract changed without updating DB — verify fails, schema-only verify shows the missing column, `db update` recovers. **Mixed-mode evolution**: iterate through multiple contract versions using `db update` (no migration files). **Corrupt marker**: marker row overwritten with garbage — verify fails, `db verify --schema-only` passes (schema intact), `db sign` recovers |
-| `drift-migration-dag.e2e.test.ts` | **Chain breakage**: after building a migration chain, a migration directory is deleted from disk. `migration apply` fails (no path to destination), recovery by re-planning the missing edge |
+| `drift-migration-dag.e2e.test.ts` | **Chain breakage**: after building a migration history, a migration directory is deleted from disk. `migration apply` fails (no path to destination), recovery by re-planning the missing edge |
 
 ### Error scenarios (no database needed)
 
