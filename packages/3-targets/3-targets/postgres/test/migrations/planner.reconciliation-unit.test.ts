@@ -1,10 +1,14 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
-import type { MigrationOperationPolicy } from '@prisma-next/family-sql/control';
+import type { MigrationOperationPolicy, SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import type { PlanningMode } from '../../src/core/migrations/planner';
 import { buildReconciliationPlan } from '../../src/core/migrations/planner-reconciliation';
+import {
+  buildExpectedFormatType,
+  constraintExistsCheck,
+} from '../../src/core/migrations/planner-sql';
 
 // ---------------------------------------------------------------------------
 // Policies
@@ -76,6 +80,62 @@ function contractWithColumn(
         [table]: {
           columns: {
             [column]: { nativeType, codecId: `pg/${nativeType}@1`, nullable },
+          },
+          primaryKey: { columns: [] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+  };
+}
+
+function contractWithColumnDefault(
+  table: string,
+  column: string,
+  nativeType: string,
+  columnDefault: ColumnDefault,
+  nullable = false,
+): SqlContract<SqlStorage> {
+  const contract = emptyContract();
+  return {
+    ...contract,
+    storage: {
+      tables: {
+        [table]: {
+          columns: {
+            [column]: {
+              nativeType,
+              codecId: `pg/${nativeType}@1`,
+              nullable,
+              default: columnDefault,
+            },
+          },
+          primaryKey: { columns: [] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+  };
+}
+
+function contractWithTypeRef(
+  table: string,
+  column: string,
+  nativeType: string,
+  typeRef: string,
+): SqlContract<SqlStorage> {
+  const contract = emptyContract();
+  return {
+    ...contract,
+    storage: {
+      tables: {
+        [table]: {
+          columns: {
+            [column]: { nativeType, codecId: 'pg/enum@1', nullable: false, typeRef },
           },
           primaryKey: { columns: [] },
           uniques: [],
@@ -311,6 +371,28 @@ describe('buildReconciliationPlan', () => {
       expect(result.operations[0]!.meta).toMatchObject({ warning: 'TABLE_REWRITE' });
     });
 
+    it('postcheck verifies column type, not just existence', () => {
+      const result = plan(
+        [
+          issue({
+            kind: 'type_mismatch',
+            table: 'post',
+            column: 'title',
+            expected: 'int4',
+            actual: 'text',
+            message: 'type mismatch',
+          }),
+        ],
+        { contract: contractWithColumn('post', 'title', 'int4') },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('format_type');
+      expect(postcheckSql).toContain('integer');
+      expect(postcheckSql).not.toBe(result.operations[0]!.precheck[0]!.sql);
+    });
+
     it('returns conflict for type_mismatch when contract column not found', () => {
       const result = plan([
         issue({
@@ -444,16 +526,110 @@ describe('buildReconciliationPlan', () => {
   });
 
   // =========================================================================
-  // Conflict conversion for unhandled issue kinds
+  // Default operations — SET DEFAULT / ALTER DEFAULT
   // =========================================================================
 
-  describe('conflict conversion', () => {
-    it('converts default_mismatch to missingButNonAdditive conflict', () => {
+  describe('column default operations', () => {
+    it('generates additive SET DEFAULT for default_missing', () => {
+      const contract = contractWithColumnDefault('user', 'bio', 'text', {
+        kind: 'literal',
+        value: 'no bio',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_missing',
+            table: 'user',
+            column: 'bio',
+            expected: 'literal(no bio)',
+            message: 'default missing',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]).toMatchObject({
+        id: 'setDefault.user.bio',
+        operationClass: 'additive',
+      });
+      expect(result.operations[0]!.execute[0]!.sql).toContain('SET DEFAULT');
+      expect(result.conflicts).toHaveLength(0);
+    });
+
+    it('generates widening SET DEFAULT for default_mismatch', () => {
+      const contract = contractWithColumnDefault('user', 'status', 'text', {
+        kind: 'literal',
+        value: 'active',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_mismatch',
+            table: 'user',
+            column: 'status',
+            expected: 'active',
+            actual: 'pending',
+            message: 'default mismatch',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]).toMatchObject({
+        id: 'setDefault.user.status',
+        operationClass: 'widening',
+      });
+      expect(result.operations[0]!.execute[0]!.sql).toContain('SET DEFAULT');
+      expect(result.conflicts).toHaveLength(0);
+    });
+
+    it('generates SET DEFAULT with function expression for default_missing', () => {
+      const contract = contractWithColumnDefault('user', 'created_at', 'timestamptz', {
+        kind: 'function',
+        expression: 'now()',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_missing',
+            table: 'user',
+            column: 'created_at',
+            expected: 'now()',
+            message: 'default missing',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]!.execute[0]!.sql).toContain('SET DEFAULT');
+      expect(result.operations[0]!.execute[0]!.sql).toContain('now()');
+    });
+
+    it('returns conflict for default_missing when contract column not found', () => {
+      const result = plan([
+        issue({
+          kind: 'default_missing',
+          table: 'user',
+          column: 'nonexistent',
+          expected: 'literal(foo)',
+          message: 'default missing',
+        }),
+      ]);
+
+      expect(result.operations).toHaveLength(0);
+      expect(result.conflicts).toHaveLength(1);
+      expect(result.conflicts[0]).toMatchObject({ kind: 'missingButNonAdditive' });
+    });
+
+    it('returns conflict for default_mismatch when contract column not found', () => {
       const result = plan([
         issue({
           kind: 'default_mismatch',
           table: 'user',
-          column: 'status',
+          column: 'nonexistent',
           expected: 'active',
           actual: 'pending',
           message: 'default mismatch',
@@ -462,12 +638,169 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations).toHaveLength(0);
       expect(result.conflicts).toHaveLength(1);
-      expect(result.conflicts[0]).toMatchObject({
-        kind: 'missingButNonAdditive',
-        summary: 'default mismatch',
-      });
+      expect(result.conflicts[0]).toMatchObject({ kind: 'missingButNonAdditive' });
     });
 
+    it('throws when default_mismatch issue references a contract column with no default', () => {
+      const contract = contractWithColumn('user', 'status', 'text');
+      expect(() =>
+        plan(
+          [
+            issue({
+              kind: 'default_mismatch',
+              table: 'user',
+              column: 'status',
+              expected: 'active',
+              actual: 'pending',
+              message: 'default mismatch',
+            }),
+          ],
+          { contract },
+        ),
+      ).toThrow('default_mismatch issue for "user"."status" but contract column has no default');
+    });
+
+    it('converts default_missing to conflict when policy forbids additive', () => {
+      const contract = contractWithColumnDefault('user', 'bio', 'text', {
+        kind: 'literal',
+        value: 'no bio',
+      });
+      const noAdditivePolicy: MigrationOperationPolicy = {
+        allowedOperationClasses: ['widening', 'destructive'],
+      };
+      const result = plan(
+        [
+          issue({
+            kind: 'default_missing',
+            table: 'user',
+            column: 'bio',
+            expected: 'literal(no bio)',
+            message: 'default missing',
+          }),
+        ],
+        { contract, policy: noAdditivePolicy },
+      );
+
+      expect(result.operations).toHaveLength(0);
+      expect(result.conflicts).toHaveLength(1);
+    });
+
+    it('converts default_mismatch to conflict when policy forbids widening', () => {
+      const contract = contractWithColumnDefault('user', 'status', 'text', {
+        kind: 'literal',
+        value: 'active',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_mismatch',
+            table: 'user',
+            column: 'status',
+            expected: 'active',
+            actual: 'pending',
+            message: 'default mismatch',
+          }),
+        ],
+        { contract, policy: ADDITIVE_ONLY_POLICY },
+      );
+
+      expect(result.operations).toHaveLength(0);
+      expect(result.conflicts).toHaveLength(1);
+    });
+
+    it('converts extra_default to conflict when policy forbids destructive', () => {
+      const result = plan(
+        [
+          issue({
+            kind: 'extra_default',
+            table: 'user',
+            column: 'status',
+            actual: "'active'::text",
+            message: 'extra default',
+          }),
+        ],
+        { policy: ADDITIVE_ONLY_POLICY },
+      );
+
+      expect(result.operations).toHaveLength(0);
+      expect(result.conflicts).toHaveLength(1);
+    });
+
+    it('default_missing postcheck verifies column has a default', () => {
+      const contract = contractWithColumnDefault('user', 'bio', 'text', {
+        kind: 'literal',
+        value: 'no bio',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_missing',
+            table: 'user',
+            column: 'bio',
+            expected: 'literal(no bio)',
+            message: 'default missing',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('IS NOT NULL');
+    });
+
+    it('default_mismatch postcheck verifies column has a default', () => {
+      const contract = contractWithColumnDefault('user', 'status', 'text', {
+        kind: 'literal',
+        value: 'active',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_mismatch',
+            table: 'user',
+            column: 'status',
+            expected: 'literal(active)',
+            actual: "'draft'::text",
+            message: 'default mismatch',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('IS NOT NULL');
+    });
+
+    it('returns null (conflict) for default_missing with autoincrement default (TML-2107)', () => {
+      const contract = contractWithColumnDefault('user', 'id', 'int4', {
+        kind: 'function',
+        expression: 'autoincrement()',
+      });
+      const result = plan(
+        [
+          issue({
+            kind: 'default_missing',
+            table: 'user',
+            column: 'id',
+            expected: 'function(autoincrement())',
+            message: 'default missing',
+          }),
+        ],
+        { contract },
+      );
+
+      expect(result.operations).toHaveLength(0);
+      expect(result.conflicts).toHaveLength(1);
+    });
+  });
+
+  // =========================================================================
+  // Conflict conversion for unhandled issue kinds
+  // =========================================================================
+
+  describe('conflict conversion', () => {
     it('converts foreign_key_mismatch (non-additive) to foreignKeyConflict', () => {
       const result = plan([
         issue({
@@ -541,6 +874,159 @@ describe('buildReconciliationPlan', () => {
         'dropTable.legacy_audit',
         'alterNullability.user.bio',
       ]);
+    });
+  });
+
+  // =========================================================================
+  // P1-2: Temporal type mappings in FORMAT_TYPE_DISPLAY
+  // =========================================================================
+
+  describe('temporal type postcheck mappings', () => {
+    it('postcheck for type_mismatch uses "timestamp without time zone" for timestamp', () => {
+      const result = plan(
+        [
+          issue({
+            kind: 'type_mismatch',
+            table: 'event',
+            column: 'created_at',
+            expected: 'timestamp',
+            actual: 'text',
+            message: 'type mismatch',
+          }),
+        ],
+        { contract: contractWithColumn('event', 'created_at', 'timestamp') },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('format_type');
+      expect(postcheckSql).toContain('timestamp without time zone');
+    });
+
+    it('postcheck for type_mismatch uses "timestamp with time zone" for timestamptz', () => {
+      const result = plan(
+        [
+          issue({
+            kind: 'type_mismatch',
+            table: 'event',
+            column: 'created_at',
+            expected: 'timestamptz',
+            actual: 'text',
+            message: 'type mismatch',
+          }),
+        ],
+        { contract: contractWithColumn('event', 'created_at', 'timestamptz') },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('format_type');
+      expect(postcheckSql).toContain('timestamp with time zone');
+    });
+  });
+
+  // =========================================================================
+  // P1-4: Mixed-case UDT names must be quoted for format_type comparison
+  // =========================================================================
+
+  describe('mixed-case user-defined type postcheck', () => {
+    it('postcheck for type_mismatch quotes mixed-case typeRef names', () => {
+      const result = plan(
+        [
+          issue({
+            kind: 'type_mismatch',
+            table: 'item',
+            column: 'status',
+            expected: 'StatusType',
+            actual: 'text',
+            message: 'type mismatch',
+          }),
+        ],
+        { contract: contractWithTypeRef('item', 'status', 'StatusType', 'StatusType') },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('format_type');
+      // format_type() returns double-quoted names for mixed-case types
+      expect(postcheckSql).toContain('"StatusType"');
+    });
+
+    it('postcheck for type_mismatch does not quote lowercase typeRef names', () => {
+      const result = plan(
+        [
+          issue({
+            kind: 'type_mismatch',
+            table: 'item',
+            column: 'status',
+            expected: 'status_type',
+            actual: 'text',
+            message: 'type mismatch',
+          }),
+        ],
+        { contract: contractWithTypeRef('item', 'status', 'status_type', 'status_type') },
+      );
+
+      expect(result.operations).toHaveLength(1);
+      const postcheckSql = result.operations[0]!.postcheck[0]!.sql;
+      expect(postcheckSql).toContain('status_type');
+      expect(postcheckSql).not.toContain('"status_type"');
+    });
+  });
+
+  // =========================================================================
+  // P2-1: constraintExistsCheck must be scoped to a specific table
+  // =========================================================================
+
+  describe('constraintExistsCheck table scoping', () => {
+    it('generated SQL includes table filter', () => {
+      const sql = constraintExistsCheck({
+        constraintName: 'fk_user_id',
+        schema: 'public',
+        table: 'child',
+      });
+
+      // The check must filter by table (conrelid) to avoid matching
+      // same-named constraints on different tables
+      expect(sql).toContain('conrelid');
+    });
+  });
+
+  // =========================================================================
+  // Helper function unit tests
+  // =========================================================================
+
+  describe('buildExpectedFormatType', () => {
+    it('maps timestamp to "timestamp without time zone"', () => {
+      const result = buildExpectedFormatType(
+        { nativeType: 'timestamp', codecId: 'pg/timestamp@1', nullable: false },
+        new Map(),
+      );
+      expect(result).toBe('timestamp without time zone');
+    });
+
+    it('maps timestamptz to "timestamp with time zone"', () => {
+      const result = buildExpectedFormatType(
+        { nativeType: 'timestamptz', codecId: 'pg/timestamptz@1', nullable: false },
+        new Map(),
+      );
+      expect(result).toBe('timestamp with time zone');
+    });
+
+    it('maps time to "time without time zone"', () => {
+      const result = buildExpectedFormatType(
+        { nativeType: 'time', codecId: 'pg/time@1', nullable: false },
+        new Map(),
+      );
+      expect(result).toBe('time without time zone');
+    });
+
+    it('maps timetz to "time with time zone"', () => {
+      const result = buildExpectedFormatType(
+        { nativeType: 'timetz', codecId: 'pg/timetz@1', nullable: false },
+        new Map(),
+      );
+      expect(result).toBe('time with time zone');
     });
   });
 

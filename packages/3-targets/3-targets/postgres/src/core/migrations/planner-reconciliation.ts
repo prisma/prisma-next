@@ -7,12 +7,17 @@ import type {
   SqlPlannerConflict,
 } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import { invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PlanningMode, PostgresPlanTargetDetails } from './planner';
 import {
+  buildColumnDefaultSql,
   buildColumnTypeSql,
+  buildExpectedFormatType,
+  columnDefaultExistsCheck,
   columnExistsCheck,
   columnNullabilityCheck,
+  columnTypeCheck,
   constraintExistsCheck,
   qualifyTableName,
   toRegclassLiteral,
@@ -189,11 +194,72 @@ function buildReconciliationOperationFromIssue(options: {
       );
     }
 
-    // Remaining issue kinds (default_missing, default_mismatch, primary_key_mismatch,
-    // unique_constraint_mismatch, index_mismatch, foreign_key_mismatch) do not yet have
-    // reconciliation operation builders. They fall through to the caller, which converts them to
-    // conflicts via convertIssueToConflict. When a new SchemaIssue kind is added, add a
-    // case here if the planner can emit an operation for it; otherwise it becomes a conflict.
+    case 'default_missing': {
+      if (!issue.table || !issue.column) {
+        return null;
+      }
+      const contractColMissing = getContractColumn(contract, issue.table, issue.column);
+      if (!contractColMissing) {
+        return null;
+      }
+      // NOTE: Being in the `default_missing` case means the verifier found the contract expects a default, so it should exist here. We must still narrow.
+      invariant(
+        contractColMissing.default !== undefined,
+        `default_missing issue for "${issue.table}"."${issue.column}" but contract column has no default`,
+      );
+      return buildDefaultOperation(
+        schemaName,
+        issue.table,
+        issue.column,
+        contractColMissing,
+        contractColMissing.default,
+        'additive',
+        'Set',
+      );
+    }
+
+    case 'default_mismatch': {
+      if (!issue.table || !issue.column) {
+        return null;
+      }
+      if (!mode.allowWidening) {
+        return null;
+      }
+      const contractColMismatch = getContractColumn(contract, issue.table, issue.column);
+      if (!contractColMismatch) {
+        return null;
+      }
+      // NOTE: Being in the `default_mismatch` case means the verifier found the contract expects a different default, so it should exist here. We must still narrow.
+      invariant(
+        contractColMismatch.default !== undefined,
+        `default_mismatch issue for "${issue.table}"."${issue.column}" but contract column has no default`,
+      );
+      return buildDefaultOperation(
+        schemaName,
+        issue.table,
+        issue.column,
+        contractColMismatch,
+        contractColMismatch.default,
+        'widening',
+        'Change',
+      );
+    }
+
+    case 'extra_default': {
+      if (!issue.table || !issue.column) {
+        return null;
+      }
+      if (!mode.allowDestructive) {
+        return null;
+      }
+      return buildDropDefaultOperation(schemaName, issue.table, issue.column);
+    }
+
+    // Remaining issue kinds (primary_key_mismatch, unique_constraint_mismatch,
+    // index_mismatch, foreign_key_mismatch) do not yet have reconciliation operation
+    // builders. They fall through to the caller, which converts them to conflicts via
+    // convertIssueToConflict. When a new SchemaIssue kind is added, add a case here if
+    // the planner can emit an operation for it; otherwise it becomes a conflict.
     default:
       return null;
   }
@@ -338,7 +404,7 @@ function buildDropConstraintOperation(
     precheck: [
       {
         description: `ensure constraint "${constraintName}" exists`,
-        sql: constraintExistsCheck({ constraintName, schema: schemaName }),
+        sql: constraintExistsCheck({ constraintName, schema: schemaName, table: tableName }),
       },
     ],
     execute: [
@@ -351,7 +417,12 @@ DROP CONSTRAINT ${quoteIdentifier(constraintName)}`,
     postcheck: [
       {
         description: `verify constraint "${constraintName}" is removed`,
-        sql: constraintExistsCheck({ constraintName, schema: schemaName, exists: false }),
+        sql: constraintExistsCheck({
+          constraintName,
+          schema: schemaName,
+          table: tableName,
+          exists: false,
+        }),
       },
     ],
   };
@@ -488,8 +559,104 @@ USING ${quoteIdentifier(columnName)}::${expectedType}`,
     ],
     postcheck: [
       {
-        description: `verify column "${columnName}" exists after type change`,
+        description: `verify column "${columnName}" has type ${expectedType}`,
+        sql: columnTypeCheck({
+          schema: schemaName,
+          table: tableName,
+          column: columnName,
+          expectedType: buildExpectedFormatType(column, codecHooks),
+        }),
+      },
+    ],
+  };
+}
+
+function buildDefaultOperation(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+  column: Omit<StorageColumn, 'default'>,
+  columnDefault: NonNullable<StorageColumn['default']>,
+  operationClass: 'additive' | 'widening',
+  verb: 'Set' | 'Change',
+): SqlMigrationPlanOperation<PostgresPlanTargetDetails> | null {
+  const qualified = qualifyTableName(schemaName, tableName);
+  const defaultClause = buildColumnDefaultSql(columnDefault, column);
+  // autoincrement defaults are handled by SERIAL types — buildColumnDefaultSql returns ''
+  // for them. Until the IR is enriched to distinguish autoincrement (TML-2107), skip.
+  if (!defaultClause) return null;
+  const verbLower = verb.toLowerCase();
+  return {
+    id: `setDefault.${tableName}.${columnName}`,
+    label: `${verb} default for ${columnName} on ${tableName}`,
+    summary: `${verb}s default on column ${columnName} of table ${tableName}`,
+    operationClass,
+    target: {
+      id: 'postgres',
+      details: buildTargetDetails('column', columnName, schemaName, tableName),
+    },
+    precheck: [
+      {
+        description: `ensure column "${columnName}" exists`,
         sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+      },
+    ],
+    execute: [
+      {
+        description: `${verbLower} default on "${columnName}"`,
+        sql: `ALTER TABLE ${qualified}\nALTER COLUMN ${quoteIdentifier(columnName)} SET ${defaultClause}`,
+      },
+    ],
+    postcheck: [
+      {
+        description: `verify column "${columnName}" has a default`,
+        sql: columnDefaultExistsCheck({
+          schema: schemaName,
+          table: tableName,
+          column: columnName,
+          exists: true,
+        }),
+      },
+    ],
+  };
+}
+
+function buildDropDefaultOperation(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  const qualified = qualifyTableName(schemaName, tableName);
+  return {
+    id: `dropDefault.${tableName}.${columnName}`,
+    label: `Drop default for ${columnName} on ${tableName}`,
+    summary: `Drops default on column ${columnName} of table ${tableName}`,
+    operationClass: 'destructive',
+    target: {
+      id: 'postgres',
+      details: buildTargetDetails('column', columnName, schemaName, tableName),
+    },
+    precheck: [
+      {
+        description: `ensure column "${columnName}" exists`,
+        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+      },
+    ],
+    execute: [
+      {
+        description: `drop default on "${columnName}"`,
+        sql: `ALTER TABLE ${qualified}\nALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
+      },
+    ],
+    postcheck: [
+      {
+        description: `verify column "${columnName}" has no default`,
+        sql: columnDefaultExistsCheck({
+          schema: schemaName,
+          table: tableName,
+          column: columnName,
+          exists: false,
+        }),
       },
     ],
   };
@@ -507,6 +674,7 @@ function convertIssueToConflict(issue: SchemaIssue): SqlPlannerConflict | null {
       return buildConflict('nullabilityConflict', issue);
     case 'default_missing':
     case 'default_mismatch':
+    case 'extra_default':
     case 'extra_table':
     case 'extra_column':
     case 'extra_primary_key':

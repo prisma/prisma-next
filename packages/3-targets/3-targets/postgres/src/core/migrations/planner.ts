@@ -525,7 +525,12 @@ PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
           precheck: [
             {
               description: `ensure unique constraint "${constraintName}" is missing`,
-              sql: constraintExistsCheck({ constraintName, schema: schemaName, exists: false }),
+              sql: constraintExistsCheck({
+                constraintName,
+                schema: schemaName,
+                table: tableName,
+                exists: false,
+              }),
             },
           ],
           execute: [
@@ -539,7 +544,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
           postcheck: [
             {
               description: `verify unique constraint "${constraintName}" exists`,
-              sql: constraintExistsCheck({ constraintName, schema: schemaName }),
+              sql: constraintExistsCheck({ constraintName, schema: schemaName, table: tableName }),
             },
           ],
         });
@@ -685,6 +690,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
               sql: constraintExistsCheck({
                 constraintName: fkName,
                 schema: schemaName,
+                table: tableName,
                 exists: false,
               }),
             },
@@ -698,7 +704,11 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
           postcheck: [
             {
               description: `verify foreign key "${fkName}" exists`,
-              sql: constraintExistsCheck({ constraintName: fkName, schema: schemaName }),
+              sql: constraintExistsCheck({
+                constraintName: fkName,
+                schema: schemaName,
+                table: tableName,
+              }),
             },
           ],
         });
