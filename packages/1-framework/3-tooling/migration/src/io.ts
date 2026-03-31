@@ -48,7 +48,7 @@ const MigrationManifestSchema = type({
 const MigrationOpSchema = type({
   id: 'string',
   label: 'string',
-  operationClass: "'additive' | 'widening' | 'destructive'",
+  operationClass: "'additive' | 'widening' | 'destructive' | 'data'",
 });
 
 // Intentionally shallow: operation-specific payload validation is owned by planner/runner layers.

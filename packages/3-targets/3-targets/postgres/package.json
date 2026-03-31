@@ -48,6 +48,7 @@
     "./control": "./dist/control.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
+    "./migration-builders": "./dist/migration-builders.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

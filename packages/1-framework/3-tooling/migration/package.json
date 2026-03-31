@@ -56,6 +56,10 @@
       "types": "./dist/exports/refs.d.mts",
       "import": "./dist/exports/refs.mjs"
     },
+    "./migration-ts": {
+      "types": "./dist/exports/migration-ts.d.mts",
+      "import": "./dist/exports/migration-ts.mjs"
+    },
     "./package.json": "./package.json"
   },
   "repository": {
