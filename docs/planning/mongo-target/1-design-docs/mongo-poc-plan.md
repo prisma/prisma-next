@@ -111,7 +111,7 @@ These are design refinement, not existential risks:
 - **[#5 — Read-time validation](design-questions.md#5-schema-validation-and-read-time-guarantees)**: What happens when a document doesn't match the contract.
 - **[#8 — Aggregation pipeline](design-questions.md#8-aggregation-pipeline-dsl-scope-and-timing)**: The escape-hatch query surface for Mongo (symmetric to the SQL query builder).
 - **[#9 — Change streams](design-questions.md#9-change-streams-and-the-runtimes-execution-model)**: Streaming lifecycle. Being validated in the SQL runtime workstream via Supabase Realtime.
-- **Value types / composites**: `Address` currently sits in `models` with `storage: {}`. Needs a separate `types`/`composites` section. See [cross-cutting-learnings.md § 5](../cross-cutting-learnings.md).
+- **Value objects**: `Address` currently sits in `models` with `storage: {}`. Needs a dedicated value objects section. See [cross-cutting-learnings.md § 5](../cross-cutting-learnings.md).
 - **Polymorphic associations**: Polymorphism on relations (a Comment belonging to Post or Video). No contract representation yet.
 - **Discriminator values are untyped strings**: The contract stores discriminator values as strings, but something must convert them to native DB values. Affects column defaults too. See [ADR 173 open questions](../../../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md).
 - **Row type naming**: `InferFullRow` (Mongo) vs `DefaultModelRow` (SQL). Needs resolution when extracting the shared contract base. See [cross-cutting-learnings.md open questions](../cross-cutting-learnings.md).

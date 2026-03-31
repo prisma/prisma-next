@@ -14,7 +14,7 @@ See also: [MongoDB primitives reference](../../../reference/mongodb-primitives-r
 
 This is a cross-family concern: SQL typed JSON/JSONB columns are the same contract-level problem (structured data nested in a parent entity). Both families need type-safe dot-notation queries, TypeScript type generation, and reusability across models. The difference is convention (Mongo: embedding is idiomatic; SQL: JSON columns are an escape hatch), not capability.
 
-Value types (Address, GeoPoint) without identity are a separate concept — they belong in a `types`/`composites` section, not `models`. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the entity vs value type distinction.
+Value objects (Address, GeoPoint) without identity are a separate concept — they belong in a dedicated value objects section, not `models`. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the entity vs value object distinction.
 
 **Still open**: relation storage details for embedding. A relation with `"strategy": "embed"` needs to know which field in the parent document holds the embedded data. The exact shape isn't designed yet.
 
@@ -225,7 +225,7 @@ For the PoC: Out of scope. The architecture constraints are:
 - **`models`** — all entities with `fields` (records of `{ nullable, codecId }`), optional `discriminator` + `variants`, and `relations`
 - **`model.storage`** — family-specific extension point (SQL: field → column; Mongo: field → codec)
 - **`relations`** — with cardinality and strategy (`"reference"` or `"embed"`)
-- **`types`/`composites`** — value objects without identity (not yet designed)
+- **value objects** — named field structures without identity (not yet designed)
 
 This is not a mechanical extraction from either contract — it's a new abstraction rooted in domain modeling concepts:
 
@@ -233,7 +233,7 @@ This is not a mechanical extraction from either contract — it's a new abstract
 |---|---|
 | **Aggregate root** | Entry in `roots`, model with storage containing table/collection |
 | **Entity** | Entry in `models` |
-| **Value type** | Entry in `types`/`composites` |
+| **Value object** | Dedicated contract section (not yet designed) |
 | **Reference** | Relation with `"strategy": "reference"` |
 | **Embedding** | Relation with `"strategy": "embed"` |
 | **Polymorphism** | `discriminator` + `variants` on any model |
