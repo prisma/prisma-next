@@ -21,6 +21,7 @@ import type {
   DefaultModelRow,
   HavingBuilder,
   HavingComparisonMethods,
+  SimplifyDeep,
 } from './types';
 import { combineWhereExprs } from './where-utils';
 
@@ -84,7 +85,11 @@ export class GroupedCollection<
   async aggregate<Spec extends AggregateSpec>(
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
   ): Promise<
-    Array<Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>>
+    Array<
+      SimplifyDeep<
+        Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>
+      >
+    >
   > {
     const aggregateSpec = fn(createAggregateBuilder(this.contract, this.modelName));
     const aggregateEntries = Object.entries(aggregateSpec);
@@ -118,7 +123,9 @@ export class GroupedCollection<
       }
       return mapped;
     }) as Array<
-      Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>
+      SimplifyDeep<
+        Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>
+      >
     >;
   }
 }
