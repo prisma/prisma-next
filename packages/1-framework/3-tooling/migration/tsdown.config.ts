@@ -7,6 +7,7 @@ export default defineConfig({
     'exports/attestation': 'src/exports/attestation.ts',
     'exports/dag': 'src/exports/dag.ts',
     'exports/refs': 'src/exports/refs.ts',
+    'exports/migration-ts': 'src/exports/migration-ts.ts',
   },
   exports: { enabled: false },
 });

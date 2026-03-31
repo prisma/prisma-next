@@ -333,4 +333,29 @@ export interface TargetMigrationsCapability<
     contract: ContractIR | null,
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>,
   ): unknown;
+
+  /**
+   * Resolves operation descriptors (thin authoring-surface data) into
+   * target-specific migration plan operations (with SQL/DDL, prechecks, postchecks).
+   *
+   * Called by `migration verify` when a migration.ts file needs to be serialized
+   * into ops.json. The descriptors come from evaluating the user's migration.ts;
+   * this method converts them using the target's SQL generation helpers and the
+   * contract context.
+   *
+   * @param descriptors - Operation descriptors from evaluating migration.ts
+   * @param context - Resolution context with contracts, schema name, and framework components
+   * @returns Resolved migration plan operations ready for ops.json serialization
+   */
+  resolveDescriptors?(
+    descriptors: readonly unknown[],
+    context: {
+      readonly fromContract: ContractIR | null;
+      readonly toContract: ContractIR;
+      readonly schemaName?: string;
+      readonly frameworkComponents?: ReadonlyArray<
+        TargetBoundComponentDescriptor<TFamilyId, TTargetId>
+      >;
+    },
+  ): readonly MigrationPlanOperation[];
 }

@@ -1,11 +1,17 @@
+import { writeFile } from 'node:fs/promises';
 import { attestMigration, verifyMigration } from '@prisma-next/migration-tools/attestation';
+import { readMigrationPackage } from '@prisma-next/migration-tools/io';
+import { evaluateMigrationTs, hasMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { join } from 'pathe';
+import { loadConfig } from '../config-loader';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  getTargetMigrations,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
@@ -18,6 +24,7 @@ import { TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationVerifyOptions extends CommonCommandOptions {
   readonly dir: string;
+  readonly config?: string;
 }
 
 export interface MigrationVerifyResult {
@@ -63,6 +70,29 @@ async function executeMigrationVerifyCommand(
     }
 
     if (result.reason === 'draft') {
+      // If migration.ts exists, evaluate and resolve descriptors into ops before attesting
+      if (await hasMigrationTs(dir)) {
+        const pkg = await readMigrationPackage(dir);
+        const descriptors = await evaluateMigrationTs(dir);
+
+        // Load config to get the target's resolveDescriptors capability
+        const config = await loadConfig(options.config);
+        const migrations = getTargetMigrations(config.target);
+        if (!migrations?.resolveDescriptors) {
+          throw new Error(
+            'Target does not support resolveDescriptors. ' +
+              'Cannot verify a migration package with migration.ts.',
+          );
+        }
+
+        const resolvedOps = migrations.resolveDescriptors(descriptors, {
+          fromContract: pkg.manifest.fromContract,
+          toContract: pkg.manifest.toContract,
+        });
+
+        await writeFile(join(dir, 'ops.json'), JSON.stringify(resolvedOps, null, 2));
+      }
+
       const migrationId = await attestMigration(dir);
       return ok({
         ok: true,
@@ -113,6 +143,7 @@ export function createMigrationVerifyCommand(): Command {
   setCommandExamples(command, ['prisma-next migration verify --dir migrations/20250101-add-users']);
   addGlobalOptions(command)
     .requiredOption('--dir <path>', 'Path to the migration package directory')
+    .option('--config <path>', 'Path to prisma-next.config.ts (required when migration.ts exists)')
     .action(async (options: MigrationVerifyOptions) => {
       const flags = parseGlobalFlags(options);
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });

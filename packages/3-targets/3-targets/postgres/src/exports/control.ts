@@ -13,6 +13,7 @@ import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/famil
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
+import { resolveOperations } from '../core/migrations/operation-resolver';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-sql';
@@ -76,6 +77,17 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           ...ifDefined('expandNativeType', expander),
           renderDefault: postgresRenderDefault,
           frameworkComponents: frameworkComponents ?? [],
+        });
+      },
+      resolveDescriptors(descriptors, context) {
+        const codecHooks = context.frameworkComponents
+          ? extractCodecControlHooks(context.frameworkComponents)
+          : new Map();
+        return resolveOperations(descriptors as Parameters<typeof resolveOperations>[0], {
+          fromContract: context.fromContract as SqlContract<SqlStorage> | null,
+          toContract: context.toContract as SqlContract<SqlStorage>,
+          schemaName: context.schemaName ?? 'public',
+          codecHooks,
         });
       },
     },
