@@ -3,19 +3,32 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:a7aadce021465acff4f105ee787388a4896d8161afe863d3c90b3320b06b0010",
-  "profileHash": "sha256:ea5c6635c0c0bd71badced0f3ee8ba912cf72dc836ae165cd533dc8f68cbfc9f",
+  "profileHash": "sha256:83d66b1cce776c9ec9e6d168086e5bd1030ccf461823b9eef39cf49f1833c6dd",
+  "roots": {
+    "Document": "Document"
+  },
   "models": {
     "Document": {
       "fields": {
         "embedding": {
+          "codecId": "pg/vector@1",
           "column": "embedding"
         },
         "id": {
+          "codecId": "pg/int4@1",
           "column": "id"
         }
       },
       "relations": {},
       "storage": {
+        "fields": {
+          "embedding": {
+            "column": "embedding"
+          },
+          "id": {
+            "column": "id"
+          }
+        },
         "table": "document"
       }
     }
@@ -69,8 +82,7 @@
       "returning": true
     },
     "sql": {
-      "enums": true,
-      "returning": true
+      "enums": true
     }
   },
   "extensionPacks": {

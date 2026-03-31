@@ -4,48 +4,121 @@
   "target": "postgres",
   "storageHash": "sha256:43f728c37e9b8f369b2b8acefa387906afd4555646a08528254eceee247342d7",
   "executionHash": "sha256:630618d96f7674c186a027d1295bfc5d688c4168c5a023a1aea01553820387dc",
-  "profileHash": "sha256:ea5c6635c0c0bd71badced0f3ee8ba912cf72dc836ae165cd533dc8f68cbfc9f",
+  "profileHash": "sha256:83d66b1cce776c9ec9e6d168086e5bd1030ccf461823b9eef39cf49f1833c6dd",
+  "roots": {
+    "Post": "Post",
+    "User": "User"
+  },
   "models": {
     "Post": {
       "fields": {
         "createdAt": {
+          "codecId": "pg/timestamptz@1",
           "column": "createdAt"
         },
         "embedding": {
-          "column": "embedding"
+          "codecId": "pg/vector@1",
+          "column": "embedding",
+          "nullable": true
         },
         "id": {
+          "codecId": "sql/char@1",
           "column": "id"
         },
         "title": {
+          "codecId": "pg/text@1",
           "column": "title"
         },
         "userId": {
+          "codecId": "pg/text@1",
           "column": "userId"
         }
       },
-      "relations": {},
+      "relations": {
+        "user": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "userId"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "strategy": "reference",
+          "to": "User"
+        }
+      },
       "storage": {
+        "fields": {
+          "createdAt": {
+            "column": "createdAt"
+          },
+          "embedding": {
+            "column": "embedding"
+          },
+          "id": {
+            "column": "id"
+          },
+          "title": {
+            "column": "title"
+          },
+          "userId": {
+            "column": "userId"
+          }
+        },
         "table": "post"
       }
     },
     "User": {
       "fields": {
         "createdAt": {
+          "codecId": "pg/timestamptz@1",
           "column": "createdAt"
         },
         "email": {
+          "codecId": "pg/text@1",
           "column": "email"
         },
         "id": {
+          "codecId": "sql/char@1",
           "column": "id"
         },
         "kind": {
+          "codecId": "pg/enum@1",
           "column": "kind"
         }
       },
-      "relations": {},
+      "relations": {
+        "posts": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "userId"
+            ]
+          },
+          "strategy": "reference",
+          "to": "Post"
+        }
+      },
       "storage": {
+        "fields": {
+          "createdAt": {
+            "column": "createdAt"
+          },
+          "email": {
+            "column": "email"
+          },
+          "id": {
+            "column": "id"
+          },
+          "kind": {
+            "column": "kind"
+          }
+        },
         "table": "user"
       }
     }
@@ -232,8 +305,7 @@
       "returning": true
     },
     "sql": {
-      "enums": true,
-      "returning": true
+      "enums": true
     }
   },
   "extensionPacks": {

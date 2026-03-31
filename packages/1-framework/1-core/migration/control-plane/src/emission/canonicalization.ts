@@ -9,8 +9,9 @@ type NormalizedContract = {
   storageHash?: string;
   executionHash?: string;
   profileHash?: string;
+  roots?: Record<string, string>;
   models: Record<string, unknown>;
-  relations: Record<string, unknown>;
+  relations?: Record<string, unknown>;
   storage: Record<string, unknown>;
   execution?: Record<string, unknown>;
   extensionPacks: Record<string, unknown>;
@@ -22,8 +23,9 @@ export type CanonicalContractInput = {
   schemaVersion: string;
   targetFamily: string;
   target: string;
+  roots?: Record<string, string>;
   models: Record<string, unknown>;
-  relations: Record<string, unknown>;
+  relations?: Record<string, unknown>;
   storage: Record<string, unknown>;
   execution?: Record<string, unknown>;
   extensionPacks: Record<string, unknown>;
@@ -42,6 +44,7 @@ const TOP_LEVEL_ORDER = [
   'storageHash',
   'executionHash',
   'profileHash',
+  'roots',
   'models',
   'relations',
   'storage',
@@ -105,6 +108,7 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isRequiredModels = isArrayEqual(currentPath, ['models']);
       const isRequiredTables = isArrayEqual(currentPath, ['storage', 'tables']);
       const isRequiredRelations = isArrayEqual(currentPath, ['relations']);
+      const isRequiredRoots = isArrayEqual(currentPath, ['roots']);
       const isRequiredExtensionPacks = isArrayEqual(currentPath, ['extensionPacks']);
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
       const isRequiredMeta = isArrayEqual(currentPath, ['meta']);
@@ -150,6 +154,7 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isRequiredModels &&
         !isRequiredTables &&
         !isRequiredRelations &&
+        !isRequiredRoots &&
         !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&
         !isRequiredMeta &&
@@ -275,8 +280,9 @@ export function canonicalizeContract(ir: CanonicalContractInput): string {
     schemaVersion: ir.schemaVersion,
     targetFamily: ir.targetFamily,
     target: ir.target,
+    ...ifDefined('roots', ir.roots),
     models: ir.models,
-    relations: ir.relations,
+    ...ifDefined('relations', ir.relations),
     storage: ir.storage,
     ...ifDefined('execution', ir.execution),
     extensionPacks: ir.extensionPacks,

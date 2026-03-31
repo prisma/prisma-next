@@ -3,30 +3,60 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:6a38af603d36ab9862c3e73197e094c00b696e55a0928d0003a7b5e9201017bc",
-  "profileHash": "sha256:1628d322a01cac03524fe340fe22d19882ec5ecf0f71f9a32c6c2dfa648a903a",
+  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
+  "roots": {
+    "Member": "Member",
+    "Team": "Team"
+  },
   "models": {
     "Member": {
       "fields": {
         "id": {
+          "codecId": "pg/int4@1",
           "column": "member_id"
         },
         "teamId": {
+          "codecId": "pg/int4@1",
           "column": "team_ref"
         }
       },
-      "relations": {},
+      "relations": {
+        "team": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": ["teamId"],
+            "targetFields": ["id"]
+          },
+          "strategy": "reference",
+          "to": "Team"
+        }
+      },
       "storage": {
+        "fields": {
+          "id": {
+            "column": "member_id"
+          },
+          "teamId": {
+            "column": "team_ref"
+          }
+        },
         "table": "team_member"
       }
     },
     "Team": {
       "fields": {
         "id": {
+          "codecId": "pg/int4@1",
           "column": "team_id"
         }
       },
       "relations": {},
       "storage": {
+        "fields": {
+          "id": {
+            "column": "team_id"
+          }
+        },
         "table": "org_team"
       }
     }
@@ -109,8 +139,7 @@
       "returning": true
     },
     "sql": {
-      "enums": true,
-      "returning": true
+      "enums": true
     }
   },
   "extensionPacks": {},

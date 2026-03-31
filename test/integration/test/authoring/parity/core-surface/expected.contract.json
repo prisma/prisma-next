@@ -3,51 +3,111 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:ba5cf6cccf8cd906b25e0a8d075875aff7492d815c738166c0146ac4b2535a28",
-  "profileHash": "sha256:1628d322a01cac03524fe340fe22d19882ec5ecf0f71f9a32c6c2dfa648a903a",
+  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
+  "roots": {
+    "Post": "Post",
+    "User": "User"
+  },
   "models": {
     "Post": {
       "fields": {
         "id": {
+          "codecId": "pg/int4@1",
           "column": "id"
         },
         "rating": {
-          "column": "rating"
+          "codecId": "pg/float8@1",
+          "column": "rating",
+          "nullable": true
         },
         "title": {
+          "codecId": "pg/text@1",
           "column": "title"
         },
         "userId": {
+          "codecId": "pg/int4@1",
           "column": "userId"
         }
       },
-      "relations": {},
+      "relations": {
+        "author": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": ["userId"],
+            "targetFields": ["id"]
+          },
+          "strategy": "reference",
+          "to": "User"
+        }
+      },
       "storage": {
+        "fields": {
+          "id": {
+            "column": "id"
+          },
+          "rating": {
+            "column": "rating"
+          },
+          "title": {
+            "column": "title"
+          },
+          "userId": {
+            "column": "userId"
+          }
+        },
         "table": "post"
       }
     },
     "User": {
       "fields": {
         "createdAt": {
+          "codecId": "pg/timestamptz@1",
           "column": "createdAt"
         },
         "email": {
+          "codecId": "pg/text@1",
           "column": "email"
         },
         "id": {
+          "codecId": "pg/int4@1",
           "column": "id"
         },
         "isActive": {
+          "codecId": "pg/bool@1",
           "column": "isActive"
         },
         "profile": {
-          "column": "profile"
+          "codecId": "pg/jsonb@1",
+          "column": "profile",
+          "nullable": true
         },
         "role": {
+          "codecId": "pg/enum@1",
           "column": "role"
         }
       },
       "relations": {},
       "storage": {
+        "fields": {
+          "createdAt": {
+            "column": "createdAt"
+          },
+          "email": {
+            "column": "email"
+          },
+          "id": {
+            "column": "id"
+          },
+          "isActive": {
+            "column": "isActive"
+          },
+          "profile": {
+            "column": "profile"
+          },
+          "role": {
+            "column": "role"
+          }
+        },
         "table": "user"
       }
     }
@@ -194,8 +254,7 @@
       "returning": true
     },
     "sql": {
-      "enums": true,
-      "returning": true
+      "enums": true
     }
   },
   "extensionPacks": {},
