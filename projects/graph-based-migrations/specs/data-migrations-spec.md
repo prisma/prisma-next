@@ -26,6 +26,31 @@ Schema evolution often requires data transformations that the database cannot pe
 
 The system must handle the common patterns — computed backfill, lossy type changes, column split/merge, table split/merge, normalization/extraction, key identity changes, constraint enforcement, data seeding. The query builder is the sole authoring surface for v1; if it can't express a scenario, that's either a gap to fill in the query builder or an out-of-scope limitation. Scenarios requiring application-level libraries (e.g., bcrypt hashing) or external data sources are out of scope and must be handled outside the migration system.
 
+### Scenario coverage summary
+
+See [data-migration-scenarios.md](./data-migration-scenarios.md) for full details per scenario.
+
+| Scenario | Auto-detect | Execution model | Known gaps |
+|----------|------------|-----------------|------------|
+| S1. Computed backfill | Yes (NOT NULL) | Full | — |
+| S2. Lossy type change | Yes (type change) | Full (temp column for same-name) | QB expression support in SET (OQ-5) |
+| S3. Column split | Yes (NOT NULL) | Full | QB expression support (OQ-5) |
+| S4. Column merge | Yes (NOT NULL) | Full | QB expression support (OQ-5) |
+| S5. Table split (vertical) | Yes (NOT NULL FK) | Full | QB INSERT...SELECT (OQ-5) |
+| S6. Table split (horizontal) | No (detection gap, OQ-4) | Full (manual authoring) | QB INSERT...SELECT (OQ-5) |
+| S7. Table merge | Yes (NOT NULL) | Full | QB INSERT...SELECT, joins (OQ-5) |
+| S8. Semantic reinterpretation | No (no structural change) | **Out of scope** — deferred (pure data migration A→A) | — |
+| S9. Denormalization | Yes (NOT NULL) | Full | QB subqueries in UPDATE (OQ-5) |
+| S10. Normalization/extraction | Yes (NOT NULL + FK) | Full | QB INSERT...SELECT, joins (OQ-5) |
+| S11. Key/identity change | Per-column only | Full (manual authoring) | Cross-table coordination (OQ-3) |
+| S12. Encoding/format change | Type changes only | Full for type changes | Same-type format changes are S8 territory |
+| S13. Constraint enforcement | No (op partition gap, OQ-1) | Workaround via `migration new` | Constraints classified as `additive` |
+| S14. Data seeding | Yes (NOT NULL FK) | Full | Check uses `return false` (always run) |
+| S15. Soft↔hard delete | No (semantic) | Full (manual authoring) | — |
+| S16. Encryption/hashing | — | **Out of scope** — requires app-level libraries | — |
+| S17. Audit trail backfill | Yes (NOT NULL) if source is in DB | Partial — DB sources work, external sources out of scope | — |
+| S18. Multi-tenant isolation | Yes (NOT NULL) | Full | — |
+
 ## R3. Data migrations are safe to retry after partial failure
 
 If a migration fails midway (crash, timeout, constraint violation), re-running it must not corrupt data or produce duplicate effects. The system needs a mechanism to determine whether a data migration has already been applied, and skip it if so.
