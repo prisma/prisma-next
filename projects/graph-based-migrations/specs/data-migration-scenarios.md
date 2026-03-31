@@ -1,6 +1,8 @@
 # Data Migration Scenarios
 
-A near-exhaustive enumeration of schema evolutions that require data migrations. For each scenario: what the user is doing, why a purely structural migration is insufficient, and what information gap the user must fill.
+A near-exhaustive enumeration of schema evolutions that require data migrations. For each scenario: what the user is doing, why a purely structural migration is insufficient, what information gap the user must fill, and how it maps to our solution.
+
+**Authoring model**: Data migrations are authored using the ORM/query builder, serialized to JSON ASTs at verification time, and rendered to SQL by the target adapter at apply time. Scenarios that can't be expressed via the query builder are noted.
 
 ---
 
@@ -14,6 +16,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: Where does the value come from? The system knows a value is needed but can't know the derivation logic.
 
+**Solution fit**: Planner auto-detects (NOT NULL without default). User authors an UPDATE via the query builder. Phasing ensures the nullable column exists (phase 1) before the data migration populates it (phase 2), then NOT NULL is applied (phase 3). Check query: `client.users.findFirst({ where: { displayName: null } })`.
+
 ---
 
 ## S2. Lossy type change
@@ -26,7 +30,7 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: What is the mapping from old values to new values?
 
-**Planner note**: When the column name stays the same (e.g., `price FLOAT` → `price BIGINT`), the planner uses a temp column strategy — creates a temp column of the target type, the user writes the conversion into it, then the planner drops the original and renames the temp. When the column name changes (e.g., `price` → `price_cents`), the standard phasing handles it naturally (add new column, data migration, drop old).
+**Solution fit**: Planner auto-detects (non-widening type change). For same-column changes, uses temp column strategy — creates a temp column of the target type, user writes the conversion, planner drops original and renames temp. For column renames with type change, standard phasing handles it (add new column, data migration, drop old). Query builder expressiveness for conversion expressions (multiply, cast, lookup) needs validation (OQ-5).
 
 ---
 
@@ -40,6 +44,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: How is the single value decomposed into multiple values?
 
+**Solution fit**: Planner detects the NOT NULL adds and scaffolds. User writes an UPDATE using the query builder with expression functions (e.g., `split_part`). Old `name` column available in phase 2 because drops are phase 3. Check query: `client.users.findFirst({ where: { firstName: null } })`. This is the April VP1 canonical example.
+
 ---
 
 ## S4. Column merge
@@ -51,6 +57,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 **Why data migration is needed**: The system can't know the combination logic — concatenation order, separator, null handling.
 
 **Information gap**: How are multiple values combined into one?
+
+**Solution fit**: Same mechanics as S3 — planner detects NOT NULL add, user writes UPDATE via query builder, old columns available in phase 2.
 
 ---
 
@@ -64,6 +72,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: Which columns move to which table? (Often inferrable from the schema diff, but the actual data copying still requires execution.)
 
+**Solution fit**: Planner detects NOT NULL FK on new table. User writes INSERT...SELECT via the query builder to copy data from the old table to the new one. Old columns available in phase 2. FK constraint applied in phase 3. Requires the query builder to support INSERT...SELECT (OQ-5).
+
 ---
 
 ## S6. Table split (horizontal)
@@ -75,6 +85,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 **Why data migration is needed**: The system has no way to know the partitioning predicate — which rows go where.
 
 **Information gap**: What predicate determines which rows go to which table?
+
+**Solution fit**: **Detection gap** — may not trigger auto-detection if new tables don't have NOT NULL columns without defaults (OQ-4). User must manually create the data migration. The execution model works: user writes INSERT...SELECT with WHERE predicates via the query builder, old table available in phase 2. Requires INSERT...SELECT support (OQ-5).
 
 ---
 
@@ -88,6 +100,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: Deduplication strategy and column mapping.
 
+**Solution fit**: Planner detects NOT NULL columns on new table. User writes INSERT...SELECT and UPDATE with joins via the query builder. Old tables available in phase 2. Complex deduplication logic may push query builder expressiveness (OQ-5).
+
 ---
 
 ## S8. Semantic reinterpretation (no structural change)
@@ -100,7 +114,7 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: What is the old-to-new value mapping? (Note: this is also a case where the planner cannot auto-detect the need — the user must initiate it.)
 
-**Note**: This scenario involves no structural change. It is related to "pure data migrations (A→A)" which are deferred in v1. For now, the user would need to pair this with some structural change on the same edge, or handle it outside the migration system.
+**Solution fit**: **Out of scope for v1.** No structural change means no graph edge to attach the data migration to. Related to "pure data migrations (A→A)" which are deferred. The user would need to pair this with a structural change (e.g., rename the column) or handle it outside the migration system.
 
 ---
 
@@ -114,6 +128,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: What is the aggregation/derivation expression, and which tables/joins are involved?
 
+**Solution fit**: Planner detects NOT NULL add. User writes an UPDATE with subquery via the query builder. Requires subquery/aggregation support in UPDATE context (OQ-5).
+
 ---
 
 ## S10. Normalization / extraction
@@ -125,6 +141,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 **Why data migration is needed**: Rows in the new table must be created from distinct values in the existing table (deduplication), then FKs in the original table must be populated to point at the new rows.
 
 **Information gap**: What constitutes a "unique" entity for deduplication (match on email? name? both?)? When duplicates have conflicting values, which wins?
+
+**Solution fit**: Planner detects NOT NULL columns on new table and NOT NULL FK. User writes INSERT...SELECT DISTINCT and UPDATE with joins via the query builder. Complex scenario — deduplication, UUID generation, FK wiring. May push query builder expressiveness limits (OQ-5). FK constraint applied in phase 3 catches incomplete wiring.
 
 ---
 
@@ -138,6 +156,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: How are new identifiers generated (UUIDv4? UUIDv7? deterministic hash of old ID?)? The cascading FK updates are mechanical but must be orchestrated correctly.
 
+**Solution fit**: Planner detects type changes per-column, but **cross-table coordination is a gap** (OQ-3). The planner would need FK graph awareness to emit coordinated temp columns across all referencing tables. For v1, the user authors this manually via `migration new`. The execution model works — the query builder can express the UPDATE with joins — but scaffolding is manual.
+
 ---
 
 ## S12. Encoding / format change
@@ -149,6 +169,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 **Why data migration is needed**: Existing values need transformation to match the new format. The system can't know the mapping without user input.
 
 **Information gap**: What is the transformation from old format to new? For timezone-naive → timezone-aware: what timezone should be assumed for existing data?
+
+**Solution fit**: Type changes (TIMESTAMP → TIMESTAMPTZ) are auto-detected. User writes conversion via query builder. Same-type format changes (JSON restructuring) are S8 territory — no structural diff, deferred. Query builder needs to support timezone and JSON functions (OQ-5).
 
 ---
 
@@ -162,6 +184,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: How to handle violations — delete duplicates (which one to keep?), replace nulls (with what value?), fix invalid values (how?)?
 
+**Solution fit**: **Op partitioning gap** (OQ-1). Constraint additions (UNIQUE, CHECK) are classified as `additive` and would run in phase 1, before the data migration. They need to run in phase 3, after violations are fixed. Workaround: user can use `migration new` with manual op ordering. Proper fix requires the operation dependency model.
+
 ---
 
 ## S14. Data seeding
@@ -173,6 +197,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 **Why data migration is needed**: The new table is empty after creation. FK constraints on existing tables will fail unless the reference data exists. This data doesn't come from existing tables — it's external.
 
 **Information gap**: What is the reference data? (Often a static dataset, but the system can't generate it.)
+
+**Solution fit**: Planner detects NOT NULL FK. User writes INSERT statements via query builder to seed the reference data, then UPDATE to wire FKs. Check convention: `return false` (always run — seeding is idempotent via upsert or the check doesn't map cleanly to "find violations"). Table created in phase 1, FK applied in phase 3.
 
 ---
 
@@ -188,9 +214,11 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Information gap**: Should soft-deleted rows be hard-deleted, archived to another table, or left as-is?
 
+**Solution fit**: **No auto-detection** — the planner can't infer semantic meaning of `deleted_at` from a column drop. User creates the data migration manually. The execution model works: user writes DELETE via query builder, old column available in phase 2 (drop is phase 3).
+
 ---
 
-## S16. Encryption / hashing
+## S16. Encryption / hashing — OUT OF SCOPE
 
 **Schema change**: Column type may change (e.g., `VARCHAR` → `BYTEA`), or stay the same but values must be transformed.
 
@@ -198,13 +226,11 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 
 **Why data migration is needed**: Values must be irreversibly transformed. The transformation requires external dependencies (bcrypt library, encryption keys) that are outside the database.
 
-**Information gap**: What transformation to apply, and how to access the required external dependencies (keys, libraries) from within the migration?
-
-**Note**: This pushes the boundary of what `db.execute` can handle — the transformation may need application-level code, not just SQL. The `run(db)` function can import libraries, but this is a case where the migration is genuinely imperative.
+**Out of scope**: This requires application-level code (Node.js crypto libraries, key management) that cannot be expressed as database queries. The query builder cannot produce bcrypt hashes or encrypt with application keys. Must be handled outside the migration system — e.g., a separate script run before or after the migration.
 
 ---
 
-## S17. Audit trail backfill
+## S17. Audit trail backfill — PARTIALLY SUPPORTED
 
 **Schema change**: Add `created_by`/`modified_by`/`created_at` columns that should be populated from historical data.
 
@@ -213,6 +239,8 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 **Why data migration is needed**: Historical values may exist in audit logs, another table, or an external system. A static default ("system") may be acceptable but loses provenance.
 
 **Information gap**: Where does the historical data come from? Is a static default acceptable, or must real values be sourced?
+
+**Solution fit**: Planner detects NOT NULL add. If the source is another database table (e.g., audit log table), the user can write an UPDATE with join via the query builder. If the source is an external system, this is out of scope (same as S16 — requires application-level code). A static default is trivially expressible.
 
 ---
 
@@ -225,3 +253,5 @@ A near-exhaustive enumeration of schema evolutions that require data migrations.
 **Why data migration is needed**: Every existing row needs a tenant assignment. If there's currently one implicit tenant, a default works. If data must be partitioned across tenants based on some logic, the user must specify the mapping.
 
 **Information gap**: How are existing rows assigned to tenants? Single default tenant, or a mapping based on existing data (e.g., domain in email, organization FK)?
+
+**Solution fit**: Planner detects NOT NULL adds on each table. Single data migration handles all tables — user writes multiple UPDATE statements via query builder. Simple case (single default tenant) is a literal value assignment. Complex case (mapping based on existing data) requires UPDATE with expressions or joins. Check query: `client.users.findFirst({ where: { tenantId: null } })`.
