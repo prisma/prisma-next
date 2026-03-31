@@ -281,8 +281,9 @@ function firstTargetColumn<TContract extends SqlContract<SqlStorage>>(
   relation: RelationMeta,
 ): string | undefined {
   const targetFields = relation.on?.targetFields;
-  if (!targetFields || targetFields.length === 0) {
+  const firstField = targetFields?.[0];
+  if (!firstField) {
     return undefined;
   }
-  return resolveFieldToColumn(contract, relation.to, targetFields[0] ?? '');
+  return resolveFieldToColumn(contract, relation.to, firstField);
 }

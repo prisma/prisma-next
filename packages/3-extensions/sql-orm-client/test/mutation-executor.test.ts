@@ -391,13 +391,16 @@ describe('mutation-executor', () => {
     const runtime = createMockRuntime();
     const withManyToMany = {
       ...contract,
-      relations: {
-        ...contract.relations,
-        users: {
-          ...contract.relations.users,
-          posts: {
-            ...contract.relations.users.posts,
-            cardinality: 'M:N',
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          relations: {
+            ...contract.models.User.relations,
+            posts: {
+              ...contract.models.User.relations.posts,
+              cardinality: 'M:N',
+            },
           },
         },
       },

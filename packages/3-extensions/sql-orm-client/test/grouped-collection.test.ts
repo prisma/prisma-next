@@ -227,7 +227,7 @@ describe('GroupedCollection', () => {
       })
       .filter((column): column is string => column !== undefined);
 
-    expect(metricColumns).toContain('posts:userId');
+    expect(metricColumns).toContain('posts:user_id');
   });
 
   it('only exposes grouped operations at runtime', () => {
