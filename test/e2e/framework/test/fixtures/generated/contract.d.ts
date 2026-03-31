@@ -342,18 +342,39 @@ export type Contract = ContractWithTypeMaps<SqlContract<
   },
   {
     readonly User: {
-      storage: { readonly table: 'user' };
-      fields: {
+      readonly storage: {
+        readonly table: 'user';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly email: { readonly column: 'email' };
+          readonly createdAt: { readonly column: 'created_at' };
+          readonly updatedAt: { readonly column: 'update_at' };
+          readonly profile: { readonly column: 'profile' };
+        };
+      };
+      readonly fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly email: Varchar<255>;
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
         readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
         readonly profile: { active: boolean; displayName: string; tags: string[] } | null;
       };
+      readonly relations: {};
     };
     readonly Post: {
-      storage: { readonly table: 'post' };
-      fields: {
+      readonly storage: {
+        readonly table: 'post';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly userId: { readonly column: 'userId' };
+          readonly title: { readonly column: 'title' };
+          readonly createdAt: { readonly column: 'created_at' };
+          readonly updatedAt: { readonly column: 'update_at' };
+          readonly meta: { readonly column: 'meta' };
+          readonly published: { readonly column: 'published' };
+        };
+      };
+      readonly fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly userId: CodecTypes['pg/int4@1']['output'];
         readonly title: CodecTypes['pg/text@1']['output'];
@@ -361,29 +382,61 @@ export type Contract = ContractWithTypeMaps<SqlContract<
         readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
         readonly meta: { rank: number; source: string; verified: boolean } | null;
       };
+      readonly relations: {};
     };
     readonly Comment: {
-      storage: { readonly table: 'comment' };
-      fields: {
+      readonly storage: {
+        readonly table: 'comment';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly postId: { readonly column: 'postId' };
+          readonly content: { readonly column: 'content' };
+          readonly createdAt: { readonly column: 'created_at' };
+          readonly updatedAt: { readonly column: 'update_at' };
+        };
+      };
+      readonly fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly postId: CodecTypes['pg/int4@1']['output'];
         readonly content: CodecTypes['pg/text@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
         readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
       };
+      readonly relations: {};
     };
     readonly Event: {
-      storage: { readonly table: 'event' };
-      fields: {
+      readonly storage: {
+        readonly table: 'event';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly name: { readonly column: 'name' };
+          readonly scheduledAt: { readonly column: 'scheduled_at' };
+          readonly createdAt: { readonly column: 'created_at' };
+        };
+      };
+      readonly fields: {
         readonly id: Char<36>;
         readonly name: CodecTypes['pg/text@1']['output'];
         readonly scheduledAt: CodecTypes['pg/timestamptz@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       };
+      readonly relations: {};
     };
     readonly LiteralDefaults: {
-      storage: { readonly table: 'literal_defaults' };
-      fields: {
+      readonly storage: {
+        readonly table: 'literal_defaults';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly label: { readonly column: 'label' };
+          readonly score: { readonly column: 'score' };
+          readonly rating: { readonly column: 'rating' };
+          readonly active: { readonly column: 'active' };
+          readonly bigCount: { readonly column: 'big_count' };
+          readonly metadata: { readonly column: 'metadata' };
+          readonly tags: { readonly column: 'tags' };
+        };
+      };
+      readonly fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly label: CodecTypes['pg/text@1']['output'];
         readonly score: CodecTypes['pg/int4@1']['output'];
@@ -393,6 +446,7 @@ export type Contract = ContractWithTypeMaps<SqlContract<
         readonly metadata: CodecTypes['pg/jsonb@1']['output'];
         readonly tags: CodecTypes['pg/jsonb@1']['output'];
       };
+      readonly relations: {};
     };
   },
   Record<string, never>,
