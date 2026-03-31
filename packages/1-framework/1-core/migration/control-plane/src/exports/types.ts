@@ -11,9 +11,10 @@ export type {
   ControlPlaneStack,
   ControlTargetDescriptor,
   ControlTargetInstance,
+  // Migration types (canonical, family-agnostic)
+  DataTransformOperation,
   EmitContractResult,
   IntrospectSchemaResult,
-  // Migration types (canonical, family-agnostic)
   MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -31,6 +32,7 @@ export type {
   OperationContext,
   SchemaIssue,
   SchemaVerificationNode,
+  SerializedQueryNode,
   SignDatabaseResult,
   TargetMigrationsCapability,
   VerifyDatabaseResult,

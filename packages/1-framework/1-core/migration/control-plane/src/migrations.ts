@@ -23,8 +23,71 @@ import type { ControlDriverInstance, ControlFamilyInstance } from './types';
  * - 'additive': Adds new structures without modifying existing ones (safe)
  * - 'widening': Relaxes constraints or expands types (generally safe)
  * - 'destructive': Removes or alters existing structures (potentially unsafe)
+ * - 'data': Data transformation operation (e.g., backfill, type conversion)
  */
-export type MigrationOperationClass = 'additive' | 'widening' | 'destructive';
+export type MigrationOperationClass = 'additive' | 'widening' | 'destructive' | 'data';
+
+// ============================================================================
+// Data Transform Operation
+// ============================================================================
+
+/**
+ * Serialized query AST node.
+ *
+ * This is the JSON-serializable representation of a query produced by
+ * the ORM/query builder. The target adapter deserializes and renders
+ * it to a target-specific query (SQL, MongoDB command, etc.) at apply time.
+ *
+ * The concrete shape will be defined by the query builder's serialization
+ * format. For now, this captures the structural contract: it's a typed
+ * JSON object with a `kind` discriminator, not arbitrary data.
+ */
+export interface SerializedQueryNode {
+  readonly kind: string;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * A data transform operation within a migration edge.
+ *
+ * Data transforms are authored in TypeScript using the query builder,
+ * serialized to JSON ASTs at verification time, and rendered to SQL
+ * by the target adapter at apply time.
+ *
+ * The `name` serves as the invariant identity — it's recorded in the
+ * ledger and used for invariant-aware routing via environment refs.
+ *
+ * In draft state (before verification), `check` and `run` are null.
+ * After verification, they contain the serialized query ASTs.
+ */
+export interface DataTransformOperation extends MigrationPlanOperation {
+  readonly operationClass: 'data';
+  /**
+   * The invariant name for this data transform.
+   * Recorded in the ledger on successful edge completion.
+   * Used by environment refs to declare required invariants.
+   */
+  readonly name: string;
+  /**
+   * Path to the TypeScript source file that produced this operation.
+   * Not part of edgeId computation — for traceability only.
+   */
+  readonly source: string;
+  /**
+   * Serialized check query, or a boolean literal.
+   * - SerializedQueryNode: describes violations; empty result = already applied.
+   * - false: always run (no check).
+   * - true: always skip.
+   * - null: not yet serialized (draft state).
+   */
+  readonly check: SerializedQueryNode | boolean | null;
+  /**
+   * Serialized run query ASTs.
+   * - Array of serialized query nodes to execute sequentially.
+   * - null: not yet serialized (draft state).
+   */
+  readonly run: readonly SerializedQueryNode[] | null;
+}
 
 /**
  * Policy defining which operation classes are allowed during a migration.

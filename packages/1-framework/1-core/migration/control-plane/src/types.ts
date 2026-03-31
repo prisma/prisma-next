@@ -18,6 +18,7 @@ import type { CoreSchemaView } from './schema-view';
 
 // Re-export migration types for convenience
 export type {
+  DataTransformOperation,
   MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -32,6 +33,7 @@ export type {
   MigrationRunnerFailure,
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
+  SerializedQueryNode,
   TargetMigrationsCapability,
 } from './migrations';
 
