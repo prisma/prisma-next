@@ -387,11 +387,14 @@ The string accessor eliminates collision entirely:
 - Operators are methods on the returned `Expression` (`...eq("NYC")`)
 - Value object traversal uses the call signature (`u("path")`)
 
-**Type safety without autocomplete:**
+**Type safety and autocomplete via recursive template literal types:**
 
-The dot-path string is type-checked at compile time using TypeScript template literal inference:
+The dot-path string is type-checked at compile time using TypeScript template literal inference. The same technique enables IDE autocomplete — ArkType demonstrates this pattern at scale with arbitrary-depth recursive grammars.
+
+The key insight: autocomplete doesn't require eagerly enumerating all possible paths. At any cursor position in a dot-path, the set of valid next tokens is finite — it's just the field names of whichever value object you've navigated into. Recursive conditional types compute these completions lazily:
 
 ```typescript
+// Validation: resolves the type at the end of a dot-path
 type ResolvePath<T, Path extends string> =
   Path extends `${infer Head}.${infer Rest}`
     ? Head extends keyof T
@@ -400,15 +403,23 @@ type ResolvePath<T, Path extends string> =
     : Path extends keyof T
       ? T[Path]
       : never;
+
+// Autocomplete: computes valid completions at the cursor position
+// After typing "homeAddress.", suggests "city", "street", "zip", "location"
+// After typing "homeAddress.location.", suggests "lat", "lng"
+// Self-referential types (NavItem.children.) just re-suggest NavItem's fields
+type PathCompletions<Fields, Prefix extends string = ""> =
+  | { [K in keyof Fields & string]:
+      | `${Prefix}${K}`
+      | (Fields[K] extends ValueObjectRef<infer VO>
+          ? PathCompletions<VO["fields"], `${Prefix}${K}.`>
+          : never)
+    }[keyof Fields & string];
 ```
 
-This validates paths lazily — `u("homeAddress.city")` compiles, `u("homeAddress.typo")` is a type error — without eagerly expanding all possible paths. This handles self-referential value objects (like `NavItem` with `children: NavItem[]`) without type explosion.
+This handles self-referential value objects safely — `NavItem.children.` re-suggests `label`, `url`, `children` without infinite expansion, because TypeScript evaluates recursive conditional types lazily (only the depth the user has typed so far).
 
-The trade-off: no IDE autocomplete inside the string. Unlike property chaining where each `.` triggers suggestions, the dot-path string is typed manually. This is acceptable because:
-- Dot-path strings are familiar (MongoDB native syntax, Lodash `_.get`, etc.)
-- Invalid paths are caught at compile time — you get a type error, not a runtime crash
-- The API surface is small — this only applies to value object field access, not the entire query API
-- Autocomplete improvements can be explored later without changing the API shape
+Typing `u("` shows top-level value object fields. Typing `u("homeAddress.` shows Address fields. Each `.` narrows to the next level, exactly like property chaining — but without the namespace collision risk.
 
 **Backend translation:**
 
