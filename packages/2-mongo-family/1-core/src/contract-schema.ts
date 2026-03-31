@@ -85,7 +85,7 @@ const MongoModelDefinitionSchema = type({
   'base?': 'string',
 });
 
-const MongoStorageCollectionSchema = type({});
+const MongoStorageCollectionSchema = type({ '+': 'reject' });
 
 export const MongoContractSchema = type({
   '+': 'reject',

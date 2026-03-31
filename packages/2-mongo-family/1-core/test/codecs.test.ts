@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createMongoCodecRegistry, type MongoCodec, mongoCodec } from '../src/exports/index';
+import { createMongoCodecRegistry } from '../src/codec-registry';
+import { type MongoCodec, mongoCodec } from '../src/codecs';
 
 describe('mongoCodec()', () => {
   it('creates a codec with the given config', () => {

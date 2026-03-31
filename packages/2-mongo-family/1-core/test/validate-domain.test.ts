@@ -213,6 +213,21 @@ describe('validateContractDomain()', () => {
       );
     });
 
+    it('rejects model with variants but no discriminator', () => {
+      const contract = makeValidContract({
+        models: {
+          Item: makeMinimalModel({
+            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            variants: { Special: { value: 'special' } },
+          }),
+          Special: makeMinimalModel({ base: 'Item' }),
+        },
+      });
+      expect(() => validateContractDomain(contract)).toThrow(
+        /model.*Item.*variants.*no discriminator/i,
+      );
+    });
+
     it('rejects model with base that also has variants', () => {
       const contract = makeValidContract({
         roots: { items: 'Item' },

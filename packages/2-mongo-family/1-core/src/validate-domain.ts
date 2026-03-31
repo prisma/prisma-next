@@ -122,6 +122,10 @@ function validateDiscriminators(contract: DomainContractShape, errors: string[])
       }
     }
 
+    if (model.variants && Object.keys(model.variants).length > 0 && !model.discriminator) {
+      errors.push(`Model "${modelName}" has variants but no discriminator`);
+    }
+
     // Single-level polymorphism only: a variant (model with `base`) cannot itself
     // declare discriminator/variants. Multi-level polymorphism is out of scope per ADR 2.
     if (model.base) {
