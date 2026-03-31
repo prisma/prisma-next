@@ -5,6 +5,7 @@ import type {
   SqlContract,
   SqlStorage,
   StorageColumn,
+  StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { AnyExpression } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -974,13 +975,66 @@ export type RelationCardinality<
     : '1:N'
   : '1:N';
 
+type RelationParentCols<Relation> = Relation extends {
+  readonly on: { readonly parentCols: infer Cols extends readonly string[] };
+}
+  ? Cols
+  : readonly [];
+
+type AnyColumnNullable<
+  Columns extends Record<string, StorageColumn>,
+  ColNames extends readonly string[],
+> = ColNames extends readonly [infer Head extends string, ...infer Tail extends string[]]
+  ? Head extends keyof Columns
+    ? Columns[Head]['nullable'] extends true
+      ? true
+      : AnyColumnNullable<Columns, Tail>
+    : true
+  : false;
+
+type HasForeignKeyForCols<
+  FKs extends readonly unknown[],
+  Cols extends readonly string[],
+> = FKs extends readonly [infer Head, ...infer Tail extends unknown[]]
+  ? Head extends { readonly columns: Cols }
+    ? true
+    : HasForeignKeyForCols<Tail, Cols>
+  : false;
+
+type IsFkSideOfRelation<
+  Table extends StorageTable,
+  ParentCols extends readonly string[],
+> = Table extends { readonly foreignKeys: infer FKs extends readonly unknown[] }
+  ? HasForeignKeyForCols<FKs, ParentCols>
+  : false;
+
+type IsToOneRelationNullable<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> = ModelTableName<TContract, ModelName> extends infer TableName extends string
+  ? TableName extends keyof TContract['storage']['tables']
+    ? TContract['storage']['tables'][TableName] extends infer Table extends StorageTable
+      ? RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
+        ? RelName extends keyof Rels
+          ? IsFkSideOfRelation<Table, RelationParentCols<Rels[RelName]>> extends true
+            ? AnyColumnNullable<Table['columns'], RelationParentCols<Rels[RelName]>>
+            : true
+          : true
+        : true
+      : true
+    : true
+  : true;
+
 export type IncludeRelationValue<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
   IncludedRow,
 > = RelationCardinality<TContract, ModelName, RelName> extends '1:1' | 'N:1'
-  ? IncludedRow | null
+  ? IsToOneRelationNullable<TContract, ModelName, RelName> extends true
+    ? IncludedRow | null
+    : IncludedRow
   : IncludedRow[];
 
 export type CollectionModelName<TContract extends SqlContract<SqlStorage>> =
