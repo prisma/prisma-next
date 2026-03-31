@@ -25,7 +25,6 @@
             "localFields": ["teamId"],
             "targetFields": ["id"]
           },
-          "strategy": "reference",
           "to": "Team"
         }
       },
