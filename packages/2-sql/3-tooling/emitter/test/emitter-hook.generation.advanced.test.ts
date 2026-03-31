@@ -48,7 +48,6 @@ describe('sql-target-family-hook', () => {
             posts: {
               to: 'Post',
               cardinality: '1:N',
-              strategy: 'reference',
               on: {
                 localFields: ['id'],
                 targetFields: ['userId'],
@@ -93,7 +92,7 @@ describe('sql-target-family-hook', () => {
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('relations: {');
     expect(types).toContain(
-      "readonly posts: { readonly to: 'Post'; readonly cardinality: '1:N'; readonly strategy: 'reference'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
+      "readonly posts: { readonly to: 'Post'; readonly cardinality: '1:N'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
     );
   });
 
@@ -359,7 +358,6 @@ describe('sql-target-family-hook', () => {
             posts: {
               to: 'Post',
               cardinality: '1:N',
-              strategy: 'reference',
               on: {
                 localFields: ['id'],
                 targetFields: ['userId'],
@@ -368,7 +366,6 @@ describe('sql-target-family-hook', () => {
             comments: {
               to: 'Comment',
               cardinality: '1:N',
-              strategy: 'reference',
               on: {
                 localFields: ['id'],
                 targetFields: ['authorId'],
@@ -413,10 +410,10 @@ describe('sql-target-family-hook', () => {
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('export type Relations');
     expect(types).toContain(
-      "readonly posts: { readonly to: 'Post'; readonly cardinality: '1:N'; readonly strategy: 'reference'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
+      "readonly posts: { readonly to: 'Post'; readonly cardinality: '1:N'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
     );
     expect(types).toContain(
-      "readonly comments: { readonly to: 'Comment'; readonly cardinality: '1:N'; readonly strategy: 'reference'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['authorId'] } }",
+      "readonly comments: { readonly to: 'Comment'; readonly cardinality: '1:N'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['authorId'] } }",
     );
   });
 

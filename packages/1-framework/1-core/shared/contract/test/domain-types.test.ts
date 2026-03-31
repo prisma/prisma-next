@@ -26,24 +26,22 @@ describe('domain types', () => {
     expect(field.codecId).toBe('pg/text@1');
   });
 
-  it('DomainRelation supports reference strategy with on clause', () => {
+  it('DomainRelation carries to, cardinality, and optional on', () => {
     const relation: DomainRelation = {
       to: 'Post',
       cardinality: '1:N',
-      strategy: 'reference',
       on: { localFields: ['id'], targetFields: ['userId'] },
     };
     expect(relation.to).toBe('Post');
-    expect(relation.strategy).toBe('reference');
+    expect(relation.on?.localFields).toEqual(['id']);
   });
 
-  it('DomainRelation supports embed strategy without on clause', () => {
+  it('DomainRelation without on clause (owned relation)', () => {
     const relation: DomainRelation = {
       to: 'Address',
-      cardinality: '1:1',
-      strategy: 'embed',
+      cardinality: '1:N',
     };
-    expect(relation.strategy).toBe('embed');
+    expect(relation.to).toBe('Address');
     expect(relation.on).toBeUndefined();
   });
 
@@ -67,5 +65,17 @@ describe('domain types', () => {
       base: 'Parent',
     };
     expect(model.base).toBe('Parent');
+  });
+
+  it('DomainModel supports owner for component membership', () => {
+    const model: DomainModel = {
+      fields: {
+        street: { nullable: false, codecId: 'pg/text@1' },
+      },
+      relations: {},
+      storage: {},
+      owner: 'User',
+    };
+    expect(model.owner).toBe('User');
   });
 });
