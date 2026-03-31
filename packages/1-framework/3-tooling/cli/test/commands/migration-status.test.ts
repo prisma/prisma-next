@@ -15,43 +15,38 @@ async function createTempDir(prefix: string): Promise<string> {
 }
 
 describe('readRefs error surface (F01/F04)', () => {
-  it('returns empty object for missing refs.json', async () => {
+  it('returns empty record for missing refs directory', async () => {
     const tempDir = await createTempDir('missing-refs');
-    const refs = await readRefs(join(tempDir, 'refs.json'));
+    const refs = await readRefs(join(tempDir, 'refs'));
     expect(refs).toEqual({});
   });
 
-  it('throws MigrationToolsError for malformed JSON', async () => {
+  it('throws MigrationToolsError for malformed JSON in ref file', async () => {
     const tempDir = await createTempDir('bad-json');
-    const refsPath = join(tempDir, 'refs.json');
-    await writeFile(refsPath, '{ not valid json !!!');
+    const refsDir = join(tempDir, 'refs');
+    await mkdir(refsDir, { recursive: true });
+    await writeFile(join(refsDir, 'staging.json'), '{ not valid json !!!');
 
-    await expect(readRefs(refsPath)).rejects.toSatisfy((error: unknown) => {
+    await expect(readRefs(refsDir)).rejects.toSatisfy((error: unknown) => {
       return (
         MigrationToolsError.is(error) &&
-        error.code === 'MIGRATION.INVALID_REFS' &&
-        error.message.includes('Invalid refs.json')
+        error.code === 'MIGRATION.INVALID_REF_FILE' &&
+        error.message.includes('Invalid ref file')
       );
     });
   });
 
-  it('throws MigrationToolsError for invalid ref names', async () => {
-    const tempDir = await createTempDir('bad-names');
-    const refsPath = join(tempDir, 'refs.json');
-    await writeFile(refsPath, JSON.stringify({ 'UPPER-CASE': 'sha256:empty' }));
-
-    await expect(readRefs(refsPath)).rejects.toSatisfy((error: unknown) => {
-      return MigrationToolsError.is(error) && error.code === 'MIGRATION.INVALID_REFS';
-    });
-  });
-
-  it('throws MigrationToolsError for invalid ref values', async () => {
+  it('throws MigrationToolsError for invalid ref values in file', async () => {
     const tempDir = await createTempDir('bad-values');
-    const refsPath = join(tempDir, 'refs.json');
-    await writeFile(refsPath, JSON.stringify({ staging: 'not-a-hash' }));
+    const refsDir = join(tempDir, 'refs');
+    await mkdir(refsDir, { recursive: true });
+    await writeFile(
+      join(refsDir, 'staging.json'),
+      JSON.stringify({ hash: 'not-a-hash', invariants: [] }),
+    );
 
-    await expect(readRefs(refsPath)).rejects.toSatisfy((error: unknown) => {
-      return MigrationToolsError.is(error) && error.code === 'MIGRATION.INVALID_REFS';
+    await expect(readRefs(refsDir)).rejects.toSatisfy((error: unknown) => {
+      return MigrationToolsError.is(error) && error.code === 'MIGRATION.INVALID_REF_FILE';
     });
   });
 });

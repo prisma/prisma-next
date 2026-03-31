@@ -1,14 +1,19 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { type } from 'arktype';
-import { dirname, join } from 'pathe';
+import { dirname, join, relative } from 'pathe';
 import {
+  errorInvalidRefFile,
   errorInvalidRefName,
-  errorInvalidRefs,
   errorInvalidRefValue,
   MigrationToolsError,
 } from './errors';
 
-export type Refs = Readonly<Record<string, string>>;
+export interface RefEntry {
+  readonly hash: string;
+  readonly invariants: readonly string[];
+}
+
+export type Refs = Readonly<Record<string, RefEntry>>;
 
 const REF_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\/[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
 const REF_VALUE_PATTERN = /^sha256:(empty|[0-9a-f]{64})$/;
@@ -25,22 +30,40 @@ export function validateRefValue(value: string): boolean {
   return REF_VALUE_PATTERN.test(value);
 }
 
-const RefsSchema = type('Record<string, string>').narrow((refs, ctx) => {
-  for (const [key, value] of Object.entries(refs)) {
-    if (!validateRefName(key)) return ctx.mustBe(`valid ref names (invalid: "${key}")`);
-    if (!validateRefValue(value))
-      return ctx.mustBe(`valid contract hashes (invalid value for "${key}": "${value}")`);
-  }
+const RefEntrySchema = type({
+  hash: 'string',
+  invariants: 'string[]',
+}).narrow((entry, ctx) => {
+  if (!validateRefValue(entry.hash))
+    return ctx.mustBe(`a valid contract hash (got "${entry.hash}")`);
   return true;
 });
 
-export async function readRefs(refsPath: string): Promise<Refs> {
+function refFilePath(refsDir: string, name: string): string {
+  return join(refsDir, `${name}.json`);
+}
+
+function refNameFromPath(refsDir: string, filePath: string): string {
+  const rel = relative(refsDir, filePath);
+  return rel.replace(/\.json$/, '');
+}
+
+export async function readRef(refsDir: string, name: string): Promise<RefEntry> {
+  if (!validateRefName(name)) {
+    throw errorInvalidRefName(name);
+  }
+
+  const filePath = refFilePath(refsDir, name);
   let raw: string;
   try {
-    raw = await readFile(refsPath, 'utf-8');
+    raw = await readFile(filePath, 'utf-8');
   } catch (error) {
     if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-      return {};
+      throw new MigrationToolsError('MIGRATION.UNKNOWN_REF', `Unknown ref "${name}"`, {
+        why: `No ref file found at "${filePath}".`,
+        fix: `Create the ref with: prisma-next migration ref set ${name} <hash>`,
+        details: { refName: name, filePath },
+      });
     }
     throw error;
   }
@@ -49,54 +72,124 @@ export async function readRefs(refsPath: string): Promise<Refs> {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw errorInvalidRefs(refsPath, 'Failed to parse as JSON');
+    throw errorInvalidRefFile(filePath, 'Failed to parse as JSON');
   }
 
-  const result = RefsSchema(parsed);
+  const result = RefEntrySchema(parsed);
   if (result instanceof type.errors) {
-    throw errorInvalidRefs(refsPath, result.summary);
+    throw errorInvalidRefFile(filePath, result.summary);
   }
 
   return result;
 }
 
-export async function writeRefs(refsPath: string, refs: Refs): Promise<void> {
-  for (const [key, value] of Object.entries(refs)) {
-    if (!validateRefName(key)) {
-      throw errorInvalidRefName(key);
+export async function readRefs(refsDir: string): Promise<Refs> {
+  let entries: string[];
+  try {
+    entries = await readdir(refsDir, { recursive: true, encoding: 'utf-8' });
+  } catch (error) {
+    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+      return {};
     }
-    if (!validateRefValue(value)) {
-      throw errorInvalidRefValue(value);
-    }
+    throw error;
   }
 
-  const sorted = Object.fromEntries(Object.entries(refs).sort(([a], [b]) => a.localeCompare(b)));
+  const jsonFiles = entries.filter((entry) => entry.endsWith('.json'));
+  const refs: Record<string, RefEntry> = {};
 
-  const dir = dirname(refsPath);
-  await mkdir(dir, { recursive: true });
+  for (const jsonFile of jsonFiles) {
+    const filePath = join(refsDir, jsonFile);
+    const name = refNameFromPath(refsDir, filePath);
 
-  const tmpPath = join(dir, `.refs.json.${Date.now()}.tmp`);
-  await writeFile(tmpPath, `${JSON.stringify(sorted, null, 2)}\n`);
-  await rename(tmpPath, refsPath);
+    let raw: string;
+    try {
+      raw = await readFile(filePath, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw errorInvalidRefFile(filePath, 'Failed to parse as JSON');
+    }
+
+    const result = RefEntrySchema(parsed);
+    if (result instanceof type.errors) {
+      throw errorInvalidRefFile(filePath, result.summary);
+    }
+
+    refs[name] = result;
+  }
+
+  return refs;
 }
 
-export function resolveRef(refs: Refs, name: string): string {
+export async function writeRef(refsDir: string, name: string, entry: RefEntry): Promise<void> {
+  if (!validateRefName(name)) {
+    throw errorInvalidRefName(name);
+  }
+  if (!validateRefValue(entry.hash)) {
+    throw errorInvalidRefValue(entry.hash);
+  }
+
+  const filePath = refFilePath(refsDir, name);
+  const dir = dirname(filePath);
+  await mkdir(dir, { recursive: true });
+
+  const tmpPath = join(dir, `.${name.split('/').pop()}.json.${Date.now()}.tmp`);
+  await writeFile(
+    tmpPath,
+    `${JSON.stringify({ hash: entry.hash, invariants: [...entry.invariants] }, null, 2)}\n`,
+  );
+  await rename(tmpPath, filePath);
+}
+
+export async function deleteRef(refsDir: string, name: string): Promise<void> {
   if (!validateRefName(name)) {
     throw errorInvalidRefName(name);
   }
 
-  const hash = refs[name];
-  if (hash === undefined) {
+  const filePath = refFilePath(refsDir, name);
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+      throw new MigrationToolsError('MIGRATION.UNKNOWN_REF', `Unknown ref "${name}"`, {
+        why: `No ref file found at "${filePath}".`,
+        fix: 'Run `prisma-next migration ref list` to see available refs.',
+        details: { refName: name, filePath },
+      });
+    }
+    throw error;
+  }
+
+  // Clean empty parent directories up to refsDir
+  let dir = dirname(filePath);
+  while (dir !== refsDir && dir.startsWith(refsDir)) {
+    try {
+      await rmdir(dir);
+      dir = dirname(dir);
+    } catch {
+      break;
+    }
+  }
+}
+
+export function resolveRef(refs: Refs, name: string): RefEntry {
+  if (!validateRefName(name)) {
+    throw errorInvalidRefName(name);
+  }
+
+  const entry = refs[name];
+  if (entry === undefined) {
     throw new MigrationToolsError('MIGRATION.UNKNOWN_REF', `Unknown ref "${name}"`, {
-      why: `No ref named "${name}" exists in refs.json.`,
-      fix: `Available refs: ${Object.keys(refs).join(', ') || '(none)'}. Create a ref with: set the "${name}" key in migrations/refs.json.`,
+      why: `No ref named "${name}" exists.`,
+      fix: `Available refs: ${Object.keys(refs).join(', ') || '(none)'}. Create a ref with: prisma-next migration ref set ${name} <hash>`,
       details: { refName: name, availableRefs: Object.keys(refs) },
     });
   }
 
-  if (!validateRefValue(hash)) {
-    throw errorInvalidRefValue(hash);
-  }
-
-  return hash;
+  return entry;
 }

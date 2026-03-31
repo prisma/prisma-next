@@ -5,7 +5,8 @@ import {
   findPathWithDecision,
   findReachableLeaves,
 } from '@prisma-next/migration-tools/dag';
-import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
+import type { Refs } from '@prisma-next/migration-tools/refs';
+import { readRef, readRefs } from '@prisma-next/migration-tools/refs';
 import type {
   AttestedMigrationBundle,
   MigrationBundle,
@@ -345,7 +346,7 @@ async function executeMigrationStatusCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
+  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -355,9 +356,9 @@ async function executeMigrationStatusCommand(
 
   let activeRefName: string | undefined;
   let activeRefHash: string | undefined;
-  let allRefs: Record<string, string> = {};
+  let allRefs: Refs = {};
   try {
-    allRefs = await readRefs(refsPath);
+    allRefs = await readRefs(refsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -373,26 +374,31 @@ async function executeMigrationStatusCommand(
 
   if (options.ref) {
     activeRefName = options.ref;
-    try {
-      activeRefHash = resolveRef(allRefs, activeRefName);
-    } catch (error) {
-      if (MigrationToolsError.is(error)) {
-        return notOk(
-          errorRuntime(error.message, {
-            why: error.why,
-            fix: error.fix,
-            meta: { code: error.code },
-          }),
-        );
+    const entry = allRefs[activeRefName];
+    if (entry) {
+      activeRefHash = entry.hash;
+    } else {
+      try {
+        const refEntry = await readRef(refsDir, activeRefName);
+        activeRefHash = refEntry.hash;
+      } catch (error) {
+        if (MigrationToolsError.is(error)) {
+          return notOk(
+            errorRuntime(error.message, {
+              why: error.why,
+              fix: error.fix,
+              meta: { code: error.code },
+            }),
+          );
+        }
+        throw error;
       }
-      throw error;
     }
   }
 
-  // todo: can't we derive this without modifying the StatusRef obj
-  const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, hash]) => ({
+  const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, entry]) => ({
     name,
-    hash,
+    hash: entry.hash,
     active: name === activeRefName,
   }));
 
@@ -712,7 +718,7 @@ export function createMigrationStatusCommand(): Command {
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--ref <name>', 'Target ref name from migrations/refs.json')
+    .option('--ref <name>', 'Target ref name from migrations/refs/')
     .option('--graph', 'Show the full migration graph with all branches')
     .option('--limit <n>', 'Maximum number of migrations to display (default: 10)')
     .option('--all', 'Show full history (disables truncation)')

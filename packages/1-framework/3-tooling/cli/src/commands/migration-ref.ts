@@ -1,9 +1,11 @@
+import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import {
+  deleteRef,
+  readRef,
   readRefs,
-  resolveRef,
   validateRefName,
   validateRefValue,
-  writeRefs,
+  writeRef,
 } from '@prisma-next/migration-tools/refs';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -21,12 +23,14 @@ interface RefSetResult {
   readonly ok: true;
   readonly ref: string;
   readonly hash: string;
+  readonly invariants: readonly string[];
 }
 
 interface RefGetResult {
   readonly ok: true;
   readonly ref: string;
   readonly hash: string;
+  readonly invariants: readonly string[];
 }
 
 interface RefDeleteResult {
@@ -37,12 +41,12 @@ interface RefDeleteResult {
 
 interface RefListResult {
   readonly ok: true;
-  readonly refs: Record<string, string>;
+  readonly refs: Record<string, RefEntry>;
 }
 
-function resolveRefsPath(configPath?: string, config?: { migrations?: { dir?: string } }): string {
+function resolveRefsDir(configPath?: string, config?: { migrations?: { dir?: string } }): string {
   const base = configPath ? resolve(configPath, '..') : process.cwd();
-  return resolve(base, config?.migrations?.dir ?? 'migrations', 'refs.json');
+  return resolve(base, config?.migrations?.dir ?? 'migrations', 'refs');
 }
 
 function mapError(error: unknown): CliStructuredError {
@@ -70,13 +74,6 @@ function cliErrorInvalidRefValue(hash: string): CliStructuredError {
   });
 }
 
-function errorRefNotFound(name: string): CliStructuredError {
-  return errorRuntime(`Ref "${name}" does not exist`, {
-    why: `No ref named "${name}" found in refs.json`,
-    fix: `Run \`prisma-next migration ref list\` to see available refs, or \`prisma-next migration ref set ${name} <hash>\` to create it`,
-  });
-}
-
 async function executeRefSetCommand(
   name: string,
   hash: string,
@@ -91,11 +88,10 @@ async function executeRefSetCommand(
 
   try {
     const config = await loadConfig(options.config);
-    const refsPath = resolveRefsPath(options.config, config);
-    const refs = await readRefs(refsPath);
-    const updated = { ...refs, [name]: hash };
-    await writeRefs(refsPath, updated);
-    return ok({ ok: true as const, ref: name, hash });
+    const refsDir = resolveRefsDir(options.config, config);
+    const entry: RefEntry = { hash, invariants: [] };
+    await writeRef(refsDir, name, entry);
+    return ok({ ok: true as const, ref: name, hash, invariants: [] });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);
     return notOk(mapError(error));
@@ -108,10 +104,9 @@ async function executeRefGetCommand(
 ): Promise<Result<RefGetResult, CliStructuredError>> {
   try {
     const config = await loadConfig(options.config);
-    const refsPath = resolveRefsPath(options.config, config);
-    const refs = await readRefs(refsPath);
-    const hash = resolveRef(refs, name);
-    return ok({ ok: true as const, ref: name, hash });
+    const refsDir = resolveRefsDir(options.config, config);
+    const entry = await readRef(refsDir, name);
+    return ok({ ok: true as const, ref: name, hash: entry.hash, invariants: entry.invariants });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);
     return notOk(mapError(error));
@@ -124,13 +119,8 @@ async function executeRefDeleteCommand(
 ): Promise<Result<RefDeleteResult, CliStructuredError>> {
   try {
     const config = await loadConfig(options.config);
-    const refsPath = resolveRefsPath(options.config, config);
-    const refs = await readRefs(refsPath);
-    if (!Object.hasOwn(refs, name)) {
-      return notOk(errorRefNotFound(name));
-    }
-    const { [name]: _, ...remaining } = refs;
-    await writeRefs(refsPath, remaining);
+    const refsDir = resolveRefsDir(options.config, config);
+    await deleteRef(refsDir, name);
     return ok({ ok: true as const, ref: name, deleted: true as const });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);
@@ -143,8 +133,8 @@ async function executeRefListCommand(options: {
 }): Promise<Result<RefListResult, CliStructuredError>> {
   try {
     const config = await loadConfig(options.config);
-    const refsPath = resolveRefsPath(options.config, config);
-    const refs = await readRefs(refsPath);
+    const refsDir = resolveRefsDir(options.config, config);
+    const refs = await readRefs(refsDir);
     return ok({ ok: true as const, refs });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);
@@ -157,7 +147,7 @@ function createRefSetCommand(): Command {
   setCommandDescriptions(
     command,
     'Set a ref to a contract hash',
-    'Sets a named ref to point to a contract hash in migrations/refs.json.',
+    'Sets a named ref to point to a contract hash in migrations/refs/.',
   );
   addGlobalOptions(command)
     .argument('<name>', 'Ref name (e.g., staging, production)')
@@ -190,7 +180,7 @@ function createRefGetCommand(): Command {
   setCommandDescriptions(
     command,
     'Get the hash for a ref',
-    'Reads a named ref from migrations/refs.json and prints its contract hash.',
+    'Reads a named ref from migrations/refs/ and prints its contract hash.',
   );
   addGlobalOptions(command)
     .argument('<name>', 'Ref name to look up')
@@ -218,7 +208,7 @@ function createRefGetCommand(): Command {
 
 function createRefDeleteCommand(): Command {
   const command = new Command('delete');
-  setCommandDescriptions(command, 'Delete a ref', 'Removes a named ref from migrations/refs.json.');
+  setCommandDescriptions(command, 'Delete a ref', 'Removes a named ref from migrations/refs/.');
   addGlobalOptions(command)
     .argument('<name>', 'Ref name to delete')
     .option('--config <path>', 'Path to prisma-next.config.ts')
@@ -245,11 +235,7 @@ function createRefDeleteCommand(): Command {
 
 function createRefListCommand(): Command {
   const command = new Command('list');
-  setCommandDescriptions(
-    command,
-    'List all refs',
-    'Lists all named refs from migrations/refs.json.',
-  );
+  setCommandDescriptions(command, 'List all refs', 'Lists all named refs from migrations/refs/.');
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (options: { config?: string; json?: string | boolean; quiet?: boolean }) => {
@@ -264,8 +250,10 @@ function createRefListCommand(): Command {
           if (entries.length === 0) {
             ui.output('No refs defined');
           } else {
-            for (const [refName, hash] of entries) {
-              ui.output(`${refName} → ${hash}`);
+            for (const [refName, entry] of entries) {
+              const invariantsSuffix =
+                entry.invariants.length > 0 ? ` [invariants: ${entry.invariants.join(', ')}]` : '';
+              ui.output(`${refName} → ${entry.hash}${invariantsSuffix}`);
             }
           }
         }
@@ -282,7 +270,6 @@ export {
   executeRefListCommand,
   cliErrorInvalidRefName,
   cliErrorInvalidRefValue,
-  errorRefNotFound,
 };
 
 export function createMigrationRefCommand(): Command {
@@ -290,7 +277,7 @@ export function createMigrationRefCommand(): Command {
   setCommandDescriptions(
     command,
     'Manage migration refs',
-    'Manage named refs in migrations/refs.json. Refs map logical environment\n' +
+    'Manage named refs in migrations/refs/. Refs map logical environment\n' +
       'names (e.g., staging, production) to contract hashes.',
   );
   addGlobalOptions(command).configureHelp({

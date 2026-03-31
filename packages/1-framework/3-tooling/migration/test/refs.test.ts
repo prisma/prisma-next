@@ -3,10 +3,22 @@ import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MigrationToolsError } from '../src/errors';
-import { readRefs, resolveRef, validateRefName, validateRefValue, writeRefs } from '../src/refs';
+import type { RefEntry, Refs } from '../src/refs';
+import {
+  deleteRef,
+  readRef,
+  readRefs,
+  resolveRef,
+  validateRefName,
+  validateRefValue,
+  writeRef,
+} from '../src/refs';
 
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
+
+const ENTRY_A: RefEntry = { hash: HASH_A, invariants: [] };
+const ENTRY_B: RefEntry = { hash: HASH_B, invariants: ['split-user-name'] };
 
 describe('validateRefName', () => {
   it('accepts simple alphanumeric names', () => {
@@ -94,127 +106,56 @@ describe('validateRefValue', () => {
   });
 });
 
-describe('readRefs', () => {
-  let tmpDir: string;
+describe('writeRef', () => {
+  let refsDir: string;
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `test-refs-read-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    await mkdir(tmpDir, { recursive: true });
+    refsDir = join(
+      tmpdir(),
+      `test-refs-write-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await rm(refsDir, { recursive: true, force: true });
   });
 
-  it('returns empty record when refs.json does not exist', async () => {
-    const refs = await readRefs(join(tmpDir, 'refs.json'));
-    expect(refs).toEqual({});
+  it('creates ref file with correct JSON', async () => {
+    await writeRef(refsDir, 'staging', ENTRY_A);
+    const content = JSON.parse(await readFile(join(refsDir, 'staging.json'), 'utf-8'));
+    expect(content).toEqual({ hash: HASH_A, invariants: [] });
   });
 
-  it('reads valid refs.json', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
-    await writeFile(refsPath, JSON.stringify({ staging: HASH_A, production: HASH_B }));
-    const refs = await readRefs(refsPath);
-    expect(refs).toEqual({ staging: HASH_A, production: HASH_B });
+  it('creates ref file with invariants', async () => {
+    await writeRef(refsDir, 'production', ENTRY_B);
+    const content = JSON.parse(await readFile(join(refsDir, 'production.json'), 'utf-8'));
+    expect(content).toEqual({ hash: HASH_B, invariants: ['split-user-name'] });
   });
 
-  it('throws on malformed JSON', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
-    await writeFile(refsPath, '{not valid json');
+  it('creates parent directories for slashed names', async () => {
+    await writeRef(refsDir, 'envs/staging', ENTRY_A);
+    const content = JSON.parse(await readFile(join(refsDir, 'envs', 'staging.json'), 'utf-8'));
+    expect(content).toEqual({ hash: HASH_A, invariants: [] });
+  });
+
+  it('creates deeply nested directories for multi-segment names', async () => {
+    await writeRef(refsDir, 'team/backend/prod', ENTRY_B);
+    const content = JSON.parse(
+      await readFile(join(refsDir, 'team', 'backend', 'prod.json'), 'utf-8'),
+    );
+    expect(content).toEqual({ hash: HASH_B, invariants: ['split-user-name'] });
+  });
+
+  it('overwrites existing ref file', async () => {
+    await writeRef(refsDir, 'staging', ENTRY_A);
+    await writeRef(refsDir, 'staging', ENTRY_B);
+    const content = JSON.parse(await readFile(join(refsDir, 'staging.json'), 'utf-8'));
+    expect(content).toEqual({ hash: HASH_B, invariants: ['split-user-name'] });
+  });
+
+  it('rejects invalid ref names', async () => {
     try {
-      await readRefs(refsPath);
-      expect.fail('expected error');
-    } catch (e) {
-      expect(MigrationToolsError.is(e)).toBe(true);
-      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REFS');
-    }
-  });
-
-  it('throws when refs.json contains non-string values', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
-    await writeFile(refsPath, JSON.stringify({ staging: 123 }));
-    try {
-      await readRefs(refsPath);
-      expect.fail('expected error');
-    } catch (e) {
-      expect(MigrationToolsError.is(e)).toBe(true);
-      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REFS');
-    }
-  });
-
-  it('throws when refs.json contains invalid hash values', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
-    await writeFile(refsPath, JSON.stringify({ staging: 'not-a-hash' }));
-    try {
-      await readRefs(refsPath);
-      expect.fail('expected error');
-    } catch (e) {
-      expect(MigrationToolsError.is(e)).toBe(true);
-      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REFS');
-    }
-  });
-
-  it('throws when refs.json contains invalid ref names', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
-    await writeFile(refsPath, JSON.stringify({ '../escape': HASH_A }));
-    try {
-      await readRefs(refsPath);
-      expect.fail('expected error');
-    } catch (e) {
-      expect(MigrationToolsError.is(e)).toBe(true);
-      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REFS');
-    }
-  });
-});
-
-describe('writeRefs', () => {
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = join(tmpdir(), `test-refs-write-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    await mkdir(tmpDir, { recursive: true });
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it('writes refs.json with sorted keys', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
-    await writeRefs(refsPath, { production: HASH_B, staging: HASH_A });
-    const content = JSON.parse(await readFile(refsPath, 'utf-8'));
-    expect(content).toEqual({ production: HASH_B, staging: HASH_A });
-    const raw = await readFile(refsPath, 'utf-8');
-    const keys = Object.keys(JSON.parse(raw));
-    expect(keys).toEqual(['production', 'staging']);
-  });
-
-  it('creates parent directory if missing', async () => {
-    const refsPath = join(tmpDir, 'nested', 'refs.json');
-    await writeRefs(refsPath, { head: HASH_A });
-    const content = JSON.parse(await readFile(refsPath, 'utf-8'));
-    expect(content).toEqual({ head: HASH_A });
-  });
-
-  it('overwrites existing refs.json', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
-    await writeRefs(refsPath, { old: HASH_A });
-    await writeRefs(refsPath, { new: HASH_B });
-    const content = JSON.parse(await readFile(refsPath, 'utf-8'));
-    expect(content).toEqual({ new: HASH_B });
-  });
-
-  it('writes empty object when no refs', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
-    await writeRefs(refsPath, {});
-    const content = JSON.parse(await readFile(refsPath, 'utf-8'));
-    expect(content).toEqual({});
-  });
-
-  it('rejects invalid ref names on write', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
-    try {
-      await writeRefs(refsPath, { '../escape': `sha256:${'a'.repeat(64)}` });
+      await writeRef(refsDir, '../escape', ENTRY_A);
       expect.fail('expected error');
     } catch (e) {
       expect(MigrationToolsError.is(e)).toBe(true);
@@ -222,10 +163,9 @@ describe('writeRefs', () => {
     }
   });
 
-  it('rejects invalid hash values on write', async () => {
-    const refsPath = join(tmpDir, 'refs.json');
+  it('rejects invalid hash values', async () => {
     try {
-      await writeRefs(refsPath, { staging: 'not-a-valid-hash' });
+      await writeRef(refsDir, 'staging', { hash: 'not-a-hash', invariants: [] });
       expect.fail('expected error');
     } catch (e) {
       expect(MigrationToolsError.is(e)).toBe(true);
@@ -234,14 +174,261 @@ describe('writeRefs', () => {
   });
 });
 
+describe('readRef', () => {
+  let refsDir: string;
+
+  beforeEach(async () => {
+    refsDir = join(tmpdir(), `test-refs-read-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    await mkdir(refsDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(refsDir, { recursive: true, force: true });
+  });
+
+  it('reads a valid ref file', async () => {
+    await writeFile(join(refsDir, 'staging.json'), JSON.stringify(ENTRY_A));
+    const entry = await readRef(refsDir, 'staging');
+    expect(entry).toEqual(ENTRY_A);
+  });
+
+  it('reads a ref with invariants', async () => {
+    await writeFile(join(refsDir, 'production.json'), JSON.stringify(ENTRY_B));
+    const entry = await readRef(refsDir, 'production');
+    expect(entry).toEqual(ENTRY_B);
+  });
+
+  it('reads a ref with slashed name', async () => {
+    await mkdir(join(refsDir, 'envs'), { recursive: true });
+    await writeFile(join(refsDir, 'envs', 'staging.json'), JSON.stringify(ENTRY_A));
+    const entry = await readRef(refsDir, 'envs/staging');
+    expect(entry).toEqual(ENTRY_A);
+  });
+
+  it('throws UNKNOWN_REF for non-existent ref', async () => {
+    try {
+      await readRef(refsDir, 'nonexistent');
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      expect((e as MigrationToolsError).code).toBe('MIGRATION.UNKNOWN_REF');
+    }
+  });
+
+  it('throws UNKNOWN_REF when refs directory does not exist', async () => {
+    const missingDir = join(refsDir, 'does-not-exist');
+    try {
+      await readRef(missingDir, 'staging');
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      expect((e as MigrationToolsError).code).toBe('MIGRATION.UNKNOWN_REF');
+    }
+  });
+
+  it('throws INVALID_REF_FILE on malformed JSON', async () => {
+    await writeFile(join(refsDir, 'staging.json'), '{not valid json');
+    try {
+      await readRef(refsDir, 'staging');
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_FILE');
+    }
+  });
+
+  it('throws INVALID_REF_FILE when file has invalid hash', async () => {
+    await writeFile(join(refsDir, 'staging.json'), JSON.stringify({ hash: 'bad', invariants: [] }));
+    try {
+      await readRef(refsDir, 'staging');
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_FILE');
+    }
+  });
+
+  it('throws INVALID_REF_FILE when file is missing invariants', async () => {
+    await writeFile(join(refsDir, 'staging.json'), JSON.stringify({ hash: HASH_A }));
+    try {
+      await readRef(refsDir, 'staging');
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_FILE');
+    }
+  });
+
+  it('throws INVALID_REF_NAME for invalid ref names', async () => {
+    try {
+      await readRef(refsDir, '../escape');
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_NAME');
+    }
+  });
+});
+
+describe('readRefs', () => {
+  let refsDir: string;
+
+  beforeEach(async () => {
+    refsDir = join(
+      tmpdir(),
+      `test-refs-readall-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+  });
+
+  afterEach(async () => {
+    await rm(refsDir, { recursive: true, force: true });
+  });
+
+  it('returns empty record when refs directory does not exist', async () => {
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({});
+  });
+
+  it('returns empty record for empty directory', async () => {
+    await mkdir(refsDir, { recursive: true });
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({});
+  });
+
+  it('reads multiple ref files', async () => {
+    await mkdir(refsDir, { recursive: true });
+    await writeFile(join(refsDir, 'staging.json'), JSON.stringify(ENTRY_A));
+    await writeFile(join(refsDir, 'production.json'), JSON.stringify(ENTRY_B));
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({ staging: ENTRY_A, production: ENTRY_B });
+  });
+
+  it('reconstructs slashed names from subdirectories', async () => {
+    await mkdir(join(refsDir, 'envs'), { recursive: true });
+    await writeFile(join(refsDir, 'envs', 'staging.json'), JSON.stringify(ENTRY_A));
+    await writeFile(join(refsDir, 'envs', 'production.json'), JSON.stringify(ENTRY_B));
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({ 'envs/staging': ENTRY_A, 'envs/production': ENTRY_B });
+  });
+
+  it('reads deeply nested refs', async () => {
+    await mkdir(join(refsDir, 'team', 'backend'), { recursive: true });
+    await writeFile(join(refsDir, 'team', 'backend', 'prod.json'), JSON.stringify(ENTRY_A));
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({ 'team/backend/prod': ENTRY_A });
+  });
+
+  it('mixes top-level and nested refs', async () => {
+    await mkdir(join(refsDir, 'envs'), { recursive: true });
+    await writeFile(join(refsDir, 'head.json'), JSON.stringify(ENTRY_A));
+    await writeFile(join(refsDir, 'envs', 'staging.json'), JSON.stringify(ENTRY_B));
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({ head: ENTRY_A, 'envs/staging': ENTRY_B });
+  });
+
+  it('ignores non-json files', async () => {
+    await mkdir(refsDir, { recursive: true });
+    await writeFile(join(refsDir, 'staging.json'), JSON.stringify(ENTRY_A));
+    await writeFile(join(refsDir, 'README.md'), '# Refs');
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({ staging: ENTRY_A });
+  });
+
+  it('throws INVALID_REF_FILE for malformed file', async () => {
+    await mkdir(refsDir, { recursive: true });
+    await writeFile(join(refsDir, 'staging.json'), '{bad json');
+    try {
+      await readRefs(refsDir);
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_FILE');
+    }
+  });
+});
+
+describe('deleteRef', () => {
+  let refsDir: string;
+
+  beforeEach(async () => {
+    refsDir = join(
+      tmpdir(),
+      `test-refs-delete-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    await mkdir(refsDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(refsDir, { recursive: true, force: true });
+  });
+
+  it('deletes a ref file', async () => {
+    await writeFile(join(refsDir, 'staging.json'), JSON.stringify(ENTRY_A));
+    await deleteRef(refsDir, 'staging');
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({});
+  });
+
+  it('deletes a nested ref and cleans empty parent directories', async () => {
+    await mkdir(join(refsDir, 'envs'), { recursive: true });
+    await writeFile(join(refsDir, 'envs', 'staging.json'), JSON.stringify(ENTRY_A));
+    await deleteRef(refsDir, 'envs/staging');
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({});
+    // The envs/ directory should be cleaned up
+    try {
+      await readFile(join(refsDir, 'envs', 'staging.json'), 'utf-8');
+      expect.fail('file should not exist');
+    } catch (e) {
+      expect((e as NodeJS.ErrnoException).code).toBe('ENOENT');
+    }
+  });
+
+  it('does not delete sibling refs when deleting a nested ref', async () => {
+    await mkdir(join(refsDir, 'envs'), { recursive: true });
+    await writeFile(join(refsDir, 'envs', 'staging.json'), JSON.stringify(ENTRY_A));
+    await writeFile(join(refsDir, 'envs', 'production.json'), JSON.stringify(ENTRY_B));
+    await deleteRef(refsDir, 'envs/staging');
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({ 'envs/production': ENTRY_B });
+  });
+
+  it('throws UNKNOWN_REF for non-existent ref', async () => {
+    try {
+      await deleteRef(refsDir, 'nonexistent');
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      expect((e as MigrationToolsError).code).toBe('MIGRATION.UNKNOWN_REF');
+    }
+  });
+
+  it('throws INVALID_REF_NAME for invalid ref names', async () => {
+    try {
+      await deleteRef(refsDir, '../escape');
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_NAME');
+    }
+  });
+});
+
 describe('resolveRef', () => {
-  it('resolves existing ref to hash', () => {
-    const refs = { staging: HASH_A, production: HASH_B };
-    expect(resolveRef(refs, 'staging')).toBe(HASH_A);
+  it('resolves existing ref to RefEntry', () => {
+    const refs: Refs = { staging: ENTRY_A, production: ENTRY_B };
+    expect(resolveRef(refs, 'staging')).toEqual(ENTRY_A);
+  });
+
+  it('returns entry with invariants', () => {
+    const refs: Refs = { production: ENTRY_B };
+    const entry = resolveRef(refs, 'production');
+    expect(entry.hash).toBe(HASH_B);
+    expect(entry.invariants).toEqual(['split-user-name']);
   });
 
   it('throws for unknown ref name', () => {
-    const refs = { staging: HASH_A };
+    const refs: Refs = { staging: ENTRY_A };
     try {
       resolveRef(refs, 'production');
       expect.fail('expected error');
@@ -252,7 +439,7 @@ describe('resolveRef', () => {
   });
 
   it('throws for invalid ref name', () => {
-    const refs = { staging: `sha256:${'a'.repeat(64)}` };
+    const refs: Refs = { staging: ENTRY_A };
     try {
       resolveRef(refs, '../escape');
       expect.fail('expected error');
@@ -261,15 +448,42 @@ describe('resolveRef', () => {
       expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_NAME');
     }
   });
+});
 
-  it('throws for invalid hash value in resolved ref', () => {
-    const refs = { staging: 'not-a-hash' } as Record<string, string>;
-    try {
-      resolveRef(refs, 'staging');
-      expect.fail('expected error');
-    } catch (e) {
-      expect(MigrationToolsError.is(e)).toBe(true);
-      expect((e as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_VALUE');
-    }
+describe('round-trip', () => {
+  let refsDir: string;
+
+  beforeEach(async () => {
+    refsDir = join(tmpdir(), `test-refs-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  });
+
+  afterEach(async () => {
+    await rm(refsDir, { recursive: true, force: true });
+  });
+
+  it('writeRef then readRef round-trips', async () => {
+    await writeRef(refsDir, 'staging', ENTRY_B);
+    const entry = await readRef(refsDir, 'staging');
+    expect(entry).toEqual(ENTRY_B);
+  });
+
+  it('multiple writeRef then readRefs round-trips', async () => {
+    await writeRef(refsDir, 'staging', ENTRY_A);
+    await writeRef(refsDir, 'production', ENTRY_B);
+    await writeRef(refsDir, 'envs/dev', { hash: HASH_A, invariants: ['seed-countries'] });
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({
+      staging: ENTRY_A,
+      production: ENTRY_B,
+      'envs/dev': { hash: HASH_A, invariants: ['seed-countries'] },
+    });
+  });
+
+  it('writeRef then deleteRef then readRefs', async () => {
+    await writeRef(refsDir, 'staging', ENTRY_A);
+    await writeRef(refsDir, 'production', ENTRY_B);
+    await deleteRef(refsDir, 'staging');
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({ production: ENTRY_B });
   });
 });

@@ -1,0 +1,7 @@
+{
+  "hash": {
+    "hash": "contract-1",
+    "invariants": ["foo", "bar"]
+  },
+  "invariants": []
+}

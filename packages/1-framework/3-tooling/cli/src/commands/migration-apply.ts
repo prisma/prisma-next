@@ -1,6 +1,6 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
-import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
+import { readRef } from '@prisma-next/migration-tools/refs';
 import type { AttestedMigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -110,7 +110,7 @@ async function executeMigrationApplyCommand(
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
+  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -147,8 +147,8 @@ async function executeMigrationApplyCommand(
   if (options.ref) {
     refName = options.ref;
     try {
-      const refs = await readRefs(refsPath);
-      destinationHash = resolveRef(refs, refName);
+      const entry = await readRef(refsDir, refName);
+      destinationHash = entry.hash;
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -389,7 +389,7 @@ export function createMigrationApplyCommand(): Command {
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--ref <name>', 'Target ref name from migrations/refs.json')
+    .option('--ref <name>', 'Target ref name from migrations/refs/')
     .action(async (options: MigrationApplyCommandOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();

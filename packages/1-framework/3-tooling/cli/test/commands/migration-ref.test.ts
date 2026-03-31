@@ -11,7 +11,14 @@ import {
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
-import { readRefs, resolveRef, writeRefs } from '@prisma-next/migration-tools/refs';
+import type { RefEntry } from '@prisma-next/migration-tools/refs';
+import {
+  deleteRef,
+  readRef,
+  readRefs,
+  resolveRef,
+  writeRef,
+} from '@prisma-next/migration-tools/refs';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
@@ -20,6 +27,10 @@ import { describe, expect, it } from 'vitest';
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const HASH_C = `sha256:${'c'.repeat(64)}`;
+
+const ENTRY_A: RefEntry = { hash: HASH_A, invariants: [] };
+const ENTRY_B: RefEntry = { hash: HASH_B, invariants: [] };
+const ENTRY_C: RefEntry = { hash: HASH_C, invariants: [] };
 
 function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
   return {
@@ -93,6 +104,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
   it('resolves ref to target hash for pathfinding', async () => {
     const tempDir = await createTempDir('ref-pathfind');
     const migrationsDir = join(tempDir, 'migrations');
+    const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createTestContract({
@@ -162,51 +174,47 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
       slug: 'add_comment',
     });
 
-    const refsPath = join(migrationsDir, 'refs.json');
-    await writeRefs(refsPath, {
-      staging: HASH_C,
-      production: HASH_B,
-    });
+    await writeRef(refsDir, 'staging', ENTRY_C);
+    await writeRef(refsDir, 'production', ENTRY_B);
 
-    const refs = await readRefs(refsPath);
-    const stagingHash = resolveRef(refs, 'staging');
-    const productionHash = resolveRef(refs, 'production');
+    const stagingEntry = await readRef(refsDir, 'staging');
+    const productionEntry = await readRef(refsDir, 'production');
 
-    expect(stagingHash).toBe(HASH_C);
-    expect(productionHash).toBe(HASH_B);
+    expect(stagingEntry.hash).toBe(HASH_C);
+    expect(productionEntry.hash).toBe(HASH_B);
 
     const packages = await readMigrationsDir(migrationsDir);
     const attested = packages.filter(isAttested);
     const graph = reconstructGraph(attested);
 
-    const pathToStaging = findPath(graph, EMPTY_CONTRACT_HASH, stagingHash);
+    const pathToStaging = findPath(graph, EMPTY_CONTRACT_HASH, stagingEntry.hash);
     expect(pathToStaging).toHaveLength(3);
 
-    const pathToProduction = findPath(graph, EMPTY_CONTRACT_HASH, productionHash);
+    const pathToProduction = findPath(graph, EMPTY_CONTRACT_HASH, productionEntry.hash);
     expect(pathToProduction).toHaveLength(2);
 
-    const pathStagingFromProd = findPath(graph, productionHash, stagingHash);
+    const pathStagingFromProd = findPath(graph, productionEntry.hash, stagingEntry.hash);
     expect(pathStagingFromProd).toHaveLength(1);
   });
 
-  it('apply does not mutate refs.json', async () => {
+  it('apply does not mutate ref files', async () => {
     const tempDir = await createTempDir('ref-readonly');
     const migrationsDir = join(tempDir, 'migrations');
+    const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
 
-    const refsPath = join(migrationsDir, 'refs.json');
-    const originalRefs = { staging: HASH_A, production: HASH_B };
-    await writeRefs(refsPath, originalRefs);
+    await writeRef(refsDir, 'staging', ENTRY_A);
+    await writeRef(refsDir, 'production', ENTRY_B);
 
-    const refs = await readRefs(refsPath);
-    resolveRef(refs, 'staging');
+    const entry = await readRef(refsDir, 'staging');
+    expect(entry.hash).toBe(HASH_A);
 
-    const refsAfter = await readRefs(refsPath);
-    expect(refsAfter).toEqual(originalRefs);
+    const refsAfter = await readRefs(refsDir);
+    expect(refsAfter).toEqual({ staging: ENTRY_A, production: ENTRY_B });
   });
 
   it('reports error for unknown ref', () => {
-    const refs = { staging: HASH_A };
+    const refs = { staging: ENTRY_A };
     expect(() => resolveRef(refs, 'production')).toThrow();
 
     try {
@@ -220,6 +228,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
   it('marker ahead of ref target produces no forward path', async () => {
     const tempDir = await createTempDir('ref-ahead');
     const migrationsDir = join(tempDir, 'migrations');
+    const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createTestContract({
@@ -264,57 +273,55 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
       slug: 'add_post',
     });
 
-    const refsPath = join(migrationsDir, 'refs.json');
-    await writeRefs(refsPath, { production: HASH_A });
+    await writeRef(refsDir, 'production', ENTRY_A);
 
-    const refs = await readRefs(refsPath);
-    const refHash = resolveRef(refs, 'production');
+    const entry = await readRef(refsDir, 'production');
 
     const packages = await readMigrationsDir(migrationsDir);
     const attested = packages.filter(isAttested);
     const graph = reconstructGraph(attested);
 
     const markerHash = HASH_B;
-    const forwardPath = findPath(graph, markerHash, refHash);
+    const forwardPath = findPath(graph, markerHash, entry.hash);
     expect(forwardPath).toBeNull();
 
-    const reversePath = findPath(graph, refHash, markerHash);
+    const reversePath = findPath(graph, entry.hash, markerHash);
     expect(reversePath).toHaveLength(1);
   });
 
-  it('ref CRUD operations with atomic writes', async () => {
+  it('ref CRUD operations with per-file writes', async () => {
     const tempDir = await createTempDir('ref-crud');
     const migrationsDir = join(tempDir, 'migrations');
+    const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
-    const refsPath = join(migrationsDir, 'refs.json');
 
-    let refs = await readRefs(refsPath);
+    let refs = await readRefs(refsDir);
     expect(refs).toEqual({});
 
-    await writeRefs(refsPath, { staging: HASH_A });
-    refs = await readRefs(refsPath);
-    expect(refs).toEqual({ staging: HASH_A });
+    await writeRef(refsDir, 'staging', ENTRY_A);
+    refs = await readRefs(refsDir);
+    expect(refs).toEqual({ staging: ENTRY_A });
 
-    await writeRefs(refsPath, { ...refs, production: HASH_B });
-    refs = await readRefs(refsPath);
-    expect(refs).toEqual({ staging: HASH_A, production: HASH_B });
+    await writeRef(refsDir, 'production', ENTRY_B);
+    refs = await readRefs(refsDir);
+    expect(refs).toEqual({ staging: ENTRY_A, production: ENTRY_B });
 
-    await writeRefs(refsPath, { ...refs, staging: HASH_C });
-    refs = await readRefs(refsPath);
-    expect(refs['staging']).toBe(HASH_C);
+    await writeRef(refsDir, 'staging', ENTRY_C);
+    refs = await readRefs(refsDir);
+    expect(refs['staging']).toEqual(ENTRY_C);
 
-    const { staging: _, ...remaining } = refs;
-    await writeRefs(refsPath, remaining);
-    refs = await readRefs(refsPath);
-    expect(refs).toEqual({ production: HASH_B });
+    await deleteRef(refsDir, 'staging');
+    refs = await readRefs(refsDir);
+    expect(refs).toEqual({ production: ENTRY_B });
 
-    const raw = await readFile(refsPath, 'utf-8');
+    const raw = await readFile(join(refsDir, 'production.json'), 'utf-8');
     expect(() => JSON.parse(raw)).not.toThrow();
   });
 
   it('status reports distance behind ref target', async () => {
     const tempDir = await createTempDir('ref-distance');
     const migrationsDir = join(tempDir, 'migrations');
+    const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createTestContract({
@@ -363,30 +370,30 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const attested = packages.filter(isAttested);
     const graph = reconstructGraph(attested);
 
-    const refsPath = join(migrationsDir, 'refs.json');
-    await writeRefs(refsPath, { production: HASH_B });
+    await writeRef(refsDir, 'production', ENTRY_B);
 
-    const refs = await readRefs(refsPath);
-    const refHash = resolveRef(refs, 'production');
+    const refs = await readRefs(refsDir);
+    const refEntry = resolveRef(refs, 'production');
 
     const markerHash = EMPTY_CONTRACT_HASH;
-    const pathToRef = findPath(graph, markerHash, refHash);
+    const pathToRef = findPath(graph, markerHash, refEntry.hash);
     expect(pathToRef).toHaveLength(2);
 
-    const atTarget = markerHash === refHash;
+    const atTarget = markerHash === refEntry.hash;
     expect(atTarget).toBe(false);
 
     const markerAtA = HASH_A;
-    const pathFromA = findPath(graph, markerAtA, refHash);
+    const pathFromA = findPath(graph, markerAtA, refEntry.hash);
     expect(pathFromA).toHaveLength(1);
 
     const markerAtB = HASH_B;
-    expect(markerAtB === refHash).toBe(true);
+    expect(markerAtB === refEntry.hash).toBe(true);
   });
 
   it('independent applies against different refs produce correct results', async () => {
     const tempDir = await createTempDir('ref-independent');
     const migrationsDir = join(tempDir, 'migrations');
+    const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createTestContract({
@@ -431,24 +438,28 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
       slug: 'add_post',
     });
 
-    const refsPath = join(migrationsDir, 'refs.json');
-    await writeRefs(refsPath, {
-      staging: HASH_B,
-      production: HASH_A,
-    });
+    await writeRef(refsDir, 'staging', { hash: HASH_B, invariants: [] });
+    await writeRef(refsDir, 'production', ENTRY_A);
 
-    const refs = await readRefs(refsPath);
+    const refs = await readRefs(refsDir);
     const packages = await readMigrationsDir(migrationsDir);
     const attested = packages.filter(isAttested);
     const graph = reconstructGraph(attested);
 
-    const stagingPath = findPath(graph, EMPTY_CONTRACT_HASH, resolveRef(refs, 'staging'));
+    const stagingPath = findPath(graph, EMPTY_CONTRACT_HASH, resolveRef(refs, 'staging').hash);
     expect(stagingPath).toHaveLength(2);
 
-    const productionPath = findPath(graph, EMPTY_CONTRACT_HASH, resolveRef(refs, 'production'));
+    const productionPath = findPath(
+      graph,
+      EMPTY_CONTRACT_HASH,
+      resolveRef(refs, 'production').hash,
+    );
     expect(productionPath).toHaveLength(1);
 
-    const refsAfter = await readRefs(refsPath);
-    expect(refsAfter).toEqual({ staging: HASH_B, production: HASH_A });
+    const refsAfter = await readRefs(refsDir);
+    expect(refsAfter).toEqual({
+      staging: { hash: HASH_B, invariants: [] },
+      production: ENTRY_A,
+    });
   });
 });
