@@ -228,6 +228,18 @@ The existing post-apply schema verification (introspect database, compare agains
 
 No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S1 — an ordinary graph edge that can carry its own data migration if needed.
 
+## Applicability to document databases
+
+The data migration mechanism is designed to be the migration surface for document databases (MongoDB, etc.), not just a supplement to SQL DDL.
+
+**Why this works**: The contract in prisma-next represents the *application's* data model, not the database's schema. A document database may be schemaless at the storage layer, but the application domain is never schemaless — there are always expected shapes, types, and relationships. The contract makes this explicit and manageable. When evolving from one contract to another, the operations are semantically equivalent regardless of target: backfill a new field, reshape a document, split a collection, deduplicate records. The *how* differs (SQL UPDATE vs MongoDB `updateMany`), but the *what* and *why* are the same.
+
+**What transfers without modification**: The serialization lifecycle (TS → JSON AST → adapter execution), the `check`/`run` contract, the graph model (edges, invariants, routing), the ledger, the Draft → Attested → Applied lifecycle, retry safety via the check query, and transaction modes (mapping to MongoDB's multi-document transactions with their respective caveats).
+
+**The key difference**: For SQL targets, structural DDL handles most schema evolution and data migrations supplement it. For document databases, schema evolution *is* data transformation — `$set`, `$unset`, `$rename`, aggregation pipeline reshapes. The data migration mechanism becomes the *primary* migration surface, not a secondary one. The three-phase model (phase 1 → data migration → phase 3) still applies as a lifecycle — prepare the environment, do the work, clean up — but the "structural" phases may be lighter or empty for document targets.
+
+**What requires target-specific work**: A MongoDB-flavored query builder client that produces MongoDB-shaped AST nodes (`updateMany`, `aggregate`, `bulkWrite`). This is the adapter's job — the data migration infrastructure is agnostic to what the ASTs look like internally. The JSON AST format has lower impedance mismatch for MongoDB than SQL, since MongoDB operations are natively JSON.
+
 # Key Decisions
 
 These document the major design choices, the alternatives considered, and why we chose this approach. They are most useful after reading the Requirements and Solution sections.
