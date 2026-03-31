@@ -66,6 +66,13 @@
         "$ref": "#/$defs/Source"
       }
     },
+    "roots": {
+      "type": "object",
+      "description": "Mapping of root model names to their identifiers",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "models": {
       "type": "object",
       "description": "Model definitions mapping application-level models to storage tables",
@@ -115,7 +122,15 @@
       "required": ["mutations"]
     }
   },
-  "required": ["schemaVersion", "target", "targetFamily", "storageHash", "models", "storage"],
+  "required": [
+    "schemaVersion",
+    "target",
+    "targetFamily",
+    "storageHash",
+    "models",
+    "storage",
+    "roots"
+  ],
   "$defs": {
     "StorageTable": {
       "type": "object",
@@ -470,6 +485,13 @@
             "table": {
               "type": "string",
               "description": "Table name in storage.tables"
+            },
+            "fields": {
+              "type": "object",
+              "description": "Per-field storage mappings",
+              "additionalProperties": {
+                "$ref": "#/$defs/ModelStorageField"
+              }
             }
           },
           "required": ["table"]
@@ -499,14 +521,33 @@
         "column": {
           "type": "string",
           "description": "Column name in the model's backing table"
+        },
+        "codecId": {
+          "type": "string",
+          "description": "Codec identifier for the field (derived from storage column)"
+        },
+        "nullable": {
+          "type": "boolean",
+          "description": "Whether the field allows NULL values (derived from storage column)"
+        }
+      },
+      "required": ["column"]
+    },
+    "ModelStorageField": {
+      "type": "object",
+      "description": "Per-field storage mapping",
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "type": "string",
+          "description": "Column name in the model's backing table"
         }
       },
       "required": ["column"]
     },
     "ModelRelation": {
       "type": "object",
-      "description": "Model relation definition",
-      "additionalProperties": false,
+      "description": "Model relation definition (domain format with localFields/targetFields, or storage format with parentCols/childCols)",
       "properties": {
         "to": {
           "type": "string",
@@ -517,30 +558,39 @@
           "enum": ["1:1", "1:N", "N:1", "N:M"],
           "description": "Relation cardinality"
         },
+        "strategy": {
+          "type": "string",
+          "enum": ["reference", "embed"],
+          "description": "Relation strategy"
+        },
         "on": {
           "type": "object",
           "description": "Relation field mappings",
-          "additionalProperties": false,
           "properties": {
             "parentCols": {
               "type": "array",
-              "description": "Parent table columns",
-              "items": {
-                "type": "string"
-              }
+              "description": "Parent table columns (storage format)",
+              "items": { "type": "string" }
             },
             "childCols": {
               "type": "array",
-              "description": "Child table columns",
-              "items": {
-                "type": "string"
-              }
+              "description": "Child table columns (storage format)",
+              "items": { "type": "string" }
+            },
+            "localFields": {
+              "type": "array",
+              "description": "Local model fields (domain format)",
+              "items": { "type": "string" }
+            },
+            "targetFields": {
+              "type": "array",
+              "description": "Target model fields (domain format)",
+              "items": { "type": "string" }
             }
-          },
-          "required": ["parentCols", "childCols"]
+          }
         }
       },
-      "required": ["to", "cardinality", "on"]
+      "required": ["to", "cardinality"]
     }
   }
 }

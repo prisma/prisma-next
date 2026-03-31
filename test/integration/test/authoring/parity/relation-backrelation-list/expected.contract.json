@@ -3,30 +3,70 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:7bc2d92b8bd871bb95a1030e0befcb591b9641949fed2263293e9111ca1b90b3",
-  "profileHash": "sha256:1628d322a01cac03524fe340fe22d19882ec5ecf0f71f9a32c6c2dfa648a903a",
+  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
+  "roots": {
+    "Post": "Post",
+    "User": "User"
+  },
   "models": {
     "Post": {
       "fields": {
         "id": {
+          "codecId": "pg/int4@1",
           "column": "id"
         },
         "userId": {
+          "codecId": "pg/int4@1",
           "column": "userId"
         }
       },
-      "relations": {},
+      "relations": {
+        "user": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": ["userId"],
+            "targetFields": ["id"]
+          },
+          "strategy": "reference",
+          "to": "User"
+        }
+      },
       "storage": {
+        "fields": {
+          "id": {
+            "column": "id"
+          },
+          "userId": {
+            "column": "userId"
+          }
+        },
         "table": "post"
       }
     },
     "User": {
       "fields": {
         "id": {
+          "codecId": "pg/int4@1",
           "column": "id"
         }
       },
-      "relations": {},
+      "relations": {
+        "posts": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": ["id"],
+            "targetFields": ["userId"]
+          },
+          "strategy": "reference",
+          "to": "Post"
+        }
+      },
       "storage": {
+        "fields": {
+          "id": {
+            "column": "id"
+          }
+        },
         "table": "user"
       }
     }
@@ -110,8 +150,7 @@
       "returning": true
     },
     "sql": {
-      "enums": true,
-      "returning": true
+      "enums": true
     }
   },
   "extensionPacks": {},
