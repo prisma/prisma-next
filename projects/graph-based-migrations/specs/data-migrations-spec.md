@@ -365,6 +365,7 @@ noTransaction(op)
 - Builders live alongside the planner in the target package (e.g., `packages/3-targets/3-targets/postgres/`), not in the framework tooling package. The planner reuses the same helpers.
 - The `dataTransform` builder is the exception — it produces `DataTransformOperation` (a framework-level type) since data transforms carry serialized query ASTs, not target-specific SQL.
 - The planner uses these same builders to construct its output. When the planner emits TS, it writes calls to these builders in the correct order.
+- **Descriptor resolution goes through `TargetMigrationsCapability`**. The operation descriptors are target-agnostic thin data, but resolving them to `SqlMigrationPlanOperation` (with SQL, prechecks, postchecks) is target-specific work. The CLI is target-agnostic and cannot import directly from a target package like `@prisma-next/target-postgres`. Instead, the target exposes a `resolveDescriptors(descriptors, context)` method on `TargetMigrationsCapability` — the same interface that already provides `createPlanner` and `createRunner`. The CLI loads the config, gets the target, and calls `target.migrations.resolveDescriptors()`. This follows the same pattern as `migration plan` (which calls `target.migrations.createPlanner()`) and `migration apply` (which calls `target.migrations.createRunner()`).
 
 ## Post-apply verification (R11)
 
