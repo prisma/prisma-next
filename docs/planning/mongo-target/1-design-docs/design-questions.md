@@ -318,3 +318,288 @@ Sub-questions:
 - **Runner integration**: The migration runner needs to execute Mongo update commands, not SQL. Does the runner use the same adapter interface the ORM uses, or does it need its own execution path?
 
 For the PoC: Out of scope for the Mongo workstream, but the april-milestone doc already notes the cross-workstream connection: "If the data invariant model from workstream 1 works well, it may become the foundation for document schema evolution." The Mongo workstream should validate that the invariant model's assumptions hold for a schemaless database — the main risk is that "postcondition = query" becomes expensive when you have to sample documents rather than inspect DDL.
+
+---
+
+## 15. Polymorphic associations
+
+ADR 173 covers polymorphic *models* (a model that has specializations via `discriminator`/`variants`/`base`). Polymorphic *associations* are a different concept: a relation that can point to one of several different model types, distinguished by a type discriminator on the relation itself.
+
+Classic example: a `Comment` that can belong to either a `Post` or a `Video`:
+
+```
+Comment → commentable → Post | Video
+```
+
+This is not a polymorphic model — `Comment` is always a `Comment`. It's the *relation target* that varies.
+
+**The question**: How does the contract express a relation that can target one of N models?
+
+### SQL representations
+
+| Pattern | How it works | Trade-offs |
+|---|---|---|
+| **Type + ID pair** (Rails-style) | `commentable_type: string` + `commentable_id: int` | Widely used. No FK constraint possible — the database can't enforce referential integrity across multiple tables. |
+| **Multiple nullable FKs** | `post_id: int?` + `video_id: int?` with a check constraint that exactly one is non-null | FK constraints work. Gets unwieldy with many targets. |
+| **Join table per target** | `comment_posts(comment_id, post_id)` + `comment_videos(comment_id, video_id)` | Clean relational design. More tables, more joins. |
+
+### MongoDB representations
+
+| Pattern | How it works | Trade-offs |
+|---|---|---|
+| **DBRef-like** | `{ ref: ObjectId, refType: "Post" }` | Idiomatic. No database enforcement. |
+| **Convention field** | `commentableId: ObjectId` + `commentableType: "Post" | "Video"` | Same as SQL type+ID pair. |
+
+### Contract considerations
+
+The current relation shape is:
+
+```json
+{
+  "to": "Post", "cardinality": "1:N", "strategy": "reference",
+  "on": { "localFields": ["authorId"], "targetFields": ["id"] }
+}
+```
+
+A polymorphic association would need something like:
+
+```json
+{
+  "commentable": {
+    "cardinality": "N:1",
+    "strategy": "reference",
+    "polymorphic": true,
+    "discriminator": "commentableType",
+    "targets": {
+      "Post": { "on": { "localFields": ["commentableId"], "targetFields": ["id"] } },
+      "Video": { "on": { "localFields": ["commentableId"], "targetFields": ["id"] } }
+    }
+  }
+}
+```
+
+Sub-questions:
+- **Is `polymorphic` a relation-level property, or does this decompose into multiple relations?** An alternative representation: the contract declares separate `commentablePost` and `commentableVideo` relations, and the ORM provides a union accessor `commentable` that dispatches based on `commentableType`. This avoids adding polymorphism to the relation model — the complexity lives in the ORM layer.
+- **How does this interact with `model.relations` vs top-level relations?** If relations are on the model (per ADR 172), the polymorphic association lives on `Comment.relations`.
+- **Type inference**: The ORM's return type for `comment.commentable` must be `Post | Video`. The discriminator field `commentableType` must narrow the type — same pattern as model polymorphism but on a relation.
+- **Referential integrity**: SQL can't enforce FK constraints on type+ID polymorphic associations. Should the contract express this limitation, or is it an implementation detail?
+
+### Relationship to ADR 173
+
+ADR 173's polymorphic models and polymorphic associations are orthogonal concepts — you can have one without the other. But they share the pattern of "discriminated union resolved by a type field." It's worth considering whether a unified mechanism serves both, or whether the concepts are different enough to warrant separate representations.
+
+Not yet designed. Not blocking for April — but should be designed before the contract shape stabilises.
+
+---
+
+## 16. Union field types (mixed-type fields)
+
+A MongoDB document field can hold values of different BSON types — a field `score` might be an `Int32` in some documents and a `String` in others. This is common in untyped or evolving collections.
+
+**The question**: How does the contract represent a field that can hold one of several types?
+
+### The current model
+
+Today, a field has a single `codecId`:
+
+```json
+{ "nullable": false, "codecId": "mongo/int32@1" }
+```
+
+This assumes every value in the field is the same type. For SQL, this is always true (columns are typed). For MongoDB, it's an aspiration — many real-world collections have mixed-type fields, either by design or from schema evolution.
+
+### Where this matters
+
+- **Introspection**: Introspecting an existing MongoDB collection will encounter mixed-type fields. The introspector needs to either pick one type and warn, or represent the union.
+- **Schema evolution**: Migrating a field from `string` to `int` means documents will contain both types until migration completes. The contract should be able to describe this transitional state.
+- **Intentional unions**: Some schemas intentionally use mixed types — a `metadata` field that can be a string or an object, a `value` field that can be a number or a string.
+- **TypeScript type inference**: If a field can be `int | string`, the generated TypeScript type should be `number | string`. The codec layer needs to handle multiple possible BSON types for the same field.
+
+### Options
+
+**A. Array of codec IDs**
+
+```json
+{ "nullable": false, "codecId": ["mongo/int32@1", "mongo/string@1"] }
+```
+
+Simple, but changes `codecId` from `string` to `string | string[]` everywhere it's consumed. Every consumer must handle the array case.
+
+**B. Dedicated union codec**
+
+```json
+{ "nullable": false, "codecId": "mongo/union@1", "codecParams": { "types": ["int32", "string"] } }
+```
+
+Keeps `codecId` as a single string. The union codec is itself parameterised. More complex codec implementation, but the contract field shape doesn't change.
+
+**C. Discriminated field union (inline polymorphism)**
+
+```json
+{
+  "score": {
+    "nullable": false,
+    "union": [
+      { "codecId": "mongo/int32@1" },
+      { "codecId": "mongo/string@1" }
+    ]
+  }
+}
+```
+
+Extends the field shape with a `union` property. Most explicit, but changes the field schema.
+
+### Relationship to polymorphic models
+
+Model-level polymorphism (ADR 173) and field-level unions are different granularities of the same idea: "this location can hold one of several shapes." Model polymorphism uses a discriminator field to distinguish shapes; field unions typically don't have a discriminator (the type is inspected at runtime). This is analogous to TypeScript's discriminated unions vs. plain unions.
+
+### SQL relevance
+
+This applies directly to SQL via `JSON`/`JSONB` columns. A JSON column can hold arbitrary structures, and the content may have mixed types at any level. If the contract represents typed JSON column content (which is a natural extension of the value objects work), the same union question applies. This is not a hypothetical future concern — SQL JSON columns are widely used today, and typed access to their contents is a common request.
+
+Not yet designed. Not blocking for April — the PoC contracts all have single-type fields. But this is a prerequisite for MongoDB introspection, for accurately modeling real-world Mongo collections, and for typed SQL JSON column access.
+
+---
+
+## 17. Many-to-many relationships
+
+Many-to-many (M:N) relationships are common in both SQL and MongoDB, but they're modeled very differently.
+
+**The question**: How does the contract represent M:N relationships, and how does the ORM surface them?
+
+### SQL representations
+
+In SQL, M:N requires a join table:
+
+```
+User ←→ user_roles ←→ Role
+```
+
+The join table (`user_roles`) has foreign keys to both sides. Two 1:N relations compose into one logical M:N. Prisma ORM calls these "implicit many-to-many" (the join table is managed for you) or "explicit many-to-many" (the join table is a model you manage).
+
+| Pattern | How it works | Trade-offs |
+|---|---|---|
+| **Implicit join table** | ORM manages the join table transparently. User sees `user.roles` and `role.users`. | Clean API. Join table has no payload — can't add attributes like `assignedAt` to the relationship. |
+| **Explicit join model** | `UserRole` is a model with `userId`, `roleId`, and optional payload fields. Two 1:N relations. | Flexible — join model can carry data. But the user manages three models instead of a logical two. |
+
+### MongoDB representations
+
+MongoDB has more options because documents can contain arrays:
+
+| Pattern | How it works | Trade-offs |
+|---|---|---|
+| **Array of references** | `User.roleIds: [ObjectId]` — each user stores an array of role IDs | Simple. No join collection. But getting all users for a role requires scanning all users. Bidirectional traversal is expensive unless both sides store arrays. |
+| **Embedded array** | `User.roles: [{ name, permissions }]` — each user embeds the full role data | No joins needed. But denormalised — updating a role means updating every user. |
+| **Join collection** | A `user_roles` collection, same as SQL | Normalised. Needs `$lookup` or multi-query. Less idiomatic for Mongo. |
+
+### Contract considerations
+
+The current relation model has `cardinality: "1:N" | "N:1"`. Adding `"M:N"` is a new cardinality, and it needs to be paired with storage details:
+
+**Option A: M:N as a contract primitive**
+
+```json
+{
+  "roles": {
+    "to": "Role",
+    "cardinality": "M:N",
+    "strategy": "reference",
+    "via": "user_roles"
+  }
+}
+```
+
+The contract expresses the logical M:N. The `via` property names the join table/collection. The ORM manages traversal.
+
+**Option B: M:N decomposes into two 1:N relations**
+
+```json
+"UserRole": {
+  "fields": { "userId": { ... }, "roleId": { ... } },
+  "relations": {
+    "user": { "to": "User", "cardinality": "N:1", ... },
+    "role": { "to": "Role", "cardinality": "N:1", ... }
+  }
+}
+```
+
+No new cardinality. The user explicitly models the join entity. The ORM can provide a convenience accessor (`user.roles`) that traverses `user → userRoles → role`, but the contract only knows about 1:N relations. This is Prisma ORM's "explicit many-to-many" approach.
+
+**Option C: Array-of-references (Mongo-specific)**
+
+For MongoDB, an array of ObjectIds in the parent document is a common M:N pattern without a join collection:
+
+```json
+{
+  "roleIds": { "nullable": false, "codecId": "mongo/array@1" },
+  "roles": {
+    "to": "Role",
+    "cardinality": "M:N",
+    "strategy": "reference",
+    "on": { "localFields": ["roleIds"], "targetFields": ["id"] }
+  }
+}
+```
+
+The relation is backed by an array field on the model, not a join table. This is a Mongo-specific storage detail — the domain relation is still M:N, but the persistence mechanism is different from SQL's join table.
+
+### Sub-questions
+
+- **Implicit vs explicit**: Should the contract support implicit M:N (managed join table) or only explicit (user models the join entity)? Implicit is more ergonomic but hides structure; explicit is more honest but more verbose.
+- **Array-of-references storage**: For Mongo, should M:N via arrays-of-references be a first-class storage strategy, or is it expressed differently?
+- **Join entity payload**: If the relationship itself carries data (e.g., `assignedAt` on a user-role assignment), implicit M:N can't express this. Does the contract need to support both implicit (no payload) and explicit (with payload)?
+- **Bidirectional traversal**: In the array-of-references pattern, only one side stores the array. Traversal from the other side requires a query. Should the contract express both directions, and how does the ORM handle the asymmetry?
+
+Note: the SQL contract currently has no way to record M:N relationships either. Join tables exist in `storage.tables` and the foreign keys are declared, but there's no contract-level concept that says "these two models have an M:N relationship via this join table." The relation model only knows `1:N` / `N:1`. This is a gap for both families, not just Mongo.
+
+Not yet designed. M:N was explicitly deferred for the SQL ORM. Now that we're modeling contract relations across families, it's worth designing — particularly because MongoDB's array-of-references pattern doesn't decompose naturally into two 1:N relations the way SQL's join table does.
+
+---
+
+## 18. Relation `strategy` naming: fact or instruction?
+
+One of the contract's design principles is that it **describes facts, not instructions** (see [10. MongoDB Family](../../../architecture%20docs/subsystems/10.%20MongoDB%20Family.md)). The current relation design uses `"strategy": "reference" | "embed"` to describe how a relation is persisted.
+
+**The question**: Does the word `strategy` violate the facts-not-instructions principle?
+
+### The tension
+
+Compare how other storage facts are stated:
+
+- `"storage": { "table": "users" }` — fact: this model's data lives in the `users` table
+- `"storage": { "collection": "users" }` — fact: this model's data lives in the `users` collection
+- `"nullable": false` — fact: this field does not accept null values
+
+Now: `"strategy": "embed"` — this reads as an instruction ("use the embedding strategy") rather than a fact ("this relation's data is physically co-located in the parent document").
+
+### Is it actually a fact?
+
+Yes — `strategy: "embed"` describes the physical arrangement of data. Address data is nested inside User documents. That's a structural fact about the database, not something the ORM chooses at query time.
+
+The problem is the *name*, not the *concept*. "Strategy" implies a choice being made, not a reality being described. The contract should read as "this is how the data is arranged" rather than "this is how you should arrange the data."
+
+### Alternative names
+
+| Name | Reads as | Example |
+|---|---|---|
+| `strategy` | "use this strategy" (instruction) | `"strategy": "embed"` |
+| `persistence` | "persisted this way" (fact) | `"persistence": "embedded"` |
+| `storage` | "stored this way" (fact) | `"storage": "embedded"` — conflicts with `model.storage` |
+| `placement` | "placed here" (fact) | `"placement": "embedded"` |
+
+Or: drop the explicit property entirely. The fact that Address has `storage: {}` (no table/collection) already implies its data is embedded somewhere. The relation's `on` field describes the join details for references; its absence could signal embedding.
+
+### Derivability
+
+Could `strategy` be derived rather than stated?
+
+- If the target model has a `storage.collection`/`storage.table` → it's a reference (the target has its own storage location)
+- If the target model has `storage: {}` → it's embedded (no independent storage)
+
+This would make embedding a consequence of the target model's storage declaration, not a property on the relation. But it breaks if the same model is embedded in one relation and referenced in another (which we haven't designed but could arise).
+
+### Recommendation
+
+If `strategy` remains, consider renaming to something that reads as descriptive rather than prescriptive. `persistence` is the strongest candidate — it clearly describes the physical arrangement without implying a runtime decision.
+
+This is a naming question, not a structural one — the concept itself (distinguishing embedded from referenced relations) is sound. Worth resolving before the contract shape stabilises.

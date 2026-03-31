@@ -97,8 +97,9 @@ Removes the backward-compatibility shim from `validateContract()` and old fields
 - **3.3** Remove old model field shape (`{ column: string }` without `nullable`/`codecId`) from the type.
 - **3.4** Update `contract.d.ts` emission to reflect the final shape (no old fields).
 - **3.5** Remove old-format JSON support from `normalizeContract()` (if dual-format was added in 1.3.1).
-- **3.6** Update all remaining test fixtures and type tests to reflect the clean types.
-- **3.7** Run full test suite and typecheck.
+- **3.6** Remove the generic `TModels` parameter from `ContractBase`. Once consumers read from domain-level fields and `SqlContract` no longer carries query-builder-specific model types via `M`, simplify `ContractBase` back to a concrete `models: Record<string, DomainModel>`. The generic was introduced to avoid `noPropertyAccessFromIndexSignature` index-signature leakage while `SqlContract`'s `M` still overrides the base `models` type.
+- **3.7** Update all remaining test fixtures and type tests to reflect the clean types.
+- **3.8** Run full test suite and typecheck.
 
 ### Milestone 4: Contract IR alignment
 
@@ -112,6 +113,40 @@ Aligns the internal `ContractIR` representation with the emitted contract JSON s
 - **4.4** Update all IR construction sites: PSL interpreter, TypeScript contract builders (`contract-ts`), and any tooling that produces `ContractIR`.
 - **4.5** Update IR-level tests and validation.
 - **4.6** Run full test suite and typecheck.
+
+### Milestone 5: Emitter generalization
+
+Refactors the `TargetFamilyHook` interface so the framework `emit()` generates domain-level `.d.ts` content and the family hook provides only storage-specific type blocks. Today `sqlTargetFamilyHook.generateContractTypes()` owns the entire `.d.ts` — ~60–70% of which (roots, model domain fields, model relations, imports, hashes, codec types, the template skeleton) is family-agnostic. This means any new family emitter would duplicate all of it. After this milestone, a new family hook only needs to provide storage-specific type generation.
+
+Independent of Milestone 4 (IR alignment) — can be done before or after.
+
+**Tasks:**
+
+#### 5.1 Design the narrower hook interface
+
+- **5.1.1** Audit `sqlTargetFamilyHook` methods and classify each as domain-level (framework) or storage-level (family). Document the split in a short design note.
+- **5.1.2** Design the new `TargetFamilyHook` interface: remove `generateContractTypes()`, add `generateStorageType(storage)`, `generateModelStorageType(model, storage)`, and any other family-specific type generation callbacks needed. Keep `validateTypes()` and `validateStructure()` on the hook.
+
+#### 5.2 Extract domain-level type generation to the framework
+
+- **5.2.1** Move `generateRootsType()` to the framework emitter.
+- **5.2.2** Move model domain field type generation (`generateColumnType()`, the codec → TypeScript type logic, parameterized renderer dispatch) to the framework emitter.
+- **5.2.3** Move model relation type generation (ADR 172 `to`/`cardinality`/`strategy`/`on` serialization) to the framework emitter.
+- **5.2.4** Move import deduplication, hash type aliases, codec/operation type intersections, `DefaultLiteralValue`, `TypeMaps`, and the `.d.ts` template skeleton to the framework emitter.
+- **5.2.5** The framework emitter calls the hook's storage-specific methods to fill in the storage sections, then assembles the complete `.d.ts`.
+
+#### 5.3 Update SQL hook to the narrower interface
+
+- **5.3.1** Implement `generateStorageType(storage)` on the SQL hook (extract from current `generateStorageType` — already a separate method, just needs to conform to the new interface).
+- **5.3.2** Implement `generateModelStorageType(model, storage)` on the SQL hook (field-to-column mapping type generation, extracted from `generateModelsType`).
+- **5.3.3** Remove `generateContractTypes()`, `generateModelsType()`, `generateRootsType()`, `generateRelationsType()`, `generateMappingsType()` from the SQL hook (now framework-owned or obsolete after M3).
+- **5.3.4** Update `serializeValue()` / `serializeObjectKey()` — decide whether these are shared utilities (framework) or hook-specific. Likely framework.
+
+#### 5.4 Regression verification
+
+- **5.4.1** Verify generated `contract.d.ts` is byte-identical (modulo formatting) before and after the refactor, using the demo contract and all 12 parity fixtures.
+- **5.4.2** Run full test suite and typecheck.
+- **5.4.3** Update emitter hook tests to test the new interface methods individually.
 
 ### Close-out
 
@@ -142,6 +177,8 @@ Aligns the internal `ContractIR` representation with the emitted contract JSON s
 | Old field shape removed (Phase 3)                                                                                     | Type test + CI     | 3.3, 3.7       | Compile-time verification                             |
 | `contract.d.ts` reflects final shape (Phase 3)                                                                        | Unit               | 3.4            | Emitter generation tests                              |
 | `ContractIR` mirrors emitted JSON (Phase 4)                                                                           | Unit + Integration | 4.5            | IR tests                                              |
+| `TargetFamilyHook` no longer owns domain-level type generation (Phase 5)                                              | Unit + Regression  | 5.4.1–5.4.3    | Byte-identical `.d.ts` output; updated hook unit tests |
+| New family hook only needs storage-specific methods (Phase 5)                                                          | Interface test     | 5.1.2, 5.3     | Hook interface conformance                            |
 
 
 ## Open Items
