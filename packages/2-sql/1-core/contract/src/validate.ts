@@ -1,10 +1,18 @@
 import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
 import { isTaggedBigInt, isTaggedRaw } from '@prisma-next/contract/types';
+import type { DomainContractShape, DomainModelShape } from '@prisma-next/contract/validate-domain';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { constructContract } from './construct';
 import type { SqlContract, SqlStorage, StorageColumn, StorageTable } from './types';
 import { applyFkDefaults } from './types';
 import { validateSqlContract, validateStorageSemantics } from './validators';
+
+function extractDomainShape(contract: SqlContract<SqlStorage>): DomainContractShape {
+  return {
+    roots: contract.roots,
+    models: contract.models as Record<string, DomainModelShape>,
+  };
+}
 
 function validateContractLogic(contract: SqlContract<SqlStorage>): void {
   const tableNames = new Set(Object.keys(contract.storage.tables));
@@ -336,6 +344,7 @@ function enrichOldFormatModels(
       }
       const targetColToField = targetColumnToField[toModel] ?? {};
 
+      // Old format: parentCols = columns on FK-holding table (local), childCols = columns on referenced table (target)
       const localFields = parentCols.map((c: string) => sourceColToField[c] ?? c);
       const targetFields = childCols.map((c: string) => targetColToField[c] ?? c);
 
@@ -520,13 +529,7 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
 
   const structurallyValid = validateSqlContract<SqlContract<SqlStorage>>(normalized);
 
-  validateContractDomain({
-    roots: structurallyValid.roots as Record<string, string>,
-    models: structurallyValid.models as Record<
-      string,
-      { fields: Record<string, unknown>; relations: Record<string, { to: string }> }
-    >,
-  });
+  validateContractDomain(extractDomainShape(structurallyValid));
 
   validateContractLogic(structurallyValid);
 
