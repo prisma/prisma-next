@@ -1,4 +1,5 @@
 import type { OperationRegistry } from '@prisma-next/operations';
+import type { DomainModel } from './domain-types';
 import type { ContractIR } from './ir';
 
 /**
@@ -59,6 +60,7 @@ export interface ContractBase<
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
   TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
+  TModels extends Record<string, unknown> = Record<string, DomainModel>,
 > {
   readonly schemaVersion: string;
   readonly target: string;
@@ -72,6 +74,7 @@ export interface ContractBase<
   readonly sources: Record<string, Source>;
   readonly execution?: ExecutionSection;
   readonly roots: Record<string, string>;
+  readonly models: TModels;
 }
 
 export interface FieldType {
