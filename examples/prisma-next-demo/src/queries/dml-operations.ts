@@ -6,6 +6,7 @@ export async function insertUser(email: string) {
   return db.sql.user
     .select('id', 'email')
     .where((f, fns) => fns.eq(f.email, email))
+    .limit(1)
     .first();
 }
 
@@ -17,6 +18,7 @@ export async function updateUser(userId: string, newEmail: string) {
   return db.sql.user
     .select('id', 'email')
     .where((f, fns) => fns.eq(f.id, userId))
+    .limit(1)
     .first();
 }
 
@@ -24,6 +26,7 @@ export async function deleteUser(userId: string) {
   const user = await db.sql.user
     .select('id', 'email')
     .where((f, fns) => fns.eq(f.id, userId))
+    .limit(1)
     .first();
   await db.sql.user
     .delete()

@@ -35,11 +35,13 @@ async function main() {
     const alice = await db.sql.user
       .select('id', 'email')
       .where((f, fns) => fns.eq(f.email, 'alice@example.com'))
+      .limit(1)
       .first();
 
     const bob = await db.sql.user
       .select('id', 'email')
       .where((f, fns) => fns.eq(f.email, 'bob@example.com'))
+      .limit(1)
       .first();
 
     if (!alice || !bob) {
