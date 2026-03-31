@@ -20,6 +20,7 @@ export default defineConfig({
         '**/exports/**',
         '**/types.ts',
         'src/index.ts', // Barrel file with only re-exports
+        'src/pack-types.ts', // Pure type definitions, no executable code
       ],
       thresholds: {
         lines: 90,

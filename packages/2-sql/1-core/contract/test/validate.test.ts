@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SqlContract, SqlStorage } from '../src/types';
-import { validateContract } from '../src/validate';
+import { normalizeContract, validateContract } from '../src/validate';
 
 const baseContract = {
   schemaVersion: '1',
@@ -431,7 +431,7 @@ describe('validateContract', () => {
     expect(result.storage.tables.User.indexes).toHaveLength(1);
   });
 
-  it('accepts null mapping buckets by treating them as empty overrides', () => {
+  it('accepts null fieldToColumn/columnToField mapping buckets as empty overrides', () => {
     const contract = makeContract();
     contract.mappings = {
       modelToTable: { User: 'User' },
@@ -441,6 +441,22 @@ describe('validateContract', () => {
     };
 
     const result = validateContract<SqlContract<SqlStorage>>(contract);
+    expect(result.mappings.fieldToColumn).toEqual({});
+    expect(result.mappings.columnToField).toEqual({});
+  });
+
+  it('accepts null modelToTable/tableToModel mapping buckets as empty overrides', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      modelToTable: null as unknown as Record<string, string>,
+      tableToModel: null as unknown as Record<string, string>,
+      fieldToColumn: null as unknown as Record<string, Record<string, string>>,
+      columnToField: null as unknown as Record<string, Record<string, string>>,
+    };
+
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    expect(result.mappings.modelToTable).toEqual({});
+    expect(result.mappings.tableToModel).toEqual({});
     expect(result.mappings.fieldToColumn).toEqual({});
     expect(result.mappings.columnToField).toEqual({});
   });
@@ -985,6 +1001,696 @@ describe('validateContract', () => {
       expect(userFields['email']['codecId']).toBe('pg/text@1');
 
       expect(result.mappings.modelToTable).toEqual({ User: 'user', Post: 'post' });
+    });
+  });
+
+  describe('old format relation to missing model', () => {
+    it('rejects relation targeting non-existent model via domain validation', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'sha256:test',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+        },
+        relations: {
+          user: {
+            posts: {
+              cardinality: '1:N',
+              on: { parentCols: ['id'], childCols: ['user_id'] },
+              to: 'Ghost',
+            },
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      };
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+        /Ghost.*not exist/i,
+      );
+    });
+  });
+
+  describe('storage semantic validation', () => {
+    it('rejects setNull referential action on NOT NULL FK column', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'sha256:test',
+        roots: { User: 'User', Post: 'Post' },
+        models: {
+          User: {
+            storage: { table: 'user', fields: { id: { column: 'id' } } },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {
+              posts: {
+                to: 'Post',
+                cardinality: '1:N',
+                on: { localFields: ['id'], targetFields: ['userId'] },
+              },
+            },
+          },
+          Post: {
+            storage: {
+              table: 'post',
+              fields: { id: { column: 'id' }, userId: { column: 'user_id' } },
+            },
+            fields: {
+              id: { nullable: false, codecId: 'pg/int4@1' },
+              userId: { nullable: false, codecId: 'pg/int4@1' },
+            },
+            relations: {
+              author: {
+                to: 'User',
+                cardinality: 'N:1',
+                on: { localFields: ['userId'], targetFields: ['id'] },
+              },
+            },
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            post: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  columns: ['user_id'],
+                  references: { table: 'user', columns: ['id'] },
+                  onDelete: 'setNull',
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            },
+          },
+        },
+      };
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+        /semantic.*setNull.*user_id.*NOT NULL/i,
+      );
+    });
+  });
+
+  describe('enrichNewFormatModels edge cases (via normalizeContract)', () => {
+    it('handles model without storage.table (skips relation derivation)', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {},
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      expect(models['User']).toBeDefined();
+    });
+
+    it('handles model with empty fields', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: {},
+            relations: {},
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      expect(models['User']).toBeDefined();
+    });
+
+    it('handles field without storage.fields entry (no column mapping)', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {},
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      const fields = models['User']['fields'] as Record<string, Record<string, unknown>>;
+      expect(fields['id']['codecId']).toBe('pg/int4@1');
+    });
+
+    it('handles relation without on clause (skips top-level relation derivation)', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {
+              posts: { to: 'Post', cardinality: '1:N' },
+            },
+          },
+          Post: {
+            storage: { table: 'post' },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {},
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const relations = result['relations'] as Record<string, Record<string, unknown>>;
+      expect(relations['user']).toBeUndefined();
+    });
+
+    it('handles relation target model without table mapping', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user', fields: { id: { column: 'id' } } },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {
+              tags: {
+                to: 'Tag',
+                cardinality: '1:N',
+                on: { localFields: ['id'], targetFields: ['userId'] },
+              },
+            },
+          },
+          Tag: {
+            fields: { userId: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {},
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const relations = result['relations'] as Record<string, Record<string, unknown>>;
+      const userRels = relations['user'] as Record<string, Record<string, unknown>> | undefined;
+      expect(userRels?.['tags']).toBeUndefined();
+    });
+
+    it('handles model without relations property', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      expect(models['User']['relations']).toEqual({});
+    });
+
+    it('handles model without fields property in multi-model contract', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user', fields: { id: { column: 'id' } } },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {},
+          },
+          Metadata: {
+            storage: { table: 'metadata' },
+            relations: {},
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      expect(models['Metadata']['fields']).toEqual({});
+    });
+
+    it('handles relation to model without fields and with on missing localFields/targetFields', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user', fields: { id: { column: 'id' } } },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {
+              meta: {
+                to: 'Metadata',
+                cardinality: '1:1',
+                on: {},
+              },
+            },
+          },
+          Metadata: {
+            storage: { table: 'metadata' },
+            relations: {},
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const relations = result['relations'] as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      expect(relations['user']['meta']['on']).toEqual({
+        parentCols: [],
+        childCols: [],
+      });
+    });
+
+    it('falls back to field names when storage.fields lacks column mapping', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {
+              posts: {
+                to: 'Post',
+                cardinality: '1:N',
+                on: { localFields: ['id'], targetFields: ['postId'] },
+              },
+            },
+          },
+          Post: {
+            storage: { table: 'post' },
+            fields: { postId: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {},
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const relations = result['relations'] as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      expect(relations['user']['posts']['on']).toEqual({
+        parentCols: ['id'],
+        childCols: ['postId'],
+      });
+    });
+
+    it('derives top-level relations with column-resolved on clauses', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        roots: { User: 'User', Post: 'Post' },
+        models: {
+          User: {
+            storage: { table: 'user', fields: { id: { column: 'id' } } },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {
+              posts: {
+                to: 'Post',
+                cardinality: '1:N',
+                on: { localFields: ['id'], targetFields: ['userId'] },
+              },
+            },
+          },
+          Post: {
+            storage: {
+              table: 'post',
+              fields: { id: { column: 'id' }, userId: { column: 'user_id' } },
+            },
+            fields: {
+              id: { nullable: false, codecId: 'pg/int4@1' },
+              userId: { nullable: false, codecId: 'pg/int4@1' },
+            },
+            relations: {
+              author: {
+                to: 'User',
+                cardinality: 'N:1',
+                on: { localFields: ['userId'], targetFields: ['id'] },
+              },
+            },
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const relations = result['relations'] as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      expect(relations['user']['posts']['to']).toBe('Post');
+      expect(relations['user']['posts']['on']).toEqual({
+        parentCols: ['id'],
+        childCols: ['user_id'],
+      });
+      expect(relations['post']['author']['to']).toBe('User');
+      expect(relations['post']['author']['on']).toEqual({
+        parentCols: ['user_id'],
+        childCols: ['id'],
+      });
+    });
+  });
+
+  describe('normalizeContract edge cases', () => {
+    it('passes through contract with no models field', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        storage: { tables: {} },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      expect(result['models']).toEqual({});
+      expect(result['roots']).toEqual({});
+    });
+
+    it('handles new-format contract without explicit roots', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'sha256:test',
+        models: {
+          User: {
+            storage: { table: 'user', fields: { id: { column: 'id' } } },
+            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            relations: {},
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      };
+
+      const result = validateContract<SqlContract<SqlStorage>>(contract);
+      expect(result.roots).toEqual({});
+    });
+  });
+
+  describe('enrichOldFormatModels edge cases (via normalizeContract)', () => {
+    it('handles old-format model without storage (no table mapping)', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+        },
+        storage: { tables: {} },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const roots = result['roots'] as Record<string, string>;
+      expect(roots['User']).toBeUndefined();
+    });
+
+    it('handles old-format model without fields or relations properties', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+          },
+        },
+        storage: { tables: {} },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      expect(models['User']['fields']).toEqual({});
+      expect(models['User']['relations']).toEqual({});
+    });
+
+    it('handles top-level relation for unknown table (no tableToModel match)', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+        },
+        relations: {
+          ghost_table: {
+            someRel: {
+              to: 'User',
+              cardinality: '1:N',
+              on: { parentCols: ['id'], childCols: ['id'] },
+            },
+          },
+        },
+        storage: { tables: {} },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      const userRels = models['User']['relations'] as Record<string, unknown>;
+      expect(userRels['someRel']).toBeUndefined();
+    });
+
+    it('handles old-format relation without on clause', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+          Post: {
+            storage: { table: 'post' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+        },
+        relations: {
+          user: {
+            posts: { to: 'Post', cardinality: '1:N' },
+          },
+        },
+        storage: { tables: {} },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      const userRels = models['User']['relations'] as Record<string, unknown>;
+      expect(userRels['posts']).toBeDefined();
+      const postsRel = userRels['posts'] as Record<string, unknown>;
+      expect(postsRel['on']).toEqual({ localFields: [], targetFields: [] });
+    });
+
+    it('falls back to column name when sourceColToField has no match', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+          Post: {
+            storage: { table: 'post' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+        },
+        relations: {
+          post: {
+            author: {
+              to: 'User',
+              cardinality: 'N:1',
+              on: { parentCols: ['unknown_col'], childCols: ['also_unknown'] },
+            },
+          },
+        },
+        storage: { tables: {} },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      const postRels = models['Post']['relations'] as Record<string, Record<string, unknown>>;
+      expect(postRels['author']['on']).toEqual({
+        localFields: ['unknown_col'],
+        targetFields: ['also_unknown'],
+      });
+    });
+
+    it('caches targetColumnToField on repeated relations to same model', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+          Post: {
+            storage: { table: 'post' },
+            fields: { id: { column: 'id' }, userId: { column: 'user_id' } },
+            relations: {},
+          },
+        },
+        relations: {
+          post: {
+            author: {
+              to: 'User',
+              cardinality: 'N:1',
+              on: { parentCols: ['user_id'], childCols: ['id'] },
+            },
+            updater: {
+              to: 'User',
+              cardinality: 'N:1',
+              on: { parentCols: ['user_id'], childCols: ['id'] },
+            },
+          },
+        },
+        storage: { tables: {} },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const models = result['models'] as Record<string, Record<string, unknown>>;
+      const postRels = models['Post']['relations'] as Record<string, Record<string, unknown>>;
+      expect(postRels['author']).toBeDefined();
+      expect(postRels['updater']).toBeDefined();
+    });
+  });
+
+  describe('detectFormat edge cases (via normalizeContract)', () => {
+    it('detects old format when model has no fields property', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: { storage: { table: 'user' } },
+        },
+        storage: { tables: {} },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      expect(result['roots']).toBeDefined();
+    });
+
+    it('detects old format when fields have neither column nor codecId', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { nullable: false } },
+          },
+        },
+        storage: { tables: {} },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      expect(result['roots']).toBeDefined();
+    });
+  });
+
+  describe('normalizeStorage edge cases (via normalizeContract)', () => {
+    it('handles table without columns property', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+        },
+        storage: {
+          tables: {
+            user: { primaryKey: { columns: ['id'] } },
+          },
+        },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const storage = result['storage'] as Record<string, unknown>;
+      const tables = storage['tables'] as Record<string, Record<string, unknown>>;
+      expect(tables['user']).toBeDefined();
     });
   });
 });
