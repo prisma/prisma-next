@@ -254,6 +254,18 @@ The full chain:
 | **Migration system** | Creates/alters the column to be JSONB |
 | **Database** | Enforces the column type at write time |
 
+### 7. Value object support is capability-gated
+
+Value objects in SQL require JSON-compatible columns (e.g., `jsonb`). Not all SQL targets support this. This makes value objects the first domain-level contract concept whose availability depends on a target capability.
+
+The constraint is **enforced at the storage level**: if the target can't produce a JSON-compatible column, the emitter can't generate valid storage for a value object field — emission fails. There's no way to describe a column capable of storing a value object without JSON support, so the failure is natural and unavoidable.
+
+The constraint is **surfaced at the authoring level** via a declared capability: the target declares a capability (e.g., `valueObject` or `structuredColumns`), and the authoring surface (PSL parser, TS contract builder) checks it upfront. If the capability is absent, the user gets a clear error ("your target doesn't support value objects") before they write an entire schema that can't be emitted.
+
+For Mongo, this isn't an issue — subdocuments are always available. No capability check needed.
+
+This follows the existing pattern: capabilities are checked early by authoring surfaces for good UX, and enforced at emission/validation as a safety net.
+
 ## Open design questions
 
 ### 2. Querying through value objects
