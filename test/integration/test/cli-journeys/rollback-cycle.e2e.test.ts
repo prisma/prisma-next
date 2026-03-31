@@ -3,7 +3,7 @@
  *
  * Tests cycle-safe shortest-path resolution after a rollback migration
  * creates a cycle in the migration graph (C1 → C2 → C1). Without --from,
- * findLeaf fails with NO_RESOLVABLE_LEAF. Using --from bypasses the cycle
+ * findLeaf fails with NO_TARGET. Using --from bypasses the cycle
  * and produces a valid migration path.
  */
 
@@ -73,8 +73,8 @@ withTempDir(({ createTempDir }) => {
         const planFail = await runMigrationPlan(ctx, ['--name', 'add-bio']);
         expect(planFail.exitCode, 'J.04: plan without --from fails').toBe(1);
         const failOutput = stripAnsi(planFail.stdout);
-        expect(failOutput, 'J.04: error mentions no resolvable leaf').toMatch(
-          /no.*resolvable.*leaf|cycle|NO_RESOLVABLE_LEAF/i,
+        expect(failOutput, 'J.04: error mentions no target').toMatch(
+          /no.*target.*resolved|cycle|NO_TARGET/i,
         );
 
         // J.05: plan with --from C1 recovers

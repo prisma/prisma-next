@@ -1,13 +1,13 @@
 # @prisma-next/migration-tools
 
-On-disk migration persistence, attestation, and chain reconstruction for Prisma Next.
+On-disk migration persistence, attestation, and history reconstruction for Prisma Next.
 
 ## Responsibilities
 
 - **Types**: Define the on-disk migration format (`MigrationManifest`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`)
 - **I/O**: Read and write migration packages to/from disk (`migration.json` + `ops.json`)
 - **Attestation**: Compute and verify content-addressed migration IDs for tamper detection
-- **Chain reconstruction**: Reconstruct and navigate migration history (path finding, latest migration detection, cycle/orphan detection)
+- **History reconstruction**: Reconstruct and navigate migration history (path finding, latest migration detection, cycle/orphan detection)
 
 ## Attestation framing
 
@@ -34,13 +34,13 @@ Full semantic validation happens in target/family migration planners and runners
 graph TD
     CLI["CLI commands<br/>(migration plan, apply, verify, show, status)"] --> IO["io.ts<br/>File I/O"]
     CLI --> ATT["attestation.ts<br/>Migration attestation"]
-    CLI --> DAG["dag.ts<br/>Chain operations"]
+    CLI --> GRAPH["dag.ts<br/>Graph operations"]
     IO --> TYPES["types.ts<br/>MigrationManifest, etc."]
     ATT --> IO
     ATT --> CAN["canonicalize-json.ts"]
     ATT --> CP["@prisma-next/core-control-plane<br/>canonicalizeContract"]
-    DAG --> TYPES
-    DAG --> ABS["@prisma-next/core-control-plane<br/>EMPTY_CONTRACT_HASH"]
+    GRAPH --> TYPES
+    GRAPH --> ABS["@prisma-next/core-control-plane<br/>EMPTY_CONTRACT_HASH"]
 ```
 
 ## Dependencies

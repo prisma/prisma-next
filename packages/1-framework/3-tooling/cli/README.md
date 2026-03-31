@@ -925,7 +925,7 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 **Options:**
 - `--config <path>`: Path to `prisma-next.config.ts`
 - `--name <slug>`: Name slug for the migration directory (default: `migration`)
-- `--from <hash>`: Explicit starting contract hash (overrides latest chain leaf detection)
+- `--from <hash>`: Explicit starting contract hash (overrides latest migration target detection)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
@@ -933,11 +933,11 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 **What it does:**
 1. Loads config and reads `contract.json` (the "to" contract)
 2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
-3. Determines the starting point: `--from <hash>` if provided, otherwise the graph leaf (latest migration)
+3. Determines the starting point: `--from <hash>` if provided, otherwise the latest migration target
 4. Diffs the starting contract against the new contract using the target's migration planner
 5. Writes a new migration package (`migration.json` + `ops.json`) and attests the `migrationId`
 
-**Branching with `--from`:** Use `--from` to create a migration edge from a specific contract hash instead of the graph leaf. This enables branched migration graphs where multiple environments diverge from a common ancestor.
+**Branching with `--from`:** Use `--from` to create a migration edge from a specific contract hash instead of the latest migration target. This enables branched migration graphs where multiple environments diverge from a common ancestor.
 
 ### `prisma-next migration show`
 
@@ -957,7 +957,7 @@ prisma-next migration show [target] [--config <path>] [--json] [-v] [-q] [--colo
 **What it does:**
 1. If `target` is a path (contains `/` or `\`), reads that directory directly
 2. If `target` is a hash prefix, scans all attested migrations and matches against `migrationId`
-3. If no target, defaults to the latest migration (chain leaf)
+3. If no target, defaults to the latest migration
 4. Displays operations with operation class badges, destructive warnings, and DDL preview
 
 **Destructive warnings:** When a migration contains destructive operations (e.g., `DROP TABLE`, `ALTER COLUMN TYPE`), the output includes a prominent `⚠` warning about potential data loss.
@@ -991,7 +991,7 @@ prisma-next migration status [--db <url>] [--ref <name>] [--config <path>] [--js
 6. Shows operation summaries with destructive operation highlighting
 7. In `--ref` mode, the `CONTRACT.AHEAD` warning is suppressed — contract being ahead of a ref target is expected in multi-environment workflows
 
-**Branched graphs:** When the migration graph has multiple leaves (divergence), status reports an `AMBIGUOUS_LEAF` error with the divergence point and branch details. Use `--ref` to target a specific branch.
+**Branched graphs:** When the migration graph has multiple branches (divergence), status reports an `AMBIGUOUS_TARGET` error with the divergence point and branch details. Use `--ref` to target a specific branch.
 
 ### `prisma-next migration apply`
 
@@ -1240,7 +1240,7 @@ export default defineConfig({
 - **`commander`**: CLI argument parsing and command routing
 - **`esbuild`**: Bundling TypeScript contract files with import allowlisting
 - **`@prisma-next/emitter`**: Contract emission engine (returns strings)
-- **`@prisma-next/migration-tools`**: On-disk migration I/O, attestation, and chain reconstruction
+- **`@prisma-next/migration-tools`**: On-disk migration I/O, attestation, and history reconstruction
 - **`@prisma-next/core-control-plane`**: Config types, migration operation types, error types, control plane stack
 
 ## Design Decisions
