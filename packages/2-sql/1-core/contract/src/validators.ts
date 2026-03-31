@@ -155,6 +155,7 @@ const ModelSchema = type({
   'discriminator?': 'unknown',
   'variants?': 'unknown',
   'base?': 'string',
+  'owner?': 'string',
 });
 
 const MappingsSchema = type({

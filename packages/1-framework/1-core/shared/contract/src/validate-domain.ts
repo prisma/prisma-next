@@ -86,7 +86,7 @@ function validateVariantsAndBases(
       }
       const baseModel = contract.models[model.base];
       if (!baseModel) continue;
-      if (!baseModel.variants || !(modelName in baseModel.variants)) {
+      if (!baseModel.variants || !Object.hasOwn(baseModel.variants, modelName)) {
         errors.push(
           `Model "${modelName}" has base "${model.base}" which does not list it as a variant`,
         );
@@ -117,7 +117,7 @@ function validateDiscriminators(contract: DomainContractShape, errors: string[])
       if (!model.variants || Object.keys(model.variants).length === 0) {
         errors.push(`Model "${modelName}" has discriminator but no variants`);
       }
-      if (!(model.discriminator.field in model.fields)) {
+      if (!Object.hasOwn(model.fields, model.discriminator.field)) {
         errors.push(
           `Discriminator field "${model.discriminator.field}" is not a field on model "${modelName}"`,
         );
