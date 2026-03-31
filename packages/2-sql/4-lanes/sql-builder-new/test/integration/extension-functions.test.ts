@@ -4,24 +4,24 @@ import { collect, setupIntegrationTest } from './setup';
 describe('integration: extension functions', () => {
   const { db } = setupIntegrationTest();
 
-  it('cosineDistance computes similarity for identical vectors', async () => {
+  it('cosineDistance computes distance for identical vectors', async () => {
     const row = await db()
       .posts.select('id')
-      .select('similarity', (f, fns) => fns.cosineDistance(f.embedding, [1, 0, 0]))
+      .select('distance', (f, fns) => fns.cosineDistance(f.embedding, [1, 0, 0]))
       .where((f, fns) => fns.eq(f.id, 1))
       .first();
     expect(row).not.toBeNull();
-    // template: 1 - (self <=> arg0), identical vectors → 1 - 0 = 1
-    expect(row!.similarity).toBeCloseTo(1, 5);
+    // template: self <=> arg0, identical vectors → distance = 0
+    expect(row!.distance).toBeCloseTo(0, 5);
   });
 
   it('cosineDistance filters in WHERE', async () => {
-    // post 1 has embedding [1,0,0] → similarity to [1,0,0] is 1.0
-    // post 3 has embedding [0,0,1] → similarity to [1,0,0] is ~0 (orthogonal)
+    // post 1 has embedding [1,0,0] → distance to [1,0,0] is 0.0
+    // post 3 has embedding [0,0,1] → distance to [1,0,0] is ~1 (orthogonal)
     const rows = await collect(
       db()
         .posts.select('id')
-        .where((f, fns) => fns.gt(fns.cosineDistance(f.embedding, [1, 0, 0]), 0.5))
+        .where((f, fns) => fns.lt(fns.cosineDistance(f.embedding, [1, 0, 0]), 0.5))
         .all(),
     );
     expect(rows.length).toBeGreaterThan(0);

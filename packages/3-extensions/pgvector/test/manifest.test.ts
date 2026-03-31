@@ -44,7 +44,7 @@ describe('pgvector descriptor', () => {
     expect(cosineDistanceOp?.lowering).toEqual({
       targetFamily: 'sql',
       strategy: 'function',
-      template: '1 - ({{self}} <=> {{arg0}})',
+      template: '{{self}} <=> {{arg0}}',
     });
   });
 

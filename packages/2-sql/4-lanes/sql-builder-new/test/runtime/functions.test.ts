@@ -266,7 +266,7 @@ describe('extension functions', () => {
         lowering: {
           targetFamily: 'sql' as const,
           strategy: 'function' as const,
-          template: '1 - ({{self}} <=> {{arg0}})',
+          template: '{{self}} <=> {{arg0}}',
         },
       },
     };
