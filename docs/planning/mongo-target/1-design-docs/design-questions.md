@@ -319,18 +319,71 @@ For the PoC: Out of scope. But the architecture should anticipate that MongoDB's
 
 ---
 
-## 13. Client-side field-level encryption (CSFLE) and queryable encryption
+## 13. Client-side field-level encryption (CSFLE) and queryable encryption *(partially resolved — contract placement decided)*
 
 MongoDB offers client-side field-level encryption (CSFLE) and queryable encryption (QE) — features that encrypt sensitive fields before they leave the application, so the database server never sees plaintext values.
 
 **The question**: How does PN surface encryption configuration for MongoDB?
 
-The MongoDB team rates this as **Medium priority**. It's a driver-level concern — the `mongodb` Node.js driver handles encryption/decryption transparently when configured. PN's involvement would be:
-- **Contract-level**: Declaring which fields are encrypted and their encryption metadata (key ID, algorithm, query type for QE).
-- **Adapter-level**: Passing encryption configuration to the MongoDB driver when establishing connections.
-- **ORM-level**: Ensuring that encrypted fields participate correctly in queries (QE allows equality queries on encrypted data; CSFLE does not).
+The MongoDB team rates this as **Medium priority**. It's a driver-level concern — the `mongodb` Node.js driver handles encryption/decryption transparently when configured.
 
-For the PoC: Out of scope. This is a production-readiness concern, not an architecture validation concern. But worth noting because it has no SQL equivalent — SQL databases handle encryption at the storage layer (TDE) or connection layer (TLS), not at the field level.
+### Where encryption configuration lives
+
+Encryption configuration belongs in the contract's **execution section**, not in `models` (domain) or `storage`. Encryption is about *how the runtime interacts with data* — the driver encrypts on write and decrypts on read — not about what the data model is or where data is stored. This is the same reasoning that places read validation policy in the execution section ([Q5](#5-schema-validation-and-read-time-guarantees)).
+
+The contract carries encryption *policy* (which fields, which algorithm, key references), not key material (which is a secret):
+
+```json
+"execution": {
+  "encryption": {
+    "keyVaultNamespace": "encryption.__keyVault",
+    "fields": {
+      "User.ssn": {
+        "keyAltName": "ssn-key",
+        "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+      },
+      "User.medicalRecords": {
+        "keyAltName": "medical-key",
+        "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+      }
+    }
+  }
+}
+```
+
+The adapter reads this at connection time and passes it to the driver's `AutoEncryptionOpts`. Actual key material is resolved from the key vault at runtime — never stored in the contract.
+
+### Algorithm choice affects queryability
+
+This is the most interesting architectural implication: **encryption algorithm determines which query operators are available on a field.**
+
+- **Deterministic encryption**: produces the same ciphertext for the same plaintext. Supports equality queries (`eq`, `neq`). Does NOT support ordering, range queries, or text operations.
+- **Random encryption**: produces different ciphertext each time. Supports NO queries at all — the field is write-only from a query perspective.
+- **Queryable Encryption (QE, MongoDB 6.0+)**: supports equality queries and (in newer versions) range queries on encrypted data, via server-side encrypted indexes.
+
+This maps directly to the codec trait system ([ADR 170](../../../architecture%20docs/adrs/ADR%20170%20-%20Codec%20trait%20system.md)). An encrypted field's effective traits are the *intersection* of its codec's declared traits and the traits permitted by its encryption algorithm:
+
+| Algorithm | Effective traits |
+|---|---|
+| **Deterministic** | `equality` only (regardless of codec's declared traits) |
+| **Random** | none (field is not queryable) |
+| **QE equality** | `equality` only |
+| **QE range** | `equality`, `order` |
+
+A `mongo/string@1` field normally has `equality`, `order`, `textual` traits. If encrypted with `Random`, it has *none*. If encrypted with `Deterministic`, it has only `equality`. The query builder must respect this — `u.ssn.eq("123-45-6789")` works for deterministic encryption, but `u.ssn.like("123%")` is a type error.
+
+This means the contract's execution section has type-level implications that feed back into the query builder. The emitter would need to emit adjusted traits in `contract.d.ts` that account for encryption, or the query builder needs to intersect codec traits with encryption constraints at build time.
+
+### PN's involvement (summary)
+
+- **Contract-level** (`execution.encryption`): Declares which fields are encrypted, with which algorithm and key references.
+- **Adapter-level**: Passes encryption configuration to the MongoDB driver's `AutoEncryptionOpts` at connection time.
+- **Type-level**: Adjusts field traits based on encryption algorithm — restricts available query operators. A field encrypted with `Random` offers no query methods; `Deterministic` offers only equality.
+- **ORM-level**: Ensures the query builder respects encryption-constrained traits.
+
+For the PoC: Out of scope for implementation, but the architectural insight about trait intersection is worth recording — it validates that the trait system is the right mechanism for gating operators, even for concerns beyond data types.
+
+See also: [mongo-schema-migrations.md](mongo-schema-migrations.md) — CSFLE is client-side configuration, not a migration concern.
 
 ---
 
