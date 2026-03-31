@@ -10,7 +10,189 @@ Data migrations solve this by allowing users to attach executable code to graph 
 
 The primary user is a backend developer who knows SQL but doesn't think about migration theory. They want to describe what should happen and have the system handle safety. The system should detect when data migrations are needed, scaffold the file, and let the user fill in the logic.
 
+# Requirements
+
+These are the problems the system must solve. The Solution section describes how each is addressed.
+
+## R1. Users can transform data during schema migration
+
+Schema evolution often requires data transformations that the database cannot perform automatically: backfilling computed values, converting between types with ambiguous mappings, splitting/merging columns or tables, resolving constraint violations, seeding reference data. The system must provide a way for users to run arbitrary data transformation code as part of a migration. See [data-migration-scenarios.md](./data-migration-scenarios.md) for the full scenario enumeration.
+
+## R2. Data migrations cover a wide range of schema evolution scenarios
+
+The system must handle the common patterns — computed backfill, lossy type changes, column split/merge, table split/merge, normalization/extraction, key identity changes, constraint enforcement, data seeding — and provide a universal escape hatch for anything else. No scenario should be impossible; the system should make common ones easy and rare ones possible.
+
+## R3. Data migrations are safe to retry after partial failure
+
+If a migration fails midway (crash, timeout, constraint violation), re-running it must not corrupt data or produce duplicate effects. The system needs a mechanism to determine whether a data migration has already been applied, and skip it if so.
+
+## R4. Users don't accidentally skip required data transformations
+
+When the planner detects a structural change that implies data migration is needed (e.g., adding a NOT NULL column without a default), it must ensure the user addresses it before the migration can be applied. The scaffolded migration must fail loudly at apply time if the user hasn't filled in the implementation. The system should make it impossible to accidentally apply a migration that needs data work without having done that work.
+
+## R5. Data migration code has access to both old and new schema state
+
+During a data migration, the user's code needs to read from old columns/tables (to get existing data) and write to new columns/tables (to populate transformed data). The old schema must not yet be torn down, and the new schema must already be partially set up.
+
+## R6. Data migrations work on tables of all sizes
+
+Small tables can be migrated within a single transaction for atomicity. Large tables may require batched updates outside of a transaction, or DDL that can't run in a transaction (e.g., `CREATE INDEX CONCURRENTLY`). The execution model must accommodate both extremes.
+
+## R7. Data migrations participate in the graph model
+
+The migration graph must be aware of data migrations. When multiple paths exist to the same contract hash, the system must be able to distinguish paths based on what data transformations they include, and select appropriately.
+
+## R8. Environments can declare which data migrations are required
+
+Different environments (production, staging, dev) may need different data migration guarantees. The system must allow environments to declare which named data migrations must have been applied, and route accordingly.
+
+## R9. Users can write arbitrary SQL when the planner is insufficient
+
+The planner generates structural DDL but cannot handle every case. Users need an escape hatch to write raw SQL (structural or data) that the system executes as a first-class migration. This should not require a separate authoring surface — it should integrate naturally with the data migration mechanism.
+
+## R10. SQL-first users don't need to write TypeScript
+
+Some users prefer writing plain SQL files over TypeScript. The system should support this without requiring them to learn the TypeScript API beyond a minimal wrapper.
+
+## R11. Planning works offline (no database connection required)
+
+Per ADR 169, migration planning must not require a live database connection. Detection of data migration needs and scaffolding must work from contract diffs alone.
+
+## R12. Post-apply verification catches schema mismatches
+
+After a migration (including any data migration) completes, the system must verify that the database schema matches the destination contract. This is the hard safety net — if the user's SQL didn't produce the expected schema state, apply fails.
+
+## R13. No special rollback mechanism
+
+Reverting a migration is just another migration in the opposite direction. The system should not introduce rollback-specific machinery for data migrations. A migration S2→S1 is an ordinary graph edge that can carry its own data migration.
+
+# Solution
+
+## Data migration authoring (R1, R2, R9, R10)
+
+A data migration is defined in a `data-migration.ts` file inside a migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(db), run(db) })` API.
+
+The `db` parameter provides a minimal raw SQL interface: `db.execute(sql, params?)` (returns rows affected) and `db.query(sql, params?)` (returns rows). Parameterized queries only. This handles 100% of scenarios — any SQL the database supports can be executed.
+
+`data-migration.ts` is compiled at apply time using the project's existing TypeScript execution tooling (tsx/esbuild). Source `.ts` files are committed; compiled JS is not.
+
+Each migration edge supports at most one data migration (single `data-migration.ts` per package).
+
+### Representation in ops.json
+
+A data migration is a first-class operation in `ops.json` — a `data_migration` entry alongside the structural operations. The planner (or `migration new`) inserts it at the correct position between additive/widening and destructive ops. The runner encounters it during sequential execution, resolves and compiles the `data-migration.ts` file, and executes `check`/`run`. This means the data migration participates in the same operation lifecycle as structural ops (prechecks, execution, postchecks) without requiring a separate execution path in the runner.
+
+```typescript
+import { defineMigration } from '@prisma-next/migration'
+
+export default defineMigration({
+  name: 'split-user-name',
+  transaction: 'inline',
+
+  async check(db) {
+    const result = await db.query(
+      `SELECT COUNT(*) as count FROM "users" WHERE "first_name" IS NULL`
+    )
+    return result[0].count === 0
+  },
+
+  async run(db) {
+    await db.execute(
+      `UPDATE "users"
+       SET "first_name" = split_part("name", $1, 1),
+           "last_name"  = split_part("name", $1, 2)
+       WHERE "first_name" IS NULL`,
+      [' ']
+    )
+  }
+})
+```
+
+### SQL-first alternative — `readSql` (R10)
+
+A `readSql(filename)` helper reads a `.sql` file relative to the migration package directory and returns a function compatible with `check` or `run`. This allows SQL-first users to write plain SQL files while using `data-migration.ts` only as a thin wrapper:
+
+```typescript
+import { defineMigration, readSql } from '@prisma-next/migration'
+export default defineMigration({
+  name: 'custom-migration',
+  transaction: 'inline',
+  check: readSql('check.sql'),
+  run: readSql('migration.sql'),
+})
+```
+
+### Manual authoring — `migration new` (R9)
+
+`migration new` scaffolds a migration package with a `data-migration.ts` and empty (or no) `ops.json`. The user writes all SQL in the `run(db)` function or via `readSql`. This is the escape hatch for when the planner's structural output is wrong, insufficient, or the user needs full control.
+
+`migration new` derives `from` hash from the current migration graph state (same logic as `migration plan`) and `to` hash from the current emitted contract. Both can be overridden with `--from` and `--to` flags.
+
+No verification at authoring time — the system trusts the user's SQL. Post-apply schema verification (R12) catches mismatches at `migration apply` time.
+
+## Retry safety — required `check(db)` (R3)
+
+`check(db)` is **required**. It returns `true` if the data migration has already been applied (skip `run`), `false` if it still needs to run. The runner calls `check` before `run` on every execution, enabling idempotent retries without a separate completion marker. Users who don't need a meaningful check can `return true` (always skip — use with caution) or `return false` (always run).
+
+## Detection and scaffolding (R4, R11)
+
+The planner detects structural changes that imply a data migration is needed:
+
+- NOT NULL column added without a default
+- Non-widening type change (e.g., FLOAT → INTEGER)
+- Existing nullable column becoming NOT NULL
+
+Detection works offline (no database connection required). The planner scaffolds when the structural diff *could* need a data migration, even if affected tables might be empty at runtime.
+
+When detection triggers, the planner generates a `data-migration.ts` with unimplemented `check` and `run` functions that fail at apply time if left unmodified, plus comments describing what was detected.
+
+For non-widening type changes on the same column (e.g., `price FLOAT` → `price BIGINT`), the planner uses a **temp column strategy**: it emits an additive op to create a temporary column with the target type, places the data migration slot after it, and emits destructive ops to drop the original column and rename the temp column. This gives the user a writable column of the correct target type during the data migration. The temp column name is deterministic and referenced in the scaffold comment.
+
+## Phased execution (R5, R6)
+
+When a data migration is present on an edge, the planner emits a `data_migration` operation entry interleaved with structural ops. The planner partitions structural ops into phases by operation class:
+
+1. **Phase 1**: all `additive` and `widening` ops (new tables, new nullable columns, relaxed constraints)
+2. **Phase 2**: `data_migration` operation (references the user's `data-migration.ts`)
+3. **Phase 3**: all `destructive` ops (SET NOT NULL, drop old columns, type changes)
+
+This partitioning is implemented as a generic framework-level function over operation classes. Target planners produce structural ops as they do today; the framework inserts the data migration entry and orders the result. For v1, the ordering is a simple class-based partition. When a proper operation dependency model lands (with `dependsOn` and topological sort), the data migration operation should integrate with that.
+
+### Transaction modes (R6)
+
+The data migration declares one of three transaction modes:
+
+| Mode | Behavior | Use case |
+|------|----------|----------|
+| `inline` | Runs inside the structural migration's transaction. Full atomicity — failure rolls back everything. | Small/fast migrations on small tables. Default. |
+| `isolated` | Gets its own transaction. Phase 1 commits first, data migration runs in a separate transaction, phase 3 runs in a third transaction. | Medium tables where you want transactional safety for the data migration but can't hold structural locks open. |
+| `unmanaged` | No transaction wrapping. User handles batching/commits. | Large tables, long-running transforms, DDL that can't run in a transaction. |
+
+In `isolated` and `unmanaged` modes, phase 1 ops are skipped on retry via existing idempotency checks (postchecks pass because columns/tables already exist). The data migration step is skipped on retry if `check(db)` returns `true`.
+
+## Graph integration (R7, R8)
+
+The invariant carried by the system is "named data migration X was applied." This is recorded in the ledger when the migration edge completes successfully.
+
+The router finds candidate paths via DFS, collecting data migration names along each path. Path selection:
+
+1. Filter to paths that satisfy required invariants (from environment refs)
+2. Prefer paths with more invariants (do the most complete migration)
+3. Tie-break by shortest path / deterministic ordering
+
+Environment refs declare desired state as target contract hash + required data migration names. A ref update is explicit and reviewable.
+
+## Post-apply verification (R12)
+
+The existing post-apply schema verification (introspect database, compare against destination contract) serves as the hard safety net for data migrations. No additional verification mechanism is needed — the runner already does this for structural migrations, and it naturally extends to cover data migrations.
+
+## Rollback (R13)
+
+No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S1 — an ordinary graph edge that can carry its own data migration if needed.
+
 # Key Decisions
+
+These document the major design choices, the alternatives considered, and why we chose this approach. They are most useful after reading the Requirements and Solution sections.
 
 ## D1. Code-first over operator algebra
 
@@ -96,182 +278,6 @@ The `throw` in the scaffold is one way to achieve (c), but the key property is t
 
 **Why this approach**: The system takes responsibility for detection and gives the user a starting point with enough context to understand what's needed. The safety property — unimplemented scaffolds fail loudly — prevents data loss from accidentally skipping a required transformation.
 
-# Requirements
-
-These are the problems the system must solve. The Solution section describes how each is addressed.
-
-## R1. Users can transform data during schema migration
-
-Schema evolution often requires data transformations that the database cannot perform automatically: backfilling computed values, converting between types with ambiguous mappings, splitting/merging columns or tables, resolving constraint violations, seeding reference data. The system must provide a way for users to run arbitrary data transformation code as part of a migration. See [data-migration-scenarios.md](./data-migration-scenarios.md) for the full scenario enumeration.
-
-## R2. Data migrations cover a wide range of schema evolution scenarios
-
-The system must handle the common patterns — computed backfill, lossy type changes, column split/merge, table split/merge, normalization/extraction, key identity changes, constraint enforcement, data seeding — and provide a universal escape hatch for anything else. No scenario should be impossible; the system should make common ones easy and rare ones possible.
-
-## R3. Data migrations are safe to retry after partial failure
-
-If a migration fails midway (crash, timeout, constraint violation), re-running it must not corrupt data or produce duplicate effects. The system needs a mechanism to determine whether a data migration has already been applied, and skip it if so.
-
-## R4. The system detects when data migrations are required
-
-Users should not be able to accidentally skip a required data transformation. When the planner detects a structural change that implies data migration is needed (e.g., adding a NOT NULL column without a default), it must ensure the user addresses it before the migration can be applied.
-
-## R5. Data migration code has access to both old and new schema state
-
-During a data migration, the user's code needs to read from old columns/tables (to get existing data) and write to new columns/tables (to populate transformed data). The old schema must not yet be torn down, and the new schema must already be partially set up.
-
-## R6. Data migrations work on tables of all sizes
-
-Small tables can be migrated within a single transaction for atomicity. Large tables may require batched updates outside of a transaction, or DDL that can't run in a transaction (e.g., `CREATE INDEX CONCURRENTLY`). The execution model must accommodate both extremes.
-
-## R7. Data migrations participate in the graph model
-
-The migration graph must be aware of data migrations. When multiple paths exist to the same contract hash, the system must be able to distinguish paths based on what data transformations they include, and select appropriately.
-
-## R8. Environments can declare which data migrations are required
-
-Different environments (production, staging, dev) may need different data migration guarantees. The system must allow environments to declare which named data migrations must have been applied, and route accordingly.
-
-## R9. Users don't accidentally skip required data transformations
-
-Beyond detection (R4), the scaffolded migration must fail loudly at apply time if the user hasn't filled in the implementation. The system should make it impossible to accidentally apply a migration that needs data work without having done that work.
-
-## R10. Users can write arbitrary SQL when the planner is insufficient
-
-The planner generates structural DDL but cannot handle every case. Users need an escape hatch to write raw SQL (structural or data) that the system executes as a first-class migration. This should not require a separate authoring surface — it should integrate naturally with the data migration mechanism.
-
-## R11. SQL-first users don't need to write TypeScript
-
-Some users prefer writing plain SQL files over TypeScript. The system should support this without requiring them to learn the TypeScript API beyond a minimal wrapper.
-
-## R12. Planning works offline (no database connection required)
-
-Per ADR 169, migration planning must not require a live database connection. Detection of data migration needs and scaffolding must work from contract diffs alone.
-
-# Solution
-
-## Data migration authoring (R1, R2, R10, R11)
-
-A data migration is defined in a `data-migration.ts` file inside a migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(db), run(db) })` API.
-
-The `db` parameter provides a minimal raw SQL interface: `db.execute(sql, params?)` (returns rows affected) and `db.query(sql, params?)` (returns rows). Parameterized queries only. This handles 100% of scenarios — any SQL the database supports can be executed.
-
-`data-migration.ts` is compiled at apply time using the project's existing TypeScript execution tooling (tsx/esbuild). Source `.ts` files are committed; compiled JS is not.
-
-Each migration edge supports at most one data migration (single `data-migration.ts` per package).
-
-### Representation in ops.json
-
-A data migration is a first-class operation in `ops.json` — a `data_migration` entry alongside the structural operations. The planner (or `migration new`) inserts it at the correct position between additive/widening and destructive ops. The runner encounters it during sequential execution, resolves and compiles the `data-migration.ts` file, and executes `check`/`run`. This means the data migration participates in the same operation lifecycle as structural ops (prechecks, execution, postchecks) without requiring a separate execution path in the runner.
-
-```typescript
-import { defineMigration } from '@prisma-next/migration'
-
-export default defineMigration({
-  name: 'split-user-name',
-  transaction: 'inline',
-
-  async check(db) {
-    const result = await db.query(
-      `SELECT COUNT(*) as count FROM "users" WHERE "first_name" IS NULL`
-    )
-    return result[0].count === 0
-  },
-
-  async run(db) {
-    await db.execute(
-      `UPDATE "users"
-       SET "first_name" = split_part("name", $1, 1),
-           "last_name"  = split_part("name", $1, 2)
-       WHERE "first_name" IS NULL`,
-      [' ']
-    )
-  }
-})
-```
-
-### SQL-first alternative — `readSql` (R11)
-
-A `readSql(filename)` helper reads a `.sql` file relative to the migration package directory and returns a function compatible with `check` or `run`. This allows SQL-first users to write plain SQL files while using `data-migration.ts` only as a thin wrapper:
-
-```typescript
-import { defineMigration, readSql } from '@prisma-next/migration'
-export default defineMigration({
-  name: 'custom-migration',
-  transaction: 'inline',
-  check: readSql('check.sql'),
-  run: readSql('migration.sql'),
-})
-```
-
-### Manual authoring — `migration new` (R10)
-
-`migration new` scaffolds a migration package with a `data-migration.ts` and empty (or no) `ops.json`. The user writes all SQL in the `run(db)` function or via `readSql`. This is the escape hatch for when the planner's structural output is wrong, insufficient, or the user needs full control.
-
-`migration new` derives `from` hash from the current migration graph state (same logic as `migration plan`) and `to` hash from the current emitted contract. Both can be overridden with `--from` and `--to` flags.
-
-No verification at authoring time — the system trusts the user's SQL. Post-apply schema verification (R13) catches mismatches at `migration apply` time.
-
-## Retry safety — required `check(db)` (R3)
-
-`check(db)` is **required**. It returns `true` if the data migration has already been applied (skip `run`), `false` if it still needs to run. The runner calls `check` before `run` on every execution, enabling idempotent retries without a separate completion marker. Users who don't need a meaningful check can `return true` (always skip — use with caution) or `return false` (always run).
-
-## Detection and scaffolding (R4, R9, R12)
-
-The planner detects structural changes that imply a data migration is needed:
-
-- NOT NULL column added without a default
-- Non-widening type change (e.g., FLOAT → INTEGER)
-- Existing nullable column becoming NOT NULL
-
-Detection works offline (no database connection required). The planner scaffolds when the structural diff *could* need a data migration, even if affected tables might be empty at runtime.
-
-When detection triggers, the planner generates a `data-migration.ts` with unimplemented `check` and `run` functions that fail at apply time if left unmodified, plus comments describing what was detected.
-
-For non-widening type changes on the same column (e.g., `price FLOAT` → `price BIGINT`), the planner uses a **temp column strategy**: it emits an additive op to create a temporary column with the target type, places the data migration slot after it, and emits destructive ops to drop the original column and rename the temp column. This gives the user a writable column of the correct target type during the data migration. The temp column name is deterministic and referenced in the scaffold comment.
-
-## Phased execution (R5, R6)
-
-When a data migration is present on an edge, the planner emits a `data_migration` operation entry interleaved with structural ops. The planner partitions structural ops into phases by operation class:
-
-1. **Phase 1**: all `additive` and `widening` ops (new tables, new nullable columns, relaxed constraints)
-2. **Phase 2**: `data_migration` operation (references the user's `data-migration.ts`)
-3. **Phase 3**: all `destructive` ops (SET NOT NULL, drop old columns, type changes)
-
-This partitioning is implemented as a generic framework-level function over operation classes. Target planners produce structural ops as they do today; the framework inserts the data migration entry and orders the result. For v1, the ordering is a simple class-based partition. When a proper operation dependency model lands (with `dependsOn` and topological sort), the data migration operation should integrate with that.
-
-### Transaction modes (R6)
-
-The data migration declares one of three transaction modes:
-
-| Mode | Behavior | Use case |
-|------|----------|----------|
-| `inline` | Runs inside the structural migration's transaction. Full atomicity — failure rolls back everything. | Small/fast migrations on small tables. Default. |
-| `isolated` | Gets its own transaction. Phase 1 commits first, data migration runs in a separate transaction, phase 3 runs in a third transaction. | Medium tables where you want transactional safety for the data migration but can't hold structural locks open. |
-| `unmanaged` | No transaction wrapping. User handles batching/commits. | Large tables, long-running transforms, DDL that can't run in a transaction. |
-
-In `isolated` and `unmanaged` modes, phase 1 ops are skipped on retry via existing idempotency checks (postchecks pass because columns/tables already exist). The data migration step is skipped on retry if `check(db)` returns `true`.
-
-## Graph integration (R7, R8)
-
-The invariant carried by the system is "named data migration X was applied." This is recorded in the ledger when the migration edge completes successfully.
-
-The router finds candidate paths via DFS, collecting data migration names along each path. Path selection:
-
-1. Filter to paths that satisfy required invariants (from environment refs)
-2. Prefer paths with more invariants (do the most complete migration)
-3. Tie-break by shortest path / deterministic ordering
-
-Environment refs declare desired state as target contract hash + required data migration names. A ref update is explicit and reviewable.
-
-## Post-apply verification (R13)
-
-The existing post-apply schema verification (introspect database, compare against destination contract) serves as the hard safety net for data migrations. No additional verification mechanism is needed — the runner already does this for structural migrations, and it naturally extends to cover data migrations.
-
-## Rollback (R14)
-
-No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S1 — an ordinary graph edge that can carry its own data migration if needed.
-
 # Acceptance Criteria
 
 ## Authoring
@@ -322,6 +328,16 @@ No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S
 - **Content hash drift detection**: Warn when data migration code has been modified since it was applied to another environment. Descoped because: (1) storing the hash in the migration manifest requires re-attestation every time the user edits the scaffolded file — the natural workflow is plan → scaffold → user edits → apply, but the manifest is sealed at plan time so the hash is immediately stale after the user fills in the scaffold; (2) storing in the ledger only enables per-database comparison, not cross-environment drift detection (you can't query staging's ledger from production); (3) a separate metadata file adds complexity for uncertain value. Revisit when we have a clearer picture of multi-environment workflows.
 - **Question-tree UX**: Interactive workflow where the system asks the user targeted questions about ambiguous diffs and compiles answers into migration code. Future authoring layer.
 
+# Open Questions
+
+1. **Op partitioning edge cases**: The additive/widening → data → destructive split assumes operation classes cleanly separate into "before" and "after" groups. Even for structural ops this isn't always true (e.g., compound type+default changes require drop → alter → set sequences). Constraint additions (UNIQUE, CHECK, FK) are classified as `additive` but are semantically tightening — they should run *after* the data migration (S13). This is a known limitation of the class-based partition. The proper fix is an operation dependency model (`dependsOn` + topological sort) where constraint ops depend on the data migration.
+
+2. **Environment ref format**: Refs currently live in `migrations/refs.json` as `{ "<name>": "<hash>" }` (implemented in TML-2051). To carry invariants, the format needs to expand to something like `{ "<name>": { "hash": "<hash>", "invariants": ["split-user-name"] } }`. This is a breaking change to the ref format. Prerequisite: refactor refs to the new shape, potentially moving them to their own file. TML-2132 (implicit default ref) is a related open ticket. The ref refactor should land before or alongside data migration support.
+
+3. **Cross-table coordinated migrations (S11)**: Scenarios like PK type changes (e.g., `SERIAL` → `UUID`) cascade across the FK graph — every referencing table needs a temp column, UUID generation, FK rewiring, and cleanup. The planner would need to trace FK references across tables and emit coordinated temp column + rename ops for all affected tables. This is significant planner intelligence beyond per-table detection. For v1, the user likely authors these migrations manually. Future work: planner FK graph awareness to auto-detect and scaffold cross-table cascading type changes.
+
+4. **Table drop detection gap (S6)**: Horizontal table splits (one table → two with rows partitioned) may not trigger auto-detection if the new tables don't have NOT NULL columns without defaults. The planner could add a heuristic: "table dropped while new tables with similar schemas are created" → suggest data migration. Low priority for v1 but a known detection gap.
+
 # Other Considerations
 
 ## Security
@@ -350,13 +366,3 @@ No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S
 - ADR 039 — Graph integrity and validation
 - ADR 044 — Pre/post check vocabulary
 - ADR 169 — Offline planning and containerization
-
-# Open Questions
-
-1. **Op partitioning edge cases**: The additive/widening → data → destructive split assumes operation classes cleanly separate into "before" and "after" groups. Even for structural ops this isn't always true (e.g., compound type+default changes require drop → alter → set sequences). Constraint additions (UNIQUE, CHECK, FK) are classified as `additive` but are semantically tightening — they should run *after* the data migration (S13). This is a known limitation of the class-based partition. The proper fix is an operation dependency model (`dependsOn` + topological sort) where constraint ops depend on the data migration.
-
-2. **Environment ref format**: Refs currently live in `migrations/refs.json` as `{ "<name>": "<hash>" }` (implemented in TML-2051). To carry invariants, the format needs to expand to something like `{ "<name>": { "hash": "<hash>", "invariants": ["split-user-name"] } }`. This is a breaking change to the ref format. Prerequisite: refactor refs to the new shape, potentially moving them to their own file. TML-2132 (implicit default ref) is a related open ticket. The ref refactor should land before or alongside data migration support.
-
-3. **Cross-table coordinated migrations (S11)**: Scenarios like PK type changes (e.g., `SERIAL` → `UUID`) cascade across the FK graph — every referencing table needs a temp column, UUID generation, FK rewiring, and cleanup. The planner would need to trace FK references across tables and emit coordinated temp column + rename ops for all affected tables. This is significant planner intelligence beyond per-table detection. For v1, the user likely authors these migrations manually. Future work: planner FK graph awareness to auto-detect and scaffold cross-table cascading type changes.
-
-4. **Table drop detection gap (S6)**: Horizontal table splits (one table → two with rows partitioned) may not trigger auto-detection if the new tables don't have NOT NULL columns without defaults. The planner could add a heuristic: "table dropped while new tables with similar schemas are created" → suggest data migration. Low priority for v1 but a known detection gap.
