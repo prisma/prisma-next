@@ -15,6 +15,12 @@ export function createUsersCollection(runtime: PgIntegrationRuntime) {
   return new Collection({ runtime, context: getTestContext() }, 'User');
 }
 
+export function createUsersCollectionWithoutReturning(runtime: PgIntegrationRuntime) {
+  const contract = { ...getTestContract(), capabilities: {} } as TestContract;
+  const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
+  return new Collection({ runtime, context }, 'User');
+}
+
 export function createPostsCollection(runtime: PgIntegrationRuntime) {
   return new Collection({ runtime, context: getTestContext() }, 'Post');
 }
@@ -31,6 +37,12 @@ export function createReturningPostsCollection(runtime: PgIntegrationRuntime) {
   const contract = withReturningCapability(getTestContract());
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
   return new Collection({ runtime, context }, 'Post');
+}
+
+export function createReturningTagsCollection(runtime: PgIntegrationRuntime) {
+  const contract = withReturningCapability(getTestContract());
+  const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
+  return new Collection({ runtime, context }, 'Tag');
 }
 
 export async function withCollectionRuntime(

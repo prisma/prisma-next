@@ -2,8 +2,9 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:9026c42837c6ba81af7ff07836fae20cfb523b4d55480a9531aa9206815d68e3",
-  "profileHash": "sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89",
+  "storageHash": "sha256:f31648e0fc4bdc9d1a2ed322c9eca3a88cf5eee5f9068d8256949f08e2e633c7",
+  "executionHash": "sha256:f744c820f5efe500202b9a1d30dff6243359b10bee2ac27753411f386c7052e0",
+  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
   "models": {
     "Comment": {
       "fields": {
@@ -57,6 +58,20 @@
       "relations": {},
       "storage": {
         "table": "profiles"
+      }
+    },
+    "Tag": {
+      "fields": {
+        "id": {
+          "column": "id"
+        },
+        "name": {
+          "column": "name"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "tags"
       }
     },
     "User": {
@@ -236,6 +251,32 @@
         },
         "uniques": []
       },
+      "tags": {
+        "columns": {
+          "id": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": [
+          {
+            "columns": [
+              "name"
+            ]
+          }
+        ]
+      },
       "users": {
         "columns": {
           "email": {
@@ -273,7 +314,34 @@
       }
     }
   },
-  "capabilities": {},
+  "execution": {
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "tags"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "enums": true
+    }
+  },
   "extensionPacks": {},
   "meta": {},
   "_generated": {

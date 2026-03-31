@@ -36,6 +36,13 @@ export const contract = defineContract<CodecTypes>()
       .column('bio', { type: textColumn, nullable: false })
       .primaryKey(['id']),
   )
+  .table('tags', (table) =>
+    table
+      .generated('id', { type: textColumn, generated: { kind: 'generator', id: 'uuidv4' } })
+      .column('name', { type: textColumn, nullable: false })
+      .primaryKey(['id'])
+      .unique(['name']),
+  )
   .model('User', 'users', (model) =>
     model
       .field('id', 'id')
@@ -122,4 +129,5 @@ export const contract = defineContract<CodecTypes>()
   .model('Profile', 'profiles', (model) =>
     model.field('id', 'id').field('userId', 'user_id').field('bio', 'bio'),
   )
+  .model('Tag', 'tags', (model) => model.field('id', 'id').field('name', 'name'))
   .build();

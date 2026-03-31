@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createReturningUsersCollection,
   createUsersCollection,
+  createUsersCollectionWithoutReturning,
   timeouts,
   withCollectionRuntime,
 } from './helpers';
@@ -104,7 +105,7 @@ describe('integration/update', () => {
     'update() and updateAll() reject when returning capability is disabled',
     async () => {
       await withCollectionRuntime(async (runtime) => {
-        const users = createUsersCollection(runtime);
+        const users = createUsersCollectionWithoutReturning(runtime);
         const filtered = users.where({ id: 1 });
 
         await expect(filtered.update({ name: 'Blocked' })).rejects.toThrow(

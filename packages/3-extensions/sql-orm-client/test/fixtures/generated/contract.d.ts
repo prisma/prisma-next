@@ -29,14 +29,16 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9026c42837c6ba81af7ff07836fae20cfb523b4d55480a9531aa9206815d68e3'>;
-export type ExecutionHash = ExecutionHashBase<string>;
+  StorageHashBase<'sha256:f31648e0fc4bdc9d1a2ed322c9eca3a88cf5eee5f9068d8256949f08e2e633c7'>;
+export type ExecutionHash =
+  ExecutionHashBase<'sha256:f744c820f5efe500202b9a1d30dff6243359b10bee2ac27753411f386c7052e0'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:670cfaa084208fec640cd80a1864182c43e9a000f4ae282b732c88e26f919e89'>;
+  ProfileHashBase<'sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = Record<string, never>;
+export type QueryOperationTypes = Record<string, never>;
 type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId] extends { readonly output: infer O }
     ? O extends Date | bigint
@@ -45,7 +47,7 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
     : Encoded
   : Encoded;
 
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes>;
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
 type ContractBase = SqlContract<
   {
@@ -152,6 +154,24 @@ type ContractBase = SqlContract<
         indexes: readonly [];
         foreignKeys: readonly [];
       };
+      readonly tags: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly name: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [{ readonly columns: readonly ['name'] }];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
     };
     readonly types: Record<string, never>;
   },
@@ -188,6 +208,13 @@ type ContractBase = SqlContract<
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly userId: CodecTypes['pg/int4@1']['output'];
         readonly bio: CodecTypes['pg/text@1']['output'];
+      };
+    };
+    readonly Tag: {
+      storage: { readonly table: 'tags' };
+      fields: {
+        readonly id: CodecTypes['pg/text@1']['output'];
+        readonly name: CodecTypes['pg/text@1']['output'];
       };
     };
   },
@@ -251,12 +278,14 @@ type ContractBase = SqlContract<
       readonly Post: 'posts';
       readonly Comment: 'comments';
       readonly Profile: 'profiles';
+      readonly Tag: 'tags';
     };
     tableToModel: {
       readonly users: 'User';
       readonly posts: 'Post';
       readonly comments: 'Comment';
       readonly profiles: 'Profile';
+      readonly tags: 'Tag';
     };
     fieldToColumn: {
       readonly User: {
@@ -273,6 +302,7 @@ type ContractBase = SqlContract<
       };
       readonly Comment: { readonly id: 'id'; readonly body: 'body'; readonly postId: 'post_id' };
       readonly Profile: { readonly id: 'id'; readonly userId: 'user_id'; readonly bio: 'bio' };
+      readonly Tag: { readonly id: 'id'; readonly name: 'name' };
     };
     columnToField: {
       readonly users: {
@@ -289,6 +319,7 @@ type ContractBase = SqlContract<
       };
       readonly comments: { readonly id: 'id'; readonly body: 'body'; readonly post_id: 'postId' };
       readonly profiles: { readonly id: 'id'; readonly user_id: 'userId'; readonly bio: 'bio' };
+      readonly tags: { readonly id: 'id'; readonly name: 'name' };
     };
   },
   StorageHash,
@@ -296,8 +327,27 @@ type ContractBase = SqlContract<
   ProfileHash
 > & {
   readonly target: 'postgres';
-  readonly capabilities: {};
+  readonly capabilities: {
+    readonly postgres: {
+      readonly jsonAgg: true;
+      readonly lateral: true;
+      readonly limit: true;
+      readonly orderBy: true;
+      readonly returning: true;
+    };
+    readonly sql: { readonly enums: true };
+  };
   readonly extensionPacks: {};
+  readonly execution: {
+    readonly mutations: {
+      readonly defaults: readonly [
+        {
+          readonly ref: { readonly table: 'tags'; readonly column: 'id' };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+      ];
+    };
+  };
 };
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;

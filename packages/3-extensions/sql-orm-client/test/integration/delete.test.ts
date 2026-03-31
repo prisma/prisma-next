@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createReturningUsersCollection,
   createUsersCollection,
+  createUsersCollectionWithoutReturning,
   timeouts,
   withCollectionRuntime,
 } from './helpers';
@@ -97,7 +98,7 @@ describe('integration/delete', () => {
     'delete() and deleteAll() reject when returning capability is disabled',
     async () => {
       await withCollectionRuntime(async (runtime) => {
-        const users = createUsersCollection(runtime);
+        const users = createUsersCollectionWithoutReturning(runtime);
         const filtered = users.where({ id: 1 });
 
         await expect(filtered.delete()).rejects.toThrow(/requires contract capability "returning"/);

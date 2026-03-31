@@ -1,8 +1,10 @@
 import { DefaultValueExpr, InsertAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
+  createReturningTagsCollection,
   createReturningUsersCollection,
   createUsersCollection,
+  createUsersCollectionWithoutReturning,
   timeouts,
   withCollectionRuntime,
 } from './helpers';
@@ -147,7 +149,7 @@ describe('integration/create', () => {
     'create() and createAll() reject when returning capability is disabled',
     async () => {
       await withCollectionRuntime(async (runtime) => {
-        const users = createUsersCollection(runtime);
+        const users = createUsersCollectionWithoutReturning(runtime);
 
         await expect(
           users.create({
@@ -188,4 +190,82 @@ describe('integration/create', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  describe('execution mutation defaults', () => {
+    it(
+      'create() generates a default id when not provided',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          const tags = createReturningTagsCollection(runtime);
+
+          const created = await tags.create({ name: 'typescript' });
+          expect(created.id).toEqual(expect.any(String));
+          expect(created.id.length).toBeGreaterThan(0);
+          expect(created.name).toBe('typescript');
+
+          const found = await tags.where({ name: 'typescript' }).first();
+          expect(found).toEqual(created);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'create() preserves an explicitly provided id',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          const tags = createReturningTagsCollection(runtime);
+
+          const created = await tags.create({ id: 'custom-id', name: 'rust' });
+          expect(created).toEqual({ id: 'custom-id', name: 'rust' });
+
+          const found = await tags.where({ name: 'rust' }).first();
+          expect(found).toEqual({ id: 'custom-id', name: 'rust' });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'createAll() generates unique ids for each row',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          const tags = createReturningTagsCollection(runtime);
+
+          const created = await tags.createAll([
+            { name: 'go' },
+            { name: 'python' },
+            { name: 'java' },
+          ]);
+
+          expect(created).toHaveLength(3);
+          const ids = created.map((t) => t.id);
+          expect(ids.every((id) => typeof id === 'string' && id.length > 0)).toBe(true);
+          expect(new Set(ids).size).toBe(3);
+
+          const all = await tags.orderBy((t) => t.name.asc()).all();
+          expect(all).toHaveLength(3);
+          expect(all.map((r) => r.name)).toEqual(['go', 'java', 'python']);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'createCount() generates ids for rows without returning them',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          const tags = createReturningTagsCollection(runtime);
+
+          const count = await tags.createCount([{ name: 'elixir' }, { name: 'haskell' }]);
+          expect(count).toBe(2);
+
+          const all = await tags.orderBy((t) => t.name.asc()).all();
+          expect(all).toHaveLength(2);
+          expect(all.every((r) => typeof r.id === 'string' && r.id.length > 0)).toBe(true);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });

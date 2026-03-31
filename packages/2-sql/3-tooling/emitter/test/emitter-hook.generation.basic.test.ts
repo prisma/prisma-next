@@ -1004,6 +1004,61 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain("readonly 'max-ngram': 5");
   });
 
+  it('includes execution section in ContractBase when IR has execution defaults', () => {
+    const ir = createContractIR({
+      models: {
+        Tag: {
+          storage: { table: 'tags' },
+          fields: { id: { column: 'id' }, name: { column: 'name' } },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          tags: {
+            columns: {
+              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      execution: {
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'tags', column: 'id' },
+              onCreate: { kind: 'generator', id: 'uuidv4' },
+            },
+          ],
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      ...testHashes,
+      executionHash: 'test-exec-hash',
+    });
+    expect(types).toContain('readonly execution:');
+    expect(types).toContain("readonly table: 'tags'");
+    expect(types).toContain("readonly column: 'id'");
+    expect(types).toContain("readonly kind: 'generator'");
+    expect(types).toContain("readonly id: 'uuidv4'");
+  });
+
+  it('emits execution as undefined when IR has no execution', () => {
+    const ir = createContractIR({
+      storage: { tables: {} },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    expect(types).toContain('readonly execution: undefined;');
+  });
+
   it('serializes empty typeParams to Record<string, never>', () => {
     const result = sqlTargetFamilyHook.serializeTypeParamsLiteral({});
     expect(result).toBe('Record<string, never>');

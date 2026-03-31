@@ -93,6 +93,23 @@ import type {
 import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
 
+function applyCreateDefaults(
+  ctx: CollectionContext<SqlContract<SqlStorage>>,
+  tableName: string,
+  rows: Record<string, unknown>[],
+): void {
+  for (const row of rows) {
+    const applied = ctx.context.applyMutationDefaults({
+      op: 'create',
+      table: tableName,
+      values: row,
+    });
+    for (const def of applied) {
+      row[def.column] = def.value;
+    }
+  }
+}
+
 type WhereDirectInput = WhereArg;
 
 function isToWhereExprInput(value: unknown): value is ToWhereExpr {
@@ -612,6 +629,7 @@ export class Collection<
     const mappedRows = data.map((row) =>
       mapModelDataToStorageRow(this.contract, this.modelName, row),
     );
+    applyCreateDefaults(this.ctx, this.tableName, mappedRows);
     const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
     const { selectedForQuery: selectedForInsert, hiddenColumns } = augmentSelectionForJoinColumns(
       this.state.selectedFields,
@@ -642,6 +660,7 @@ export class Collection<
     const mappedRows = data.map((row) =>
       mapModelDataToStorageRow(this.contract, this.modelName, row),
     );
+    applyCreateDefaults(this.ctx, this.tableName, mappedRows);
     const compiled = compileInsertCount(this.contract, this.tableName, mappedRows);
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
     return data.length;
@@ -660,6 +679,7 @@ export class Collection<
     assertReturningCapability(this.contract, 'upsert()');
 
     const createValues = mapModelDataToStorageRow(this.contract, this.modelName, input.create);
+    applyCreateDefaults(this.ctx, this.tableName, [createValues]);
     const updateValues = mapModelDataToStorageRow(this.contract, this.modelName, input.update);
     const hasUpdateValues = Object.keys(updateValues).length > 0;
     const conflictColumns = resolveUpsertConflictColumns(
