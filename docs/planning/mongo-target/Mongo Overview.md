@@ -31,6 +31,5 @@
 ## Current planning
 
 - [april-milestone.md](../april-milestone.md) WS4 — current priorities and scope
-- `projects/` — implementation specs and plans (transient, per the Drive workflow)
 
 New architectural decisions should be recorded as ADRs in `docs/architecture docs/adrs/` directly (not under this directory).

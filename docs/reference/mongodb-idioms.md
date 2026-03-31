@@ -4,7 +4,7 @@ What patterns do experienced MongoDB developers use, expect their tools to suppo
 
 For each idiom: what the developer does, a concrete example, and what it means for PN.
 
-### Sources
+## Sources
 
 - [Data Modeling](https://www.mongodb.com/docs/manual/data-modeling/) — MongoDB's top-level data modeling guide
 - [Schema Design Patterns](https://www.mongodb.com/docs/manual/data-modeling/design-patterns/) — Official pattern catalog
@@ -33,7 +33,7 @@ The defining MongoDB idiom. If two pieces of data are always accessed together, 
 }
 ```
 
-**PN implication**: The contract must express embed vs. reference as a first-class choice. The ORM must handle embedded data differently from referenced data (no join needed, atomic writes, always loaded). See [design question #1](../planning/mongo-target/1-design-docs/design-questions.md#1-embedded-documents-relation-field-or-distinct-concept).
+**PN implication**: The contract must express embed vs. reference as a first-class choice. The ORM must handle embedded data differently from referenced data (no join needed, atomic writes, always loaded). See [ADR 174 — Aggregate roots and relation strategies](../architecture%20docs/adrs/ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md).
 
 ### Reference what grows unboundedly or is accessed independently
 
@@ -49,7 +49,7 @@ When an embedded array would grow without limit, or when the related data needs 
 { _id: ObjectId("bbb"), userId: ObjectId("aaa"), total: 99.99, items: [...] }
 ```
 
-**PN implication**: The ORM must resolve references — either via application-level joining or `$lookup`. The contract's relation declarations drive this. See [design question #7](../planning/mongo-target/1-design-docs/design-questions.md#7-relation-loading-application-level-joining-vs-lookup).
+**PN implication**: The ORM must resolve references — either via application-level joining or `$lookup`. The contract's relation declarations drive this. The Mongo ORM uses `$lookup` aggregation stages for reference includes.
 
 ### Extended reference (partial denormalization)
 
@@ -110,7 +110,7 @@ Store documents of different "types" in one collection, distinguished by a discr
 
 All three share some fields (`_id`, `type`, `recipient`-ish) but have type-specific fields. Queries like "find all notifications for user X" run against one collection.
 
-**PN implication**: The contract needs discriminated unions — a base model with shared fields and variant models with type-specific fields. This is promoted to April validation scope. See [design question #6](../planning/mongo-target/1-design-docs/design-questions.md#6-polymorphism-and-discriminated-unions-validate-in-april).
+**PN implication**: The contract needs discriminated unions — a base model with shared fields and variant models with type-specific fields. See [ADR 173 — Polymorphism via discriminator and variants](../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md).
 
 ### Schema versioning
 
@@ -246,7 +246,7 @@ db.orders.aggregate([
 ])
 ```
 
-**PN implication**: The ORM covers basic CRUD. Aggregation pipelines are the escape hatch for everything else. A raw pipeline API is the PoC minimum; a type-safe pipeline builder is a future goal. See [design question #8](../planning/mongo-target/1-design-docs/design-questions.md#8-aggregation-pipeline-dsl-scope-and-timing).
+**PN implication**: The ORM covers basic CRUD. Aggregation pipelines are the escape hatch for everything else. A raw pipeline API is the PoC minimum; a type-safe pipeline builder is a future goal.
 
 ### Distinct values
 
@@ -282,7 +282,7 @@ db.posts.updateOne(
 )
 ```
 
-**PN implication**: The ORM's `update()` should support `$set` (implicit for plain data) and expose `$inc`, `$currentDate` as Mongo-native extensions. See [design question #4](../planning/mongo-target/1-design-docs/design-questions.md#4-update-operators-shared-orm-surface-vs-mongo-native-operations).
+**PN implication**: The ORM's `update()` should support `$set` (implicit for plain data) and expose `$inc`, `$currentDate` as Mongo-native extensions.
 
 ### Atomic array mutations
 
@@ -380,7 +380,7 @@ for await (const change of stream) {
 }
 ```
 
-**PN implication**: Out of scope for PoC. The runtime's async iterable model is a natural fit, but the plugin pipeline's lifecycle semantics need to accommodate unbounded streams. See [design question #9](../planning/mongo-target/1-design-docs/design-questions.md#9-change-streams-and-the-runtimes-execution-model).
+**PN implication**: Out of scope for PoC. The runtime's async iterable model is a natural fit, but the plugin pipeline's lifecycle semantics need to accommodate unbounded streams.
 
 ### TTL for automatic expiration
 
