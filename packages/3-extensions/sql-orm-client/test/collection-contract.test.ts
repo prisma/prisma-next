@@ -52,7 +52,7 @@ describe('collection-contract capability detection', () => {
   });
 
   it('assertReturningCapability throws when returning is unavailable', () => {
-    const contract = getTestContract();
+    const contract = { ...getTestContract(), capabilities: {} };
     expect(() => assertReturningCapability(contract, 'create()')).toThrow(
       /requires contract capability "returning"/,
     );

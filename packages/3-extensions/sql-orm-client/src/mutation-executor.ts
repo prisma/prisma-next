@@ -176,7 +176,7 @@ async function createGraph(
     );
   }
 
-  const parentRow = await insertSingleRow(scope, contract, modelName, scalarData);
+  const parentRow = await insertSingleRow(scope, context, modelName, scalarData);
 
   for (const relationMutation of childOwned) {
     if (relationMutation.mutation.kind === 'disconnect') {
@@ -566,12 +566,24 @@ function buildChildJoinWhere(
 
 async function insertSingleRow(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  context: ExecutionContext,
   modelName: string,
   data: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
+  const contract = context.contract;
   const tableName = resolveModelTableName(contract, modelName);
+
   const mappedData = mapModelDataToStorageRow(contract, modelName, data);
+  const applied = context.applyMutationDefaults({
+    op: 'create',
+    table: tableName,
+    values: mappedData,
+  });
+
+  for (const def of applied) {
+    mappedData[def.column] = def.value;
+  }
+
   const compiled = compileInsertReturning(contract, tableName, [mappedData], undefined);
   const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 

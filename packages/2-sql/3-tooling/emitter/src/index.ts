@@ -350,6 +350,7 @@ export const sqlTargetFamilyHook = {
     readonly target: ${this.serializeValue(ir.target)};
     readonly capabilities: ${this.serializeValue(ir.capabilities)};
     readonly extensionPacks: ${this.serializeValue(ir.extensionPacks)};
+    readonly execution: ${this.serializeValue(ir.execution)};
   };
 
   export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;

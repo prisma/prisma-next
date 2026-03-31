@@ -4,8 +4,9 @@ import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
 import { getTestContext, getTestContract } from '../helpers';
 import {
+  createReturningTagsCollection,
   createReturningUsersCollection,
-  createUsersCollection,
+  createUsersCollectionWithoutReturning,
   timeouts,
   withCollectionRuntime,
 } from './helpers';
@@ -77,7 +78,7 @@ describe('integration/upsert', () => {
     'upsert() rejects when returning capability is disabled',
     async () => {
       await withCollectionRuntime(async (runtime) => {
-        const users = createUsersCollection(runtime);
+        const users = createUsersCollectionWithoutReturning(runtime);
 
         await expect(
           users.upsert({
@@ -105,6 +106,35 @@ describe('integration/upsert', () => {
             update: { name: 'NoPK Updated' },
           }),
         ).rejects.toThrow(/requires conflict columns/);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'upsert() generates execution defaults for the create branch',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const tags = createReturningTagsCollection(runtime);
+
+        const created = await tags.upsert({
+          create: { name: 'typescript' },
+          update: { name: 'typescript' },
+          conflictOn: { name: 'typescript' },
+        });
+
+        expect(created.id).toEqual(expect.any(String));
+        expect(created.id.length).toBeGreaterThan(0);
+        expect(created.name).toBe('typescript');
+
+        const updated = await tags.upsert({
+          create: { name: 'typescript' },
+          update: { name: 'typescript-updated' },
+          conflictOn: { name: 'typescript' },
+        });
+
+        expect(updated.id).toBe(created.id);
+        expect(updated.name).toBe('typescript-updated');
       });
     },
     timeouts.spinUpPpgDev,

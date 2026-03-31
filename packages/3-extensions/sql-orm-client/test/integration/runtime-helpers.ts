@@ -109,6 +109,7 @@ export async function createPgIntegrationRuntime(
 }
 
 export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<void> {
+  await runtime.query('drop table if exists tags');
   await runtime.query('drop table if exists comments');
   await runtime.query('drop table if exists profiles');
   await runtime.query('drop table if exists posts');
@@ -145,6 +146,13 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
       id integer primary key,
       user_id integer,
       bio text not null
+    )
+  `);
+
+  await runtime.query(`
+    create table tags (
+      id text primary key,
+      name text not null unique
     )
   `);
 }
