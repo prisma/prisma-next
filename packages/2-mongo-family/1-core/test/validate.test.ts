@@ -25,7 +25,6 @@ describe('validateMongoContract()', () => {
 
     it('rejects missing targetFamily', () => {
       const json = makeValidContractJson();
-      // biome-ignore lint/performance/noDelete: test needs to remove a property
       delete (json as Record<string, unknown>)['targetFamily'];
       expect(() => validateMongoContract(json)).toThrow();
     });
