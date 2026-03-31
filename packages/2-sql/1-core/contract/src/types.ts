@@ -227,10 +227,9 @@ export type SqlContract<
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
   TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> = ContractBase<TStorageHash, TExecutionHash, TProfileHash> & {
+> = ContractBase<TStorageHash, TExecutionHash, TProfileHash, M> & {
   readonly targetFamily: string;
   readonly storage: S;
-  readonly models: M;
   readonly relations: R;
   readonly mappings: Map;
   readonly execution?: ExecutionSection;

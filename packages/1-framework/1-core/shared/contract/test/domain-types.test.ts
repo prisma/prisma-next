@@ -3,15 +3,12 @@ import type { DomainField, DomainModel, DomainRelation } from '../src/domain-typ
 import type { ContractBase } from '../src/types';
 
 describe('domain types', () => {
-  it('ContractBase includes roots', () => {
+  it('ContractBase includes roots and models', () => {
     type Roots = ContractBase['roots'];
+    type Models = ContractBase['models'];
 
     const roots: Roots = { users: 'User' };
-    expect(roots).toEqual({ users: 'User' });
-  });
-
-  it('DomainModel can represent SQL models', () => {
-    const models: Record<string, DomainModel> = {
+    const models: Models = {
       User: {
         fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
         relations: {},
@@ -19,6 +16,7 @@ describe('domain types', () => {
       },
     };
 
+    expect(roots).toEqual({ users: 'User' });
     expect(models['User']?.fields['id']?.nullable).toBe(false);
   });
 
