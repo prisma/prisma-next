@@ -11,7 +11,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { sql } from '../../src/runtime/sql';
 import { contract as contractJson } from '../fixtures/contract';
 import type { Contract } from '../fixtures/generated/contract';
@@ -436,5 +436,43 @@ describe('grouped query methods', () => {
   it('grouped query supports chained groupBy', () => {
     const ast = getAst(db().posts.select('user_id', 'views').groupBy('user_id').groupBy('views'));
     expect(ast.groupBy).toHaveLength(2);
+  });
+});
+
+describe('mutation defaults', () => {
+  function dbWithSpy() {
+    const spy = vi.fn(() => []);
+    const d = sql({
+      context: {
+        ...stubBase,
+        contract: sqlContract,
+        applyMutationDefaults: spy,
+      } as unknown as ExecutionContext<typeof sqlContract>,
+      runtime: stubRuntime,
+    });
+    return { d, spy };
+  }
+
+  it('INSERT calls applyMutationDefaults with op create', async () => {
+    const { d, spy } = dbWithSpy();
+    await d.users.insert({ id: 1, name: 'A', email: 'a@b.com' }).first();
+    expect(spy).toHaveBeenCalledWith({
+      op: 'create',
+      table: 'users',
+      values: { id: 1, name: 'A', email: 'a@b.com' },
+    });
+  });
+
+  it('UPDATE calls applyMutationDefaults with op update', async () => {
+    const { d, spy } = dbWithSpy();
+    await d.users
+      .update({ name: 'B' })
+      .where((f, fns) => fns.eq(f.id, 1))
+      .first();
+    expect(spy).toHaveBeenCalledWith({
+      op: 'update',
+      table: 'users',
+      values: { name: 'B' },
+    });
   });
 });
