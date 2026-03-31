@@ -261,6 +261,110 @@ The router finds candidate paths via DFS, collecting data migration names along 
 
 Environment refs declare desired state as target contract hash + required data migration names. A ref update is explicit and reviewable.
 
+## Operation builder API
+
+The operation builders are the primitives that both the planner and manual authoring use to construct migration operation chains. Each builder produces one or more operation entries that serialize to `ops.json`. The builders map 1:1 to the operations the Postgres planner currently produces.
+
+### Table operations
+
+```typescript
+createTable(tableName, { columns, primaryKey?, uniques?, indexes?, foreignKeys? })
+// → operationClass: 'additive'
+
+dropTable(tableName)
+// → operationClass: 'destructive'
+```
+
+### Column operations
+
+```typescript
+addColumn(tableName, columnName, { type, nullable?, default? })
+// → operationClass: 'additive'
+// When NOT NULL without default on non-empty table: uses temporary identity default
+
+dropColumn(tableName, columnName)
+// → operationClass: 'destructive'
+
+alterColumnType(tableName, columnName, { newType })
+// → operationClass: 'destructive'
+// Warning: may cause table rewrite
+
+setNotNull(tableName, columnName)
+// → operationClass: 'destructive'
+// Precheck: no NULL values exist
+
+dropNotNull(tableName, columnName)
+// → operationClass: 'widening'
+
+setDefault(tableName, columnName, defaultValue)
+// → operationClass: 'additive' (new default) or 'widening' (change default)
+
+dropDefault(tableName, columnName)
+// → operationClass: 'destructive'
+```
+
+### Constraint operations
+
+```typescript
+addPrimaryKey(tableName, { columns, constraintName? })
+// → operationClass: 'additive'
+
+addUnique(tableName, { columns, constraintName? })
+// → operationClass: 'additive'
+
+addForeignKey(tableName, { columns, references: { table, columns }, onDelete?, onUpdate?, constraintName? })
+// → operationClass: 'additive'
+
+dropConstraint(tableName, constraintName)
+// → operationClass: 'destructive'
+```
+
+### Index operations
+
+```typescript
+createIndex(tableName, { columns, indexName?, unique? })
+// → operationClass: 'additive'
+
+dropIndex(tableName, indexName)
+// → operationClass: 'destructive'
+```
+
+### Data transform operations
+
+```typescript
+dataTransform(name, {
+  check: (client) => QueryAST | boolean,
+  run: (client) => QueryAST | QueryAST[],
+})
+// → operationClass: 'data'
+// name becomes the invariant identity recorded in the ledger
+```
+
+### Type operations
+
+```typescript
+createType(typeName, definition)
+// → operationClass: 'additive'
+// For enums, domains, composite types
+```
+
+### Annotations
+
+```typescript
+transaction([...ops])
+// Wraps a group of operations in a single transaction
+
+noTransaction(op)
+// Marks an operation to run outside any transaction
+```
+
+### Design notes
+
+- Each builder produces an operation object (or array of objects) with the same shape as `SqlMigrationPlanOperation` — `id`, `label`, `operationClass`, `target`, `precheck`, `execute`, `postcheck`.
+- The `dataTransform` builder is special: its `check` and `run` are callbacks that receive the query builder client and return ASTs. At verification time, these are evaluated and the ASTs are serialized into the op entry.
+- Builders are target-agnostic at the interface level. The target adapter determines how each operation renders to SQL (or MongoDB commands, etc.). For v1, only the Postgres adapter exists.
+- The planner uses these same builders to construct its output. When the planner emits TS, it writes calls to these builders in the correct order.
+
 ## Post-apply verification (R11)
 
 The existing post-apply schema verification (introspect database, compare against destination contract) serves as the hard safety net. No additional verification mechanism is needed — the runner already does this for structural migrations, and it naturally extends to cover migrations with data transforms.
@@ -403,7 +507,7 @@ These document the major design choices, the alternatives considered, and why we
 
 4. **Query builder expressiveness**: The query builder needs UPDATE, INSERT...SELECT, DELETE, subqueries with joins, and target-specific functions. Gaps mean the query builder needs extending — no raw SQL fallback in v1.
 
-5. **Operation builder API design**: The primitive operation builders (`addColumn`, `dropColumn`, `setNotNull`, `dataTransform`, etc.) and their type signatures need concrete design. This is the authoring surface for both planner output and manual authoring.
+5. **Operation builder API design**: **Resolved.** See "Operation builder API" section in the Solution. Covers table, column, constraint, index, type, and data transform operations mapped to the 19 operation types the Postgres planner produces.
 
 6. **Planner TS output format**: The planner currently writes `ops.json` directly. Changing it to produce `migration.ts` that evaluates to ops is a significant refactor of the planning pipeline. The transition path needs design.
 
