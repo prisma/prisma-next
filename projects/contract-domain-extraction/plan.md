@@ -184,12 +184,11 @@ Independent of Milestone 4 (IR alignment) — can be done before or after.
 ## Open Items
 
 1. **Dual-format `normalizeContract()`.** Task 1.3.1 adds detection of old vs new JSON format in `normalizeContract()` to enable incremental fixture migration. This adds temporary complexity but significantly reduces risk — fixtures can be migrated across multiple PRs rather than atomically. The old-format path is removed in task 3.5.
-2. **Spec open questions (with default assumptions from spec):**
-  - `model.storage.fields` shape: just `{ column: string }` (minimal). Top-level `storage.tables` is source of truth for column metadata.
-  - Relation join naming: use ADR 172 naming (`localFields`/`targetFields`), not old naming (`childCols`/`parentCols`).
-  - `roots` derivation: emitter derives from existing model/table mapping. Explicit authoring-level roots is Phase 4 / DSL concern.
-  - ~~`strategy` on relations~~: **Resolved.** Per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), relations are plain graph edges — no `strategy` field. Owned models declare `"owner"` on the model itself.
+2. ~~**Spec open questions.**~~ **All resolved** (see spec § Open Questions):
+  - `model.storage.fields` shape: `{ column: string }` only. Top-level `storage.tables` is the single source of truth for column metadata.
+  - Relation join naming: `localFields`/`targetFields` (not `childCols`/`parentCols`).
+  - `roots` derivation: emitter derives for now; IR supplies in Phase 4.
+  - `model.relations` shape: per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), plain graph edges — no `strategy`. Owned models declare `"owner"` on the model itself.
 3. **Phase 2 coordination with Alexey.** The ORM client migration (tasks 2.1–2.5) touches core ORM internals. This must be sequenced to avoid conflicts with Alexey's active ORM development. The widened types from Phase 1 allow him to migrate incrementally.
 4. `**paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
-5. **Unresolved spec open questions** carried forward from spec (see spec § Open Questions for full context).
 
