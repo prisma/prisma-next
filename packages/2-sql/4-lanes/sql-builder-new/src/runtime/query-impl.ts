@@ -15,6 +15,7 @@ import type {
 import type { ResolveRow } from '../resolve';
 import type {
   Expand,
+  JoinOuterScope,
   JoinSource,
   QueryContext,
   Scope,
@@ -22,7 +23,6 @@ import type {
   // biome-ignore lint/correctness/noUnusedImports: used in `declare` property
   SubqueryMarker,
 } from '../scope';
-import { JoinOuterScope } from '../scope';
 import type { GroupedQuery } from '../types/grouped-query';
 import type { SelectQuery } from '../types/select-query';
 import {
@@ -105,10 +105,14 @@ abstract class QueryBase<
       namespaces: { [alias]: this.state.rowFields } as Record<Alias, RowType>,
     };
     return {
-      [JoinOuterScope]: scope,
       getJoinOuterScope: () => scope,
       buildAst: () => derivedSource,
-    };
+
+      // `as unknown` is necessary, because JoinOuterScope is a phantom type-only property that does not exist at runtime
+    } satisfies Omit<JoinSource<RowType, Alias>, typeof JoinOuterScope> as unknown as JoinSource<
+      RowType,
+      Alias
+    >;
   }
 
   getRowFields(): Record<string, ScopeField> {
