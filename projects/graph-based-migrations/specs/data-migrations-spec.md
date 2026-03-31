@@ -80,7 +80,7 @@ These apply across the entire solution:
 
 Data migrations are authored in a `data-migration.ts` file inside the migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(client), run(client) })` API.
 
-The `client` parameter provides the existing ORM/query builder interface. Functions return query ASTs — they do not execute queries directly. This is the key to R0: the TypeScript is evaluated once (at verification time) to produce ASTs, which are serialized as JSON into `ops.json`. At apply time, the target adapter renders the ASTs to SQL and executes them. No TypeScript is loaded.
+The `client` parameter provides the existing ORM/query builder interface. Functions return query ASTs (or an array of ASTs for multi-step transformations) — they do not execute queries directly. This is the key to R0: the TypeScript is evaluated once (at verification time) to produce ASTs, which are serialized as JSON into `ops.json`. At apply time, the target adapter renders the ASTs to SQL and executes them. No TypeScript is loaded.
 
 Each migration edge supports at most one data migration (single `data-migration.ts` per package).
 
@@ -322,7 +322,7 @@ These document the major design choices, the alternatives considered, and why we
 
 - [ ] A `data-migration.ts` file using `defineMigration` is recognized during verification/planning
 - [ ] `check(client)` is required — `defineMigration` without `check` is a type error
-- [ ] `run(client)` and `check(client)` receive the ORM/query builder client and return query ASTs
+- [ ] `run(client)` and `check(client)` receive the ORM/query builder client and return query ASTs (or array of ASTs)
 - [ ] `migration verify` evaluates the TypeScript once and serializes resulting ASTs as JSON into `ops.json`
 - [ ] No TypeScript is loaded or executed at `migration apply` time — only serialized ASTs from `ops.json` rendered to SQL by the target adapter
 - [ ] The `data-migration.ts` source file is not part of the `edgeId` computation; only serialized ASTs are
