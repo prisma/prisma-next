@@ -152,7 +152,13 @@ No verification at authoring time. Post-apply schema verification (R12) catches 
 
 ## Retry safety — required `check` (R3)
 
-`check(client)` is **required**. It returns a query AST whose result determines whether the data migration has already been applied. At apply time, the runner executes the rendered check SQL — if the result indicates "already done", the run step is skipped. Users who don't need a meaningful check can return a query that always indicates "skip" or "always run".
+`check(client)` is **required**. It returns one of:
+
+- **A query AST** (the common case): the query describes *violations* — rows that indicate the migration still needs to run. Empty result = already applied (skip `run`). Non-empty result = needs to run. This is efficient (`LIMIT 1` for early exit) and the violation rows are useful for diagnostics.
+- **`false`**: always run. For seeding, idempotent-by-construction cases, or when a meaningful check isn't worth writing.
+- **`true`**: always skip. Use with caution.
+
+At apply time, the runner executes the serialized check query (or interprets the literal boolean) to decide whether to skip the `run` step.
 
 ## Detection and scaffolding (R4, R11)
 
@@ -238,13 +244,13 @@ These document the major design choices, the alternatives considered, and why we
 
 ## D3. Required `check` postcondition
 
-**Decision**: Every data migration must implement a `check(client)` function that returns a query AST. The query is serialized to JSON, rendered to SQL at apply time, and executed to determine if the migration has already been applied.
+**Decision**: Every data migration must implement a `check(client)` function that returns a query AST (describing violations — empty result means done), `false` (always run), or `true` (always skip). The query is serialized to JSON, rendered to SQL at apply time, and executed to determine if the migration has already been applied.
 
 **Alternatives considered**:
 - Optional postconditions with a separate ledger completion marker for retry safety
 - No postconditions, relying solely on idempotent queries
 
-**Why required**: Solves three problems with one mechanism: (1) retry safety — runner executes the rendered check SQL before the run SQL, skipping if already done, (2) no need for a mid-migration ledger write or separate completion marker, (3) forces the user to think about what "done" means. The escape hatch is trivial (return a query that always indicates "skip" or "always run") so it doesn't block users who don't care, but it nudges toward correctness.
+**Why required**: Solves three problems with one mechanism: (1) retry safety — runner executes the rendered check SQL before the run SQL, skipping if already done, (2) no need for a mid-migration ledger write or separate completion marker, (3) forces the user to think about what "done" means. The escape hatch is trivial (`return false` to always run, `return true` to always skip) so it doesn't block users who don't care, but it nudges toward correctness.
 
 ## D4. Single-edge with interleaved ops over split into multiple edges
 
@@ -362,7 +368,6 @@ These document the major design choices, the alternatives considered, and why we
 
 5. **Query builder expressiveness for data migrations**: The ORM/query builder needs to support UPDATE, INSERT ... SELECT, DELETE, subqueries with joins, and target-specific functions (e.g., `split_part`, `gen_random_uuid`). The current expressiveness of the query builder for DML operations needs validation against the scenario list. If gaps exist, `readSql` is the fallback.
 
-6. **`check` result interpretation**: The `check` function returns a query AST. How does the runner interpret the query result as "already applied" vs "needs to run"? Convention options: (a) count query — 0 means done, (b) boolean query — true means done, (c) existence query — no rows means done. Needs a clear convention or configurable interpretation.
 
 # Other Considerations
 
