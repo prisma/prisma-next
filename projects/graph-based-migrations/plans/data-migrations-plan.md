@@ -38,7 +38,7 @@ The ORM/query builder needs to support the DML operations data migrations requir
 - [ ] Verify DELETE FROM ... WHERE (S6, S13, S15 scenarios)
 - [ ] Verify subqueries in UPDATE context (S9 denormalization)
 - [ ] Verify target-specific functions are expressible (e.g., `split_part`, `gen_random_uuid`, `AT TIME ZONE`)
-- [ ] Document gaps — `readSql` is the fallback for anything the query builder can't express
+- [ ] Document gaps — if critical DML operations are missing, assess whether query builder extensions are needed before M1
 - [ ] If critical gaps exist, assess whether query builder extensions are needed before M1
 
 ## Milestones
@@ -66,8 +66,6 @@ The core data migration lifecycle works end-to-end: author a `data-migration.ts`
 - [ ] Write test for retry after partial failure in isolated mode: phase 1 ops skip via idempotency, check determines data migration skip
 - [ ] Write test: `data-migration.ts` source file is NOT part of `edgeId` — only serialized ASTs in ops.json are
 - [ ] Write test: `migration apply` rejects draft (unattested) packages
-- [ ] Implement `readSql(filename)` helper: reads `.sql` file relative to migration package directory, returns a raw SQL AST node that serializes directly
-- [ ] Write tests for `readSql`: resolves relative path, serializes into ops, handles single and multi-statement SQL
 - [ ] E2E test: hand-authored `data-migration.ts` using query builder that splits `name` → `firstName` + `lastName` → verify → apply → confirm data transformation and schema state
 
 ### Milestone 2: Planner detection, scaffolding, and `migration new`
@@ -90,7 +88,7 @@ The planner detects when data migrations are needed and scaffolds `data-migratio
 - [ ] Support `--from` and `--to` flags on `migration new` for explicit hash override
 - [ ] Write tests for `migration new`: correct `from`/`to` in manifest, scaffold file is valid TS, `--from`/`--to` override defaults
 - [ ] E2E test: `migration plan` detects NOT NULL add → scaffolds → user fills in → `migration verify` → `migration apply` → data migrated
-- [ ] E2E test: `migration new` → user writes raw SQL via `readSql` → verify → apply → post-apply verification passes
+- [ ] E2E test: `migration new` → user writes data migration using query builder → verify → apply → post-apply verification passes
 
 ### Milestone 3: Graph integration and invariant-aware routing
 

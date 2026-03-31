@@ -24,7 +24,7 @@ Schema evolution often requires data transformations that the database cannot pe
 
 ## R2. Data migrations cover a wide range of schema evolution scenarios
 
-The system must handle the common patterns — computed backfill, lossy type changes, column split/merge, table split/merge, normalization/extraction, key identity changes, constraint enforcement, data seeding. Raw SQL via `readSql` serves as the escape hatch for anything the query builder can't express. Scenarios requiring application-level libraries (e.g., bcrypt hashing) or external data sources are out of scope and must be handled outside the migration system.
+The system must handle the common patterns — computed backfill, lossy type changes, column split/merge, table split/merge, normalization/extraction, key identity changes, constraint enforcement, data seeding. The query builder is the sole authoring surface for v1; if it can't express a scenario, that's either a gap to fill in the query builder or an out-of-scope limitation. Scenarios requiring application-level libraries (e.g., bcrypt hashing) or external data sources are out of scope and must be handled outside the migration system.
 
 ## R3. Data migrations are safe to retry after partial failure
 
@@ -50,23 +50,19 @@ The migration graph must be aware of data migrations. When multiple paths exist 
 
 Different environments (production, staging, dev) may need different data migration guarantees. The system must allow environments to declare which named data migrations must have been applied, and route accordingly.
 
-## R9. Users can write arbitrary SQL when the planner is insufficient
+## R9. Users can author migrations manually
 
-The planner generates structural DDL but cannot handle every case. Users need an escape hatch to write raw SQL (structural or data) that the system includes as a first-class migration. This should integrate naturally with the data migration mechanism.
+Users need to be able to write their own migration (structural DDL, data transformations, or both) without relying on the planner. This should integrate naturally with the data migration mechanism rather than requiring a separate authoring surface.
 
-## R10. SQL-first users don't need to write TypeScript
-
-Some users prefer writing plain SQL files over TypeScript. The system should support this without requiring them to learn the TypeScript API beyond a minimal wrapper.
-
-## R11. Planning works offline (no database connection required)
+## R10. Planning works offline (no database connection required)
 
 Per ADR 169, migration planning must not require a live database connection. Detection of data migration needs and scaffolding must work from contract diffs alone.
 
-## R12. Post-apply verification catches schema mismatches
+## R11. Post-apply verification catches schema mismatches
 
 After a migration (including any data migration) completes, the system must verify that the database schema matches the destination contract. This is the hard safety net — if the migration didn't produce the expected schema state, apply fails.
 
-## R13. No special rollback mechanism
+## R12. No special rollback mechanism
 
 Reverting a migration is just another migration in the opposite direction. The system should not introduce rollback-specific machinery for data migrations. A migration S2→S1 is an ordinary graph edge that can carry its own data migration.
 
@@ -80,7 +76,7 @@ These apply across the entire solution:
 - Only serialized JSON ASTs are stored in `ops.json`. The target adapter renders them to SQL at apply time. No TypeScript is loaded or executed at apply time.
 - User-authored data migration queries should be idempotent. The required `check` query provides the primary retry-safety mechanism, but truly idempotent `run` queries are the safest approach for `isolated`/`unmanaged` modes.
 
-## Authoring and serialization model (R0, R1, R2)
+## Authoring and serialization model (R0, R1, R2, R9)
 
 Data migrations are authored in a `data-migration.ts` file inside the migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(client), run(client) })` API.
 
@@ -119,36 +115,23 @@ export default defineMigration({
 
   run(client) {
     return client.users
-      .update({ firstName: sql`split_part("name", ' ', 1)`,
-                lastName: sql`split_part("name", ' ', 2)` })
+      .update({ firstName: expr("split_part(name, ' ', 1)"),
+                lastName: expr("split_part(name, ' ', 2)") })
       .where({ firstName: null })
     // Serialized as JSON AST in ops.json
     // Rendered at apply time to: UPDATE "users" SET "first_name" = split_part(...), ...
+    // Note: exact API for raw expressions TBD based on query builder capabilities
   }
-})
-```
-
-### SQL-first alternative — `readSql` (R9, R10)
-
-A `readSql(filename)` helper reads a `.sql` file relative to the migration package directory. The raw SQL is stored directly in the ops entry at verification time (as a raw SQL AST node). This allows SQL-first users to write plain SQL files:
-
-```typescript
-import { defineMigration, readSql } from '@prisma-next/migration'
-export default defineMigration({
-  name: 'custom-migration',
-  transaction: 'inline',
-  check: readSql('check.sql'),
-  run: readSql('migration.sql'),
 })
 ```
 
 ### Manual authoring — `migration new` (R9)
 
-`migration new` scaffolds a migration package with a `data-migration.ts` and empty (or no) structural ops. The user writes queries using the ORM/query builder or `readSql`. This is the escape hatch for when the planner's structural output is wrong, insufficient, or the user needs full control.
+`migration new` scaffolds a migration package with a `data-migration.ts` and empty (or no) structural ops. The user writes queries using the ORM/query builder. This is the escape hatch for when the user wants to author the entire migration manually.
 
 `migration new` derives `from` hash from the current migration graph state (same logic as `migration plan`) and `to` hash from the current emitted contract. Both can be overridden with `--from` and `--to` flags.
 
-No verification at authoring time. Post-apply schema verification (R12) catches mismatches.
+No verification at authoring time. Post-apply schema verification (R11) catches mismatches.
 
 ## Retry safety — required `check` (R3)
 
@@ -165,7 +148,7 @@ The check executes at the same point in the migration — between phase 1 (addit
 
 This dual role means the execution within phase 2 is: check → (skip or run) → check again → (fail or proceed to phase 3).
 
-## Detection and scaffolding (R4, R11)
+## Detection and scaffolding (R4, R10)
 
 The planner detects structural changes that imply a data migration is needed:
 
@@ -213,11 +196,11 @@ The router finds candidate paths via DFS, collecting data migration names along 
 
 Environment refs declare desired state as target contract hash + required data migration names. A ref update is explicit and reviewable.
 
-## Post-apply verification (R12)
+## Post-apply verification (R11)
 
 The existing post-apply schema verification (introspect database, compare against destination contract) serves as the hard safety net for data migrations. No additional verification mechanism is needed — the runner already does this for structural migrations, and it naturally extends to cover data migrations.
 
-## Rollback (R13)
+## Rollback (R12)
 
 No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S1 — an ordinary graph edge that can carry its own data migration if needed.
 
@@ -356,6 +339,7 @@ These document the major design choices, the alternatives considered, and why we
 - **Pure data migrations (A→A)**: Data-only transformations with no schema change. The model extends naturally to self-edges later, but ADR 039 currently rejects self-loops.
 - **Smart scaffolding / recipe templates**: Pre-filled queries for common patterns (backfill, type conversion, extraction). Future DX layer.
 - **Arbitrary code execution**: Scenarios requiring application-level libraries (e.g., bcrypt hashing, S16) or external data sources (e.g., audit trail from external API, S17) cannot be expressed in this model. They must be handled outside the migration system.
+- **Raw SQL escape hatch (`readSql`, `sql` tagged templates)**: Descoped for v1. The query builder is the sole authoring surface. However, the AST model naturally supports a future `raw_sql` node type — an opaque SQL string stored in the JSON AST, passed through verbatim by the target adapter. This would enable `readSql` (read `.sql` file → `raw_sql` AST node) and raw SQL expressions within the query builder. The `raw_sql` node is inherently target-specific (Postgres adapter executes it, MongoDB adapter would reject it), which is an acceptable tradeoff for an escape hatch. Not implementing in v1 to keep the authoring surface focused on the query builder and validate its expressiveness first.
 - **Runtime no-op detection**: Mock-style verification that migration queries actually modified data. Future safety layer.
 - **Operator algebra**: Composable migration operators with commutativity analysis. Useful design thinking but the invariant model handles correctness without it.
 - **Content hash drift detection**: Warn when data migration source has been modified since it was applied to another environment. Descoped because: (1) the `data-migration.ts` is not part of `edgeId` — only the serialized ASTs are; (2) the serialized ASTs in ops.json already have integrity via `edgeId`; (3) cross-environment comparison requires shared state that doesn't exist. Revisit when we have a clearer picture of multi-environment workflows.
