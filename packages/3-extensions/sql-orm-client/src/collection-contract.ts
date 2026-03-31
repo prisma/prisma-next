@@ -1,18 +1,69 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RelationCardinalityTag } from './types';
 
-interface RelationWithOn {
+type ModelStorageFields = Record<string, { column?: string }>;
+type ModelEntry = {
+  storage?: { table?: string; fields?: ModelStorageFields };
+  relations?: Record<string, unknown>;
+  fields?: Record<string, { codecId?: string }>;
+};
+type ModelsMap = Record<string, ModelEntry>;
+
+function modelsOf(contract: SqlContract<SqlStorage>): ModelsMap {
+  return contract.models as ModelsMap;
+}
+
+export function resolveFieldToColumn(
+  contract: SqlContract<SqlStorage>,
+  modelName: string,
+  fieldName: string,
+): string {
+  return modelsOf(contract)[modelName]?.storage?.fields?.[fieldName]?.column ?? fieldName;
+}
+
+export function getFieldToColumnMap(
+  contract: SqlContract<SqlStorage>,
+  modelName: string,
+): Record<string, string> {
+  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
+  const result: Record<string, string> = {};
+  for (const [f, s] of Object.entries(storageFields)) {
+    if (s?.column) result[f] = s.column;
+  }
+  return result;
+}
+
+export function getColumnToFieldMap(
+  contract: SqlContract<SqlStorage>,
+  modelName: string,
+): Record<string, string> {
+  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
+  const result: Record<string, string> = {};
+  for (const [f, s] of Object.entries(storageFields)) {
+    if (s?.column) result[s.column] = f;
+  }
+  return result;
+}
+
+export function findModelNameForTable(
+  contract: SqlContract<SqlStorage>,
+  tableName: string,
+): string | undefined {
+  for (const [modelName, model] of Object.entries(modelsOf(contract))) {
+    if (model?.storage?.table === tableName) {
+      return modelName;
+    }
+  }
+  return undefined;
+}
+
+interface ResolvedRelation {
   readonly to: string;
   readonly cardinality: RelationCardinalityTag | undefined;
   readonly on: {
-    readonly parentCols: readonly string[];
-    readonly childCols: readonly string[];
+    readonly localFields: readonly string[];
+    readonly targetFields: readonly string[];
   };
-}
-
-interface LegacyRelation {
-  readonly model: string;
-  readonly foreignKey: string;
 }
 
 export interface ResolvedIncludeRelation {
@@ -28,46 +79,36 @@ export function resolveIncludeRelation(
   modelName: string,
   relationName: string,
 ): ResolvedIncludeRelation {
-  const parentTableName = resolveModelTableName(contract, modelName);
-  const relation = resolveContractRelation(contract, parentTableName, relationName);
-  if (relation) {
-    const relatedTableName = resolveModelTableName(contract, relation.to);
-    const parentPkColumn = relation.on.parentCols[0];
-    const fkColumn = relation.on.childCols[0];
-    if (parentPkColumn && fkColumn) {
-      return {
-        relatedModelName: relation.to,
-        relatedTableName,
-        fkColumn,
-        parentPkColumn,
-        cardinality: relation.cardinality,
-      };
-    }
+  const relation = resolveModelRelation(contract, modelName, relationName);
+  if (!relation) {
+    throw new Error(`Relation '${relationName}' not found on model '${modelName}'`);
   }
 
-  const legacy = resolveLegacyModelRelation(contract, modelName, relationName);
-  if (legacy) {
-    const parentTable = contract.storage.tables[parentTableName];
-    const parentPkColumn = parentTable?.primaryKey?.columns[0] ?? 'id';
-    return {
-      relatedModelName: legacy.model,
-      relatedTableName: resolveModelTableName(contract, legacy.model),
-      fkColumn: legacy.foreignKey,
-      parentPkColumn,
-      cardinality: '1:N',
-    };
-  }
+  const relatedTableName = resolveModelTableName(contract, relation.to);
 
-  throw new Error(`Relation '${relationName}' not found on model '${modelName}'`);
+  const localColumn = resolveFieldToColumn(contract, modelName, relation.on.localFields[0] ?? '');
+  const targetColumn = resolveFieldToColumn(
+    contract,
+    relation.to,
+    relation.on.targetFields[0] ?? '',
+  );
+
+  return {
+    relatedModelName: relation.to,
+    relatedTableName,
+    fkColumn: targetColumn,
+    parentPkColumn: localColumn,
+    cardinality: relation.cardinality,
+  };
 }
 
-function resolveContractRelation(
+function resolveModelRelation(
   contract: SqlContract<SqlStorage>,
-  parentTableName: string,
+  modelName: string,
   relationName: string,
-): RelationWithOn | undefined {
-  const tableRelations = contract.relations as Record<string, Record<string, unknown>>;
-  const relation = tableRelations[parentTableName]?.[relationName];
+): ResolvedRelation | undefined {
+  const models = modelsOf(contract);
+  const relation = models[modelName]?.relations?.[relationName];
   if (!relation || typeof relation !== 'object') {
     return undefined;
   }
@@ -76,17 +117,17 @@ function resolveContractRelation(
     to?: unknown;
     cardinality?: unknown;
     on?: {
-      parentCols?: unknown;
-      childCols?: unknown;
+      localFields?: unknown;
+      targetFields?: unknown;
     };
   };
-  const parentCols = relationObj.on?.parentCols;
-  const childCols = relationObj.on?.childCols;
+  const localFields = relationObj.on?.localFields;
+  const targetFields = relationObj.on?.targetFields;
 
   if (
     typeof relationObj.to !== 'string' ||
-    !Array.isArray(parentCols) ||
-    !Array.isArray(childCols)
+    !Array.isArray(localFields) ||
+    !Array.isArray(targetFields)
   ) {
     return undefined;
   }
@@ -95,8 +136,8 @@ function resolveContractRelation(
     to: relationObj.to,
     cardinality: parseRelationCardinality(relationObj.cardinality),
     on: {
-      parentCols: parentCols as readonly string[],
-      childCols: childCols as readonly string[],
+      localFields: localFields as readonly string[],
+      targetFields: targetFields as readonly string[],
     },
   };
 }
@@ -108,40 +149,14 @@ function parseRelationCardinality(value: unknown): RelationCardinalityTag | unde
   return undefined;
 }
 
-function resolveLegacyModelRelation(
-  contract: SqlContract<SqlStorage>,
-  modelName: string,
-  relationName: string,
-): LegacyRelation | undefined {
-  const models = contract.models as Record<
-    string,
-    { relations?: Record<string, { model?: unknown; foreignKey?: unknown }> }
-  >;
-  const relation = models[modelName]?.relations?.[relationName];
-  if (!relation) {
-    return undefined;
-  }
-
-  if (typeof relation.model !== 'string' || typeof relation.foreignKey !== 'string') {
-    return undefined;
-  }
-
-  return {
-    model: relation.model,
-    foreignKey: relation.foreignKey,
-  };
-}
-
 export function resolveUpsertConflictColumns(
   contract: SqlContract<SqlStorage>,
   modelName: string,
   conflictOn: Record<string, unknown> | undefined,
 ): string[] {
-  const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
-
   if (conflictOn && typeof conflictOn === 'object') {
-    const columns = Object.keys(conflictOn).map(
-      (fieldName) => fieldToColumn[fieldName] ?? fieldName,
+    const columns = Object.keys(conflictOn).map((fieldName) =>
+      resolveFieldToColumn(contract, modelName, fieldName),
     );
     if (columns.length > 0) {
       return columns;
@@ -157,14 +172,7 @@ export function resolveModelTableName(
   contract: SqlContract<SqlStorage>,
   modelName: string,
 ): string {
-  const mappedTable = contract.mappings.modelToTable?.[modelName];
-  if (mappedTable) {
-    return mappedTable;
-  }
-
-  const modelStorage = (contract.models as Record<string, { storage?: { table?: unknown } }>)[
-    modelName
-  ]?.storage;
+  const modelStorage = modelsOf(contract)[modelName]?.storage;
   if (modelStorage && typeof modelStorage.table === 'string') {
     return modelStorage.table;
   }

@@ -10,6 +10,7 @@ import {
 } from './collection-column-mapping';
 import {
   assertReturningCapability,
+  getColumnToFieldMap,
   isToOneCardinality,
   resolveIncludeRelation,
   resolveModelTableName,
@@ -888,7 +889,7 @@ export class Collection<
     createValues: Record<string, unknown>,
     conflictColumns: readonly string[],
   ): Record<string, unknown> {
-    const columnToField = this.contract.mappings.columnToField?.[this.tableName] ?? {};
+    const columnToField = getColumnToFieldMap(this.contract, this.modelName);
     const criterion: Record<string, unknown> = {};
 
     for (const columnName of conflictColumns) {

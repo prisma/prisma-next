@@ -1,11 +1,12 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { getFieldToColumnMap } from './collection-contract';
 import type { AggregateBuilder, AggregateSelector, NumericFieldNames } from './types';
 
 export function createAggregateBuilder<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
 >(contract: TContract, modelName: ModelName): AggregateBuilder<TContract, ModelName> {
-  const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
+  const fieldToColumn = getFieldToColumnMap(contract, modelName);
 
   return {
     count() {
