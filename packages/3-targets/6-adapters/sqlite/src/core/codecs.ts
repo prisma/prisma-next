@@ -26,55 +26,64 @@ export type JsonValue =
 const sqliteTextCodec = codec({
   typeId: SQLITE_TEXT_CODEC_ID,
   targetTypes: ['text'],
+  traits: ['equality', 'order', 'textual'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
 });
 
-const sqliteIntegerCodec = codec<typeof SQLITE_INTEGER_CODEC_ID, number, number>({
+const sqliteIntegerCodec = codec({
   typeId: SQLITE_INTEGER_CODEC_ID,
   targetTypes: ['integer'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
 });
 
-const sqliteRealCodec = codec<typeof SQLITE_REAL_CODEC_ID, number, number>({
+const sqliteRealCodec = codec({
   typeId: SQLITE_REAL_CODEC_ID,
   targetTypes: ['real'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
 });
 
-const sqliteBlobCodec = codec<typeof SQLITE_BLOB_CODEC_ID, Uint8Array, Uint8Array>({
+const sqliteBlobCodec = codec({
   typeId: SQLITE_BLOB_CODEC_ID,
   targetTypes: ['blob'],
-  encode: (value) => value,
-  decode: (wire) => wire,
+  traits: ['equality'],
+  encode: (value: Uint8Array): Uint8Array => value,
+  decode: (wire: Uint8Array): Uint8Array => wire,
 });
 
-const sqliteBooleanCodec = codec<typeof SQLITE_BOOLEAN_CODEC_ID, number, boolean>({
+const sqliteBooleanCodec = codec({
   typeId: SQLITE_BOOLEAN_CODEC_ID,
   targetTypes: ['integer'],
+  traits: ['equality', 'boolean'],
   encode: (value: boolean): number => (value ? 1 : 0),
   decode: (wire: number): boolean => wire !== 0,
 });
 
-const sqliteDatetimeCodec = codec<typeof SQLITE_DATETIME_CODEC_ID, string, Date>({
+const sqliteDatetimeCodec = codec({
   typeId: SQLITE_DATETIME_CODEC_ID,
   targetTypes: ['text'],
+  traits: ['equality', 'order'],
   encode: (value: Date): string => value.toISOString(),
   decode: (wire: string): Date => new Date(wire),
 });
 
-const sqliteJsonCodec = codec<typeof SQLITE_JSON_CODEC_ID, string | JsonValue, JsonValue>({
+const sqliteJsonCodec = codec({
   typeId: SQLITE_JSON_CODEC_ID,
   targetTypes: ['text'],
-  encode: (value) => JSON.stringify(value),
-  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  traits: ['equality'],
+  encode: (value: JsonValue): string => JSON.stringify(value),
+  decode: (wire: string | JsonValue): JsonValue =>
+    typeof wire === 'string' ? (JSON.parse(wire) as JsonValue) : wire,
 });
 
-const sqliteBigintCodec = codec<typeof SQLITE_BIGINT_CODEC_ID, number | bigint, bigint>({
+const sqliteBigintCodec = codec({
   typeId: SQLITE_BIGINT_CODEC_ID,
   targetTypes: ['integer'],
+  traits: ['equality', 'order', 'numeric'],
   encode: (value: bigint): number | bigint => value,
   decode: (wire: number | bigint): bigint => BigInt(wire),
 });

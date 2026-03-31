@@ -109,6 +109,10 @@ class PostgresAdapterImpl
       target: 'postgres',
       capabilities: defaultCapabilities,
       codecs: () => this.codecRegistry,
+      readMarkerStatement: () => ({
+        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta from prisma_contract.marker where id = $1',
+        params: [1],
+      }),
     });
   }
 
