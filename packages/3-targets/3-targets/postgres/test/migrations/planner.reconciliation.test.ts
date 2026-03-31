@@ -175,6 +175,7 @@ function createContract(
     storageHash: coreHash('sha256:reconciliation-contract'),
     profileHash: profileHash('sha256:reconciliation-profile'),
     storage: { tables },
+    roots: {},
     models: {},
     relations: {},
     mappings: {},

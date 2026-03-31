@@ -280,6 +280,7 @@ export function createTestContract(
     storage: rest.storage ?? { tables: {} },
     models: rest.models ?? {},
     relations: rest.relations ?? {},
+    roots: rest.roots ?? {},
     mappings: rest.mappings ?? {},
     capabilities: rest.capabilities ?? {},
     extensionPacks: rest.extensionPacks ?? {},

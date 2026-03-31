@@ -769,7 +769,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(types).toContain(
-      "readonly vector: { readonly column: 'vector'; readonly nullable: false; readonly codecId: 'pg/vector@1' }",
+      "readonly vector: CodecTypes['pg/vector@1']['output'] & { length: 1536 }",
     );
   });
 
@@ -825,7 +825,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(types).toContain(
-      "readonly vector: { readonly column: 'vector'; readonly nullable: false; readonly codecId: 'pg/vector@1' }",
+      "readonly vector: CodecTypes['pg/vector@1']['output'] & { length: 1536 }",
     );
   });
 });

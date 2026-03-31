@@ -36,6 +36,7 @@ function wrap(storage: SqlStorage): SqlContract<SqlStorage> {
     storage,
     models: {},
     relations: {},
+    roots: {},
     mappings: {},
     capabilities: {},
     extensionPacks: {},

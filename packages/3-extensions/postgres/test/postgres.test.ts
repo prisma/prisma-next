@@ -72,6 +72,7 @@ const contract: SqlContract<SqlStorage> = {
   target: 'postgres',
   storageHash: 'sha256:test' as never,
   models: {},
+  roots: {},
   relations: {},
   storage: { tables: {} },
   extensionPacks: {},

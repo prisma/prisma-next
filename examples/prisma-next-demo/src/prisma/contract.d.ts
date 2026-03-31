@@ -153,31 +153,11 @@ type ContractBase = SqlContract<
         };
       };
       fields: {
-        readonly id: {
-          readonly column: 'id';
-          readonly nullable: false;
-          readonly codecId: 'sql/char@1';
-        };
-        readonly title: {
-          readonly column: 'title';
-          readonly nullable: false;
-          readonly codecId: 'pg/text@1';
-        };
-        readonly userId: {
-          readonly column: 'userId';
-          readonly nullable: false;
-          readonly codecId: 'pg/text@1';
-        };
-        readonly createdAt: {
-          readonly column: 'createdAt';
-          readonly nullable: false;
-          readonly codecId: 'pg/timestamptz@1';
-        };
-        readonly embedding: {
-          readonly column: 'embedding';
-          readonly nullable: true;
-          readonly codecId: 'pg/vector@1';
-        };
+        readonly id: Char<36>;
+        readonly title: CodecTypes['pg/text@1']['output'];
+        readonly userId: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly embedding: Vector<1536> | null;
       };
       relations: {
         readonly user: {
@@ -202,26 +182,10 @@ type ContractBase = SqlContract<
         };
       };
       fields: {
-        readonly id: {
-          readonly column: 'id';
-          readonly nullable: false;
-          readonly codecId: 'sql/char@1';
-        };
-        readonly email: {
-          readonly column: 'email';
-          readonly nullable: false;
-          readonly codecId: 'pg/text@1';
-        };
-        readonly createdAt: {
-          readonly column: 'createdAt';
-          readonly nullable: false;
-          readonly codecId: 'pg/timestamptz@1';
-        };
-        readonly kind: {
-          readonly column: 'kind';
-          readonly nullable: false;
-          readonly codecId: 'pg/enum@1';
-        };
+        readonly id: Char<36>;
+        readonly email: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly kind: 'admin' | 'user';
       };
       relations: {
         readonly posts: {
