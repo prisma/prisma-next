@@ -132,6 +132,7 @@ export type ModelDefinition = {
   readonly storage: ModelStorage;
   readonly fields: Record<string, ModelField>;
   readonly relations: Record<string, unknown>;
+  readonly owner?: string;
 };
 
 export type SqlModelFieldStorage = {
@@ -146,7 +147,6 @@ export type SqlModelStorage = {
 export type SqlRelation = {
   readonly to: string;
   readonly cardinality: '1:1' | '1:N' | 'N:1';
-  readonly strategy: 'reference';
   readonly on: DomainRelationOn;
 };
 

@@ -509,6 +509,10 @@
           "additionalProperties": {
             "$ref": "#/$defs/ModelRelation"
           }
+        },
+        "owner": {
+          "type": "string",
+          "description": "Owner model name — declares this model belongs to another model's aggregate (per ADR 177)"
         }
       },
       "required": ["storage", "fields"]
@@ -557,11 +561,6 @@
           "type": "string",
           "enum": ["1:1", "1:N", "N:1", "N:M"],
           "description": "Relation cardinality"
-        },
-        "strategy": {
-          "type": "string",
-          "enum": ["reference", "embed"],
-          "description": "Relation strategy"
         },
         "on": {
           "type": "object",

@@ -73,6 +73,7 @@ const ModelSchema = type.declare<ModelDefinition>().type({
   storage: ModelStorageSchema,
   fields: type({ '[string]': ModelFieldSchema }),
   relations: type({ '[string]': 'unknown' }),
+  'owner?': 'string',
 });
 
 const GeneratorIdSchema = type('string').narrow((value, ctx) => {
