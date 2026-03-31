@@ -65,6 +65,12 @@ The planner detects when data migrations are needed and scaffolds `data-migratio
 - [ ] Write test: scaffolded file is valid TypeScript that fails at runtime with clear error
 - [ ] Write test: `migration apply` fails with clear error message when scaffold throw is still present
 - [ ] Write test: no scaffold generated when detection doesn't trigger (e.g., nullable column add, lossless type widening)
+- [ ] Implement `readSql(filename)` helper: reads `.sql` file relative to migration package directory, returns function compatible with `check`/`run` (splits on `;`, executes statements sequentially)
+- [ ] Write tests for `readSql`: resolves relative path, executes statements, handles empty file, handles single statement
+- [ ] Implement `migration new` command: scaffold migration package with `data-migration.ts` boilerplate, empty `ops.json`, derive `from`/`to` hashes from graph state and emitted contract
+- [ ] Support `--from` and `--to` flags on `migration new` for explicit hash override
+- [ ] Write tests for `migration new`: correct `from`/`to` in manifest, scaffold file is valid TS, `--from`/`--to` override defaults
+- [ ] E2E test: `migration new` → user writes raw SQL via `readSql` → `migration apply` → post-apply verification passes
 
 ### Milestone 3: Graph integration and invariant-aware routing
 
