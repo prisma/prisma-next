@@ -1,7 +1,8 @@
 {
   "extends": ["@prisma-next/tsconfig/base"],
   "compilerOptions": {
-    "rootDir": "."
+    "rootDir": ".",
+    "types": ["vitest/globals"]
   },
   "include": ["src", "test", "*.config.*", "package.json"],
   "exclude": ["dist", "dist-tsc", "dist-tsc-prod", "node_modules"]
