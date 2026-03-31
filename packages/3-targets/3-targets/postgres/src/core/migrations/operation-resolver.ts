@@ -6,7 +6,6 @@
  * the planner's SQL generation pipeline. It runs at verification time.
  */
 
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   DataTransformOperation,
   SerializedQueryNode,
@@ -39,7 +38,7 @@ import type {
   SetDefaultDescriptor,
   SetNotNullDescriptor,
 } from './operation-descriptors';
-import type { PostgresPlanTargetDetails } from './planner';
+import type { OperationClass, PostgresPlanTargetDetails } from './planner';
 import {
   buildAddColumnSql,
   buildCreateTableSql,
@@ -54,47 +53,35 @@ import {
 } from './planner-sql';
 
 export interface OperationResolverContext {
-  readonly fromContract: ContractIR | null;
-  readonly toContract: ContractIR;
+  readonly fromContract: SqlContract<SqlStorage> | null;
+  readonly toContract: SqlContract<SqlStorage>;
   readonly schemaName: string;
   readonly codecHooks: Map<string, CodecControlHooks>;
 }
 
 type ResolvedOp = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
-function asSqlContract(contract: ContractIR): SqlContract<SqlStorage> {
-  return contract as SqlContract<SqlStorage>;
-}
-
-function getTable(contract: ContractIR, tableName: string): StorageTable | undefined {
-  return asSqlContract(contract).storage.tables[tableName];
+function getTable(contract: SqlContract<SqlStorage>, tableName: string): StorageTable | undefined {
+  return contract.storage.tables[tableName];
 }
 
 function getColumn(
-  contract: ContractIR,
+  contract: SqlContract<SqlStorage>,
   tableName: string,
   columnName: string,
 ): StorageColumn | undefined {
   return getTable(contract, tableName)?.columns[columnName];
 }
 
-function target(
-  objectType: string,
+function targetDetails(
+  objectType: OperationClass,
   name: string,
   schema: string,
   table?: string,
-): {
-  readonly id: 'postgres';
-  readonly details: PostgresPlanTargetDetails;
-} {
+): { readonly id: 'postgres'; readonly details: PostgresPlanTargetDetails } {
   return {
     id: 'postgres',
-    details: {
-      schema,
-      objectType,
-      name,
-      ...ifDefined('table', table),
-    } as PostgresPlanTargetDetails,
+    details: { schema, objectType, name, ...ifDefined('table', table) },
   };
 }
 
@@ -114,7 +101,7 @@ function resolveCreateTable(
     label: `Create table "${desc.table}"`,
     summary: `Creates table "${desc.table}"`,
     operationClass: 'additive',
-    target: target('table', desc.table, ctx.schemaName),
+    target: targetDetails('table', desc.table, ctx.schemaName),
     precheck: [
       step(
         `ensure table "${desc.table}" does not exist`,
@@ -139,7 +126,7 @@ function resolveDropTable(desc: DropTableDescriptor, ctx: OperationResolverConte
     id: `dropTable.${desc.table}`,
     label: `Drop table "${desc.table}"`,
     operationClass: 'destructive',
-    target: target('table', desc.table, ctx.schemaName),
+    target: targetDetails('table', desc.table, ctx.schemaName),
     precheck: [
       step(
         `ensure table "${desc.table}" exists`,
@@ -165,7 +152,7 @@ function resolveAddColumn(desc: AddColumnDescriptor, ctx: OperationResolverConte
     id: `column.${desc.table}.${desc.column}`,
     label: `Add column "${desc.column}" to "${desc.table}"`,
     operationClass: 'additive',
-    target: target('column', desc.column, ctx.schemaName, desc.table),
+    target: targetDetails('column', desc.column, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure column "${desc.column}" is missing`,
@@ -198,7 +185,7 @@ function resolveDropColumn(desc: DropColumnDescriptor, ctx: OperationResolverCon
     id: `dropColumn.${desc.table}.${desc.column}`,
     label: `Drop column "${desc.column}" from "${desc.table}"`,
     operationClass: 'destructive',
-    target: target('column', desc.column, ctx.schemaName, desc.table),
+    target: targetDetails('column', desc.column, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure column "${desc.column}" exists`,
@@ -238,7 +225,7 @@ function resolveAlterColumnType(
     id: `alterType.${desc.table}.${desc.column}`,
     label: `Alter type of "${desc.table}"."${desc.column}" to ${desc.newType}`,
     operationClass: 'destructive',
-    target: target('column', desc.column, ctx.schemaName, desc.table),
+    target: targetDetails('column', desc.column, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure column "${desc.column}" exists`,
@@ -272,7 +259,7 @@ function resolveSetNotNull(desc: SetNotNullDescriptor, ctx: OperationResolverCon
     id: `alterNullability.${desc.table}.${desc.column}`,
     label: `Set NOT NULL on "${desc.table}"."${desc.column}"`,
     operationClass: 'destructive',
-    target: target('column', desc.column, ctx.schemaName, desc.table),
+    target: targetDetails('column', desc.column, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure column "${desc.column}" exists`,
@@ -312,7 +299,7 @@ function resolveDropNotNull(
     id: `alterNullability.${desc.table}.${desc.column}`,
     label: `Drop NOT NULL on "${desc.table}"."${desc.column}"`,
     operationClass: 'widening',
-    target: target('column', desc.column, ctx.schemaName, desc.table),
+    target: targetDetails('column', desc.column, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure column "${desc.column}" exists`,
@@ -345,7 +332,7 @@ function resolveSetDefault(desc: SetDefaultDescriptor, ctx: OperationResolverCon
     id: `setDefault.${desc.table}.${desc.column}`,
     label: `Set default on "${desc.table}"."${desc.column}"`,
     operationClass: 'additive',
-    target: target('column', desc.column, ctx.schemaName, desc.table),
+    target: targetDetails('column', desc.column, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure column "${desc.column}" exists`,
@@ -371,7 +358,7 @@ function resolveDropDefault(
     id: `dropDefault.${desc.table}.${desc.column}`,
     label: `Drop default on "${desc.table}"."${desc.column}"`,
     operationClass: 'destructive',
-    target: target('column', desc.column, ctx.schemaName, desc.table),
+    target: targetDetails('column', desc.column, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure column "${desc.column}" exists`,
@@ -399,7 +386,7 @@ function resolveAddPrimaryKey(
     id: `primaryKey.${desc.table}.${constraintName}`,
     label: `Add primary key on "${desc.table}"`,
     operationClass: 'additive',
-    target: target('primaryKey', constraintName, ctx.schemaName, desc.table),
+    target: targetDetails('primaryKey', constraintName, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure primary key "${constraintName}" does not exist`,
@@ -434,7 +421,7 @@ function resolveAddUnique(desc: AddUniqueDescriptor, ctx: OperationResolverConte
     id: `unique.${desc.table}.${constraintName}`,
     label: `Add unique constraint on "${desc.table}" (${desc.columns.join(', ')})`,
     operationClass: 'additive',
-    target: target('unique', constraintName, ctx.schemaName, desc.table),
+    target: targetDetails('unique', constraintName, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure constraint "${constraintName}" does not exist`,
@@ -479,7 +466,7 @@ function resolveAddForeignKey(
       id: `foreignKey.${desc.table}.${fkName}`,
       label: `Add foreign key "${fkName}" on "${desc.table}"`,
       operationClass: 'additive',
-      target: target('foreignKey', fkName, ctx.schemaName, desc.table),
+      target: targetDetails('foreignKey', fkName, ctx.schemaName, desc.table),
       precheck: [
         step(
           `ensure FK "${fkName}" does not exist`,
@@ -520,7 +507,7 @@ function resolveAddForeignKey(
     id: `foreignKey.${desc.table}.${fkName}`,
     label: `Add foreign key "${fkName}" on "${desc.table}"`,
     operationClass: 'additive',
-    target: target('foreignKey', fkName, ctx.schemaName, desc.table),
+    target: targetDetails('foreignKey', fkName, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure FK "${fkName}" does not exist`,
@@ -555,7 +542,7 @@ function resolveDropConstraint(
     id: `dropConstraint.${desc.table}.${desc.constraintName}`,
     label: `Drop constraint "${desc.constraintName}" on "${desc.table}"`,
     operationClass: 'destructive',
-    target: target('unique', desc.constraintName, ctx.schemaName, desc.table),
+    target: targetDetails('unique', desc.constraintName, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure constraint "${desc.constraintName}" exists`,
@@ -597,7 +584,7 @@ function resolveCreateIndex(
     id: `index.${desc.table}.${indexName}`,
     label: `Create index "${indexName}" on "${desc.table}"`,
     operationClass: 'additive',
-    target: target('index', indexName, ctx.schemaName, desc.table),
+    target: targetDetails('index', indexName, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure index "${indexName}" does not exist`,
@@ -624,7 +611,7 @@ function resolveDropIndex(desc: DropIndexDescriptor, ctx: OperationResolverConte
     id: `dropIndex.${desc.table}.${desc.indexName}`,
     label: `Drop index "${desc.indexName}"`,
     operationClass: 'destructive',
-    target: target('index', desc.indexName, ctx.schemaName, desc.table),
+    target: targetDetails('index', desc.indexName, ctx.schemaName, desc.table),
     precheck: [
       step(
         `ensure index "${desc.indexName}" exists`,
@@ -658,7 +645,7 @@ function resolveCreateType(
 }
 
 function resolveDataTransform(desc: DataTransformDescriptor): DataTransformOperation {
-  const run = Array.isArray(desc.run) ? desc.run : [desc.run];
+  const run: readonly SerializedQueryNode[] = Array.isArray(desc.run) ? desc.run : [desc.run];
   return {
     id: `data_migration.${desc.name}`,
     label: `Data transform: ${desc.name}`,
@@ -666,7 +653,7 @@ function resolveDataTransform(desc: DataTransformDescriptor): DataTransformOpera
     name: desc.name,
     source: desc.source,
     check: desc.check,
-    run: run as readonly SerializedQueryNode[],
+    run,
   };
 }
 
