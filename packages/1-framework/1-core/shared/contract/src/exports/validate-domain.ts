@@ -3,4 +3,4 @@ export {
   type DomainModelShape,
   type DomainValidationResult,
   validateContractDomain,
-} from '@prisma-next/contract/validate-domain';
+} from '../validate-domain';
