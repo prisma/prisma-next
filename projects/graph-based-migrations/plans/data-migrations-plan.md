@@ -27,19 +27,9 @@ We will also move on from having a single refs.json file to a refs directoyr wit
 - [ ] Tests: ref read/write round-trip with invariants, backward compatibility with old format, validation of invariant names
 - [ ] Note: TML-2132 (implicit default ref) is separate work, not bundled here
 
-### P2: Validate query builder expressiveness
+### Query builder status (not a blocker)
 
-The ORM/query builder needs to support the DML operations data migrations require. Validate before building the serialization pipeline.
-
-**Tasks:**
-
-- [ ] Verify the query builder supports UPDATE ... SET ... WHERE (S1, S2, S3, S4 scenarios)
-- [ ] Verify INSERT INTO ... SELECT ... FROM with joins (S5, S7, S10 scenarios)
-- [ ] Verify DELETE FROM ... WHERE (S6, S13, S15 scenarios)
-- [ ] Verify subqueries in UPDATE context (S9 denormalization)
-- [ ] Verify target-specific functions are expressible (e.g., `split_part`, `gen_random_uuid`, `AT TIME ZONE`)
-- [ ] Document gaps — if critical DML operations are missing, assess whether query builder extensions are needed before M1
-- [ ] If critical gaps exist, assess whether query builder extensions are needed before M1
+The query builder has known gaps for data migration DML: SET clause only accepts literal values/column refs (no expressions like `split_part`), no INSERT...SELECT, no joins on UPDATE/DELETE, and ASTs need a JSON serialization codec. These are independent of the data migration infrastructure — as the query builder is extended, data migrations automatically gain expressiveness. The infrastructure (serialization, phased execution, check/run lifecycle, routing) does not depend on query builder completeness.
 
 ## Milestones
 
