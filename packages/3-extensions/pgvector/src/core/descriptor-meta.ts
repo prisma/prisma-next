@@ -6,7 +6,7 @@ const pgvectorTypeId = 'pg/vector@1' as const;
 const cosineLowering = {
   targetFamily: 'sql',
   strategy: 'function',
-  template: '1 - ({{self}} <=> {{arg0}})',
+  template: '{{self}} <=> {{arg0}}',
 } as const;
 
 const cosineDistanceOperation = Object.freeze({
@@ -32,7 +32,7 @@ export const pgvectorQueryOperations: readonly QueryOperationDescriptor[] = [
     lowering: {
       targetFamily: 'sql',
       strategy: 'function',
-      template: '1 - ({{self}} <=> {{arg0}})',
+      template: '{{self}} <=> {{arg0}}',
     },
   },
 ];

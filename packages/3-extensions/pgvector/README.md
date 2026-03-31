@@ -164,7 +164,7 @@ Computes the cosine distance between two vectors.
 
 **Signature**: `cosineDistance(rhs: number[] | vector): number`
 
-**SQL**: Uses the pgvector `<=>` operator: `1 - (vector1 <=> vector2)`
+**SQL**: Uses the pgvector `<=>` operator: `vector1 <=> vector2`
 
 **Example**:
 ```typescript
