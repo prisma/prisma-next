@@ -266,6 +266,89 @@ For Mongo, this isn't an issue — subdocuments are always available. No capabil
 
 This follows the existing pattern: capabilities are checked early by authoring surfaces for good UX, and enforced at emission/validation as a safety net.
 
+### 8. Polymorphic value objects use discriminator/variants/base
+
+Value objects can be polymorphic using the same mechanism as models ([ADR 173](../../../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)). A base value object declares a `discriminator` and `variants`; each variant declares its `base` and adds type-specific fields:
+
+```json
+"valueObjects": {
+  "ContactInfo": {
+    "discriminator": { "field": "channel" },
+    "variants": {
+      "EmailContact": { "value": "email" },
+      "PhoneContact": { "value": "phone" }
+    },
+    "fields": {
+      "channel": { "nullable": false, "codecId": "mongo/string@1" }
+    }
+  },
+  "EmailContact": {
+    "base": "ContactInfo",
+    "fields": {
+      "address": { "nullable": false, "codecId": "mongo/string@1" }
+    }
+  },
+  "PhoneContact": {
+    "base": "ContactInfo",
+    "fields": {
+      "number": { "nullable": false, "codecId": "mongo/string@1" }
+    }
+  }
+}
+```
+
+TypeScript inference produces `ContactInfo = EmailContact | PhoneContact`, narrowed by the `channel` discriminator — the same narrowing pattern the ORM already uses for model polymorphism. The only difference is the framework commitment level: polymorphic value objects don't get identity, lifecycle, or integrity guarantees.
+
+Real-world examples: `ContactInfo` (email vs phone vs push), `PaymentMethod` (card vs bank), `MediaAttachment` (image vs video), form field definitions (text vs select vs number).
+
+### 9. Union types: `union` as a field type descriptor
+
+A field can hold one of several types — scalars, value objects, or a mix. The `union` property handles this as a third mutually exclusive field type descriptor alongside `codecId` and `type`:
+
+```json
+"fields": {
+  "email":    { "nullable": false, "codecId": "mongo/string@1" },
+  "address":  { "nullable": false, "type": "Address" },
+  "score":    { "nullable": false, "union": [
+    { "codecId": "mongo/int32@1" },
+    { "codecId": "mongo/string@1" }
+  ]},
+  "location": { "nullable": false, "union": [
+    { "type": "Address" },
+    { "type": "GeoPoint" }
+  ]},
+  "data":     { "nullable": false, "union": [
+    { "codecId": "mongo/string@1" },
+    { "type": "Address" }
+  ]}
+}
+```
+
+Each union member makes the same `codecId` vs `type` choice that a field does. The field type system is:
+
+| Property | Meaning | Example |
+|---|---|---|
+| `codecId` | One scalar type | `"mongo/string@1"` |
+| `type` | One value object | `"Address"` |
+| `union` | Multiple types (any mix of scalars and value objects) | `[{ "codecId": "..." }, { "type": "..." }]` |
+
+All three are mutually exclusive on a field. `codecId` and `type` are the degenerate single-member cases; `union` is the general form.
+
+### Structured vs unstructured unions
+
+Polymorphic value objects (decision 8) and union types (decision 9) are both unions, but they serve different needs:
+
+| | Polymorphic value object | `union` field |
+|---|---|---|
+| **Discriminated?** | Yes — explicit discriminator field | No — runtime type inspection |
+| **Shared base?** | Yes — variants share fields via `base` | No — members are independent types |
+| **Type narrowing** | Discriminator value narrows the type | `typeof` / structural inspection |
+| **Use case** | Structured variants with shared fields | Heterogeneous values, schema evolution, mixed types |
+
+Both produce TypeScript union types. The polymorphic pattern is stronger (compile-time narrowing via discriminator), while `union` is more flexible (any mix of types, no shared structure required).
+
+This also resolves [design-questions.md § Q16](design-questions.md#16-union-field-types-mixed-type-fields) — union field types are handled by the `union` property, which subsumes all three options previously considered.
+
 ## Open design questions
 
 ### 2. Querying through value objects
@@ -296,11 +379,7 @@ This replaces the entire address. There's no "update the address where `_id` = X
 
 Whether partial updates of value object fields are supported (`update({ homeAddress: { city: "LA" } })` meaning "change only the city") is a UX question — it's technically possible (`$set: { "homeAddress.city": "LA" }`) but may violate the "value objects are replaced wholesale" semantics.
 
-### 4. Can value objects be polymorphic?
-
-A `ContactInfo` that's either `{ type: "email", address: "..." }` or `{ type: "phone", number: "..." }`. This intersects with Q16 (union field types) and ADR 173 (discriminators). Probably out of scope for the initial design.
-
-### 5. Contract key naming
+### 4. Contract key naming
 
 The exact key name for the value objects section (`valueObjects`, `types`, `composites`, etc.) is a cosmetic decision that should be made before the contract shape stabilises. `valueObjects` is the working name.
 
