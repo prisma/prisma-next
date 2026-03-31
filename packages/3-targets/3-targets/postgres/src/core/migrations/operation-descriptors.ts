@@ -7,6 +7,9 @@
  * using the full contract context (codec hooks, schema name, etc.).
  */
 
+import type { SerializedQueryNode } from '@prisma-next/core-control-plane/types';
+import { ifDefined } from '@prisma-next/utils/defined';
+
 // ============================================================================
 // Table descriptors
 // ============================================================================
@@ -151,8 +154,8 @@ export interface DataTransformDescriptor {
   readonly kind: 'dataTransform';
   readonly name: string;
   readonly source: string;
-  readonly check: unknown;
-  readonly run: unknown;
+  readonly check: SerializedQueryNode | boolean;
+  readonly run: SerializedQueryNode | readonly SerializedQueryNode[];
 }
 
 // ============================================================================
@@ -186,8 +189,12 @@ export function createTable(
   table: string,
   options: { columns: Readonly<Record<string, ColumnSpec>>; primaryKey?: readonly string[] },
 ): CreateTableDescriptor {
-  const base = { kind: 'createTable' as const, table, columns: options.columns };
-  return options.primaryKey ? { ...base, primaryKey: options.primaryKey } : base;
+  return {
+    kind: 'createTable',
+    table,
+    columns: options.columns,
+    ...ifDefined('primaryKey', options.primaryKey),
+  };
 }
 
 export function dropTable(table: string): DropTableDescriptor {
@@ -199,12 +206,14 @@ export function addColumn(
   column: string,
   options: { type: string; nullable?: boolean; default?: string },
 ): AddColumnDescriptor {
-  const base: AddColumnDescriptor = { kind: 'addColumn', table, column, type: options.type };
-  if (options.nullable !== undefined) return { ...base, nullable: options.nullable };
-  if (options.default !== undefined) return { ...base, default: options.default };
-  if (options.nullable !== undefined && options.default !== undefined)
-    return { ...base, nullable: options.nullable, default: options.default };
-  return base;
+  return {
+    kind: 'addColumn',
+    table,
+    column,
+    type: options.type,
+    ...ifDefined('nullable', options.nullable),
+    ...ifDefined('default', options.default),
+  };
 }
 
 export function dropColumn(table: string, column: string): DropColumnDescriptor {
@@ -243,16 +252,24 @@ export function addPrimaryKey(
   table: string,
   options: { columns: readonly string[]; constraintName?: string },
 ): AddPrimaryKeyDescriptor {
-  const base = { kind: 'addPrimaryKey' as const, table, columns: options.columns };
-  return options.constraintName ? { ...base, constraintName: options.constraintName } : base;
+  return {
+    kind: 'addPrimaryKey',
+    table,
+    columns: options.columns,
+    ...ifDefined('constraintName', options.constraintName),
+  };
 }
 
 export function addUnique(
   table: string,
   options: { columns: readonly string[]; constraintName?: string },
 ): AddUniqueDescriptor {
-  const base = { kind: 'addUnique' as const, table, columns: options.columns };
-  return options.constraintName ? { ...base, constraintName: options.constraintName } : base;
+  return {
+    kind: 'addUnique',
+    table,
+    columns: options.columns,
+    ...ifDefined('constraintName', options.constraintName),
+  };
 }
 
 export function addForeignKey(
@@ -265,19 +282,15 @@ export function addForeignKey(
     constraintName?: string;
   },
 ): AddForeignKeyDescriptor {
-  const base = {
-    kind: 'addForeignKey' as const,
+  return {
+    kind: 'addForeignKey',
     table,
     columns: options.columns,
     references: options.references,
+    ...ifDefined('onDelete', options.onDelete),
+    ...ifDefined('onUpdate', options.onUpdate),
+    ...ifDefined('constraintName', options.constraintName),
   };
-  const withOnDelete = options.onDelete ? { ...base, onDelete: options.onDelete } : base;
-  const withOnUpdate = options.onUpdate
-    ? { ...withOnDelete, onUpdate: options.onUpdate }
-    : withOnDelete;
-  return options.constraintName
-    ? { ...withOnUpdate, constraintName: options.constraintName }
-    : withOnUpdate;
 }
 
 export function dropConstraint(table: string, constraintName: string): DropConstraintDescriptor {
@@ -288,8 +301,12 @@ export function createIndex(
   table: string,
   options: { columns: readonly string[]; indexName?: string },
 ): CreateIndexDescriptor {
-  const base = { kind: 'createIndex' as const, table, columns: options.columns };
-  return options.indexName ? { ...base, indexName: options.indexName } : base;
+  return {
+    kind: 'createIndex',
+    table,
+    columns: options.columns,
+    ...ifDefined('indexName', options.indexName),
+  };
 }
 
 export function dropIndex(table: string, indexName: string): DropIndexDescriptor {
@@ -302,7 +319,10 @@ export function createType(typeName: string): CreateTypeDescriptor {
 
 export function dataTransform(
   name: string,
-  options: { check: unknown; run: unknown },
+  options: {
+    check: SerializedQueryNode | boolean;
+    run: SerializedQueryNode | readonly SerializedQueryNode[];
+  },
 ): DataTransformDescriptor {
   return {
     kind: 'dataTransform',
