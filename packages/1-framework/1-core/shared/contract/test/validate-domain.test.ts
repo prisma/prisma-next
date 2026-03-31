@@ -123,15 +123,14 @@ describe('validateContractDomain()', () => {
   describe('relation target validation', () => {
     it('accepts relations with valid targets', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item' },
+        roots: { items: 'Item', users: 'User' },
         models: {
           Item: makeMinimalModel({
             relations: {
-              owner: {
+              creator: {
                 to: 'User',
                 cardinality: 'N:1',
-                strategy: 'reference',
-                on: { localFields: ['ownerId'], targetFields: ['_id'] },
+                on: { localFields: ['creatorId'], targetFields: ['_id'] },
               },
             },
           }),
@@ -146,18 +145,17 @@ describe('validateContractDomain()', () => {
         models: {
           Item: makeMinimalModel({
             relations: {
-              owner: {
+              creator: {
                 to: 'Ghost',
                 cardinality: 'N:1',
-                strategy: 'reference',
-                on: { localFields: ['ownerId'], targetFields: ['_id'] },
+                on: { localFields: ['creatorId'], targetFields: ['_id'] },
               },
             },
           }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(
-        /relation.*owner.*Item.*target.*Ghost.*not exist/i,
+        /relation.*creator.*Item.*target.*Ghost.*not exist/i,
       );
     });
   });
@@ -271,12 +269,10 @@ describe('validateContractDomain()', () => {
               tag: {
                 to: 'Tag',
                 cardinality: '1:1',
-                strategy: 'embed',
-                field: 'tag',
               },
             },
           }),
-          Tag: makeMinimalModel(),
+          Tag: makeMinimalModel({ owner: 'Item' }),
         },
       });
       const result = validateContractDomain(contract);
@@ -300,8 +296,56 @@ describe('validateContractDomain()', () => {
     });
   });
 
+  describe('ownership validation', () => {
+    it('accepts valid owner reference', () => {
+      const contract = makeValidContract({
+        roots: { items: 'Item' },
+        models: {
+          Item: makeMinimalModel({
+            relations: { address: { to: 'Address', cardinality: '1:1' } },
+          }),
+          Address: makeMinimalModel({ owner: 'Item' }),
+        },
+      });
+      expect(() => validateContractDomain(contract)).not.toThrow();
+    });
+
+    it('rejects self-ownership', () => {
+      const contract = makeValidContract({
+        models: {
+          Item: makeMinimalModel({ owner: 'Item' }),
+        },
+      });
+      expect(() => validateContractDomain(contract)).toThrow(/Item.*cannot own itself/i);
+    });
+
+    it('rejects owner referencing non-existent model', () => {
+      const contract = makeValidContract({
+        models: {
+          Item: makeMinimalModel({ owner: 'Ghost' }),
+        },
+      });
+      expect(() => validateContractDomain(contract)).toThrow(/Item.*owner.*Ghost.*not exist/i);
+    });
+
+    it('rejects owned model appearing in roots', () => {
+      const contract = makeValidContract({
+        roots: { items: 'Item', addresses: 'Address' },
+        models: {
+          Item: makeMinimalModel({
+            relations: { address: { to: 'Address', cardinality: '1:1' } },
+          }),
+          Address: makeMinimalModel({ owner: 'Item' }),
+        },
+      });
+      expect(() => validateContractDomain(contract)).toThrow(
+        /owned model.*Address.*must not appear in roots/i,
+      );
+    });
+  });
+
   describe('happy path', () => {
-    it('validates a complex contract with polymorphism and relations', () => {
+    it('validates a complex contract with polymorphism, relations, and ownership', () => {
       const contract = {
         roots: { tasks: 'Task', users: 'User' },
         models: {
@@ -316,14 +360,11 @@ describe('validateContractDomain()', () => {
               assignee: {
                 to: 'User',
                 cardinality: 'N:1',
-                strategy: 'reference',
                 on: { localFields: ['assigneeId'], targetFields: ['_id'] },
               },
               comments: {
                 to: 'Comment',
                 cardinality: '1:N',
-                strategy: 'embed',
-                field: 'comments',
               },
             },
             discriminator: { field: 'type' },
@@ -353,8 +394,6 @@ describe('validateContractDomain()', () => {
               addresses: {
                 to: 'Address',
                 cardinality: '1:N',
-                strategy: 'embed',
-                field: 'addresses',
               },
             },
           }),
@@ -364,6 +403,7 @@ describe('validateContractDomain()', () => {
               city: { codecId: 'mongo/string@1', nullable: false },
               zip: { codecId: 'mongo/string@1', nullable: false },
             },
+            owner: 'User',
           }),
           Comment: makeMinimalModel({
             fields: {
@@ -371,6 +411,7 @@ describe('validateContractDomain()', () => {
               text: { codecId: 'mongo/string@1', nullable: false },
               createdAt: { codecId: 'mongo/date@1', nullable: false },
             },
+            owner: 'Task',
           }),
         },
       };

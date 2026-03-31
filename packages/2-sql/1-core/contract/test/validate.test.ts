@@ -860,7 +860,6 @@ describe('validateContract', () => {
       expect(userRels['posts']).toEqual({
         to: 'Post',
         cardinality: '1:N',
-        strategy: 'reference',
         on: { localFields: ['id'], targetFields: ['userId'] },
       });
     });
@@ -899,7 +898,6 @@ describe('validateContract', () => {
             posts: {
               to: 'Post',
               cardinality: '1:N',
-              strategy: 'reference',
               on: { localFields: ['id'], targetFields: ['userId'] },
             },
           },
@@ -920,7 +918,6 @@ describe('validateContract', () => {
             author: {
               to: 'User',
               cardinality: 'N:1',
-              strategy: 'reference',
               on: { localFields: ['userId'], targetFields: ['id'] },
             },
           },
