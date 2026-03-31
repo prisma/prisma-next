@@ -169,9 +169,12 @@ export function constructContract<TContract extends SqlContract<SqlStorage>>(
   const defaultMappings = computeDefaultMappings(input.models as Record<string, ModelDefinition>);
   const mappings = mergeMappings(defaultMappings, existingMappings);
 
+  const stripped = stripGenerated(input);
+
   const contractWithMappings = {
-    ...stripGenerated(input),
+    ...stripped,
     mappings,
+    roots: (stripped as Record<string, unknown>)['roots'] ?? {},
   };
 
   return contractWithMappings as TContract;

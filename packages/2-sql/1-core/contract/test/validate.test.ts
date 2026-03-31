@@ -766,4 +766,228 @@ describe('validateContract', () => {
       /NOT NULL but has a literal null default/,
     );
   });
+
+  describe('dual-format bridge', () => {
+    const oldFormatContract = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:bridge-test',
+      models: {
+        User: {
+          storage: { table: 'user' },
+          fields: {
+            id: { column: 'id' },
+            email: { column: 'email' },
+          },
+          relations: {},
+        },
+        Post: {
+          storage: { table: 'post' },
+          fields: {
+            id: { column: 'id' },
+            userId: { column: 'user_id' },
+          },
+          relations: {},
+        },
+      },
+      relations: {
+        post: {
+          author: {
+            cardinality: 'N:1',
+            on: { parentCols: ['user_id'], childCols: ['id'] },
+            to: 'User',
+          },
+        },
+        user: {
+          posts: {
+            cardinality: '1:N',
+            on: { parentCols: ['id'], childCols: ['user_id'] },
+            to: 'Post',
+          },
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          post: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                columns: ['user_id'],
+                references: { table: 'user', columns: ['id'] },
+                constraint: true,
+                index: true,
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    it('old format enriches with domain fields (nullable, codecId, roots, storage.fields, relations)', () => {
+      const result = validateContract<SqlContract<SqlStorage>>(oldFormatContract);
+
+      expect(result.roots).toEqual({ User: 'User', Post: 'Post' });
+
+      const userModel = result.models.User as Record<string, unknown>;
+      const userFields = userModel['fields'] as Record<string, Record<string, unknown>>;
+      expect(userFields['email']['nullable']).toBe(true);
+      expect(userFields['email']['codecId']).toBe('pg/text@1');
+      expect(userFields['email']['column']).toBe('email');
+
+      const userStorage = userModel['storage'] as Record<string, unknown>;
+      const userStorageFields = userStorage['fields'] as Record<string, Record<string, unknown>>;
+      expect(userStorageFields['id']).toEqual({ column: 'id' });
+      expect(userStorageFields['email']).toEqual({ column: 'email' });
+
+      const userRels = userModel['relations'] as Record<string, Record<string, unknown>>;
+      expect(userRels['posts']).toEqual({
+        to: 'Post',
+        cardinality: '1:N',
+        strategy: 'reference',
+        on: { localFields: ['id'], targetFields: ['userId'] },
+      });
+    });
+
+    it('old format preserves original mappings and top-level relations', () => {
+      const result = validateContract<SqlContract<SqlStorage>>(oldFormatContract);
+
+      expect(result.mappings.modelToTable).toEqual({ User: 'user', Post: 'post' });
+      expect(result.mappings.tableToModel).toEqual({ user: 'User', post: 'Post' });
+
+      const relations = result.relations as Record<string, Record<string, unknown>>;
+      expect(relations['post']['author']).toBeDefined();
+      expect(relations['user']['posts']).toBeDefined();
+    });
+
+    const newFormatContract = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:bridge-test-new',
+      roots: { User: 'User', Post: 'Post' },
+      models: {
+        User: {
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'email' },
+            },
+          },
+          fields: {
+            id: { nullable: false, codecId: 'pg/int4@1' },
+            email: { nullable: true, codecId: 'pg/text@1' },
+          },
+          relations: {
+            posts: {
+              to: 'Post',
+              cardinality: '1:N',
+              strategy: 'reference',
+              on: { localFields: ['id'], targetFields: ['userId'] },
+            },
+          },
+        },
+        Post: {
+          storage: {
+            table: 'post',
+            fields: {
+              id: { column: 'id' },
+              userId: { column: 'user_id' },
+            },
+          },
+          fields: {
+            id: { nullable: false, codecId: 'pg/int4@1' },
+            userId: { nullable: false, codecId: 'pg/int4@1' },
+          },
+          relations: {
+            author: {
+              to: 'User',
+              cardinality: 'N:1',
+              strategy: 'reference',
+              on: { localFields: ['userId'], targetFields: ['id'] },
+            },
+          },
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          post: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                columns: ['user_id'],
+                references: { table: 'user', columns: ['id'] },
+                constraint: true,
+                index: true,
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    it('new format derives old fields (column on model fields, top-level relations)', () => {
+      const result = validateContract<SqlContract<SqlStorage>>(newFormatContract);
+
+      const postModel = result.models.Post as Record<string, unknown>;
+      const postFields = postModel['fields'] as Record<string, Record<string, unknown>>;
+      expect(postFields['userId']['column']).toBe('user_id');
+      expect(postFields['id']['column']).toBe('id');
+
+      const relations = result.relations as Record<string, Record<string, unknown>>;
+      const postRels = relations['post'] as Record<string, Record<string, unknown>>;
+      expect(postRels['author']['to']).toBe('User');
+      expect(postRels['author']['cardinality']).toBe('N:1');
+      expect(postRels['author']['on']).toEqual({
+        parentCols: ['user_id'],
+        childCols: ['id'],
+      });
+    });
+
+    it('new format preserves roots and domain-level model fields', () => {
+      const result = validateContract<SqlContract<SqlStorage>>(newFormatContract);
+
+      expect(result.roots).toEqual({ User: 'User', Post: 'Post' });
+
+      const userModel = result.models.User as Record<string, unknown>;
+      const userFields = userModel['fields'] as Record<string, Record<string, unknown>>;
+      expect(userFields['email']['nullable']).toBe(true);
+      expect(userFields['email']['codecId']).toBe('pg/text@1');
+
+      expect(result.mappings.modelToTable).toEqual({ User: 'user', Post: 'post' });
+    });
+  });
 });
