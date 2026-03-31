@@ -8,17 +8,17 @@ Where internal terminology currently diverges from the desired user-facing term,
 
 ## Core Concepts
 
-### Schema
-
-A schema lets users describe their application domain and how it maps to persistence mechanisms. For SQL databases, that means tables, columns, relationships, types, and invariants. For document-oriented databases, the persistence mechanisms will differ. Schemas can be authored in PSL (Prisma Schema Language) or via TypeScript builders.
-
-The schema is the **input**; the contract is the **output**. Users think in terms of "my Prisma schema" — the contract is a derived artifact.
-
 ### Contract
 
-A verifiable agreement between an application and its database. The application declares what models it depends on and how they map to storage; the database guarantees it provides the required structures. Emitted as `contract.json` + `contract.d.ts`, the application carries its contract and the database is signed with the contract's hash to make the agreement verifiable at both migration and runtime.
+A verifiable agreement between an application and its database. Users author their contract in PSL (Prisma Schema Language) or TypeScript builders — describing models, fields, relations, and how they map to storage. The system compiles this into `contract.json` + `contract.d.ts`, which downstream tools (ORM, runtime, migrations) consume. The authored contract definition is the user's source of truth; `contract.json` is a derived build artifact in the same sense as `package-lock.json`.
 
-Users author schemas; the system emits contracts. The contract is a build artifact like `package-lock.json`, not something users typically edit directly.
+The application carries its contract and the database is signed with the contract's hash, making the agreement verifiable at both migration and runtime.
+
+### Schema
+
+The structure of the database itself — tables, columns, indexes, constraints (SQL) or collections and indexes (MongoDB). The schema lives in the database; the contract lives in source code. Prisma Next manages the schema through migrations that bring the database in line with the contract.
+
+In other ORMs, "schema" often refers to the user-authored model definitions. In Prisma Next, that's the contract. "Schema" refers specifically to the database's actual structure.
 
 ### Contract Provider
 
@@ -33,7 +33,7 @@ Configured via the `contract:` property in `prisma-next.config.ts`.
 
 ### Extension
 
-An installable package that adds features to Prisma Next — new data types, database-specific operations, or custom behavior. For example, the pgvector extension adds vector search support. Extensions integrate across the full stack: they can extend your schema language, contribute to the contract, and provide runtime behavior.
+An installable package that adds features to Prisma Next — new data types, database-specific operations, or custom behavior. For example, the pgvector extension adds vector search support. Extensions integrate across the full stack: they can extend the contract language, contribute types and capabilities, and provide runtime behavior.
 
 > **Divergence:** Currently named "extension pack" / `extensionPacks` in code and config. The desired user-facing term is simply "extension" / `extensions`. **Status: pending refactor.**
 
@@ -45,19 +45,19 @@ A function that runs around every query, similar to middleware in Express or Koa
 
 ### Plan
 
-The compiled form of a query. Before anything touches the database, Prisma Next compiles your query into a plan — the exact SQL, parameters, and metadata. Plans are inspectable, so you (or your tooling) can see exactly what will execute. Guardrails like budgets and lints operate on plans, not raw queries.
+The compiled form of a query. Before anything touches the database, Prisma Next compiles your query into a plan — the query payload, parameters, and metadata. Plans are inspectable, so you (or your tooling) can see exactly what will execute. Guardrails like budgets and lints operate on plans, not raw queries. Each family has its own plan type — `SqlQueryPlan` carries a SQL string and parameters; `MongoQueryPlan` carries a command (find, insert, update, delete, or aggregate pipeline).
 
 ### Adapter
 
-The piece that translates your queries into the specific SQL dialect your database understands and executes them. Each database has its own adapter (e.g., Postgres). Adapters also report what features the database supports, so Prisma Next can check at startup whether your contract's requirements are met.
+The piece that connects Prisma Next to a specific database. For SQL targets, the adapter translates queries into the correct dialect. For MongoDB, the adapter dispatches commands to the `mongodb` Node.js driver. Adapters also report what features the database supports, so Prisma Next can check at startup whether your contract's requirements are met.
 
 ### Driver
 
-The library that handles the actual network connection to your database. A driver manages connections, transactions, and wire-protocol details for a specific database client (e.g., `pg` for Postgres). Most users configure a driver once and don't interact with it directly.
+The library that handles the actual network connection to your database. A driver manages connections, transactions, and wire-protocol details for a specific database client (e.g., `pg` for Postgres, `mongodb` for MongoDB). Most users configure a driver once and don't interact with it directly.
 
 ### Target
 
-Which specific database you're using — Postgres, MySQL, etc. Each target belongs to a family (e.g., Postgres is an SQL target) and supports a specific set of capabilities.
+Which specific database you're using — Postgres, MySQL, MongoDB, etc. Each target belongs to a family (e.g., Postgres is a SQL target; MongoDB is a Mongo target) and supports a specific set of capabilities.
 
 ### Family
 
