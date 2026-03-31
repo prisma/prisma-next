@@ -519,23 +519,22 @@
     },
     "ModelField": {
       "type": "object",
-      "description": "Model field definition mapping to storage column",
+      "description": "Domain field definition. New format has codecId + nullable (column lives in model.storage.fields). Old format has column only.",
       "additionalProperties": false,
       "properties": {
         "column": {
           "type": "string",
-          "description": "Column name in the model's backing table"
+          "description": "Column name in the model's backing table (old format; new format uses model.storage.fields)"
         },
         "codecId": {
           "type": "string",
-          "description": "Codec identifier for the field (derived from storage column)"
+          "description": "Codec identifier for the field"
         },
         "nullable": {
           "type": "boolean",
-          "description": "Whether the field allows NULL values (derived from storage column)"
+          "description": "Whether the field allows NULL values"
         }
-      },
-      "required": ["column"]
+      }
     },
     "ModelStorageField": {
       "type": "object",
