@@ -1,8 +1,8 @@
-# Refined Option A Gap Closure Plan
+# Staged Contract DSL Gap Closure Plan
 
 ## Summary
 
-This plan closes the remaining gaps between the current refined Option A implementation and the design principles in the project spec. Success means TS and PSL share the same semantic registry, pack composition becomes the source of vocabulary, typed local and cross-model refs become the default path, model-level `.sql(...)` shrinks to irreducibly SQL-only detail, and no-emit, parity, and portability stay intact.
+This plan closes the remaining gaps between the current staged contract DSL implementation and the design principles in the project spec. Success means TS and PSL share the same semantic registry, pack composition becomes the source of vocabulary, typed local and cross-model refs become the default path, model-level `.sql(...)` shrinks to irreducibly SQL-only detail, and no-emit, parity, and portability stay intact.
 
 **Spec:** `projects/ts-contract-authoring-redesign/spec.md`
 
@@ -24,8 +24,8 @@ Deliver one shared semantic foundation for TS and PSL so the remaining DSL surfa
 **Tasks:**
 
 - [ ] Define a shared semantic registry shape for type constructors, field presets, relation-local storage overlays, and named storage-type refs inside the existing authoring/tooling package boundaries.
-- [ ] Introduce explicit semantic node types for fields, relations, attributes, and local storage overlays so refined TS and PSL lowering consume the same intermediate data structures.
-- [ ] Refactor refined Option A lowering to consume registry-backed semantic nodes instead of directly baking portable helpers into `refined-option-a.ts`.
+- [ ] Introduce explicit semantic node types for fields, relations, attributes, and local storage overlays so staged contract DSL and PSL lowering consume the same intermediate data structures.
+- [ ] Refactor staged contract DSL lowering to consume registry-backed semantic nodes instead of directly baking portable helpers into `staged-contract-dsl.ts`.
 - [ ] Extend SQL family assembly to compose the same semantic registry from targets, adapters, and extension packs with deterministic merge order and duplicate-owner errors.
 - [ ] Refactor PSL interpretation to use the shared registry where semantics overlap today, replacing bespoke scalar/default lookups with the shared semantic layer.
 - [ ] Add conformance tests proving equivalent TS and PSL authoring paths lower through the same semantic helpers to the same contract IR.
@@ -53,7 +53,7 @@ Prove the gap-closing work does not regress determinism, no-emit typing, or targ
 
 - [ ] Add type tests for registry-driven autocomplete of pack-owned helpers, typed named storage-type refs, typed model tokens, and local SQL overlays.
 - [ ] Add unit tests for registry composition conflicts, local overlay lowering, and semantic validation around duplicated names or ambiguous storage declarations.
-- [ ] Add parity fixtures comparing legacy builder, refined TS, and PSL outputs for the supported shared vocabulary.
+- [ ] Add parity fixtures comparing legacy builder, staged contract DSL, and PSL outputs for the supported shared vocabulary.
 - [ ] Add a portability fixture showing a representative Postgres contract can switch to SQLite within the target rewrite budget, with target-specific deltas isolated and easy to locate.
 - [ ] Re-run no-emit integration coverage through `validateContract`, `schema()`, and `sql()` using the registry-driven surface.
 - [ ] Measure TS server/typecheck cost on representative contracts and document any limits or deferred follow-up if the new registry types materially slow authoring.

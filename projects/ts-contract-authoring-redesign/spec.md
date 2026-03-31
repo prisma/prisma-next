@@ -1,6 +1,6 @@
 # Summary
 
-Prisma Next should redesign the SQL TypeScript contract authoring surface around a refined Option A with a shared semantic core and a minimal SQL overlay. TS and PSL should derive from the same pack-provided constructors, presets, and lowering utilities from ADR 170, while `contract.ts` stays terse, intuitive, fully typed in no-emit mode, and portable across SQL targets. The redesign must continue to emit the same canonical `contract.json` and `contract.d.ts` through `prisma-next contract emit`.
+Prisma Next should redesign the SQL TypeScript contract authoring surface around a staged contract DSL with a shared semantic core and a minimal SQL overlay. TS and PSL should derive from the same pack-provided constructors, presets, and lowering utilities from ADR 170, while `contract.ts` stays terse, intuitive, fully typed in no-emit mode, and portable across SQL targets. The redesign must continue to emit the same canonical `contract.json` and `contract.d.ts` through `prisma-next contract emit`.
 
 # Description
 
@@ -32,7 +32,7 @@ The new surface should let authors describe the portable model graph first, expr
 
 ## Final public API direction
 
-The chosen direction is still refined Option A, but with a sharper target shape than the current prototype slice:
+The chosen direction is still staged contract DSL, but with a sharper target shape than the current prototype slice:
 
 ```ts
 const User = model('User', {
@@ -275,7 +275,7 @@ export const contract = defineContract({
   target: postgresPack,
   extensionPacks: { pgvector },
   naming: { tables: 'snake_case', columns: 'snake_case' },
-  storageHash: 'sha256:option-a-full-sketch',
+  storageHash: 'sha256:staged-contract-dsl-full-sketch',
   foreignKeyDefaults: { constraint: true, index: false },
   capabilities: {
     postgres: {
@@ -561,16 +561,16 @@ Intended result:
 - portable field helpers stay unchanged
 - target-specific helpers are obvious and localized
 
-### Fallback reference: Option B
+### No Separate Fluent Shell
 
-Option B remains a fallback implementation path only if Option A turns out materially worse in inference quality or implementation complexity. If retained at all, it should be a fluent contract shell over the same inner model DSL, not a distinct model authoring language.
+This branch does not keep a second public authoring surface in reserve. If a fluent contract shell ever exists, it must remain a thin wrapper over the staged contract DSL rather than a second model authoring language.
 
 ## Requirements
 
 ## Functional Requirements
 
 - Provide a SQL TS authoring surface where an author defines a model’s scalar fields, relations, and SQL/storage modifiers in one local unit.
-- Support refined Option A as the primary public API:
+- Support staged contract DSL as the primary public API:
   - `defineContract({ ... })`
   - `model({ fields, relations }).sql(...)`
   - `field`, `rel`, `type`, and `c` helper vocabularies
@@ -642,7 +642,7 @@ This is an authoring-surface redesign inside existing package boundaries. The ma
 
 ## Observability
 
-The first slice should add tests that compare lowered refined Option A output against current builder behavior. A later explain/debug surface should make lowering inspectable during development.
+The first slice should add tests that compare lowered staged contract DSL output against current builder behavior. A later explain/debug surface should make lowering inspectable during development.
 
 ## Data Protection
 

@@ -1,8 +1,8 @@
-# Refined Option A Execution Plan
+# Staged Contract DSL Execution Plan
 
 ## Summary
 
-This project lands the refined Option A SQL contract authoring surface: `defineContract({ ... })` with `model('User', { fields, relations }).attributes(...).sql(...)`, inline `field.id()` / `field.unique()` for the 90% path, typed local field refs, typed model tokens for cross-model refs, and lowering to the existing canonical SQL contract IR. Success means authors can use the new staged model DSL without changing emitted contract semantics, downstream `schema()` / `sql()` inference keeps working, and the first slice establishes a path to migrate the remaining high-level field vocabulary and call sites.
+This project lands the staged contract DSL SQL contract authoring surface: `defineContract({ ... })` with `model('User', { fields, relations }).attributes(...).sql(...)`, inline `field.id()` / `field.unique()` for the 90% path, typed local field refs, typed model tokens for cross-model refs, and lowering to the existing canonical SQL contract IR. Success means authors can use the new staged model DSL without changing emitted contract semantics, downstream `schema()` / `sql()` inference keeps working, and the first slice establishes a path to migrate the remaining high-level field vocabulary and call sites.
 
 **Spec:** `projects/ts-contract-authoring-redesign/spec.md`
 
@@ -18,16 +18,16 @@ This project lands the refined Option A SQL contract authoring surface: `defineC
 
 ### Milestone 1: Authoring DSL and Lowering
 
-Deliver the first coherent refined Option A slice on top of the current SQL builder/lowering pipeline.
+Deliver the first coherent staged contract DSL slice on top of the current SQL builder/lowering pipeline.
 
 **Tasks:**
 
-- [ ] Add refined Option A public surface types and exports in `@prisma-next/sql-contract-ts`.
+- [ ] Add staged contract DSL public surface types and exports in `@prisma-next/sql-contract-ts`.
 - [ ] Implement `defineContract({ ... })` object-literal entrypoint as an additive overload over the current builder.
 - [ ] Implement `model('User', { fields, relations }).attributes(...).sql(...)` descriptors and lower them into the existing table/model builder path.
 - [ ] Implement field, relation, and constraint helper vocabularies for the first slice.
 - [ ] Implement root naming defaults plus per-table and per-field overrides.
-- [ ] Preserve existing normalized contract output for supported refined Option A inputs.
+- [ ] Preserve existing normalized contract output for supported staged contract DSL inputs.
 
 ### Milestone 2: Type Safety and Verification
 
@@ -35,10 +35,10 @@ Prove the new DSL is safe and usable through targeted runtime and type-level tes
 
 **Tasks:**
 
-- [ ] Add unit tests for refined Option A lowering, constraint emission, and relation lowering.
+- [ ] Add unit tests for staged contract DSL lowering, constraint emission, and relation lowering.
 - [ ] Add type tests proving `cols` includes scalar fields only and excludes relation fields.
-- [ ] Add integration coverage showing a refined Option A contract works with `validateContract`, `schema()`, and `sql()`.
-- [ ] Add parity-style tests comparing refined Option A output with equivalent legacy builder output.
+- [ ] Add integration coverage showing a staged contract DSL contract works with `validateContract`, `schema()`, and `sql()`.
+- [ ] Add parity-style tests comparing staged contract DSL output with equivalent legacy builder output.
 - [ ] Add focused portability coverage for naming defaults and target swaps where feasible in-package.
 
 ### Milestone 3: Migration and Close-out
@@ -47,7 +47,7 @@ Prepare the repo to adopt the new surface and clean up transient project artifac
 
 **Tasks:**
 
-- [ ] Update package docs and one representative example to the refined Option A surface.
+- [ ] Update package docs and one representative example to the staged contract DSL surface.
 - [ ] Decide which remaining high-level field helpers ship now versus follow-on slices and document any temporary gaps.
 - [ ] Verify all acceptance criteria against implemented tests and any required manual checks.
 - [ ] Finalize any long-lived docs or ADR updates needed outside `projects/`.
@@ -57,7 +57,7 @@ Prepare the repo to adopt the new surface and clean up transient project artifac
 
 | Acceptance Criterion | Test Type | Task/Milestone | Notes |
 |---|---|---|---|
-| Author can define a model with `fields`, `relations`, `.attributes(...)`, and `.sql(...)` without separate `.table(...)` and `.model(...)` calls | Unit + Integration | Milestone 1 / Milestone 2 | Core refined Option A construction path |
+| Author can define a model with `fields`, `relations`, `.attributes(...)`, and `.sql(...)` without separate `.table(...)` and `.model(...)` calls | Unit + Integration | Milestone 1 / Milestone 2 | Core staged contract DSL construction path |
 | Common scalar fields no longer require duplicate field-to-column declarations when names match | Unit | Milestone 1 / Milestone 2 | Cover default column naming |
 | Table and column naming come from root strategy with explicit overrides | Unit | Milestone 1 / Milestone 2 | Cover `snake_case` and explicit `table` / `column` overrides |
 | `cols` exposes only scalar fields and excludes relations | Type test | Milestone 2 | Primary DX acceptance point |

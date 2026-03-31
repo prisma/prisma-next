@@ -17,7 +17,7 @@ const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 const timestamptzColumn = columnDescriptor('pg/timestamptz@1');
 
-describe('refined option A authoring surface', () => {
+describe('staged contract DSL authoring surface', () => {
   it('lowers inline ids and uniques while keeping sql focused on table/index/fk concerns', () => {
     const types = {
       Role: {
@@ -68,7 +68,7 @@ describe('refined option A authoring surface', () => {
 
     const contract = defineContract({
       target: postgresTargetPack,
-      storageHash: 'sha256:refined-option-a',
+      storageHash: 'sha256:staged-contract-dsl',
       foreignKeyDefaults: { constraint: true, index: false },
       types,
       models: {
@@ -78,7 +78,7 @@ describe('refined option A authoring surface', () => {
     });
 
     expect(contract.target).toBe('postgres');
-    expect(contract.storageHash).toBe('sha256:refined-option-a');
+    expect(contract.storageHash).toBe('sha256:staged-contract-dsl');
     expect(contract.storage.tables['app_user']).toMatchObject({
       primaryKey: { columns: ['id'], name: 'app_user_pkey' },
       uniques: [{ columns: ['email'], name: 'app_user_email_key' }],

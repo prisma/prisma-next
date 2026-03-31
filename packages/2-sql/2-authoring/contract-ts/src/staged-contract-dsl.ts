@@ -549,13 +549,29 @@ function ksuidIdField<const Name extends string | undefined = undefined>(
   return createBuiltinIdField('ksuid', undefined, options);
 }
 
+type RelationModelRefSource = 'string' | 'token' | 'lazyToken';
+type TargetFieldRefSource = 'string' | 'token';
+
+type EagerRelationModelName<
+  ModelName extends string = string,
+  Source extends Exclude<RelationModelRefSource, 'lazyToken'> = Exclude<
+    RelationModelRefSource,
+    'lazyToken'
+  >,
+> = {
+  readonly kind: 'relationModelName';
+  readonly source: Source;
+  readonly modelName: ModelName;
+};
+
 type LazyRelationModelName<ModelName extends string = string> = {
   readonly kind: 'lazyRelationModelName';
+  readonly source: 'lazyToken';
   readonly resolve: () => ModelName;
 };
 
 type RelationModelSource<ModelName extends string = string> =
-  | ModelName
+  | EagerRelationModelName<ModelName>
   | LazyRelationModelName<ModelName>;
 
 type BelongsToRelation<
@@ -664,8 +680,13 @@ export type ColumnRef<FieldName extends string = string> = {
   readonly fieldName: FieldName;
 };
 
-export type TargetFieldRef<ModelName extends string = string, FieldName extends string = string> = {
+export type TargetFieldRef<
+  ModelName extends string = string,
+  FieldName extends string = string,
+  Source extends TargetFieldRefSource = TargetFieldRefSource,
+> = {
   readonly kind: 'targetFieldRef';
+  readonly source: Source;
   readonly modelName: ModelName;
   readonly fieldName: FieldName;
 };
@@ -735,6 +756,7 @@ export type ForeignKeyConstraint<
   readonly fields: SourceFieldNames;
   readonly targetModel: TargetModelName;
   readonly targetFields: TargetFieldNames;
+  readonly targetSource?: TargetFieldRefSource;
   readonly name?: Name;
   readonly onDelete?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
   readonly onUpdate?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
@@ -749,6 +771,7 @@ function normalizeFieldRefInput(input: ColumnRef | readonly ColumnRef[]): readon
 function normalizeTargetFieldRefInput(input: TargetFieldRef | readonly TargetFieldRef[]): {
   readonly modelName: string;
   readonly fieldNames: readonly string[];
+  readonly source: TargetFieldRefSource;
 } {
   const refs = Array.isArray(input) ? input : [input];
   const [first] = refs;
@@ -761,6 +784,7 @@ function normalizeTargetFieldRefInput(input: TargetFieldRef | readonly TargetFie
   return {
     modelName: first.modelName,
     fieldNames: refs.map((ref) => ref.fieldName),
+    source: refs.some((ref) => ref.source === 'string') ? 'string' : 'token',
   };
 }
 
@@ -771,6 +795,7 @@ function createConstraintsDsl() {
   ): TargetFieldRef<ModelName, FieldName> {
     return {
       kind: 'targetFieldRef',
+      source: 'string',
       modelName,
       fieldName,
     };
@@ -876,6 +901,7 @@ function createConstraintsDsl() {
       fields: normalizeFieldRefInput(fieldOrFields),
       targetModel: normalizedTarget.modelName,
       targetFields: normalizedTarget.fieldNames,
+      targetSource: normalizedTarget.source,
       ...(options?.name ? { name: options.name } : {}),
       ...(options?.onDelete ? { onDelete: options.onDelete } : {}),
       ...(options?.onUpdate ? { onUpdate: options.onUpdate } : {}),
@@ -938,6 +964,7 @@ function createModelTokenRefs<
   for (const fieldName of Object.keys(fields)) {
     refs[fieldName] = {
       kind: 'targetFieldRef',
+      source: 'token',
       modelName,
       fieldName,
     };
@@ -1069,7 +1096,7 @@ type ValidateAttributesStageSpec<
     : never
   : AttributesSpec;
 
-export class RefinedModelBuilder<
+export class StagedModelBuilder<
   ModelName extends string | undefined,
   Fields extends Record<string, ScalarFieldBuilder>,
   Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
@@ -1099,7 +1126,7 @@ export class RefinedModelBuilder<
 
   ref<FieldName extends keyof Fields & string>(
     this: ModelName extends string
-      ? RefinedModelBuilder<ModelName, Fields, Relations, AttributesSpec, SqlSpec>
+      ? StagedModelBuilder<ModelName, Fields, Relations, AttributesSpec, SqlSpec>
       : never,
     fieldName: FieldName,
   ): TargetFieldRef<ModelName & string, FieldName> {
@@ -1110,6 +1137,7 @@ export class RefinedModelBuilder<
 
     return {
       kind: 'targetFieldRef',
+      source: 'token',
       modelName,
       fieldName,
     } as TargetFieldRef<ModelName & string, FieldName>;
@@ -1117,8 +1145,8 @@ export class RefinedModelBuilder<
 
   relations<const NextRelations extends Record<string, AnyRelationBuilder>>(
     relations: NextRelations,
-  ): RefinedModelBuilder<ModelName, Fields, Relations & NextRelations, AttributesSpec, SqlSpec> {
-    return new RefinedModelBuilder(
+  ): StagedModelBuilder<ModelName, Fields, Relations & NextRelations, AttributesSpec, SqlSpec> {
+    return new StagedModelBuilder(
       {
         ...this.stageOne,
         relations: {
@@ -1136,8 +1164,8 @@ export class RefinedModelBuilder<
       AttributeContext<Fields>,
       ValidateAttributesStageSpec<Fields, SqlSpec, NextAttributesSpec>
     >,
-  ): RefinedModelBuilder<ModelName, Fields, Relations, NextAttributesSpec, SqlSpec> {
-    return new RefinedModelBuilder(this.stageOne, specOrFactory, this.sqlFactory);
+  ): StagedModelBuilder<ModelName, Fields, Relations, NextAttributesSpec, SqlSpec> {
+    return new StagedModelBuilder(this.stageOne, specOrFactory, this.sqlFactory);
   }
 
   sql<const NextSqlSpec extends SqlStageSpec>(
@@ -1145,8 +1173,8 @@ export class RefinedModelBuilder<
       SqlContext<Fields>,
       ValidateSqlStageSpec<Fields, AttributesSpec, NextSqlSpec>
     >,
-  ): RefinedModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
-    return new RefinedModelBuilder(this.stageOne, this.attributesFactory, specOrFactory);
+  ): StagedModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
+    return new StagedModelBuilder(this.stageOne, this.attributesFactory, specOrFactory);
   }
 
   buildAttributesSpec(): AttributesSpec {
@@ -1239,25 +1267,34 @@ function normalizeRelationModelSource(
   target: string | AnyNamedModelToken | LazyNamedModelToken,
 ): RelationModelSource<string> {
   if (typeof target === 'string') {
-    return target;
+    return {
+      kind: 'relationModelName',
+      source: 'string',
+      modelName: target,
+    };
   }
 
   if (typeof target === 'function') {
     return {
       kind: 'lazyRelationModelName',
+      source: 'lazyToken',
       resolve: () => resolveNamedModelTokenName(target()),
     };
   }
 
-  return resolveNamedModelTokenName(target);
+  return {
+    kind: 'relationModelName',
+    source: 'token',
+    modelName: resolveNamedModelTokenName(target),
+  };
 }
 
-export type RefinedContractInput<
+export type StagedContractInput<
   Target extends TargetPackRef<'sql', string> = TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   Models extends Record<
     string,
-    RefinedModelBuilder<
+    StagedModelBuilder<
       string | undefined,
       Record<string, ScalarFieldBuilder>,
       Record<string, AnyRelationBuilder>,
@@ -1288,7 +1325,7 @@ export function model<
     readonly fields: Fields;
     readonly relations?: Relations;
   },
-): RefinedModelBuilder<ModelName, Fields, Relations>;
+): StagedModelBuilder<ModelName, Fields, Relations>;
 
 export function model<
   Fields extends Record<string, ScalarFieldBuilder>,
@@ -1296,7 +1333,7 @@ export function model<
 >(input: {
   readonly fields: Fields;
   readonly relations?: Relations;
-}): RefinedModelBuilder<undefined, Fields, Relations>;
+}): StagedModelBuilder<undefined, Fields, Relations>;
 
 export function model<
   const ModelName extends string,
@@ -1313,14 +1350,14 @@ export function model<
     readonly fields: Fields;
     readonly relations?: Relations;
   },
-): RefinedModelBuilder<ModelName | undefined, Fields, Relations> {
+): StagedModelBuilder<ModelName | undefined, Fields, Relations> {
   const input = typeof modelNameOrInput === 'string' ? maybeInput : modelNameOrInput;
 
   if (!input) {
     throw new Error('model("ModelName", ...) requires a model definition.');
   }
 
-  return new RefinedModelBuilder({
+  return new StagedModelBuilder({
     ...(typeof modelNameOrInput === 'string' ? { modelName: modelNameOrInput } : {}),
     fields: input.fields,
     relations: (input.relations ?? {}) as Relations,
@@ -1481,7 +1518,7 @@ export const field = {
   },
 };
 
-export function isRefinedContractInput(value: unknown): value is RefinedContractInput {
+export function isStagedContractInput(value: unknown): value is StagedContractInput {
   return typeof value === 'object' && value !== null && 'target' in value;
 }
 
@@ -1500,7 +1537,7 @@ export function resolveRelationModelName(value: RelationModelSource<string>): st
   if (isLazyRelationModelName(value)) {
     return value.resolve();
   }
-  return value;
+  return value.modelName;
 }
 
 export function applyNaming(name: string, strategy: NamingStrategy | undefined): string {
@@ -1532,7 +1569,7 @@ export type FieldStateOf<T> = T extends ScalarFieldBuilder<infer State> ? State 
 export type RelationStateOf<T> = T extends RelationBuilder<infer State> ? State : never;
 
 export type ModelFieldsOf<T> =
-  T extends RefinedModelBuilder<
+  T extends StagedModelBuilder<
     string | undefined,
     infer Fields,
     Record<string, AnyRelationBuilder>,
@@ -1543,7 +1580,7 @@ export type ModelFieldsOf<T> =
     : never;
 
 export type ModelRelationsOf<T> =
-  T extends RefinedModelBuilder<
+  T extends StagedModelBuilder<
     string | undefined,
     Record<string, ScalarFieldBuilder>,
     infer Relations,
@@ -1554,7 +1591,7 @@ export type ModelRelationsOf<T> =
     : never;
 
 export type ModelAttributesOf<T> =
-  T extends RefinedModelBuilder<
+  T extends StagedModelBuilder<
     string | undefined,
     Record<string, ScalarFieldBuilder>,
     Record<string, AnyRelationBuilder>,
@@ -1565,7 +1602,7 @@ export type ModelAttributesOf<T> =
     : undefined;
 
 export type ModelSqlOf<T> =
-  T extends RefinedModelBuilder<
+  T extends StagedModelBuilder<
     string | undefined,
     Record<string, ScalarFieldBuilder>,
     Record<string, AnyRelationBuilder>,

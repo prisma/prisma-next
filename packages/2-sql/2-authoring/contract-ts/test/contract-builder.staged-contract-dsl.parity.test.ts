@@ -23,11 +23,11 @@ const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 const timestamptzColumn = columnDescriptor('pg/timestamptz@1');
 
-function expectRefinedParity(refined: unknown, legacy: unknown): void {
+function expectStagedParity(refined: unknown, legacy: unknown): void {
   expect(refined).toEqual(legacy);
 }
 
-describe('refined option A parity with legacy builder', () => {
+describe('staged contract DSL parity with legacy builder', () => {
   it('matches legacy builder output for named types, defaults, naming defaults, and foreign keys', () => {
     const types = {
       Role: {
@@ -63,7 +63,7 @@ describe('refined option A parity with legacy builder', () => {
       target: postgresTargetPack,
       extensionPacks: { pgvector: pgvectorPack },
       naming: { tables: 'snake_case', columns: 'snake_case' },
-      storageHash: 'sha256:refined-option-a-parity-core',
+      storageHash: 'sha256:staged-contract-dsl-parity-core',
       foreignKeyDefaults: { constraint: true, index: false },
       capabilities: {
         postgres: {
@@ -99,7 +99,7 @@ describe('refined option A parity with legacy builder', () => {
     const legacy = defineContract()
       .target(postgresTargetPack)
       .extensionPacks({ pgvector: pgvectorPack })
-      .storageHash('sha256:refined-option-a-parity-core')
+      .storageHash('sha256:staged-contract-dsl-parity-core')
       .foreignKeyDefaults({ constraint: true, index: false })
       .capabilities({
         postgres: {
@@ -180,7 +180,7 @@ describe('refined option A parity with legacy builder', () => {
       )
       .build();
 
-    expectRefinedParity(refined, legacy);
+    expectStagedParity(refined, legacy);
   });
 
   it('matches legacy builder output for compound ids and uniques', () => {
@@ -226,7 +226,7 @@ describe('refined option A parity with legacy builder', () => {
       )
       .build();
 
-    expectRefinedParity(refined, legacy);
+    expectStagedParity(refined, legacy);
   });
 
   it('matches legacy builder output for many-to-many relation lowering', () => {
@@ -342,6 +342,6 @@ describe('refined option A parity with legacy builder', () => {
       .model('PostTag', 'post_tag', (m) => m.field('postId', 'post_id').field('tagId', 'tag_id'))
       .build();
 
-    expectRefinedParity(refined, legacy);
+    expectStagedParity(refined, legacy);
   });
 });

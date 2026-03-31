@@ -1,6 +1,6 @@
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
-import { defineContract, field, model } from '../src/contract-builder';
+import { defineContract, field, model, rel } from '../src/contract-builder';
 
 type PortableSqlCodecTypes = {
   readonly 'pg/enum@1': { output: string };
@@ -275,7 +275,7 @@ const pgvectorExtensionPack = {
   },
 } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
-describe('refined option A helper vocabulary', () => {
+describe('staged contract DSL helper vocabulary', () => {
   it('lowers portable scalar helpers and explicit uuidv4 primary keys', () => {
     const AuditEntry = model('AuditEntry', {
       fields: {
@@ -510,6 +510,98 @@ describe('refined option A helper vocabulary', () => {
       });
 
       expect(emitWarning).not.toHaveBeenCalled();
+    } finally {
+      emitWarning.mockRestore();
+    }
+  });
+
+  it('warns when a string relation target could use a named model token instead', () => {
+    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
+
+    try {
+      const User = model('User', {
+        fields: {
+          id: field.id.uuidv7(),
+        },
+      }).sql({
+        table: 'app_user',
+      });
+
+      defineContract({
+        target: postgresTargetPack,
+        models: {
+          User,
+          Post: model('Post', {
+            fields: {
+              id: field.id.uuidv7(),
+              userId: field.uuid(),
+            },
+            relations: {
+              user: rel.belongsTo('User', { from: 'userId', to: 'id' }),
+            },
+          }).sql({
+            table: 'blog_post',
+          }),
+        },
+      });
+
+      expect(emitWarning).toHaveBeenCalledWith(
+        expect.stringContaining(`rel.belongsTo('User', { from: 'userId', to: 'id' })`),
+        expect.objectContaining({
+          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+        }),
+      );
+      expect(emitWarning).toHaveBeenCalledWith(
+        expect.stringContaining(`Use rel.belongsTo(User, { from: 'userId', to: 'id' })`),
+        expect.objectContaining({
+          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+        }),
+      );
+    } finally {
+      emitWarning.mockRestore();
+    }
+  });
+
+  it('warns when constraints.ref fallback could use model token refs instead', () => {
+    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
+
+    try {
+      const User = model('User', {
+        fields: {
+          id: field.id.uuidv7(),
+        },
+      }).sql({
+        table: 'app_user',
+      });
+
+      defineContract({
+        target: postgresTargetPack,
+        models: {
+          User,
+          Post: model('Post', {
+            fields: {
+              id: field.id.uuidv7(),
+              userId: field.uuid(),
+            },
+          }).sql(({ cols, constraints }) => ({
+            table: 'blog_post',
+            foreignKeys: [constraints.foreignKey(cols.userId, constraints.ref('User', 'id'))],
+          })),
+        },
+      });
+
+      expect(emitWarning).toHaveBeenCalledWith(
+        expect.stringContaining(`constraints.ref('User', 'id')`),
+        expect.objectContaining({
+          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+        }),
+      );
+      expect(emitWarning).toHaveBeenCalledWith(
+        expect.stringContaining('Use User.refs.id'),
+        expect.objectContaining({
+          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+        }),
+      );
     } finally {
       emitWarning.mockRestore();
     }

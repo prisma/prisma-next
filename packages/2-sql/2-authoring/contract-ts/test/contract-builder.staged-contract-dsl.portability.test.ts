@@ -69,7 +69,7 @@ function buildPortableContract<TTarget extends string>(target: PortableTargetPac
   return defineContract({
     target,
     naming: { tables: 'snake_case', columns: 'snake_case' },
-    storageHash: 'sha256:portable-refined-option-a',
+    storageHash: 'sha256:portable-staged-contract-dsl',
     models: {
       User,
       Post,
@@ -77,8 +77,8 @@ function buildPortableContract<TTarget extends string>(target: PortableTargetPac
   });
 }
 
-describe('refined option A portability coverage', () => {
-  it('keeps portable refined contracts identical across postgres and sqlite target swaps', () => {
+describe('staged contract DSL portability coverage', () => {
+  it('keeps portable staged contracts identical across postgres and sqlite target swaps', () => {
     const postgresContract = buildPortableContract(postgresTargetPack);
     const sqliteContract = buildPortableContract(sqliteTargetPack);
 

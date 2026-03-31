@@ -6,6 +6,7 @@ import type {
 import type {
   AuthoringContributions,
   AuthoringTypeConstructorDescriptor,
+  ExtensionPackRef,
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
 import {
@@ -94,6 +95,8 @@ type ResolvedField = {
   readonly executionDefault?: ExecutionMutationDefaultValue;
   readonly isId: boolean;
   readonly isUnique: boolean;
+  readonly idName?: string;
+  readonly uniqueName?: string;
 };
 
 type ParsedRelationAttribute = {
@@ -136,6 +139,28 @@ type ModelNameMapping = {
   readonly tableName: string;
   readonly fieldColumns: Map<string, string>;
 };
+
+function buildComposedExtensionPackRefs(
+  target: TargetPackRef<'sql', 'postgres'>,
+  extensionIds: readonly string[],
+): Record<string, ExtensionPackRef<'sql', 'postgres'>> | undefined {
+  if (extensionIds.length === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    extensionIds.map((extensionId) => [
+      extensionId,
+      {
+        kind: 'extension',
+        id: extensionId,
+        familyId: target.familyId,
+        targetId: target.targetId,
+        version: '0.0.1',
+      } satisfies ExtensionPackRef<'sql', 'postgres'>,
+    ]),
+  );
+}
 
 function lowerFirst(value: string): string {
   if (value.length === 0) return value;
@@ -359,6 +384,37 @@ function parseMapName(input: {
     return input.defaultValue;
   }
   return parsed;
+}
+
+function parseConstraintMapArgument(input: {
+  readonly attribute: PslAttribute | undefined;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly entityLabel: string;
+  readonly span: PslSpan;
+  readonly code: string;
+}): string | undefined {
+  if (!input.attribute) {
+    return undefined;
+  }
+
+  const raw = getNamedArgument(input.attribute, 'map');
+  if (!raw) {
+    return undefined;
+  }
+
+  const parsed = parseQuotedStringLiteral(raw);
+  if (parsed !== undefined) {
+    return parsed;
+  }
+
+  input.diagnostics.push({
+    code: input.code,
+    message: `${input.entityLabel} map argument must be a quoted string literal`,
+    sourceId: input.sourceId,
+    span: input.span,
+  });
+  return undefined;
 }
 
 function parsePgvectorLength(input: {
@@ -872,14 +928,35 @@ function collectResolvedFields(
       }
     }
     const mappedColumnName = mapping.fieldColumns.get(field.name) ?? field.name;
+    const idAttribute = getAttribute(field.attributes, 'id');
+    const uniqueAttribute = getAttribute(field.attributes, 'unique');
+    const idName = parseConstraintMapArgument({
+      attribute: idAttribute,
+      sourceId,
+      diagnostics,
+      entityLabel: `Field "${model.name}.${field.name}" @id`,
+      span: field.span,
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+    });
+    const uniqueName = parseConstraintMapArgument({
+      attribute: uniqueAttribute,
+      sourceId,
+      diagnostics,
+      entityLabel: `Field "${model.name}.${field.name}" @unique`,
+      span: field.span,
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+    });
+
     resolvedFields.push({
       field,
       columnName: mappedColumnName,
       descriptor,
       ...ifDefined('defaultValue', loweredDefault.defaultValue),
       ...ifDefined('executionDefault', loweredDefault.executionDefault),
-      isId: Boolean(getAttribute(field.attributes, 'id')),
-      isUnique: Boolean(getAttribute(field.attributes, 'unique')),
+      isId: Boolean(idAttribute),
+      isUnique: Boolean(uniqueAttribute),
+      ...ifDefined('idName', idName),
+      ...ifDefined('uniqueName', uniqueName),
     });
   }
 
@@ -1535,9 +1612,9 @@ export function interpretPslDocumentToSqlContractIR(
       input.scalarTypeDescriptors,
     );
 
-    const primaryKeyColumns = resolvedFields
-      .filter((field) => field.isId)
-      .map((field) => field.columnName);
+    const primaryKeyFields = resolvedFields.filter((field) => field.isId);
+    const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
+    const primaryKeyName = primaryKeyFields.length === 1 ? primaryKeyFields[0]?.idName : undefined;
     if (primaryKeyColumns.length === 0) {
       diagnostics.push({
         code: 'PSL_MISSING_PRIMARY_KEY',
@@ -1614,7 +1691,10 @@ export function interpretPslDocumentToSqlContractIR(
       );
     const uniqueConstraints: SqlSemanticUniqueConstraintNode[] = resolvedFields
       .filter((field) => field.isUnique)
-      .map((field) => ({ columns: [field.columnName] }));
+      .map((field) => ({
+        columns: [field.columnName],
+        ...ifDefined('name', field.uniqueName),
+      }));
     const indexNodes: SqlSemanticIndexNode[] = [];
     const foreignKeyNodes: SqlSemanticForeignKeyNode[] = [];
 
@@ -1645,10 +1725,24 @@ export function interpretPslDocumentToSqlContractIR(
         if (!columnNames) {
           continue;
         }
+        const constraintName = parseConstraintMapArgument({
+          attribute: modelAttribute,
+          sourceId,
+          diagnostics,
+          entityLabel: `Model "${model.name}" @@${modelAttribute.name}`,
+          span: modelAttribute.span,
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        });
         if (modelAttribute.name === 'unique') {
-          uniqueConstraints.push({ columns: columnNames });
+          uniqueConstraints.push({
+            columns: columnNames,
+            ...ifDefined('name', constraintName),
+          });
         } else {
-          indexNodes.push({ columns: columnNames });
+          indexNodes.push({
+            columns: columnNames,
+            ...ifDefined('name', constraintName),
+          });
         }
         continue;
       }
@@ -1807,7 +1901,14 @@ export function interpretPslDocumentToSqlContractIR(
         ...ifDefined('default', resolvedField.defaultValue),
         ...ifDefined('executionDefault', resolvedField.executionDefault),
       })),
-      ...(primaryKeyColumns.length > 0 ? { id: { columns: primaryKeyColumns } } : {}),
+      ...(primaryKeyColumns.length > 0
+        ? {
+            id: {
+              columns: primaryKeyColumns,
+              ...ifDefined('name', primaryKeyName),
+            },
+          }
+        : {}),
       ...(uniqueConstraints.length > 0 ? { uniques: uniqueConstraints } : {}),
       ...(indexNodes.length > 0 ? { indexes: indexNodes } : {}),
       ...(foreignKeyNodes.length > 0 ? { foreignKeys: foreignKeyNodes } : {}),
@@ -1844,6 +1945,10 @@ export function interpretPslDocumentToSqlContractIR(
 
   const contract = buildSqlContractFromSemanticDefinition({
     target: input.target,
+    ...ifDefined(
+      'extensionPacks',
+      buildComposedExtensionPackRefs(input.target, [...composedExtensions].sort(compareStrings)),
+    ),
     ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
     models: semanticModels.map((model) => ({
       ...model,

@@ -11,7 +11,7 @@ If your goal is:
 - good future model/query type inference
 - good LLM-assisted editing and refactoring
 
-then the best long-term design is still **refined Option A**, but with a sharper interpretation than the current prototype slice:
+then the best long-term design is still **staged contract DSL**, but with a sharper interpretation than the current prototype slice:
 
 - one shared semantic authoring core for TS and PSL
 - pack-provided type constructors and field presets as the source vocabulary, per ADR 170
@@ -90,15 +90,12 @@ The exact spellings of `attributes`, local `.sql(...)`, or `User.ref('id')` can 
 - relation and field-local `.sql(...)` handle one-off storage naming overrides
 - model-level `.sql(...)` is the last-resort place for table mapping and advanced SQL-only detail
 
-If the team wants a fallback for migration comfort, keep **Option B** only as a fluent shell over the same inner semantic DSL. Do not let it become a separate per-field builder language.
-
 My recommendation is:
 
-- **Best long-term design:** refined Option A
-- **Safer fallback:** Option B as a narrow contract shell only
-- **Best for LLMs:** refined Option A
+- **Best long-term design:** staged contract DSL
+- **Best for LLMs:** staged contract DSL
 
-## Why Refined Option A Wins
+## Why Staged Contract DSL Wins
 
 - It separates domain intent from SQL detail cleanly.
 - It gives the best autocomplete story for local field refs through `cols.*`.
@@ -129,7 +126,7 @@ The crucial improvement is not “object literal versus chain” by itself. The 
 - Do not evaluate “does this default physically fit this storage representation?” during authoring.
 - Keep one spelling per concept.
 
-## Refined Option A
+## Staged Contract DSL
 
 ### Interpreting the current prototype
 
@@ -252,7 +249,7 @@ export const contract = defineContract({
   target: postgresPack,
   extensionPacks: { pgvector },
   naming: { tables: 'snake_case', columns: 'snake_case' },
-  storageHash: 'sha256:refined-option-a',
+  storageHash: 'sha256:staged-contract-dsl',
   foreignKeyDefaults: { constraint: true, index: false },
   capabilities: {
     postgres: {
@@ -274,7 +271,7 @@ export const contract = defineContract({
 });
 ```
 
-### Where refined Option A excels
+### Where staged contract DSL excels
 
 - Best separation between model intent and SQL/storage detail.
 - Best local autocomplete story via `fields.*` and `cols.*`.
@@ -283,7 +280,7 @@ export const contract = defineContract({
 - Best shape for codemods and LLM-assisted edits.
 - Best reviewability because a model is one self-contained block.
 
-### Where refined Option A still struggles
+### Where staged contract DSL still struggles
 
 - It still puts design pressure on `field`, `rel`, `attributes`, and `constraints`; the vocabulary must stay coherent.
 - Large models can still become visually dense.
@@ -301,54 +298,9 @@ export const contract = defineContract({
 - Add an explain/debug surface later, but do not block the first implementation slice on it.
 - Be ruthless about vocabulary discipline.
 
-## Option B, but Narrow
+## No Separate Fluent Shell
 
-### Shape
-
-If Option B survives at all, it should look like this:
-
-```ts
-defineContract()
-  .target(target)
-  .extensionPacks(extensionPacks)
-  .naming(naming)
-  .types(types)
-  .models(models)
-```
-
-The inner model DSL must still be the same refined Option A DSL:
-
-```ts
-const Account = model({
-  fields: {
-    id: field.generated(uuidv4()).id(),
-    email: field.column(textColumn).unique(),
-  },
-  relations: {
-    posts: rel.hasMany('Post', { by: 'authorId' }),
-  },
-}).sql({ table: 'account' });
-```
-
-### What Option B must not become
-
-```ts
-.model('Account', (m) =>
-  m
-    .field(...)
-    .field(...)
-    .relation(...)
-    .constraint(...)
-)
-```
-
-That version is worse for:
-
-- readability
-- diffability
-- TS server performance
-- portability review
-- LLM reliability
+This recommendation assumes one public authoring language. A future fluent contract shell is acceptable only if it stays a thin wrapper over the staged contract DSL and never becomes a second per-field builder language.
 
 ## Type-Level and Performance Guidance
 
@@ -361,7 +313,7 @@ That version is worse for:
 
 ## Which Is Better for LLMs?
 
-**Refined Option A is better for LLMs.**
+**Staged Contract DSL is better for LLMs.**
 
 Why:
 
@@ -371,11 +323,9 @@ Why:
 - Portability boundaries are easier to see.
 - Partial edits are safer because the local context is compact and explicit.
 
-Option B is still workable for LLMs if it stays a top-level shell over the same DSL. It gets much worse if it turns into repeated `.field()` / `.relation()` / `.constraint()` chains.
-
 ## Bottom Line
 
-Choose refined Option A if the bar is:
+Choose staged contract DSL if the bar is:
 
 - elegant contract authoring
 - strong autocomplete in constraint authoring
@@ -383,5 +333,3 @@ Choose refined Option A if the bar is:
 - future inferred model/query/client types
 - LLM-friendly contract maintenance
 - better long-term ergonomics
-
-Choose Option B only if the team values familiarity and short-term delivery safety more than those long-term properties, and even then keep it narrow.

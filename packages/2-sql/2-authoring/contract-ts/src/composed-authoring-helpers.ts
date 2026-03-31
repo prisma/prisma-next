@@ -16,7 +16,13 @@ import {
 } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import { field, model, rel, ScalarFieldBuilder, type ScalarFieldState } from './refined-option-a';
+import {
+  field,
+  model,
+  rel,
+  ScalarFieldBuilder,
+  type ScalarFieldState,
+} from './staged-contract-dsl';
 
 type UnionToIntersection<U> = (U extends unknown ? (value: U) => void : never) extends (
   value: infer I,

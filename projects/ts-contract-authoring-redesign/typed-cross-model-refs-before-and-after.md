@@ -1,10 +1,10 @@
 # Typed Cross-Model Refs: Before and After
 
-**Status:** implemented in the current refined Option A prototype.
+**Status:** implemented in the current staged contract DSL prototype.
 
 ## Goal
 
-Improve cross-model foreign-key authoring in refined Option A without turning the type system into a graph solver.
+Improve cross-model foreign-key authoring in staged contract DSL without turning the type system into a graph solver.
 
 In the current surface, local refs are good:
 
@@ -233,7 +233,7 @@ That is much cheaper, conceptually and type-wise, than making every callback und
 
 ### 5. Better fit with extracted model constants
 
-Refined Option A already reads well when models are extracted:
+Staged Contract DSL already reads well when models are extracted:
 
 ```ts
 const User = model('User', { fields: { ... } });

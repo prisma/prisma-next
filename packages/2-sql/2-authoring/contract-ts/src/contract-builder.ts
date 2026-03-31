@@ -50,26 +50,6 @@ import {
 } from './composed-authoring-helpers';
 import { computeMappings } from './contract';
 import {
-  type AttributeStageIdFieldNames,
-  applyNaming,
-  type FieldStateOf,
-  field,
-  type IdConstraint,
-  isRefinedContractInput,
-  type ModelAttributesSpec,
-  model,
-  normalizeRelationFieldNames,
-  type RefinedContractInput,
-  type RefinedModelBuilder,
-  type RelationState as RefinedRelationState,
-  type RelationBuilder,
-  rel,
-  resolveRelationModelName,
-  type ScalarFieldBuilder,
-  type SqlStageSpec,
-  type UniqueConstraint,
-} from './refined-option-a';
-import {
   buildSemanticSqlContract,
   type SqlSemanticContractBuilderLike,
   type SqlSemanticContractDefinition,
@@ -81,6 +61,26 @@ import {
   type SqlSemanticRelationNode,
   type SqlSemanticUniqueConstraintNode,
 } from './semantic-contract';
+import {
+  type AttributeStageIdFieldNames,
+  applyNaming,
+  type FieldStateOf,
+  field,
+  type IdConstraint,
+  isStagedContractInput,
+  type ModelAttributesSpec,
+  model,
+  normalizeRelationFieldNames,
+  type RelationBuilder,
+  rel,
+  resolveRelationModelName,
+  type ScalarFieldBuilder,
+  type SqlStageSpec,
+  type StagedContractInput,
+  type StagedModelBuilder,
+  type RelationState as StagedRelationState,
+  type UniqueConstraint,
+} from './staged-contract-dsl';
 
 type ColumnDefaultForCodec<
   CodecTypes extends Record<string, { output: unknown }>,
@@ -204,25 +204,25 @@ type MergeExtensionCodecTypesSafe<Packs> =
       : MergeExtensionCodecTypes<Packs>
     : Record<string, never>;
 
-type RefinedDefinitionExtensionPacks<Definition> = Definition extends {
+type StagedDefinitionExtensionPacks<Definition> = Definition extends {
   readonly extensionPacks?: infer Packs extends Record<string, ExtensionPackRef<'sql', string>>;
 }
   ? Packs
   : Record<never, never>;
 
-type RefinedDefinitionCapabilities<Definition> = Definition extends {
+type StagedDefinitionCapabilities<Definition> = Definition extends {
   readonly capabilities?: infer Capabilities extends Record<string, Record<string, boolean>>;
 }
   ? Capabilities
   : undefined;
 
-type RefinedDefinitionTargetId<Definition> = Definition extends {
+type StagedDefinitionTargetId<Definition> = Definition extends {
   readonly target: TargetPackRef<'sql', infer Target>;
 }
   ? Target
   : never;
 
-type RefinedDefinitionStorageHash<Definition> = Definition extends {
+type StagedDefinitionStorageHash<Definition> = Definition extends {
   readonly storageHash?: infer StorageHash extends string;
 }
   ? StorageHash
@@ -230,12 +230,12 @@ type RefinedDefinitionStorageHash<Definition> = Definition extends {
 
 type Present<T> = Exclude<T, undefined>;
 
-type CodecTypesFromRefinedDefinition<Definition> = ExtractCodecTypesFromPack<
+type CodecTypesFromStagedDefinition<Definition> = ExtractCodecTypesFromPack<
   Definition extends { readonly target: infer Target } ? Target : never
 > &
-  MergeExtensionCodecTypesSafe<RefinedDefinitionExtensionPacks<Definition>>;
+  MergeExtensionCodecTypesSafe<StagedDefinitionExtensionPacks<Definition>>;
 
-type RefinedDefinitionModels<Definition> = Definition extends {
+type StagedDefinitionModels<Definition> = Definition extends {
   readonly models?: unknown;
 }
   ? Present<Definition['models']> extends Record<string, unknown>
@@ -243,7 +243,7 @@ type RefinedDefinitionModels<Definition> = Definition extends {
     : Record<never, never>
   : Record<never, never>;
 
-type RefinedDefinitionTypes<Definition> = Definition extends {
+type StagedDefinitionTypes<Definition> = Definition extends {
   readonly types?: unknown;
 }
   ? Present<Definition['types']> extends Record<string, StorageTypeInstance>
@@ -251,13 +251,13 @@ type RefinedDefinitionTypes<Definition> = Definition extends {
     : Record<never, never>
   : Record<never, never>;
 
-type RefinedDefinitionTableNaming<Definition> = Definition extends {
+type StagedDefinitionTableNaming<Definition> = Definition extends {
   readonly naming?: { readonly tables?: infer Strategy extends string };
 }
   ? Strategy
   : undefined;
 
-type RefinedDefinitionColumnNaming<Definition> = Definition extends {
+type StagedDefinitionColumnNaming<Definition> = Definition extends {
   readonly naming?: { readonly columns?: infer Strategy extends string };
 }
   ? Strategy
@@ -304,43 +304,43 @@ type ApplyNamingType<Name extends string, Strategy extends string | undefined> =
     ? SnakeCase<Name>
     : Name;
 
-type RefinedModelNames<Definition> = keyof RefinedDefinitionModels<Definition> & string;
+type StagedModelNames<Definition> = keyof StagedDefinitionModels<Definition> & string;
 
-type RefinedModelFields<
+type StagedModelFields<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
-> = RefinedDefinitionModels<Definition>[ModelName] extends {
+  ModelName extends StagedModelNames<Definition>,
+> = StagedDefinitionModels<Definition>[ModelName] extends {
   readonly stageOne: {
     readonly fields: Record<string, ScalarFieldBuilder>;
   };
 }
-  ? RefinedDefinitionModels<Definition>[ModelName]['stageOne']['fields']
+  ? StagedDefinitionModels<Definition>[ModelName]['stageOne']['fields']
   : Record<never, never>;
 
-type RefinedModelFieldNames<
+type StagedModelFieldNames<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
-> = keyof RefinedModelFields<Definition, ModelName> & string;
+  ModelName extends StagedModelNames<Definition>,
+> = keyof StagedModelFields<Definition, ModelName> & string;
 
-type RefinedModelFieldState<
+type StagedModelFieldState<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
-  FieldName extends RefinedModelFieldNames<Definition, ModelName>,
-> = FieldStateOf<RefinedModelFields<Definition, ModelName>[FieldName]>;
+  ModelName extends StagedModelNames<Definition>,
+  FieldName extends StagedModelFieldNames<Definition, ModelName>,
+> = FieldStateOf<StagedModelFields<Definition, ModelName>[FieldName]>;
 
-type RefinedModelSql<
+type StagedModelSql<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
-> = RefinedDefinitionModels<Definition>[ModelName] extends {
+  ModelName extends StagedModelNames<Definition>,
+> = StagedDefinitionModels<Definition>[ModelName] extends {
   readonly __sql: infer SqlSpec;
 }
   ? SqlSpec
   : undefined;
 
-type RefinedModelAttributes<
+type StagedModelAttributes<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
-> = RefinedDefinitionModels<Definition>[ModelName] extends {
+  ModelName extends StagedModelNames<Definition>,
+> = StagedDefinitionModels<Definition>[ModelName] extends {
   readonly __attributes: infer AttributesSpec;
 }
   ? AttributesSpec
@@ -395,14 +395,14 @@ type DescriptorTypeRef<Descriptor> = Descriptor extends {
   : undefined;
 
 type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageTypeInstance> = {
-  [TypeName in keyof RefinedDefinitionTypes<Definition> & string]: [TypeRef] extends [
-    RefinedDefinitionTypes<Definition>[TypeName],
+  [TypeName in keyof StagedDefinitionTypes<Definition> & string]: [TypeRef] extends [
+    StagedDefinitionTypes<Definition>[TypeName],
   ]
-    ? [RefinedDefinitionTypes<Definition>[TypeName]] extends [TypeRef]
+    ? [StagedDefinitionTypes<Definition>[TypeName]] extends [TypeRef]
       ? TypeName
       : never
     : never;
-}[keyof RefinedDefinitionTypes<Definition> & string];
+}[keyof StagedDefinitionTypes<Definition> & string];
 
 type ResolveNamedStorageTypeKey<Definition, TypeRef> = TypeRef extends string
   ? TypeRef
@@ -414,8 +414,8 @@ type ResolveNamedStorageTypeKey<Definition, TypeRef> = TypeRef extends string
 
 type ResolveNamedStorageType<Definition, TypeRef> =
   ResolveNamedStorageTypeKey<Definition, TypeRef> extends infer TypeName extends string
-    ? TypeName extends keyof RefinedDefinitionTypes<Definition>
-      ? RefinedDefinitionTypes<Definition>[TypeName]
+    ? TypeName extends keyof StagedDefinitionTypes<Definition>
+      ? StagedDefinitionTypes<Definition>[TypeName]
       : StorageTypeInstance
     : StorageTypeInstance;
 
@@ -437,100 +437,98 @@ type ResolveFieldColumnTypeParams<Definition, FieldState> = [
   ? undefined
   : DescriptorTypeParams<FieldDescriptorOf<FieldState>>;
 
-type RefinedModelTableName<Definition, ModelName extends RefinedModelNames<Definition>> = [
+type StagedModelTableName<Definition, ModelName extends StagedModelNames<Definition>> = [
   Defined<
-    RefinedModelSql<Definition, ModelName> extends { readonly table?: infer TableName }
+    StagedModelSql<Definition, ModelName> extends { readonly table?: infer TableName }
       ? TableName
       : never
   >,
 ] extends [never]
-  ? ApplyNamingType<ModelName, RefinedDefinitionTableNaming<Definition>>
+  ? ApplyNamingType<ModelName, StagedDefinitionTableNaming<Definition>>
   : Defined<
-        RefinedModelSql<Definition, ModelName> extends { readonly table?: infer TableName }
+        StagedModelSql<Definition, ModelName> extends { readonly table?: infer TableName }
           ? TableName
           : never
       > extends infer ExplicitTableName extends string
     ? ExplicitTableName
-    : ApplyNamingType<ModelName, RefinedDefinitionTableNaming<Definition>>;
+    : ApplyNamingType<ModelName, StagedDefinitionTableNaming<Definition>>;
 
-type RefinedModelColumnName<
+type StagedModelColumnName<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
-  FieldName extends RefinedModelFieldNames<Definition, ModelName>,
-> = [FieldColumnOverrideOf<RefinedModelFieldState<Definition, ModelName, FieldName>>] extends [
-  never,
-]
-  ? ApplyNamingType<FieldName, RefinedDefinitionColumnNaming<Definition>>
+  ModelName extends StagedModelNames<Definition>,
+  FieldName extends StagedModelFieldNames<Definition, ModelName>,
+> = [FieldColumnOverrideOf<StagedModelFieldState<Definition, ModelName, FieldName>>] extends [never]
+  ? ApplyNamingType<FieldName, StagedDefinitionColumnNaming<Definition>>
   : FieldColumnOverrideOf<
-        RefinedModelFieldState<Definition, ModelName, FieldName>
+        StagedModelFieldState<Definition, ModelName, FieldName>
       > extends infer ExplicitColumnName extends string
     ? ExplicitColumnName
-    : ApplyNamingType<FieldName, RefinedDefinitionColumnNaming<Definition>>;
+    : ApplyNamingType<FieldName, StagedDefinitionColumnNaming<Definition>>;
 
-type RefinedFieldNamesToColumnNames<
+type StagedFieldNamesToColumnNames<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
+  ModelName extends StagedModelNames<Definition>,
   FieldNames extends readonly string[],
 > = FieldNames extends readonly []
   ? readonly []
   : FieldNames extends readonly [
-        infer First extends RefinedModelFieldNames<Definition, ModelName>,
+        infer First extends StagedModelFieldNames<Definition, ModelName>,
         ...infer Rest extends readonly string[],
       ]
     ? readonly [
-        RefinedModelColumnName<Definition, ModelName, First>,
-        ...RefinedFieldNamesToColumnNames<Definition, ModelName, Rest>,
+        StagedModelColumnName<Definition, ModelName, First>,
+        ...StagedFieldNamesToColumnNames<Definition, ModelName, Rest>,
       ]
     : readonly string[];
 
-type RefinedInlineIdFieldName<Definition, ModelName extends RefinedModelNames<Definition>> = {
-  [FieldName in RefinedModelFieldNames<Definition, ModelName>]: [
-    FieldInlineIdSpecOf<RefinedModelFieldState<Definition, ModelName, FieldName>>,
+type StagedInlineIdFieldName<Definition, ModelName extends StagedModelNames<Definition>> = {
+  [FieldName in StagedModelFieldNames<Definition, ModelName>]: [
+    FieldInlineIdSpecOf<StagedModelFieldState<Definition, ModelName, FieldName>>,
   ] extends [never]
     ? never
     : FieldName;
-}[RefinedModelFieldNames<Definition, ModelName>];
+}[StagedModelFieldNames<Definition, ModelName>];
 
-type RefinedInlineIdFieldNames<Definition, ModelName extends RefinedModelNames<Definition>> = [
-  RefinedInlineIdFieldName<Definition, ModelName>,
+type StagedInlineIdFieldNames<Definition, ModelName extends StagedModelNames<Definition>> = [
+  StagedInlineIdFieldName<Definition, ModelName>,
 ] extends [never]
   ? undefined
-  : readonly [RefinedInlineIdFieldName<Definition, ModelName>];
+  : readonly [StagedInlineIdFieldName<Definition, ModelName>];
 
-type RefinedInlineIdName<Definition, ModelName extends RefinedModelNames<Definition>> = {
-  [FieldName in RefinedModelFieldNames<Definition, ModelName>]: FieldInlineIdSpecOf<
-    RefinedModelFieldState<Definition, ModelName, FieldName>
+type StagedInlineIdName<Definition, ModelName extends StagedModelNames<Definition>> = {
+  [FieldName in StagedModelFieldNames<Definition, ModelName>]: FieldInlineIdSpecOf<
+    StagedModelFieldState<Definition, ModelName, FieldName>
   > extends { readonly name?: infer Name extends string }
     ? Name
     : never;
-}[RefinedModelFieldNames<Definition, ModelName>];
+}[StagedModelFieldNames<Definition, ModelName>];
 
-type RefinedAttributeIdFieldNames<
+type StagedAttributeIdFieldNames<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
-> = AttributeStageIdFieldNames<RefinedModelAttributes<Definition, ModelName>>;
+  ModelName extends StagedModelNames<Definition>,
+> = AttributeStageIdFieldNames<StagedModelAttributes<Definition, ModelName>>;
 
-type RefinedAttributeIdName<Definition, ModelName extends RefinedModelNames<Definition>> = Defined<
-  RefinedModelAttributes<Definition, ModelName> extends {
+type StagedAttributeIdName<Definition, ModelName extends StagedModelNames<Definition>> = Defined<
+  StagedModelAttributes<Definition, ModelName> extends {
     readonly id?: { readonly name?: infer Name extends string };
   }
     ? Name
     : never
 >;
 
-type RefinedModelIdFieldNames<Definition, ModelName extends RefinedModelNames<Definition>> = [
-  RefinedAttributeIdFieldNames<Definition, ModelName>,
+type StagedModelIdFieldNames<Definition, ModelName extends StagedModelNames<Definition>> = [
+  StagedAttributeIdFieldNames<Definition, ModelName>,
 ] extends [undefined]
-  ? RefinedInlineIdFieldNames<Definition, ModelName>
-  : RefinedAttributeIdFieldNames<Definition, ModelName>;
+  ? StagedInlineIdFieldNames<Definition, ModelName>
+  : StagedAttributeIdFieldNames<Definition, ModelName>;
 
-type RefinedModelIdName<Definition, ModelName extends RefinedModelNames<Definition>> = [
-  RefinedAttributeIdName<Definition, ModelName>,
+type StagedModelIdName<Definition, ModelName extends StagedModelNames<Definition>> = [
+  StagedAttributeIdName<Definition, ModelName>,
 ] extends [never]
-  ? Defined<RefinedInlineIdName<Definition, ModelName>>
-  : RefinedAttributeIdName<Definition, ModelName>;
+  ? Defined<StagedInlineIdName<Definition, ModelName>>
+  : StagedAttributeIdName<Definition, ModelName>;
 
-type RefinedStorageColumn<
+type StagedStorageColumn<
   CodecId extends string,
   Nullable extends boolean,
   NativeType extends string,
@@ -546,70 +544,67 @@ type RefinedStorageColumn<
     ? { readonly typeParams: TypeParams }
     : Record<string, never>);
 
-type RefinedModelStorageColumn<
+type StagedModelStorageColumn<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
+  ModelName extends StagedModelNames<Definition>,
   FieldName extends string,
-> = FieldName extends RefinedModelFieldNames<Definition, ModelName>
-  ? RefinedStorageColumn<
+> = FieldName extends StagedModelFieldNames<Definition, ModelName>
+  ? StagedStorageColumn<
       DescriptorCodecId<
-        ResolveFieldDescriptor<Definition, RefinedModelFieldState<Definition, ModelName, FieldName>>
+        ResolveFieldDescriptor<Definition, StagedModelFieldState<Definition, ModelName, FieldName>>
       >,
-      FieldNullableOf<RefinedModelFieldState<Definition, ModelName, FieldName>>,
+      FieldNullableOf<StagedModelFieldState<Definition, ModelName, FieldName>>,
       DescriptorNativeType<
-        ResolveFieldDescriptor<Definition, RefinedModelFieldState<Definition, ModelName, FieldName>>
+        ResolveFieldDescriptor<Definition, StagedModelFieldState<Definition, ModelName, FieldName>>
       >,
       ResolveFieldColumnTypeRef<
         Definition,
-        RefinedModelFieldState<Definition, ModelName, FieldName>
+        StagedModelFieldState<Definition, ModelName, FieldName>
       >,
       ResolveFieldColumnTypeParams<
         Definition,
-        RefinedModelFieldState<Definition, ModelName, FieldName>
+        StagedModelFieldState<Definition, ModelName, FieldName>
       >
     >
   : never;
 
-type RefinedBuiltModels<Definition> = {
-  readonly [ModelName in RefinedModelNames<Definition>]: {
+type StagedBuiltModels<Definition> = {
+  readonly [ModelName in StagedModelNames<Definition>]: {
     readonly storage: {
-      readonly table: RefinedModelTableName<Definition, ModelName>;
+      readonly table: StagedModelTableName<Definition, ModelName>;
     };
     readonly fields: {
-      readonly [FieldName in RefinedModelFieldNames<Definition, ModelName>]: {
-        readonly column: RefinedModelColumnName<Definition, ModelName, FieldName>;
+      readonly [FieldName in StagedModelFieldNames<Definition, ModelName>]: {
+        readonly column: StagedModelColumnName<Definition, ModelName, FieldName>;
       };
     };
   };
 };
 
-type RefinedBuiltModelFields<
+type StagedBuiltModelFields<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
-> = RefinedBuiltModels<Definition>[ModelName]['fields'];
+  ModelName extends StagedModelNames<Definition>,
+> = StagedBuiltModels<Definition>[ModelName]['fields'];
 
-type RefinedBuiltModelTableName<
+type StagedBuiltModelTableName<
   Definition,
-  ModelName extends RefinedModelNames<Definition>,
-> = RefinedBuiltModels<Definition>[ModelName]['storage']['table'];
+  ModelName extends StagedModelNames<Definition>,
+> = StagedBuiltModels<Definition>[ModelName]['storage']['table'];
 
-type RefinedBuiltStorageTableColumns<
-  Definition,
-  ModelName extends RefinedModelNames<Definition>,
-> = {
-  readonly [FieldName in keyof RefinedBuiltModelFields<Definition, ModelName> &
-    string as RefinedBuiltModelFields<
+type StagedBuiltStorageTableColumns<Definition, ModelName extends StagedModelNames<Definition>> = {
+  readonly [FieldName in keyof StagedBuiltModelFields<Definition, ModelName> &
+    string as StagedBuiltModelFields<
     Definition,
     ModelName
-  >[FieldName]['column']]: RefinedModelStorageColumn<Definition, ModelName, FieldName>;
+  >[FieldName]['column']]: StagedModelStorageColumn<Definition, ModelName, FieldName>;
 };
 
-type RefinedBuiltStorageTables<Definition> = {
-  readonly [ModelName in RefinedModelNames<Definition> as RefinedBuiltModelTableName<
+type StagedBuiltStorageTables<Definition> = {
+  readonly [ModelName in StagedModelNames<Definition> as StagedBuiltModelTableName<
     Definition,
     ModelName
   >]: {
-    readonly columns: RefinedBuiltStorageTableColumns<Definition, ModelName>;
+    readonly columns: StagedBuiltStorageTableColumns<Definition, ModelName>;
     readonly uniques: ReadonlyArray<{
       readonly columns: readonly string[];
       readonly name?: string;
@@ -624,41 +619,41 @@ type RefinedBuiltStorageTables<Definition> = {
       readonly constraint: boolean;
       readonly index: boolean;
     }>;
-  } & (RefinedModelIdFieldNames<Definition, ModelName> extends readonly string[]
+  } & (StagedModelIdFieldNames<Definition, ModelName> extends readonly string[]
     ? {
         readonly primaryKey: {
-          readonly columns: RefinedFieldNamesToColumnNames<
+          readonly columns: StagedFieldNamesToColumnNames<
             Definition,
             ModelName,
-            RefinedModelIdFieldNames<Definition, ModelName>
+            StagedModelIdFieldNames<Definition, ModelName>
           >;
-          readonly name?: RefinedModelIdName<Definition, ModelName>;
+          readonly name?: StagedModelIdName<Definition, ModelName>;
         };
       }
     : Record<string, never>);
 };
 
-type RefinedBuiltStorage<Definition> = {
-  readonly tables: RefinedBuiltStorageTables<Definition>;
-  readonly types: RefinedDefinitionTypes<Definition>;
+type StagedBuiltStorage<Definition> = {
+  readonly tables: StagedBuiltStorageTables<Definition>;
+  readonly types: StagedDefinitionTypes<Definition>;
 };
 
-type RefinedBuiltMappings<Definition> = {
+type StagedBuiltMappings<Definition> = {
   readonly modelToTable: {
-    readonly [ModelName in RefinedModelNames<Definition>]: RefinedBuiltModelTableName<
+    readonly [ModelName in StagedModelNames<Definition>]: StagedBuiltModelTableName<
       Definition,
       ModelName
     >;
   };
   readonly tableToModel: {
-    readonly [ModelName in RefinedModelNames<Definition> as RefinedBuiltModelTableName<
+    readonly [ModelName in StagedModelNames<Definition> as StagedBuiltModelTableName<
       Definition,
       ModelName
     >]: ModelName;
   };
   readonly fieldToColumn: {
-    readonly [ModelName in RefinedModelNames<Definition>]: {
-      readonly [FieldName in RefinedModelFieldNames<Definition, ModelName>]: RefinedModelColumnName<
+    readonly [ModelName in StagedModelNames<Definition>]: {
+      readonly [FieldName in StagedModelFieldNames<Definition, ModelName>]: StagedModelColumnName<
         Definition,
         ModelName,
         FieldName
@@ -666,43 +661,44 @@ type RefinedBuiltMappings<Definition> = {
     };
   };
   readonly columnToField: {
-    readonly [ModelName in RefinedModelNames<Definition> as RefinedBuiltModelTableName<
+    readonly [ModelName in StagedModelNames<Definition> as StagedBuiltModelTableName<
       Definition,
       ModelName
     >]: {
-      readonly [FieldName in RefinedModelFieldNames<
+      readonly [FieldName in StagedModelFieldNames<Definition, ModelName> as StagedModelColumnName<
         Definition,
-        ModelName
-      > as RefinedModelColumnName<Definition, ModelName, FieldName>]: FieldName;
+        ModelName,
+        FieldName
+      >]: FieldName;
     };
   };
 };
 
-type BuiltRefinedContract<Definition> = ContractWithTypeMaps<
+type BuiltStagedContract<Definition> = ContractWithTypeMaps<
   SqlContract<
-    RefinedBuiltStorage<Definition>,
-    RefinedBuiltModels<Definition>,
+    StagedBuiltStorage<Definition>,
+    StagedBuiltModels<Definition>,
     Record<string, Record<string, RelationDefinition>>,
-    RefinedBuiltMappings<Definition>
+    StagedBuiltMappings<Definition>
   > & {
     readonly schemaVersion: '1';
-    readonly target: RefinedDefinitionTargetId<Definition>;
+    readonly target: StagedDefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';
-    readonly storageHash: RefinedDefinitionStorageHash<Definition> extends string
-      ? RefinedDefinitionStorageHash<Definition>
+    readonly storageHash: StagedDefinitionStorageHash<Definition> extends string
+      ? StagedDefinitionStorageHash<Definition>
       : string;
   } & {
-    readonly extensionPacks: keyof RefinedDefinitionExtensionPacks<Definition> extends never
+    readonly extensionPacks: keyof StagedDefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>
-      : RefinedDefinitionExtensionPacks<Definition>;
-    readonly capabilities: RefinedDefinitionCapabilities<Definition> extends Record<
+      : StagedDefinitionExtensionPacks<Definition>;
+    readonly capabilities: StagedDefinitionCapabilities<Definition> extends Record<
       string,
       Record<string, boolean>
     >
-      ? RefinedDefinitionCapabilities<Definition>
+      ? StagedDefinitionCapabilities<Definition>
       : Record<string, Record<string, boolean>>;
   },
-  TypeMaps<CodecTypesFromRefinedDefinition<Definition>, Record<string, never>>
+  TypeMaps<CodecTypesFromStagedDefinition<Definition>, Record<string, never>>
 >;
 
 type BuildStorageTable<
@@ -824,19 +820,19 @@ function encodeColumnDefault(defaultInput: ColumnDefault): ColumnDefault {
   return { kind: 'literal', value: encodeDefaultLiteralValue(defaultInput.value) };
 }
 
-type RuntimeRefinedModel = RefinedModelBuilder<
+type RuntimeStagedModel = StagedModelBuilder<
   string | undefined,
   Record<string, ScalarFieldBuilder>,
-  Record<string, RelationBuilder<RefinedRelationState>>,
+  Record<string, RelationBuilder<StagedRelationState>>,
   ModelAttributesSpec | undefined,
   SqlStageSpec | undefined
 >;
 
-type RefinedModelLike = {
+type StagedModelLike = {
   readonly stageOne: {
     readonly modelName?: string;
     readonly fields: Record<string, ScalarFieldBuilder>;
-    readonly relations: Record<string, RelationBuilder<RefinedRelationState>>;
+    readonly relations: Record<string, RelationBuilder<StagedRelationState>>;
   };
   readonly __attributes: ModelAttributesSpec | undefined;
   readonly __sql: SqlStageSpec | undefined;
@@ -849,7 +845,7 @@ type RuntimeModelSpec = {
   readonly tableName: string;
   readonly fieldBuilders: Record<string, ScalarFieldBuilder>;
   readonly fieldToColumn: Record<string, string>;
-  readonly relations: Record<string, RelationBuilder<RefinedRelationState>>;
+  readonly relations: Record<string, RelationBuilder<StagedRelationState>>;
   readonly attributesSpec: ModelAttributesSpec | undefined;
   readonly sqlSpec: SqlStageSpec | undefined;
 };
@@ -896,7 +892,7 @@ function resolveFieldDescriptor(
 }
 
 function emitTypedNamedTypeFallbackWarnings(
-  models: Record<string, RuntimeRefinedModel>,
+  models: Record<string, RuntimeStagedModel>,
   storageTypes: Record<string, StorageTypeInstance>,
 ): void {
   const warnedFields = new Set<string>();
@@ -915,8 +911,220 @@ function emitTypedNamedTypeFallbackWarnings(
       warnedFields.add(warningKey);
 
       process.emitWarning(
-        `Refined contract field "${modelName}.${fieldName}" uses field.namedType('${fieldState.typeRef}'). ` +
+        `Staged contract field "${modelName}.${fieldName}" uses field.namedType('${fieldState.typeRef}'). ` +
           `Use field.namedType(types.${fieldState.typeRef}) when the storage type is declared in the same contract to keep autocomplete and typed local refs.`,
+        {
+          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+        },
+      );
+    }
+  }
+}
+
+function hasNamedModelToken(
+  models: Record<string, RuntimeStagedModel>,
+  modelName: string,
+): boolean {
+  return models[modelName]?.stageOne.modelName === modelName;
+}
+
+function formatFieldSelection(fieldNames: readonly string[]): string {
+  if (fieldNames.length === 1) {
+    return `'${fieldNames[0]}'`;
+  }
+
+  return `[${fieldNames.map((fieldName) => `'${fieldName}'`).join(', ')}]`;
+}
+
+function formatTokenFieldSelection(modelName: string, fieldNames: readonly string[]): string {
+  if (fieldNames.length === 1) {
+    return `${modelName}.refs.${fieldNames[0]}`;
+  }
+
+  return `[${fieldNames.map((fieldName) => `${modelName}.refs.${fieldName}`).join(', ')}]`;
+}
+
+function formatConstraintsRefCall(modelName: string, fieldNames: readonly string[]): string {
+  if (fieldNames.length === 1) {
+    return `constraints.ref('${modelName}', '${fieldNames[0]}')`;
+  }
+
+  return `[${fieldNames
+    .map((fieldName) => `constraints.ref('${modelName}', '${fieldName}')`)
+    .join(', ')}]`;
+}
+
+function formatRelationModelDisplay(
+  relationModel:
+    | StagedRelationState['toModel']
+    | Extract<StagedRelationState, { kind: 'manyToMany' }>['through'],
+): string {
+  if (relationModel.kind === 'lazyRelationModelName') {
+    return `() => ${relationModel.resolve()}`;
+  }
+
+  return relationModel.source === 'string'
+    ? `'${relationModel.modelName}'`
+    : relationModel.modelName;
+}
+
+function formatBelongsToFallbackCall(
+  targetModelDisplay: string,
+  fromFields: readonly string[],
+  toFields: readonly string[],
+): string {
+  return `rel.belongsTo(${targetModelDisplay}, { from: ${formatFieldSelection(fromFields)}, to: ${formatFieldSelection(toFields)} })`;
+}
+
+function formatHasManyFallbackCall(
+  helperName: 'hasMany' | 'hasOne',
+  targetModelDisplay: string,
+  byFields: readonly string[],
+): string {
+  return `rel.${helperName}(${targetModelDisplay}, { by: ${formatFieldSelection(byFields)} })`;
+}
+
+function formatManyToManyFallbackCall(
+  targetModelDisplay: string,
+  throughModelDisplay: string,
+  fromFields: readonly string[],
+  toFields: readonly string[],
+): string {
+  return `rel.manyToMany(${targetModelDisplay}, { through: ${throughModelDisplay}, from: ${formatFieldSelection(fromFields)}, to: ${formatFieldSelection(toFields)} })`;
+}
+
+function emitTypedCrossModelFallbackWarnings(
+  modelSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+  models: Record<string, RuntimeStagedModel>,
+): void {
+  const warnedKeys = new Set<string>();
+
+  for (const spec of modelSpecs.values()) {
+    for (const [relationName, relationBuilder] of Object.entries(spec.relations)) {
+      const relation = relationBuilder.build();
+
+      if (
+        relation.toModel.kind === 'relationModelName' &&
+        relation.toModel.source === 'string' &&
+        hasNamedModelToken(models, relation.toModel.modelName)
+      ) {
+        const warningKey = `${spec.modelName}.${relationName}.toModel`;
+        if (!warnedKeys.has(warningKey)) {
+          warnedKeys.add(warningKey);
+
+          const relationCall =
+            relation.kind === 'belongsTo'
+              ? formatBelongsToFallbackCall(
+                  `'${relation.toModel.modelName}'`,
+                  normalizeRelationFieldNames(relation.from),
+                  normalizeRelationFieldNames(relation.to),
+                )
+              : relation.kind === 'hasMany'
+                ? formatHasManyFallbackCall(
+                    'hasMany',
+                    `'${relation.toModel.modelName}'`,
+                    normalizeRelationFieldNames(relation.by),
+                  )
+                : relation.kind === 'hasOne'
+                  ? formatHasManyFallbackCall(
+                      'hasOne',
+                      `'${relation.toModel.modelName}'`,
+                      normalizeRelationFieldNames(relation.by),
+                    )
+                  : formatManyToManyFallbackCall(
+                      `'${relation.toModel.modelName}'`,
+                      formatRelationModelDisplay(relation.through),
+                      normalizeRelationFieldNames(relation.from),
+                      normalizeRelationFieldNames(relation.to),
+                    );
+
+          const suggestion =
+            relation.kind === 'belongsTo'
+              ? formatBelongsToFallbackCall(
+                  relation.toModel.modelName,
+                  normalizeRelationFieldNames(relation.from),
+                  normalizeRelationFieldNames(relation.to),
+                )
+              : relation.kind === 'hasMany'
+                ? formatHasManyFallbackCall(
+                    'hasMany',
+                    relation.toModel.modelName,
+                    normalizeRelationFieldNames(relation.by),
+                  )
+                : relation.kind === 'hasOne'
+                  ? formatHasManyFallbackCall(
+                      'hasOne',
+                      relation.toModel.modelName,
+                      normalizeRelationFieldNames(relation.by),
+                    )
+                  : formatManyToManyFallbackCall(
+                      relation.toModel.modelName,
+                      formatRelationModelDisplay(relation.through),
+                      normalizeRelationFieldNames(relation.from),
+                      normalizeRelationFieldNames(relation.to),
+                    );
+
+          process.emitWarning(
+            `Staged contract relation "${spec.modelName}.${relationName}" uses ${relationCall}. ` +
+              `Use ${suggestion} when the named model token is available in the same contract to keep typed relation targets and model refs.`,
+            {
+              code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+            },
+          );
+        }
+      }
+
+      if (
+        relation.kind === 'manyToMany' &&
+        relation.through.kind === 'relationModelName' &&
+        relation.through.source === 'string' &&
+        hasNamedModelToken(models, relation.through.modelName)
+      ) {
+        const warningKey = `${spec.modelName}.${relationName}.through`;
+        if (!warnedKeys.has(warningKey)) {
+          warnedKeys.add(warningKey);
+
+          const relationCall = formatManyToManyFallbackCall(
+            formatRelationModelDisplay(relation.toModel),
+            `'${relation.through.modelName}'`,
+            normalizeRelationFieldNames(relation.from),
+            normalizeRelationFieldNames(relation.to),
+          );
+          const suggestion = formatManyToManyFallbackCall(
+            formatRelationModelDisplay(relation.toModel),
+            relation.through.modelName,
+            normalizeRelationFieldNames(relation.from),
+            normalizeRelationFieldNames(relation.to),
+          );
+
+          process.emitWarning(
+            `Staged contract relation "${spec.modelName}.${relationName}" uses ${relationCall}. ` +
+              `Use ${suggestion} when the named model token is available in the same contract to keep typed relation targets and model refs.`,
+            {
+              code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+            },
+          );
+        }
+      }
+    }
+
+    for (const [foreignKeyIndex, foreignKey] of (spec.sqlSpec?.foreignKeys ?? []).entries()) {
+      if (
+        foreignKey.targetSource !== 'string' ||
+        !hasNamedModelToken(models, foreignKey.targetModel)
+      ) {
+        continue;
+      }
+
+      const warningKey = `${spec.modelName}.sql.foreignKeys.${foreignKeyIndex}`;
+      if (warnedKeys.has(warningKey)) {
+        continue;
+      }
+      warnedKeys.add(warningKey);
+
+      process.emitWarning(
+        `Staged contract model "${spec.modelName}" uses ${formatConstraintsRefCall(foreignKey.targetModel, foreignKey.targetFields)} in .sql(...). ` +
+          `Use ${formatTokenFieldSelection(foreignKey.targetModel, foreignKey.targetFields)} when the named model token is available in the same contract to keep typed model refs.`,
         {
           code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
         },
@@ -933,7 +1141,7 @@ function mapFieldNamesToColumnNames(
   return fieldNames.map((fieldName) => {
     const columnName = fieldToColumn[fieldName];
     if (!columnName) {
-      throw new Error(`Unknown field "${modelName}.${fieldName}" in refined contract definition`);
+      throw new Error(`Unknown field "${modelName}.${fieldName}" in staged contract definition`);
     }
     return columnName;
   });
@@ -1076,7 +1284,7 @@ function resolveRelationAnchorFields(spec: RuntimeModelSpec): readonly string[] 
 
 function resolveSemanticRelationNode(
   relationName: string,
-  relation: RefinedRelationState,
+  relation: StagedRelationState,
   currentSpec: RuntimeModelSpec,
   allSpecs: Map<string, RuntimeModelSpec>,
 ): SqlSemanticRelationNode {
@@ -1321,11 +1529,11 @@ export function buildSqlContractFromSemanticDefinition(
   );
 }
 
-function buildRefinedContract<Definition extends RefinedContractInput>(
+function buildStagedContract<Definition extends StagedContractInput>(
   definition: Definition,
-): BuiltRefinedContract<Definition> {
+): BuiltStagedContract<Definition> {
   const storageTypes = { ...(definition.types ?? {}) } as Record<string, StorageTypeInstance>;
-  const models = { ...(definition.models ?? {}) } as Record<string, RuntimeRefinedModel>;
+  const models = { ...(definition.models ?? {}) } as Record<string, RuntimeStagedModel>;
 
   emitTypedNamedTypeFallbackWarnings(models, storageTypes);
 
@@ -1360,6 +1568,8 @@ function buildRefinedContract<Definition extends RefinedContractInput>(
     });
   }
 
+  emitTypedCrossModelFallbackWarnings(modelSpecs, models);
+
   const semanticModels = Array.from(modelSpecs.values()).map((spec) =>
     resolveSemanticModelNode(spec, modelSpecs, storageTypes),
   );
@@ -1372,7 +1582,7 @@ function buildRefinedContract<Definition extends RefinedContractInput>(
     ...(definition.foreignKeyDefaults ? { foreignKeyDefaults: definition.foreignKeyDefaults } : {}),
     ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
     models: semanticModels,
-  }) as BuiltRefinedContract<Definition>;
+  }) as BuiltStagedContract<Definition>;
 }
 
 class SqlContractBuilder<
@@ -2014,13 +2224,13 @@ class SqlContractBuilder<
   }
 }
 
-type RefinedContractDefinition<
+type StagedContractDefinition<
   Target extends TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance>,
-  Models extends Record<string, RefinedModelLike>,
+  Models extends Record<string, StagedModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined,
-  Naming extends RefinedContractInput['naming'] | undefined,
+  Naming extends StagedContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
 > = {
@@ -2034,11 +2244,11 @@ type RefinedContractDefinition<
   readonly models?: Models;
 };
 
-type RefinedContractScaffold<
+type StagedContractScaffold<
   Target extends TargetPackRef<'sql', string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined,
-  Naming extends RefinedContractInput['naming'] | undefined,
+  Naming extends StagedContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
 > = {
@@ -2050,10 +2260,10 @@ type RefinedContractScaffold<
   readonly capabilities?: Capabilities;
 };
 
-type RefinedContractFactory<
+type StagedContractFactory<
   Target extends TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance>,
-  Models extends Record<string, RefinedModelLike>,
+  Models extends Record<string, StagedModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = (helpers: ComposedAuthoringHelpers<Target, ExtensionPacks>) => {
   readonly types?: Types;
@@ -2066,16 +2276,16 @@ export function defineContract<
 export function defineContract<
   const Target extends TargetPackRef<'sql', string>,
   const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
-  const Models extends Record<string, RefinedModelLike> = Record<never, never>,
+  const Models extends Record<string, StagedModelLike> = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
     | undefined = undefined,
   const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
-  const Naming extends RefinedContractInput['naming'] | undefined = undefined,
+  const Naming extends StagedContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
 >(
-  definition: RefinedContractDefinition<
+  definition: StagedContractDefinition<
     Target,
     Types,
     Models,
@@ -2085,8 +2295,8 @@ export function defineContract<
     StorageHash,
     ForeignKeyDefaults
   >,
-): BuiltRefinedContract<
-  RefinedContractDefinition<
+): BuiltStagedContract<
+  StagedContractDefinition<
     Target,
     Types,
     Models,
@@ -2100,16 +2310,16 @@ export function defineContract<
 export function defineContract<
   const Target extends TargetPackRef<'sql', string>,
   const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
-  const Models extends Record<string, RefinedModelLike> = Record<never, never>,
+  const Models extends Record<string, StagedModelLike> = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
     | undefined = undefined,
   const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
-  const Naming extends RefinedContractInput['naming'] | undefined = undefined,
+  const Naming extends StagedContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
 >(
-  definition: RefinedContractScaffold<
+  definition: StagedContractScaffold<
     Target,
     ExtensionPacks,
     Capabilities,
@@ -2117,9 +2327,9 @@ export function defineContract<
     StorageHash,
     ForeignKeyDefaults
   >,
-  factory: RefinedContractFactory<Target, Types, Models, ExtensionPacks>,
-): BuiltRefinedContract<
-  RefinedContractDefinition<
+  factory: StagedContractFactory<Target, Types, Models, ExtensionPacks>,
+): BuiltStagedContract<
+  StagedContractDefinition<
     Target,
     Types,
     Models,
@@ -2133,15 +2343,15 @@ export function defineContract<
 export function defineContract<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 >(
-  definition?: RefinedContractInput,
-  factory?: RefinedContractFactory<
+  definition?: StagedContractInput,
+  factory?: StagedContractFactory<
     TargetPackRef<'sql', string>,
     Record<string, StorageTypeInstance>,
-    Record<string, RefinedModelLike>,
+    Record<string, StagedModelLike>,
     Record<string, ExtensionPackRef<'sql', string>> | undefined
   >,
-): SqlContractBuilder<CodecTypes> | BuiltRefinedContract<RefinedContractInput> {
-  if (definition && isRefinedContractInput(definition)) {
+): SqlContractBuilder<CodecTypes> | BuiltStagedContract<StagedContractInput> {
+  if (definition && isStagedContractInput(definition)) {
     if (factory) {
       const builtDefinition = {
         ...definition,
@@ -2152,9 +2362,9 @@ export function defineContract<
           }),
         ),
       };
-      return buildRefinedContract(builtDefinition);
+      return buildStagedContract(builtDefinition);
     }
-    return buildRefinedContract(definition);
+    return buildStagedContract(definition);
   }
   return new SqlContractBuilder<CodecTypes>();
 }
@@ -2162,7 +2372,7 @@ export function defineContract<
 export { field, model, rel };
 export type {
   ComposedAuthoringHelpers,
-  RefinedContractInput,
-  RefinedModelBuilder,
+  StagedContractInput,
+  StagedModelBuilder,
   ScalarFieldBuilder,
 };

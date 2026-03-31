@@ -17,12 +17,12 @@ This package contains the SQL-specific TypeScript contract authoring surface for
 This package is part of the SQL family namespace (`packages/2-sql/2-authoring/contract-ts`) and provides:
 - SQL contract builder (`defineContract`) in two forms:
   - legacy chain builder
-  - refined Option A object-literal authoring with `model('User', { fields, relations }).attributes(...).sql(...)`
+  - staged contract DSL object-literal authoring with `model('User', { fields, relations }).attributes(...).sql(...)`
 - SQL contract JSON schema - JSON schema for validating contract structure
 
 ## Responsibilities
 
-- **SQL Contract Builder**: Provides both the existing chain builder and the refined Option A authoring surface for creating SQL contracts programmatically with type safety
+- **SQL Contract Builder**: Provides both the existing chain builder and the staged contract DSL authoring surface for creating SQL contracts programmatically with type safety
 - **Storage Type Authoring**: Supports `storage.types` declarations and `typeRef` columns via the SQL builder
 - **SQL Contract JSON Schema**: Provides JSON schema for validating contract structure in IDEs and tooling
 - **Composition Layer**: Composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic
@@ -60,7 +60,7 @@ This package is part of the package layering architecture:
 
 ### Building Contracts
 
-#### Refined Option A
+#### Staged Contract DSL
 
 The refined surface keeps domain meaning close to the model:
 - field-level `id()` and `unique()` for the common single-field case
@@ -186,7 +186,8 @@ This first slice now includes a small portable helper vocabulary:
 - `field.namedType('Role')` still works as a fallback, but when `types.Role` exists in the same contract the builder emits `PN_CONTRACT_TYPED_FALLBACK_AVAILABLE`; prefer `field.namedType(types.Role)` for autocomplete and typed local refs
 - use the callback overload when you want target- and extension-composed `type.*` and pack-owned `field.*` helper autocomplete inside `contract.ts`
 - use named model tokens plus `User.refs.id` or `User.ref('id')` for cross-model foreign-key targets
-- keep `constraints.ref('Model', 'field')` only as a fallback when you do not have a named token in scope
+- `constraints.ref('Model', 'field')` still works as a fallback, but when the named model token exists in the same contract the builder emits `PN_CONTRACT_TYPED_FALLBACK_AVAILABLE`; prefer `User.refs.id`-style refs for autocomplete and typed model refs
+- string relation targets such as `rel.belongsTo('User', ...)`, `rel.hasMany('Post', ...)`, and `rel.manyToMany('Tag', { through: 'PostTag', ... })` still work, but when named model tokens exist in the same contract the builder emits `PN_CONTRACT_TYPED_FALLBACK_AVAILABLE`; prefer model tokens so cross-model authoring stays typed end-to-end
 - use inline `.id()` for single-field identity and `.attributes(({ fields, constraints }) => ({ id: constraints.id([...]) }))` for compound identity
 - use inline `.unique()` for single-field uniqueness and `.attributes(({ fields, constraints }) => ({ uniques: [constraints.unique([...])] }))` for compound uniqueness
 - duplicate named primary keys, uniques, indexes, and foreign keys are rejected during build/validation instead of silently overriding each other
@@ -297,7 +298,7 @@ Integration tests that depend on both `sql-contract-ts` and `sql-query` are loca
 
 ## Migration Notes
 
-- **Refined Option A is the long-term direction**: `defineContract({ ... })` plus `model('User', { fields, relations }).sql(...)`
+- **Staged contract DSL is the long-term direction**: `defineContract({ ... })` plus `model('User', { fields, relations }).sql(...)`
 - **The first slice keeps the helper vocabulary intentionally small**: prefer pack-provided descriptors over a large built-in preset surface for now
 - **Backward Compatibility**: `@prisma-next/sql-query` re-exports contract authoring functions for backward compatibility (will be removed in Slice 7)
 - **Import Path**: New code should import directly from `@prisma-next/sql-contract-ts`
