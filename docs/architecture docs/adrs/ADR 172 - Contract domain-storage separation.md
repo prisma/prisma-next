@@ -122,9 +122,9 @@ Separate the contract into a domain level (family-agnostic) and a storage level 
 
 Each model's domain section should give a reader a complete picture of the field — its name, its type, its nullability — without consulting the storage block. This is why `model.fields` is a record carrying `{ nullable: boolean, codecId: string }` rather than a bare string array.
 
-`**nullable`** is a domain concept: "can a User have no email?" is a business rule that directly affects the TypeScript types the ORM infers (`string` vs `string | null`). Both families need it identically. `nullable` is always an explicit `boolean` (never omitted, never inferred from a default) so the contract is self-describing — a reader doesn't need to know "what's the default?" to understand a field. This also makes contract diffs clearer: `false → true`, not `undefined → true`.
+**`nullable`** is a domain concept: "can a User have no email?" is a business rule that directly affects the TypeScript types the ORM infers (`string` vs `string | null`). Both families need it identically. `nullable` is always an explicit `boolean` (never omitted, never inferred from a default) so the contract is self-describing — a reader doesn't need to know "what's the default?" to understand a field. This also makes contract diffs clearer: `false → true`, not `undefined → true`.
 
-`**codecId**` identifies a field's type. Describing a field without its type leaves the domain section incomplete. The codec identifier is the framework's way of expressing a field's type, and as a concept it is family-agnostic: every family uses codec identifiers, the identifier format is universal, and any consumer can read one without understanding the family's storage model. A Mongo contract's field says `"mongo/string@1"` and an SQL contract's says `"pg/text@1"` for the same domain concept — the *values* differ, but the *structure* is identical. **"Family-agnostic" describes the structure of the domain section, not its values.** The specific codec IDs *available* depend on framework composition (which families, targets, and extensions are loaded), but that is a composition concern, not a structural one.
+**`codecId`** identifies a field's type. Describing a field without its type leaves the domain section incomplete. The codec identifier is the framework's way of expressing a field's type, and as a concept it is family-agnostic: every family uses codec identifiers, the identifier format is universal, and any consumer can read one without understanding the family's storage model. A Mongo contract's field says `"mongo/string@1"` and an SQL contract's says `"pg/text@1"` for the same domain concept — the *values* differ, but the *structure* is identical. **"Family-agnostic" describes the structure of the domain section, not its values.** The specific codec IDs *available* depend on framework composition (which families, targets, and extensions are loaded), but that is a composition concern, not a structural one.
 
 ### Three levels of the contract
 
@@ -158,8 +158,8 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 
 ### Other domain-level properties
 
-- `**model.relations**` — connections to other models with cardinality and strategy (see [ADR 174](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)).
-- `**model.discriminator**` + `**model.variants**` — optional polymorphism declaration (see [ADR 173](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)).
+- **`model.relations`** — connections to other models with cardinality and strategy (see [ADR 174](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)).
+- **`model.discriminator`** + **`model.variants`** — optional polymorphism declaration (see [ADR 173](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)).
 
 **Note — relations placement is a change from the current contract.** The current SQL emitter produces a top-level `relations` block as a sibling of `models`, keyed by model name (e.g., `contract.relations.user.posts`). The SQL ORM client consumes relations from this top-level block. This ADR moves relations onto each model (`model.relations`) because a model's relationships are part of its domain description — a reader should be able to understand a model completely without consulting a separate section. The current top-level placement was not a deliberate design choice; it diverged from the test fixtures (which use the nested form) during emitter development. The SQL emitter and ORM client will need to be updated to match.
 
@@ -179,8 +179,13 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 
 ### What this requires
 
-- Both `SqlContract` and `MongoContract` will need to be modified to adopt this structure.
-- The emitter must be updated to produce the new format.
+**Implemented in this PR (Mongo PoC):**
+- `MongoContract` adopts the domain-storage separation with `model.fields` carrying `{ nullable, codecId }`, `model.relations` with strategy, and `model.storage` scoped per model.
+- `validateContractDomain()` validates domain-level invariants (roots, variants, relations, discriminators) in a family-agnostic way.
+- `validateMongoStorage()` validates Mongo-specific storage rules.
+
+**Remaining follow-ups:**
+- `SqlContract` must be updated to match (move `nullable`/`codecId` into domain-level `model.fields`, move relations onto each model).
 - The SQL emitter must move relations from the top-level `relations` block onto each model's `relations` property.
 - Consumer libraries that read the contract will need to be updated — notably the SQL ORM client, which currently reads from the top-level `relations` block.
 - The `ContractBase` type must be designed as a new abstraction, not extracted mechanically from either existing contract.
@@ -189,6 +194,6 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 
 - [ADR 173 — Polymorphism via discriminator and variants](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)
 - [ADR 174 — Aggregate roots and relation strategies](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md)
-- [contract-symmetry.md](../../planning/mongo-target/1-design-docs/contract-symmetry.md) — convergence/divergence analysis
-- [cross-cutting-learnings.md](../../planning/mongo-target/cross-cutting-learnings.md) — design principles and open questions
+- [Data Contract subsystem doc](../subsystems/1.%20Data%20Contract.md) — contract structure and semantics
+- [MongoDB Family subsystem doc](../subsystems/10.%20MongoDB%20Family.md) — Mongo contract, ORM, and execution pipeline
 

@@ -34,7 +34,7 @@ MongoRuntimeCore
   wraps in AsyncIterableResult<Row>
 ```
 
-A **query plan** is the complete description of a database operation — everything the driver needs to execute it. In SQL, this is an SQL string + parameters, and there's a lowering step from the ORM's internal representation (`SqlQueryPlan`) to the wire format (`ExecutionPlan`). In Mongo, queries are already structured objects — the command IS the wire format, so there's no lowering step and a single plan type.
+A **query plan** is the complete description of a database operation — everything the driver needs to execute it. In SQL, this is an SQL string + parameters, and there's a lowering step from the ORM's internal representation (`SqlQueryPlan`) to the wire format (`ExecutionPlan`). In Mongo, the adapter performs a similar lowering step (`adapter.lower()`) that resolves parameter references and converts `MongoCommand` objects into `MongoWireCommand` objects for the driver.
 
 What's shared across families: `PlanMeta` (operation name, model, lane, target, storageHash), the plugin lifecycle pattern (`beforeExecute → onRow → afterExecute`), and `AsyncIterableResult<Row>`.
 
@@ -100,7 +100,7 @@ interface MongoDriverInterface {
 }
 ```
 
-Dispatch is a switch on `command.operation`:
+Dispatch is a switch on `wireCommand.kind`:
 - `find` → `collection.find(filter, options)` → returns a `FindCursor` (already `AsyncIterable`)
 - `insertOne` → `collection.insertOne(document)` → wrap acknowledgment in single-element iterable
 - `aggregate` → `collection.aggregate(pipeline)` → returns an `AggregationCursor`

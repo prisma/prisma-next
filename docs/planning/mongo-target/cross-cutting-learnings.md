@@ -63,7 +63,7 @@ The contract redesign found the right abstraction: separate domain from persiste
 - `discriminator` + `variants` — optional, for polymorphism
 - `relations` — connections to other models
 
-`**model.storage`** — family-specific bridge:
+**`model.storage`** — family-specific bridge:
 
 SQL maps fields to column names (because SQL has a genuine field → column indirection):
 
