@@ -12,8 +12,7 @@
     "User": {
       "fields": {
         "id": {
-          "codecId": "pg/text@1",
-          "column": "id"
+          "codecId": "pg/text@1"
         }
       },
       "relations": {},

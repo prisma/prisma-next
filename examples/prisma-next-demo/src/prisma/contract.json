@@ -13,25 +13,20 @@
     "Post": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
-          "column": "createdAt"
+          "codecId": "pg/timestamptz@1"
         },
         "embedding": {
           "codecId": "pg/vector@1",
-          "column": "embedding",
           "nullable": true
         },
         "id": {
-          "codecId": "sql/char@1",
-          "column": "id"
+          "codecId": "sql/char@1"
         },
         "title": {
-          "codecId": "pg/text@1",
-          "column": "title"
+          "codecId": "pg/text@1"
         },
         "userId": {
-          "codecId": "pg/text@1",
-          "column": "userId"
+          "codecId": "pg/text@1"
         }
       },
       "relations": {
@@ -73,20 +68,16 @@
     "User": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
-          "column": "createdAt"
+          "codecId": "pg/timestamptz@1"
         },
         "email": {
-          "codecId": "pg/text@1",
-          "column": "email"
+          "codecId": "pg/text@1"
         },
         "id": {
-          "codecId": "sql/char@1",
-          "column": "id"
+          "codecId": "sql/char@1"
         },
         "kind": {
-          "codecId": "pg/enum@1",
-          "column": "kind"
+          "codecId": "pg/enum@1"
         }
       },
       "relations": {
