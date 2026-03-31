@@ -193,17 +193,68 @@ type UserRow = {
 }
 ```
 
+### 5. Value objects need no special storage mapping
+
+Value object fields use `storage.fields` like any other field. The storage layer doesn't know or care that a field contains structured data — it just maps domain field names to physical locations:
+
+**Mongo:**
+
+```json
+"storage": {
+  "collection": "users",
+  "fields": {
+    "email": { "field": "email" },
+    "homeAddress": { "field": "home_address" }
+  }
+}
+```
+
+**SQL:**
+
+```json
+"storage": {
+  "table": "users",
+  "fields": {
+    "email": { "column": "email" },
+    "homeAddress": { "column": "home_address" }
+  }
+}
+```
+
+The composite *structure* of what's inside the field comes from the value object definition in the domain section. The storage mapping just says where the data lives. The ORM combines both: "this field is an Address (so I know the shape) and it lives in this column (so I know where to read/write it)."
+
+This is the domain/storage separation doing what it was designed for. No new storage sections, no new mapping concepts.
+
+### 6. Validation cross-references domain and storage
+
+For SQL, the column backing a value object field must be JSON-compatible (e.g., `jsonb`). The top-level `storage` section already describes every column's native type:
+
+```json
+"storage": {
+  "tables": {
+    "users": {
+      "columns": {
+        "home_address": { "nativeType": "jsonb", "nullable": true }
+      }
+    }
+  }
+}
+```
+
+Contract validation (`validateSqlStorage()`) cross-references the domain field type with the storage column's native type — if a value object field maps to an `integer` column, that's a validation error.
+
+For Mongo, there's nothing to validate — any document field can hold a subdocument.
+
+The full chain:
+
+| Layer | Responsibility |
+|---|---|
+| **Emitter** | Generates the correct column type (JSONB) when it sees a value object field |
+| **Contract validation** | Cross-references domain field type with column native type — rejects mismatches |
+| **Migration system** | Creates/alters the column to be JSONB |
+| **Database** | Enforces the column type at write time |
+
 ## Open design questions
-
-### 1. How do value objects map to storage?
-
-The physical representation is family-specific:
-
-- **Mongo**: Embedded subdocument. Identity mapping (domain fields = document fields). Natural fit.
-- **SQL JSONB**: Serialized into a single JSON column.
-- **SQL flattened columns**: Each value object field maps to a separate column with a prefix convention (`address_street`, `address_city`).
-
-Value object fields appear in the model's domain-level `fields` section (decided above). The storage mapping for where that data physically lives probably goes in the parent model's `storage` section, parallel to `storage.fields` and `storage.relations`. The exact shape isn't designed yet.
 
 ### 2. Querying through value objects
 
