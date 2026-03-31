@@ -429,21 +429,65 @@ Typing `u("` shows top-level value object fields. Typing `u("homeAddress.` shows
 | **SQL JSONB** | `home_address->>'city' = 'NYC'` — JSON path extraction |
 | **SQL flattened** | `home_address_city = 'NYC'` — if stored as separate column |
 
-## Open design questions
+### 11. Mutation semantics: the verb determines the behaviour
 
-### 3. Mutation semantics
+Omitting a field in a mutation is inherently ambiguous — it could mean "don't change," "set to null," or "use the default value." Rather than trying to infer intent from the shape of the data, **the operation determines the semantics**:
 
-Value objects are replaced, not patched by identity:
+- **`create()` / `insert()`**: all required fields must be provided. Omitted optional fields get their defaults. This always produces a complete object.
+- **`update()`**: only specified fields change. Omitted fields are untouched. No defaults applied.
+- **Field accessor**: explicit per-field operations. No ambiguity — every operation is stated.
 
 ```typescript
-db.users.where({ id }).update({
-  homeAddress: { street: "456 Oak Ave", city: "LA", location: null }
+// create — all required fields, defaults fill in the rest
+db.users.create({
+  email: "alice@example.com",
+  homeAddress: { street: "123 Main", city: "NYC" }
+  // location defaults to null, country defaults to "US"
 })
+
+// update — partial: only city changes, everything else untouched
+db.users.where({ id }).update({
+  homeAddress: { city: "LA" }
+})
+
+// field accessor — explicit per-field operations
+db.users.where({ id }).update(u => [
+  u("homeAddress.city").set("LA"),
+  u("homeAddress.country").unset(),
+  u("stats.loginCount").inc(1),
+  u("tags").push("premium"),
+])
 ```
 
-This replaces the entire address. There's no "update the address where `_id` = X" because the framework doesn't track value object identity. In Mongo, this compiles to `$set: { homeAddress: { street: "456 Oak Ave", city: "LA", location: null } }`.
+Complete replacement of a value object uses the field accessor: `u("homeAddress").set({ ...complete object })`. This is explicit — you're saying "replace the whole thing."
 
-Whether partial updates of value object fields are supported (`update({ homeAddress: { city: "LA" } })` meaning "change only the city") is a UX question — it's technically possible (`$set: { "homeAddress.city": "LA" }`) but may violate the "value objects are replaced wholesale" semantics.
+**Three mutation forms:**
+
+| Form | Semantics | Example |
+|---|---|---|
+| **Plain object in `update()`** | Partial — omitted fields untouched | `update({ homeAddress: { city: "LA" } })` |
+| **Field accessor `.set()`** | Explicit replacement of a single field/value object | `update(u => [ u("homeAddress").set({ ...all fields }) ])` |
+| **Field accessor operations** | Targeted mutation operators | `update(u => [ u("count").inc(1), u("tags").push("x") ])` |
+
+**Backend translation:**
+
+| Form | Mongo | SQL JSONB |
+|---|---|---|
+| **Partial update** | `$set: { "homeAddress.city": "LA" }` | `SET home_address = jsonb_set(home_address, '{city}', '"LA"')` |
+| **Complete replacement** | `$set: { "homeAddress": { ...all fields } }` | `SET home_address = '{ ...complete JSON }'` |
+| **Field operations** | `{ $inc: { "stats.loginCount": 1 }, $push: { "tags": "x" } }` | `.set()` and `.unset()` only — richer operators are Mongo-specific |
+
+The mutation operators available on a field handle are **capability-gated by target**, using the same mechanism as query operators:
+- **All targets**: `.set()`, `.unset()`
+- **Mongo**: `.inc()`, `.mul()`, `.push()`, `.pull()`, `.addToSet()`, `.pop()`, etc.
+- **SQL**: `.set()` and `.unset()` for JSONB paths (arithmetic and array ops are not practically supported)
+
+The dot-path accessor thus serves three roles across the API:
+1. **Querying**: `u("homeAddress.city").eq("NYC")` — filter expressions with trait-gated operators
+2. **Mutation operations**: `u("stats.loginCount").inc(1)` — targeted field operations with capability-gated operators
+3. **Type-safe path references**: for anything else that needs to name a nested field
+
+## Open design questions
 
 ### 4. Contract key naming
 
