@@ -37,6 +37,7 @@
     "./framework-components": "./dist/framework-components.mjs",
     "./ir": "./dist/ir.mjs",
     "./types": "./dist/types.mjs",
+    "./validate-domain": "./dist/validate-domain.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
