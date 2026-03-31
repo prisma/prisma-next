@@ -1,14 +1,14 @@
 # Summary
 
-Data migrations are user-authored query builder expressions that transform data during structural schema migrations. They are authored in TypeScript using the existing ORM/query builder, serialized to target-agnostic JSON ASTs in `ops.json` at verification time, and rendered to SQL by the target adapter at apply time. They execute mid-edge in the migration graph — after additive/widening ops create the new schema surface, before destructive ops tighten constraints and drop old columns. The system tracks data migrations as named invariants on graph edges, enabling invariant-aware routing.
+Data migrations are data transformation operations that execute as part of a migration edge in the graph. All migrations — structural and data — are authored in TypeScript as operation chains, serialized to target-agnostic JSON ASTs in `ops.json` at verification time, and rendered to SQL by the target adapter at apply time. Data transforms are first-class operations in the chain, positioned by the planner at the correct point between structural ops. The system tracks data migrations as named invariants on graph edges, enabling invariant-aware routing.
 
 # Description
 
 Prisma Next's graph-based migration system models schema evolution as a directed graph of contract-hash states connected by structural migration edges. This works well when migrations are purely structural (path-independent), but breaks down when data transformations are involved — two databases at the same contract hash can have meaningfully different data depending on which path was taken.
 
-Data migrations solve this by allowing users to attach serialized query operations to graph edges. The system doesn't reason about what the queries do; it tracks that named migrations were applied, and routes through paths that satisfy required invariants. This preserves the graph model's flexibility for structural routing while adding data-awareness without collapsing to linear history.
+Data migrations solve this by allowing data transform operations to be part of the operation chain on graph edges. The system doesn't reason about what the transforms do; it tracks that named data migrations were applied, and routes through paths that satisfy required invariants. This preserves the graph model's flexibility for structural routing while adding data-awareness without collapsing to linear history.
 
-The primary user is a backend developer who knows SQL but doesn't think about migration theory. They want to describe what should happen and have the system handle safety. The system should detect when data migrations are needed, scaffold the file, and let the user fill in the logic.
+The primary user is a backend developer who knows SQL but doesn't think about migration theory. They want to describe what should happen and have the system handle safety. The system should detect when data migrations are needed, scaffold the appropriate operations, and let the user fill in the data transformation logic.
 
 # Requirements
 
@@ -16,7 +16,7 @@ These are the problems the system must solve. The Solution section describes how
 
 ## R0. No arbitrary code execution at apply time
 
-Data migrations must not involve executing arbitrary TypeScript at apply time. The authoring surface is TypeScript (using the existing ORM/query builder), but the output is a serialized JSON AST that can be inspected, audited, and shipped to a SaaS runner without trusting user code. This is critical because: (1) migrations will eventually be serialized and shipped to a hosted service, where executing arbitrary code is a non-starter, (2) even locally, importing a TypeScript module executes top-level code, which is a security risk in team settings, (3) serialized ASTs enable plan-time visibility — reviewers see exactly what will execute.
+Migrations must not involve executing arbitrary TypeScript at apply time. The authoring surface is TypeScript, but the output is serialized JSON ASTs that can be inspected, audited, and shipped to a SaaS runner without trusting user code. This is critical because: (1) migrations will eventually be serialized and shipped to a hosted service, where executing arbitrary code is a non-starter, (2) even locally, importing a TypeScript module executes top-level code, which is a security risk in team settings, (3) serialized ASTs enable plan-time visibility — reviewers see exactly what will execute.
 
 ## R1. Users can express data transformations during schema migration
 
@@ -44,7 +44,7 @@ See [data-migration-scenarios.md](./data-migration-scenarios.md) for full detail
 | S10. Normalization/extraction | Yes (NOT NULL + FK) | Full | QB INSERT...SELECT, joins (OQ-5) |
 | S11. Key/identity change | Per-column only | Full (manual authoring) | Cross-table coordination (OQ-3) |
 | S12. Encoding/format change | Type changes only | Full for type changes | Same-type format changes are S8 territory |
-| S13. Constraint enforcement | No (op partition gap, OQ-1) | Workaround via `migration new` | Constraints classified as `additive` |
+| S13. Constraint enforcement | Yes | Full | — |
 | S14. Data seeding | Yes (NOT NULL FK) | Full | Check uses `return false` (always run) |
 | S15. Soft↔hard delete | No (semantic) | Full (manual authoring) | — |
 | S16. Encryption/hashing | — | **Out of scope** — requires app-level libraries | — |
@@ -77,7 +77,7 @@ Different environments (production, staging, dev) may need different data migrat
 
 ## R9. Users can author migrations manually
 
-Users need to be able to write their own migration (structural DDL, data transformations, or both) without relying on the planner. This should integrate naturally with the data migration mechanism rather than requiring a separate authoring surface.
+Users need to be able to write their own migration (structural DDL, data transformations, or both) without relying on the planner. This should use the same authoring surface as planner-generated migrations.
 
 ## R10. Planning works offline (no database connection required)
 
@@ -97,39 +97,82 @@ Reverting a migration is just another migration in the opposite direction. The s
 
 These apply across the entire solution:
 
-- The framework-level op partitioning function must not depend on target-specific knowledge — it operates solely on operation classes.
 - Only serialized JSON ASTs are stored in `ops.json`. The target adapter renders them to SQL at apply time. No TypeScript is loaded or executed at apply time.
-- User-authored data migration queries should be idempotent. The required `check` query provides the primary retry-safety mechanism, but truly idempotent `run` queries are the safest approach for `isolated`/`unmanaged` modes.
+- User-authored data migration queries should be idempotent. The required `check` query provides the primary retry-safety mechanism, but truly idempotent `run` queries are the safest approach.
 
-## Authoring and serialization model (R0, R1, R2, R9)
+## Unified TypeScript authoring model (R0, R1, R2, R9)
 
-Data migrations are authored in a `data-migration.ts` file inside the migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(client), run(client) })` API.
+All migrations — structural and data — are authored as TypeScript files that return a list of operations. The file is evaluated at verification time to produce JSON ASTs, which are written to `ops.json`. At apply time, only the serialized ASTs are loaded and rendered to SQL by the target adapter.
 
-The `client` parameter provides the existing ORM/query builder interface. Functions return query ASTs (or an array of ASTs for multi-step transformations) — they do not execute queries directly. This is the key to R0: the TypeScript is evaluated once (at verification time) to produce ASTs, which are serialized as JSON into `ops.json`. At apply time, the target adapter renders the ASTs to SQL and executes them. No TypeScript is loaded.
+The planner generates these TypeScript files. When the planner detects patterns (column split, type change with backfill), it emits strategy calls — convenience wrappers that expand to correctly-ordered sequences of primitive operations. The user can also author migration files manually via `migration new`.
 
-Each migration edge supports at most one data migration (single `data-migration.ts` per package).
+A data transform is just another operation in the chain — it has a name (the invariant identity), plus `check` and `run` expressions built with the query builder:
+
+```typescript
+// migrations/0003_split_name/migration.ts
+import { addColumn, dropColumn, setNotNull, dataTransform } from '@prisma-next/migration'
+
+export default () => [
+  addColumn("users", "first_name", { type: "varchar", nullable: true }),
+  addColumn("users", "last_name", { type: "varchar", nullable: true }),
+  dataTransform("split-user-name", {
+    check: (client) => client.users.findFirst({ where: { firstName: null } }),
+    run: (client) => client.users.update({
+      firstName: expr("split_part(name, ' ', 1)"),
+      lastName: expr("split_part(name, ' ', 2)"),
+    }).where({ firstName: null }),
+  }),
+  setNotNull("users", "first_name"),
+  setNotNull("users", "last_name"),
+  dropColumn("users", "name"),
+]
+```
+
+The `check` and `run` callbacks receive a query builder client and return ASTs — they do not execute queries. At verification time, the system evaluates the TS, calls these callbacks to capture the ASTs, and serializes everything into `ops.json`. The `dataTransform`'s `check` and `run` ASTs are serialized alongside the structural op ASTs.
+
+### Strategies (R2)
+
+Common patterns are encapsulated as strategies — functions that expand to correctly-ordered sequences of primitive operations:
+
+```typescript
+import { columnSplit } from '@prisma-next/migration'
+
+export default () =>
+  columnSplit("users", "name", {
+    columns: ["first_name", "last_name"],
+    transform: (client) => client.users.update({
+      firstName: expr("split_part(name, ' ', 1)"),
+      lastName: expr("split_part(name, ' ', 2)"),
+    }).where({ firstName: null }),
+    check: (client) => client.users.findFirst({ where: { firstName: null } }),
+  })
+```
+
+`columnSplit` internally produces: addColumn(first_name) → addColumn(last_name) → dataTransform → setNotNull(first_name) → setNotNull(last_name) → dropColumn(name). The ordering is correct by construction.
+
+The planner detects when a strategy applies and scaffolds the appropriate call. The user provides only the information gap — how to derive the new values from the old. Building a library of strategies is future DX work; for v1, the planner emits raw operation sequences with the data transform positioned correctly.
 
 ### Serialization lifecycle
 
-The `data-migration.ts` integrates with the existing Draft → Attested → Applied lifecycle:
+The migration TS file integrates with the existing Draft → Attested → Applied lifecycle:
 
-1. **Scaffold (Draft)**: `migration plan` detects a data migration is needed, scaffolds `data-migration.ts` with unimplemented functions. The migration package has no `edgeId` (draft state).
-2. **Author (Draft)**: User fills in `check` and `run` using the ORM/query builder. Still draft — the TS hasn't been evaluated and the ASTs haven't been serialized.
-3. **Verify/Attest**: `migration verify` (or re-running `migration plan`) evaluates the TypeScript, captures the resulting query ASTs, serializes them as JSON into `ops.json` as `data_migration` operation entries. The `edgeId` is computed from the serialized content. The package is now attested.
-4. **Apply**: `migration apply` reads the serialized ASTs from `ops.json`, the target adapter renders them to SQL, and executes them. No TypeScript is loaded. Only attested packages are applied (existing behavior).
+1. **Scaffold (Draft)**: `migration plan` produces a `migration.ts` file. If a data migration is needed, the data transform's `check` and `run` are unimplemented. The package is in draft state (no `edgeId`).
+2. **Author (Draft)**: User fills in the data transform logic using the query builder. Still draft — the TS hasn't been evaluated.
+3. **Verify/Attest**: `migration verify` evaluates the TypeScript, captures all operation ASTs (structural and data), serializes them as JSON into `ops.json`. The `edgeId` is computed from the serialized content. The package is now attested.
+4. **Apply**: `migration apply` reads the serialized ASTs from `ops.json`, the target adapter renders them to SQL, and executes them sequentially. No TypeScript is loaded.
 
-The `data-migration.ts` file remains in the package as source code for reference, but is not part of the `edgeId` computation. If the TS is edited after attestation, the serialized ASTs are stale — re-running `migration verify` re-evaluates and re-serializes.
+The `migration.ts` file remains in the package as source code for reference, but is not part of the `edgeId` computation.
 
 ### Representation in ops.json
 
-The data migration is a first-class operation in `ops.json` with two states:
+All operations — structural and data — are entries in `ops.json`. A data transform entry has two states:
 
-**Draft** (after scaffolding, before verification):
+**Draft** (before verification):
 ```json
 {
   "id": "data_migration.split-user-name",
   "operationClass": "data",
-  "source": "data-migration.ts",
+  "source": "migration.ts",
   "check": null,
   "run": null
 }
@@ -140,62 +183,34 @@ The data migration is a first-class operation in `ops.json` with two states:
 {
   "id": "data_migration.split-user-name",
   "operationClass": "data",
-  "source": "data-migration.ts",
+  "source": "migration.ts",
   "check": { /* serialized query AST */ },
   "run": [{ /* serialized query AST */ }]
 }
 ```
 
-`migration verify` detects the placeholder (null check/run), evaluates the TS source, captures the ASTs, and fills them in. The `source` field stays for traceability but is not part of the `edgeId` computation. The target adapter renders the ASTs to SQL at apply time. The runner processes it sequentially like any other operation.
-
-```typescript
-import { defineMigration } from '@prisma-next/migration'
-
-export default defineMigration({
-  name: 'split-user-name',
-  transaction: 'inline',
-
-  check(client) {
-    return client.users.count().where({ firstName: null })
-    // Serialized as JSON AST in ops.json
-    // Rendered at apply time to: SELECT COUNT(*) FROM "users" WHERE "first_name" IS NULL
-    // Runner interprets: count === 0 → already applied (skip run)
-  },
-
-  run(client) {
-    return client.users
-      .update({ firstName: expr("split_part(name, ' ', 1)"),
-                lastName: expr("split_part(name, ' ', 2)") })
-      .where({ firstName: null })
-    // Serialized as JSON AST in ops.json
-    // Rendered at apply time to: UPDATE "users" SET "first_name" = split_part(...), ...
-    // Note: exact API for raw expressions TBD based on query builder capabilities
-  }
-})
-```
+Structural operations are serialized from their operation builders (`addColumn`, `setNotNull`, etc.) at the same verification step. The runner processes all operations sequentially.
 
 ### Manual authoring — `migration new` (R9)
 
-`migration new` scaffolds a migration package with a `data-migration.ts` and empty (or no) structural ops. The user writes queries using the ORM/query builder. This is the escape hatch for when the user wants to author the entire migration manually.
+`migration new` scaffolds a `migration.ts` with an empty operation list. The user writes operations using the same builders and `dataTransform` calls. This is the escape hatch for when the user wants full control — structural ops, data transforms, or both.
 
-`migration new` derives `from` hash from the current migration graph state (same logic as `migration plan`) and `to` hash from the current emitted contract. Both can be overridden with `--from` and `--to` flags.
-
-No verification at authoring time. Post-apply schema verification (R11) catches mismatches.
+`migration new` derives `from` hash from the current migration graph state and `to` hash from the current emitted contract. Both can be overridden with `--from` and `--to` flags.
 
 ## Retry safety — required `check` (R3)
 
-`check(client)` is **required**. It returns one of:
+`check(client)` is **required** on every `dataTransform`. It returns one of:
 
 - **A query AST** (the common case): the query describes *violations* — rows that indicate the migration still needs to run. Empty result = already applied (skip `run`). Non-empty result = needs to run. This is efficient (`LIMIT 1` for early exit) and the violation rows are useful for diagnostics.
 - **`false`**: always run. For seeding, idempotent-by-construction cases, or when a meaningful check isn't worth writing.
 - **`true`**: always skip. Use with caution.
 
-The check executes at the same point in the migration — between phase 1 (additive/widening) and phase 3 (destructive) — in two roles:
+The check executes in two roles:
 
 - **Before `run` (retry)**: determines whether to skip `run`. If the check returns no violations, the data migration is already complete.
-- **After `run` (validation)**: confirms that `run` did its job. If violations remain, the migration fails *before* phase 3 tightens constraints — producing a meaningful diagnostic ("47 rows still have first_name IS NULL") instead of a cryptic database error from phase 3 ("cannot set NOT NULL, column contains nulls").
+- **After `run` (validation)**: confirms that `run` did its job. If violations remain, the migration fails *before* subsequent tightening operations — producing a meaningful diagnostic ("47 rows still have first_name IS NULL") instead of a cryptic database error from a later SET NOT NULL.
 
-This dual role means the execution within phase 2 is: check → (skip or run) → check again → (fail or proceed to phase 3).
+The execution sequence for a data transform operation is: check → (skip or run) → check again → (fail or proceed).
 
 ## Detection and scaffolding (R4, R10)
 
@@ -207,35 +222,36 @@ The planner detects structural changes that imply a data migration is needed:
 
 Detection works offline (no database connection required). The planner scaffolds when the structural diff *could* need a data migration, even if affected tables might be empty at runtime.
 
-When detection triggers, the planner generates a `data-migration.ts` with unimplemented `check` and `run` functions. The unimplemented functions prevent `migration verify` from attesting the package — it stays in draft state until the user fills them in.
+When detection triggers, the planner produces a `migration.ts` with the structural operations and a `dataTransform` with unimplemented `check` and `run`. The unimplemented callbacks prevent `migration verify` from attesting the package — it stays in draft state until the user fills them in.
 
-For non-widening type changes on the same column (e.g., `price FLOAT` → `price BIGINT`), the planner uses a **temp column strategy**: it emits an additive op to create a temporary column with the target type, places the data migration slot after it, and emits destructive ops to drop the original column and rename the temp column. This gives the user's queries a writable column of the correct target type during the data migration. The temp column name is deterministic and referenced in the scaffold comment.
+For non-widening type changes on the same column (e.g., `price FLOAT` → `price BIGINT`), the planner uses a **temp column strategy**: it emits addColumn(temp) → dataTransform → dropColumn(original) → renameColumn(temp → original) in the correct order.
 
-## Phased execution (R5, R6)
+## Planner-managed operation ordering (R5)
 
-When a data migration is present on an edge, the planner emits a `data_migration` operation entry interleaved with structural ops. The planner partitions structural ops into phases by operation class:
+The planner emits operations in the correct order directly. There is no generic class-based partitioning framework — the planner knows the full contract and positions each operation (structural and data) where it belongs:
 
-1. **Phase 1**: all `additive` and `widening` ops (new tables, new nullable columns, relaxed constraints)
-2. **Phase 2**: `data_migration` operation (serialized query ASTs from the data migration)
-3. **Phase 3**: all `destructive` ops (SET NOT NULL, drop old columns, type changes)
+- Additive ops (create tables, add nullable columns) come first
+- Data transforms come after the schema state they need is set up
+- Tightening ops (SET NOT NULL, UNIQUE, CHECK constraints) come after the data transforms that populate/fix the data
+- Destructive ops (drop columns, drop tables) come last
 
-This partitioning is implemented as a generic framework-level function over operation classes. Target planners produce structural ops as they do today; the framework inserts the data migration entry and orders the result. For v1, the ordering is a simple class-based partition. When a proper operation dependency model lands (with `dependsOn` and topological sort), the data migration operation should integrate with that.
+This ordering is the planner's responsibility because it sees the full contract diff and understands cross-table dependencies (FKs, referenced constraints). Strategies encapsulate common ordering patterns, but the planner makes the decisions.
 
 ### Transaction modes (R6)
 
-The data migration declares one of three transaction modes:
+Individual operations or groups of operations can carry transaction annotations. The runner respects these when executing:
 
 | Mode | Behavior | Use case |
 |------|----------|----------|
-| `inline` | Runs inside the structural migration's transaction. Full atomicity — failure rolls back everything. | Small/fast migrations on small tables. Default. |
-| `isolated` | Gets its own transaction. Phase 1 commits first, data migration runs in a separate transaction, phase 3 runs in a third transaction. | Medium tables where you want transactional safety for the data migration but can't hold structural locks open. |
-| `unmanaged` | No transaction wrapping. The serialized SQL executes without a transaction. | DDL that can't run in a transaction (e.g., `CREATE INDEX CONCURRENTLY`), or cases where the user provides multiple batched statements in their `run`. |
+| `inline` (default) | All operations run in a single transaction. Full atomicity. | Small/fast migrations. |
+| `isolated` | Specific operations run in their own transaction. | Data transforms on medium tables. |
+| `unmanaged` | Specific operations run without transaction wrapping. | DDL that can't run in a transaction, large batch operations. |
 
-In `isolated` and `unmanaged` modes, phase 1 ops are skipped on retry via existing idempotency checks (postchecks pass because columns/tables already exist). The data migration step is skipped on retry if the serialized check query indicates "already applied".
+The transaction model is composable — the user annotates individual operations or groups rather than declaring a single mode for the entire migration.
 
 ## Graph integration (R7, R8)
 
-The invariant carried by the system is "named data migration X was applied." This is recorded in the ledger when the migration edge completes successfully.
+The invariant carried by the system is "named data migration X was applied." This is recorded in the ledger when the migration edge completes successfully. The name comes from the `dataTransform`'s first argument.
 
 The router finds candidate paths via DFS, collecting data migration names along each path. Path selection:
 
@@ -247,39 +263,38 @@ Environment refs declare desired state as target contract hash + required data m
 
 ## Post-apply verification (R11)
 
-The existing post-apply schema verification (introspect database, compare against destination contract) serves as the hard safety net for data migrations. No additional verification mechanism is needed — the runner already does this for structural migrations, and it naturally extends to cover data migrations.
+The existing post-apply schema verification (introspect database, compare against destination contract) serves as the hard safety net. No additional verification mechanism is needed — the runner already does this for structural migrations, and it naturally extends to cover migrations with data transforms.
 
 ## Rollback (R12)
 
-No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S1 — an ordinary graph edge that can carry its own data migration if needed.
+No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S1 — an ordinary graph edge that can carry its own data transforms if needed.
 
 ## Applicability to document databases
 
-The data migration mechanism is designed to be the migration surface for document databases (MongoDB, etc.), not just a supplement to SQL DDL.
+The unified migration model is designed to work for document databases (MongoDB, etc.), not just SQL targets.
 
-**Why this works**: The contract in prisma-next represents the *application's* data model, not the database's schema. A document database may be schemaless at the storage layer, but the application domain is never schemaless — there are always expected shapes, types, and relationships. The contract makes this explicit and manageable. When evolving from one contract to another, the operations are semantically equivalent regardless of target: backfill a new field, reshape a document, split a collection, deduplicate records. The *how* differs (SQL UPDATE vs MongoDB `updateMany`), but the *what* and *why* are the same.
+**Why this works**: The contract in prisma-next represents the *application's* data model, not the database's schema. A document database may be schemaless at the storage layer, but the application domain is never schemaless — there are always expected shapes, types, and relationships. The contract makes this explicit and manageable. When evolving from one contract to another, the operations are semantically equivalent regardless of target: backfill a new field, reshape a document, split a collection, deduplicate records.
 
-**What transfers without modification**: The serialization lifecycle (TS → JSON AST → adapter execution), the `check`/`run` contract, the graph model (edges, invariants, routing), the ledger, the Draft → Attested → Applied lifecycle, retry safety via the check query, and transaction modes (mapping to MongoDB's multi-document transactions with their respective caveats).
+**What transfers without modification**: The serialization lifecycle (TS → JSON AST → adapter execution), the `check`/`run` contract, the graph model (edges, invariants, routing), the ledger, the Draft → Attested → Applied lifecycle, retry safety, and transaction modes.
 
-**The key difference**: For SQL targets, structural DDL handles most schema evolution and data migrations supplement it. For document databases, schema evolution *is* data transformation — `$set`, `$unset`, `$rename`, aggregation pipeline reshapes. The data migration mechanism becomes the *primary* migration surface, not a secondary one. The three-phase model (phase 1 → data migration → phase 3) still applies as a lifecycle — prepare the environment, do the work, clean up — but the "structural" phases may be lighter or empty for document targets.
+**The key difference**: For SQL targets, many operations are structural DDL. For document databases, schema evolution *is* data transformation. The data transform mechanism becomes the primary migration surface. The operation chain model handles both naturally — a MongoDB migration is just a chain of data transforms with no structural ops.
 
-**What requires target-specific work**: A MongoDB-flavored query builder client that produces MongoDB-shaped AST nodes (`updateMany`, `aggregate`, `bulkWrite`). This is the adapter's job — the data migration infrastructure is agnostic to what the ASTs look like internally. The JSON AST format has lower impedance mismatch for MongoDB than SQL, since MongoDB operations are natively JSON.
+**What requires target-specific work**: A MongoDB-flavored query builder client that produces MongoDB-shaped AST nodes. The JSON AST format has lower impedance mismatch for MongoDB than SQL, since MongoDB operations are natively JSON.
 
 # Key Decisions
 
-These document the major design choices, the alternatives considered, and why we chose this approach. They are most useful after reading the Requirements and Solution sections.
+These document the major design choices, the alternatives considered, and why we chose this approach.
 
-## D1. TypeScript-authored, AST-serialized, SQL-executed — not an operator algebra
+## D1. TypeScript-authored, AST-serialized — unified for structural and data
 
-**Decision**: Data migrations are authored in TypeScript using the existing ORM/query builder, serialized to JSON ASTs at verification time, and rendered to SQL by the target adapter at apply time. They are not algebraic representations (SMO-style typed operators with commutativity analysis), and they do not execute arbitrary TypeScript at apply time.
+**Decision**: All migrations are authored as TypeScript operation chains, serialized to JSON ASTs at verification time, and rendered to target-specific queries at apply time. Data transforms are operations in the chain, not a separate mechanism.
 
 **Alternatives considered**:
-- **Operator algebra**: A V2 operator algebra (`derive`, `derive_across`, `deduplicate`, `expand`, `filter`, `generate`) inspired by PRISM's Schema Modification Operators. Would enable automatic path equivalence reasoning and canonical form comparison. Rejected because: the expression language does "enormous work", and any scenario the algebra can't handle falls through to an opaque escape hatch.
-- **Arbitrary code execution at apply time**: User writes TypeScript that runs directly against the database. Rejected because: (1) migrations will be shipped to a SaaS runner where arbitrary code is a security risk, (2) importing TypeScript modules executes top-level code, (3) serialized ASTs enable plan-time visibility and auditability.
+- **Operator algebra**: SMO-style typed operators with commutativity analysis. Rejected: expression language does "enormous work," opaque escape hatch needed for anything it can't express.
+- **Arbitrary code execution at apply time**: Rejected: security risk for SaaS, top-level code execution on import, no auditability.
+- **Separate `data-migration.ts` file**: Data migration as a separate file alongside `ops.json`. Rejected in favor of unified operation chain: simpler model, no class-based partitioning needed, data transforms positioned naturally in the sequence.
 
-**Why this approach**: The ORM/query builder already exists and is expressive enough for the common data migration scenarios (S1–S14). The authoring experience is TypeScript (familiar, type-safe), but the execution artifact is a JSON AST (serializable, auditable, target-agnostic, shippable). The serialization happens at verification time as part of the existing Draft → Attested lifecycle.
-
-**What we give up**: Scenarios requiring application-level libraries (S16: bcrypt hashing) or external data sources (S17: audit trail from external API) cannot be expressed. These are edge cases handled outside the migration system.
+**Why unified chain**: One authoring surface for everything. The planner produces TS that includes both structural ops and data transforms in the correct order. Strategies encapsulate common patterns. Manual authoring (`migration new`) uses the same surface. No need for a separate partitioning framework.
 
 ## D2. Name over semantic postconditions; honest about what invariants are
 
@@ -289,144 +304,116 @@ These document the major design choices, the alternatives considered, and why we
 
 **Why name**: The name is stable under code changes (fixing a bug in the migration doesn't change its identity), human-readable in CLI output and ref files, and serves as the primary key for invariant requirements.
 
-**Alternative considered — semantic postconditions**: Carry checkable predicates about data state ("all phone numbers match E.164"). Problem: we can't exhaustively cover all possible postcondition checks with a typed representation. The required `check` function (D3) gives us user-authored postconditions for retry safety without pretending the system can reason about them.
+**Alternative considered — semantic postconditions**: Carry checkable predicates about data state ("all phone numbers match E.164"). Problem: we can't exhaustively cover all possible postcondition checks with a typed representation. The required `check` on `dataTransform` gives us user-authored postconditions for retry safety without pretending the system can reason about them.
 
 ## D3. Required `check` postcondition
 
-**Decision**: Every data migration must implement a `check(client)` function that returns a query AST (describing violations — empty result means done), `false` (always run), or `true` (always skip). The query is serialized to JSON, rendered to SQL at apply time, and executed to determine if the migration has already been applied.
+**Decision**: Every `dataTransform` must include a `check` that returns a query AST (violations — empty = done), `false` (always run), or `true` (always skip).
+
+**Why required**: Solves three problems: (1) retry safety — check before run, skip if done, (2) post-run validation — check after run, fail before tightening ops if violations remain, (3) forces the user to think about "done."
+
+## D4. Single-edge, planner-managed ordering
+
+**Decision**: A migration is a single graph edge with an ordered operation chain. The planner positions operations (structural and data) in the correct order.
 
 **Alternatives considered**:
-- Optional postconditions with a separate ledger completion marker for retry safety
-- No postconditions, relying solely on idempotent queries
+- Split into multiple edges (additive → data → destructive). Rejected: requires synthesizing intermediate contracts, creates graph noise.
+- Generic class-based partitioning. Rejected: doesn't handle constraint ops correctly (classified as additive but semantically tightening), and the planner already knows the right order.
 
-**Why required**: Solves three problems with one mechanism: (1) retry safety — runner executes the rendered check SQL before the run SQL, skipping if already done, (2) no need for a mid-migration ledger write or separate completion marker, (3) forces the user to think about what "done" means. The escape hatch is trivial (`return false` to always run, `return true` to always skip) so it doesn't block users who don't care, but it nudges toward correctness.
-
-## D4. Single-edge with interleaved ops over split into multiple edges
-
-**Decision**: A data migration lives within a single graph edge. Structural ops are partitioned into phases (additive → data migration → destructive) within that edge.
-
-**Alternatives considered**: Split the migration into two edges — Edge 1 (additive ops, creates intermediate contract state) → Edge 2 (destructive ops). The data migration runs between the two edges.
-
-**Why single-edge**:
-- The split model requires synthesizing an intermediate contract from partial ops — a function like `applyOp(contract, op) → contract` which does not exist in the system.
-- The intermediate contract state is graph noise — an implementation artifact that leaks into the user's mental model. Nobody wants to target it with a ref or reason about it.
-- The single-edge model preserves the option for `inline` transaction atomicity (one transaction wrapping everything), which the split model loses since each edge runs its own transaction.
-- The single-edge model requires bounded runner changes (process serialized ASTs between structural op phases) rather than a new contract synthesis capability.
+**Why planner-managed**: The planner sees the full contract diff and understands cross-table dependencies. It positions each operation where it belongs. Strategies encapsulate common patterns but the planner makes the decisions. This eliminates the op partitioning edge case (OQ-1 from earlier versions).
 
 ## D5. Co-located with edges, not independent
 
-**Decision**: Data migrations are attached to structural migration edges (Model A from the solutions doc). They are not independent artifacts that float in the graph.
+**Decision**: Data transforms are operations within migration edges, not independent artifacts.
 
-**Alternatives considered**: Model B (independent data migrations applied when schema allows) — data migrations are separate from structural transitions, applied whenever their schema requirements are met.
+**Why**: A data transform needs a specific schema to run against. It has a natural home in the edge that creates that schema. Co-location means the structural path determines which transforms run — no separate routing needed.
 
-**Why co-located**: A data migration almost always needs a specific schema to run against. It has a natural home on the edge that creates that schema. Co-location means the structural path determines which data migrations run — no separate routing layer needed. Model B would require its own compatibility checking, routing, and execution model.
+## D6. Temp column strategy for same-column type changes
 
-## D6. Class-based op partition for v1, dependency model later
+**Decision**: When a column's type changes without a rename (e.g., `price FLOAT` → `price BIGINT`), the planner emits addColumn(temp) → dataTransform → dropColumn(original) → renameColumn(temp).
 
-**Decision**: For v1, the planner partitions ops by operation class: additive/widening before the data migration, destructive after. A proper operation dependency model (`dependsOn` + topological sort) is future work.
+**Why**: The only approach that gives the user a writable column of the correct target type while old data is still readable.
 
-**Alternatives considered**: Implement `dependsOn` from the start, with the data migration operation expressing explicit dependencies on structural ops.
+**Future refinement — `USING` clause**: For simple conversions expressible as a single SQL expression, `ALTER COLUMN TYPE ... USING` is simpler. The planner could offer common patterns and fall back to temp column when the user needs complex logic.
 
-**Why class-based for now**: Covers the common scenarios (S1–S5, S9, S10, S14). The known gap — constraint additions (UNIQUE, CHECK, FK) are classified as `additive` but are semantically tightening and should run after the data migration (S13) — is a real limitation but not a blocker for VP1. The dependency model is the proper fix and should be designed to subsume the class-based partition when it lands.
+## D7. Planner detects, scaffolds with context, prevents accidental no-ops
 
-## D7. Temp column strategy for same-column type changes
-
-**Decision**: When a column's type changes without a rename (e.g., `price FLOAT` → `price BIGINT`), the planner creates a temporary column of the target type, places the data migration after it, and emits destructive ops to drop the original and rename the temp.
-
-**Alternatives considered**:
-- Use `ALTER COLUMN TYPE ... USING` to let the database handle the conversion. Problem: this bypasses the data migration entirely — the user can't control the conversion logic.
-- Write new-type values to the old-type column. Problem: the old column can't hold values of the new type.
-- Change the type first, then transform. Problem: the type change may fail or lose data before the user's conversion runs.
-
-**Why temp column**: It's the only approach that gives the user a writable column of the correct target type while the old data is still available to read from. The temp column name is deterministic and referenced in the scaffold comment. The user never sees it in the final schema.
-
-**Future refinement — `USING` clause for common conversions**: Many type changes can be expressed as a single SQL expression in an `ALTER COLUMN TYPE ... USING` clause (e.g., `USING (price * 100)::bigint`, `USING created_at AT TIME ZONE 'America/New_York'`, `USING CASE status WHEN 1 THEN 'active' END`). When the conversion is a SQL expression, the `USING` approach is simpler — no temp column, no data migration file, just a single structural op. The planner could offer common conversion patterns (multiply, cast, round, timezone, enum lookup) and generate the `USING` clause directly, falling back to the temp column strategy only when the user needs imperative logic that can't be expressed as a single SQL expression. This fits into the deferred "smart scaffolding / recipe templates" layer.
-
-## D8. Planner detects, scaffolds with context, and prevents accidental no-ops
-
-**Decision**: The planner auto-detects structural changes that imply a data migration is needed (NOT NULL without default, non-widening type change, nullable → NOT NULL) and scaffolds a `data-migration.ts` that: (a) provides the full `defineMigration` boilerplate so the user starts from a working structure, (b) includes comments describing what was detected and what the user needs to provide, and (c) keeps the package in draft state until the user fills in the implementation — `migration verify` cannot attest an unimplemented data migration.
-
-**Alternatives considered**:
-- Warn only — planner flags the need, user creates the file manually. Problem: easy to miss the warning and proceed without a data migration.
-- Block — planner refuses to create the migration package until user provides a data migration. Problem: blocks the plan workflow; user can't see the structural plan until they've written data migration code they don't yet understand.
-- Smart scaffolding — pre-fill the `run` function with likely queries based on the detected pattern. Future DX layer; minimal scaffolding proves the model first.
-
-**Why this approach**: The system takes responsibility for detection and gives the user a starting point with enough context to understand what's needed. The draft state guarantees that unimplemented data migrations cannot be applied — the package must be attested first, which requires the TS to produce valid query ASTs.
+**Decision**: The planner auto-detects data migration needs and scaffolds a `migration.ts` with the correct operation sequence, including an unimplemented `dataTransform`. The package stays in draft state until the user fills in the transform logic and runs `migration verify`.
 
 # Acceptance Criteria
 
 ## Authoring and serialization
 
-- [ ] A `data-migration.ts` file using `defineMigration` is recognized during verification/planning
-- [ ] `check(client)` is required — `defineMigration` without `check` is a type error
-- [ ] `run(client)` and `check(client)` receive the ORM/query builder client and return query ASTs (or array of ASTs)
-- [ ] `migration verify` evaluates the TypeScript once and serializes resulting ASTs as JSON into `ops.json`
-- [ ] No TypeScript is loaded or executed at `migration apply` time — only serialized ASTs from `ops.json` rendered to SQL by the target adapter
-- [ ] The `data-migration.ts` source file is not part of the `edgeId` computation; only serialized ASTs are
-- [ ] A migration package with an unresolved `data-migration.ts` (not yet serialized) is in draft state (`edgeId` null/stale)
+- [ ] Migration TS files returning operation lists are recognized during verification
+- [ ] `dataTransform` `check` is required — omitting it is a type error
+- [ ] `check` and `run` receive the query builder client and return ASTs (or arrays of ASTs)
+- [ ] `migration verify` evaluates the TypeScript and serializes all operation ASTs into `ops.json`
+- [ ] No TypeScript is loaded at `migration apply` time — only serialized ASTs rendered by the target adapter
+- [ ] The `migration.ts` source file is not part of the `edgeId` computation; only serialized ASTs are
+- [ ] A package with unresolved `dataTransform` (null check/run in ops.json) is in draft state
 - [ ] `migration apply` rejects draft (unattested) packages
 
 ## Detection and scaffolding
 
-- [ ] `migration plan` scaffolds a `data-migration.ts` when it detects a NOT NULL column added without a default
+- [ ] `migration plan` scaffolds a `migration.ts` with `dataTransform` when it detects a NOT NULL column without default
 - [ ] `migration plan` scaffolds when it detects a non-widening type change
 - [ ] `migration plan` scaffolds when it detects a nullable → NOT NULL change
-- [ ] Scaffolded file includes a comment describing the detected change
-- [ ] An unimplemented scaffold prevents attestation — `migration verify` fails or keeps the package in draft state
+- [ ] Scaffolded `dataTransform` includes a comment describing the detected change
+- [ ] An unimplemented `dataTransform` prevents attestation
 
 ## Execution
 
-- [ ] With a data migration present, structural ops execute in order: additive/widening → data migration → destructive
-- [ ] `inline` mode: data migration runs in the same transaction as structural ops; failure rolls back everything
-- [ ] `isolated` mode: phase 1 commits, data migration runs in own transaction, phase 3 runs in own transaction
-- [ ] `unmanaged` mode: data migration runs without transaction wrapping
-- [ ] On retry after partial failure in `isolated`/`unmanaged` modes, phase 1 ops are skipped via existing idempotency checks
-- [ ] On retry, the serialized check query is executed — if it indicates "already applied", the run step is skipped
+- [ ] Operations execute in the order they appear in the chain
+- [ ] Data transform check runs before and after the transform's run step
+- [ ] `inline`: all operations in one transaction; failure rolls back everything
+- [ ] `isolated`: annotated operations get their own transaction
+- [ ] `unmanaged`: annotated operations run without transaction wrapping
+- [ ] On retry, check determines whether to skip the data transform's run step
 
 ## Graph integration
 
-- [ ] Data migration name is recorded in ledger on successful edge completion
+- [ ] Data migration name (from `dataTransform`) is recorded in ledger on edge completion
 - [ ] Router selects path satisfying required invariants from environment ref
-- [ ] When no invariants are required, router prefers path with more data migrations over path with fewer
+- [ ] When no invariants are required, router prefers path with more data migrations
 - [ ] Environment ref can declare required data migration names alongside target contract hash
 
 ## Rollback
 
-- [ ] A migration S2→S1 with a data migration works identically to S1→S2 — no special rollback machinery
+- [ ] A migration S2→S1 with data transforms works identically to S1→S2
 
 # Non-goals
 
-- **Multiple data migrations per edge**: Requires a dependency model between operations. Future work.
-- **Pure data migrations (A→A)**: Data-only transformations with no schema change. The model extends naturally to self-edges later, but ADR 039 currently rejects self-loops.
-- **Smart scaffolding / recipe templates**: Pre-filled queries for common patterns (backfill, type conversion, extraction). Future DX layer.
-- **Arbitrary code execution**: Scenarios requiring application-level libraries (e.g., bcrypt hashing, S16) or external data sources (e.g., audit trail from external API, S17) cannot be expressed in this model. They must be handled outside the migration system.
-- **Raw SQL escape hatch (`readSql`, `sql` tagged templates)**: Descoped for v1. The query builder is the sole authoring surface. However, the AST model naturally supports a future `raw_sql` node type — an opaque SQL string stored in the JSON AST, passed through verbatim by the target adapter. This would enable `readSql` (read `.sql` file → `raw_sql` AST node) and raw SQL expressions within the query builder. The `raw_sql` node is inherently target-specific (Postgres adapter executes it, MongoDB adapter would reject it), which is an acceptable tradeoff for an escape hatch. Not implementing in v1 to keep the authoring surface focused on the query builder and validate its expressiveness first.
-- **Runtime no-op detection**: Mock-style verification that migration queries actually modified data. Future safety layer.
-- **Operator algebra**: Composable migration operators with commutativity analysis. Useful design thinking but the invariant model handles correctness without it.
-- **Content hash drift detection**: Warn when data migration source has been modified since it was applied to another environment. Descoped because: (1) the `data-migration.ts` is not part of `edgeId` — only the serialized ASTs are; (2) the serialized ASTs in ops.json already have integrity via `edgeId`; (3) cross-environment comparison requires shared state that doesn't exist. Revisit when we have a clearer picture of multi-environment workflows.
-- **Question-tree UX**: Interactive workflow where the system asks the user targeted questions about ambiguous diffs and compiles answers into migration queries. Future authoring layer.
-- **Invariant management CLI**: The ref format supports invariants (`{ hash, invariants: string[] }`), but there's no CLI surface for managing them (e.g., `migration ref set-invariant staging split-user-name`). For v1, invariants on refs are set programmatically or by editing the ref JSON files directly. A proper CLI surface for adding/removing invariants on refs is future work.
+- **Multiple data transforms per edge requiring dependency analysis between them**: For v1, data transforms in a single chain are ordered by the planner or manually by the user. Cross-transform dependency analysis is future work.
+- **Pure data migrations (A→A)**: Data-only transformations with no schema change. ADR 039 currently rejects self-loops.
+- **Strategy library**: Pre-built strategies (`columnSplit`, `nonNullBackfill`, `typeChange`, `tableExtraction`) are future DX work. For v1, the planner emits raw operation sequences.
+- **Arbitrary code execution**: Scenarios requiring application-level libraries (e.g., bcrypt hashing, S16) or external data sources are out of scope.
+- **Raw SQL escape hatch**: Descoped for v1. The AST model supports a future `raw_sql` node type — an opaque SQL string stored in the JSON, passed through verbatim by the target adapter. Not implementing in v1 to validate query builder expressiveness first.
+- **Runtime no-op detection**: Mock-style verification that transforms actually modified data. Future safety layer.
+- **Content hash drift detection**: Descoped — the `migration.ts` is not part of `edgeId`, serialized ASTs have integrity via `edgeId`, and cross-environment comparison requires shared state.
+- **Question-tree UX**: Interactive diff-driven authoring. Future layer.
+- **Invariant management CLI**: The ref format supports invariants but there's no CLI surface for managing them yet. For v1, edit ref JSON files directly.
 
 # Open Questions
 
-1. **Op partitioning edge cases**: The additive/widening → data → destructive split assumes operation classes cleanly separate into "before" and "after" groups. Even for structural ops this isn't always true (e.g., compound type+default changes require drop → alter → set sequences). Constraint additions (UNIQUE, CHECK, FK) are classified as `additive` but are semantically tightening — they should run *after* the data migration (S13). This is a known limitation of the class-based partition. The proper fix is an operation dependency model (`dependsOn` + topological sort) where constraint ops depend on the data migration.
+1. **Cross-table coordinated migrations (S11)**: PK type changes cascade across the FK graph. The planner needs FK graph awareness to emit coordinated ops across all referencing tables. For v1, user-authored manually.
 
-2. **Environment ref format**: **Resolved.** Refs refactored from single `migrations/refs.json` to `migrations/refs/<name>.json` with `{ hash, invariants: string[] }` format. Invariant management CLI deferred (see Non-goals).
+2. **Environment ref format**: **Resolved.** Refs refactored to `migrations/refs/<name>.json` with `{ hash, invariants: string[] }`.
 
-3. **Cross-table coordinated migrations (S11)**: Scenarios like PK type changes (e.g., `SERIAL` → `UUID`) cascade across the FK graph — every referencing table needs a temp column, UUID generation, FK rewiring, and cleanup. The planner would need to trace FK references across tables and emit coordinated temp column + rename ops for all affected tables. This is significant planner intelligence beyond per-table detection. For v1, the user likely authors these migrations manually. Future work: planner FK graph awareness to auto-detect and scaffold cross-table cascading type changes.
+3. **Table drop detection gap (S6)**: Horizontal table splits may not trigger auto-detection. Known gap for v1.
 
-4. **Table drop detection gap (S6)**: Horizontal table splits (one table → two with rows partitioned) may not trigger auto-detection if the new tables don't have NOT NULL columns without defaults. The planner could add a heuristic: "table dropped while new tables with similar schemas are created" → suggest data migration. Low priority for v1 but a known detection gap.
+4. **Query builder expressiveness**: The query builder needs UPDATE, INSERT...SELECT, DELETE, subqueries with joins, and target-specific functions. Gaps mean the query builder needs extending — no raw SQL fallback in v1.
 
-5. **Query builder expressiveness for data migrations**: The ORM/query builder needs to support UPDATE, INSERT ... SELECT, DELETE, subqueries with joins, and target-specific functions (e.g., `split_part`, `gen_random_uuid`). The current expressiveness of the query builder for DML operations needs validation against the scenario list. If gaps exist, the query builder needs extending — there is no raw SQL fallback in v1.
+5. **Operation builder API design**: The primitive operation builders (`addColumn`, `dropColumn`, `setNotNull`, `dataTransform`, etc.) and their type signatures need concrete design. This is the authoring surface for both planner output and manual authoring.
 
+6. **Planner TS output format**: The planner currently writes `ops.json` directly. Changing it to produce `migration.ts` that evaluates to ops is a significant refactor of the planning pipeline. The transition path needs design.
 
 # Other Considerations
 
 ## Security
 
-- No TypeScript is executed at apply time. Only serialized JSON ASTs (rendered to SQL by the target adapter) are executed.
-- Data migration SQL runs with the same database permissions as the migration runner. No privilege escalation.
-- The `data-migration.ts` source is evaluated only at verification time on the author's machine. It is not loaded by `migration apply` or shipped to SaaS.
+- No TypeScript is executed at apply time. Only serialized JSON ASTs are executed.
+- Data migration SQL runs with the same database permissions as the migration runner.
+- The `migration.ts` source is evaluated only at verification time on the author's machine.
 
 ## Observability
 
@@ -438,6 +425,7 @@ These document the major design choices, the alternatives considered, and why we
 - [data-migrations.md](./data-migrations.md) — Theory: invariants, guarded transitions, desired state model
 - [data-migrations-solutions.md](./data-migrations-solutions.md) — Solution exploration: compatibility, routing, integration models
 - [data-migration-scenarios.md](./data-migration-scenarios.md) — 18 schema evolution scenarios walked through against the design
+- [data-migrations-response.md](./data-migrations-response.md) — Feedback on spec: unified TS authoring model, strategies, operation chains
 - [april-milestone.md](./april-milestone.md) — VP1: prove data migrations work in the graph model
 - [chat.md](./chat.md) — Design exploration: operator algebra, scenario enumeration, question-tree UX
 - Planner implementation: `packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts`
