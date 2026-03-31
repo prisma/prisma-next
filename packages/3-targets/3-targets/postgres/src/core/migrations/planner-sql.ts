@@ -126,7 +126,7 @@ function renderParameterizedTypeSql(
   return expanded !== column.nativeType ? expanded : null;
 }
 
-function buildColumnDefaultSql(
+export function buildColumnDefaultSql(
   columnDefault: PostgresColumnDefault | undefined,
   column?: StorageColumn,
 ): string {
@@ -192,10 +192,12 @@ export function toRegclassLiteral(schema: string, name: string): string {
 export function constraintExistsCheck({
   constraintName,
   schema,
+  table,
   exists = true,
 }: {
   constraintName: string;
   schema: string;
+  table: string;
   exists?: boolean;
 }): string {
   const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
@@ -204,6 +206,7 @@ export function constraintExistsCheck({
   JOIN pg_namespace n ON c.connamespace = n.oid
   WHERE c.conname = '${escapeLiteral(constraintName)}'
   AND n.nspname = '${escapeLiteral(schema)}'
+  AND c.conrelid = to_regclass(${toRegclassLiteral(schema, table)})
 )`;
 }
 
@@ -247,6 +250,111 @@ export function columnNullabilityCheck({
     AND table_name = '${escapeLiteral(table)}'
     AND column_name = '${escapeLiteral(column)}'
     AND is_nullable = '${expected}'
+)`;
+}
+
+/**
+ * Maps contract native type names to the display form returned by PostgreSQL's
+ * `format_type()`. Base types use short names in the contract (e.g., `int4`)
+ * but `format_type()` returns SQL-standard names (e.g., `integer`).
+ *
+ * NOTE: The inverse mapping lives in `normalizeFormattedType` in control-adapter.ts.
+ * These two maps must stay in sync. A shared bidirectional map in
+ * @prisma-next/adapter-postgres would eliminate the drift risk.
+ */
+const FORMAT_TYPE_DISPLAY: ReadonlyMap<string, string> = new Map([
+  ['int2', 'smallint'],
+  ['int4', 'integer'],
+  ['int8', 'bigint'],
+  ['float4', 'real'],
+  ['float8', 'double precision'],
+  ['bool', 'boolean'],
+  ['timestamp', 'timestamp without time zone'],
+  ['timestamptz', 'timestamp with time zone'],
+  ['time', 'time without time zone'],
+  ['timetz', 'time with time zone'],
+]);
+
+/**
+ * Builds the string that `format_type(atttypid, atttypmod)` would return for a
+ * contract column. Used for postchecks — separate from `buildColumnTypeSql` which
+ * produces DDL-safe strings (e.g., quoted identifiers, SERIAL).
+ */
+export function buildExpectedFormatType(
+  column: StorageColumn,
+  codecHooks: Map<string, CodecControlHooks>,
+): string {
+  // Parameterized types: expand with typeParams.
+  // format_type() returns the same form (e.g., 'character varying(255)').
+  if (column.typeParams && column.codecId) {
+    const hooks = codecHooks.get(column.codecId);
+    if (hooks?.expandNativeType) {
+      return hooks.expandNativeType({
+        nativeType: column.nativeType,
+        codecId: column.codecId,
+        typeParams: column.typeParams,
+      });
+    }
+  }
+
+  // User-defined types (enums, composites): format_type() double-quotes names
+  // that contain uppercase characters (e.g., "StatusType") but returns lowercase
+  // names bare (e.g., status_type). We can't use quoteIdentifier() here because
+  // it always quotes, which would break the lowercase case.
+  if (column.typeRef) {
+    const needsQuoting = column.nativeType !== column.nativeType.toLowerCase();
+    return needsQuoting ? `"${column.nativeType}"` : column.nativeType;
+  }
+
+  // Base types: map contract short names to format_type() display names.
+  return FORMAT_TYPE_DISPLAY.get(column.nativeType) ?? column.nativeType;
+}
+
+/** Checks that the column's full type (including typmods) matches the expected type via `format_type()`. */
+export function columnTypeCheck({
+  schema,
+  table,
+  column,
+  expectedType,
+}: {
+  schema: string;
+  table: string;
+  column: string;
+  expectedType: string;
+}): string {
+  return `SELECT EXISTS (
+  SELECT 1
+  FROM pg_attribute a
+  JOIN pg_class c ON c.oid = a.attrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = '${escapeLiteral(schema)}'
+    AND c.relname = '${escapeLiteral(table)}'
+    AND a.attname = '${escapeLiteral(column)}'
+    AND format_type(a.atttypid, a.atttypmod) = '${escapeLiteral(expectedType)}'
+    AND NOT a.attisdropped
+)`;
+}
+
+/** Checks that a column default exists (or does not exist) via `information_schema.columns.column_default`. */
+export function columnDefaultExistsCheck({
+  schema,
+  table,
+  column,
+  exists = true,
+}: {
+  schema: string;
+  table: string;
+  column: string;
+  exists?: boolean;
+}): string {
+  const nullCheck = exists ? 'IS NOT NULL' : 'IS NULL';
+  return `SELECT EXISTS (
+  SELECT 1
+  FROM information_schema.columns
+  WHERE table_schema = '${escapeLiteral(schema)}'
+    AND table_name = '${escapeLiteral(table)}'
+    AND column_name = '${escapeLiteral(column)}'
+    AND column_default ${nullCheck}
 )`;
 }
 
