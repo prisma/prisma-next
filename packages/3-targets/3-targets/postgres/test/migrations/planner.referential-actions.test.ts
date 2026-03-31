@@ -52,6 +52,7 @@ function createRefActionContract(
         },
       },
     },
+    roots: {},
     models: {},
     relations: {},
     mappings: {},

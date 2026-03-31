@@ -585,12 +585,8 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain(
-      "readonly name: { readonly column: 'name'; readonly nullable: true; readonly codecId: 'pg/text@1' }",
-    );
-    expect(types).toContain(
-      "readonly email: { readonly column: 'email'; readonly nullable: false; readonly codecId: 'pg/text@1' }",
-    );
+    expect(types).toContain("readonly name: CodecTypes['pg/text@1']['output'] | null");
+    expect(types).toContain("readonly email: CodecTypes['pg/text@1']['output']");
   });
 
   it('generates contract types with model field missing column reference', () => {
@@ -622,9 +618,7 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain(
-      "readonly email: { readonly column: 'nonexistent'; readonly nullable: false; readonly codecId: '' }",
-    );
+    expect(types).toContain("readonly email: { readonly column: 'nonexistent' }");
   });
 
   it('generates contract types with model referencing missing table', () => {
@@ -654,9 +648,7 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain(
-      "readonly id: { readonly column: 'id'; readonly nullable: false; readonly codecId: '' }",
-    );
+    expect(types).toContain("readonly id: { readonly column: 'id' }");
   });
 
   it('generates contract types with undefined models', () => {
@@ -713,12 +705,8 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain(
-      "readonly id: { readonly column: 'id'; readonly nullable: false; readonly codecId: 'pg/int4@1' }",
-    );
-    expect(types).not.toContain(
-      "readonly id: { readonly column: 'id'; readonly nullable: true; readonly codecId: 'pg/int4@1' }",
-    );
+    expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
+    expect(types).not.toContain("readonly id: CodecTypes['pg/int4@1']['output'] | null");
   });
 
   it('renders parameterized type when column has typeParams and renderer exists', () => {
@@ -766,12 +754,8 @@ describe('sql-target-family-hook', () => {
       parameterizedRenderers,
     });
 
-    expect(types).toContain(
-      "readonly vector: { readonly column: 'vector'; readonly nullable: false; readonly codecId: 'pg/vector@1' }",
-    );
-    expect(types).toContain(
-      "readonly id: { readonly column: 'id'; readonly nullable: false; readonly codecId: 'pg/int4@1' }",
-    );
+    expect(types).toContain('readonly vector: Vector<1536>');
+    expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
   });
 
   it('falls back to CodecTypes when column has typeParams but no renderer', () => {
@@ -806,9 +790,7 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
-    expect(types).toContain(
-      "readonly vector: { readonly column: 'vector'; readonly nullable: false; readonly codecId: 'pg/vector@1' }",
-    );
+    expect(types).toContain("readonly vector: CodecTypes['pg/vector@1']['output']");
     expect(types).not.toContain('Vector<1536>');
   });
 

@@ -62,10 +62,11 @@ describe('validateContract structure validation', () => {
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/storage/);
   });
 
-  it('throws on missing models', () => {
+  it('defaults missing models to empty object', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, models: undefined } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/models/);
+    const result = validateContract<SqlContract<SqlStorage>>(invalid);
+    expect(result.models).toEqual({});
   });
 
   it('throws on invalid column type', () => {

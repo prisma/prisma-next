@@ -819,8 +819,7 @@ describe('validateContract normalization', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     const normalized = normalizeContract(contractInput);
-    // Normalization should pass through null models unchanged
-    expect(normalized.models).toBeNull();
+    expect(normalized.models).toEqual({});
   });
 });
 

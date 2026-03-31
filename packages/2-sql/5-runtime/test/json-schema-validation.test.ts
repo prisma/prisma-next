@@ -135,6 +135,7 @@ function createJsonSchemaContract(
     storageHash: coreHash('sha256:test'),
     models: {},
     relations: {},
+    roots: {},
     storage: {
       tables: {
         user: {

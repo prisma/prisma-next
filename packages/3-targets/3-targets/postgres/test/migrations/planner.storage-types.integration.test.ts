@@ -43,6 +43,7 @@ const contractWithEnum: SqlContract<SqlStorage> = {
       },
     },
   },
+  roots: {},
   models: {},
   relations: {},
   mappings: {},

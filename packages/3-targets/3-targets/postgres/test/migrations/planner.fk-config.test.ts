@@ -48,6 +48,7 @@ function createFkTestContract(fkConfig: {
         },
       },
     },
+    roots: {},
     models: {},
     relations: {},
     mappings: {},

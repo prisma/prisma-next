@@ -56,6 +56,7 @@ function emptyContract(): SqlContract<SqlStorage> {
     storageHash: coreHash('sha256:test'),
     profileHash: profileHash('sha256:test'),
     storage: { tables: {} },
+    roots: {},
     models: {},
     relations: {},
     mappings: {},

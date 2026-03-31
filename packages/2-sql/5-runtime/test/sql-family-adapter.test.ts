@@ -12,6 +12,7 @@ const testContract: SqlContract<SqlStorage> = {
   storageHash: coreHash('sha256:test-hash'),
   models: {},
   relations: {},
+  roots: {},
   storage: { tables: {} },
   extensionPacks: {},
   capabilities: {},
