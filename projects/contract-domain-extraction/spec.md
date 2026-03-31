@@ -314,14 +314,14 @@ This phase is independent of Phase 4 (IR alignment) and can be done before or af
 
 **Types:**
 
-- [ ] `ContractBase` has typed `roots`, `models` (with `fields: Record<string, { nullable, codecId }>`, `relations`, optional `discriminator`/`variants`/`base`), declared in the framework core package
+- [ ] `ContractBase` has typed `roots`, `models` (with `fields: Record<string, { nullable, codecId }>`, `relations`, optional `discriminator`/`variants`/`base`/`owner`), declared in the framework core package
 - [ ] `SqlContract extends ContractBase` with SQL-specific storage and retains old consumer-facing fields (`mappings`, top-level `relations`, `model.fields` with `{ column }`)
 - [ ] Emitted `contract.d.ts` includes both old and new field shapes
 
 **Validation:**
 
 - [ ] `validateContract()` parses the new JSON structure and returns the widened type, populating old fields (e.g., `mappings`) from new structure (e.g., `model.storage`)
-- [ ] Shared domain validation (roots, variants, relations, discriminators, orphans) runs as part of SQL `validateContract()`
+- [ ] Shared domain validation (roots, variants, relations, discriminators, ownership, orphans) runs as part of SQL `validateContract()`
 
 **No consumer changes:**
 
