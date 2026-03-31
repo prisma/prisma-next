@@ -6,10 +6,7 @@
  * the planner's SQL generation pipeline. It runs at verification time.
  */
 
-import type {
-  DataTransformOperation,
-  SerializedQueryNode,
-} from '@prisma-next/core-control-plane/types';
+import type { SerializedQueryNode } from '@prisma-next/core-control-plane/types';
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type {
   SqlContract,
@@ -644,16 +641,47 @@ function resolveCreateType(
   );
 }
 
-function resolveDataTransform(desc: DataTransformDescriptor): DataTransformOperation {
-  const run: readonly SerializedQueryNode[] = Array.isArray(desc.run) ? desc.run : [desc.run];
+function renderQueryNodeToSql(node: SerializedQueryNode): string {
+  if (node.kind === 'raw_sql') {
+    const sql = node['sql'];
+    if (typeof sql !== 'string') {
+      throw new Error('raw_sql node must have a string "sql" field');
+    }
+    return sql;
+  }
+  throw new Error(
+    `Cannot render SerializedQueryNode of kind "${node.kind}" to SQL. Only "raw_sql" is supported for v1.`,
+  );
+}
+
+function resolveDataTransform(desc: DataTransformDescriptor): ResolvedOp {
+  const runNodes: readonly SerializedQueryNode[] = Array.isArray(desc.run) ? desc.run : [desc.run];
+
+  // Build execute steps from run ASTs
+  const executeSteps = runNodes.map((node, i) =>
+    step(`data transform "${desc.name}" step ${i + 1}`, renderQueryNodeToSql(node)),
+  );
+
+  // Build postcheck from check AST (used for idempotency probe and post-run validation)
+  // Convention: check query returns rows when violations exist (needs to run).
+  // Runner postchecks expect true = satisfied. Wrap in NOT EXISTS to invert.
+  const postcheckSteps: { description: string; sql: string }[] = [];
+  if (typeof desc.check !== 'boolean') {
+    const checkSql = renderQueryNodeToSql(desc.check);
+    postcheckSteps.push(
+      step(`verify data transform "${desc.name}" is complete`, `SELECT NOT EXISTS (${checkSql})`),
+    );
+  }
+
   return {
     id: `data_migration.${desc.name}`,
     label: `Data transform: ${desc.name}`,
     operationClass: 'data',
-    name: desc.name,
-    source: desc.source,
-    check: desc.check,
-    run,
+    target: targetDetails('table', desc.name, 'public'),
+    precheck: [],
+    execute: executeSteps,
+    postcheck: postcheckSteps,
+    meta: { dataTransformName: desc.name, source: desc.source },
   };
 }
 
@@ -666,14 +694,11 @@ import { quoteIdentifier as quoteId } from '@prisma-next/adapter-postgres/contro
 export function resolveOperations(
   descriptors: readonly MigrationOpDescriptor[],
   context: OperationResolverContext,
-): readonly (ResolvedOp | DataTransformOperation)[] {
+): readonly ResolvedOp[] {
   return descriptors.map((desc) => resolveOperation(desc, context));
 }
 
-function resolveOperation(
-  desc: MigrationOpDescriptor,
-  ctx: OperationResolverContext,
-): ResolvedOp | DataTransformOperation {
+function resolveOperation(desc: MigrationOpDescriptor, ctx: OperationResolverContext): ResolvedOp {
   switch (desc.kind) {
     case 'createTable':
       return resolveCreateTable(desc, ctx);
