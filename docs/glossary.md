@@ -110,18 +110,6 @@ The terminology used instead of "inheritance" or "subclassing" for polymorphic m
 
 ---
 
-## Contract Structure
-
-### Domain / Storage Separation
-
-The contract's two-layer design. The domain layer (`roots`, `models` with `fields`/`relations`/`discriminator`/`variants`) describes what the application models. The storage layer (`model.storage`, top-level `storage`) describes how things persist. The domain structure is family-agnostic; family-specific details are scoped to storage. See [ADR 172](architecture%20docs/adrs/ADR%20172%20-%20Contract%20domain-storage%20separation.md).
-
-### ContractBase
-
-The shared domain-level contract type consumed by family-agnostic code (ORM clients, validation, tooling). Contains `roots`, `models` (with fields, relations, discriminator/variants). Family-specific contracts (`SqlContract`, `MongoContract`) extend it with their own storage types.
-
----
-
 ## Query Surfaces
 
 ### Query Builder
@@ -130,8 +118,6 @@ A type-safe interface for constructing queries that compile to plans. Each query
 
 - **SQL query builder** — composable, relational query construction via chained method calls (`sql().from(...).select(...).limit(...)`)
 - **Raw SQL query builder** — write SQL directly when the DSL doesn't cover your use case. Raw SQL queries still go through the same guardrails (budgets, lints, telemetry) as builder queries.
-
-Future: **Typed SQL query builder** — write queries in `.sql` files and get full type safety, with parameter and result types inferred from your contract.
 
 > **Divergence:** Currently named "query lane" / "lane" in code and architecture docs. The desired user-facing term is "query builder". **Status: pending refactor.**
 
