@@ -330,7 +330,7 @@ ADR 173 covers polymorphic *models* (a model that has specializations via `discr
 
 Classic example: a `Comment` that can belong to either a `Post` or a `Video`:
 
-```
+```text
 Comment → commentable → Post | Video
 ```
 
@@ -351,7 +351,7 @@ This is not a polymorphic model — `Comment` is always a `Comment`. It's the *r
 | Pattern | How it works | Trade-offs |
 |---|---|---|
 | **DBRef-like** | `{ ref: ObjectId, refType: "Post" }` | Idiomatic. No database enforcement. |
-| **Convention field** | `commentableId: ObjectId` + `commentableType: "Post" | "Video"` | Same as SQL type+ID pair. |
+| **Convention field** | `commentableId: ObjectId` + `commentableType: "Post" \| "Video"` | Same as SQL type+ID pair. |
 
 ### Contract considerations
 
@@ -473,7 +473,7 @@ Many-to-many (M:N) relationships are common in both SQL and MongoDB, but they're
 
 In SQL, M:N requires a join table:
 
-```
+```text
 User ←→ user_roles ←→ Role
 ```
 

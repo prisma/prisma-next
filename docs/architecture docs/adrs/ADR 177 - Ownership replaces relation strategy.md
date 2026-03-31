@@ -91,6 +91,25 @@ A User model with a referenced relation (Post) and an owned model (Address). Add
         }
       }
     },
+    "Post": {
+      "fields": {
+        "id": { "nullable": false, "codecId": "pg/int4@1" },
+        "authorId": { "nullable": false, "codecId": "pg/int4@1" }
+      },
+      "relations": {
+        "author": {
+          "to": "User", "cardinality": "N:1",
+          "on": { "localFields": ["authorId"], "targetFields": ["id"] }
+        }
+      },
+      "storage": {
+        "table": "posts",
+        "fields": {
+          "id": { "column": "id" },
+          "authorId": { "column": "author_id" }
+        }
+      }
+    },
     "Address": {
       "owner": "User",
       "fields": {
