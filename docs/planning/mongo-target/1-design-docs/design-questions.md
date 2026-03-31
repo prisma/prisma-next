@@ -10,13 +10,15 @@ See also: [MongoDB primitives reference](../../../reference/mongodb-primitives-r
 
 ## 1. Embedded documents *(resolved — cross-family concern)*
 
-**Answer**: Embedding is a relation property. The parent model's relation declares `"strategy": "embed"` (vs `"reference"` for cross-collection/cross-table). The embedded model appears as a sibling in `models` with its own `fields` and `storage` block (field mappings but no table/collection name). The embedded model doesn't know where it's embedded — that's on the parent's relation.
+**Answer**: Embedding is expressed via model ownership. An owned model declares `"owner": "ParentModel"` — a domain-level fact stating that the model belongs to the parent's aggregate. The owned model appears as a sibling in `models` with its own `fields` block. Its `storage` block is empty (`{}`), because it doesn't own a storage unit. The parent's `storage.relations` section maps the relation to its physical storage location (e.g., `"addresses": { "field": "addresses" }` for Mongo, `"addresses": { "column": "address_data" }` for SQL JSONB).
+
+Relations to owned models are plain graph edges: `{ "to": "Address", "cardinality": "1:N" }` — no `strategy`, no storage annotation. The `owner` property on the target model distinguishes owned relations from referenced ones.
 
 This is a cross-family concern: SQL typed JSON/JSONB columns are the same contract-level problem (structured data nested in a parent entity). Both families need type-safe dot-notation queries, TypeScript type generation, and reusability across models. The difference is convention (Mongo: embedding is idiomatic; SQL: JSON columns are an escape hatch), not capability.
 
 Value objects (Address, GeoPoint) without identity are a separate concept — they belong in a dedicated value objects section, not `models`. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the entity vs value object distinction.
 
-**Still open**: relation storage details for embedding. A relation with `"strategy": "embed"` needs to know which field in the parent document holds the embedded data. The exact shape isn't designed yet.
+See [ADR 177 — Ownership replaces relation strategy](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) for the full rationale.
 
 ---
 
@@ -224,7 +226,8 @@ For the PoC: Out of scope. The architecture constraints are:
 - **`roots`** — maps ORM accessor names to model names
 - **`models`** — all entities with `fields` (records of `{ nullable, codecId }`), optional `discriminator` + `variants`, and `relations`
 - **`model.storage`** — family-specific extension point (SQL: field → column; Mongo: field → codec)
-- **`relations`** — with cardinality and strategy (`"reference"` or `"embed"`)
+- **`relations`** — with cardinality and optional join details (`on`)
+- **`owner`** — model-level declaration of aggregate membership (see [ADR 177](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md))
 - **value objects** — named field structures without identity (not yet designed)
 
 This is not a mechanical extraction from either contract — it's a new abstraction rooted in domain modeling concepts:
@@ -234,8 +237,8 @@ This is not a mechanical extraction from either contract — it's a new abstract
 | **Aggregate root** | Entry in `roots`, model with storage containing table/collection |
 | **Entity** | Entry in `models` |
 | **Value object** | Dedicated contract section (not yet designed) |
-| **Reference** | Relation with `"strategy": "reference"` |
-| **Embedding** | Relation with `"strategy": "embed"` |
+| **Owned model** | Model with `"owner": "ParentModel"` — co-located storage |
+| **Reference** | Relation with `on` join details to an independent model |
 | **Polymorphism** | `discriminator` + `variants` on any model |
 
 See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the full design principles, examples, and remaining open questions.
@@ -356,7 +359,7 @@ The current relation shape is:
 
 ```json
 {
-  "to": "Post", "cardinality": "1:N", "strategy": "reference",
+  "to": "Post", "cardinality": "1:N",
   "on": { "localFields": ["authorId"], "targetFields": ["id"] }
 }
 ```
@@ -367,7 +370,6 @@ A polymorphic association would need something like:
 {
   "commentable": {
     "cardinality": "N:1",
-    "strategy": "reference",
     "polymorphic": true,
     "discriminator": "commentableType",
     "targets": {
@@ -503,7 +505,6 @@ The current relation model has `cardinality: "1:N" | "N:1"`. Adding `"M:N"` is a
   "roles": {
     "to": "Role",
     "cardinality": "M:N",
-    "strategy": "reference",
     "via": "user_roles"
   }
 }
@@ -535,7 +536,6 @@ For MongoDB, an array of ObjectIds in the parent document is a common M:N patter
   "roles": {
     "to": "Role",
     "cardinality": "M:N",
-    "strategy": "reference",
     "on": { "localFields": ["roleIds"], "targetFields": ["id"] }
   }
 }
@@ -556,50 +556,15 @@ Not yet designed. M:N was explicitly deferred for the SQL ORM. Now that we're mo
 
 ---
 
-## 18. Relation `strategy` naming: fact or instruction?
+## 18. Relation `strategy` naming: fact or instruction? *(resolved)*
 
-One of the contract's design principles is that it **describes facts, not instructions** (see [10. MongoDB Family](../../../architecture%20docs/subsystems/10.%20MongoDB%20Family.md)). The current relation design uses `"strategy": "reference" | "embed"` to describe how a relation is persisted.
+**Answer**: `strategy` has been replaced entirely by model-level `owner`. The core insight was that "Address is a component of User" is a domain fact about the model, not a property of the relation edge. Putting `strategy: "embed"` on the relation mixed domain and storage concerns and read as an instruction rather than a fact.
 
-**The question**: Does the word `strategy` violate the facts-not-instructions principle?
+The resolution:
+- **`owner: "ModelName"`** on the owned model (domain fact): "Address belongs to User's aggregate"
+- **`storage.relations`** on the parent model (storage mapping): maps the relation to a physical location (`"field": "addresses"` in Mongo, `"column": "address_data"` in SQL)
+- **Relations become plain graph edges**: `{ "to": "Address", "cardinality": "1:N" }` — no `strategy`
 
-### The tension
+The pattern mirrors `base` for polymorphism: just as a variant says `"base": "Task"`, an owned model says `"owner": "User"`.
 
-Compare how other storage facts are stated:
-
-- `"storage": { "table": "users" }` — fact: this model's data lives in the `users` table
-- `"storage": { "collection": "users" }` — fact: this model's data lives in the `users` collection
-- `"nullable": false` — fact: this field does not accept null values
-
-Now: `"strategy": "embed"` — this reads as an instruction ("use the embedding strategy") rather than a fact ("this relation's data is physically co-located in the parent document").
-
-### Is it actually a fact?
-
-Yes — `strategy: "embed"` describes the physical arrangement of data. Address data is nested inside User documents. That's a structural fact about the database, not something the ORM chooses at query time.
-
-The problem is the *name*, not the *concept*. "Strategy" implies a choice being made, not a reality being described. The contract should read as "this is how the data is arranged" rather than "this is how you should arrange the data."
-
-### Alternative names
-
-| Name | Reads as | Example |
-|---|---|---|
-| `strategy` | "use this strategy" (instruction) | `"strategy": "embed"` |
-| `persistence` | "persisted this way" (fact) | `"persistence": "embedded"` |
-| `storage` | "stored this way" (fact) | `"storage": "embedded"` — conflicts with `model.storage` |
-| `placement` | "placed here" (fact) | `"placement": "embedded"` |
-
-Or: drop the explicit property entirely. The fact that Address has `storage: {}` (no table/collection) already implies its data is embedded somewhere. The relation's `on` field describes the join details for references; its absence could signal embedding.
-
-### Derivability
-
-Could `strategy` be derived rather than stated?
-
-- If the target model has a `storage.collection`/`storage.table` → it's a reference (the target has its own storage location)
-- If the target model has `storage: {}` → it's embedded (no independent storage)
-
-This would make embedding a consequence of the target model's storage declaration, not a property on the relation. But it breaks if the same model is embedded in one relation and referenced in another (which we haven't designed but could arise).
-
-### Recommendation
-
-If `strategy` remains, consider renaming to something that reads as descriptive rather than prescriptive. `persistence` is the strongest candidate — it clearly describes the physical arrangement without implying a runtime decision.
-
-This is a naming question, not a structural one — the concept itself (distinguishing embedded from referenced relations) is sound. Worth resolving before the contract shape stabilises.
+See [ADR 177 — Ownership replaces relation strategy](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) for the full rationale and examples.

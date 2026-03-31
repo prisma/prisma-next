@@ -83,14 +83,13 @@ Value objects are a future concept in the contract; currently they're represente
 
 > **Status:** Not yet implemented in the contract. Tracked as an open question.
 
-### Relation Strategy
+### Owner
 
-How a relation between two models is persisted. Each relation in the contract declares one of two strategies:
+A domain-level property on a model declaring aggregate membership. If Address says `"owner": "User"`, it means Address is a component of User's aggregate — its data is co-located within User's storage (embedded document in MongoDB, JSONB column in SQL). Owned models don't appear in `roots` and have empty `storage` blocks. The parent's `storage.relations` maps the relation to its physical location. See [ADR 177](architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md).
 
-- **`reference`** — the related model lives in its own storage unit (table or collection). Resolved at query time via JOIN (SQL) or `$lookup` / application-level stitching (MongoDB).
-- **`embed`** — the related model is nested inside the parent's document (MongoDB) or JSON column (SQL). No join needed; the data comes back in the same read.
+### Relation
 
-Embedding is a property of the *relation*, not the model. The same model can be embedded in one parent and referenced from another.
+A connection between two models in the contract. Relations are plain graph edges: they declare `to` (target model), `cardinality` (`1:N`, `N:1`), and optionally `on` (join details for referenced relations). Relations carry no storage annotations — whether the target model is co-located or independent is determined by whether it has an `owner` property.
 
 ### Discriminator
 

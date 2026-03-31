@@ -69,7 +69,7 @@ model Comment {
 The contract captures:
 - **Models and fields**: User has `name: String`, `email: String`, etc.
 - **Relations and their cardinality**: User → Post is 1:N, User → Address is 1:1
-- **Storage strategy**: Address is embedded (lives inside the User document), Post is referenced (lives in its own collection). This is a Mongo-specific concern that the contract makes explicit.
+- **Model ownership**: Address is owned by User (lives inside the User document), Post is independent (lives in its own collection). Embedding is a cross-family concern that the contract makes explicit via the `owner` property.
 - **Field types**: mapped to BSON types via codecs, with TypeScript types derived automatically
 
 The distinction between embedded and referenced is a **data modeling decision** that the user makes explicitly. PN doesn't hide it — it surfaces it as a first-class choice, because it affects query semantics, atomicity, and performance.
@@ -275,7 +275,7 @@ The aspiration is that the same plugin pipeline that works for SQL also works fo
 
 Clarity about what's out of scope is as important as the promises:
 
-- **Portability between SQL and Mongo.** The shared ORM interface means the *patterns* are consistent, but a SQL contract and a Mongo contract are not interchangeable. You can't swap your Postgres database for MongoDB by changing a config line. The domain model transfers; the storage strategy and query capabilities do not.
+- **Portability between SQL and Mongo.** The shared ORM interface means the *patterns* are consistent, but a SQL contract and a Mongo contract are not interchangeable. You can't swap your Postgres database for MongoDB by changing a config line. The domain model transfers; the storage details and query capabilities do not.
 - **Full MongoDB feature coverage.** PN covers the common CRUD and relation patterns. Advanced features (sharding configuration, capped collections, GridFS, time-series collections) are out of scope for the ORM client. Users who need these use the raw driver through PN's escape hatch.
 - **Hiding that it's MongoDB.** PN is mongo-native, not mongo-agnostic. Embedded documents, `ObjectId`, array operations, and aggregation pipelines are all concepts the user will encounter. PN makes them type-safe and ergonomic, not invisible.
 - **Field-level encryption management.** MongoDB's CSFLE and Queryable Encryption are driver-level concerns. PN can pass encryption configuration through to the MongoDB driver, but it doesn't implement encryption itself. This is a future adapter-level capability, not an ORM concern. See [design question #13](../planning/mongo-target/1-design-docs/design-questions.md#13-client-side-field-level-encryption-csfle-and-queryable-encryption).

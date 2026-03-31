@@ -27,7 +27,7 @@ Architecture docs in this repo serve two audiences: team members working on the 
 
 **Write for a developer without prior context.** Imagine someone joining the team and reading this doc as their first exposure to this part of the system.
 
-- Explain *why* before *what*. Before introducing a concept like `strategy: "embed"`, explain the problem it solves: "In SQL, related data lives in separate tables and is joined at query time. In MongoDB, the idiomatic pattern is to store related data inside the parent document."
+- Explain *why* before *what*. Before introducing a concept like model ownership, explain the problem it solves: "In SQL, related data lives in separate tables and is joined at query time. In MongoDB, the idiomatic pattern is to store related data inside the parent document."
 - Let ideas breathe. Don't compress three concepts into one sentence. If a sentence requires the reader to already understand three things to parse it, break it apart.
 - Use concrete examples — code snippets, JSON fragments, "a developer writing X gets Y under the hood." Abstract descriptions are hard to pin understanding to.
 
@@ -46,8 +46,8 @@ Bad: "MongoDB is a database family in Prisma Next. The contract, ORM, execution 
 
 **Inline summaries with ADR links.** When referencing an ADR, summarize the key idea in the text and link the ADR for depth. The doc should be understandable without following any links.
 
-Good: "Embedding is a property of the *relation*, not the model. A relation with `"strategy": "embed"` means the related model lives nested inside the parent's document. See [ADR 174](...)."
-Bad: "See [ADR 174](...) for how embedding works."
+Good: "An owned model declares `owner: \"User\"` — a domain fact about aggregate membership. Its data lives within the owner's storage. See [ADR 177](...)."
+Bad: "See [ADR 177](...) for how embedding works."
 
 **References section.** Organize by durability:
 1. Architecture decisions (ADRs) — first

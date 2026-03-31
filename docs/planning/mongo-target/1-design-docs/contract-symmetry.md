@@ -27,7 +27,8 @@ These elements are identical between SQL and Mongo:
 | **`codecId`** | Field type identifier on `model.fields[f].codecId`. The concept is family-agnostic; available IDs depend on framework composition. |
 | **`nullable`** | Domain-level field metadata (`model.fields[f].nullable`). Non-optional boolean. |
 | **`discriminator` + `variants` + `base`** | Polymorphism declaration. Base model lists specializations (`variants`); each variant names its generalization (`base`). Bidirectional, same structure in both families. |
-| **`model.relations`** | Connections to other models with cardinality and strategy. |
+| **`model.relations`** | Connections to other models with cardinality and optional join details. |
+| **`model.owner`** | Declares aggregate membership — owned model's data is co-located with the owner's storage. See [ADR 177](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md). |
 | **Variant models as siblings** | Base models, variants, and embedded models all appear as top-level `models` entries. |
 | **TypeMaps phantom key** | `ContractWithTypeMaps<C, T>` / `MongoContractWithTypeMaps<C, T>` |
 | **Codec abstractions** | Registry interface is family-agnostic; codecs themselves are family-specific. |
@@ -70,6 +71,6 @@ The domain model's four building blocks map to contract structure:
 | **Aggregate root** | Entry in `roots`, model with `storage` containing table/collection |
 | **Entity** | Entry in `models` with `fields` and `relations` |
 | **Value object** | Dedicated contract section (not yet designed) |
-| **Reference** | Relation with `"strategy": "reference"` |
-| **Embedding** | Relation with `"strategy": "embed"` |
+| **Owned model** | Model with `"owner": "ParentModel"` — co-located storage |
+| **Reference** | Relation with `on` join details to an independent model |
 | **Polymorphism** | `discriminator` + `variants` on base model; `base` on each variant (specialization/generalization) |
