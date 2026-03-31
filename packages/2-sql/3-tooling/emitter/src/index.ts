@@ -577,7 +577,6 @@ export const sqlTargetFamilyHook = {
         if (relObj['to']) relParts.push(`readonly to: '${relObj['to']}'`);
         if (relObj['cardinality'])
           relParts.push(`readonly cardinality: '${relObj['cardinality']}'`);
-        if (relObj['strategy']) relParts.push(`readonly strategy: '${relObj['strategy']}'`);
         const on = relObj['on'] as { localFields?: string[]; targetFields?: string[] } | undefined;
         if (on?.localFields && on.targetFields) {
           const localFields = on.localFields.map((f) => `'${f}'`).join(', ');

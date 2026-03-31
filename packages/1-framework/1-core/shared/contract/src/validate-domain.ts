@@ -4,6 +4,7 @@ export interface DomainModelShape {
   readonly discriminator?: { readonly field: string };
   readonly variants?: Record<string, unknown>;
   readonly base?: string;
+  readonly owner?: string;
 }
 
 export interface DomainContractShape {
@@ -24,6 +25,7 @@ export function validateContractDomain(contract: DomainContractShape): DomainVal
   validateVariantsAndBases(contract, modelNames, errors);
   validateRelationTargets(contract, modelNames, errors);
   validateDiscriminators(contract, errors);
+  validateOwnership(contract, modelNames, errors);
   detectOrphanedModels(contract, modelNames, warnings);
 
   if (errors.length > 0) {
@@ -137,6 +139,32 @@ function validateDiscriminators(contract: DomainContractShape, errors: string[])
   }
 }
 
+function validateOwnership(
+  contract: DomainContractShape,
+  modelNames: Set<string>,
+  errors: string[],
+): void {
+  for (const [modelName, model] of Object.entries(contract.models)) {
+    if (!model.owner) continue;
+
+    if (model.owner === modelName) {
+      errors.push(`Model "${modelName}" cannot own itself`);
+    }
+
+    if (!modelNames.has(model.owner)) {
+      errors.push(`Model "${modelName}" has owner "${model.owner}" which does not exist in models`);
+    }
+
+    for (const [rootKey, rootModel] of Object.entries(contract.roots)) {
+      if (rootModel === modelName) {
+        errors.push(
+          `Owned model "${modelName}" must not appear in roots (found as root "${rootKey}")`,
+        );
+      }
+    }
+  }
+}
+
 function detectOrphanedModels(
   contract: DomainContractShape,
   modelNames: Set<string>,
@@ -148,7 +176,7 @@ function detectOrphanedModels(
     referenced.add(modelName);
   }
 
-  for (const model of Object.values(contract.models)) {
+  for (const [modelName, model] of Object.entries(contract.models)) {
     for (const relation of Object.values(model.relations)) {
       referenced.add(relation.to);
     }
@@ -159,6 +187,9 @@ function detectOrphanedModels(
     }
     if (model.base) {
       referenced.add(model.base);
+    }
+    if (model.owner) {
+      referenced.add(modelName);
     }
   }
 

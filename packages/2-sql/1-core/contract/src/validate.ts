@@ -351,7 +351,6 @@ function enrichOldFormatModels(
       modelRelations[relName] = {
         to: toModel,
         cardinality: rel['cardinality'],
-        strategy: 'reference',
         on: { localFields, targetFields },
       };
     }
