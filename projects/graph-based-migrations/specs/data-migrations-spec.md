@@ -355,7 +355,7 @@ These document the major design choices, the alternatives considered, and why we
 
 4. **Table drop detection gap (S6)**: Horizontal table splits (one table → two with rows partitioned) may not trigger auto-detection if the new tables don't have NOT NULL columns without defaults. The planner could add a heuristic: "table dropped while new tables with similar schemas are created" → suggest data migration. Low priority for v1 but a known detection gap.
 
-5. **Query builder expressiveness for data migrations**: The ORM/query builder needs to support UPDATE, INSERT ... SELECT, DELETE, subqueries with joins, and target-specific functions (e.g., `split_part`, `gen_random_uuid`). The current expressiveness of the query builder for DML operations needs validation against the scenario list. If gaps exist, `readSql` is the fallback.
+5. **Query builder expressiveness for data migrations**: The ORM/query builder needs to support UPDATE, INSERT ... SELECT, DELETE, subqueries with joins, and target-specific functions (e.g., `split_part`, `gen_random_uuid`). The current expressiveness of the query builder for DML operations needs validation against the scenario list. If gaps exist, the query builder needs extending — there is no raw SQL fallback in v1.
 
 
 # Other Considerations
