@@ -14,9 +14,9 @@ The primary user is a backend developer who knows SQL but doesn't think about mi
 
 These are the problems the system must solve. The Solution section describes how each is addressed.
 
-## R0: Hard requirement - running a data migration cannot involve executing arbitrary code at apply time
+## R0. No arbitrary code execution at apply time
 
-Instead of giving the user to a db client with arbitrary sql, we give them some sort of ORM-ish client that lets them author data migrations using ORM-like syntax, but the result should be some sort of SQL query AST that we then run at apply time.
+Data migrations must not involve executing arbitrary TypeScript at apply time. The authoring surface is TypeScript (using the existing ORM/query builder), but the output is serialized SQL that can be inspected, audited, and shipped to a SaaS runner without trusting user code. This is critical because: (1) migrations will eventually be serialized and shipped to a hosted service, where executing arbitrary code is a non-starter, (2) even locally, importing a TypeScript module executes top-level code, which is a security risk in team settings, (3) serialized SQL enables plan-time visibility — reviewers see exactly what will execute.
 
 ## R1. Users can transform data during schema migration
 
@@ -77,23 +77,31 @@ Reverting a migration is just another migration in the opposite direction. The s
 These apply across the entire solution:
 
 - The framework-level op partitioning function must not depend on target-specific knowledge — it operates solely on operation classes.
-- Data migration code runs in-process with the migration runner. No separate process, container, or sandbox.
-- The `db` interface must enforce parameterized queries to prevent SQL injection in user-authored migration code.
-- User-authored data migration code should be idempotent. The required `check(db)` function provides the primary retry-safety mechanism, but truly idempotent `run(db)` code is the safest approach for `isolated`/`unmanaged` modes where `check` might not cover all edge cases.
+- Only serialized SQL is executed at apply time. No TypeScript evaluation, no arbitrary code. The `data-migration.ts` is source code that compiles to SQL; the SQL is the artifact.
+- User-authored data migration code should be idempotent. The required `check` function provides the primary retry-safety mechanism, but truly idempotent `run` code is the safest approach for `isolated`/`unmanaged` modes.
 
-## Data migration authoring (R1, R2, R9, R10)
+## Authoring and serialization model (R0, R1, R2)
 
-A data migration is defined in a `data-migration.ts` file inside a migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(db), run(db) })` API.
+Data migrations are authored in a `data-migration.ts` file inside the migration package directory (alongside `ops.json`), using a `defineMigration({ name, transaction, check(client), run(client) })` API.
 
-The `db` parameter provides a minimal raw SQL interface: `db.execute(sql, params?)` (returns rows affected) and `db.query(sql, params?)` (returns rows). Parameterized queries only. This handles 100% of scenarios — any SQL the database supports can be executed.
-
-`data-migration.ts` is compiled at apply time using the project's existing TypeScript execution tooling (tsx/esbuild). Source `.ts` files are committed; compiled JS is not.
+The `client` parameter provides the existing ORM/query builder interface. Functions return query ASTs — they do not execute queries directly. This is the key to R0: the TypeScript is evaluated once (at verification/plan time) to produce SQL, which is serialized into the migration package. At apply time, only the serialized SQL is executed.
 
 Each migration edge supports at most one data migration (single `data-migration.ts` per package).
 
+### Serialization lifecycle
+
+The `data-migration.ts` integrates with the existing Draft → Attested → Applied lifecycle:
+
+1. **Scaffold (Draft)**: `migration plan` detects a data migration is needed, scaffolds `data-migration.ts` with unimplemented functions. The migration package has no `edgeId` (draft state).
+2. **Author (Draft)**: User fills in `check` and `run` using the ORM/query builder. Still draft — the TS hasn't been evaluated.
+3. **Verify/Attest**: `migration verify` (or re-running `migration plan`) evaluates the TypeScript, captures the resulting SQL ASTs, serializes them into `ops.json` as `data_migration` operation entries. The `edgeId` is computed from the serialized content. The package is now attested.
+4. **Apply**: `migration apply` executes the serialized SQL from `ops.json`. No TypeScript is loaded. Only attested packages are applied (existing behavior).
+
+The `data-migration.ts` file remains in the package as source code for reference, but is not part of the `edgeId` computation. If the TS is edited after attestation, the serialized SQL is stale — re-running `migration verify` re-evaluates and re-serializes.
+
 ### Representation in ops.json
 
-A data migration is a first-class operation in `ops.json` — a `data_migration` entry alongside the structural operations. The planner (or `migration new`) inserts it at the correct position between additive/widening and destructive ops. The runner encounters it during sequential execution, resolves and compiles the `data-migration.ts` file, and executes `check`/`run`. This means the data migration participates in the same operation lifecycle as structural ops (prechecks, execution, postchecks) without requiring a separate execution path in the runner.
+The serialized data migration is a first-class operation in `ops.json` — a `data_migration` entry alongside the structural operations, containing the SQL statements produced by the ORM/query builder. The runner processes it sequentially like any other operation. This means the data migration participates in the same operation lifecycle as structural ops without requiring a separate execution path.
 
 ```typescript
 import { defineMigration } from '@prisma-next/migration'
@@ -103,29 +111,24 @@ export default defineMigration({
   transaction: 'inline',
 
   check(client) {
-    // const result = await db.query(
-    //   `SELECT COUNT(*) as count FROM "users" WHERE "first_name" IS NULL`
-    // )
-    // return result[0].count === 0
-    return client.users.aggregate({ /* .. */}).where({ first_name: null });
+    return client.users.count().where({ firstName: null })
+    // Serializes to: SELECT COUNT(*) FROM "users" WHERE "first_name" IS NULL
+    // Runner interprets: count === 0 → already applied (skip run)
   },
-  run(db, doMigration: () => Promise<void>) {
-    const foo = await db.users.all();
-    // await db.execute(
-    //   `UPDATE "users"
-    //    SET "first_name" = split_part("name", $1, 1),
-    //        "last_name"  = split_part("name", $1, 2)
-    //    WHERE "first_name" IS NULL`,
-    //   [' ']
-    // )
-    return db.users.update(...) // -> AST;
+
+  run(client) {
+    return client.users
+      .update({ firstName: sql`split_part("name", ' ', 1)`,
+                lastName: sql`split_part("name", ' ', 2)` })
+      .where({ firstName: null })
+    // Serializes to: UPDATE "users" SET "first_name" = split_part("name", ' ', 1), ...
   }
 })
 ```
 
 ### SQL-first alternative — `readSql` (R10)
 
-A `readSql(filename)` helper reads a `.sql` file relative to the migration package directory and returns a function compatible with `check` or `run`. This allows SQL-first users to write plain SQL files while using `data-migration.ts` only as a thin wrapper:
+A `readSql(filename)` helper reads a `.sql` file relative to the migration package directory. The SQL is serialized directly into ops at verification time. This allows SQL-first users to write plain SQL files:
 
 ```typescript
 import { defineMigration, readSql } from '@prisma-next/migration'
@@ -139,15 +142,15 @@ export default defineMigration({
 
 ### Manual authoring — `migration new` (R9)
 
-`migration new` scaffolds a migration package with a `data-migration.ts` and empty (or no) `ops.json`. The user writes all SQL in the `run(db)` function or via `readSql`. This is the escape hatch for when the planner's structural output is wrong, insufficient, or the user needs full control.
+`migration new` scaffolds a migration package with a `data-migration.ts` and empty (or no) structural ops. The user writes queries using the ORM/query builder or `readSql`. This is the escape hatch for when the planner's structural output is wrong, insufficient, or the user needs full control.
 
 `migration new` derives `from` hash from the current migration graph state (same logic as `migration plan`) and `to` hash from the current emitted contract. Both can be overridden with `--from` and `--to` flags.
 
-No verification at authoring time — the system trusts the user's SQL. Post-apply schema verification (R12) catches mismatches at `migration apply` time.
+No verification at authoring time. Post-apply schema verification (R12) catches mismatches.
 
-## Retry safety — required `check(db)` (R3)
+## Retry safety — required `check` (R3)
 
-`check(db)` is **required**. It returns `true` if the data migration has already been applied (skip `run`), `false` if it still needs to run. The runner calls `check` before `run` on every execution, enabling idempotent retries without a separate completion marker. Users who don't need a meaningful check can `return true` (always skip — use with caution) or `return false` (always run).
+`check(client)` is **required**. It returns a query whose result determines whether the data migration has already been applied. At apply time, the runner executes the serialized check SQL — if the result indicates "already done", the run SQL is skipped. Users who don't need a meaningful check can return a query that always indicates "skip" or "always run".
 
 ## Detection and scaffolding (R4, R11)
 
@@ -209,15 +212,17 @@ No special rollback mechanism. Reverting state S1→S2 is a new migration S2→S
 
 These document the major design choices, the alternatives considered, and why we chose this approach. They are most useful after reading the Requirements and Solution sections.
 
-## D1. Code-first over operator algebra
+## D1. TypeScript-authored, SQL-executed — not an operator algebra
 
-**Decision**: Data migrations are TypeScript functions, not algebraic representations (SMO-style typed operators with commutativity analysis).
+**Decision**: Data migrations are authored in TypeScript using the existing ORM/query builder, but compile to serialized SQL. They are not algebraic representations (SMO-style typed operators with commutativity analysis), and they do not execute arbitrary TypeScript at apply time.
 
-**Alternatives considered**: The chat exploration designed a V2 operator algebra (`derive`, `derive_across`, `deduplicate`, `expand`, `filter`, `generate`) inspired by PRISM's Schema Modification Operators. This would enable automatic path equivalence reasoning and canonical form comparison.
+**Alternatives considered**:
+- **Operator algebra**: A V2 operator algebra (`derive`, `derive_across`, `deduplicate`, `expand`, `filter`, `generate`) inspired by PRISM's Schema Modification Operators. Would enable automatic path equivalence reasoning and canonical form comparison. Rejected because: the expression language does "enormous work", and any scenario the algebra can't handle falls through to an opaque escape hatch.
+- **Arbitrary code execution at apply time**: User writes TypeScript that runs directly against the database. Rejected because: (1) migrations will be shipped to a SaaS runner where arbitrary code is a security risk, (2) importing TypeScript modules executes top-level code, (3) serialized SQL enables plan-time visibility and auditability.
 
-**Why code-first**: The algebra can't express arbitrary transformations — the expression language inside operators like `derive` does "enormous work" (the chat's own observation). Any scenario the algebra can't handle falls through to an opaque escape hatch the system can't reason about. Code-first handles 100% of scenarios by definition. The algebra remains useful as design thinking (it identifies the right scenario categories) and could become a future optimization layer, but it's not the runtime representation.
+**Why this approach**: The ORM/query builder already exists and is expressive enough for the common data migration scenarios (S1–S14). The authoring experience is TypeScript (familiar, type-safe), but the execution artifact is SQL (serializable, auditable, shippable). The serialization happens at verification time as part of the existing Draft → Attested lifecycle.
 
-**What we give up**: Automatic path equivalence reasoning. Two paths to the same hash can't be proven data-equivalent without running them. The invariant model ("named migration X was applied") handles correctness differently — it doesn't prove equivalence, it tracks what happened.
+**What we give up**: Scenarios requiring application-level libraries (S16: bcrypt hashing) or external data sources (S17: audit trail from external API) cannot be expressed. These are edge cases handled outside the migration system.
 
 ## D2. Name + hash over semantic postconditions; honest about what invariants are
 
@@ -229,15 +234,15 @@ These document the major design choices, the alternatives considered, and why we
 
 **Alternative considered — semantic postconditions**: Carry checkable predicates about data state ("all phone numbers match E.164"). Problem: we can't exhaustively cover all possible postcondition checks with a typed representation. Any typed system eventually needs an escape hatch that's just code, at which point the postcondition is opaque anyway. The required `check(db)` function (D3) gives us user-authored postconditions for retry safety without pretending the system can reason about them.
 
-## D3. Required `check(db)` postcondition
+## D3. Required `check` postcondition
 
-**Decision**: Every data migration must implement a `check(db)` function that returns `true` if the migration has already been applied.
+**Decision**: Every data migration must implement a `check(client)` function that returns a query AST. The query is serialized to SQL and executed at apply time to determine if the migration has already been applied.
 
 **Alternatives considered**:
 - Optional postconditions with a separate ledger completion marker for retry safety
 - No postconditions, relying solely on user code idempotency
 
-**Why required**: Solves three problems with one mechanism: (1) retry safety — runner calls `check()` before `run()`, skipping if already done, (2) no need for a mid-migration ledger write or separate completion marker, (3) forces the user to think about what "done" means. The escape hatch is trivial (`return true` to always skip, `return false` to always run) so it doesn't block users who don't care, but it nudges toward correctness.
+**Why required**: Solves three problems with one mechanism: (1) retry safety — runner executes the serialized check SQL before the run SQL, skipping if already done, (2) no need for a mid-migration ledger write or separate completion marker, (3) forces the user to think about what "done" means. The escape hatch is trivial (return a query that always indicates "skip" or "always run") so it doesn't block users who don't care, but it nudges toward correctness.
 
 ## D4. Single-edge with interleaved ops over split into multiple edges
 
@@ -295,14 +300,16 @@ The `throw` in the scaffold is one way to achieve (c), but the key property is t
 
 # Acceptance Criteria
 
-## Authoring
+## Authoring and serialization
 
-- [ ] A `data-migration.ts` file using `defineMigration` is recognized by the runner when present in a migration package
-- [ ] `check(db)` is required — `defineMigration` without `check` is a type error
-- [ ] Runner calls `check(db)` before `run(db)` — if `check` returns `true`, `run` is skipped
-- [ ] `db.execute(sql, params)` runs parameterized SQL and returns affected row count
-- [ ] `db.query(sql, params)` runs parameterized SQL and returns result rows
-- [ ] The `data-migration.ts` file is compiled from TypeScript at apply time without requiring a pre-build step
+- [ ] A `data-migration.ts` file using `defineMigration` is recognized during verification/planning
+- [ ] `check(client)` is required — `defineMigration` without `check` is a type error
+- [ ] `run(client)` and `check(client)` receive the ORM/query builder client and return query ASTs
+- [ ] `migration verify` evaluates the TypeScript once and serializes resulting SQL into `ops.json`
+- [ ] No TypeScript is loaded or executed at `migration apply` time — only serialized SQL from `ops.json`
+- [ ] The `data-migration.ts` source file is not part of the `edgeId` computation; only serialized SQL is
+- [ ] A migration package with an unresolved `data-migration.ts` (not yet serialized) is in draft state (`edgeId` null/stale)
+- [ ] `migration apply` rejects draft (unattested) packages
 
 ## Detection and scaffolding
 
@@ -319,7 +326,7 @@ The `throw` in the scaffold is one way to achieve (c), but the key property is t
 - [ ] `isolated` mode: phase 1 commits, data migration runs in own transaction, phase 3 runs in own transaction
 - [ ] `unmanaged` mode: data migration runs without transaction wrapping
 - [ ] On retry after partial failure in `isolated`/`unmanaged` modes, phase 1 ops are skipped via existing idempotency checks
-- [ ] On retry, `check(db)` is called — if it returns `true`, the data migration `run` is skipped
+- [ ] On retry, the serialized check SQL is executed — if it indicates "already applied", the run SQL is skipped
 
 ## Graph integration
 
