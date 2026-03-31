@@ -534,6 +534,8 @@ export const sqlTargetFamilyHook = {
       return 'Record<string, never>';
     }
 
+    const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
+
     const modelTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models)) {
       const fields: string[] = [];
@@ -541,15 +543,29 @@ export const sqlTargetFamilyHook = {
       const tableName = model.storage.table;
       const table = storage.tables[tableName];
 
-      for (const [fieldName, field] of Object.entries(model.fields)) {
-        const colName = field.column;
-        const column = table?.columns[colName];
-        const nullable = column?.nullable ?? false;
-        const codecId = column?.codecId ?? '';
-        fields.push(
-          `readonly ${fieldName}: { readonly column: '${colName}'; readonly nullable: ${nullable}; readonly codecId: '${codecId}' }`,
-        );
-        storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${colName}' }`);
+      if (table) {
+        for (const [fieldName, field] of Object.entries(model.fields)) {
+          const column = table.columns[field.column];
+          if (!column) {
+            fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+            storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+            continue;
+          }
+
+          const jsType = this.generateColumnType(
+            column,
+            storage,
+            parameterizedRenderers,
+            renderCtx,
+          );
+          fields.push(`readonly ${fieldName}: ${jsType}`);
+          storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+        }
+      } else {
+        for (const [fieldName, field] of Object.entries(model.fields)) {
+          fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+          storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+        }
       }
 
       const relations: string[] = [];

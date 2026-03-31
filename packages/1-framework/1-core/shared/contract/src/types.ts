@@ -1,5 +1,4 @@
 import type { OperationRegistry } from '@prisma-next/operations';
-import type { DomainModel } from './domain-types';
 import type { ContractIR } from './ir';
 
 /**
@@ -73,7 +72,6 @@ export interface ContractBase<
   readonly sources: Record<string, Source>;
   readonly execution?: ExecutionSection;
   readonly roots: Record<string, string>;
-  readonly models: Record<string, DomainModel>;
 }
 
 export interface FieldType {
