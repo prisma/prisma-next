@@ -360,9 +360,10 @@ noTransaction(op)
 
 ### Design notes
 
-- Each builder produces an operation object (or array of objects) with the same shape as `SqlMigrationPlanOperation` — `id`, `label`, `operationClass`, `target`, `precheck`, `execute`, `postcheck`.
-- The `dataTransform` builder is special: its `check` and `run` are callbacks that receive the query builder client and return ASTs. At verification time, these are evaluated and the ASTs are serialized into the op entry.
-- Builders are target-agnostic at the interface level. The target adapter determines how each operation renders to SQL (or MongoDB commands, etc.). For v1, only the Postgres adapter exists.
+- Each builder produces `SqlMigrationPlanOperation` objects — the same type that the planner already produces and that `ops.json` already contains. The builders are ergonomic wrappers around the existing planner SQL generation helpers (`planner-sql.ts`, `planner-recipes.ts`), not a new type system.
+- **Builders are target-specific** (Postgres builders produce Postgres SQL). This is an intentional decision: the alternative is a target-agnostic builder layer that each adapter must implement separately. Since `ops.json` already contains target-specific SQL, and the planner already produces target-specific operations, the builders should too. For a new target (MySQL, MongoDB), the builders would be reimplemented with the same ergonomic API but different internal SQL generation — the API surface is the shared contract, not the implementation. Shared logic can be factored out internally.
+- Builders live alongside the planner in the target package (e.g., `packages/3-targets/3-targets/postgres/`), not in the framework tooling package. The planner reuses the same helpers.
+- The `dataTransform` builder is the exception — it produces `DataTransformOperation` (a framework-level type) since data transforms carry serialized query ASTs, not target-specific SQL.
 - The planner uses these same builders to construct its output. When the planner emits TS, it writes calls to these builders in the correct order.
 
 ## Post-apply verification (R11)
