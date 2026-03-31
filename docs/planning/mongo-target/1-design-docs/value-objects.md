@@ -8,18 +8,36 @@ The distinction between a model and a value object is not about what fields they
 
 **Model (entity):** The framework guarantees global unique addressability. Everything built on that guarantee — querying from a root, targeting a specific entity for mutation, `include` resolution, identity-based deduplication — depends on the promise that each model instance is uniquely identifiable across the system. The framework enforces this.
 
-**Value object:** The framework provides type structure but makes no identity guarantees. A value object can have whatever fields you want, including something that looks like an `_id`. But the framework won't treat it as meaningful. You don't get roots, you don't get independent queries, you don't get identity-based mutation targeting. The data is structured values, nothing more.
+**Value object:** The framework provides type structure but no identity guarantees and no behavioural hooks. A value object can have whatever fields you want, including something that looks like an `_id`. But the framework won't treat it as meaningful. The data is structured values, nothing more.
 
 This means putting a unique identifier on a value object is allowed — the framework won't stop you — but none of the capabilities that depend on unique addressability will function. You can't query value objects from a root. You can't target them for independent mutation. They are interchangeable instances of structured data.
 
-This framing parallels how other contract declarations work:
+### The full capability gap
 
-| Declaration | Framework guarantee |
+The distinction goes beyond identity. Models are full framework citizens — the framework builds an entire capability surface around them. Value objects are typed data structures with none of that surface:
+
+| Capability | Models | Value objects |
+|---|---|---|
+| **Global unique addressability** | Guaranteed | Not guaranteed |
+| **Query entry point** (roots) | Yes | No |
+| **Identity-based mutation** | Yes — target by ID | No — replaced wholesale |
+| **Business logic association** | Yes — custom collection classes, domain methods | No |
+| **Lifecycle hooks** | Yes — `onCreate`, `onUpdate`, `onDelete` | No |
+| **Referential integrity** | Yes — cascading deletes, restrict constraints | No |
+| **Include resolution** | Yes — loaded via `include` | No — inlined in parent row |
+
+Models will have associated business logic. In OOP terms, they're class instances with methods. Even though our ORM may not instantiate classes directly, we expect users to attach domain logic to their models (custom collection methods, validation, computed properties). Lifecycle events matter too — deleting a User has application-wide consequences (cancel orders, stop emails, clean up references). The framework will provide hooks for these events.
+
+None of this applies to value objects. Replacing a User's Address doesn't trigger lifecycle hooks. No referential integrity check fires when an Address changes. No business logic is associated with the Address type. It's data.
+
+### Framework commitment levels
+
+| Declaration | Framework commitment |
 |---|---|
 | In `roots` | "The framework provides this as a query entry point" |
-| In `models` | "The framework guarantees global unique addressability" |
-| `owner` on a model | "The framework guarantees addressability within the owner's scope" |
-| In `valueObjects` | "The framework provides type structure but no identity guarantees" |
+| In `models` | "Full framework citizen — identity, lifecycle, business logic, integrity" |
+| `owner` on a model | "Full citizen, scoped within the owner's aggregate" |
+| In `valueObjects` | "Typed data structure — no identity, no lifecycle, no hooks" |
 
 Each is a level of framework commitment, not a structural restriction on what fields you can declare.
 
