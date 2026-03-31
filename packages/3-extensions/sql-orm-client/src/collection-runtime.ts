@@ -1,5 +1,10 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  findModelNameForTable,
+  getColumnToFieldMap,
+  getFieldToColumnMap,
+} from './collection-contract';
 import type { CollectionContext, RuntimeConnection, RuntimeScope } from './types';
 
 export interface RowEnvelope {
@@ -45,7 +50,8 @@ export function stripHiddenMappedFields(
     return;
   }
 
-  const columnToField = contract.mappings.columnToField?.[tableName] ?? {};
+  const modelName = findModelNameForTable(contract, tableName) ?? tableName;
+  const columnToField = getColumnToFieldMap(contract, modelName);
   for (const hiddenColumn of hiddenColumns) {
     const fieldName = columnToField[hiddenColumn] ?? hiddenColumn;
     delete mapped[fieldName];
@@ -68,8 +74,13 @@ export function mapStorageRowToModelFields(
   tableName: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
-  const columnToField = contract.mappings.columnToField?.[tableName];
-  if (!columnToField) {
+  const modelName = findModelNameForTable(contract, tableName);
+  if (!modelName) {
+    return { ...row };
+  }
+
+  const columnToField = getColumnToFieldMap(contract, modelName);
+  if (Object.keys(columnToField).length === 0) {
     return { ...row };
   }
 
@@ -85,7 +96,7 @@ export function mapModelDataToStorageRow(
   modelName: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
-  const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
+  const fieldToColumn = getFieldToColumnMap(contract, modelName);
   const mapped: Record<string, unknown> = {};
   for (const [fieldName, value] of Object.entries(row)) {
     if (value === undefined) {

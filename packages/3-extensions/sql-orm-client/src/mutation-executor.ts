@@ -6,7 +6,12 @@ import {
   LiteralExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
-import { resolveModelTableName, resolvePrimaryKeyColumn } from './collection-contract';
+import {
+  getColumnToFieldMap,
+  resolveFieldToColumn,
+  resolveModelTableName,
+  resolvePrimaryKeyColumn,
+} from './collection-contract';
 import {
   acquireRuntimeScope,
   mapModelDataToStorageRow,
@@ -666,9 +671,8 @@ function getRelationDefinitions(
   contract: SqlContract<SqlStorage>,
   modelName: string,
 ): RelationDefinition[] {
-  const parentTableName = resolveModelTableName(contract, modelName);
-  const tableRelations = contract.relations as Record<string, Record<string, unknown>>;
-  const relationMap = tableRelations[parentTableName] ?? {};
+  const models = contract.models as Record<string, { relations?: Record<string, unknown> }>;
+  const relationMap = models[modelName]?.relations ?? {};
 
   const definitions: RelationDefinition[] = [];
   for (const [relationName, relationValue] of Object.entries(relationMap)) {
@@ -680,8 +684,8 @@ function getRelationDefinitions(
       to?: unknown;
       cardinality?: unknown;
       on?: {
-        parentCols?: unknown;
-        childCols?: unknown;
+        localFields?: unknown;
+        targetFields?: unknown;
       };
     };
 
@@ -689,19 +693,26 @@ function getRelationDefinitions(
       continue;
     }
 
-    const parentCols = relation.on?.parentCols;
-    const childCols = relation.on?.childCols;
-    if (!Array.isArray(parentCols) || !Array.isArray(childCols)) {
+    const localFields = relation.on?.localFields;
+    const targetFields = relation.on?.targetFields;
+    if (!Array.isArray(localFields) || !Array.isArray(targetFields)) {
       continue;
     }
+
+    const parentCols = (localFields as string[]).map((f) =>
+      resolveFieldToColumn(contract, modelName, f),
+    );
+    const childCols = (targetFields as string[]).map((f) =>
+      resolveFieldToColumn(contract, relation.to as string, f),
+    );
 
     definitions.push({
       relationName,
       relatedModelName: relation.to,
       relatedTableName: resolveModelTableName(contract, relation.to),
       cardinality: parseCardinality(relation.cardinality),
-      parentCols: [...parentCols],
-      childCols: [...childCols],
+      parentCols,
+      childCols,
     });
   }
 
@@ -720,7 +731,6 @@ function toFieldName(
   modelName: string,
   columnName: string,
 ): string {
-  const tableName = resolveModelTableName(contract, modelName);
-  const columnToField = contract.mappings.columnToField?.[tableName] ?? {};
+  const columnToField = getColumnToFieldMap(contract, modelName);
   return columnToField[columnName] ?? columnName;
 }

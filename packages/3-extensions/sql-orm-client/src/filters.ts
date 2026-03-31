@@ -9,6 +9,7 @@ import {
   OrExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import { getFieldToColumnMap, resolveModelTableName } from './collection-contract';
 import type { ShorthandWhereFilter } from './types';
 
 export function and(...exprs: AnyExpression[]): AndExpr {
@@ -36,17 +37,8 @@ export function shorthandToWhereExpr<
   filters: ShorthandWhereFilter<TContract, ModelName>,
 ): AnyExpression | undefined {
   const contract = context.contract;
-  const models = contract.models as Record<
-    string,
-    {
-      storage?: {
-        table?: string;
-      };
-    }
-  >;
-  const tableName =
-    contract.mappings.modelToTable?.[modelName] ?? models[modelName]?.storage?.table ?? modelName;
-  const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
+  const tableName = resolveModelTableName(contract, modelName);
+  const fieldToColumn = getFieldToColumnMap(contract, modelName);
 
   const exprs: AnyExpression[] = [];
   for (const [fieldName, value] of Object.entries(filters)) {
@@ -62,7 +54,7 @@ export function shorthandToWhereExpr<
       continue;
     }
 
-    assertFieldHasEqualityTrait(context, tableName, columnName, modelName, fieldName);
+    assertFieldHasEqualityTrait(context, modelName, fieldName);
     exprs.push(BinaryExpr.eq(left, LiteralExpr.of(value)));
   }
 
@@ -75,15 +67,14 @@ export function shorthandToWhereExpr<
 
 function assertFieldHasEqualityTrait(
   context: ExecutionContext,
-  tableName: string,
-  columnName: string,
   modelName: string,
   fieldName: string,
 ): void {
-  const tables = context.contract.storage?.tables as
-    | Record<string, { columns?: Record<string, { codecId?: string }> }>
-    | undefined;
-  const codecId = tables?.[tableName]?.columns?.[columnName]?.codecId;
+  const models = context.contract.models as Record<
+    string,
+    { fields?: Record<string, { codecId?: string }> }
+  >;
+  const codecId = models[modelName]?.fields?.[fieldName]?.codecId;
   const traits = codecId ? context.codecs.traitsOf(codecId) : [];
   if (!traits.includes('equality')) {
     throw new Error(

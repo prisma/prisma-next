@@ -8,6 +8,7 @@ import {
   LiteralExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
+import { getFieldToColumnMap } from './collection-contract';
 import { mapStorageRowToModelFields } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { compileGroupedAggregate } from './query-plan';
@@ -126,7 +127,7 @@ function createHavingBuilder<TContract extends SqlContract<SqlStorage>, ModelNam
   modelName: ModelName,
   tableName: string,
 ): HavingBuilder<TContract, ModelName> {
-  const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
+  const fieldToColumn = getFieldToColumnMap(contract, modelName);
   const createMetricExpr = (
     fn: Exclude<AggregateExpr['fn'], 'count'>,
     fieldName: string,
