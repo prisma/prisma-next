@@ -263,35 +263,41 @@ type ExtractCodecOutputType<
   : never;
 
 /**
- * Extracts the model name for a given table from the contract mappings.
+ * Extracts the model name for a given table by iterating models to find the one
+ * whose `storage.table` matches.
  */
 type ExtractTableToModel<
   Contract extends SqlContract<SqlStorage>,
   TableName extends string,
-> = Contract['mappings'] extends {
-  readonly tableToModel: infer TableToModel;
-}
-  ? TableToModel extends Record<string, string>
-    ? TableName extends keyof TableToModel
-      ? TableToModel[TableName]
-      : never
-    : never
+> = Contract['models'] extends infer Models extends Record<string, unknown>
+  ? {
+      [M in keyof Models & string]: Models[M] extends {
+        readonly storage: { readonly table: TableName };
+      }
+        ? M
+        : never;
+    }[keyof Models & string]
   : never;
 
 /**
- * Extracts the field name for a given table column from the contract mappings.
+ * Extracts the field name for a given column by finding the field in
+ * `model.storage.fields` whose `column` matches.
  */
 type ExtractColumnToField<
   Contract extends SqlContract<SqlStorage>,
   TableName extends string,
   ColumnName extends string,
-> = Contract['mappings'] extends {
-  readonly columnToField: infer ColumnToField;
-}
-  ? ColumnToField extends Record<string, Record<string, string>>
-    ? TableName extends keyof ColumnToField
-      ? ColumnName extends keyof ColumnToField[TableName]
-        ? ColumnToField[TableName][ColumnName]
+> = ExtractTableToModel<Contract, TableName> extends infer ModelName extends string
+  ? Contract['models'] extends infer Models extends Record<string, unknown>
+    ? ModelName & keyof Models extends infer MKey extends string
+      ? Models[MKey] extends {
+          readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
+        }
+        ? {
+            [F in keyof Fields & string]: Fields[F] extends { readonly column: ColumnName }
+              ? F
+              : never;
+          }[keyof Fields & string]
         : never
       : never
     : never
@@ -319,13 +325,8 @@ type ExtractFieldValue<
   : never;
 
 /**
- * Extracts the JavaScript type for a column from model mappings if available.
- * Returns `never` if the column maps to a ModelField object (which indicates
- * a relation that should fall through to codec-based type resolution).
- *
- * The check for ModelField uses `Exclude<keyof FieldValue, 'column'> extends never`
- * to ensure we only skip pure `{ column: string }` marker objects, not richer
- * object types that happen to include a `column` property.
+ * Extracts the JavaScript type for a column from model fields if available.
+ * Model fields in the .d.ts carry concrete JS types (e.g. `string`, `Char<36>`).
  */
 type ExtractColumnJsTypeFromModels<
   Contract extends SqlContract<SqlStorage>,
@@ -335,13 +336,7 @@ type ExtractColumnJsTypeFromModels<
   ? ModelName extends string
     ? ExtractColumnToField<Contract, TableName, ColumnName> extends infer FieldName
       ? FieldName extends string
-        ? ExtractFieldValue<Contract, ModelName, FieldName> extends infer FieldValue
-          ? FieldValue extends { readonly column: string }
-            ? Exclude<keyof FieldValue, 'column'> extends never
-              ? never
-              : FieldValue
-            : FieldValue
-          : never
+        ? ExtractFieldValue<Contract, ModelName, FieldName>
         : never
       : never
     : never
