@@ -3,8 +3,6 @@ import type {
   ForeignKey,
   ForeignKeyReferences,
   ModelDefinition,
-  ModelField,
-  ModelStorage,
   PrimaryKey,
   ReferentialAction,
   SqlContract,
@@ -135,18 +133,28 @@ const StorageSchema = type({
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
 
-const ModelFieldSchema = type.declare<ModelField>().type({
+const ModelFieldSchema = type({
+  'column?': 'string',
+  'nullable?': 'boolean',
+  'codecId?': 'string',
+});
+
+const ModelStorageFieldSchema = type({
   column: 'string',
 });
 
-const ModelStorageSchema = type.declare<ModelStorage>().type({
+const ModelStorageSchema = type({
   table: 'string',
+  'fields?': type({ '[string]': ModelStorageFieldSchema }),
 });
 
-const ModelSchema = type.declare<ModelDefinition>().type({
+const ModelSchema = type({
   storage: ModelStorageSchema,
   fields: type({ '[string]': ModelFieldSchema }),
   relations: type({ '[string]': 'unknown' }),
+  'discriminator?': 'unknown',
+  'variants?': 'unknown',
+  'base?': 'string',
 });
 
 const MappingsSchema = type({
@@ -178,6 +186,7 @@ const SqlContractSchema = type({
   'meta?': ContractMetaSchema,
   'sources?': 'Record<string, unknown>',
   'relations?': type({ '[string]': 'unknown' }),
+  'roots?': 'Record<string, string>',
   'mappings?': MappingsSchema,
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
@@ -220,7 +229,7 @@ export function validateModel(value: unknown): ModelDefinition {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Model validation failed: ${messages}`);
   }
-  return result;
+  return result as ModelDefinition;
 }
 
 /**
