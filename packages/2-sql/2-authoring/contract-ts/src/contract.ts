@@ -115,6 +115,7 @@ const SqlContractSchema = type({
   'extensionPacks?': 'Record<string, unknown>',
   'meta?': 'Record<string, unknown>',
   'sources?': 'Record<string, unknown>',
+  'roots?': 'Record<string, string>',
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
   'execution?': ExecutionSchema,
