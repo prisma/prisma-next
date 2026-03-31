@@ -223,6 +223,24 @@ type ContractBase = SqlContract<
         indexes: readonly [];
         foreignKeys: readonly [];
       };
+      readonly tags: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly name: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [{ readonly columns: readonly ['name'] }];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
     };
     readonly types: Record<string, never>;
   },
@@ -269,95 +287,6 @@ type ContractBase = SqlContract<
         readonly reviewerId: CodecTypes['pg/int4@1']['output'];
       };
     };
-    readonly Tag: {
-      storage: { readonly table: 'tags' };
-      fields: {
-        readonly id: CodecTypes['pg/text@1']['output'];
-        readonly name: CodecTypes['pg/text@1']['output'];
-      };
-    };
-  },
-  {
-    readonly users: {
-      readonly invitedUsers: {
-        readonly to: 'User';
-        readonly cardinality: '1:N';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['invited_by_id'];
-        };
-      };
-      readonly invitedBy: {
-        readonly to: 'User';
-        readonly cardinality: 'N:1';
-        readonly on: {
-          readonly parentCols: readonly ['invited_by_id'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-      readonly posts: {
-        readonly to: 'Post';
-        readonly cardinality: '1:N';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['user_id'];
-        };
-      };
-      readonly profile: {
-        readonly to: 'Profile';
-        readonly cardinality: '1:1';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['user_id'];
-        };
-      };
-    };
-    readonly posts: {
-      readonly comments: {
-        readonly to: 'Comment';
-        readonly cardinality: '1:N';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['post_id'];
-        };
-      };
-      readonly author: {
-        readonly to: 'User';
-        readonly cardinality: 'N:1';
-        readonly on: {
-          readonly parentCols: readonly ['user_id'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-    };
-    readonly profiles: {
-      readonly user: {
-        readonly to: 'User';
-        readonly cardinality: '1:1';
-        readonly on: {
-          readonly parentCols: readonly ['user_id'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-    };
-    readonly articles: {
-      readonly reviewer: {
-        readonly to: 'User';
-        readonly cardinality: 'N:1';
-        readonly on: {
-          readonly parentCols: readonly ['reviewer_id'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-    };
-  },
-  {
-    modelToTable: {
-      readonly User: 'users';
-      readonly Post: 'posts';
-      readonly Comment: 'comments';
-      readonly Profile: 'profiles';
-      readonly Article: 'articles';
       readonly Tag: 'tags';
     };
     tableToModel: {
@@ -366,28 +295,6 @@ type ContractBase = SqlContract<
       readonly comments: 'Comment';
       readonly profiles: 'Profile';
       readonly articles: 'Article';
-      readonly tags: 'Tag';
-    };
-    fieldToColumn: {
-      readonly User: {
-        readonly id: 'id';
-        readonly name: 'name';
-        readonly email: 'email';
-        readonly invitedById: 'invited_by_id';
-      };
-      readonly Post: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly userId: 'user_id';
-        readonly views: 'views';
-      };
-      readonly Comment: { readonly id: 'id'; readonly body: 'body'; readonly postId: 'post_id' };
-      readonly Profile: { readonly id: 'id'; readonly userId: 'user_id'; readonly bio: 'bio' };
-      readonly Article: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly reviewerId: 'reviewer_id';
-      };
       readonly Tag: { readonly id: 'id'; readonly name: 'name' };
     };
     columnToField: {
