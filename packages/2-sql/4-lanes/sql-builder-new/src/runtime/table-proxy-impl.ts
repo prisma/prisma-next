@@ -156,11 +156,11 @@ export class TableProxyImpl<
   }
 
   insert(values: Record<string, unknown>): InsertQuery<QC, AvailableScope, EmptyRow> {
-    return new InsertQueryImpl(this.#tableName, this.#scope, values, this.ctx);
+    return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, values, this.ctx);
   }
 
   update(set: Record<string, unknown>): UpdateQuery<QC, AvailableScope, EmptyRow> {
-    return new UpdateQueryImpl(this.#tableName, this.#scope, set, this.ctx);
+    return new UpdateQueryImpl(this.#tableName, this.#table, this.#scope, set, this.ctx);
   }
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow> {

@@ -1,3 +1,4 @@
+import type { StorageTable } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression as AstExpression,
   ColumnRef,
@@ -8,6 +9,7 @@ import {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { MutationDefaultsOp } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ExpressionBuilder } from '../expression';
 import type { ResolveRow } from '../resolve';
 import type { QueryContext, Scope, ScopeField } from '../scope';
@@ -27,6 +29,25 @@ import { createFieldProxy } from './field-proxy';
 import { createFunctions } from './functions';
 
 type WhereCallback = ExpressionBuilder<Scope, QueryContext>;
+
+function buildParamValues(
+  values: Record<string, unknown>,
+  table: StorageTable,
+  tableName: string,
+  op: MutationDefaultsOp,
+  ctx: BuilderContext,
+): Record<string, ParamRef> {
+  const params: Record<string, ParamRef> = {};
+  for (const [col, value] of Object.entries(values)) {
+    const column = table.columns[col];
+    params[col] = ParamRef.of(value, column ? { codecId: column.codecId } : undefined);
+  }
+  for (const def of ctx.applyMutationDefaults({ op, table: tableName, values })) {
+    const column = table.columns[def.column];
+    params[def.column] = ParamRef.of(def.value, column ? { codecId: column.codecId } : undefined);
+  }
+  return params;
+}
 
 function buildReturningColumnRefs(tableName: string, columns: string[]): ColumnRef[] {
   return columns.map((col) => ColumnRef.of(tableName, col));
@@ -52,6 +73,7 @@ export class InsertQueryImpl<
   implements InsertQuery<QC, AvailableScope, RowType>
 {
   readonly #tableName: string;
+  readonly #table: StorageTable;
   readonly #scope: Scope;
   readonly #values: Record<string, unknown>;
   readonly #returningColumns: string[];
@@ -59,6 +81,7 @@ export class InsertQueryImpl<
 
   constructor(
     tableName: string,
+    table: StorageTable,
     scope: Scope,
     values: Record<string, unknown>,
     ctx: BuilderContext,
@@ -67,6 +90,7 @@ export class InsertQueryImpl<
   ) {
     super(ctx);
     this.#tableName = tableName;
+    this.#table = table;
     this.#scope = scope;
     this.#values = values;
     this.#returningColumns = returningColumns;
@@ -85,6 +109,7 @@ export class InsertQueryImpl<
       }
       return new InsertQueryImpl(
         this.#tableName,
+        this.#table,
         this.#scope,
         this.#values,
         this.ctx,
@@ -95,11 +120,13 @@ export class InsertQueryImpl<
   );
 
   #buildPlan(): SqlQueryPlan {
-    const paramValues: Record<string, ParamRef> = {};
-    for (const [col, value] of Object.entries(this.#values)) {
-      const field = this.#scope.topLevel[col];
-      paramValues[col] = ParamRef.of(value, field ? { codecId: field.codecId } : undefined);
-    }
+    const paramValues = buildParamValues(
+      this.#values,
+      this.#table,
+      this.#tableName,
+      'create',
+      this.ctx,
+    );
 
     let ast = InsertAst.into(TableSource.named(this.#tableName)).withValues(paramValues);
 
@@ -139,6 +166,7 @@ export class UpdateQueryImpl<
   implements UpdateQuery<QC, AvailableScope, RowType>
 {
   readonly #tableName: string;
+  readonly #table: StorageTable;
   readonly #scope: Scope;
   readonly #setValues: Record<string, unknown>;
   readonly #whereCallbacks: readonly WhereCallback[];
@@ -147,6 +175,7 @@ export class UpdateQueryImpl<
 
   constructor(
     tableName: string,
+    table: StorageTable,
     scope: Scope,
     setValues: Record<string, unknown>,
     ctx: BuilderContext,
@@ -156,6 +185,7 @@ export class UpdateQueryImpl<
   ) {
     super(ctx);
     this.#tableName = tableName;
+    this.#table = table;
     this.#scope = scope;
     this.#setValues = setValues;
     this.#whereCallbacks = whereCallbacks;
@@ -166,6 +196,7 @@ export class UpdateQueryImpl<
   where(expr: ExpressionBuilder<AvailableScope, QC>): UpdateQuery<QC, AvailableScope, RowType> {
     return new UpdateQueryImpl(
       this.#tableName,
+      this.#table,
       this.#scope,
       this.#setValues,
       this.ctx,
@@ -187,6 +218,7 @@ export class UpdateQueryImpl<
       }
       return new UpdateQueryImpl(
         this.#tableName,
+        this.#table,
         this.#scope,
         this.#setValues,
         this.ctx,
@@ -198,11 +230,13 @@ export class UpdateQueryImpl<
   );
 
   #buildPlan(): SqlQueryPlan {
-    const setParams: Record<string, ParamRef> = {};
-    for (const [col, value] of Object.entries(this.#setValues)) {
-      const field = this.#scope.topLevel[col];
-      setParams[col] = ParamRef.of(value, field ? { codecId: field.codecId } : undefined);
-    }
+    const setParams = buildParamValues(
+      this.#setValues,
+      this.#table,
+      this.#tableName,
+      'update',
+      this.ctx,
+    );
 
     const whereExpr = combineWhereExprs(
       this.#whereCallbacks.map((cb) =>

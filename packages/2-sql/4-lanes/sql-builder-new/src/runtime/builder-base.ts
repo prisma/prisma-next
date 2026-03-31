@@ -10,6 +10,10 @@ import {
   type TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type {
+  AppliedMutationDefault,
+  MutationDefaultsOptions,
+} from '@prisma-next/sql-relational-core/query-lane-context';
 import type { QueryOperationEntry } from '@prisma-next/sql-relational-core/query-operations';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import type {
@@ -75,6 +79,9 @@ export interface BuilderContext {
   readonly runtime: Runtime;
   readonly target: string;
   readonly storageHash: string;
+  readonly applyMutationDefaults: (
+    options: MutationDefaultsOptions,
+  ) => ReadonlyArray<AppliedMutationDefault>;
 }
 
 export function emptyState(from: TableSource, scope: Scope): BuilderState {

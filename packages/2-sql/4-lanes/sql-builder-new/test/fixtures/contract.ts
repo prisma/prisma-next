@@ -3,6 +3,7 @@ import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-typ
 import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
 import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
+import { uuidv4 } from '@prisma-next/ids';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
@@ -62,6 +63,12 @@ export const contract = defineContract<CodecTypes>()
       .column('id', { type: int4Column, nullable: false })
       .column('user_id', { type: int4Column, nullable: false })
       .column('bio', { type: textColumn, nullable: false })
+      .primaryKey(['id']),
+  )
+  .table('articles', (table) =>
+    table
+      .generated('id', uuidv4())
+      .column('title', { type: textColumn, nullable: false })
       .primaryKey(['id']),
   )
   .model('User', 'users', (model) =>
@@ -150,4 +157,5 @@ export const contract = defineContract<CodecTypes>()
   .model('Profile', 'profiles', (model) =>
     model.field('id', 'id').field('userId', 'user_id').field('bio', 'bio'),
   )
+  .model('Article', 'articles', (model) => model.field('id', 'id').field('title', 'title'))
   .build();

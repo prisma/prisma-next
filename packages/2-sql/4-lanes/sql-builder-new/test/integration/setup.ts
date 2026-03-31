@@ -98,6 +98,12 @@ export function setupIntegrationTest() {
           (1, 1, 'Alice bio'),
           (2, 2, 'Bob bio')
       `);
+      await c.query(`
+        CREATE TABLE articles (
+          id uuid PRIMARY KEY,
+          title text NOT NULL
+        )
+      `);
     });
 
     const stack = createSqlExecutionStack({

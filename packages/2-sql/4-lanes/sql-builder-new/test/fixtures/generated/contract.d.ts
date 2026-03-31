@@ -33,10 +33,11 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:09fd32ad8b0c75e83d46508cfaeca1ff1a9813e4615e7ed23ffc742cfa190710'>;
-export type ExecutionHash = ExecutionHashBase<string>;
+  StorageHashBase<'sha256:66156b32794cfd2e278065ac87508e4dc6a3157e778f83c36fd976b65d973579'>;
+export type ExecutionHash =
+  ExecutionHashBase<'sha256:b667fade3a4d71590247b5a1fc013558869bc7f4a54e27060a0242faae3619f2'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:eb014c98c4ba6a3e1ddd72bb170d48c49a4e8d5d411e473b80b9c16b57d0469b'>;
+  ProfileHashBase<'sha256:a246c1ceb7b2680efaf1e28032a46faa765c06f898f2fea1687b107b68b8340f'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -162,6 +163,24 @@ type ContractBase = SqlContract<
         indexes: readonly [];
         foreignKeys: readonly [];
       };
+      readonly articles: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'character';
+            readonly codecId: 'sql/char@1';
+            readonly nullable: false;
+          };
+          readonly title: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
     };
     readonly types: Record<string, never>;
   },
@@ -199,6 +218,10 @@ type ContractBase = SqlContract<
         readonly userId: CodecTypes['pg/int4@1']['output'];
         readonly bio: CodecTypes['pg/text@1']['output'];
       };
+    };
+    readonly Article: {
+      storage: { readonly table: 'articles' };
+      fields: { readonly id: Char<36>; readonly title: CodecTypes['pg/text@1']['output'] };
     };
   },
   {
@@ -261,12 +284,14 @@ type ContractBase = SqlContract<
       readonly Post: 'posts';
       readonly Comment: 'comments';
       readonly Profile: 'profiles';
+      readonly Article: 'articles';
     };
     tableToModel: {
       readonly users: 'User';
       readonly posts: 'Post';
       readonly comments: 'Comment';
       readonly profiles: 'Profile';
+      readonly articles: 'Article';
     };
     fieldToColumn: {
       readonly User: {
@@ -283,6 +308,7 @@ type ContractBase = SqlContract<
       };
       readonly Comment: { readonly id: 'id'; readonly body: 'body'; readonly postId: 'post_id' };
       readonly Profile: { readonly id: 'id'; readonly userId: 'user_id'; readonly bio: 'bio' };
+      readonly Article: { readonly id: 'id'; readonly title: 'title' };
     };
     columnToField: {
       readonly users: {
@@ -299,6 +325,7 @@ type ContractBase = SqlContract<
       };
       readonly comments: { readonly id: 'id'; readonly body: 'body'; readonly post_id: 'postId' };
       readonly profiles: { readonly id: 'id'; readonly user_id: 'userId'; readonly bio: 'bio' };
+      readonly articles: { readonly id: 'id'; readonly title: 'title' };
     };
   },
   StorageHash,
@@ -307,24 +334,78 @@ type ContractBase = SqlContract<
 > & {
   readonly target: 'postgres';
   readonly capabilities: {
-    readonly sql: {
-      readonly lateral: true;
-      readonly returning: true;
-      readonly jsonAgg: true;
-      readonly enums: true;
-      readonly foreignKeys: true;
-      readonly autoIndexesForeignKeys: false;
-    };
+    readonly pgvector: { readonly hnsw: true; readonly ivfflat: true; readonly vector: true };
     readonly postgres: {
-      readonly partialIndex: true;
       readonly deferrableConstraints: true;
+      readonly distinctOn: true;
+      readonly jsonAgg: true;
+      readonly lateral: true;
+      readonly limit: true;
+      readonly orderBy: true;
+      readonly partialIndex: true;
+      readonly 'pgvector/cosine': true;
+      readonly returning: true;
       readonly savepoints: true;
       readonly transactionalDDL: true;
-      readonly distinctOn: true;
     };
-    readonly pgvector: { readonly ivfflat: true; readonly hnsw: true; readonly vector: true };
+    readonly sql: {
+      readonly autoIndexesForeignKeys: false;
+      readonly enums: true;
+      readonly foreignKeys: true;
+      readonly jsonAgg: true;
+      readonly lateral: true;
+      readonly returning: true;
+    };
   };
-  readonly extensionPacks: { readonly pgvector: {} };
+  readonly extensionPacks: {
+    readonly pgvector: {
+      readonly capabilities: { readonly postgres: { readonly 'pgvector/cosine': true } };
+      readonly familyId: 'sql';
+      readonly id: 'pgvector';
+      readonly kind: 'extension';
+      readonly targetId: 'postgres';
+      readonly types: {
+        readonly codecTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorTypes';
+            readonly named: 'CodecTypes';
+            readonly package: '@prisma-next/extension-pgvector/codec-types';
+          };
+          readonly parameterized: { readonly 'pg/vector@1': 'Vector<{{length}}>' };
+          readonly typeImports: readonly [
+            {
+              readonly alias: 'Vector';
+              readonly named: 'Vector';
+              readonly package: '@prisma-next/extension-pgvector/codec-types';
+            },
+          ];
+        };
+        readonly operationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorOperationTypes';
+            readonly named: 'OperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
+        };
+        readonly queryOperationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorQueryOperationTypes';
+            readonly named: 'QueryOperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
+        };
+        readonly storage: readonly [
+          {
+            readonly familyId: 'sql';
+            readonly nativeType: 'vector';
+            readonly targetId: 'postgres';
+            readonly typeId: 'pg/vector@1';
+          },
+        ];
+      };
+      readonly version: '0.0.1';
+    };
+  };
 };
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
