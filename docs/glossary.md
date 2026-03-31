@@ -73,11 +73,13 @@ A model that owns its own storage unit (table or collection) and serves as an OR
 
 ### Model (Entity)
 
-A data description with unique identity and a lifecycle. Models appear in the contract's `models` section. Each model has one canonical storage location — either its own table/collection (aggregate root) or inside another model's storage (embedded). The distinction from value types is identity: two Posts with the same title are still different Posts.
+A data description with unique identity and a lifecycle. Models appear in the contract's `models` section. Each model has one canonical storage location — either its own table/collection (aggregate root) or inside another model's storage (embedded). The distinction from value objects is identity: two Posts with the same title are still different Posts.
 
-### Value Type (Composite)
+### Value Object
 
-A named field structure with no identity. Two instances with the same field values are interchangeable — an Address defined by street/city/state has no separate identity beyond its content. Value types are a future concept in the contract (a `types`/`composites` section); currently they're represented as models with empty storage.
+An object defined entirely by its field values, with no separate identity. Two instances with the same values are interchangeable — an Address with the same street/city/state is the same Address regardless of which User it belongs to. This is the key distinction from models (entities), which have identity independent of their fields.
+
+Value objects are a future concept in the contract; currently they're represented as models with empty storage. A dedicated contract section would make the distinction explicit.
 
 > **Status:** Not yet implemented in the contract. Tracked as an open question.
 

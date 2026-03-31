@@ -61,7 +61,7 @@ The Mongo wrapper exists because Mongo contracts carry richer structural metadat
 
 The contract redesign demonstrates that a shared base IS viable — at the domain level. The `roots`, `models` (with `fields` carrying `nullable` and `codecId`, `discriminator`/`variants`/`base`), and `relations` sections are structurally identical between families. Only `model.storage` differs, and it's scoped. For Mongo, `model.storage` is minimal (collection name only); for SQL, it carries field-to-column mappings. This remaining divergence is justified — it reflects a real structural difference between the families, not an arbitrary placement choice.
 
-A shared `ContractBase` should capture the domain-level structure and leave `model.storage` as a family-specific extension point. This is not a mechanical extraction from either `SqlContract` or `MongoContract` — it's a new abstraction rooted in domain modeling concepts (aggregate roots, entities, value types, references) that both families implement.
+A shared `ContractBase` should capture the domain-level structure and leave `model.storage` as a family-specific extension point. This is not a mechanical extraction from either `SqlContract` or `MongoContract` — it's a new abstraction rooted in domain modeling concepts (aggregate roots, entities, value objects, references) that both families implement.
 
 The domain model's four building blocks map to contract structure:
 
@@ -69,7 +69,7 @@ The domain model's four building blocks map to contract structure:
 |---|---|
 | **Aggregate root** | Entry in `roots`, model with `storage` containing table/collection |
 | **Entity** | Entry in `models` with `fields` and `relations` |
-| **Value type** | Entry in `types`/`composites` (not yet designed) |
+| **Value object** | Dedicated contract section (not yet designed) |
 | **Reference** | Relation with `"strategy": "reference"` |
 | **Embedding** | Relation with `"strategy": "embed"` |
 | **Polymorphism** | `discriminator` + `variants` on base model; `base` on each variant (specialization/generalization) |

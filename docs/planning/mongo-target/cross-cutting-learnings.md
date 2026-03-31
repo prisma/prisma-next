@@ -1,7 +1,7 @@
 # Cross-Cutting Learnings
 
 > **Note**: The proven learnings from this document have been promoted to the main architecture docs:
-> - Contract design principles, domain/storage separation, polymorphism, embedded types, entity vs value type → [1. Data Contract.md § Cross-family contract design](../../architecture%20docs/subsystems/1.%20Data%20Contract.md)
+> - Contract design principles, domain/storage separation, polymorphism, embedded types, entity vs value object → [1. Data Contract.md § Cross-family contract design](../../architecture%20docs/subsystems/1.%20Data%20Contract.md)
 > - Shared ORM Collection interface → [3. Query Lanes.md § Shared Collection interface across families](../../architecture%20docs/subsystems/3.%20Query%20Lanes.md)
 > - Full MongoDB Family overview → [10. MongoDB Family.md](../../architecture%20docs/subsystems/10.%20MongoDB%20Family.md)
 >
@@ -91,7 +91,7 @@ Embedded documents in Mongo and typed JSON columns in SQL are the same contract-
 
 **Embedding is a relation property, not a model property.** The parent model's relation declares the embedding strategy (`"strategy": "embed"`); the embedded model doesn't know where it's embedded. An embedded model has its own `fields` and `storage` (field-to-codec mappings) but no table/collection name — it doesn't own a storage unit.
 
-The entity vs value type distinction matters: an embedded **entity** (e.g., a Post with `_id` embedded in User) has identity and lifecycle. An embedded **value type** (e.g., Address) has no identity — it belongs in a `types`/`composites` section, not `models`.
+The entity vs value object distinction matters: an embedded **entity** (e.g., a Post with `_id` embedded in User) has identity and lifecycle. An embedded **value object** (e.g., Address) has no identity — it belongs in a dedicated value objects section, not `models`.
 
 **Where to apply**: Contract type system, authoring surfaces, emitter, query builder. See [design-questions.md § DQ #1](1-design-docs/design-questions.md#1-embedded-documents-relation-field-or-distinct-concept-cross-family-concern).
 
@@ -144,13 +144,13 @@ Polymorphism is **orthogonal to aggregate root / embedded** — any model can be
 
 ---
 
-## 5. Models are entities; value types are a separate concept
+## 5. Models are entities; value objects are a separate concept
 
 **Source**: M2 design discussion
 
-A **model** (entity) has unique identity and a lifecycle that matters to the application. A **value type** has no identity — it's defined entirely by its properties. Two instances with the same values are interchangeable.
+A **model** (entity) has unique identity and a lifecycle that matters to the application. A **value object** has no identity — it's defined entirely by its properties. Two instances with the same values are interchangeable.
 
-The `models` section describes all entities regardless of storage strategy. Storage strategy (own table/collection vs embedded in parent) is orthogonal to identity. Types/value objects are a separate, simpler concept — named field structures with no identity semantics — and belong in a `types` or `composites` section.
+The `models` section describes all entities regardless of storage strategy. Storage strategy (own table/collection vs embedded in parent) is orthogonal to identity. Value objects are a separate, simpler concept — named field structures with no identity semantics — and belong in a dedicated contract section.
 
 Today the framework treats models as pure data descriptions (no behavior). Framing models as entities keeps the door open for a natural future extension: letting users define the class instantiated for each entity retrieved from a collection, turning collections into proper repositories and models into real OOP entities with behavior.
 
