@@ -1,10 +1,6 @@
 import type {
-  ModelDefinition,
-  ModelField,
-  ModelStorage,
   PrimaryKey,
   SqlContract,
-  SqlMappings,
   SqlStorage,
   StorageTypeInstance,
   UniqueConstraint,
@@ -159,51 +155,6 @@ function validateContractStructure<T extends SqlContract<SqlStorage>>(
   // TypeScript needs an assertion here due to exactOptionalPropertyTypes differences
   // between Arktype's inferred type and the generic T, but runtime-wise they're compatible
   return contractResult as O.Overwrite<T, { targetFamily: 'sql' }>;
-}
-
-/**
- * Computes mapping dictionaries from models and storage structures.
- * Assumes valid input - validation happens separately in validateContractLogic().
- *
- * @param models - Models object from contract
- * @param storage - Storage object from contract
- * @param existingMappings - Existing mappings from contract input (optional)
- * @returns Computed mappings dictionary
- */
-export function computeMappings(
-  models: Record<string, ModelDefinition>,
-  _storage: SqlStorage,
-  existingMappings?: Partial<SqlMappings>,
-): SqlMappings {
-  const modelToTable: Record<string, string> = {};
-  const tableToModel: Record<string, string> = {};
-  const fieldToColumn: Record<string, Record<string, string>> = {};
-  const columnToField: Record<string, Record<string, string>> = {};
-
-  for (const [modelName, model] of Object.entries(models)) {
-    const tableName = model.storage.table;
-    modelToTable[modelName] = tableName;
-    tableToModel[tableName] = modelName;
-
-    const modelFieldToColumn: Record<string, string> = {};
-    for (const [fieldName, field] of Object.entries(model.fields)) {
-      const columnName = field.column;
-      modelFieldToColumn[fieldName] = columnName;
-
-      if (!columnToField[tableName]) {
-        columnToField[tableName] = {};
-      }
-      columnToField[tableName][columnName] = fieldName;
-    }
-    fieldToColumn[modelName] = modelFieldToColumn;
-  }
-
-  return {
-    modelToTable: existingMappings?.modelToTable ?? modelToTable,
-    tableToModel: existingMappings?.tableToModel ?? tableToModel,
-    fieldToColumn: existingMappings?.fieldToColumn ?? fieldToColumn,
-    columnToField: existingMappings?.columnToField ?? columnToField,
-  };
 }
 
 /**
@@ -518,29 +469,7 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
 
   const contractForValidation = structurallyValid as SqlContract<SqlStorage>;
 
-  // Validate contract logic (contracts must already have fully qualified type IDs)
   validateContractLogic(contractForValidation);
 
-  // Extract existing mappings (optional - will be computed if missing)
-  const existingMappings = (contractForValidation as { mappings?: Partial<SqlMappings> }).mappings;
-
-  // Compute mappings from models and storage
-  const mappings = computeMappings(
-    contractForValidation.models as Record<string, ModelDefinition>,
-    contractForValidation.storage,
-    existingMappings,
-  );
-
-  // Add default values for optional metadata fields if missing
-  const contractWithMappings = {
-    ...structurallyValid,
-    models: contractForValidation.models,
-    relations: contractForValidation.relations,
-    storage: contractForValidation.storage,
-    mappings,
-  };
-
-  // Type assertion: The caller provides the strict type via TContract.
-  // We validate the structure matches, but the precise types come from contract.d.ts
-  return decodeContractDefaults(contractWithMappings) as TContract;
+  return decodeContractDefaults(contractForValidation) as TContract;
 }
