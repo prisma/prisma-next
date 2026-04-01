@@ -132,6 +132,17 @@ A typical migration sequence might be:
 
 The migration graph from the SQL system can accommodate both — data migration nodes and schema migration nodes interleaved as needed.
 
+### Indexes on polymorphic collections
+
+When a collection holds multiple variants (STI — the only option in Mongo), variant-specific fields are absent from documents of other variants. An index on a variant-specific field must use a `partialFilterExpression` scoped to that variant's discriminator value, otherwise:
+
+- Unique indexes fail (multiple documents missing the field all index as `null`)
+- Non-unique indexes waste space indexing irrelevant documents
+
+The migration system should derive the partial filter automatically: the contract already knows which model owns the field (`base` relationship) and the discriminator condition (`discriminator` + `variants`). No user intervention needed.
+
+This is a cross-family concern — the same problem applies to SQL STI with Postgres partial indexes. See [ADR 173 § Indexes on variant-specific fields](../../../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md#indexes-on-variant-specific-fields).
+
 ## Open questions
 
 - **Validator generation**: Should the emitter generate `$jsonSchema` from the contract model definitions, or should users author validators independently? Automatic generation is more convenient; manual authoring is more flexible (you can validate things the contract doesn't express, like cross-field constraints).

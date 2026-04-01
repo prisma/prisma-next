@@ -215,6 +215,41 @@ For *unstructured* unions (no discriminator, no shared fields), see [ADR 179 —
 - **Variant field resolution is implicit.** A reader must know that a variant's full field set is its own `fields` merged with its `base` model's `fields`. This convention must be documented and understood by all contract consumers.
 - **Bidirectional redundancy.** The `base` ↔ `variants` relationship is expressed on both sides. The emitter guarantees consistency; the cost is a small amount of JSON redundancy.
 
+### Indexes on variant-specific fields
+
+When variants share a storage unit (STI in SQL, single collection in Mongo), variant-specific fields are absent from rows/documents of other variants. This has direct consequences for indexing:
+
+- **Unique indexes fail.** A unique index on Bug's `severity` column sees NULL (SQL) or missing (Mongo) for every Feature row/document. In MongoDB, multiple missing values violate uniqueness. In SQL, most engines allow multiple NULLs in a unique index, but the semantics are still wrong — you want uniqueness among Bugs only, not across the whole table.
+- **Index waste.** A non-unique index on a variant-specific field indexes every row/document in the storage unit, including the ones where the field is irrelevant.
+
+The solution is **partial indexes** — indexes scoped to documents/rows matching a discriminator condition:
+
+```sql
+-- Postgres
+CREATE UNIQUE INDEX idx_bug_severity ON tasks (severity) WHERE type = 'bug';
+```
+
+```javascript
+// MongoDB
+db.tasks.createIndex({ severity: 1 }, {
+  unique: true,
+  partialFilterExpression: { type: "bug" }
+})
+```
+
+**No domain representation change is needed.** The contract already contains everything required to derive the filter: variant membership tells you which model owns the field, and `discriminator`/`variants` tells you the discriminator field and value. The emitter and migration system derive the partial index condition automatically from these domain facts.
+
+This is handled in family-specific or target-specific logic:
+
+| Target | Partial index support | Migration output |
+|---|---|---|
+| Postgres | Yes | `WHERE type = 'bug'` clause on `CREATE INDEX` |
+| SQLite | Yes | Same `WHERE` clause syntax |
+| MySQL | No | No partial indexes — application-level enforcement or generated column workaround; migration system should warn |
+| MongoDB | Yes | `partialFilterExpression` on `createIndex` |
+
+The emitter's rule is straightforward: if an index targets a field that belongs to a variant (not the base model), and the variant shares storage with the base, automatically scope the index to the variant's discriminator value. If the target doesn't support partial indexes, emit a warning.
+
 ### Open questions
 
 - **Discriminator values are untyped strings.** The contract stores discriminator values as JSON strings (`"value": "bug"`), but the discriminator field has a `codecId` that determines its database type. Something in the system — the emitter or the runtime — needs to convert `"bug"` into a value appropriate for the storage type (e.g., a text literal in SQL, a string in BSON). This is an instance of a broader unsolved problem: the contract has several places where values are represented as JSON strings but need to be interpreted through a codec at runtime (column defaults are another example). This doesn't affect the PoC — hand-crafted contracts can sidestep it — but it needs a general solution before the emitter can produce contracts with discriminator values, defaults, or other typed literals.
