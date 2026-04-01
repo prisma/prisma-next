@@ -30,25 +30,24 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.relations).toMatchObject({
-      user: {
-        posts: {
-          to: 'Post',
-          cardinality: '1:N',
-          on: {
-            parentCols: ['id'],
-            childCols: ['userId'],
-          },
+    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    expect(models['User']?.relations).toMatchObject({
+      posts: {
+        to: 'Post',
+        cardinality: '1:N',
+        on: {
+          localFields: ['id'],
+          targetFields: ['userId'],
         },
       },
-      post: {
-        user: {
-          to: 'User',
-          cardinality: 'N:1',
-          on: {
-            parentCols: ['userId'],
-            childCols: ['id'],
-          },
+    });
+    expect(models['Post']?.relations).toMatchObject({
+      user: {
+        to: 'User',
+        cardinality: 'N:1',
+        on: {
+          localFields: ['userId'],
+          targetFields: ['id'],
         },
       },
     });
@@ -78,21 +77,22 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.relations!['user']).toMatchObject({
+    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    expect(models['User']?.relations).toMatchObject({
       authored: {
         to: 'Post',
         cardinality: '1:N',
         on: {
-          parentCols: ['id'],
-          childCols: ['authorId'],
+          localFields: ['id'],
+          targetFields: ['authorId'],
         },
       },
       reviewed: {
         to: 'Post',
         cardinality: '1:N',
         on: {
-          parentCols: ['id'],
-          childCols: ['reviewerId'],
+          localFields: ['id'],
+          targetFields: ['reviewerId'],
         },
       },
     });
@@ -129,25 +129,15 @@ model Member {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.relations).toMatchObject({
-      user: {
-        posts: {
-          to: 'Post',
-          cardinality: '1:N',
-        },
-      },
-      post: {
-        user: {
-          to: 'User',
-          cardinality: 'N:1',
-        },
-      },
-      member: {
-        team: {
-          to: 'Team',
-          cardinality: 'N:1',
-        },
-      },
+    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    expect(models['User']?.relations).toMatchObject({
+      posts: { to: 'Post', cardinality: '1:N' },
+    });
+    expect(models['Post']?.relations).toMatchObject({
+      user: { to: 'User', cardinality: 'N:1' },
+    });
+    expect(models['Member']?.relations).toMatchObject({
+      team: { to: 'Team', cardinality: 'N:1' },
     });
   });
 
@@ -168,23 +158,22 @@ model Member {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.relations).toMatchObject({
-      employee: {
-        manager: {
-          to: 'Employee',
-          cardinality: 'N:1',
-          on: {
-            parentCols: ['managerId'],
-            childCols: ['id'],
-          },
+    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    expect(models['Employee']?.relations).toMatchObject({
+      manager: {
+        to: 'Employee',
+        cardinality: 'N:1',
+        on: {
+          localFields: ['managerId'],
+          targetFields: ['id'],
         },
-        reports: {
-          to: 'Employee',
-          cardinality: '1:N',
-          on: {
-            parentCols: ['id'],
-            childCols: ['managerId'],
-          },
+      },
+      reports: {
+        to: 'Employee',
+        cardinality: '1:N',
+        on: {
+          localFields: ['id'],
+          targetFields: ['managerId'],
         },
       },
     });
