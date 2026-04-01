@@ -8,7 +8,7 @@ import type {
 } from '../expression';
 import type { GatedMethod, QueryContext, Scope, ScopeField, Subquery } from '../scope';
 import type { GroupedQuery } from './grouped-query';
-import type { WithAlias, WithDistinct, WithExecution, WithPagination, WithSelect } from './shared';
+import type { WithAlias, WithBuild, WithDistinct, WithPagination, WithSelect } from './shared';
 
 export interface SelectQuery<
   QC extends QueryContext,
@@ -19,7 +19,7 @@ export interface SelectQuery<
     WithPagination,
     WithDistinct,
     WithAlias<RowType>,
-    WithExecution<QC, RowType> {
+    WithBuild<QC, RowType> {
   where(expr: ExpressionBuilder<AvailableScope, QC>): SelectQuery<QC, AvailableScope, RowType>;
 
   orderBy(

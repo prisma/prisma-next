@@ -1,10 +1,11 @@
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
 test('distinct() on a basic select', () => {
-  const distinctUsers = db.users.select('name', 'email').distinct().firstOrThrow();
+  const distinctUsers = db.users.select('name', 'email').distinct().build();
 
-  expectTypeOf(distinctUsers).toEqualTypeOf<Promise<{ name: string; email: string }>>();
+  expectTypeOf(distinctUsers).toEqualTypeOf<SqlQueryPlan<{ name: string; email: string }>>();
 });
 
 test('distinctOn with a single column name', () => {
@@ -12,9 +13,9 @@ test('distinctOn with a single column name', () => {
     .select('name', 'email')
     .distinctOn('name')
     .orderBy('name')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(distinctOnName).toEqualTypeOf<Promise<{ name: string; email: string }>>();
+  expectTypeOf(distinctOnName).toEqualTypeOf<SqlQueryPlan<{ name: string; email: string }>>();
 });
 
 test('distinctOn with multiple column names', () => {
@@ -22,9 +23,9 @@ test('distinctOn with multiple column names', () => {
     .select('name', 'email')
     .distinctOn('name', 'email')
     .orderBy('name')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(distinctOnMulti).toEqualTypeOf<Promise<{ name: string; email: string }>>();
+  expectTypeOf(distinctOnMulti).toEqualTypeOf<SqlQueryPlan<{ name: string; email: string }>>();
 });
 
 test('distinctOn with expression callback', () => {
@@ -32,9 +33,9 @@ test('distinctOn with expression callback', () => {
     .select('name', 'email')
     .distinctOn((f) => f.name)
     .orderBy('name')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(distinctOnExpr).toEqualTypeOf<Promise<{ name: string; email: string }>>();
+  expectTypeOf(distinctOnExpr).toEqualTypeOf<SqlQueryPlan<{ name: string; email: string }>>();
 });
 
 test('distinctOn with joined tables — namespace access in expression', () => {
@@ -43,9 +44,9 @@ test('distinctOn with joined tables — namespace access in expression', () => {
     .select('name', 'title')
     .distinctOn((f) => f.users.name)
     .orderBy((f) => f.users.name)
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(distinctOnJoin).toEqualTypeOf<Promise<{ name: string; title: string }>>();
+  expectTypeOf(distinctOnJoin).toEqualTypeOf<SqlQueryPlan<{ name: string; title: string }>>();
 });
 
 test('distinct() on a grouped query', () => {
@@ -54,9 +55,9 @@ test('distinct() on a grouped query', () => {
     .select('cnt', (_f, fns) => fns.count())
     .groupBy('name')
     .distinct()
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(distinctGrouped).toEqualTypeOf<Promise<{ name: string; cnt: number }>>();
+  expectTypeOf(distinctGrouped).toEqualTypeOf<SqlQueryPlan<{ name: string; cnt: number }>>();
 });
 
 test('distinctOn on a grouped query', () => {
@@ -67,13 +68,15 @@ test('distinctOn on a grouped query', () => {
     .groupBy('name')
     .distinctOn('name')
     .orderBy('name')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(distinctOnGrouped).toEqualTypeOf<Promise<{ name: string; postCount: number }>>();
+  expectTypeOf(distinctOnGrouped).toEqualTypeOf<
+    SqlQueryPlan<{ name: string; postCount: number }>
+  >();
 });
 
 test('distinctOn referencing scope field not in select', () => {
-  const distinctOnScope = db.users.select('name').distinctOn('id').orderBy('id').firstOrThrow();
+  const distinctOnScope = db.users.select('name').distinctOn('id').orderBy('id').build();
 
-  expectTypeOf(distinctOnScope).toEqualTypeOf<Promise<{ name: string }>>();
+  expectTypeOf(distinctOnScope).toEqualTypeOf<SqlQueryPlan<{ name: string }>>();
 });

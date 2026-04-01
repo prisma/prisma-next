@@ -114,19 +114,21 @@ describe('postgres', () => {
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
   });
 
-  it('defers stack instantiation runtime creation and pool creation until sql or runtime is accessed', () => {
+  it('sql is constructed eagerly without runtime; runtime and pool are deferred until runtime() is accessed', () => {
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
     });
 
-    expect(db.orm).toEqual({ lane: 'orm' });
+    expect(mocks.sqlBuilder).toHaveBeenCalledTimes(1);
+    expect(db.sql).toEqual({ lane: 'sql' });
+
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
 
-    // accessing db.sql triggers lazy runtime creation
-    expect(db.sql).toEqual({ lane: 'sql' });
+    // accessing runtime() triggers lazy creation
+    db.runtime();
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
     expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
     expect(mocks.poolCtor).toHaveBeenCalledTimes(1);

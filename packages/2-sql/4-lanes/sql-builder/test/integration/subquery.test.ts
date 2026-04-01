@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { collect, setupIntegrationTest } from './setup';
+import { setupIntegrationTest } from './setup';
 
 describe('integration: subqueries', () => {
-  const { db } = setupIntegrationTest();
+  const { db, runtime } = setupIntegrationTest();
 
   it('EXISTS filters to rows with matching subquery', async () => {
     const d = db();
-    const rows = await collect(
+    const rows = await runtime().execute(
       d.users
         .select('id', 'name')
         .where((f, fns) =>
@@ -15,7 +15,7 @@ describe('integration: subqueries', () => {
           ),
         )
         .orderBy('id')
-        .all(),
+        .build(),
     );
     expect(rows.map((r) => r.name)).toEqual(['Alice', 'Bob', 'Charlie']);
   });
@@ -27,7 +27,7 @@ describe('integration: subqueries', () => {
     // So subquery returns user_ids [1, 2]
     // Parent filters out Bob (id=2), leaving only Alice (id=1)
     const d = db();
-    const rows = await collect(
+    const rows = await runtime().execute(
       d.users
         .select('id', 'name')
         .where((f, fns) =>
@@ -40,7 +40,7 @@ describe('integration: subqueries', () => {
           ),
         )
         .orderBy('id')
-        .all(),
+        .build(),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]!.name).toBe('Alice');
@@ -50,11 +50,11 @@ describe('integration: subqueries', () => {
   it('subquery as join source', async () => {
     const d = db();
     const sub = d.posts.select('user_id', 'title').as('sub');
-    const rows = await collect(
+    const rows = await runtime().execute(
       d.users
         .innerJoin(sub, (f, fns) => fns.eq(f.users.id, f.sub.user_id))
         .select('name', 'title')
-        .all(),
+        .build(),
     );
     expect(rows.length).toBe(4);
   });

@@ -24,33 +24,43 @@ async function main() {
 
   try {
     // Insert users
-    await db.sql.user
-      .insert({
-        email: 'alice@example.com',
-        createdAt: new Date(),
-        kind: 'admin',
-      })
-      .first();
+    await runtime.execute(
+      db.sql.user
+        .insert({
+          email: 'alice@example.com',
+          createdAt: new Date(),
+          kind: 'admin',
+        })
+        .build(),
+    );
 
-    await db.sql.user
-      .insert({
-        email: 'bob@example.com',
-        createdAt: new Date(),
-        kind: 'user',
-      })
-      .first();
+    await runtime.execute(
+      db.sql.user
+        .insert({
+          email: 'bob@example.com',
+          createdAt: new Date(),
+          kind: 'user',
+        })
+        .build(),
+    );
 
-    const alice = await db.sql.user
-      .select('id', 'email')
-      .where((f, fns) => fns.eq(f.email, 'alice@example.com'))
-      .limit(1)
-      .first();
+    const aliceRows = await runtime.execute(
+      db.sql.user
+        .select('id', 'email')
+        .where((f, fns) => fns.eq(f.email, 'alice@example.com'))
+        .limit(1)
+        .build(),
+    );
+    const alice = aliceRows[0] ?? null;
 
-    const bob = await db.sql.user
-      .select('id', 'email')
-      .where((f, fns) => fns.eq(f.email, 'bob@example.com'))
-      .limit(1)
-      .first();
+    const bobRows = await runtime.execute(
+      db.sql.user
+        .select('id', 'email')
+        .where((f, fns) => fns.eq(f.email, 'bob@example.com'))
+        .limit(1)
+        .build(),
+    );
+    const bob = bobRows[0] ?? null;
 
     if (!alice || !bob) {
       throw new Error('Failed to create users');
@@ -69,32 +79,38 @@ async function main() {
     };
 
     // Insert posts with embeddings
-    await db.sql.post
-      .insert({
-        title: 'First Post',
-        userId: alice.id,
-        embedding: generateEmbedding(1),
-        createdAt: new Date(),
-      })
-      .first();
+    await runtime.execute(
+      db.sql.post
+        .insert({
+          title: 'First Post',
+          userId: alice.id,
+          embedding: generateEmbedding(1),
+          createdAt: new Date(),
+        })
+        .build(),
+    );
 
-    await db.sql.post
-      .insert({
-        title: 'Second Post',
-        userId: alice.id,
-        embedding: generateEmbedding(2),
-        createdAt: new Date(),
-      })
-      .first();
+    await runtime.execute(
+      db.sql.post
+        .insert({
+          title: 'Second Post',
+          userId: alice.id,
+          embedding: generateEmbedding(2),
+          createdAt: new Date(),
+        })
+        .build(),
+    );
 
-    await db.sql.post
-      .insert({
-        title: 'Third Post',
-        userId: bob.id,
-        embedding: generateEmbedding(3),
-        createdAt: new Date(),
-      })
-      .first();
+    await runtime.execute(
+      db.sql.post
+        .insert({
+          title: 'Third Post',
+          userId: bob.id,
+          embedding: generateEmbedding(3),
+          createdAt: new Date(),
+        })
+        .build(),
+    );
 
     console.log('Seed completed successfully!');
   } finally {

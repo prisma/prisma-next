@@ -1,3 +1,4 @@
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   AggregateFunctions,
   Expression,
@@ -115,11 +116,6 @@ export interface WithAlias<RowType extends Record<string, ScopeField>> {
   as<Alias extends string>(newAlias: Alias): JoinSource<RowType, Alias>;
 }
 
-export interface WithExecution<
-  QC extends QueryContext,
-  RowType extends Record<string, ScopeField>,
-> {
-  first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null>;
-  firstOrThrow(): Promise<ResolveRow<RowType, QC['codecTypes']>>;
-  all(): AsyncIterable<ResolveRow<RowType, QC['codecTypes']>>;
+export interface WithBuild<QC extends QueryContext, RowType extends Record<string, ScopeField>> {
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>>;
 }

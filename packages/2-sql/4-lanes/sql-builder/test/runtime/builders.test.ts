@@ -10,7 +10,6 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { describe, expect, it, vi } from 'vitest';
 import { sql } from '../../src/runtime/sql';
 import { contract as contractJson } from '../fixtures/contract';
@@ -21,8 +20,6 @@ import type { Contract } from '../fixtures/generated/contract';
 // ---------------------------------------------------------------------------
 
 const sqlContract = validateContract<Contract>(contractJson);
-
-const stubRuntime = { execute: () => (async function* () {})() } as unknown as Runtime;
 
 const stubBase = {
   operations: {},
@@ -37,7 +34,6 @@ function db() {
     context: { ...stubBase, contract: sqlContract } as unknown as ExecutionContext<
       typeof sqlContract
     >,
-    runtime: stubRuntime,
   });
 }
 
@@ -50,7 +46,6 @@ function dbNoCapabilities() {
     context: { ...stubBase, contract: noLateralContract } as unknown as ExecutionContext<
       typeof noLateralContract
     >,
-    runtime: stubRuntime,
   });
 }
 
@@ -448,14 +443,13 @@ describe('mutation defaults', () => {
         contract: sqlContract,
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
-      runtime: stubRuntime,
     });
     return { d, spy };
   }
 
-  it('INSERT calls applyMutationDefaults with op create', async () => {
+  it('INSERT calls applyMutationDefaults with op create', () => {
     const { d, spy } = dbWithSpy();
-    await d.users.insert({ id: 1, name: 'A', email: 'a@b.com' }).first();
+    d.users.insert({ id: 1, name: 'A', email: 'a@b.com' }).build();
     expect(spy).toHaveBeenCalledWith({
       op: 'create',
       table: 'users',
@@ -463,12 +457,12 @@ describe('mutation defaults', () => {
     });
   });
 
-  it('UPDATE calls applyMutationDefaults with op update', async () => {
+  it('UPDATE calls applyMutationDefaults with op update', () => {
     const { d, spy } = dbWithSpy();
-    await d.users
+    d.users
       .update({ name: 'B' })
       .where((f, fns) => fns.eq(f.id, 1))
-      .first();
+      .build();
     expect(spy).toHaveBeenCalledWith({
       op: 'update',
       table: 'users',

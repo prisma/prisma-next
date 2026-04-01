@@ -1,4 +1,5 @@
 import type { StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExpressionBuilder, WithFields } from '../expression';
 import type { ResolveRow } from '../resolve';
 import type { EmptyRow, GatedMethod, QueryContext, Scope, ScopeField } from '../scope';
@@ -36,9 +37,7 @@ export interface InsertQuery<
       ...columns: Columns
     ) => InsertQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>
   >;
-  first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null>;
-  firstOrThrow(): Promise<ResolveRow<RowType, QC['codecTypes']>>;
-  all(): AsyncIterable<ResolveRow<RowType, QC['codecTypes']>>;
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>>;
 }
 
 export interface UpdateQuery<
@@ -54,9 +53,7 @@ export interface UpdateQuery<
       ...columns: Columns
     ) => UpdateQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>
   >;
-  first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null>;
-  firstOrThrow(): Promise<ResolveRow<RowType, QC['codecTypes']>>;
-  all(): AsyncIterable<ResolveRow<RowType, QC['codecTypes']>>;
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>>;
 }
 
 export interface DeleteQuery<
@@ -72,7 +69,5 @@ export interface DeleteQuery<
       ...columns: Columns
     ) => DeleteQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>
   >;
-  first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null>;
-  firstOrThrow(): Promise<ResolveRow<RowType, QC['codecTypes']>>;
-  all(): AsyncIterable<ResolveRow<RowType, QC['codecTypes']>>;
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>>;
 }

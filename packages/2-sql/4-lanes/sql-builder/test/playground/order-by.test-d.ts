@@ -1,3 +1,4 @@
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
@@ -5,22 +6,22 @@ test('orderBy with select alias', () => {
   const ordered = db.users
     .select('authorName', (f) => f.name)
     .orderBy('authorName', { direction: 'desc', nulls: 'last' })
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(ordered).toEqualTypeOf<Promise<{ authorName: string }>>();
+  expectTypeOf(ordered).toEqualTypeOf<SqlQueryPlan<{ authorName: string }>>();
 });
 
 test('orderBy with expression referencing alias', () => {
   const orderedExpr = db.users
     .select('authorName', (f) => f.name)
     .orderBy((f) => f.authorName, { direction: 'asc' })
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(orderedExpr).toEqualTypeOf<Promise<{ authorName: string }>>();
+  expectTypeOf(orderedExpr).toEqualTypeOf<SqlQueryPlan<{ authorName: string }>>();
 });
 
 test('orderBy with scope field not in select', () => {
-  const orderedScope = db.users.select('name').orderBy('id').firstOrThrow();
+  const orderedScope = db.users.select('name').orderBy('id').build();
 
-  expectTypeOf(orderedScope).toEqualTypeOf<Promise<{ name: string }>>();
+  expectTypeOf(orderedScope).toEqualTypeOf<SqlQueryPlan<{ name: string }>>();
 });

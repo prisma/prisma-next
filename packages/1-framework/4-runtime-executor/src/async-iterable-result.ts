@@ -68,6 +68,28 @@ export class AsyncIterableResult<Row> implements AsyncIterable<Row>, PromiseLike
     return this.bufferedArrayPromise;
   }
 
+  /**
+   * Returns the first row, or null if the result set is empty.
+   */
+  async first(): Promise<Row | null> {
+    const rows = await this.toArray();
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Returns the first row, or throws if the result set is empty.
+   */
+  async firstOrThrow(): Promise<Row> {
+    const row = await this.first();
+    if (row === null)
+      throw runtimeError(
+        'RUNTIME.NO_ROWS',
+        'Expected at least one row, but none were returned',
+        {},
+      );
+    return row;
+  }
+
   // biome-ignore lint/suspicious/noThenProperty: PromiseLike implementation is intentional for await support.
   then<TResult1 = Row[], TResult2 = never>(
     onfulfilled?: ((value: Row[]) => TResult1 | PromiseLike<TResult1>) | undefined | null,

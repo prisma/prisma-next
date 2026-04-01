@@ -73,7 +73,7 @@ const seededPostIds = {
 } as const;
 
 async function seedOrmClientData(runtime: Runtime): Promise<void> {
-  const db = sql({ context, runtime });
+  const db = sql({ context });
 
   const users = [
     {
@@ -103,7 +103,7 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
   ];
 
   for (const user of users) {
-    await db.user.insert(user).first();
+    await runtime.execute(db.user.insert(user).build());
   }
 
   const posts = [
@@ -140,7 +140,7 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
   ];
 
   for (const post of posts) {
-    await db.post.insert(post).first();
+    await runtime.execute(db.post.insert(post).build());
   }
 }
 

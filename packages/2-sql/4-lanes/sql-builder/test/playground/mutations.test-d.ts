@@ -1,35 +1,36 @@
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
 test('INSERT without returning resolves to empty row', () => {
-  const result = db.users.insert({ id: 1, name: 'Alice', email: 'a@b.com' }).first();
-  expectTypeOf(result).toEqualTypeOf<Promise<Record<never, never> | null>>();
+  const result = db.users.insert({ id: 1, name: 'Alice', email: 'a@b.com' }).build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<Record<never, never>>>();
 });
 
 test('INSERT with returning resolves to selected columns', () => {
   const result = db.users
     .insert({ id: 1, name: 'Alice', email: 'a@b.com' })
     .returning('id', 'email')
-    .first();
-  expectTypeOf(result).toEqualTypeOf<Promise<{ id: number; email: string } | null>>();
+    .build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<{ id: number; email: string }>>();
 });
 
-test('INSERT firstOrThrow omits null from return type', () => {
-  const result = db.users.insert({ id: 1 }).returning('id', 'name').firstOrThrow();
-  expectTypeOf(result).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+test('INSERT build return type', () => {
+  const result = db.users.insert({ id: 1 }).returning('id', 'name').build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
-test('INSERT all returns AsyncIterable', () => {
-  const result = db.users.insert({ id: 1 }).returning('id').all();
-  expectTypeOf(result).toEqualTypeOf<AsyncIterable<{ id: number }>>();
+test('INSERT build returns SqlQueryPlan', () => {
+  const result = db.users.insert({ id: 1 }).returning('id').build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<{ id: number }>>();
 });
 
 test('UPDATE without returning resolves to empty row', () => {
   const result = db.users
     .update({ name: 'Bob' })
     .where((f, fns) => fns.eq(f.id, 1))
-    .first();
-  expectTypeOf(result).toEqualTypeOf<Promise<Record<never, never> | null>>();
+    .build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<Record<never, never>>>();
 });
 
 test('UPDATE with WHERE and returning resolves to selected columns', () => {
@@ -37,8 +38,8 @@ test('UPDATE with WHERE and returning resolves to selected columns', () => {
     .update({ name: 'Bob' })
     .where((f, fns) => fns.eq(f.id, 1))
     .returning('id', 'name')
-    .first();
-  expectTypeOf(result).toEqualTypeOf<Promise<{ id: number; name: string } | null>>();
+    .build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('UPDATE returning before where preserves row type', () => {
@@ -46,16 +47,16 @@ test('UPDATE returning before where preserves row type', () => {
     .update({ email: 'new@test.com' })
     .returning('id', 'email')
     .where((f, fns) => fns.eq(f.id, 1))
-    .first();
-  expectTypeOf(result).toEqualTypeOf<Promise<{ id: number; email: string } | null>>();
+    .build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<{ id: number; email: string }>>();
 });
 
 test('DELETE without returning resolves to empty row', () => {
   const result = db.users
     .delete()
     .where((f, fns) => fns.eq(f.id, 1))
-    .first();
-  expectTypeOf(result).toEqualTypeOf<Promise<Record<never, never> | null>>();
+    .build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<Record<never, never>>>();
 });
 
 test('DELETE with WHERE and returning resolves to selected columns', () => {
@@ -63,15 +64,13 @@ test('DELETE with WHERE and returning resolves to selected columns', () => {
     .delete()
     .where((f, fns) => fns.eq(f.id, 1))
     .returning('id', 'email')
-    .first();
-  expectTypeOf(result).toEqualTypeOf<Promise<{ id: number; email: string } | null>>();
+    .build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<{ id: number; email: string }>>();
 });
 
 test('INSERT returning includes nullable column', () => {
-  const result = db.users.insert({ id: 1 }).returning('id', 'invited_by_id').first();
-  expectTypeOf(result).toEqualTypeOf<
-    Promise<{ id: number; invited_by_id: number | null } | null>
-  >();
+  const result = db.users.insert({ id: 1 }).returning('id', 'invited_by_id').build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<{ id: number; invited_by_id: number | null }>>();
 });
 
 test('INSERT values accept codec input types', () => {

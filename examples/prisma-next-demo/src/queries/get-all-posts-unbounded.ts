@@ -1,5 +1,4 @@
 import { db } from '../prisma/db';
-import { collect } from './utils';
 
 /**
  * WARNING: This query intentionally violates the row budget to demonstrate
@@ -16,5 +15,6 @@ import { collect } from './utils';
  * To fix this query, add a .limit() clause or add proper filtering.
  */
 export async function getAllPostsUnbounded() {
-  return collect(db.sql.post.select('id', 'title', 'userId', 'createdAt').all());
+  const plan = db.sql.post.select('id', 'title', 'userId', 'createdAt').build();
+  return db.runtime().execute(plan);
 }

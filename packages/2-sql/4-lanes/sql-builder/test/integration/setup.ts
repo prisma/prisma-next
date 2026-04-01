@@ -23,12 +23,6 @@ export { timeouts };
 
 const sqlContract = validateContract<Contract>(contract);
 
-export async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
-  const out: T[] = [];
-  for await (const item of iter) out.push(item);
-  return out;
-}
-
 export function setupIntegrationTest() {
   let runtime: Runtime;
   let context: ExecutionContext<typeof sqlContract>;
@@ -147,9 +141,8 @@ export function setupIntegrationTest() {
     }
   });
 
-  function db() {
-    return sql({ context, runtime });
-  }
-
-  return { db };
+  return {
+    db: () => sql({ context }),
+    runtime: () => runtime,
+  };
 }

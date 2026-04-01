@@ -119,7 +119,7 @@ export class InsertQueryImpl<
     },
   );
 
-  #buildPlan(): SqlQueryPlan {
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>> {
     const paramValues = buildParamValues(
       this.#values,
       this.#table,
@@ -134,26 +134,7 @@ export class InsertQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildQueryPlan(ast, this.#rowFields, this.ctx);
-  }
-
-  async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {
-    const plan = this.#buildPlan();
-    for await (const row of this.ctx.runtime.execute(plan)) {
-      return row as ResolveRow<RowType, QC['codecTypes']>;
-    }
-    return null;
-  }
-
-  async firstOrThrow(): Promise<ResolveRow<RowType, QC['codecTypes']>> {
-    const result = await this.first();
-    if (result === null) throw new Error('Expected at least one row, but none were returned');
-    return result;
-  }
-
-  all(): AsyncIterable<ResolveRow<RowType, QC['codecTypes']>> {
-    const plan = this.#buildPlan();
-    return this.ctx.runtime.execute(plan) as AsyncIterable<ResolveRow<RowType, QC['codecTypes']>>;
+    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes']>>(ast, this.#rowFields, this.ctx);
   }
 }
 
@@ -229,7 +210,7 @@ export class UpdateQueryImpl<
     },
   );
 
-  #buildPlan(): SqlQueryPlan {
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>> {
     const setParams = buildParamValues(
       this.#setValues,
       this.#table,
@@ -252,26 +233,7 @@ export class UpdateQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildQueryPlan(ast, this.#rowFields, this.ctx);
-  }
-
-  async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {
-    const plan = this.#buildPlan();
-    for await (const row of this.ctx.runtime.execute(plan)) {
-      return row as ResolveRow<RowType, QC['codecTypes']>;
-    }
-    return null;
-  }
-
-  async firstOrThrow(): Promise<ResolveRow<RowType, QC['codecTypes']>> {
-    const result = await this.first();
-    if (result === null) throw new Error('Expected at least one row, but none were returned');
-    return result;
-  }
-
-  all(): AsyncIterable<ResolveRow<RowType, QC['codecTypes']>> {
-    const plan = this.#buildPlan();
-    return this.ctx.runtime.execute(plan) as AsyncIterable<ResolveRow<RowType, QC['codecTypes']>>;
+    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes']>>(ast, this.#rowFields, this.ctx);
   }
 }
 
@@ -337,7 +299,7 @@ export class DeleteQueryImpl<
     },
   );
 
-  #buildPlan(): SqlQueryPlan {
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>> {
     const whereExpr = combineWhereExprs(
       this.#whereCallbacks.map((cb) =>
         evaluateWhere(cb, this.#scope, this.ctx.queryOperationTypes),
@@ -350,25 +312,6 @@ export class DeleteQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildQueryPlan(ast, this.#rowFields, this.ctx);
-  }
-
-  async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {
-    const plan = this.#buildPlan();
-    for await (const row of this.ctx.runtime.execute(plan)) {
-      return row as ResolveRow<RowType, QC['codecTypes']>;
-    }
-    return null;
-  }
-
-  async firstOrThrow(): Promise<ResolveRow<RowType, QC['codecTypes']>> {
-    const result = await this.first();
-    if (result === null) throw new Error('Expected at least one row, but none were returned');
-    return result;
-  }
-
-  all(): AsyncIterable<ResolveRow<RowType, QC['codecTypes']>> {
-    const plan = this.#buildPlan();
-    return this.ctx.runtime.execute(plan) as AsyncIterable<ResolveRow<RowType, QC['codecTypes']>>;
+    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes']>>(ast, this.#rowFields, this.ctx);
   }
 }

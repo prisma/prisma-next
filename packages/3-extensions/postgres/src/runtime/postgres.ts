@@ -171,7 +171,6 @@ export default function postgres<
   });
 
   const schema = schemaBuilder<TContract, TTypeMaps>(context);
-  let sqlInstance: Db<TContract> | undefined;
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -242,20 +241,10 @@ export default function postgres<
     context,
   });
 
-  // sql-builder's sql() requires a Runtime instance at construction time (it's stored in
-  // BuilderContext and used when queries execute via .first()/.all()). Since runtime creation
-  // also initiates background driver connection when a binding is provided, we defer both
-  // runtime and sql creation until first access to preserve the lazy-connect lifecycle.
-  const getSql = (): Db<TContract> => {
-    if (sqlInstance) return sqlInstance;
-    sqlInstance = sqlBuilder<TContract>({ context, runtime: getRuntime() });
-    return sqlInstance;
-  };
+  const sql: Db<TContract> = sqlBuilder<TContract>({ context });
 
   return {
-    get sql() {
-      return getSql();
-    },
+    sql,
     schema: schema as PostgresClient<TContract, TTypeMaps>['schema'],
     orm,
     context,

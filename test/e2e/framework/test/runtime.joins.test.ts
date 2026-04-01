@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
-import { collect, withTestRuntime } from './utils';
+import { withTestRuntime } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -13,7 +13,7 @@ describe('end-to-end JOIN queries', () => {
   it(
     'INNER JOIN returns matching rows',
     async () => {
-      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
         await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
           'ada@example.com',
           'tess@example.com',
@@ -24,7 +24,7 @@ describe('end-to-end JOIN queries', () => {
           [1, 'First Post', true, 'Second Post', false, 2, 'Third Post', true],
         );
 
-        const rows = await collect(
+        const rows = await runtime.execute(
           db.user
             .innerJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
             .select((f) => ({
@@ -33,7 +33,7 @@ describe('end-to-end JOIN queries', () => {
               postId: f.post.id,
               title: f.post.title,
             }))
-            .all(),
+            .build(),
         );
 
         expect(rows.length).toBe(3);
@@ -51,7 +51,7 @@ describe('end-to-end JOIN queries', () => {
   it(
     'LEFT JOIN returns all users including those without posts',
     async () => {
-      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
         await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
           'ada@example.com',
           'tess@example.com',
@@ -63,7 +63,7 @@ describe('end-to-end JOIN queries', () => {
           true,
         ]);
 
-        const rows = await collect(
+        const rows = await runtime.execute(
           db.user
             .outerLeftJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
             .select((f) => ({
@@ -72,7 +72,7 @@ describe('end-to-end JOIN queries', () => {
               postId: f.post.id,
               title: f.post.title,
             }))
-            .all(),
+            .build(),
         );
 
         expect(rows.length).toBe(3);
@@ -105,14 +105,14 @@ describe('end-to-end JOIN queries', () => {
   it(
     'RIGHT JOIN returns all posts including those without users',
     async () => {
-      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
         await client.query('insert into "user" (email) values ($1)', ['ada@example.com']);
         await client.query(
           'insert into "post" ("userId", title, published) values ($1, $2, $3), ($4, $5, $6)',
           [1, 'First Post', true, 999, 'Orphan Post', true],
         );
 
-        const rows = await collect(
+        const rows = await runtime.execute(
           db.user
             .outerRightJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
             .select((f) => ({
@@ -121,7 +121,7 @@ describe('end-to-end JOIN queries', () => {
               postId: f.post.id,
               title: f.post.title,
             }))
-            .all(),
+            .build(),
         );
 
         expect(rows.length).toBe(2);
@@ -147,7 +147,7 @@ describe('end-to-end JOIN queries', () => {
   it(
     'FULL JOIN returns all users and posts',
     async () => {
-      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
         await client.query('insert into "user" (email) values ($1), ($2)', [
           'ada@example.com',
           'tess@example.com',
@@ -157,7 +157,7 @@ describe('end-to-end JOIN queries', () => {
           [1, 'First Post', true, 999, 'Orphan Post', true],
         );
 
-        const rows = await collect(
+        const rows = await runtime.execute(
           db.user
             .outerFullJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
             .select((f) => ({
@@ -166,7 +166,7 @@ describe('end-to-end JOIN queries', () => {
               postId: f.post.id,
               title: f.post.title,
             }))
-            .all(),
+            .build(),
         );
 
         expect(rows.length).toBe(3);
@@ -197,7 +197,7 @@ describe('end-to-end JOIN queries', () => {
   it(
     'chained joins (user -> post -> comment) returns correct results',
     async () => {
-      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
         await client.query('insert into "user" (email) values ($1), ($2)', [
           'ada@example.com',
           'tess@example.com',
@@ -212,7 +212,7 @@ describe('end-to-end JOIN queries', () => {
           'Second Comment',
         ]);
 
-        const rows = await collect(
+        const rows = await runtime.execute(
           db.user
             .innerJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
             .outerLeftJoin(db.comment, (f, fns) => fns.eq(f.post.id, f.comment.postId))
@@ -224,7 +224,7 @@ describe('end-to-end JOIN queries', () => {
               commentId: f.comment.id,
               content: f.comment.content,
             }))
-            .all(),
+            .build(),
         );
 
         expect(rows.length).toBe(3);
