@@ -252,15 +252,14 @@ model Post {
         },
       },
     });
-    expect(result.value.relations).toMatchObject({
-      post: {
-        author: {
-          to: 'User',
-          cardinality: 'N:1',
-          on: {
-            parentCols: ['userId'],
-            childCols: ['id'],
-          },
+    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    expect(models['Post']?.relations).toMatchObject({
+      author: {
+        to: 'User',
+        cardinality: 'N:1',
+        on: {
+          localFields: ['userId'],
+          targetFields: ['id'],
         },
       },
     });
