@@ -72,6 +72,19 @@ Draft migrations from `migration new` are invisible to `migration status` and `m
 - [ ] `migration plan`: error if a draft package targeting the same `to` hash already exists
 - [ ] Update `loadMigrationBundles` or add a variant that returns both attested and draft bundles
 
+### Milestone: Slot in existing typed client for dataTransform check/run
+
+The current dataTransform API accepts `SerializedQueryNode` objects directly (`raw_sql` nodes as stopgap). The intended API uses the existing ORM/query builder client: `check: (db) => db.users.findFirst(...)`, `run: (db) => [db.users.updateMany(...), ...]`. The client already exists — this milestone is about wiring it in and serializing the ASTs it produces.
+
+**Tasks:**
+
+- [ ] Update dataTransform descriptor to accept callbacks (`(db) => AST | AST[]`) instead of direct `SerializedQueryNode`
+- [ ] At verify time, pass the existing typed client to check/run callbacks, capture the returned ASTs
+- [ ] Serialize the captured ASTs to JSON in ops.json (the serialization format depends on the query builder's AST shape)
+- [ ] Update query-node-renderer to deserialize and render these ASTs to SQL at apply time (replacing the `raw_sql` passthrough)
+- [ ] Raw SQL remains supported automatically through the typed client's raw SQL capabilities
+- [ ] Update E2E test to use callback-based API
+
 ### Milestone: Planner detection and scaffolding
 
 The planner detects data migration needs and produces `migration.ts` files with operation builder calls (including `dataTransform` placeholders).

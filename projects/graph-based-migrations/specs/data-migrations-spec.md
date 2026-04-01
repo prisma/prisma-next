@@ -104,17 +104,17 @@ These apply across the entire solution:
 
 All migrations — structural and data — are authored as TypeScript files that return a list of operations. The file is evaluated at verification time to produce JSON ASTs, which are written to `ops.json`. At apply time, only the serialized ASTs are loaded and rendered to SQL by the target adapter.
 
-The planner generates these TypeScript files. When the planner detects patterns (column split, type change with backfill), it emits strategy calls — convenience wrappers that expand to correctly-ordered sequences of primitive operations. The user can also author migration files manually via `migration new`.
+The planner will generate these TypeScript files (not yet implemented — see plan for planner detection milestone). When the planner detects patterns (column split, type change with backfill), it will emit operation sequences with data transform placeholders. The user can also author migration files manually via `migration new`.
 
-A data transform is just another operation in the chain — it has a name (the invariant identity), plus `check` and `run` expressions built with the query builder:
+A data transform is just another operation in the chain — it has a name (the invariant identity), plus `check` and `run` callbacks that receive a typed client and return query ASTs:
 
 ```typescript
-// migrations/0003_split_name/migration.ts
+// migrations/0003_split_name/migration.ts — intended API (query builder callbacks)
 import { addColumn, dropColumn, setNotNull, dataTransform } from '@prisma-next/migration'
 
 export default () => [
-  addColumn("users", "first_name", { type: "varchar", nullable: true }),
-  addColumn("users", "last_name", { type: "varchar", nullable: true }),
+  addColumn("users", "first_name", { nullable: true }),
+  addColumn("users", "last_name", { nullable: true }),
   dataTransform("split-user-name", {
     check: (client) => client.users.findFirst({ where: { firstName: null } }),
     run: (client) => client.users.update({
@@ -128,7 +128,28 @@ export default () => [
 ]
 ```
 
-The `check` and `run` callbacks receive a query builder client and return ASTs — they do not execute queries. At verification time, the system evaluates the TS, calls these callbacks to capture the ASTs, and serializes everything into `ops.json`. The `dataTransform`'s `check` and `run` ASTs are serialized alongside the structural op ASTs.
+The `check` and `run` callbacks receive a typed query builder client and return ASTs — they do not execute queries. At verification time, the system evaluates the TS, calls these callbacks to capture the ASTs, and serializes everything into `ops.json`.
+
+**Current v1 implementation**: The callback-based API is not yet implemented. Data transforms currently accept `SerializedQueryNode` objects directly, with `raw_sql` nodes as a stopgap:
+
+```typescript
+// migrations/0003_split_name/migration.ts — current v1 API (raw_sql nodes)
+import { addColumn, dropColumn, setNotNull, dataTransform } from '@prisma-next/target-postgres/migration-builders'
+
+export default () => [
+  addColumn("users", "first_name", { nullable: true }),
+  addColumn("users", "last_name", { nullable: true }),
+  dataTransform("split-user-name", {
+    check: { kind: "raw_sql", sql: 'SELECT 1 FROM "users" WHERE "first_name" IS NULL LIMIT 1' },
+    run: { kind: "raw_sql", sql: 'UPDATE "users" SET "first_name" = split_part("name", \' \', 1), "last_name" = split_part("name", \' \', 2) WHERE "first_name" IS NULL' },
+  }),
+  setNotNull("users", "first_name"),
+  setNotNull("users", "last_name"),
+  dropColumn("users", "name"),
+]
+```
+
+The `raw_sql` node is a temporary workaround until the typed client and query builder AST serialization are built. The callback-based API will replace direct `SerializedQueryNode` construction — the verify step will pass a typed client to the callbacks, capture the returned ASTs, and serialize them.
 
 ### Strategies (R2)
 
