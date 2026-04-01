@@ -32,6 +32,8 @@ export default defineConfig({
         // The formatters/ directory was split from the former output.ts monolith.
         'src/utils/formatters/emit.ts',
         'src/utils/formatters/errors.ts',
+        'src/utils/formatters/graph-migration-mapper.ts',
+        'src/utils/formatters/graph-render.ts',
         'src/utils/formatters/help.ts',
         'src/utils/formatters/migrations.ts',
         'src/utils/formatters/styled.ts',
