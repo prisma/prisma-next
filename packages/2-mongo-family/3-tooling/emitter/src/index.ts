@@ -166,8 +166,14 @@ export const mongoTargetFamilyHook = {
           `Model "${modelName}" is missing required field "relations" (must be an object)`,
         );
       }
+      if (!model.storage || typeof model.storage !== 'object') {
+        throw new Error(
+          `Model "${modelName}" is missing required field "storage" (must be an object)`,
+        );
+      }
 
-      const collection = model.storage['collection'] as string | undefined;
+      const collectionValue = model.storage['collection'];
+      const collection = typeof collectionValue === 'string' ? collectionValue : undefined;
 
       if (model.owner) {
         if (collection) {
@@ -190,14 +196,17 @@ export const mongoTargetFamilyHook = {
 
       if (model.base) {
         const baseModel = models[model.base];
-        if (baseModel) {
-          const variantCollection = collection;
-          const baseCollection = baseModel.storage['collection'] as string | undefined;
-          if (variantCollection !== baseCollection) {
-            throw new Error(
-              `Variant "${modelName}" must share its base's collection ("${baseCollection ?? '(none)'}"), but has "${variantCollection ?? '(none)'}"`,
-            );
-          }
+        if (!baseModel) {
+          throw new Error(
+            `Model "${modelName}" declares base "${model.base}" which does not exist in models`,
+          );
+        }
+        const variantCollection = collection;
+        const baseCollection = baseModel.storage['collection'] as string | undefined;
+        if (variantCollection !== baseCollection) {
+          throw new Error(
+            `Variant "${modelName}" must share its base's collection ("${baseCollection ?? '(none)'}"), but has "${variantCollection ?? '(none)'}"`,
+          );
         }
       }
 
@@ -207,6 +216,19 @@ export const mongoTargetFamilyHook = {
           if (!model.relations[relName]) {
             throw new Error(
               `Model "${modelName}" has storage.relations.${relName} but no matching domain-level relation`,
+            );
+          }
+        }
+      }
+
+      for (const [relName, rel] of Object.entries(model.relations)) {
+        const relObj = rel as Record<string, unknown>;
+        const targetModelName = relObj['to'] as string | undefined;
+        if (targetModelName) {
+          const targetModel = models[targetModelName];
+          if (targetModel?.owner === modelName && !storageRelations?.[relName]) {
+            throw new Error(
+              `Model "${modelName}" has embed relation "${relName}" to owned model "${targetModelName}" but no matching storage.relations entry`,
             );
           }
         }

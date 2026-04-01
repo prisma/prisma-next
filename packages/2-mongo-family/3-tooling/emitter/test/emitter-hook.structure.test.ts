@@ -191,6 +191,60 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
     );
   });
 
+  it('throws when model is missing storage', () => {
+    const ir = createMongoIR({
+      models: {
+        User: {
+          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          relations: {},
+        },
+      },
+      storage: { collections: { users: {} } },
+    });
+    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+      'missing required field "storage"',
+    );
+  });
+
+  it('throws when base model does not exist', () => {
+    const ir = createMongoIR({
+      models: {
+        Bug: {
+          fields: { severity: { codecId: 'mongo/string@1', nullable: false } },
+          relations: {},
+          storage: { collection: 'tasks' },
+          base: 'NonExistent',
+        },
+      },
+      storage: { collections: { tasks: {} } },
+    });
+    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+      'declares base "NonExistent" which does not exist',
+    );
+  });
+
+  it('throws when embed relation to owned model is missing storage.relations entry', () => {
+    const ir = createMongoIR({
+      models: {
+        User: {
+          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          relations: { addresses: { to: 'Address', cardinality: '1:N' } },
+          storage: { collection: 'users' },
+        },
+        Address: {
+          fields: { street: { codecId: 'mongo/string@1', nullable: false } },
+          relations: {},
+          storage: {},
+          owner: 'User',
+        },
+      },
+      storage: { collections: { users: {} } },
+    });
+    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+      'embed relation "addresses" to owned model "Address" but no matching storage.relations entry',
+    );
+  });
+
   it('throws when storage.relations key has no matching domain-level relation', () => {
     const ir = createMongoIR({
       models: {
