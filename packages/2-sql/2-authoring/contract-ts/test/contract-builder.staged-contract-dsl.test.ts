@@ -40,7 +40,7 @@ describe('staged contract DSL authoring surface', () => {
         createdAt: field.column(timestamptzColumn).column('created_at').defaultSql('now()'),
       },
       relations: {
-        posts: rel.hasMany('Post', { by: 'userId' }),
+        posts: rel.hasMany(() => Post, { by: 'userId' }),
       },
     }).sql({
       table: 'app_user',
@@ -243,8 +243,8 @@ describe('staged contract DSL authoring surface', () => {
         title: field.column(textColumn),
       },
       relations: {
-        tags: rel.manyToMany('Tag', {
-          through: 'PostTag',
+        tags: rel.manyToMany(() => Tag, {
+          through: () => PostTag,
           from: 'postId',
           to: 'tagId',
         }),

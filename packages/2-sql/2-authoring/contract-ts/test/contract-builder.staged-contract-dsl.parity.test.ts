@@ -245,8 +245,8 @@ describe('staged contract DSL parity with legacy builder', () => {
         title: field.column(textColumn),
       },
       relations: {
-        tags: rel.manyToMany('Tag', {
-          through: 'PostTag',
+        tags: rel.manyToMany(() => Tag, {
+          through: () => PostTag,
           from: 'postId',
           to: 'tagId',
         }),

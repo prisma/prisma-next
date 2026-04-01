@@ -41,7 +41,7 @@ function buildPortableContract<TTarget extends string>(target: PortableTargetPac
       createdAt: field.column(timestampColumn).defaultSql('CURRENT_TIMESTAMP'),
     },
     relations: {
-      posts: rel.hasMany('Post', { by: 'authorId' }),
+      posts: rel.hasMany(() => Post, { by: 'authorId' }),
     },
   }).sql({
     table: 'app_user',
