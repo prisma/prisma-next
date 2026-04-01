@@ -1,4 +1,4 @@
-type Task = Record<string, unknown>;
+import type { ApiTask } from '../types';
 
 function getSeverityClass(severity: string): string {
   switch (severity) {
@@ -22,46 +22,42 @@ function getPriorityClass(priority: string): string {
   }
 }
 
-function TaskCard({ task }: { task: Task }) {
-  const isBug = task['type'] === 'bug';
-  const comments = (task['comments'] ?? []) as Array<Record<string, unknown>>;
-  const assignee = task['assignee'] as Record<string, unknown> | undefined;
-
+function TaskCard({ task }: { task: ApiTask }) {
   return (
-    <div className={`card ${isBug ? 'card-bug' : 'card-feature'}`}>
+    <div className={`card ${task.type === 'bug' ? 'card-bug' : 'card-feature'}`}>
       <div className="card-header">
-        <span className={`type-badge ${isBug ? 'type-bug' : 'type-feature'}`}>
-          {isBug ? 'Bug' : 'Feature'}
+        <span className={`type-badge ${task.type === 'bug' ? 'type-bug' : 'type-feature'}`}>
+          {task.type === 'bug' ? 'Bug' : 'Feature'}
         </span>
-        <h3>{task['title'] as string}</h3>
+        <h3>{task.title}</h3>
       </div>
 
       <div className="card-meta">
-        {isBug ? (
-          <span className={`badge ${getSeverityClass(task['severity'] as string)}`}>
-            Severity: {task['severity'] as string}
+        {task.type === 'bug' ? (
+          <span className={`badge ${getSeverityClass(task.severity)}`}>
+            Severity: {task.severity}
           </span>
         ) : (
           <>
-            <span className={`badge ${getPriorityClass(task['priority'] as string)}`}>
-              Priority: {task['priority'] as string}
+            <span className={`badge ${getPriorityClass(task.priority)}`}>
+              Priority: {task.priority}
             </span>
-            <span className="badge badge-release">Release: {task['targetRelease'] as string}</span>
+            <span className="badge badge-release">Release: {task.targetRelease}</span>
           </>
         )}
 
-        {assignee && (
-          <span className="badge badge-assignee">Assignee: {assignee['name'] as string}</span>
+        {task.assignee && (
+          <span className="badge badge-assignee">Assignee: {task.assignee.name}</span>
         )}
       </div>
 
-      {comments.length > 0 && (
+      {task.comments.length > 0 && (
         <div className="comments">
-          <h4>Comments ({comments.length})</h4>
-          {comments.map((comment) => (
-            <div key={comment['_id'] as string} className="comment">
-              <p>{comment['text'] as string}</p>
-              <time>{new Date(comment['createdAt'] as string).toLocaleDateString()}</time>
+          <h4>Comments ({task.comments.length})</h4>
+          {task.comments.map((comment) => (
+            <div key={comment._id} className="comment">
+              <p>{comment.text}</p>
+              <time>{new Date(comment.createdAt).toLocaleDateString()}</time>
             </div>
           ))}
         </div>
@@ -70,9 +66,9 @@ function TaskCard({ task }: { task: Task }) {
   );
 }
 
-export function TaskList({ tasks }: { tasks: Task[] }) {
-  const bugs = tasks.filter((t) => t['type'] === 'bug');
-  const features = tasks.filter((t) => t['type'] === 'feature');
+export function TaskList({ tasks }: { tasks: ApiTask[] }) {
+  const bugs = tasks.filter((t): t is ApiTask & { type: 'bug' } => t.type === 'bug');
+  const features = tasks.filter((t): t is ApiTask & { type: 'feature' } => t.type === 'feature');
 
   return (
     <div className="task-list">
@@ -80,7 +76,7 @@ export function TaskList({ tasks }: { tasks: Task[] }) {
         <h2>Bugs ({bugs.length})</h2>
         <div className="cards">
           {bugs.map((task) => (
-            <TaskCard key={task['_id'] as string} task={task} />
+            <TaskCard key={task._id} task={task} />
           ))}
         </div>
       </section>
@@ -89,7 +85,7 @@ export function TaskList({ tasks }: { tasks: Task[] }) {
         <h2>Features ({features.length})</h2>
         <div className="cards">
           {features.map((task) => (
-            <TaskCard key={task['_id'] as string} task={task} />
+            <TaskCard key={task._id} task={task} />
           ))}
         </div>
       </section>

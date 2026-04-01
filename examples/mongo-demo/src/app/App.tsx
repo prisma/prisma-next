@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ApiTask, ApiUser } from '../types';
 import { TaskList } from './TaskList';
 import { UserList } from './UserList';
 
@@ -6,8 +7,8 @@ type Tab = 'tasks' | 'users';
 
 export function App() {
   const [tab, setTab] = useState<Tab>('tasks');
-  const [tasks, setTasks] = useState<Array<Record<string, unknown>>>([]);
-  const [users, setUsers] = useState<Array<Record<string, unknown>>>([]);
+  const [tasks, setTasks] = useState<ApiTask[]>([]);
+  const [users, setUsers] = useState<ApiUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,8 +21,8 @@ export function App() {
           throw new Error('API request failed');
         }
 
-        setTasks(await tasksRes.json());
-        setUsers(await usersRes.json());
+        setTasks((await tasksRes.json()) as ApiTask[]);
+        setUsers((await usersRes.json()) as ApiUser[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
