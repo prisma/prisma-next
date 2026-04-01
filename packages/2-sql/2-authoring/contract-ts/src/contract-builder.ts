@@ -539,38 +539,6 @@ class SqlContractBuilder<
 
     const models = modelsPartial as unknown as BuildModels<Models>;
 
-    const relationsPartial: Partial<Record<string, Record<string, RelationDefinition>>> = {};
-    for (const modelName in this.state.models) {
-      const modelState = this.state.models[modelName];
-      if (!modelState) continue;
-
-      const modelStateTyped = modelState as unknown as {
-        name: string;
-        table: string;
-        fields: Record<string, string>;
-        relations: Record<string, RelationDefinition>;
-      };
-
-      const tableName = modelStateTyped.table;
-      if (!tableName) continue;
-
-      if (modelStateTyped.relations && Object.keys(modelStateTyped.relations).length > 0) {
-        if (!relationsPartial[tableName]) {
-          relationsPartial[tableName] = {};
-        }
-
-        const tableRelations = relationsPartial[tableName];
-        if (tableRelations) {
-          for (const relationName in modelStateTyped.relations) {
-            const relation = modelStateTyped.relations[relationName];
-            if (relation) {
-              tableRelations[relationName] = relation;
-            }
-          }
-        }
-      }
-    }
-
     const extensionNamespaces = this.state.extensionNamespaces ?? [];
     const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };
     for (const namespace of extensionNamespaces) {
@@ -585,7 +553,6 @@ class SqlContractBuilder<
       targetFamily: 'sql' as const,
       storageHash: this.state.storageHash || 'sha256:ts-builder-placeholder',
       models,
-      relations: relationsPartial,
       roots: {},
       storage,
       ...(execution ? { execution } : {}),
