@@ -316,6 +316,10 @@ export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
   );
 }
 
+function isAuthoringTemplateRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export function isAuthoringTypeConstructorDescriptor(
   value: unknown,
 ): value is AuthoringTypeConstructorDescriptor {
@@ -344,7 +348,7 @@ export function resolveAuthoringTemplateValue(
     let value = args[template.index];
 
     for (const segment of template.path ?? []) {
-      if (typeof value !== 'object' || value === null || !(segment in value)) {
+      if (!isAuthoringTemplateRecord(value) || !Object.hasOwn(value, segment)) {
         value = undefined;
         break;
       }
@@ -466,14 +470,24 @@ function resolveAuthoringStorageTypeTemplate(
   readonly typeParams?: Record<string, unknown>;
 } {
   const nativeType = resolveAuthoringTemplateValue(template.nativeType, args);
+  if (typeof nativeType !== 'string') {
+    throw new Error(
+      `Resolved authoring nativeType must be a string for codec "${template.codecId}", received ${String(nativeType)}`,
+    );
+  }
   const typeParams =
     template.typeParams === undefined
       ? undefined
-      : (resolveAuthoringTemplateValue(template.typeParams, args) as Record<string, unknown>);
+      : resolveAuthoringTemplateValue(template.typeParams, args);
+  if (typeParams !== undefined && !isAuthoringTemplateRecord(typeParams)) {
+    throw new Error(
+      `Resolved authoring typeParams must be an object for codec "${template.codecId}", received ${String(typeParams)}`,
+    );
+  }
 
   return {
     codecId: template.codecId,
-    nativeType: typeof nativeType === 'string' ? nativeType : String(nativeType),
+    nativeType,
     ...(typeParams === undefined ? {} : { typeParams }),
   };
 }
@@ -498,9 +512,14 @@ function resolveAuthoringColumnDefaultTemplate(
   }
 
   const expression = resolveAuthoringTemplateValue(template.expression, args);
+  if (expression === undefined || (typeof expression === 'object' && expression !== null)) {
+    throw new Error(
+      `Resolved authoring function default expression must resolve to a primitive, received ${String(expression)}`,
+    );
+  }
   return {
     kind: 'function',
-    expression: typeof expression === 'string' ? expression : String(expression),
+    expression: String(expression),
   };
 }
 
