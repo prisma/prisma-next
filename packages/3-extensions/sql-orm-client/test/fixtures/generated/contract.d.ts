@@ -21,9 +21,6 @@ import type {
 } from '@prisma-next/contract/types';
 import type {
   SqlContract,
-  SqlStorage,
-  SqlMappings,
-  ModelDefinition,
   ContractWithTypeMaps,
   TypeMaps as TypeMapsType,
 } from '@prisma-next/sql-contract/types';
@@ -394,142 +391,6 @@ type ContractBase = SqlContract<
       readonly relations: {};
     };
   },
-  {
-    readonly users: {
-      readonly invitedUsers: {
-        readonly to: 'User';
-        readonly cardinality: '1:N';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['invited_by_id'];
-        };
-      };
-      readonly invitedBy: {
-        readonly to: 'User';
-        readonly cardinality: 'N:1';
-        readonly on: {
-          readonly parentCols: readonly ['invited_by_id'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-      readonly posts: {
-        readonly to: 'Post';
-        readonly cardinality: '1:N';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['user_id'];
-        };
-      };
-      readonly profile: {
-        readonly to: 'Profile';
-        readonly cardinality: '1:1';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['user_id'];
-        };
-      };
-    };
-    readonly posts: {
-      readonly comments: {
-        readonly to: 'Comment';
-        readonly cardinality: '1:N';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['post_id'];
-        };
-      };
-      readonly author: {
-        readonly to: 'User';
-        readonly cardinality: 'N:1';
-        readonly on: {
-          readonly parentCols: readonly ['user_id'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-    };
-    readonly profiles: {
-      readonly user: {
-        readonly to: 'User';
-        readonly cardinality: '1:1';
-        readonly on: {
-          readonly parentCols: readonly ['user_id'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-    };
-    readonly articles: {
-      readonly reviewer: {
-        readonly to: 'User';
-        readonly cardinality: 'N:1';
-        readonly on: {
-          readonly parentCols: readonly ['reviewer_id'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-    };
-  },
-  {
-    modelToTable: {
-      readonly User: 'users';
-      readonly Post: 'posts';
-      readonly Comment: 'comments';
-      readonly Profile: 'profiles';
-      readonly Article: 'articles';
-      readonly Tag: 'tags';
-    };
-    tableToModel: {
-      readonly users: 'User';
-      readonly posts: 'Post';
-      readonly comments: 'Comment';
-      readonly profiles: 'Profile';
-      readonly articles: 'Article';
-      readonly tags: 'Tag';
-    };
-    fieldToColumn: {
-      readonly User: {
-        readonly id: 'id';
-        readonly name: 'name';
-        readonly email: 'email';
-        readonly invitedById: 'invited_by_id';
-      };
-      readonly Post: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly userId: 'user_id';
-        readonly views: 'views';
-      };
-      readonly Comment: { readonly id: 'id'; readonly body: 'body'; readonly postId: 'post_id' };
-      readonly Profile: { readonly id: 'id'; readonly userId: 'user_id'; readonly bio: 'bio' };
-      readonly Article: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly reviewerId: 'reviewer_id';
-      };
-      readonly Tag: { readonly id: 'id'; readonly name: 'name' };
-    };
-    columnToField: {
-      readonly users: {
-        readonly id: 'id';
-        readonly name: 'name';
-        readonly email: 'email';
-        readonly invited_by_id: 'invitedById';
-      };
-      readonly posts: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly user_id: 'userId';
-        readonly views: 'views';
-      };
-      readonly comments: { readonly id: 'id'; readonly body: 'body'; readonly post_id: 'postId' };
-      readonly profiles: { readonly id: 'id'; readonly user_id: 'userId'; readonly bio: 'bio' };
-      readonly articles: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly reviewer_id: 'reviewerId';
-      };
-      readonly tags: { readonly id: 'id'; readonly name: 'name' };
-    };
-  },
   StorageHash,
   ExecutionHash,
   ProfileHash
@@ -562,4 +423,3 @@ export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Tables = Contract['storage']['tables'];
 export type Models = Contract['models'];
-export type Relations = Contract['relations'];
