@@ -461,47 +461,12 @@ function resolveAddForeignKey(
         f.references.table === desc.references.table),
   );
 
-  if (fk) {
-    return {
-      id: `foreignKey.${desc.table}.${fkName}`,
-      label: `Add foreign key "${fkName}" on "${desc.table}"`,
-      operationClass: 'additive',
-      target: targetDetails('foreignKey', fkName, ctx.schemaName, desc.table),
-      precheck: [
-        step(
-          `ensure FK "${fkName}" does not exist`,
-          constraintExistsCheck({
-            constraintName: fkName,
-            schema: ctx.schemaName,
-            table: desc.table,
-            exists: false,
-          }),
-        ),
-      ],
-      execute: [
-        step(`add FK "${fkName}"`, buildForeignKeySql(ctx.schemaName, desc.table, fkName, fk)),
-      ],
-      postcheck: [
-        step(
-          `verify FK "${fkName}" exists`,
-          constraintExistsCheck({
-            constraintName: fkName,
-            schema: ctx.schemaName,
-            table: desc.table,
-          }),
-        ),
-      ],
-    };
+  if (!fk) {
+    throw new Error(
+      `Foreign key on "${desc.table}" (${desc.columns.join(', ')}) → "${desc.references.table}" not found in destination contract. ` +
+        'Ensure the FK is declared in the contract before authoring a migration that adds it.',
+    );
   }
-
-  // Fallback: build SQL from descriptor directly (no contract FK found)
-  const qualified = qualifyTableName(ctx.schemaName, desc.table);
-  const refQualified = qualifyTableName(ctx.schemaName, desc.references.table);
-  const columnList = desc.columns.map(quoteId).join(', ');
-  const refColumnList = desc.references.columns.map(quoteId).join(', ');
-  let sql = `ALTER TABLE ${qualified} ADD CONSTRAINT ${quoteId(fkName)} FOREIGN KEY (${columnList}) REFERENCES ${refQualified} (${refColumnList})`;
-  if (desc.onDelete) sql += `\nON DELETE ${desc.onDelete}`;
-  if (desc.onUpdate) sql += `\nON UPDATE ${desc.onUpdate}`;
 
   return {
     id: `foreignKey.${desc.table}.${fkName}`,
@@ -519,7 +484,9 @@ function resolveAddForeignKey(
         }),
       ),
     ],
-    execute: [step(`add FK "${fkName}"`, sql)],
+    execute: [
+      step(`add FK "${fkName}"`, buildForeignKeySql(ctx.schemaName, desc.table, fkName, fk)),
+    ],
     postcheck: [
       step(
         `verify FK "${fkName}" exists`,
