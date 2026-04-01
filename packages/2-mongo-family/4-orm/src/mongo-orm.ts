@@ -1,4 +1,4 @@
-import type { PlanMeta } from '@prisma-next/contract/types';
+import type { DomainReferenceRelation, PlanMeta } from '@prisma-next/contract/types';
 import {
   AggregateCommand,
   FindCommand,
@@ -7,7 +7,6 @@ import {
   type MongoExpr,
   type MongoModelDefinition,
   type MongoQueryPlan,
-  type MongoReferenceRelation,
   type MongoTypeMaps,
 } from '@prisma-next/mongo-core';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
@@ -41,31 +40,31 @@ function buildLookupStages(
     if (!shouldInclude) continue;
 
     const relation = model.relations[relName];
-    if (!relation || relation.strategy !== 'reference') continue;
+    if (!relation) continue;
 
-    const refRelation = relation as MongoReferenceRelation;
+    const targetModel = contract.models[relation.to];
+    if (!targetModel || targetModel.owner) continue;
 
-    if (refRelation.on.localFields.length !== 1 || refRelation.on.targetFields.length !== 1) {
+    const ref = relation as DomainReferenceRelation;
+
+    if (ref.on.localFields.length !== 1 || ref.on.targetFields.length !== 1) {
       throw new Error(
-        `Compound references are not yet supported: relation "${relName}" has ${refRelation.on.localFields.length} local field(s) and ${refRelation.on.targetFields.length} target field(s)`,
+        `Compound references are not yet supported: relation "${relName}" has ${ref.on.localFields.length} local field(s) and ${ref.on.targetFields.length} target field(s)`,
       );
     }
 
-    const targetModel = contract.models[refRelation.to];
-    if (!targetModel) continue;
-
-    const targetCollection = resolveCollection(targetModel, refRelation.to);
+    const targetCollection = resolveCollection(targetModel, ref.to);
 
     stages.push({
       $lookup: {
         from: targetCollection,
-        localField: refRelation.on.localFields[0],
-        foreignField: refRelation.on.targetFields[0],
+        localField: ref.on.localFields[0],
+        foreignField: ref.on.targetFields[0],
         as: relName,
       },
     });
 
-    if (refRelation.cardinality === 'N:1' || refRelation.cardinality === '1:1') {
+    if (ref.cardinality === 'N:1' || ref.cardinality === '1:1') {
       stages.push({
         $unwind: {
           path: `$${relName}`,
