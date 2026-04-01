@@ -347,6 +347,28 @@ export interface TargetMigrationsCapability<
    * @param context - Resolution context with contracts, schema name, and framework components
    * @returns Resolved migration plan operations ready for ops.json serialization
    */
+  /**
+   * Plans a migration using the descriptor-based planner.
+   * Returns operation descriptors and whether data migration is needed.
+   * The caller decides whether to resolve immediately or scaffold migration.ts.
+   */
+  planWithDescriptors?(context: {
+    readonly fromContract: ContractIR | null;
+    readonly toContract: ContractIR;
+    readonly frameworkComponents?: ReadonlyArray<
+      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
+    >;
+  }):
+    | {
+        readonly ok: true;
+        readonly descriptors: readonly unknown[];
+        readonly needsDataMigration: boolean;
+      }
+    | {
+        readonly ok: false;
+        readonly conflicts: readonly MigrationPlannerConflict[];
+      };
+
   resolveDescriptors?(
     descriptors: readonly unknown[],
     context: {

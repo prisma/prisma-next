@@ -1,3 +1,7 @@
+import {
+  normalizeSchemaNativeType,
+  parsePostgresDefault,
+} from '@prisma-next/adapter-postgres/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
@@ -10,9 +14,11 @@ import type {
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/family-sql/control';
+import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
+import { planDescriptors } from '../core/migrations/descriptor-planner';
 import { resolveOperations } from '../core/migrations/operation-resolver';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
@@ -79,6 +85,48 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           frameworkComponents: frameworkComponents ?? [],
         });
       },
+      planWithDescriptors(context) {
+        const toContract = context.toContract as SqlContract<SqlStorage>;
+        const fromContract = context.fromContract as SqlContract<SqlStorage> | null;
+
+        // Synthesize schema IR from the fromContract (same as createPlanner flow)
+        const expander = buildNativeTypeExpander(context.frameworkComponents);
+        const fromSchemaIR = contractToSchemaIR(fromContract, {
+          annotationNamespace: 'pg',
+          ...ifDefined('expandNativeType', expander),
+          renderDefault: postgresRenderDefault,
+          frameworkComponents: context.frameworkComponents ?? [],
+        });
+
+        // Collect schema issues via verifier
+        const verifyResult = verifySqlSchema({
+          contract: toContract,
+          schema: fromSchemaIR,
+          strict: true,
+          typeMetadataRegistry: new Map(),
+          frameworkComponents: context.frameworkComponents ?? [],
+          normalizeDefault: parsePostgresDefault,
+          normalizeNativeType: normalizeSchemaNativeType,
+        });
+
+        // Run descriptor planner
+        const planResult = planDescriptors({
+          issues: verifyResult.schema.issues,
+          toContract,
+          fromContract,
+        });
+
+        if (!planResult.ok) {
+          return { ok: false as const, conflicts: planResult.failure };
+        }
+
+        return {
+          ok: true as const,
+          descriptors: planResult.value.descriptors,
+          needsDataMigration: planResult.value.needsDataMigration,
+        };
+      },
+
       resolveDescriptors(descriptors, context) {
         const codecHooks = context.frameworkComponents
           ? extractCodecControlHooks(context.frameworkComponents)
