@@ -1,56 +1,61 @@
 import { type } from 'arktype';
 
-const MongoModelFieldSchema = type({
+const FieldSchema = type({
   '+': 'reject',
   codecId: 'string',
   nullable: 'boolean',
 });
 
-const MongoModelStorageSchema = type({
-  '+': 'reject',
-  'collection?': 'string',
-});
-
-const MongoDiscriminatorSchema = type({
-  '+': 'reject',
-  field: 'string',
-});
-
-const MongoVariantEntrySchema = type({
-  '+': 'reject',
-  value: 'string',
-});
-
-const MongoReferenceRelationOnSchema = type({
+const RelationOnSchema = type({
   '+': 'reject',
   localFields: 'string[]',
   targetFields: 'string[]',
 });
 
-const MongoReferenceRelationSchema = type({
+const RelationSchema = type({
   '+': 'reject',
   to: 'string',
   cardinality: "'1:1' | '1:N' | 'N:1'",
-  strategy: "'reference'",
-  on: MongoReferenceRelationOnSchema,
+  'on?': RelationOnSchema,
 });
 
-const MongoEmbedRelationSchema = type({
+const StorageRelationEntrySchema = type({
   '+': 'reject',
-  to: 'string',
-  cardinality: "'1:1' | '1:N'",
-  strategy: "'embed'",
   field: 'string',
 });
 
-const MongoRelationSchema = MongoReferenceRelationSchema.or(MongoEmbedRelationSchema);
+const ModelStorageSchema = type({
+  '+': 'reject',
+  'collection?': 'string',
+  'relations?': type('Record<string, unknown>').pipe((relations) => {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(relations)) {
+      const parsed = StorageRelationEntrySchema(value);
+      if (parsed instanceof type.errors) {
+        throw new Error(`Invalid storage relation "${key}": ${parsed.summary}`);
+      }
+      result[key] = parsed;
+    }
+    return result;
+  }),
+});
 
-const MongoModelDefinitionSchema = type({
+const DiscriminatorSchema = type({
+  '+': 'reject',
+  field: 'string',
+});
+
+const VariantEntrySchema = type({
+  '+': 'reject',
+  value: 'string',
+});
+
+const ModelDefinitionSchema = type({
   '+': 'reject',
   fields: type('Record<string, unknown>').pipe((fields) => {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(fields)) {
-      const parsed = MongoModelFieldSchema(value);
+      const parsed = FieldSchema(value);
       if (parsed instanceof type.errors) {
         throw new Error(`Invalid field "${key}": ${parsed.summary}`);
       }
@@ -58,11 +63,11 @@ const MongoModelDefinitionSchema = type({
     }
     return result;
   }),
-  storage: MongoModelStorageSchema,
+  storage: ModelStorageSchema,
   relations: type('Record<string, unknown>').pipe((relations) => {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(relations)) {
-      const parsed = MongoRelationSchema(value);
+      const parsed = RelationSchema(value);
       if (parsed instanceof type.errors) {
         throw new Error(`Invalid relation "${key}": ${parsed.summary}`);
       }
@@ -70,11 +75,11 @@ const MongoModelDefinitionSchema = type({
     }
     return result;
   }),
-  'discriminator?': MongoDiscriminatorSchema,
+  'discriminator?': DiscriminatorSchema,
   'variants?': type('Record<string, unknown>').pipe((variants) => {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(variants)) {
-      const parsed = MongoVariantEntrySchema(value);
+      const parsed = VariantEntrySchema(value);
       if (parsed instanceof type.errors) {
         throw new Error(`Invalid variant "${key}": ${parsed.summary}`);
       }
@@ -83,9 +88,10 @@ const MongoModelDefinitionSchema = type({
     return result;
   }),
   'base?': 'string',
+  'owner?': 'string',
 });
 
-const MongoStorageCollectionSchema = type({ '+': 'reject' });
+const StorageCollectionSchema = type({ '+': 'reject' });
 
 export const MongoContractSchema = type({
   '+': 'reject',
@@ -96,7 +102,7 @@ export const MongoContractSchema = type({
     collections: type('Record<string, unknown>').pipe((collections) => {
       const result: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(collections)) {
-        const parsed = MongoStorageCollectionSchema(value);
+        const parsed = StorageCollectionSchema(value);
         if (parsed instanceof type.errors) {
           throw new Error(`Invalid collection "${key}": ${parsed.summary}`);
         }
@@ -108,7 +114,7 @@ export const MongoContractSchema = type({
   models: type('Record<string, unknown>').pipe((models) => {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(models)) {
-      const parsed = MongoModelDefinitionSchema(value);
+      const parsed = ModelDefinitionSchema(value);
       if (parsed instanceof type.errors) {
         throw new Error(`Invalid model "${key}": ${parsed.summary}`);
       }
