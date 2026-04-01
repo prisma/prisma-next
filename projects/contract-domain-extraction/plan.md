@@ -83,7 +83,7 @@ Migrates consumer code to read from the new domain-level TypeScript fields inste
 - **2.4** Migrate `sql-orm-client` field type reads: replace storage-layer codec/nullable reads with `model.fields[f].codecId` and `model.fields[f].nullable`.
 - **2.5** Update `sql-orm-client` type-level generics: update `types.ts` conditional types from `TContract['mappings']['fieldToColumn']` to domain-level access patterns.
 - **2.6** Update `relational-core` types: update `ExtractTableToModel`/`ExtractColumnToField` in `packages/2-sql/4-lanes/relational-core/src/types.ts` to use new domain fields.
-- **2.7** Migrate `paradedb` extension: update BM25 index field column resolution in `packages/3-extensions/paradedb/src/types/index-types.ts`.
+- **2.7** ~~Migrate `paradedb` extension~~: N/A — `paradedb` defines extension-pack descriptors and index types; it does not consume `mappings` or top-level `relations`.
 - **2.8** Verify: no consumer imports or reads from `mappings`, no consumer reads top-level `relations`.
 
 ### Milestone 3: Mongo emitter hook (with shared domain-level generation)
@@ -113,6 +113,7 @@ Removes the backward-compatibility shim from `validateContract()` and old fields
 - **4.4** Update `contract.d.ts` emission to reflect the final shape (no old fields).
 - **4.5** Remove old-format JSON support from `normalizeContract()` (if dual-format was added in 1.3.1).
 - **4.6** Remove the generic `TModels` parameter from `ContractBase`. Once consumers read from domain-level fields and `SqlContract` no longer carries query-builder-specific model types via `M`, simplify `ContractBase` back to a concrete `models: Record<string, DomainModel>`. The generic was introduced to avoid `noPropertyAccessFromIndexSignature` index-signature leakage while `SqlContract`'s `M` still overrides the base `models` type.
+- **4.6.1** Remove repeated `as Record<string, ...>` casts on `contract.models` in ORM-client helpers. Once `ContractBase.models` is concretely typed (4.6), the casts added during M2 become unnecessary — remove them and verify the typed access compiles without casts.
 - **4.7** Update all remaining test fixtures and type tests to reflect the clean types.
 - **4.8** Run full test suite and typecheck.
 
