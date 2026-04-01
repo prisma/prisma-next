@@ -19,7 +19,6 @@ const testContract: SqlContract<SqlStorage> = {
   target: 'postgres',
   storageHash: coreHash('sha256:test'),
   models: {},
-  relations: {},
   roots: {},
   storage: {
     tables: {
@@ -37,7 +36,6 @@ const testContract: SqlContract<SqlStorage> = {
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {},
 };
 
 function createStack(

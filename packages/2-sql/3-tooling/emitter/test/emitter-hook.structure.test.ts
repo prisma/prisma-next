@@ -8,7 +8,6 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
     targetFamily: 'sql',
     target: 'test-db',
     models: {},
-    relations: {},
     storage: { tables: {} },
     extensions: {},
     capabilities: {},

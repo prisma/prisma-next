@@ -36,7 +36,6 @@ function createParamTypesTestContract(
     target: 'postgres',
     storageHash: coreHash('sha256:test'),
     models: {},
-    relations: {},
     roots: {},
     storage: {
       tables: {
@@ -56,7 +55,6 @@ function createParamTypesTestContract(
     capabilities: {},
     meta: {},
     sources: {},
-    mappings: {},
   };
 }
 

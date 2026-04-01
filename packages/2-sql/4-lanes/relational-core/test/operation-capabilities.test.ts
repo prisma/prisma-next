@@ -31,8 +31,6 @@ describe('Operation capability gating', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const signature: SqlOperationSignature = {
@@ -85,8 +83,6 @@ describe('Operation capability gating', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const signature: SqlOperationSignature = {
@@ -139,8 +135,6 @@ describe('Operation capability gating', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const signature: SqlOperationSignature = {
@@ -196,8 +190,6 @@ describe('Operation capability gating', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const signature: SqlOperationSignature = {

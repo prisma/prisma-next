@@ -26,7 +26,7 @@ export interface ContractIR<
   readonly target: string;
   readonly roots?: Record<string, string>;
   readonly models: TModels;
-  readonly relations: TRelations;
+  readonly relations?: TRelations;
   readonly storage: TStorage;
   readonly execution?: TExecution;
   readonly extensionPacks: Record<string, unknown>;
@@ -114,7 +114,7 @@ export function contractIR<
   roots?: Record<string, string>;
   storage: TStorage;
   models: TModels;
-  relations: TRelations;
+  relations?: TRelations;
   execution?: TExecution;
 }): ContractIR<TStorage, TModels, TRelations, TExecution> {
   return {
@@ -125,7 +125,7 @@ export function contractIR<
     ...ifDefined('roots', opts.roots),
     storage: opts.storage,
     models: opts.models,
-    relations: opts.relations,
+    ...ifDefined('relations', opts.relations),
     ...ifDefined('execution', opts.execution),
   };
 }

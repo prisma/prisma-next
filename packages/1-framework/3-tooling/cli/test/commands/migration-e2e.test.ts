@@ -32,7 +32,6 @@ function createContract(
     targetFamily: 'sql',
     target: 'postgres',
     models: {},
-    relations: {},
     storage,
     extensionPacks: {},
     capabilities: {},

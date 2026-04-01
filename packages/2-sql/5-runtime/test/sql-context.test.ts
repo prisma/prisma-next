@@ -21,14 +21,12 @@ const testContract: SqlContract<SqlStorage> = {
   target: 'postgres',
   storageHash: coreHash('sha256:test'),
   models: {},
-  relations: {},
   roots: {},
   storage: { tables: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {},
 };
 
 function createTestExtensionDescriptor(options?: {

@@ -64,8 +64,6 @@ const fixtureContract = createTestContract({
     },
   },
   models: {},
-  relations: {},
-  mappings: {},
 });
 
 function createTestRuntime(mockDriver: MockDriver): Runtime {

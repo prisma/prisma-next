@@ -92,8 +92,6 @@ describe('schema', () => {
       },
     },
     models: {},
-    relations: {},
-    mappings: {},
   });
 
   it('creates schema with tables', () => {
@@ -200,8 +198,6 @@ describe('schema', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();

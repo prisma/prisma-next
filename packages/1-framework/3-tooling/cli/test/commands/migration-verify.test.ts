@@ -14,7 +14,6 @@ function createTestContract(): ContractIR {
     targetFamily: 'sql',
     target: 'postgres',
     models: {},
-    relations: {},
     storage: { tables: {} },
     extensionPacks: {},
     capabilities: {},

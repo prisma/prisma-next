@@ -129,7 +129,6 @@ function createTestContractIR(
     target: 'postgres',
     storageHash: 'sha256:placeholder',
     models: {},
-    relations: {},
     storage: { tables: {} },
     extensionPacks: {},
     capabilities: {},

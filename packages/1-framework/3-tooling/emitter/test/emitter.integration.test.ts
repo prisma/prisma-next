@@ -259,7 +259,6 @@ describe('emitter integration', () => {
         targetFamily: contractJson1['targetFamily'] as string,
         target: contractJson1['target'] as string,
         models: contractJson1['models'] as Record<string, unknown>,
-        relations: (contractJson1['relations'] as Record<string, unknown>) || {},
         storage: contractJson1['storage'] as Record<string, unknown>,
         extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
         capabilities:

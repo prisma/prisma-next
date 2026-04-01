@@ -87,8 +87,6 @@ describe('ast/join', () => {
       },
     },
     models: {},
-    relations: {},
-    mappings: {},
   });
 
   it('creates inner, left, right, and full joins with rich classes', () => {
