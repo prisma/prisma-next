@@ -112,7 +112,8 @@ export function resolveIncludeRelation(
   modelName: string,
   relationName: string,
 ): ResolvedIncludeRelation {
-  const relation = resolveModelRelation(contract, modelName, relationName);
+  const relations = resolveModelRelations(contract, modelName);
+  const relation = relations[relationName];
   const localField = relation?.on.localFields[0];
   const targetField = relation?.on.targetFields[0];
   if (!relation || !localField || !targetField) {
@@ -132,47 +133,54 @@ export function resolveIncludeRelation(
   };
 }
 
-function resolveModelRelation(
+const modelRelationsCache = new WeakMap<object, Map<string, Record<string, ResolvedRelation>>>();
+
+export function resolveModelRelations(
   contract: SqlContract<SqlStorage>,
   modelName: string,
-  relationName: string,
-): ResolvedRelation | undefined {
+): Record<string, ResolvedRelation> {
+  let perContract = modelRelationsCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    modelRelationsCache.set(contract, perContract);
+  }
+  const cached = perContract.get(modelName);
+  if (cached) return cached;
+
   const models = modelsOf(contract);
-  const relation = models[modelName]?.relations?.[relationName];
-  if (!relation || typeof relation !== 'object') {
-    return undefined;
-  }
+  const relationMap = models[modelName]?.relations ?? {};
+  const resolved: Record<string, ResolvedRelation> = {};
 
-  const relationObj = relation as {
-    to?: unknown;
-    cardinality?: unknown;
-    on?: {
-      localFields?: unknown;
-      targetFields?: unknown;
+  for (const [name, value] of Object.entries(relationMap)) {
+    if (!value || typeof value !== 'object') continue;
+
+    const rel = value as {
+      to?: unknown;
+      cardinality?: unknown;
+      on?: { localFields?: unknown; targetFields?: unknown };
     };
-  };
-  const localFields = relationObj.on?.localFields;
-  const targetFields = relationObj.on?.targetFields;
+    const localFields = rel.on?.localFields;
+    const targetFields = rel.on?.targetFields;
 
-  if (
-    typeof relationObj.to !== 'string' ||
-    !Array.isArray(localFields) ||
-    !Array.isArray(targetFields)
-  ) {
-    return undefined;
+    if (typeof rel.to !== 'string' || !Array.isArray(localFields) || !Array.isArray(targetFields)) {
+      continue;
+    }
+
+    resolved[name] = {
+      to: rel.to,
+      cardinality: parseRelationCardinality(rel.cardinality),
+      on: {
+        localFields: localFields as readonly string[],
+        targetFields: targetFields as readonly string[],
+      },
+    };
   }
 
-  return {
-    to: relationObj.to,
-    cardinality: parseRelationCardinality(relationObj.cardinality),
-    on: {
-      localFields: localFields as readonly string[],
-      targetFields: targetFields as readonly string[],
-    },
-  };
+  perContract.set(modelName, resolved);
+  return resolved;
 }
 
-function parseRelationCardinality(value: unknown): RelationCardinalityTag | undefined {
+export function parseRelationCardinality(value: unknown): RelationCardinalityTag | undefined {
   if (value === '1:1' || value === 'N:1' || value === '1:N' || value === 'M:N') {
     return value;
   }
