@@ -258,6 +258,7 @@ The remaining risks are **integration risks**, not architectural ones. The longe
 - The SQL contract, emitter, and ORM all use the pre-redesign shape. Every consumer that stabilizes against the old shape is a call site to update later.
 - The PSL/TS authoring surfaces are actively being designed. If they stabilize around SQL idioms (no `roots`, no `discriminator`/`variants`, no embed/reference strategy), retrofitting will be expensive.
 - The SQL ORM client is actively being refined. Pinning it to the new contract shape has high value but requires coordination with Alexey.
+- The migration system (WS1) is being designed and validated against SQL only. If it stabilizes without accommodating MongoDB's DDL-equivalent operations (indexes, JSON Schema validators, collection options) and Mongo-native data migrations, retrofitting family-agnostic migration support will be expensive.
 
 #### Priority queue
 
@@ -275,18 +276,27 @@ Proof: Mongo `Collection` class with the same method vocabulary as SQL, compilin
 
 Proof: querying a polymorphic root returns a discriminated union type that narrows correctly on the discriminator field in both SQL and Mongo ORM clients.
 
+**4. Schema migrations for MongoDB.** MongoDB has DDL-equivalent server-side configuration that the migration system must manage: indexes (unique, compound, text, geospatial, TTL, partial, wildcard), JSON Schema validators, and collection options (capped, time series, collation). The contract's `storage.collections` section describes these, and the migration planner diffs contract states to generate `createIndex`/`dropIndex`/`createCollection` operations — the same graph-based system used for SQL DDL. Polymorphic collections require partial indexes with `partialFilterExpression` scoped to the discriminator value. See [mongo-schema-migrations.md](mongo-target/1-design-docs/mongo-schema-migrations.md).
+
+Proof: a contract diff between two Mongo contract states produces the correct index creation/deletion operations. The migration runner applies them against a real MongoDB instance. Partial indexes for polymorphic collections are generated correctly.
+
+**5. Data migrations for MongoDB.** In MongoDB, schema evolution *is* data migration — there's no DDL boundary. "Add a field" means updating documents. "Split `name` into `firstName` + `lastName`" is a data migration. The invariant-guarded transition model from [ADR 176](../architecture%20docs/adrs/ADR%20176%20-%20Data%20migrations%20as%20invariant-guarded%20transitions.md) applies directly: postconditions are Mongo queries, transformations are Mongo update operations, and "done" means contract hash + invariants satisfied. This cross-validates WS1 (migration system) — if the same graph model handles both SQL structural migrations and Mongo data migrations, the architecture is genuinely family-agnostic.
+
+Proof: a data migration (e.g. split `name` → `firstName` + `lastName`) runs against a Mongo collection through the same migration graph that handles SQL migrations. `plan`, `apply`, and `status` work across both families.
+
 **P2 — Stretch:**
 
-**4. Basic Mongo query builder.** A type-safe query builder and/or aggregation pipeline builder for MongoDB, operating on the contract. This is the escape-hatch equivalent of the SQL query builder — a lower-level surface for queries the ORM can't express.
+**6. Basic Mongo query builder.** A type-safe query builder and/or aggregation pipeline builder for MongoDB, operating on the contract. This is the escape-hatch equivalent of the SQL query builder — a lower-level surface for queries the ORM can't express.
 
 **Cross-family validation (falls out of P1):**
 
 - **Contract generalizes**: both ORM clients read from `ContractBase`, shared domain validation layer.
 - **Runtime generalizes**: a caching or telemetry middleware works across both families without family-specific code.
+- **Migrations generalize**: the same graph-based migration system handles SQL DDL and Mongo index/validator/data migrations.
 
-Not applicable in April: migration planner/runner (Mongo is schemaless in the DDL sense), streaming subscriptions (validated in the SQL runtime workstream via Supabase Realtime — see [workstream 3, VP5](#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)), production-quality MongoDB driver, Mongo-native query ergonomics.
+Not applicable in April: streaming subscriptions (validated in the SQL runtime workstream via Supabase Realtime — see [workstream 3, VP5](#3-runtime-pipeline-orm-query-builders-middleware-framework-integration)), production-quality MongoDB driver, Mongo-native query ergonomics.
 
-Stop condition: Both ORM clients consume `ContractBase`. Polymorphic models work in both families. A middleware operates across both families without family-specific code.
+Stop condition: Both ORM clients consume `ContractBase`. Polymorphic models work in both families. A middleware operates across both families without family-specific code. The migration graph handles both SQL DDL and Mongo schema/data migrations.
 
 ---
 
