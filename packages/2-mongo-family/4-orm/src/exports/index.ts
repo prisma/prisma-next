@@ -1,6 +1,5 @@
 export { mongoOrm } from '../mongo-orm';
 export type {
-  EmbedRelationKeys,
   IncludeResultFields,
   InferFullRow,
   InferRootRow,
@@ -11,5 +10,4 @@ export type {
   MongoOrmOptions,
   MongoQueryExecutor,
   MongoWhereFilter,
-  ReferenceRelationKeys,
 } from '../types';

@@ -38,3 +38,25 @@ export type DomainModel = {
   readonly base?: string;
   readonly owner?: string;
 };
+
+type HasModelsWithRelations = {
+  readonly models: Record<string, { readonly relations: Record<string, DomainRelation> }>;
+};
+
+export type ReferenceRelationKeys<
+  TContract extends HasModelsWithRelations,
+  ModelName extends string & keyof TContract['models'],
+> = {
+  [K in keyof TContract['models'][ModelName]['relations']]: TContract['models'][ModelName]['relations'][K] extends DomainReferenceRelation
+    ? K
+    : never;
+}[keyof TContract['models'][ModelName]['relations']];
+
+export type EmbedRelationKeys<
+  TContract extends HasModelsWithRelations,
+  ModelName extends string & keyof TContract['models'],
+> = {
+  [K in keyof TContract['models'][ModelName]['relations']]: TContract['models'][ModelName]['relations'][K] extends DomainReferenceRelation
+    ? never
+    : K;
+}[keyof TContract['models'][ModelName]['relations']];
