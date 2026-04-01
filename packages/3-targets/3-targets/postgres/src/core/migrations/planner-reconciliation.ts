@@ -93,6 +93,8 @@ function isAdditiveIssue(issue: SchemaIssue): boolean {
   switch (issue.kind) {
     case 'type_missing':
     case 'type_values_mismatch':
+    case 'enum_values_added':
+    case 'enum_values_changed':
     case 'missing_table':
     case 'missing_column':
     case 'dependency_missing':

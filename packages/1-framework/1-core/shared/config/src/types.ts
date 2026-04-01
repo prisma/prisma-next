@@ -201,6 +201,8 @@ export interface SchemaIssue {
     | 'type_mismatch'
     | 'type_missing'
     | 'type_values_mismatch'
+    | 'enum_values_added'
+    | 'enum_values_changed'
     | 'nullability_mismatch'
     | 'primary_key_mismatch'
     | 'foreign_key_mismatch'

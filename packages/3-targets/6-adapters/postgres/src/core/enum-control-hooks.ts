@@ -697,14 +697,26 @@ export const pgEnumControlHooks: CodecControlHooks = {
         },
       ];
     }
-    if (!arraysEqual(existing, desired)) {
+    const diff = determineEnumDiff(existing, desired);
+    if (diff.kind === 'add_values') {
       return [
         {
-          kind: 'type_values_mismatch',
+          kind: 'enum_values_added',
           typeName,
           expected: desired.join(', '),
           actual: existing.join(', '),
-          message: `Type "${typeName}" values do not match contract`,
+          message: `Enum type "${typeName}" needs new values: ${diff.values.join(', ')}`,
+        },
+      ];
+    }
+    if (diff.kind === 'rebuild') {
+      return [
+        {
+          kind: 'enum_values_changed',
+          typeName,
+          expected: desired.join(', '),
+          actual: existing.join(', '),
+          message: `Enum type "${typeName}" values changed (requires rebuild)`,
         },
       ];
     }

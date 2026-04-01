@@ -10,7 +10,11 @@ import type {
   DataTransformOperation,
   SerializedQueryNode,
 } from '@prisma-next/core-control-plane/types';
-import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
+import type {
+  CodecControlHooks,
+  ComponentDatabaseDependency,
+  SqlMigrationPlanOperation,
+} from '@prisma-next/family-sql/control';
 import type {
   SqlContract,
   SqlStorage,
@@ -24,9 +28,10 @@ import type {
   AddPrimaryKeyDescriptor,
   AddUniqueDescriptor,
   AlterColumnTypeDescriptor,
+  CreateDependencyDescriptor,
+  CreateEnumTypeDescriptor,
   CreateIndexDescriptor,
   CreateTableDescriptor,
-  CreateTypeDescriptor,
   DataTransformDescriptor,
   DropColumnDescriptor,
   DropConstraintDescriptor,
@@ -57,6 +62,7 @@ export interface OperationResolverContext {
   readonly toContract: SqlContract<SqlStorage>;
   readonly schemaName: string;
   readonly codecHooks: Map<string, CodecControlHooks>;
+  readonly dependencies?: readonly ComponentDatabaseDependency<unknown>[];
 }
 
 type ResolvedOp = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -617,15 +623,69 @@ function resolveDropIndex(desc: DropIndexDescriptor, ctx: OperationResolverConte
   };
 }
 
-function resolveCreateType(
-  _desc: CreateTypeDescriptor,
-  _ctx: OperationResolverContext,
+function enumTypeExistsCheck(schemaName: string, nativeType: string, exists = true): string {
+  const clause = exists ? 'EXISTS' : 'NOT EXISTS';
+  return `SELECT ${clause} (
+  SELECT 1
+  FROM pg_type t
+  JOIN pg_namespace n ON t.typnamespace = n.oid
+  WHERE n.nspname = '${escapeLiteral(schemaName)}'
+    AND t.typname = '${escapeLiteral(nativeType)}'
+)`;
+}
+
+function resolveCreateEnumType(
+  desc: CreateEnumTypeDescriptor,
+  ctx: OperationResolverContext,
 ): ResolvedOp {
-  // Type creation is handled by codec hooks in the planner.
-  // For manually authored migrations, this is a placeholder.
-  throw new Error(
-    'createType resolution not yet implemented — type operations are handled by codec hooks',
-  );
+  const typeInstance = ctx.toContract.storage.types?.[desc.typeName];
+  if (!typeInstance) {
+    throw new Error(`Type "${desc.typeName}" not found in destination contract storage.types`);
+  }
+  const values = typeInstance.typeParams?.['values'];
+  if (!Array.isArray(values) || !values.every((v): v is string => typeof v === 'string')) {
+    throw new Error(`Type "${desc.typeName}" has no valid enum values in typeParams`);
+  }
+  const qualifiedType = qualifyName(ctx.schemaName, typeInstance.nativeType);
+  const literalValues = values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
+  return {
+    id: `type.${desc.typeName}`,
+    label: `Create enum type "${desc.typeName}"`,
+    operationClass: 'additive',
+    target: targetDetails('type', desc.typeName, ctx.schemaName),
+    precheck: [
+      step(
+        `ensure type "${typeInstance.nativeType}" does not exist`,
+        enumTypeExistsCheck(ctx.schemaName, typeInstance.nativeType, false),
+      ),
+    ],
+    execute: [
+      step(
+        `create enum type "${typeInstance.nativeType}"`,
+        `CREATE TYPE ${qualifiedType} AS ENUM (${literalValues})`,
+      ),
+    ],
+    postcheck: [
+      step(
+        `verify type "${typeInstance.nativeType}" exists`,
+        enumTypeExistsCheck(ctx.schemaName, typeInstance.nativeType),
+      ),
+    ],
+  };
+}
+
+function resolveCreateDependency(
+  desc: CreateDependencyDescriptor,
+  ctx: OperationResolverContext,
+): readonly ResolvedOp[] {
+  const dep = ctx.dependencies?.find((d) => d.id === desc.dependencyId);
+  if (!dep) {
+    throw new Error(
+      `Dependency "${desc.dependencyId}" not found in resolver context. ` +
+        'Ensure frameworkComponents are passed to resolveDescriptors.',
+    );
+  }
+  return dep.install as readonly ResolvedOp[];
 }
 
 function resolveDataTransform(desc: DataTransformDescriptor): DataTransformOperation {
@@ -642,56 +702,63 @@ function resolveDataTransform(desc: DataTransformDescriptor): DataTransformOpera
 }
 
 // Re-import quoteIdentifier under a short alias
-import { quoteIdentifier as quoteId } from '@prisma-next/adapter-postgres/control';
+import {
+  escapeLiteral,
+  qualifyName,
+  quoteIdentifier as quoteId,
+} from '@prisma-next/adapter-postgres/control';
 
 /**
  * Resolves an array of operation descriptors into SqlMigrationPlanOperation objects.
+ * Most descriptors resolve 1:1, but createType and createDependency may expand to multiple ops.
  */
 export function resolveOperations(
   descriptors: readonly MigrationOpDescriptor[],
   context: OperationResolverContext,
 ): readonly (ResolvedOp | DataTransformOperation)[] {
-  return descriptors.map((desc) => resolveOperation(desc, context));
+  return descriptors.flatMap((desc) => resolveOperation(desc, context));
 }
 
 function resolveOperation(
   desc: MigrationOpDescriptor,
   ctx: OperationResolverContext,
-): ResolvedOp | DataTransformOperation {
+): readonly (ResolvedOp | DataTransformOperation)[] {
   switch (desc.kind) {
     case 'createTable':
-      return resolveCreateTable(desc, ctx);
+      return [resolveCreateTable(desc, ctx)];
     case 'dropTable':
-      return resolveDropTable(desc, ctx);
+      return [resolveDropTable(desc, ctx)];
     case 'addColumn':
-      return resolveAddColumn(desc, ctx);
+      return [resolveAddColumn(desc, ctx)];
     case 'dropColumn':
-      return resolveDropColumn(desc, ctx);
+      return [resolveDropColumn(desc, ctx)];
     case 'alterColumnType':
-      return resolveAlterColumnType(desc, ctx);
+      return [resolveAlterColumnType(desc, ctx)];
     case 'setNotNull':
-      return resolveSetNotNull(desc, ctx);
+      return [resolveSetNotNull(desc, ctx)];
     case 'dropNotNull':
-      return resolveDropNotNull(desc, ctx);
+      return [resolveDropNotNull(desc, ctx)];
     case 'setDefault':
-      return resolveSetDefault(desc, ctx);
+      return [resolveSetDefault(desc, ctx)];
     case 'dropDefault':
-      return resolveDropDefault(desc, ctx);
+      return [resolveDropDefault(desc, ctx)];
     case 'addPrimaryKey':
-      return resolveAddPrimaryKey(desc, ctx);
+      return [resolveAddPrimaryKey(desc, ctx)];
     case 'addUnique':
-      return resolveAddUnique(desc, ctx);
+      return [resolveAddUnique(desc, ctx)];
     case 'addForeignKey':
-      return resolveAddForeignKey(desc, ctx);
+      return [resolveAddForeignKey(desc, ctx)];
     case 'dropConstraint':
-      return resolveDropConstraint(desc, ctx);
+      return [resolveDropConstraint(desc, ctx)];
     case 'createIndex':
-      return resolveCreateIndex(desc, ctx);
+      return [resolveCreateIndex(desc, ctx)];
     case 'dropIndex':
-      return resolveDropIndex(desc, ctx);
-    case 'createType':
-      return resolveCreateType(desc, ctx);
+      return [resolveDropIndex(desc, ctx)];
+    case 'createEnumType':
+      return [resolveCreateEnumType(desc, ctx)];
+    case 'createDependency':
+      return resolveCreateDependency(desc, ctx);
     case 'dataTransform':
-      return resolveDataTransform(desc);
+      return [resolveDataTransform(desc)];
   }
 }

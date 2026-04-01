@@ -65,8 +65,10 @@ function descriptorToBuilderCall(desc: OperationDescriptor): string {
       return `createIndex(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.columns)})`;
     case 'dropIndex':
       return `dropIndex(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.indexName)})`;
-    case 'createType':
-      return `createType(${JSON.stringify(desc.typeName)})`;
+    case 'createEnumType':
+      return `createEnumType(${JSON.stringify(desc.typeName)})`;
+    case 'createDependency':
+      return `createDependency(${JSON.stringify(desc.dependencyId)})`;
     case 'dataTransform':
       return `dataTransform(${JSON.stringify(desc.name)}, {\n    check: ${serializeQueryNode(desc.check)},\n    run: ${serializeQueryNode(desc.run)},\n  })`;
     default:

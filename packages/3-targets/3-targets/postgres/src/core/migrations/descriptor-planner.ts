@@ -22,6 +22,8 @@ import {
   addPrimaryKey,
   addUnique,
   alterColumnType,
+  createDependency,
+  createEnumType,
   createIndex,
   createTable,
   dataTransform,
@@ -97,7 +99,8 @@ const ISSUE_KIND_ORDER: Record<string, number> = {
   // Dependencies and types first
   dependency_missing: 1,
   type_missing: 2,
-  type_values_mismatch: 3,
+  enum_values_added: 3,
+  enum_values_changed: 3,
 
   // Drops (reconciliation — clear the way for creates)
   // FKs dropped first (they depend on other constraints)
@@ -349,30 +352,54 @@ function mapIssue(
         ),
       );
 
-    // Type/dependency operations — not yet handled by descriptors
-    case 'type_missing':
+    // Types
+    case 'type_missing': {
+      if (!issue.typeName)
+        return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
+      const typeInstance = ctx.toContract.storage.types?.[issue.typeName];
+      if (!typeInstance) {
+        return notOk(
+          issueConflict(
+            'unsupportedOperation',
+            `Type "${issue.typeName}" reported missing but not found in destination contract`,
+          ),
+        );
+      }
+      // TODO: codec-specific descriptor dispatch should be driven by a registry, not hardcoded prefix checks
+      if (typeInstance.codecId.startsWith('pg/enum')) {
+        return ok([createEnumType(issue.typeName)]);
+      }
       return notOk(
         issueConflict(
           'unsupportedOperation',
-          `Custom type "${issue.typeName ?? 'unknown'}" is missing — type creation not yet supported by descriptor planner`,
+          `Type "${issue.typeName}" uses codec "${typeInstance.codecId}" — only enum types are supported by the descriptor planner`,
         ),
       );
+    }
 
-    case 'type_values_mismatch':
+    case 'enum_values_added':
       return notOk(
         issueConflict(
           'unsupportedOperation',
-          'Custom type values differ — type alteration not yet supported by descriptor planner',
+          `Enum type "${issue.typeName ?? 'unknown'}" has new values — enum value addition not yet supported by descriptor planner`,
         ),
       );
 
+    case 'enum_values_changed':
+      return notOk(
+        issueConflict(
+          'unsupportedOperation',
+          `Enum type "${issue.typeName ?? 'unknown'}" values changed — enum rebuild not yet supported by descriptor planner`,
+        ),
+      );
+
+    // Dependencies
     case 'dependency_missing':
-      return notOk(
-        issueConflict(
-          'unsupportedOperation',
-          'Database dependency is missing — dependency initialization not yet supported by descriptor planner',
-        ),
-      );
+      if (!issue.dependencyId)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Dependency missing issue has no dependencyId'),
+        );
+      return ok([createDependency(issue.dependencyId)]);
   }
 }
 

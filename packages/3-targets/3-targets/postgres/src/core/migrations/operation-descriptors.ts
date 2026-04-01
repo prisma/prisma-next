@@ -125,9 +125,18 @@ export interface DropIndexDescriptor {
 // Type descriptors
 // ============================================================================
 
-export interface CreateTypeDescriptor {
-  readonly kind: 'createType';
+export interface CreateEnumTypeDescriptor {
+  readonly kind: 'createEnumType';
   readonly typeName: string;
+}
+
+// ============================================================================
+// Dependency descriptors
+// ============================================================================
+
+export interface CreateDependencyDescriptor {
+  readonly kind: 'createDependency';
+  readonly dependencyId: string;
 }
 
 // ============================================================================
@@ -162,7 +171,8 @@ export type MigrationOpDescriptor =
   | DropConstraintDescriptor
   | CreateIndexDescriptor
   | DropIndexDescriptor
-  | CreateTypeDescriptor
+  | CreateEnumTypeDescriptor
+  | CreateDependencyDescriptor
   | DataTransformDescriptor;
 
 // ============================================================================
@@ -233,8 +243,12 @@ export function dropIndex(table: string, indexName: string): DropIndexDescriptor
   return { kind: 'dropIndex', table, indexName };
 }
 
-export function createType(typeName: string): CreateTypeDescriptor {
-  return { kind: 'createType', typeName };
+export function createEnumType(typeName: string): CreateEnumTypeDescriptor {
+  return { kind: 'createEnumType', typeName };
+}
+
+export function createDependency(dependencyId: string): CreateDependencyDescriptor {
+  return { kind: 'createDependency', dependencyId };
 }
 
 export function dataTransform(
@@ -278,6 +292,7 @@ export const builders = {
   dropConstraint,
   createIndex,
   dropIndex,
-  createType,
+  createEnumType,
+  createDependency,
   dataTransform,
 } as const;
