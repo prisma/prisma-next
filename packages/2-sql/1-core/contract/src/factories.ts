@@ -94,10 +94,15 @@ export function model(
   relations: Record<string, unknown>;
 } {
   const storage: SqlModelStorage = { table: tableName, fields };
-  const domainFields = Object.fromEntries(Object.keys(fields).map((name) => [name, {}])) as Record<
-    string,
-    { nullable?: boolean; codecId?: string }
-  >;
+  const domainFields = Object.fromEntries(
+    Object.entries(fields).map(([name, field]) => [
+      name,
+      {
+        ...(field.codecId !== undefined ? { codecId: field.codecId } : {}),
+        ...(field.nullable !== undefined ? { nullable: field.nullable } : {}),
+      },
+    ]),
+  ) as Record<string, { nullable?: boolean; codecId?: string }>;
   return {
     storage,
     fields: domainFields,
