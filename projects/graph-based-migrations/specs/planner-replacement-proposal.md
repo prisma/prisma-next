@@ -141,25 +141,94 @@ The resolver already handles all the additive descriptors. For the reconciliatio
 
 All reconciliation operations are already handled by the resolver.
 
-## Data migration detection
+## Pattern matching on issues
 
-With the descriptor-based planner, detection is natural:
+Before the planner does its default issue-to-descriptor mapping, it runs pattern matchers. Each matcher is a function that examines the issue list, optionally consumes issues it recognizes, and returns the ops to handle them:
 
 ```typescript
-case 'missing_column':
-  const column = contract.storage.tables[issue.table].columns[issue.column];
-  if (column.nullable === false && column.default === undefined) {
-    // NOT NULL without default → needs data migration
-    descriptors.push(addColumn(issue.table, issue.column, { nullable: true }));
-    descriptors.push(dataTransformDraft(`backfill-${issue.table}-${issue.column}`, 'migration.ts'));
-    descriptors.push(setNotNull(issue.table, issue.column));
-  } else {
-    descriptors.push(addColumn(issue.table, issue.column));
-  }
-  break;
+interface PatternContext {
+  readonly toContract: SqlContract<SqlStorage>;
+  readonly fromContract: SqlContract<SqlStorage> | null;
+}
+
+type PatternMatcher = (
+  issues: readonly SchemaIssue[],
+  context: PatternContext,
+) =>
+  | { kind: 'match'; issues: readonly SchemaIssue[]; ops: readonly MigrationOpDescriptor[] }
+  | { kind: 'no_match' };
 ```
 
-No interception of private methods. No post-processing of ops. The pattern matching happens where it naturally belongs — in the issue-to-descriptor mapping.
+The planner chains matchers, then handles whatever's left with default mapping:
+
+```typescript
+let remaining = issues;
+const ops: MigrationOpDescriptor[] = [];
+
+for (const matcher of matchers) {
+  const result = matcher(remaining, context);
+  if (result.kind === 'match') {
+    remaining = result.issues;  // issues with matched ones removed
+    ops.push(...result.ops);
+  }
+}
+
+// Default handling for remaining issues
+for (const issue of remaining) {
+  ops.push(...defaultOpsForIssue(issue));
+}
+```
+
+Each matcher looks at the full issue list, pulls out what it handles, returns the rest. No framework, no registry — just functions with a type signature.
+
+### v1 matcher: NOT NULL backfill
+
+```typescript
+const notNullBackfillMatcher: PatternMatcher = (issues, ctx) => {
+  const matched: SchemaIssue[] = [];
+  const ops: MigrationOpDescriptor[] = [];
+
+  for (const issue of issues) {
+    if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
+    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    if (!column || column.nullable !== false || column.default !== undefined) continue;
+
+    matched.push(issue);
+    ops.push(
+      addColumn(issue.table, issue.column, { nullable: true }),
+      dataTransformDraft(`backfill-${issue.table}-${issue.column}`, 'migration.ts'),
+      setNotNull(issue.table, issue.column),
+    );
+  }
+
+  if (matched.length === 0) return { kind: 'no_match' };
+  return {
+    kind: 'match',
+    issues: issues.filter(i => !matched.includes(i)),
+    ops,
+  };
+};
+```
+
+### Future matchers (examples, not v1)
+
+**Column rename** — consumes `extra_column` + `missing_column` with same type on same table:
+```typescript
+const columnRenameMatcher: PatternMatcher = (issues, ctx) => {
+  // Match pairs of extra+missing columns with compatible types
+  // Consume both issues, emit renameColumn or add→copy→drop sequence
+};
+```
+
+**Column split** — consumes `extra_column` + multiple `missing_column` on same table:
+```typescript
+const columnSplitMatcher: PatternMatcher = (issues, ctx) => {
+  // Match one extra + N missing where types are compatible
+  // Consume all, emit addColumn(nullable) × N + dataTransform + setNotNull × N + dropColumn
+};
+```
+
+Matchers are ordered by specificity — more specific patterns (column split) should run before less specific ones (NOT NULL backfill) to avoid partial matches. A split's `missing_column` issues would be consumed before the backfill matcher sees them.
 
 ## Migration output
 
