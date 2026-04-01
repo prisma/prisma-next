@@ -581,8 +581,8 @@ export const sqlTargetFamilyHook = {
           relParts.push(`readonly cardinality: '${relObj['cardinality']}'`);
         const on = relObj['on'] as { localFields?: string[]; targetFields?: string[] } | undefined;
         if (on?.localFields && on.targetFields) {
-          const localFields = on.localFields.map((f) => `'${f}'`).join(', ');
-          const targetFields = on.targetFields.map((f) => `'${f}'`).join(', ');
+          const localFields = on.localFields.map((f) => this.serializeValue(f)).join(', ');
+          const targetFields = on.targetFields.map((f) => this.serializeValue(f)).join(', ');
           relParts.push(
             `readonly on: { readonly localFields: readonly [${localFields}]; readonly targetFields: readonly [${targetFields}] }`,
           );
