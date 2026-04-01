@@ -109,6 +109,12 @@ importers:
       mongodb:
         specifier: ^6.16.0
         version: 6.21.0
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -119,12 +125,27 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.4
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react-swc':
+        specifier: ^4.2.3
+        version: 4.2.3(vite@7.3.1(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       mongodb-memory-server:
         specifier: ^10.4.0
         version: 10.4.3
+      tsx:
+        specifier: ^4.19.2
+        version: 4.20.6
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      vite:
+        specifier: 'catalog:'
+        version: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       vitest:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
