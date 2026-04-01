@@ -3,7 +3,7 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:6a38af603d36ab9862c3e73197e094c00b696e55a0928d0003a7b5e9201017bc",
-  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
+  "profileHash": "sha256:1628d322a01cac03524fe340fe22d19882ec5ecf0f71f9a32c6c2dfa648a903a",
   "roots": {
     "Member": "Member",
     "Team": "Team"
@@ -135,7 +135,8 @@
       "returning": true
     },
     "sql": {
-      "enums": true
+      "enums": true,
+      "returning": true
     }
   },
   "extensionPacks": {},
