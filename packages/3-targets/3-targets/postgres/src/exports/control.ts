@@ -94,7 +94,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         const toContract = context.toContract as SqlContract<SqlStorage>;
         const fromContract = context.fromContract as SqlContract<SqlStorage> | null;
 
-        // Synthesize schema IR from the fromContract (same as createPlanner flow)
+        // Synthesize schema IR from the fromContract (same as contractToSchema flow)
         const expander = buildNativeTypeExpander(context.frameworkComponents);
         const fromSchemaIR = contractToSchemaIR(fromContract, {
           annotationNamespace: 'pg',

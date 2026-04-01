@@ -326,6 +326,7 @@ async function executeMigrationPlanCommand(
       const resolvedOps = migrations.resolveDescriptors(evaluatedDescriptors as never, {
         fromContract,
         toContract: toContractJson,
+        frameworkComponents,
       });
 
       await writeMigrationOps(packageDir, resolvedOps);
