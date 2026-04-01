@@ -67,6 +67,8 @@ export function getColumnToFieldMap(
   return cached;
 }
 
+// Assumes 1:1 table→model mapping. When multiple models can share a storage
+// table (e.g. owned models), callers should thread modelName directly instead.
 export function findModelNameForTable(
   contract: SqlContract<SqlStorage>,
   tableName: string,
