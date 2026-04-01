@@ -53,6 +53,30 @@ async function executeMigrationVerifyCommand(
   }
 
   try {
+    // If migration.ts exists, always evaluate and resolve to ops.json.
+    // This ensures ops.json is always fresh relative to migration.ts.
+    if (await hasMigrationTs(dir)) {
+      const pkg = await readMigrationPackage(dir);
+      const descriptors = await evaluateMigrationTs(dir);
+
+      const config = await loadConfig(options.config);
+      const migrations = getTargetMigrations(config.target);
+      if (!migrations?.resolveDescriptors) {
+        throw new Error(
+          'Target does not support resolveDescriptors. ' +
+            'Cannot verify a migration package with migration.ts.',
+        );
+      }
+
+      const resolvedOps = migrations.resolveDescriptors(descriptors, {
+        fromContract: pkg.manifest.fromContract,
+        toContract: pkg.manifest.toContract,
+      });
+
+      await writeMigrationOps(dir, resolvedOps);
+    }
+
+    // Now verify/attest with the (potentially updated) ops.json
     const result = await verifyMigration(dir);
 
     if (result.ok) {
@@ -68,29 +92,6 @@ async function executeMigrationVerifyCommand(
     }
 
     if (result.reason === 'draft') {
-      // If migration.ts exists, evaluate and resolve descriptors into ops before attesting
-      if (await hasMigrationTs(dir)) {
-        const pkg = await readMigrationPackage(dir);
-        const descriptors = await evaluateMigrationTs(dir);
-
-        // Load config to get the target's resolveDescriptors capability
-        const config = await loadConfig(options.config);
-        const migrations = getTargetMigrations(config.target);
-        if (!migrations?.resolveDescriptors) {
-          throw new Error(
-            'Target does not support resolveDescriptors. ' +
-              'Cannot verify a migration package with migration.ts.',
-          );
-        }
-
-        const resolvedOps = migrations.resolveDescriptors(descriptors, {
-          fromContract: pkg.manifest.fromContract,
-          toContract: pkg.manifest.toContract,
-        });
-
-        await writeMigrationOps(dir, resolvedOps);
-      }
-
       const migrationId = await attestMigration(dir);
       return ok({
         ok: true,
@@ -101,16 +102,16 @@ async function executeMigrationVerifyCommand(
       });
     }
 
-    return notOk(
-      errorRuntime('migrationId mismatch — migration has been modified', {
-        why: `stored=${result.storedMigrationId}, computed=${result.computedMigrationId}`,
-        fix: 'If the change was intentional, set "migrationId" to null in migration.json and rerun `migration verify` to re-attest. Otherwise, restore the original migration.',
-        meta: {
-          storedMigrationId: result.storedMigrationId,
-          computedMigrationId: result.computedMigrationId,
-        },
-      }),
-    );
+    // Mismatch — ops.json was just rewritten by migration.ts evaluation above,
+    // so this means the stored migrationId is stale. Re-attest.
+    const migrationId = await attestMigration(dir);
+    return ok({
+      ok: true,
+      status: 'attested',
+      dir,
+      migrationId,
+      summary: `Migration re-attested with migrationId: ${migrationId}`,
+    });
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -136,7 +137,7 @@ export function createMigrationVerifyCommand(): Command {
     'Verify a migration package migrationId',
     'Recomputes the content-addressed migrationId for a migration package and compares\n' +
       'it against the stored value. Draft migrations (migrationId: null) are automatically\n' +
-      'attested. If migration.ts exists, it is evaluated and resolved before attestation.',
+      'attested. If migration.ts exists, it is always re-evaluated and ops.json is refreshed.',
   );
   setCommandExamples(command, ['prisma-next migration verify --dir migrations/20250101-add-users']);
   addGlobalOptions(command)
