@@ -4,6 +4,14 @@
  * Populates the demo database with sample data using Prisma Next's SQL builder.
  *
  * Run with: pnpm seed
+ *
+ * Creates:
+ * - 2 users (alice, bob)
+ * - 3 posts with vector embeddings (for similarity search demos)
+ *
+ * Prerequisites:
+ * - DATABASE_URL environment variable set
+ * - Database schema and marker applied (run `pnpm emit` then `pnpm db:init`)
  */
 import 'dotenv/config';
 
@@ -51,7 +59,7 @@ async function main() {
     console.log(`Created user: ${alice.email} (id: ${alice.id})`);
     console.log(`Created user: ${bob.email} (id: ${bob.id})`);
 
-    // Generate sample embedding vectors (1536 dimensions)
+    // Generate sample embedding vectors (1536 dimensions, matching common embedding models)
     const generateEmbedding = (seed: number): number[] => {
       const embedding: number[] = [];
       for (let i = 0; i < 1536; i++) {
