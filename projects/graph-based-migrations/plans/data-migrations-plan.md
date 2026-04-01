@@ -44,6 +44,7 @@ Refs refactored from `migrations/refs.json` to `migrations/refs/<name>.json` wit
 - [ ] Test that verify correctly loads config for resolveDescriptors when migration.ts is present
 - [ ] Test verify with --dir on an already-attested package (existing behavior preserved)
 - [ ] Consider: should verify re-attest already-attested packages that have a migration.ts with newer mtime than ops.json? (stale serialization detection)
+- [ ] Fix verify output display — header, config path, migrations dir should match the style of other migration commands (plan, apply, status)
 - [ ] Future: scan-all-packages mode without --dir (deferred to reduce scope)
 
 ### Milestone: migration show support for data transforms

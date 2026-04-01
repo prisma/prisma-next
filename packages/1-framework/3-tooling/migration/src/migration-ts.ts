@@ -9,7 +9,7 @@
  */
 
 import { readFile, stat, writeFile } from 'node:fs/promises';
-import { join } from 'pathe';
+import { join, resolve } from 'pathe';
 
 const MIGRATION_TS_FILE = 'migration.ts';
 
@@ -86,7 +86,7 @@ export async function hasMigrationTs(packageDir: string): Promise<boolean> {
  * Requires Node ≥24 for native TypeScript support.
  */
 export async function evaluateMigrationTs(packageDir: string): Promise<readonly unknown[]> {
-  const filePath = join(packageDir, MIGRATION_TS_FILE);
+  const filePath = resolve(join(packageDir, MIGRATION_TS_FILE));
 
   // Verify the file exists before attempting import
   try {
