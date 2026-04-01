@@ -26,16 +26,15 @@ export function validateMongoStorage(contract: MongoContract): void {
     }
 
     for (const [relName, relation] of Object.entries(model.relations)) {
-      if (relation.strategy === 'embed') {
-        const target = contract.models[relation.to];
-        if (target?.storage.collection) {
+      const targetModel = contract.models[relation.to];
+
+      if (targetModel?.owner) {
+        if (targetModel.storage.collection) {
           errors.push(
             `Embed relation "${relName}" targets "${relation.to}" which must not have a collection`,
           );
         }
-      }
-
-      if (relation.strategy === 'reference') {
+      } else if ('on' in relation && relation.on) {
         for (const localField of relation.on.localFields) {
           if (!(localField in model.fields)) {
             errors.push(
@@ -44,7 +43,6 @@ export function validateMongoStorage(contract: MongoContract): void {
           }
         }
 
-        const targetModel = contract.models[relation.to];
         if (targetModel) {
           for (const targetField of relation.on.targetFields) {
             if (!(targetField in targetModel.fields)) {
