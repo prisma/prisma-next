@@ -58,9 +58,8 @@ describe('domain types', () => {
     const _extendsRelation: AssertExtends<DomainEmbedRelation, DomainRelation> = true;
     expect(_extendsRelation).toBe(true);
 
-    // N:1 is reference-only — not assignable to DomainEmbedRelation
+    // @ts-expect-error — N:1 is reference-only, not assignable to DomainEmbedRelation
     const _n1NotEmbed: AssertExtends<{ to: string; cardinality: 'N:1' }, DomainEmbedRelation> =
-      // @ts-expect-error — N:1 is not assignable to '1:1' | '1:N'
       true;
     expect(_n1NotEmbed).toBe(true);
   });

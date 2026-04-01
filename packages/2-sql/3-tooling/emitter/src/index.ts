@@ -293,8 +293,9 @@ export const sqlTargetFamilyHook = {
       .map((imp) => imp.alias)
       .join(' & ');
 
+    const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
     const storageType = this.generateStorageType(storage);
-    const modelsType = this.generateModelsType(models, storage, parameterizedRenderers);
+    const modelsType = this.generateModelsType(models, storage, parameterizedRenderers, renderCtx);
     const relationsType = this.generateRelationsType(ir.relations);
     const mappingsType = this.generateMappingsType(models, storage);
     const rootsType = this.generateRootsType(ir.roots);
@@ -530,7 +531,8 @@ export const sqlTargetFamilyHook = {
   generateModelsType(
     models: Record<string, ModelDefinition> | undefined,
     storage: SqlStorage,
-    parameterizedRenderers?: Map<string, TypeRenderEntry>,
+    parameterizedRenderers: Map<string, TypeRenderEntry> | undefined,
+    renderCtx: TypeRenderContext,
   ): string {
     if (!models) {
       return 'Record<string, never>';
