@@ -239,13 +239,29 @@ describe('staged contract DSL parity with legacy builder', () => {
       table: 'post_tag',
     });
 
+    const Post = model('Post', {
+      fields: {
+        id: field.column(textColumn).id(),
+        title: field.column(textColumn),
+      },
+      relations: {
+        tags: rel.manyToMany('Tag', {
+          through: 'PostTag',
+          from: 'postId',
+          to: 'tagId',
+        }),
+      },
+    }).sql({
+      table: 'post',
+    });
+
     const Tag = model('Tag', {
       fields: {
         id: field.column(textColumn).id(),
         label: field.column(textColumn),
       },
       relations: {
-        posts: rel.manyToMany(() => Post, {
+        posts: rel.manyToMany(Post, {
           through: () => PostTag,
           from: 'tagId',
           to: 'postId',
@@ -253,22 +269,6 @@ describe('staged contract DSL parity with legacy builder', () => {
       },
     }).sql({
       table: 'tag',
-    });
-
-    const Post = model('Post', {
-      fields: {
-        id: field.column(textColumn).id(),
-        title: field.column(textColumn),
-      },
-      relations: {
-        tags: rel.manyToMany(() => Tag, {
-          through: () => PostTag,
-          from: 'postId',
-          to: 'tagId',
-        }),
-      },
-    }).sql({
-      table: 'post',
     });
 
     const refined = defineContract({

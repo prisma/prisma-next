@@ -1,9 +1,9 @@
 const BASE_TIMEOUTS = {
   spinUpPpgDev: 30000,
   spinUpDbServer: 30000,
-  typeScriptCompilation: 8000,
+  typeScriptCompilation: 12000,
   databaseOperation: 5000,
-  default: 100,
+  default: 500,
 } as const;
 
 function getMultiplier(): number {

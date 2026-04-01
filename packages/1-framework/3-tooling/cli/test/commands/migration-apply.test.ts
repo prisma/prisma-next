@@ -85,7 +85,8 @@ async function writeAttestedMigration(
 }
 
 // These tests write migration packages to disk, attest them (SHA-256 + read/write),
-// then read them back. The default 100ms timeout (200ms in CI) is too tight for
+// then read them back. The shared default timeout is intentionally overridden here
+// because this test does real filesystem work and still needs more headroom.
 // filesystem I/O on slow CI runners.
 describe(
   'migration apply — pending migration resolution',

@@ -1,6 +1,6 @@
 import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { StorageColumn } from '@prisma-next/sql-contract/types';
+import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { PostgresPlanTargetDetails } from './planner';
 import {
   buildAddColumnSql,
@@ -36,9 +36,11 @@ export function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
   readonly columnName: string;
   readonly column: StorageColumn;
   readonly codecHooks: Map<string, CodecControlHooks>;
+  readonly storageTypes: Record<string, StorageTypeInstance>;
   readonly temporaryDefault: string;
 }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  const { schema, tableName, columnName, column, codecHooks, temporaryDefault } = options;
+  const { schema, tableName, columnName, column, codecHooks, storageTypes, temporaryDefault } =
+    options;
   const qualified = qualifyTableName(schema, tableName);
 
   return {
@@ -53,7 +55,14 @@ export function buildAddNotNullColumnWithTemporaryDefaultOperation(options: {
     execute: [
       {
         description: `add column "${columnName}"`,
-        sql: buildAddColumnSql(qualified, columnName, column, codecHooks, temporaryDefault),
+        sql: buildAddColumnSql(
+          qualified,
+          columnName,
+          column,
+          codecHooks,
+          temporaryDefault,
+          storageTypes,
+        ),
       },
       {
         description: `drop temporary default from column "${columnName}"`,

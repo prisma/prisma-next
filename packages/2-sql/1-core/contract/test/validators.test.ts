@@ -653,9 +653,9 @@ describe('SQL contract validators', () => {
             orgId: col('int4', 'pg/int4@1'),
           },
           {
-            foreignKeys: [
-              fk(['orgId'], { table: 'org', columns: ['id'] }, { onDelete: 'cascade' }),
-              fk(['orgId'], { table: 'org', columns: ['id'] }, { onDelete: 'cascade' }),
+            fks: [
+              fk(['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
+              fk(['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
             ],
           },
         ),

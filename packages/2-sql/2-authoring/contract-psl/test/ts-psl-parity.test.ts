@@ -140,7 +140,7 @@ const representativeTsAuthoring = `defineContract(
         embedding: field.namedType(types.Embedding1536).optional(),
         createdAt: field.createdAt(),
       },
-      relations: { posts: rel.hasMany(() => Post, { by: 'authorId' }) },
+      relations: { posts: rel.hasMany('Post', { by: 'authorId' }) },
     }).sql({ table: 'user' });
     const Post = model('Post', {
       fields: {
@@ -148,11 +148,11 @@ const representativeTsAuthoring = `defineContract(
         authorId: field.column(int4Column),
         title: field.text(),
       },
-      relations: { author: rel.belongsTo(User, { from: 'authorId', to: 'id' }) },
+      relations: { author: rel.belongsTo('User', { from: 'authorId', to: 'id' }) },
     }).sql(({ cols, constraints }) => ({
       table: 'post',
       indexes: [constraints.index(cols.authorId, { name: 'post_author_id_idx' })],
-      foreignKeys: [constraints.foreignKey(cols.authorId, User.refs.id, { name: 'post_author_id_fkey', onDelete: 'cascade' })],
+      foreignKeys: [constraints.foreignKey(cols.authorId, constraints.ref('User', 'id'), { name: 'post_author_id_fkey', onDelete: 'cascade' })],
     }));
     return { types, models: { User, Post } };
   },
@@ -179,7 +179,7 @@ function buildTsContract() {
           createdAt: field.createdAt(),
         },
         relations: {
-          posts: rel.hasMany(() => Post, { by: 'authorId' }),
+          posts: rel.hasMany('Post', { by: 'authorId' }),
         },
       }).sql({
         table: 'user',
@@ -192,13 +192,13 @@ function buildTsContract() {
           title: field.text(),
         },
         relations: {
-          author: rel.belongsTo(User, { from: 'authorId', to: 'id' }),
+          author: rel.belongsTo('User', { from: 'authorId', to: 'id' }),
         },
       }).sql(({ cols, constraints }) => ({
         table: 'post',
         indexes: [constraints.index(cols.authorId, { name: 'post_author_id_idx' })],
         foreignKeys: [
-          constraints.foreignKey(cols.authorId, User.refs.id, {
+          constraints.foreignKey(cols.authorId, constraints.ref('User', 'id'), {
             name: 'post_author_id_fkey',
             onDelete: 'cascade',
           }),

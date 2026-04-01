@@ -99,6 +99,58 @@ describe('verifySqlSchema - basic', () => {
       expect(result.schema.issues).toHaveLength(0);
     });
 
+    it('treats parameterized named storage type refs as matching when expanded', () => {
+      const contract = createTestContract(
+        {
+          document: {
+            columns: {
+              embedding: {
+                nativeType: 'vector',
+                codecId: 'pg/vector@1',
+                nullable: false,
+                typeRef: 'Embedding1536',
+              },
+            },
+            primaryKey: { columns: ['embedding'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+        {},
+        {
+          Embedding1536: {
+            nativeType: 'vector',
+            codecId: 'pg/vector@1',
+            typeParams: { length: 1536 },
+          },
+        },
+      );
+
+      const schema = createTestSchemaIR({
+        document: createSchemaTable(
+          'document',
+          {
+            embedding: { nativeType: 'vector(1536)', nullable: false },
+          },
+          {
+            primaryKey: { columns: ['embedding'] },
+          },
+        ),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [createMockPostgresComponent()],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.schema.issues).toHaveLength(0);
+    });
+
     it('reports type mismatch when schema omits parameters', () => {
       const contract: SqlContract<SqlStorage> = {
         schemaVersion: '1',

@@ -76,18 +76,20 @@ const sqlFloatCodec = codec({
   decode: (wire: number): number => wire,
 });
 
-const sqlTextCodec = codec<typeof SQL_TEXT_CODEC_ID, string, string>({
+const sqlTextCodec = codec({
   typeId: SQL_TEXT_CODEC_ID,
   targetTypes: ['text'],
+  traits: ['equality', 'order', 'textual'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
 });
 
-const sqlTimestampCodec = codec<typeof SQL_TIMESTAMP_CODEC_ID, string | Date, string>({
+const sqlTimestampCodec = codec({
   typeId: SQL_TIMESTAMP_CODEC_ID,
   targetTypes: ['timestamp'],
-  encode: (value): string => (value instanceof Date ? value.toISOString() : value),
-  decode: (wire): string => (wire instanceof Date ? wire.toISOString() : wire),
+  traits: ['equality', 'order'],
+  encode: (value: string | Date): string => (value instanceof Date ? value.toISOString() : value),
+  decode: (wire: string | Date): string => (wire instanceof Date ? wire.toISOString() : wire),
   paramsSchema: precisionParamsSchema,
 });
 

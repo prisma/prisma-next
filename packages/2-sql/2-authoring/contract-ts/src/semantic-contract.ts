@@ -4,9 +4,8 @@ import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/
 import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
-  ReferentialAction,
 } from '@prisma-next/contract-authoring';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { ReferentialAction, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 
 export interface SqlSemanticFieldNode {
   readonly fieldName: string;

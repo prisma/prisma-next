@@ -41,7 +41,7 @@ function buildPortableContract<TTarget extends string>(target: PortableTargetPac
       createdAt: field.column(timestampColumn).defaultSql('CURRENT_TIMESTAMP'),
     },
     relations: {
-      posts: rel.hasMany(() => Post, { by: 'authorId' }),
+      posts: rel.hasMany('Post', { by: 'authorId' }),
     },
   }).sql({
     table: 'app_user',
@@ -81,10 +81,14 @@ describe('staged contract DSL portability coverage', () => {
   it('keeps portable staged contracts identical across postgres and sqlite target swaps', () => {
     const postgresContract = buildPortableContract(postgresTargetPack);
     const sqliteContract = buildPortableContract(sqliteTargetPack);
+    const postgresStorageTables = postgresContract.storage.tables as Record<
+      string,
+      { readonly columns: Record<string, unknown> }
+    >;
 
     expect(postgresContract.target).toBe('postgres');
     expect(sqliteContract.target).toBe('sqlite');
-    expect(postgresContract.storage.tables.app_user.columns.created_at).toMatchObject({
+    expect(postgresStorageTables['app_user']?.columns['created_at']).toMatchObject({
       codecId: 'sql/timestamp@1',
       nativeType: 'timestamp',
       default: {
@@ -92,7 +96,7 @@ describe('staged contract DSL portability coverage', () => {
         expression: 'CURRENT_TIMESTAMP',
       },
     });
-    expect(postgresContract.storage.tables.blog_post.columns.author_id).toMatchObject({
+    expect(postgresStorageTables['blog_post']?.columns['author_id']).toMatchObject({
       codecId: 'sql/char@1',
       nativeType: 'character',
       typeParams: { length: 36 },

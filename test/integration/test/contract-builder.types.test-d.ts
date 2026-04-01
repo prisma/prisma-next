@@ -139,7 +139,7 @@ test('refined object contract preserves downstream schema and ResultType inferen
       createdAt: field.column(timestamptzColumn),
     },
     relations: {
-      posts: rel.hasMany(() => Post, { by: 'userId' }),
+      posts: rel.hasMany('Post', { by: 'userId' }),
     },
   }).sql({
     table: 'user',
@@ -371,7 +371,7 @@ test('portable refined helpers preserve downstream schema and ResultType inferen
       createdAt: field.createdAt(),
     },
     relations: {
-      posts: rel.hasMany(() => Post, { by: 'authorId' }),
+      posts: rel.hasMany('Post', { by: 'authorId' }),
     },
   }).sql({
     table: 'user',

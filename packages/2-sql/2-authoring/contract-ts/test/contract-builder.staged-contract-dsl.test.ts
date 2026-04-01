@@ -40,7 +40,7 @@ describe('staged contract DSL authoring surface', () => {
         createdAt: field.column(timestamptzColumn).column('created_at').defaultSql('now()'),
       },
       relations: {
-        posts: rel.hasMany(() => Post, { by: 'userId' }),
+        posts: rel.hasMany('Post', { by: 'userId' }),
       },
     }).sql({
       table: 'app_user',
@@ -76,27 +76,38 @@ describe('staged contract DSL authoring surface', () => {
         Post,
       },
     });
+    const storageTables = contract.storage.tables as Record<
+      string,
+      {
+        readonly primaryKey?: unknown;
+        readonly uniques?: unknown;
+        readonly indexes?: unknown;
+        readonly foreignKeys?: unknown;
+        readonly columns: Record<
+          string,
+          { readonly default?: unknown; readonly typeRef?: unknown }
+        >;
+      }
+    >;
 
     expect(contract.target).toBe('postgres');
     expect(contract.storageHash).toBe('sha256:staged-contract-dsl');
-    expect(contract.storage.tables['app_user']).toMatchObject({
+    expect(storageTables['app_user']).toMatchObject({
       primaryKey: { columns: ['id'], name: 'app_user_pkey' },
       uniques: [{ columns: ['email'], name: 'app_user_email_key' }],
     });
-    expect(contract.storage.tables['blog_post']).toMatchObject({
+    expect(storageTables['blog_post']).toMatchObject({
       primaryKey: { columns: ['id'], name: 'blog_post_pkey' },
       indexes: [{ columns: ['user_id'], name: 'blog_post_user_id_idx' }],
     });
 
-    const appUserColumns = contract.storage.tables['app_user']?.columns as
-      | Record<string, { default?: unknown; typeRef?: unknown }>
-      | undefined;
+    const appUserColumns = storageTables['app_user']?.columns;
     expect(appUserColumns?.['created_at']?.default).toEqual({
       kind: 'function',
       expression: 'now()',
     });
     expect(appUserColumns?.['role']?.typeRef).toBe('Role');
-    expect(contract.storage.tables['blog_post']?.foreignKeys).toEqual([
+    expect(storageTables['blog_post']?.foreignKeys).toEqual([
       {
         columns: ['user_id'],
         references: { table: 'app_user', columns: ['id'] },
@@ -226,13 +237,29 @@ describe('staged contract DSL authoring surface', () => {
       table: 'post_tag',
     });
 
+    const Post = model('Post', {
+      fields: {
+        id: field.column(textColumn).id(),
+        title: field.column(textColumn),
+      },
+      relations: {
+        tags: rel.manyToMany('Tag', {
+          through: 'PostTag',
+          from: 'postId',
+          to: 'tagId',
+        }),
+      },
+    }).sql({
+      table: 'post',
+    });
+
     const Tag = model('Tag', {
       fields: {
         id: field.column(textColumn).id(),
         label: field.column(textColumn),
       },
       relations: {
-        posts: rel.manyToMany(() => Post, {
+        posts: rel.manyToMany(Post, {
           through: () => PostTag,
           from: 'tagId',
           to: 'postId',
@@ -240,22 +267,6 @@ describe('staged contract DSL authoring surface', () => {
       },
     }).sql({
       table: 'tag',
-    });
-
-    const Post = model('Post', {
-      fields: {
-        id: field.column(textColumn).id(),
-        title: field.column(textColumn),
-      },
-      relations: {
-        tags: rel.manyToMany(() => Tag, {
-          through: () => PostTag,
-          from: 'postId',
-          to: 'tagId',
-        }),
-      },
-    }).sql({
-      table: 'post',
     });
 
     const contract = defineContract({

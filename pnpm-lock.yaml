@@ -76,6 +76,9 @@ importers:
       lint-staged:
         specifier: ^16.2.6
         version: 16.2.6
+      tslib:
+        specifier: ^2.8.1
+        version: 2.8.1
       tsx:
         specifier: ^4.20.6
         version: 4.20.6
@@ -1085,6 +1088,9 @@ importers:
       '@prisma-next/psl-parser':
         specifier: workspace:*
         version: link:../../../1-framework/2-authoring/psl-parser
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../1-core/contract
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../contract-ts
@@ -1095,6 +1101,9 @@ importers:
         specifier: ^2.0.3
         version: 2.0.3
     devDependencies:
+      '@prisma-next/contract-authoring':
+        specifier: workspace:*
+        version: link:../../../1-framework/2-authoring/contract
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../0-config/tsconfig
@@ -1368,8 +1377,8 @@ importers:
         specifier: workspace:*
         version: link:../../3-tooling/family
       '@prisma-next/ids':
-        specifier: ^0.0.1
-        version: 0.0.1
+        specifier: workspace:*
+        version: link:../../../1-framework/2-authoring/ids
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../1-core/contract
@@ -2818,24 +2827,6 @@ packages:
 
   '@oxc-project/types@0.106.0':
     resolution: {integrity: sha512-QdsH3rZq480VnOHSHgPYOhjL8O8LBdcnSjM408BpPCCUc0JYYZPG9Gafl9i3OcGk/7137o+gweb4cCv3WAUykg==}
-
-  '@prisma-next/contract-authoring@0.0.1':
-    resolution: {integrity: sha512-vyXpU238N9Q8DJy3JZWmPRHWQHBR4f4Dr8XJezcXIZ3BoLzLUTgL969nzYBtVZVCDDGQcC6FWFYP0fndMk2AKg==}
-
-  '@prisma-next/contract@0.0.1':
-    resolution: {integrity: sha512-Hv4riY6ACYbSeDz+w1MA6RdfGtypPCCXLNtVKiC1ITLuHaMbSk+v1hk5TGS7e4iUZZCdyeT/HraeCwCcb86ASg==}
-
-  '@prisma-next/ids@0.0.1':
-    resolution: {integrity: sha512-CMxcWNSPGRmZsNBa2Wn4EB8bUyE6Bl3bXkvhSgxJ65XRicFLvvDSf+0u+zJL+MEUoy+IyGFpTYAF4wG8mBvIwA==}
-
-  '@prisma-next/operations@0.0.1':
-    resolution: {integrity: sha512-bTr+uFPCTku3TV1FAuDCuIQf97A3vxuuiXzagec4QvhGWjI5YAgO8WaKBnR/f93cg5cM+wEpv4UujqYzG98v4g==}
-
-  '@prisma-next/plan@0.0.1':
-    resolution: {integrity: sha512-+Luaz9lc6W9QMlzQcTleKLJAS/Y5Lc7JjJGBgfsgDI+jxvIE7YynYe8aPqEHJpNBEyz3VnGwQAx296X0/UIBlQ==}
-
-  '@prisma-next/utils@0.0.1':
-    resolution: {integrity: sha512-vCAXorYkP5yghWDg6cWO0mx42tCf5oJ8QLoFNMjlESeZqyfdjd1HgETLGQ17EerdevqzvepCLXofh3FleJq88Q==}
 
   '@prisma/debug@7.1.0':
     resolution: {integrity: sha512-pPAckG6etgAsEBusmZiFwM9bldLSNkn++YuC4jCTJACdK5hLOVnOzX7eSL2FgaU6Gomd6wIw21snUX2dYroMZQ==}
@@ -5287,30 +5278,6 @@ snapshots:
   '@oxc-project/types@0.103.0': {}
 
   '@oxc-project/types@0.106.0': {}
-
-  '@prisma-next/contract-authoring@0.0.1':
-    dependencies:
-      '@prisma-next/contract': 0.0.1
-      ts-toolbelt: 9.6.0
-
-  '@prisma-next/contract@0.0.1':
-    dependencies:
-      '@prisma-next/operations': 0.0.1
-
-  '@prisma-next/ids@0.0.1':
-    dependencies:
-      '@prisma-next/contract': 0.0.1
-      '@prisma-next/contract-authoring': 0.0.1
-      '@prisma-next/utils': 0.0.1
-      uniku: 0.0.12
-
-  '@prisma-next/operations@0.0.1':
-    dependencies:
-      '@prisma-next/plan': 0.0.1
-
-  '@prisma-next/plan@0.0.1': {}
-
-  '@prisma-next/utils@0.0.1': {}
 
   '@prisma/debug@7.1.0': {}
 

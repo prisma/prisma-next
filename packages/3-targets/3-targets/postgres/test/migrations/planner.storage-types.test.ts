@@ -1,5 +1,6 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import { coreHash } from '@prisma-next/contract/types';
+import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -273,5 +274,64 @@ describe('PostgresMigrationPlanner - storage types', () => {
     // Custom type names must be quoted to preserve case in PostgreSQL
     // Without quotes, PostgreSQL lowercases "UserKind" to "userkind"
     expect(createTableSql).toContain('"UserKind"');
+  });
+
+  it('expands parameterized storage type refs when creating tables', () => {
+    const planner = createPostgresMigrationPlanner();
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: coreHash('sha256:contract'),
+      storage: {
+        tables: {
+          document: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              embedding: {
+                nativeType: 'vector',
+                codecId: 'pg/vector@1',
+                nullable: false,
+                typeRef: 'Embedding1536',
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+        types: {
+          Embedding1536: {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 1536 },
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      sources: {},
+    };
+
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [pgvectorDescriptor],
+    });
+
+    expectNarrowedType(result.kind === 'success');
+
+    const tableOp = result.plan.operations.find((op) => op.id === 'table.document');
+    expect(tableOp).toBeDefined();
+
+    const createTableSql = tableOp?.execute[0]?.sql ?? '';
+    expect(createTableSql).toContain('"embedding" vector(1536) NOT NULL');
+    expect(createTableSql).not.toContain('"embedding" "vector(1536)"');
   });
 });

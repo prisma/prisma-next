@@ -1,5 +1,5 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import type { StorageColumn } from '@prisma-next/sql-contract/types';
+import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 /**
@@ -10,19 +10,25 @@ import { ifDefined } from '@prisma-next/utils/defined';
 export function resolveIdentityValue(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string | null {
-  if (column.codecId) {
-    const hookDefault = codecHooks.get(column.codecId)?.resolveIdentityValue?.({
-      nativeType: column.nativeType,
-      codecId: column.codecId,
-      ...ifDefined('typeParams', column.typeParams),
+  const referencedType = column.typeRef ? storageTypes[column.typeRef] : undefined;
+  const codecId = referencedType?.codecId ?? column.codecId;
+  const nativeType = referencedType?.nativeType ?? column.nativeType;
+  const typeParams = referencedType?.typeParams ?? column.typeParams;
+
+  if (codecId) {
+    const hookDefault = codecHooks.get(codecId)?.resolveIdentityValue?.({
+      nativeType,
+      codecId,
+      ...ifDefined('typeParams', typeParams),
     });
     if (hookDefault !== undefined) {
       return hookDefault;
     }
   }
 
-  return buildBuiltinIdentityValue(column.nativeType, column.typeParams);
+  return buildBuiltinIdentityValue(nativeType, typeParams);
 }
 
 /**

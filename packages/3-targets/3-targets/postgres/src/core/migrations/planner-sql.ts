@@ -6,6 +6,7 @@ import type {
   ReferentialAction,
   StorageColumn,
   StorageTable,
+  StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { PostgresColumnDefault } from '../types';
 
@@ -13,12 +14,13 @@ export function buildCreateTableSql(
   qualifiedTableName: string,
   table: StorageTable,
   codecHooks: Map<string, CodecControlHooks>,
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
   const columnDefinitions = Object.entries(table.columns).map(
     ([columnName, column]: [string, StorageColumn]) => {
       const parts = [
         quoteIdentifier(columnName),
-        buildColumnTypeSql(column, codecHooks),
+        buildColumnTypeSql(column, codecHooks, storageTypes),
         buildColumnDefaultSql(column.default, column),
         column.nullable ? '' : 'NOT NULL',
       ].filter(Boolean);
@@ -70,32 +72,42 @@ function assertSafeDefaultExpression(expression: string): void {
 export function buildColumnTypeSql(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
+  const resolved = resolveColumnTypeMetadata(column, storageTypes);
   const columnDefault = column.default;
 
   if (columnDefault?.kind === 'function' && columnDefault.expression === 'autoincrement()') {
-    if (column.nativeType === 'int4' || column.nativeType === 'integer') {
+    if (resolved.nativeType === 'int4' || resolved.nativeType === 'integer') {
       return 'SERIAL';
     }
-    if (column.nativeType === 'int8' || column.nativeType === 'bigint') {
+    if (resolved.nativeType === 'int8' || resolved.nativeType === 'bigint') {
       return 'BIGSERIAL';
     }
-    if (column.nativeType === 'int2' || column.nativeType === 'smallint') {
+    if (resolved.nativeType === 'int2' || resolved.nativeType === 'smallint') {
       return 'SMALLSERIAL';
     }
   }
 
-  if (column.typeRef) {
-    return quoteIdentifier(column.nativeType);
+  const expanded = renderParameterizedTypeSql(resolved, codecHooks, column.typeRef !== undefined);
+  if (expanded) {
+    return expanded;
   }
 
-  assertSafeNativeType(column.nativeType);
-  return renderParameterizedTypeSql(column, codecHooks) ?? column.nativeType;
+  if (column.typeRef) {
+    assertSafeNativeType(resolved.nativeType);
+    const needsQuoting = resolved.nativeType !== resolved.nativeType.toLowerCase();
+    return needsQuoting ? quoteIdentifier(resolved.nativeType) : resolved.nativeType;
+  }
+
+  assertSafeNativeType(resolved.nativeType);
+  return resolved.nativeType;
 }
 
 function renderParameterizedTypeSql(
-  column: StorageColumn,
+  column: Pick<StorageColumn, 'nativeType' | 'codecId' | 'typeParams'>,
   codecHooks: Map<string, CodecControlHooks>,
+  allowMissingHook = false,
 ): string | null {
   if (!column.typeParams) {
     return null;
@@ -110,6 +122,9 @@ function renderParameterizedTypeSql(
 
   const hooks = codecHooks.get(column.codecId);
   if (!hooks?.expandNativeType) {
+    if (allowMissingHook) {
+      return null;
+    }
     throw new Error(
       `Column declares typeParams for nativeType "${column.nativeType}" ` +
         `but no expandNativeType hook is registered for codecId "${column.codecId}". ` +
@@ -124,6 +139,28 @@ function renderParameterizedTypeSql(
   });
 
   return expanded !== column.nativeType ? expanded : null;
+}
+
+type ResolvedColumnTypeMetadata = Pick<StorageColumn, 'nativeType' | 'codecId' | 'typeParams'>;
+
+function resolveColumnTypeMetadata(
+  column: StorageColumn,
+  storageTypes: Record<string, StorageTypeInstance>,
+): ResolvedColumnTypeMetadata {
+  if (!column.typeRef) {
+    return column;
+  }
+
+  const referencedType = storageTypes[column.typeRef];
+  if (!referencedType) {
+    return column;
+  }
+
+  return {
+    codecId: referencedType.codecId,
+    nativeType: referencedType.nativeType,
+    typeParams: referencedType.typeParams,
+  };
 }
 
 export function buildColumnDefaultSql(
@@ -283,16 +320,18 @@ const FORMAT_TYPE_DISPLAY: ReadonlyMap<string, string> = new Map([
 export function buildExpectedFormatType(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
+  const resolved = resolveColumnTypeMetadata(column, storageTypes);
   // Parameterized types: expand with typeParams.
   // format_type() returns the same form (e.g., 'character varying(255)').
-  if (column.typeParams && column.codecId) {
-    const hooks = codecHooks.get(column.codecId);
+  if (resolved.typeParams && resolved.codecId) {
+    const hooks = codecHooks.get(resolved.codecId);
     if (hooks?.expandNativeType) {
       return hooks.expandNativeType({
-        nativeType: column.nativeType,
-        codecId: column.codecId,
-        typeParams: column.typeParams,
+        nativeType: resolved.nativeType,
+        codecId: resolved.codecId,
+        typeParams: resolved.typeParams,
       });
     }
   }
@@ -302,12 +341,12 @@ export function buildExpectedFormatType(
   // names bare (e.g., status_type). We can't use quoteIdentifier() here because
   // it always quotes, which would break the lowercase case.
   if (column.typeRef) {
-    const needsQuoting = column.nativeType !== column.nativeType.toLowerCase();
-    return needsQuoting ? `"${column.nativeType}"` : column.nativeType;
+    const needsQuoting = resolved.nativeType !== resolved.nativeType.toLowerCase();
+    return needsQuoting ? `"${resolved.nativeType}"` : resolved.nativeType;
   }
 
   // Base types: map contract short names to format_type() display names.
-  return FORMAT_TYPE_DISPLAY.get(column.nativeType) ?? column.nativeType;
+  return FORMAT_TYPE_DISPLAY.get(resolved.nativeType) ?? resolved.nativeType;
 }
 
 /** Checks that the column's full type (including typmods) matches the expected type via `format_type()`. */
@@ -383,8 +422,9 @@ export function buildAddColumnSql(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
   defaultLiteral?: string | null,
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
-  const typeSql = buildColumnTypeSql(column, codecHooks);
+  const typeSql = buildColumnTypeSql(column, codecHooks, storageTypes);
   const defaultSql =
     buildColumnDefaultSql(column.default, column) ||
     (defaultLiteral != null ? `DEFAULT ${defaultLiteral}` : '');

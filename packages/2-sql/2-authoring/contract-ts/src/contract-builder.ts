@@ -65,6 +65,7 @@ import {
   type AttributeStageIdFieldNames,
   applyNaming,
   type FieldStateOf,
+  type ForeignKeyConstraint,
   field,
   type IdConstraint,
   isStagedContractInput,
@@ -1173,9 +1174,14 @@ function resolveInlineIdConstraint(spec: RuntimeModelSpec): IdConstraint | undef
     );
   }
 
+  const [inlineIdField] = inlineIdFields;
+  if (!inlineIdField) {
+    return undefined;
+  }
+
   return {
     kind: 'id',
-    fields: [inlineIdFields[0]],
+    fields: [inlineIdField],
     ...(idName ? { name: idName } : {}),
   };
 }
@@ -1286,7 +1292,7 @@ function resolveSemanticRelationNode(
   relationName: string,
   relation: StagedRelationState,
   currentSpec: RuntimeModelSpec,
-  allSpecs: Map<string, RuntimeModelSpec>,
+  allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
 ): SqlSemanticRelationNode {
   const targetModelName = resolveRelationModelName(relation.toModel);
   const targetSpec = allSpecs.get(targetModelName);

@@ -56,7 +56,19 @@ export type ScalarFieldState<
     ? { readonly unique: UniqueSpec }
     : { readonly unique?: undefined });
 
-type HasNamedConstraintId<State extends ScalarFieldState> =
+type AnyScalarFieldState = {
+  readonly kind: 'scalar';
+  readonly descriptor?: (ColumnTypeDescriptor & { readonly codecId: string }) | undefined;
+  readonly typeRef?: NamedStorageTypeRef | undefined;
+  readonly nullable: boolean;
+  readonly columnName?: string | undefined;
+  readonly default?: ColumnDefault | undefined;
+  readonly executionDefault?: ExecutionMutationDefaultValue | undefined;
+  readonly id?: NamedConstraintSpec | undefined;
+  readonly unique?: NamedConstraintSpec | undefined;
+};
+
+type HasNamedConstraintId<State extends AnyScalarFieldState> =
   State extends ScalarFieldState<
     string,
     NamedStorageTypeRef | undefined,
@@ -70,7 +82,7 @@ type HasNamedConstraintId<State extends ScalarFieldState> =
       : false
     : false;
 
-type HasNamedConstraintUnique<State extends ScalarFieldState> =
+type HasNamedConstraintUnique<State extends AnyScalarFieldState> =
   State extends ScalarFieldState<
     string,
     NamedStorageTypeRef | undefined,
@@ -84,7 +96,7 @@ type HasNamedConstraintUnique<State extends ScalarFieldState> =
       : false
     : false;
 
-type FieldSqlSpecForState<State extends ScalarFieldState> = {
+type FieldSqlSpecForState<State extends AnyScalarFieldState> = {
   readonly column?: string;
 } & (HasNamedConstraintId<State> extends true
   ? { readonly id?: NamedConstraintNameSpec }
@@ -94,7 +106,7 @@ type FieldSqlSpecForState<State extends ScalarFieldState> = {
     : Record<never, never>);
 
 type ApplyFieldSqlSpec<
-  State extends ScalarFieldState,
+  State extends AnyScalarFieldState,
   Spec extends FieldSqlSpecForState<State>,
 > = State extends ScalarFieldState<
   infer CodecId,
@@ -127,15 +139,6 @@ export type GeneratedFieldSpec = {
   readonly typeParams?: Record<string, unknown>;
   readonly generated: ExecutionMutationDefaultValue;
 };
-
-type AnyScalarFieldState = ScalarFieldState<
-  string,
-  NamedStorageTypeRef | undefined,
-  boolean,
-  string | undefined,
-  NamedConstraintSpec | undefined,
-  NamedConstraintSpec | undefined
->;
 
 type NanoidGeneratorOptions = {
   readonly size?: number;
@@ -176,7 +179,7 @@ function toColumnDefault(value: ColumnDefaultLiteralInputValue | ColumnDefault):
   return { kind: 'literal', value };
 }
 
-export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldState> {
+export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFieldState> {
   declare readonly __state: State;
 
   constructor(private readonly state: State) {}
@@ -326,10 +329,13 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
   sql<const Spec extends FieldSqlSpecForState<State>>(
     spec: Spec,
   ): ScalarFieldBuilder<ApplyFieldSqlSpec<State, Spec>> {
-    if (spec.id && !this.state.id) {
+    const idSpec = 'id' in spec ? spec.id : undefined;
+    const uniqueSpec = 'unique' in spec ? spec.unique : undefined;
+
+    if (idSpec && !this.state.id) {
       throw new Error('field.sql({ id }) requires an existing inline .id(...) declaration.');
     }
-    if (spec.unique && !this.state.unique) {
+    if (uniqueSpec && !this.state.unique) {
       throw new Error(
         'field.sql({ unique }) requires an existing inline .unique(...) declaration.',
       );
@@ -338,9 +344,9 @@ export class ScalarFieldBuilder<State extends ScalarFieldState = AnyScalarFieldS
     return new ScalarFieldBuilder({
       ...this.state,
       ...(spec.column ? { columnName: spec.column } : {}),
-      ...(spec.id ? { id: { name: spec.id.name } } : {}),
-      ...(spec.unique ? { unique: { name: spec.unique.name } } : {}),
-    } as ApplyFieldSqlSpec<State, Spec>);
+      ...(idSpec ? { id: { name: idSpec.name } } : {}),
+      ...(uniqueSpec ? { unique: { name: uniqueSpec.name } } : {}),
+    } as unknown as ApplyFieldSqlSpec<State, Spec>);
   }
 
   build(): State {
@@ -1239,6 +1245,9 @@ function normalizeRelationModelSource<Token extends AnyNamedModelToken>(
 function normalizeRelationModelSource<ToModel extends string>(
   target: ToModel,
 ): RelationModelSource<ToModel>;
+function normalizeRelationModelSource(
+  target: string | AnyNamedModelToken | LazyNamedModelToken,
+): RelationModelSource<string>;
 function normalizeRelationModelSource(
   target: string | AnyNamedModelToken | LazyNamedModelToken,
 ): RelationModelSource<string> {

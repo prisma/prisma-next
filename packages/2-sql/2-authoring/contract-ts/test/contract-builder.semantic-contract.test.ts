@@ -124,16 +124,29 @@ describe('shared semantic contract lowering', () => {
       ],
     });
 
-    expect(contract.storage.types?.Role).toEqual({
+    const storage = contract.storage as {
+      readonly types?: Record<string, unknown>;
+      readonly tables?: Record<
+        string,
+        { readonly primaryKey?: unknown; readonly foreignKeys?: unknown }
+      >;
+    };
+    const relations = contract.relations as Record<string, Record<string, unknown> | undefined>;
+    const models = contract.models as Record<
+      string,
+      { readonly fields: Record<string, unknown> } | undefined
+    >;
+
+    expect(storage['types']?.['Role']).toEqual({
       codecId: 'pg/enum@1',
       nativeType: 'role',
       typeParams: { values: ['USER', 'ADMIN'] },
     });
-    expect(contract.storage.tables.app_user.primaryKey).toEqual({
+    expect(storage['tables']?.['app_user']?.primaryKey).toEqual({
       columns: ['id'],
       name: 'app_user_pkey',
     });
-    expect(contract.storage.tables.blog_post.foreignKeys).toEqual([
+    expect(storage['tables']?.['blog_post']?.foreignKeys).toEqual([
       {
         columns: ['author_id'],
         references: {
@@ -145,7 +158,7 @@ describe('shared semantic contract lowering', () => {
         index: true,
       },
     ]);
-    expect(contract.relations.app_user?.posts).toEqual({
+    expect(relations['app_user']?.['posts']).toEqual({
       to: 'Post',
       cardinality: '1:N',
       on: {
@@ -153,7 +166,7 @@ describe('shared semantic contract lowering', () => {
         childCols: ['author_id'],
       },
     });
-    expect(contract.models.Post.fields.authorId).toEqual({
+    expect(models['Post']?.fields['authorId']).toEqual({
       column: 'author_id',
     });
   });

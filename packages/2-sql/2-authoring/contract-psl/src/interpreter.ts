@@ -22,7 +22,7 @@ import type {
   PslModel,
   PslSpan,
 } from '@prisma-next/psl-parser';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { ReferentialAction, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
   buildSqlContractFromSemanticDefinition,
   type SqlSemanticForeignKeyNode,
@@ -48,6 +48,17 @@ type ColumnDescriptor = {
   readonly typeRef?: string;
   readonly typeParams?: Record<string, unknown>;
 };
+
+function toNamedTypeFieldDescriptor(
+  typeRef: string,
+  descriptor: Pick<ColumnDescriptor, 'codecId' | 'nativeType'>,
+): ColumnDescriptor {
+  return {
+    codecId: descriptor.codecId,
+    nativeType: descriptor.nativeType,
+    typeRef,
+  };
+}
 
 function getAuthoringTypeConstructor(
   contributions: AuthoringContributions | undefined,
@@ -1094,7 +1105,7 @@ function normalizeReferentialAction(input: {
   readonly sourceId: string;
   readonly span: PslSpan;
   readonly diagnostics: ContractSourceDiagnostic[];
-}): string | undefined {
+}): ReferentialAction | undefined {
   const normalized =
     REFERENTIAL_ACTION_MAP[input.actionToken as keyof typeof REFERENTIAL_ACTION_MAP];
   if (normalized) {
@@ -1457,10 +1468,15 @@ export function interpretPslDocumentToSqlContractIR(
       codecId: enumStorageType.codecId,
       nativeType: enumStorageType.nativeType,
       typeRef: enumDeclaration.name,
-      ...ifDefined('typeParams', enumStorageType.typeParams),
     };
     enumTypeDescriptors.set(enumDeclaration.name, descriptor);
-    storageTypes[enumDeclaration.name] = enumStorageType;
+    storageTypes[enumDeclaration.name] = {
+      codecId: enumStorageType.codecId,
+      nativeType: enumStorageType.nativeType,
+      typeParams: enumStorageType.typeParams ?? {
+        values: enumDeclaration.values.map((value) => value.name),
+      },
+    };
   }
 
   for (const declaration of input.document.ast.types?.declarations ?? []) {
@@ -1540,11 +1556,15 @@ export function interpretPslDocumentToSqlContractIR(
             nativeType: 'vector',
             typeParams: { length },
           };
-      namedTypeDescriptors.set(declaration.name, {
-        ...pgvectorStorageType,
-        typeRef: declaration.name,
-      });
-      storageTypes[declaration.name] = pgvectorStorageType;
+      namedTypeDescriptors.set(
+        declaration.name,
+        toNamedTypeFieldDescriptor(declaration.name, pgvectorStorageType),
+      );
+      storageTypes[declaration.name] = {
+        codecId: pgvectorStorageType.codecId,
+        nativeType: pgvectorStorageType.nativeType,
+        typeParams: pgvectorStorageType.typeParams ?? { length },
+      };
       continue;
     }
 
@@ -1560,23 +1580,19 @@ export function interpretPslDocumentToSqlContractIR(
       if (!descriptor) {
         continue;
       }
-      namedTypeDescriptors.set(declaration.name, {
-        ...descriptor,
-        typeRef: declaration.name,
-      });
-      builder = builder.storageType(declaration.name, {
+      namedTypeDescriptors.set(
+        declaration.name,
+        toNamedTypeFieldDescriptor(declaration.name, descriptor),
+      );
+      storageTypes[declaration.name] = {
         codecId: descriptor.codecId,
         nativeType: descriptor.nativeType,
         typeParams: descriptor.typeParams ?? {},
-      });
+      };
       continue;
     }
 
-    const descriptor: ColumnDescriptor = {
-      codecId: baseDescriptor.codecId,
-      nativeType: baseDescriptor.nativeType,
-      typeRef: declaration.name,
-    };
+    const descriptor = toNamedTypeFieldDescriptor(declaration.name, baseDescriptor);
     namedTypeDescriptors.set(declaration.name, descriptor);
     storageTypes[declaration.name] = {
       codecId: baseDescriptor.codecId,

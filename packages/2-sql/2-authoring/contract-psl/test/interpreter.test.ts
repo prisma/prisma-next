@@ -319,27 +319,47 @@ model Event {
           typeParams: { precision: 10, scale: 2 },
         },
       },
+    });
+    expect(result.value.storage).toMatchObject({
       tables: {
         event: {
           columns: {
-            id: { codecId: 'pg/text@1', nativeType: 'uuid' },
+            id: { codecId: 'pg/text@1', nativeType: 'uuid', nullable: false, typeRef: 'Id' },
             slug: {
               codecId: 'sql/varchar@1',
               nativeType: 'character varying',
-              typeParams: { length: 191 },
+              nullable: false,
+              typeRef: 'Slug',
             },
-            rating: { codecId: 'pg/int2@1', nativeType: 'int2' },
+            rating: {
+              codecId: 'pg/int2@1',
+              nativeType: 'int2',
+              nullable: false,
+              typeRef: 'Rating',
+            },
             happenedAt: {
               codecId: 'pg/time@1',
               nativeType: 'time',
-              typeParams: { precision: 3 },
+              nullable: false,
+              typeRef: 'HappenedAt',
             },
-            publishDay: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
-            payload: { codecId: 'pg/json@1', nativeType: 'json' },
+            publishDay: {
+              codecId: 'pg/timestamptz@1',
+              nativeType: 'date',
+              nullable: false,
+              typeRef: 'PublishDay',
+            },
+            payload: {
+              codecId: 'pg/json@1',
+              nativeType: 'json',
+              nullable: false,
+              typeRef: 'Payload',
+            },
             amount: {
               codecId: 'pg/numeric@1',
               nativeType: 'numeric',
-              typeParams: { precision: 10, scale: 2 },
+              nullable: false,
+              typeRef: 'Amount',
             },
           },
           primaryKey: { columns: ['id'] },
@@ -390,11 +410,24 @@ model User {
           typeParams: { values: ['OWNER'] },
         },
       },
+    });
+    expect(result.value.storage).toMatchObject({
       tables: {
         user: {
           columns: {
-            role: { codecId: 'pg/enum@1', nativeType: 'user_role' },
-            legacyRole: { codecId: 'pg/enum@1', nativeType: 'Role' },
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'user_role',
+              nullable: false,
+              typeRef: 'UserRole',
+            },
+            legacyRole: {
+              codecId: 'pg/enum@1',
+              nativeType: 'Role',
+              nullable: false,
+              typeRef: 'Role',
+            },
           },
         },
       },
@@ -457,32 +490,41 @@ model Event {
           typeParams: { precision: 2 },
         },
       },
+    });
+    expect(result.value.storage).toMatchObject({
       tables: {
         event: {
           columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             code: {
               codecId: 'sql/char@1',
               nativeType: 'character',
-              typeParams: { length: 12 },
+              nullable: false,
+              typeRef: 'Code',
             },
             score: {
               codecId: 'pg/float4@1',
               nativeType: 'float4',
+              nullable: false,
+              typeRef: 'Score',
             },
             createdAt: {
               codecId: 'pg/timestamp@1',
               nativeType: 'timestamp',
-              typeParams: { precision: 3 },
+              nullable: false,
+              typeRef: 'CreatedAt',
             },
             publishedAt: {
               codecId: 'pg/timestamptz@1',
               nativeType: 'timestamptz',
-              typeParams: { precision: 6 },
+              nullable: false,
+              typeRef: 'PublishedAt',
             },
             reminderAt: {
               codecId: 'pg/timetz@1',
               nativeType: 'timetz',
-              typeParams: { precision: 2 },
+              nullable: false,
+              typeRef: 'ReminderAt',
             },
           },
         },
@@ -938,7 +980,7 @@ model Document {
       types: {
         Role: {
           codecId: 'custom/enum@1',
-          nativeType: 'role',
+          nativeType: 'Role',
           typeParams: { values: ['USER', 'ADMIN'] },
         },
         Embedding1536: {
@@ -952,7 +994,7 @@ model Document {
           columns: {
             role: {
               codecId: 'custom/enum@1',
-              nativeType: 'role',
+              nativeType: 'Role',
               typeRef: 'Role',
             },
             embedding: {

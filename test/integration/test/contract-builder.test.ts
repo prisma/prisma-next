@@ -281,7 +281,7 @@ describe('builder integration', () => {
         createdAt: field.column(timestamptzColumn),
       },
       relations: {
-        posts: rel.hasMany(() => Post, { by: 'userId' }),
+        posts: rel.hasMany('Post', { by: 'userId' }),
       },
     }).sql({
       table: 'user',
