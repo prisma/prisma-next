@@ -4,7 +4,6 @@ export type {
   AddPrimaryKeyDescriptor,
   AddUniqueDescriptor,
   AlterColumnTypeDescriptor,
-  ColumnSpec,
   CreateIndexDescriptor,
   CreateTableDescriptor,
   CreateTypeDescriptor,

@@ -41,6 +41,7 @@ import type {
 import type { OperationClass, PostgresPlanTargetDetails } from './planner';
 import {
   buildAddColumnSql,
+  buildColumnDefaultSql,
   buildCreateTableSql,
   buildExpectedFormatType,
   buildForeignKeySql,
@@ -222,7 +223,7 @@ function resolveAlterColumnType(
   const expectedType = buildExpectedFormatType(column, ctx.codecHooks);
   return {
     id: `alterType.${desc.table}.${desc.column}`,
-    label: `Alter type of "${desc.table}"."${desc.column}" to ${desc.newType}`,
+    label: `Alter type of "${desc.table}"."${desc.column}" to ${column.nativeType}`,
     operationClass: 'destructive',
     target: targetDetails('column', desc.column, ctx.schemaName, desc.table),
     precheck: [
@@ -234,7 +235,7 @@ function resolveAlterColumnType(
     execute: [
       step(
         `alter type of "${desc.column}"`,
-        `ALTER TABLE ${qualified} ALTER COLUMN ${quoteId(desc.column)} TYPE ${desc.newType} USING ${quoteId(desc.column)}::${desc.newType}`,
+        `ALTER TABLE ${qualified} ALTER COLUMN ${quoteId(desc.column)} TYPE ${expectedType} USING ${quoteId(desc.column)}::${expectedType}`,
       ),
     ],
     postcheck: [
@@ -326,6 +327,14 @@ function resolveDropNotNull(
 }
 
 function resolveSetDefault(desc: SetDefaultDescriptor, ctx: OperationResolverContext): ResolvedOp {
+  const column = getColumn(ctx.toContract, desc.table, desc.column);
+  if (!column)
+    throw new Error(`Column "${desc.table}"."${desc.column}" not found in destination contract`);
+  const defaultSql = buildColumnDefaultSql(column.default, column);
+  if (!defaultSql)
+    throw new Error(
+      `Column "${desc.table}"."${desc.column}" has no default in destination contract`,
+    );
   const qualified = qualifyTableName(ctx.schemaName, desc.table);
   return {
     id: `setDefault.${desc.table}.${desc.column}`,
@@ -341,7 +350,7 @@ function resolveSetDefault(desc: SetDefaultDescriptor, ctx: OperationResolverCon
     execute: [
       step(
         `set default on "${desc.column}"`,
-        `ALTER TABLE ${qualified} ALTER COLUMN ${quoteId(desc.column)} SET DEFAULT ${desc.default}`,
+        `ALTER TABLE ${qualified} ALTER COLUMN ${quoteId(desc.column)} ${defaultSql}`,
       ),
     ],
     postcheck: [],
@@ -378,9 +387,12 @@ function resolveAddPrimaryKey(
   desc: AddPrimaryKeyDescriptor,
   ctx: OperationResolverContext,
 ): ResolvedOp {
-  const constraintName = desc.constraintName ?? `${desc.table}_pkey`;
+  const table = getTable(ctx.toContract, desc.table);
+  if (!table?.primaryKey)
+    throw new Error(`Table "${desc.table}" has no primary key in destination contract`);
+  const constraintName = table.primaryKey.name ?? `${desc.table}_pkey`;
   const qualified = qualifyTableName(ctx.schemaName, desc.table);
-  const columnList = desc.columns.map(quoteId).join(', ');
+  const columnList = table.primaryKey.columns.map(quoteId).join(', ');
   return {
     id: `primaryKey.${desc.table}.${constraintName}`,
     label: `Add primary key on "${desc.table}"`,
@@ -413,7 +425,9 @@ function resolveAddPrimaryKey(
 }
 
 function resolveAddUnique(desc: AddUniqueDescriptor, ctx: OperationResolverContext): ResolvedOp {
-  const constraintName = desc.constraintName ?? `${desc.table}_${desc.columns.join('_')}_key`;
+  const table = getTable(ctx.toContract, desc.table);
+  const unique = table?.uniques?.find((u) => u.columns.join(',') === desc.columns.join(','));
+  const constraintName = unique?.name ?? `${desc.table}_${desc.columns.join('_')}_key`;
   const qualified = qualifyTableName(ctx.schemaName, desc.table);
   const columnList = desc.columns.map(quoteId).join(', ');
   return {
@@ -451,21 +465,17 @@ function resolveAddForeignKey(
   desc: AddForeignKeyDescriptor,
   ctx: OperationResolverContext,
 ): ResolvedOp {
-  const fkName = desc.constraintName ?? `${desc.table}_${desc.columns.join('_')}_fkey`;
   const table = getTable(ctx.toContract, desc.table);
-  const fk = table?.foreignKeys?.find(
-    (f) =>
-      f.name === fkName ||
-      (f.columns.join(',') === desc.columns.join(',') &&
-        f.references.table === desc.references.table),
-  );
+  const fk = table?.foreignKeys?.find((f) => f.columns.join(',') === desc.columns.join(','));
 
   if (!fk) {
     throw new Error(
-      `Foreign key on "${desc.table}" (${desc.columns.join(', ')}) → "${desc.references.table}" not found in destination contract. ` +
+      `Foreign key on "${desc.table}" (${desc.columns.join(', ')}) not found in destination contract. ` +
         'Ensure the FK is declared in the contract before authoring a migration that adds it.',
     );
   }
+
+  const fkName = fk.name ?? `${desc.table}_${desc.columns.join('_')}_fkey`;
 
   return {
     id: `foreignKey.${desc.table}.${fkName}`,
@@ -543,7 +553,9 @@ function resolveCreateIndex(
   desc: CreateIndexDescriptor,
   ctx: OperationResolverContext,
 ): ResolvedOp {
-  const indexName = desc.indexName ?? `${desc.table}_${desc.columns.join('_')}_idx`;
+  const table = getTable(ctx.toContract, desc.table);
+  const index = table?.indexes?.find((i) => i.columns.join(',') === desc.columns.join(','));
+  const indexName = index?.name ?? `${desc.table}_${desc.columns.join('_')}_idx`;
   const qualified = qualifyTableName(ctx.schemaName, desc.table);
   const columnList = desc.columns.map(quoteId).join(', ');
   return {
