@@ -59,7 +59,7 @@ export const mongoTargetFamilyHook = {
       throw new Error(`Expected targetFamily "mongo", got "${ir.targetFamily}"`);
     }
 
-    const storage = ir.storage as MongoStorageIR | undefined;
+    const storage = ir.storage as unknown as MongoStorageIR | undefined;
     if (!storage || !storage.collections || typeof storage.collections !== 'object') {
       throw new Error('Mongo contract must have storage.collections');
     }
@@ -79,7 +79,7 @@ export const mongoTargetFamilyHook = {
         );
       }
 
-      const collection = model.storage.collection as string | undefined;
+      const collection = model.storage['collection'] as string | undefined;
 
       if (model.owner) {
         if (collection) {
@@ -104,7 +104,7 @@ export const mongoTargetFamilyHook = {
         const baseModel = models[model.base];
         if (baseModel) {
           const variantCollection = collection;
-          const baseCollection = baseModel.storage.collection as string | undefined;
+          const baseCollection = baseModel.storage['collection'] as string | undefined;
           if (variantCollection !== baseCollection) {
             throw new Error(
               `Variant "${modelName}" must share its base's collection ("${baseCollection ?? '(none)'}"), but has "${variantCollection ?? '(none)'}"`,
@@ -113,7 +113,7 @@ export const mongoTargetFamilyHook = {
         }
       }
 
-      const storageRelations = model.storage.relations as Record<string, unknown> | undefined;
+      const storageRelations = model.storage['relations'] as Record<string, unknown> | undefined;
       if (storageRelations) {
         for (const [relName, _relVal] of Object.entries(storageRelations)) {
           const targetModel = Object.entries(models).find(
@@ -145,7 +145,7 @@ export const mongoTargetFamilyHook = {
   ): string {
     const parameterizedTypeImports = options?.parameterizedTypeImports;
     const models = ir.models as Record<string, MongoModelIR>;
-    const storage = ir.storage as MongoStorageIR;
+    const storage = ir.storage as unknown as MongoStorageIR;
 
     const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
     if (parameterizedTypeImports) {
@@ -251,12 +251,12 @@ export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;
 
   generateModelStorageType(model: MongoModelIR): string {
     const parts: string[] = [];
-    const collection = model.storage.collection as string | undefined;
+    const collection = model.storage['collection'] as string | undefined;
     if (collection) {
       parts.push(`readonly collection: ${serializeValue(collection)}`);
     }
 
-    const storageRelations = model.storage.relations as
+    const storageRelations = model.storage['relations'] as
       | Record<string, Record<string, unknown>>
       | undefined;
     if (storageRelations && Object.keys(storageRelations).length > 0) {
