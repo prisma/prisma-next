@@ -44,6 +44,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { UnionToIntersection } from './authoring-type-utils';
 import {
   type ComposedAuthoringHelpers,
   createComposedAuthoringHelpers,
@@ -173,12 +174,6 @@ type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
     ? C
     : Record<string, never>
   : Record<string, never>;
-
-type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (
-  k: infer I,
-) => void
-  ? I
-  : never;
 
 type MergeExtensionCodecTypes<Packs extends Record<string, unknown>> = UnionToIntersection<
   {

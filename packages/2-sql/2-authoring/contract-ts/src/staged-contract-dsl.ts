@@ -20,6 +20,12 @@ import {
   createFieldHelpersFromNamespace,
   createFieldPresetHelper,
 } from './authoring-helper-runtime';
+import type {
+  NamedConstraintSpec,
+  NamedConstraintState,
+  SupportsNamedConstraintOptions,
+  TupleFromArgumentDescriptors,
+} from './authoring-type-utils';
 
 export type NamingStrategy = 'identity' | 'snake_case';
 
@@ -29,10 +35,6 @@ export type NamingConfig = {
 };
 
 type NamedStorageTypeRef = string | StorageTypeInstance;
-
-type NamedConstraintSpec<Name extends string | undefined = string | undefined> = {
-  readonly name?: Name;
-};
 
 type NamedConstraintNameSpec<Name extends string = string> = {
   readonly name: Name;
@@ -142,11 +144,6 @@ export type GeneratedFieldSpec = {
   readonly generated: ExecutionMutationDefaultValue;
 };
 
-type NamedConstraintState<
-  Enabled extends boolean,
-  Name extends string | undefined = undefined,
-> = Enabled extends true ? NamedConstraintSpec<Name> : undefined;
-
 type FieldBuilderFromPresetDescriptor<
   Descriptor extends AuthoringFieldPresetDescriptor,
   Name extends string | undefined = undefined,
@@ -163,50 +160,6 @@ type FieldBuilderFromPresetDescriptor<
     >
   >
 >;
-
-type OptionalObjectArgumentKeys<Properties extends Record<string, AuthoringArgumentDescriptor>> = {
-  readonly [K in keyof Properties]: Properties[K] extends { readonly optional: true } ? K : never;
-}[keyof Properties];
-
-type ObjectArgumentType<Properties extends Record<string, AuthoringArgumentDescriptor>> = {
-  readonly [K in Exclude<
-    keyof Properties,
-    OptionalObjectArgumentKeys<Properties>
-  >]: ArgTypeFromDescriptor<Properties[K]>;
-} & {
-  readonly [K in OptionalObjectArgumentKeys<Properties>]?: ArgTypeFromDescriptor<Properties[K]>;
-};
-
-type ArgTypeFromDescriptor<Arg extends AuthoringArgumentDescriptor> = Arg extends {
-  readonly kind: 'string';
-}
-  ? string
-  : Arg extends { readonly kind: 'number' }
-    ? number
-    : Arg extends { readonly kind: 'stringArray' }
-      ? readonly string[]
-      : Arg extends {
-            readonly kind: 'object';
-            readonly properties: infer Properties extends Record<
-              string,
-              AuthoringArgumentDescriptor
-            >;
-          }
-        ? ObjectArgumentType<Properties>
-        : never;
-
-type TupleFromArgumentDescriptors<Args extends readonly AuthoringArgumentDescriptor[]> = {
-  readonly [K in keyof Args]: Args[K] extends AuthoringArgumentDescriptor
-    ? ArgTypeFromDescriptor<Args[K]>
-    : never;
-};
-
-type SupportsNamedConstraintOptions<Descriptor extends AuthoringFieldPresetDescriptor> =
-  Descriptor['output'] extends { readonly id: true }
-    ? true
-    : Descriptor['output'] extends { readonly unique: true }
-      ? true
-      : false;
 
 type FieldHelperFunctionWithoutNamedConstraint<Descriptor extends AuthoringFieldPresetDescriptor> =
   Descriptor extends { readonly args: infer Args extends readonly AuthoringArgumentDescriptor[] }
