@@ -87,64 +87,6 @@ describe('validateContract', () => {
     expect(result.storage.tables['User']?.columns).toHaveProperty('id');
   });
 
-  it('handles missing relations field', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {},
-      relations: undefined,
-      storage: {
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    const result = validateContract<SqlContract<SqlStorage>>(contractInput);
-    // Relations can be undefined if not provided
-    expect(result).toBeDefined();
-  });
-
-  it('handles missing mappings field', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {},
-      relations: {},
-      mappings: undefined,
-      storage: {
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    const result = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(result.mappings).toBeDefined();
-    expect(result.mappings.modelToTable).toBeDefined();
-    expect(result.mappings.tableToModel).toBeDefined();
-    expect(result.mappings.fieldToColumn).toBeDefined();
-    expect(result.mappings.columnToField).toBeDefined();
-  });
-
   it('handles empty foreignKeys array', () => {
     const contractInput = {
       schemaVersion: '1',
@@ -152,8 +94,6 @@ describe('validateContract', () => {
       targetFamily: 'sql',
       storageHash: 'sha256:test',
       models: {},
-      relations: {},
-      mappings: {},
       storage: {
         tables: {
           User: {
@@ -178,8 +118,6 @@ describe('validateContract', () => {
       targetFamily: 'sql',
       storageHash: 'sha256:test',
       models: {},
-      relations: {},
-      mappings: {},
       storage: {
         tables: {
           User: {
@@ -221,8 +159,6 @@ describe('validateContract', () => {
       targetFamily: 'sql',
       storageHash: 'sha256:test',
       models: {},
-      relations: {},
-      mappings: {},
       storage: {
         tables: {
           Post: {

@@ -133,7 +133,6 @@ const StorageSchema = type({
 });
 
 const ModelFieldSchema = type({
-  'column?': 'string',
   'nullable?': 'boolean',
   'codecId?': 'string',
 });
