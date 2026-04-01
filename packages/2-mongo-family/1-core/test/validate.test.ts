@@ -48,7 +48,7 @@ describe('validateMongoContract()', () => {
       expect(() => validateMongoContract(json)).toThrow();
     });
 
-    it('rejects relation with invalid strategy', () => {
+    it('rejects relation with unexpected property', () => {
       const json = {
         ...makeValidContractJson(),
         models: {
@@ -56,7 +56,7 @@ describe('validateMongoContract()', () => {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             storage: { collection: 'items' },
             relations: {
-              bad: { to: 'Other', cardinality: '1:1', strategy: 'magic' },
+              bad: { to: 'Other', cardinality: '1:1', extra: true },
             },
           },
         },
@@ -89,15 +89,19 @@ describe('validateMongoContract()', () => {
         models: {
           Item: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
-            storage: { collection: 'items' },
+            storage: {
+              collection: 'items',
+              relations: { tags: { field: 'tags' } },
+            },
             relations: {
-              tags: { to: 'Tag', cardinality: '1:N', strategy: 'embed', field: 'tags' },
+              tags: { to: 'Tag', cardinality: '1:N' },
             },
           },
           Tag: {
             fields: { name: { codecId: 'mongo/string@1', nullable: false } },
             storage: { collection: 'tags' },
             relations: {},
+            owner: 'Item',
           },
         },
       };

@@ -130,7 +130,6 @@ describe('validateContractDomain()', () => {
               owner: {
                 to: 'User',
                 cardinality: 'N:1',
-                strategy: 'reference',
                 on: { localFields: ['ownerId'], targetFields: ['_id'] },
               },
             },
@@ -149,7 +148,6 @@ describe('validateContractDomain()', () => {
               owner: {
                 to: 'Ghost',
                 cardinality: 'N:1',
-                strategy: 'reference',
                 on: { localFields: ['ownerId'], targetFields: ['_id'] },
               },
             },
@@ -271,8 +269,6 @@ describe('validateContractDomain()', () => {
               tag: {
                 to: 'Tag',
                 cardinality: '1:1',
-                strategy: 'embed',
-                field: 'tag',
               },
             },
           }),
@@ -316,14 +312,11 @@ describe('validateContractDomain()', () => {
               assignee: {
                 to: 'User',
                 cardinality: 'N:1',
-                strategy: 'reference',
                 on: { localFields: ['assigneeId'], targetFields: ['_id'] },
               },
               comments: {
                 to: 'Comment',
                 cardinality: '1:N',
-                strategy: 'embed',
-                field: 'comments',
               },
             },
             discriminator: { field: 'type' },
@@ -353,8 +346,6 @@ describe('validateContractDomain()', () => {
               addresses: {
                 to: 'Address',
                 cardinality: '1:N',
-                strategy: 'embed',
-                field: 'addresses',
               },
             },
           }),

@@ -24,7 +24,6 @@
         "posts": {
           "to": "Post",
           "cardinality": "1:N",
-          "strategy": "reference",
           "on": {
             "localFields": ["_id"],
             "targetFields": ["authorId"]
@@ -49,7 +48,6 @@
         "author": {
           "to": "User",
           "cardinality": "N:1",
-          "strategy": "reference",
           "on": {
             "localFields": ["authorId"],
             "targetFields": ["_id"]

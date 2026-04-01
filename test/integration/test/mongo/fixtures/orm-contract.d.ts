@@ -5,7 +5,10 @@ import type {
 } from '@prisma-next/mongo-core';
 
 type TaskModel = {
-  readonly storage: { readonly collection: 'tasks' };
+  readonly storage: {
+    readonly collection: 'tasks';
+    readonly relations: { readonly comments: { readonly field: 'comments' } };
+  };
   readonly fields: {
     readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
     readonly title: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
@@ -16,7 +19,6 @@ type TaskModel = {
     readonly assignee: {
       readonly to: 'User';
       readonly cardinality: 'N:1';
-      readonly strategy: 'reference';
       readonly on: {
         readonly localFields: readonly ['assigneeId'];
         readonly targetFields: readonly ['_id'];
@@ -25,8 +27,6 @@ type TaskModel = {
     readonly comments: {
       readonly to: 'Comment';
       readonly cardinality: '1:N';
-      readonly strategy: 'embed';
-      readonly field: 'comments';
     };
   };
   readonly discriminator: { readonly field: 'type' };
@@ -56,7 +56,10 @@ type FeatureModel = {
 };
 
 type UserModel = {
-  readonly storage: { readonly collection: 'users' };
+  readonly storage: {
+    readonly collection: 'users';
+    readonly relations: { readonly addresses: { readonly field: 'addresses' } };
+  };
   readonly fields: {
     readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
     readonly name: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
@@ -66,8 +69,6 @@ type UserModel = {
     readonly addresses: {
       readonly to: 'Address';
       readonly cardinality: '1:N';
-      readonly strategy: 'embed';
-      readonly field: 'addresses';
     };
   };
 };
@@ -80,6 +81,7 @@ type AddressModel = {
     readonly zip: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
   };
   readonly relations: Record<string, never>;
+  readonly owner: 'User';
 };
 
 type CommentModel = {
@@ -90,6 +92,7 @@ type CommentModel = {
     readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
   };
   readonly relations: Record<string, never>;
+  readonly owner: 'Task';
 };
 
 type OrmContract = MongoContract<
