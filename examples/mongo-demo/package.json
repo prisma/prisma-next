@@ -16,7 +16,7 @@
     "@prisma-next/mongo-core": "workspace:*",
     "@prisma-next/mongo-orm": "workspace:*",
     "@prisma-next/mongo-runtime": "workspace:*",
-    "mongodb": "^6.16.0"
+    "mongodb": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
