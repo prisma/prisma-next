@@ -115,6 +115,14 @@ describe('SQL contract validators', () => {
       } as unknown;
       expect(() => validateModel(invalid)).toThrow();
     });
+
+    it('validates model without relations', () => {
+      const modelWithoutRelations = {
+        storage: { table: 'user', fields: { id: { column: 'id' } } },
+        fields: { id: {} },
+      };
+      expect(() => validateModel(modelWithoutRelations)).not.toThrow();
+    });
   });
 
   describe('validateSqlContract', () => {
