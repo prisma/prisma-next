@@ -78,6 +78,9 @@ async function main() {
     'export type CodecTypes = Record<string, never>;',
     `export type CodecTypes = ${MONGO_CODEC_TYPES};`,
   );
+  if (contractDts === result.contractDts) {
+    throw new Error('Failed to inject CodecTypes -- emitter output format may have changed');
+  }
 
   const srcDir = resolve(import.meta.dirname, '..', 'src');
   writeFileSync(resolve(srcDir, 'contract.json'), result.contractJson + '\n');

@@ -48,6 +48,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
 
   it('findMany returns seeded users', async () => {
     const db = client.db(dbName);
+    // Deterministic string IDs for assertions (cast needed because MongoDB driver expects ObjectId for _id)
     await db.collection('users').insertMany([
       { _id: 'u1' as never, name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
       { _id: 'u2' as never, name: 'Bob', email: 'bob@example.com', bio: null },
