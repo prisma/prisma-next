@@ -37,13 +37,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
   });
 
   afterAll(async () => {
-    try {
-      await runtime?.close();
-      await client?.close();
-      await replSet?.stop();
-    } catch {
-      // Ignore cleanup errors
-    }
+    await Promise.allSettled([runtime?.close(), client?.close(), replSet?.stop()]);
   }, timeouts.spinUpDbServer);
 
   it('findMany returns seeded users', async () => {
@@ -56,10 +50,11 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
 
     const orm = mongoOrm({ contract, executor: runtime });
     const users = await orm.users.findMany();
+    const sorted = [...users].sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
-    expect(users).toHaveLength(2);
-    expect(users[0]).toMatchObject({ name: 'Alice', email: 'alice@example.com', bio: 'Writer' });
-    expect(users[1]).toMatchObject({ name: 'Bob', email: 'bob@example.com', bio: null });
+    expect(sorted).toHaveLength(2);
+    expect(sorted[0]).toMatchObject({ name: 'Alice', email: 'alice@example.com', bio: 'Writer' });
+    expect(sorted[1]).toMatchObject({ name: 'Bob', email: 'bob@example.com', bio: null });
   });
 
   it('findMany returns seeded posts', async () => {
@@ -89,10 +84,11 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
 
     const orm = mongoOrm({ contract, executor: runtime });
     const posts = await orm.posts.findMany();
+    const sorted = [...posts].sort((a, b) => String(a.title).localeCompare(String(b.title)));
 
-    expect(posts).toHaveLength(2);
-    expect(posts[0]).toMatchObject({ title: 'Hello World', content: 'My first post' });
-    expect(posts[1]).toMatchObject({ title: 'Second Post', content: 'More content' });
+    expect(sorted).toHaveLength(2);
+    expect(sorted[0]).toMatchObject({ title: 'Hello World', content: 'My first post' });
+    expect(sorted[1]).toMatchObject({ title: 'Second Post', content: 'More content' });
   });
 
   it('findMany with include resolves Post -> User via $lookup', async () => {
