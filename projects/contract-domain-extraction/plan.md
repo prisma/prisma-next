@@ -199,6 +199,6 @@ Migrates the SQL emitter hook onto the shared domain-level generation utilities 
   - `roots` derivation: emitter derives for now; IR supplies in M5.
   - `model.relations` shape: per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), plain graph edges — no `strategy`. Owned models declare `"owner"` on the model itself.
 3. **M2 coordination with Alexey.** The ORM client migration (tasks 2.1–2.5) touches core ORM internals. This must be sequenced to avoid conflicts with Alexey's active ORM development. The widened types from M1 allow him to migrate incrementally.
-4. `**paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
+4. **`paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
 5. **M3 sequencing.** The Mongo emitter hook (M3) can run in parallel with M2 since it doesn't touch the SQL emitter. It establishes the shared domain-level generation API that M6 later migrates the SQL hook onto.
 
