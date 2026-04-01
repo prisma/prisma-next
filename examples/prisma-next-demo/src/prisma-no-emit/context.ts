@@ -23,6 +23,4 @@ export const context = createExecutionContext({
 
 export const schema = schemaBuilder(context);
 export const tables = schema.tables;
-export function createSql() {
-  return sqlBuilder<typeof contract>({ context });
-}
+export const sql = sqlBuilder<typeof contract>({ context });

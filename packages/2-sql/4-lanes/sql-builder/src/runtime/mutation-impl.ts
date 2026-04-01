@@ -134,7 +134,7 @@ export class InsertQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildQueryPlan(ast, this.#rowFields, this.ctx);
+    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes']>>(ast, this.#rowFields, this.ctx);
   }
 }
 
@@ -233,7 +233,7 @@ export class UpdateQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildQueryPlan(ast, this.#rowFields, this.ctx);
+    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes']>>(ast, this.#rowFields, this.ctx);
   }
 }
 
@@ -312,6 +312,6 @@ export class DeleteQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildQueryPlan(ast, this.#rowFields, this.ctx);
+    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes']>>(ast, this.#rowFields, this.ctx);
   }
 }

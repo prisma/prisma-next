@@ -18,6 +18,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
         db.user
           .select('id', 'email', 'created_at', 'update_at')
           .where((f, fns) => fns.eq(f.email, 'e2e@example.com'))
+          .limit(1)
           .build(),
       );
       const inserted = insertedRows[0];
@@ -43,6 +44,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
         db.user
           .select('id', 'email')
           .where((f, fns) => fns.eq(f.id, userId))
+          .limit(1)
           .build(),
       );
       const updated = updatedRows[0];
@@ -78,6 +80,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         db.event
           .select('id', 'name', 'created_at', 'scheduled_at')
           .where((f, fns) => fns.eq(f.name, 'uuidv7-test-event'))
+          .limit(1)
           .build(),
       );
       const row = rows[0];
@@ -101,6 +104,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         db.event
           .select('id', 'name')
           .where((f, fns) => fns.eq(f.id, overrideId))
+          .limit(1)
           .build(),
       );
       const row = rows[0];
@@ -121,6 +125,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         db.event
           .select('id', 'name')
           .where((f, fns) => fns.eq(f.name, 'to-be-updated'))
+          .limit(1)
           .build(),
       );
       const inserted = insertedRows[0];
@@ -140,6 +145,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         db.event
           .select('id', 'name')
           .where((f, fns) => fns.eq(f.id, eventId))
+          .limit(1)
           .build(),
       );
       const updated = updatedRows[0];
@@ -170,6 +176,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
       const rows = await runtime.execute(
         db.literal_defaults
           .select('id', 'label', 'score', 'rating', 'active', 'big_count', 'metadata', 'tags')
+          .limit(1)
           .build(),
       );
       const row = rows[0];
@@ -205,6 +212,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         db.user
           .select('id', 'profile')
           .where((f, fns) => fns.eq(f.email, 'json@example.com'))
+          .limit(1)
           .build(),
       );
       const userRow = userRows[0];
@@ -226,6 +234,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         db.post
           .select('id', 'meta')
           .where((f, fns) => fns.eq(f.title, 'Typed JSON post'))
+          .limit(1)
           .build(),
       );
       const postRow = postRows[0];

@@ -1,9 +1,0 @@
-{
-  "extends": ["@prisma-next/tsconfig/base"],
-  "compilerOptions": {
-    "noEmit": true,
-    "types": ["vitest/globals", "node"]
-  },
-  "include": ["../src/**/*.ts", "./**/*.ts"],
-  "exclude": ["../dist"]
-}

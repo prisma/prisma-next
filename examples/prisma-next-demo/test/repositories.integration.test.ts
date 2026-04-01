@@ -72,14 +72,6 @@ const seededPostIds = {
   adminZebra: '10000000-0000-0000-0000-000000000005',
 } as const;
 
-async function collectAll<T>(iter: AsyncIterable<T>): Promise<T[]> {
-  const rows: T[] = [];
-  for await (const row of iter) {
-    rows.push(row);
-  }
-  return rows;
-}
-
 async function seedOrmClientData(runtime: Runtime): Promise<void> {
   const db = sql({ context });
 
@@ -111,7 +103,7 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
   ];
 
   for (const user of users) {
-    await collectAll(runtime.execute(db.user.insert(user).build()));
+    await runtime.execute(db.user.insert(user).build());
   }
 
   const posts = [
@@ -148,7 +140,7 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
   ];
 
   for (const post of posts) {
-    await collectAll(runtime.execute(db.post.insert(post).build()));
+    await runtime.execute(db.post.insert(post).build());
   }
 }
 

@@ -1,19 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { collect, setupIntegrationTest } from './setup';
+import { setupIntegrationTest } from './setup';
 
 describe('integration: GROUP BY / HAVING', () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('GROUP BY with COUNT', async () => {
-    const rows = await collect(
-      runtime().execute(
-        db()
-          .posts.select('user_id')
-          .select('cnt', (_f, fns) => fns.count())
-          .groupBy('user_id')
-          .orderBy('user_id')
-          .build(),
-      ),
+    const rows = await runtime().execute(
+      db()
+        .posts.select('user_id')
+        .select('cnt', (_f, fns) => fns.count())
+        .groupBy('user_id')
+        .orderBy('user_id')
+        .build(),
     );
     expect(rows.length).toBeGreaterThan(0);
     const alice = rows.find((r) => r.user_id === 1);
@@ -21,15 +19,13 @@ describe('integration: GROUP BY / HAVING', () => {
   });
 
   it('HAVING filters groups', async () => {
-    const rows = await collect(
-      runtime().execute(
-        db()
-          .posts.select('user_id')
-          .select('cnt', (_f, fns) => fns.count())
-          .groupBy('user_id')
-          .having((_f, fns) => fns.gt(fns.count(), 1))
-          .build(),
-      ),
+    const rows = await runtime().execute(
+      db()
+        .posts.select('user_id')
+        .select('cnt', (_f, fns) => fns.count())
+        .groupBy('user_id')
+        .having((_f, fns) => fns.gt(fns.count(), 1))
+        .build(),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]!.user_id).toBe(1);

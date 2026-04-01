@@ -1,5 +1,4 @@
 import { db } from '../prisma/db';
-import { collect } from './utils';
 
 /**
  * Guardrail-proving query: DELETE without WHERE.
@@ -8,5 +7,5 @@ import { collect } from './utils';
  */
 export async function deleteWithoutWhere() {
   const plan = db.sql.user.delete().build();
-  await collect(db.runtime().execute(plan));
+  await db.runtime().execute(plan);
 }

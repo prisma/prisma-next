@@ -1,26 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { collect, setupIntegrationTest } from './setup';
+import { setupIntegrationTest } from './setup';
 
 describe('integration: LIMIT / OFFSET', () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('LIMIT restricts row count', async () => {
-    const rows = await collect(
-      runtime().execute(db().users.select('id').orderBy('id').limit(2).build()),
-    );
+    const rows = await runtime().execute(db().users.select('id').orderBy('id').limit(2).build());
     expect(rows).toHaveLength(2);
   });
 
   it('OFFSET skips rows', async () => {
-    const rows = await collect(
-      runtime().execute(db().users.select('id').orderBy('id').offset(2).build()),
-    );
+    const rows = await runtime().execute(db().users.select('id').orderBy('id').offset(2).build());
     expect(rows[0]!.id).toBe(3);
   });
 
   it('LIMIT + OFFSET paginates correctly', async () => {
-    const rows = await collect(
-      runtime().execute(db().users.select('id').orderBy('id').limit(2).offset(1).build()),
+    const rows = await runtime().execute(
+      db().users.select('id').orderBy('id').limit(2).offset(1).build(),
     );
     expect(rows).toHaveLength(2);
     expect(rows[0]!.id).toBe(2);

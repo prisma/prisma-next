@@ -1,23 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { collect, setupIntegrationTest } from './setup';
+import { setupIntegrationTest } from './setup';
 
 describe('integration: subqueries', () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('EXISTS filters to rows with matching subquery', async () => {
     const d = db();
-    const rows = await collect(
-      runtime().execute(
-        d.users
-          .select('id', 'name')
-          .where((f, fns) =>
-            fns.exists(
-              d.posts.select('id').where((pf, pfns) => pfns.eq(pf.posts.user_id, f.users.id)),
-            ),
-          )
-          .orderBy('id')
-          .build(),
-      ),
+    const rows = await runtime().execute(
+      d.users
+        .select('id', 'name')
+        .where((f, fns) =>
+          fns.exists(
+            d.posts.select('id').where((pf, pfns) => pfns.eq(pf.posts.user_id, f.users.id)),
+          ),
+        )
+        .orderBy('id')
+        .build(),
     );
     expect(rows.map((r) => r.name)).toEqual(['Alice', 'Bob', 'Charlie']);
   });
@@ -29,22 +27,20 @@ describe('integration: subqueries', () => {
     // So subquery returns user_ids [1, 2]
     // Parent filters out Bob (id=2), leaving only Alice (id=1)
     const d = db();
-    const rows = await collect(
-      runtime().execute(
-        d.users
-          .select('id', 'name')
-          .where((f, fns) =>
-            fns.and(
-              fns.ne(f.name, 'Bob'),
-              fns.in(
-                f.id,
-                d.posts.select('user_id').where((pf, pfns) => pfns.gt(pf.views, 50)),
-              ),
+    const rows = await runtime().execute(
+      d.users
+        .select('id', 'name')
+        .where((f, fns) =>
+          fns.and(
+            fns.ne(f.name, 'Bob'),
+            fns.in(
+              f.id,
+              d.posts.select('user_id').where((pf, pfns) => pfns.gt(pf.views, 50)),
             ),
-          )
-          .orderBy('id')
-          .build(),
-      ),
+          ),
+        )
+        .orderBy('id')
+        .build(),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]!.name).toBe('Alice');
@@ -54,13 +50,11 @@ describe('integration: subqueries', () => {
   it('subquery as join source', async () => {
     const d = db();
     const sub = d.posts.select('user_id', 'title').as('sub');
-    const rows = await collect(
-      runtime().execute(
-        d.users
-          .innerJoin(sub, (f, fns) => fns.eq(f.users.id, f.sub.user_id))
-          .select('name', 'title')
-          .build(),
-      ),
+    const rows = await runtime().execute(
+      d.users
+        .innerJoin(sub, (f, fns) => fns.eq(f.users.id, f.sub.user_id))
+        .select('name', 'title')
+        .build(),
     );
     expect(rows.length).toBe(4);
   });

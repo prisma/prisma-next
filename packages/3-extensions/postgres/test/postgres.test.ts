@@ -120,11 +120,9 @@ describe('postgres', () => {
       url: 'postgres://localhost:5432/db',
     });
 
-    // sql-builder is created eagerly (no runtime dependency)
-    expect(db.sql).toEqual({ lane: 'sql' });
     expect(mocks.sqlBuilder).toHaveBeenCalledTimes(1);
+    expect(db.sql).toEqual({ lane: 'sql' });
 
-    // runtime, stack instantiation, and pool are still deferred
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();

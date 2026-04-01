@@ -125,7 +125,7 @@ abstract class QueryBase<
   }
 
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>> {
-    return buildPlan(this.state, this.ctx);
+    return buildPlan<ResolveRow<RowType, QC['codecTypes']>>(this.state, this.ctx);
   }
 }
 
