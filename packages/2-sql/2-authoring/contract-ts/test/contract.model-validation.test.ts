@@ -108,10 +108,8 @@ describe('validateContract model validation', () => {
       ...baseContract,
       models: {
         User: {
-          storage: { table: 'User' },
-          fields: {
-            id: { column: '' },
-          },
+          storage: { table: 'User', fields: { id: { column: '' } } },
+          fields: { id: { codecId: 'pg/int4@1', nullable: false } },
           // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
         } as any,
       },
@@ -126,10 +124,8 @@ describe('validateContract model validation', () => {
       ...baseContract,
       models: {
         User: {
-          storage: { table: 'User' },
-          fields: {
-            id: { column: 'nonExistent' },
-          },
+          storage: { table: 'User', fields: { id: { column: 'nonExistent' } } },
+          fields: { id: { codecId: 'pg/int4@1', nullable: false } },
           // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
         } as any,
       },

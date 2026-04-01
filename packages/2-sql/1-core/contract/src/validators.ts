@@ -145,12 +145,12 @@ const ModelStorageFieldSchema = type({
 
 const ModelStorageSchema = type({
   table: 'string',
-  'fields?': type({ '[string]': ModelStorageFieldSchema }),
+  fields: type({ '[string]': ModelStorageFieldSchema }),
 });
 
 const ModelSchema = type({
   storage: ModelStorageSchema,
-  fields: type({ '[string]': ModelFieldSchema }),
+  'fields?': type({ '[string]': ModelFieldSchema }),
   relations: type({ '[string]': 'unknown' }),
   'discriminator?': 'unknown',
   'variants?': 'unknown',

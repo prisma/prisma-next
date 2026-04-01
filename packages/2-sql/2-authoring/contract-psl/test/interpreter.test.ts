@@ -162,10 +162,12 @@ describe('interpretPslDocumentToSqlContractIR', () => {
     });
     expect(result.value.models).toMatchObject({
       User: {
-        storage: { table: 'user' },
-        fields: {
-          id: { column: 'id' },
-          email: { column: 'email' },
+        storage: {
+          table: 'user',
+          fields: {
+            id: { column: 'id' },
+            email: { column: 'email' },
+          },
         },
       },
     });
@@ -618,14 +620,18 @@ model Member {
     });
     expect(result.value.models).toMatchObject({
       Team: {
-        storage: { table: 'org_team' },
-        fields: { id: { column: 'team_id' } },
+        storage: {
+          table: 'org_team',
+          fields: { id: { column: 'team_id' } },
+        },
       },
       Member: {
-        storage: { table: 'team_member' },
-        fields: {
-          id: { column: 'member_id' },
-          teamId: { column: 'team_ref' },
+        storage: {
+          table: 'team_member',
+          fields: {
+            id: { column: 'member_id' },
+            teamId: { column: 'team_ref' },
+          },
         },
       },
     });

@@ -57,15 +57,21 @@ const StorageSchema = type({
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
 
-const ModelFieldSchema = type.declare<ModelField>().type({
+const ModelFieldSchema = type({
+  'nullable?': 'boolean',
+  'codecId?': 'string',
+});
+
+const ModelStorageFieldSchema = type({
   column: 'string',
 });
 
-const ModelStorageSchema = type.declare<ModelStorage>().type({
+const ModelStorageSchema = type({
   table: 'string',
+  'fields?': type({ '[string]': ModelStorageFieldSchema }),
 });
 
-const ModelSchema = type.declare<ModelDefinition>().type({
+const ModelSchema = type({
   storage: ModelStorageSchema,
   fields: type({ '[string]': ModelFieldSchema }),
   relations: type({ '[string]': 'unknown' }),
@@ -232,11 +238,12 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
     }
   }
 
-  // Validate models
   for (const [modelName, modelUnknown] of Object.entries(models)) {
-    // normalizeContract() ensures models have both domain (DomainModel) and SQL-specific (ModelDefinition) properties
-    const model = modelUnknown as unknown as ModelDefinition;
-    // Validate model has storage.table
+    const model = modelUnknown as {
+      storage?: { table?: string; fields?: Record<string, { column?: string }> };
+      fields?: Record<string, unknown>;
+      relations?: Record<string, unknown>;
+    };
     if (!model.storage?.table) {
       /* c8 ignore next */
       throw new Error(`Model "${modelName}" is missing storage.table`);
@@ -244,7 +251,6 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
 
     const tableName = model.storage.table;
 
-    // Validate model's table exists in storage
     if (!tableNames.has(tableName)) {
       /* c8 ignore next */
       throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
@@ -256,7 +262,6 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
       throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
     }
 
-    // Validate model's table has a primary key
     if (!table.primaryKey) {
       /* c8 ignore next */
       throw new Error(`Model "${modelName}" table "${tableName}" is missing a primary key`);
@@ -264,26 +269,20 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
 
     const columnNames = new Set(Object.keys(table.columns));
 
-    // Validate model fields
-    if (!model.fields) {
-      /* c8 ignore next */
-      throw new Error(`Model "${modelName}" is missing fields`);
-    }
+    const storageFields = model.storage.fields;
+    if (storageFields) {
+      for (const [fieldName, storageField] of Object.entries(storageFields)) {
+        if (!storageField.column) {
+          /* c8 ignore next */
+          throw new Error(`Model "${modelName}" field "${fieldName}" is missing column property`);
+        }
 
-    for (const [fieldName, fieldUnknown] of Object.entries(model.fields)) {
-      const field = fieldUnknown as { column: string };
-      // Validate field has column property
-      if (!field.column) {
-        /* c8 ignore next */
-        throw new Error(`Model "${modelName}" field "${fieldName}" is missing column property`);
-      }
-
-      // Validate field's column exists in the model's backing table
-      if (!columnNames.has(field.column)) {
-        /* c8 ignore next */
-        throw new Error(
-          `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${tableName}"`,
-        );
+        if (!columnNames.has(storageField.column)) {
+          /* c8 ignore next */
+          throw new Error(
+            `Model "${modelName}" field "${fieldName}" references non-existent column "${storageField.column}" in table "${tableName}"`,
+          );
+        }
       }
     }
 

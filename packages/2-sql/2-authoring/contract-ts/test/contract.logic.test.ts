@@ -508,8 +508,10 @@ describe('validateContract logic validation', () => {
       const contract = createModelContract();
       const userModel = (contract['models'] as Record<string, Record<string, unknown>>)[
         'User'
-      ] as Record<string, unknown>;
-      userModel['fields'] = { id: { column: 'missing' } };
+      ] as Record<string, Record<string, unknown>>;
+      (userModel['storage'] as Record<string, unknown>)['fields'] = {
+        id: { column: 'missing' },
+      };
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
         /references non-existent column "missing"/,
       );
