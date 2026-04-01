@@ -1,6 +1,7 @@
 import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { Plugin } from 'esbuild';
 import { build } from 'esbuild';
@@ -180,7 +181,7 @@ export async function loadContractFromTs(
     }
     writeFileSync(tempFile, bundleContent, 'utf-8');
 
-    const module = (await import(`file://${tempFile}`)) as {
+    const module = (await import(/* @vite-ignore */ pathToFileURL(tempFile).href)) as {
       default?: unknown;
       contract?: unknown;
     };
