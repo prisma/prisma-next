@@ -37,50 +37,25 @@ type CreateInputContract = SqlContract<
   },
   {
     User: {
-      storage: { table: 'user' };
+      storage: {
+        table: 'user';
+        fields: {
+          id: { column: 'id' };
+          email: { column: 'email' };
+          name: { column: 'name' };
+          slug: { column: 'slug' };
+          createdAt: { column: 'created_at' };
+        };
+      };
       fields: {
-        id: { column: 'id' };
-        email: { column: 'email' };
-        name: { column: 'name' };
-        slug: { column: 'slug' };
-        createdAt: { column: 'created_at' };
+        id: { codecId: 'pg/int4@1'; nullable: false };
+        email: { codecId: 'pg/text@1'; nullable: false };
+        name: { codecId: 'pg/text@1'; nullable: true };
+        slug: { codecId: 'pg/text@1'; nullable: false };
+        createdAt: { codecId: 'pg/text@1'; nullable: false };
       };
       relations: Record<string, never>;
     };
-  },
-  {
-    user: Record<string, never>;
-  },
-  {
-    modelToTable: {
-      User: 'user';
-    };
-    tableToModel: {
-      user: 'User';
-    };
-    fieldToColumn: {
-      User: {
-        id: 'id';
-        email: 'email';
-        name: 'name';
-        slug: 'slug';
-        createdAt: 'created_at';
-      };
-    };
-    columnToField: {
-      user: {
-        id: 'id';
-        email: 'email';
-        name: 'name';
-        slug: 'slug';
-        created_at: 'createdAt';
-      };
-    };
-    codecTypes: {
-      'pg/int4@1': { output: number };
-      'pg/text@1': { output: string };
-    };
-    operationTypes: Record<string, never>;
   }
 > & {
   readonly execution: {
