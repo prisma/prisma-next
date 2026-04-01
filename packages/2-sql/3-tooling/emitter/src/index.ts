@@ -14,13 +14,17 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 type IRModelField = { readonly column: string };
-type IRModelStorage = { readonly table: string };
+type IRModelStorage = {
+  readonly table: string;
+  readonly fields?: Record<string, IRModelField>;
+};
 type IRModelDefinition = {
   readonly storage: IRModelStorage;
-  readonly fields: Record<string, IRModelField>;
+  readonly fields?: Record<string, unknown>;
   readonly relations: Record<string, unknown>;
   readonly owner?: string;
 };
+
 import { assertDefined } from '@prisma-next/utils/assertions';
 
 /**
@@ -110,12 +114,12 @@ export const sqlTargetFamilyHook = {
         }
 
         const columnNames = new Set(Object.keys(table.columns));
-        if (!model.fields || Object.keys(model.fields).length === 0) {
-          throw new Error(`Model "${modelName}" is missing fields`);
+        const storageFields = model.storage.fields;
+        if (!storageFields || Object.keys(storageFields).length === 0) {
+          throw new Error(`Model "${modelName}" is missing storage.fields`);
         }
 
-        for (const [fieldName, fieldUnknown] of Object.entries(model.fields)) {
-          const field = fieldUnknown as IRModelField;
+        for (const [fieldName, field] of Object.entries(storageFields)) {
           if (!field.column) {
             throw new Error(`Model "${modelName}" field "${fieldName}" is missing column property`);
           }
@@ -544,8 +548,9 @@ export const sqlTargetFamilyHook = {
       const tableName = model.storage.table;
       const table = storage.tables[tableName];
 
+      const storageFields = model.storage.fields ?? {};
       if (table) {
-        for (const [fieldName, field] of Object.entries(model.fields)) {
+        for (const [fieldName, field] of Object.entries(storageFields)) {
           const column = table.columns[field.column];
           if (!column) {
             fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
@@ -563,7 +568,7 @@ export const sqlTargetFamilyHook = {
           storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
         }
       } else {
-        for (const [fieldName, field] of Object.entries(model.fields)) {
+        for (const [fieldName, field] of Object.entries(storageFields)) {
           fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
           storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
         }
@@ -631,5 +636,4 @@ export const sqlTargetFamilyHook = {
 
     return nullable ? `${baseType} | null` : baseType;
   },
-
 } as const;

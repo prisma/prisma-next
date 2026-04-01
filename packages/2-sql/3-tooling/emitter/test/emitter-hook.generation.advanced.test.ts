@@ -40,9 +40,11 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+            },
           },
           relations: {
             posts: {
@@ -56,10 +58,12 @@ describe('sql-target-family-hook', () => {
           },
         },
         Post: {
-          storage: { table: 'post' },
-          fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+          storage: {
+            table: 'post',
+            fields: {
+              id: { column: 'id' },
+              userId: { column: 'userId' },
+            },
           },
           relations: {},
         },
@@ -224,9 +228,11 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+            },
           },
           relations: {
             posts: {
@@ -248,10 +254,12 @@ describe('sql-target-family-hook', () => {
           },
         },
         Post: {
-          storage: { table: 'post' },
-          fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+          storage: {
+            table: 'post',
+            fields: {
+              id: { column: 'id' },
+              userId: { column: 'userId' },
+            },
           },
           relations: {},
         },
@@ -295,9 +303,11 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+            },
           },
           relations: {},
         },
@@ -325,11 +335,13 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
-            name: { column: 'name' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'email' },
+              name: { column: 'name' },
+            },
           },
           relations: {},
         },
@@ -366,17 +378,21 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+            },
           },
           relations: {},
         },
         Post: {
-          storage: { table: 'post' },
-          fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+          storage: {
+            table: 'post',
+            fields: {
+              id: { column: 'id' },
+              userId: { column: 'userId' },
+            },
           },
           relations: {},
         },
@@ -443,8 +459,10 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {},
+          storage: {
+            table: 'user',
+            fields: {},
+          },
           relations: {
             partialRel: { to: 'Post' },
             invalidRel: { on: { childCols: ['id'] } },
@@ -472,8 +490,10 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {},
+          storage: {
+            table: 'user',
+            fields: {},
+          },
           relations: {},
         },
       },
@@ -602,10 +622,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         Embedding: {
-          storage: { table: 'embedding' },
-          fields: {
-            id: { column: 'id' },
-            vector: { column: 'vector' },
+          storage: {
+            table: 'embedding',
+            fields: {
+              id: { column: 'id' },
+              vector: { column: 'vector' },
+            },
           },
           relations: {},
         },
@@ -651,10 +673,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         Embedding: {
-          storage: { table: 'embedding' },
-          fields: {
-            id: { column: 'id' },
-            vector: { column: 'vector' },
+          storage: {
+            table: 'embedding',
+            fields: {
+              id: { column: 'id' },
+              vector: { column: 'vector' },
+            },
           },
           relations: {},
         },
