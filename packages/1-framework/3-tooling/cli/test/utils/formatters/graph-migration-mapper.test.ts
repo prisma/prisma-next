@@ -291,8 +291,11 @@ describe('migrationGraphToRenderInput', () => {
   });
 
   it('empty graph with no edges — fallback to empty hash', () => {
-    const graph = buildGraph([]);
-    graph.nodes.add(ROOT);
+    const nodes = new Set<string>([ROOT]);
+    const graph = {
+      ...buildGraph([]),
+      nodes,
+    };
     const result = migrationGraphToRenderInput(
       makeInput({
         graph,
