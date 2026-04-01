@@ -1,6 +1,16 @@
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
-import { defineContract, field, model, rel } from '../src/contract-builder';
+import {
+  defineContract,
+  field,
+  model,
+  rel,
+  type StagedModelBuilder,
+} from '../src/contract-builder';
+
+// biome-ignore lint/suspicious/noExplicitAny: widening for test convenience
+type AnyModel = StagedModelBuilder<any, any, any, any, any>;
+
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
@@ -239,7 +249,7 @@ describe('staged contract DSL parity with legacy builder', () => {
       table: 'post_tag',
     });
 
-    const Post = model('Post', {
+    const Post: AnyModel = model('Post', {
       fields: {
         id: field.column(textColumn).id(),
         title: field.column(textColumn),

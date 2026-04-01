@@ -1,6 +1,16 @@
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
-import { defineContract, field, model, rel } from '../src/contract-builder';
+import {
+  defineContract,
+  field,
+  model,
+  rel,
+  type StagedModelBuilder,
+} from '../src/contract-builder';
+
+// biome-ignore lint/suspicious/noExplicitAny: widening for test convenience
+type AnyModel = StagedModelBuilder<any, any, any, any, any>;
+
 import { columnDescriptor } from './helpers/column-descriptor';
 
 type PortableSqlCodecTypes = {
@@ -34,7 +44,7 @@ const textColumn = columnDescriptor('sql/text@1');
 const timestampColumn = columnDescriptor('sql/timestamp@1');
 
 function buildPortableContract<TTarget extends string>(target: PortableTargetPack<TTarget>) {
-  const User = model('User', {
+  const User: AnyModel = model('User', {
     fields: {
       id: field.column(uuidColumn).id({ name: 'app_user_pkey' }),
       email: field.column(textColumn).unique({ name: 'app_user_email_key' }),
@@ -59,7 +69,7 @@ function buildPortableContract<TTarget extends string>(target: PortableTargetPac
   }).sql(({ cols, constraints }) => ({
     table: 'blog_post',
     foreignKeys: [
-      constraints.foreignKey(cols.authorId, User.refs.id, {
+      constraints.foreignKey([cols.authorId], [User.refs['id']!], {
         name: 'blog_post_author_id_fkey',
         onDelete: 'cascade',
       }),

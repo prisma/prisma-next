@@ -6,7 +6,13 @@ import {
   model,
   rel,
   type StagedContractInput,
+  type StagedModelBuilder,
 } from '../src/contract-builder';
+
+// Widened model type to break circular inference in tests with lazy cross-model refs.
+// biome-ignore lint/suspicious/noExplicitAny: widening for test convenience
+type AnyModel = StagedModelBuilder<any, any, any, any, any>;
+
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const typecheckOnly = process.env['PN_TYPECHECK_ONLY'] === 'true';
@@ -41,7 +47,7 @@ type OwnershipRelationCase = {
 };
 
 function buildOwnershipRelationContract(ownershipCase: OwnershipRelationCase) {
-  const User = model('User', {
+  const User: AnyModel = model('User', {
     fields: {
       id: field.column(textColumn).id(),
       ...(ownershipCase.label === 'hasMany' ? { email: field.column(textColumn) } : {}),
@@ -70,7 +76,7 @@ function buildOwnershipRelationContract(ownershipCase: OwnershipRelationCase) {
         user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
       }).sql(({ cols, constraints }) => ({
         table: ownershipCase.targetTable,
-        foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
+        foreignKeys: [constraints.foreignKey([cols.userId], [User.refs['id']!])],
       })),
     },
   });
@@ -86,7 +92,7 @@ describe('staged contract DSL authoring surface', () => {
       },
     } as const;
 
-    const User = model('User', {
+    const User: AnyModel = model('User', {
       fields: {
         id: field
           .generated({
@@ -118,7 +124,7 @@ describe('staged contract DSL authoring surface', () => {
       table: 'blog_post',
       indexes: [constraints.index(cols.userId, { name: 'blog_post_user_id_idx' })],
       foreignKeys: [
-        constraints.foreignKey(cols.userId, User.refs.id, {
+        constraints.foreignKey([cols.userId], [User.refs['id']!], {
           name: 'blog_post_user_id_fkey',
           onDelete: 'cascade',
         }),
@@ -181,8 +187,9 @@ describe('staged contract DSL authoring surface', () => {
         onCreate: { kind: 'generator', id: 'uuidv4' },
       },
     ]);
-    expect(contract.models['User']?.fields['createdAt']).toEqual({ column: 'created_at' });
-    expect(contract.models['Post']?.fields['userId']).toEqual({ column: 'user_id' });
+    const contractModels = contract.models as Record<string, { fields: Record<string, unknown> }>;
+    expect(contractModels['User']?.fields['createdAt']).toEqual({ column: 'created_at' });
+    expect(contractModels['Post']?.fields['userId']).toEqual({ column: 'user_id' });
     expect(contract.relations['app_user']).toMatchObject({
       posts: {
         to: 'Post',
@@ -244,19 +251,29 @@ describe('staged contract DSL authoring surface', () => {
       },
     });
 
-    expect(contract.storage.tables.app_user.primaryKey).toEqual({
+    const tables = contract.storage.tables as Record<
+      string,
+      {
+        primaryKey?: unknown;
+        uniques?: unknown;
+        foreignKeys?: unknown;
+        columns: Record<string, unknown>;
+      }
+    >;
+    const models = contract.models as Record<string, { fields: Record<string, unknown> }>;
+    expect(tables['app_user']?.primaryKey).toEqual({
       columns: ['id'],
       name: 'app_user_pkey',
     });
-    expect(contract.storage.tables.app_user.uniques).toEqual([
+    expect(tables['app_user']?.uniques).toEqual([
       {
         columns: ['email'],
         name: 'app_user_email_key',
       },
     ]);
-    expect(contract.storage.tables.blog_post.columns.author_id).toBeDefined();
-    expect(contract.storage.tables.blog_post.columns.created_at).toBeDefined();
-    expect(contract.storage.tables.blog_post.foreignKeys).toEqual([
+    expect(tables['blog_post']?.columns['author_id']).toBeDefined();
+    expect(tables['blog_post']?.columns['created_at']).toBeDefined();
+    expect(tables['blog_post']?.foreignKeys).toEqual([
       {
         columns: ['author_id'],
         references: { table: 'app_user', columns: ['id'] },
@@ -266,8 +283,8 @@ describe('staged contract DSL authoring surface', () => {
         index: false,
       },
     ]);
-    expect(contract.models.Post.fields.authorId).toEqual({ column: 'author_id' });
-    expect(contract.models.Post.fields.createdAt).toEqual({ column: 'created_at' });
+    expect(models['Post']?.fields['authorId']).toEqual({ column: 'author_id' });
+    expect(models['Post']?.fields['createdAt']).toEqual({ column: 'created_at' });
   });
 
   it.each([
@@ -301,7 +318,7 @@ describe('staged contract DSL authoring surface', () => {
       table: 'post_tag',
     });
 
-    const Post = model('Post', {
+    const Post: AnyModel = model('Post', {
       fields: {
         id: field.column(textColumn).id(),
         title: field.column(textColumn),
@@ -412,7 +429,7 @@ describe('staged contract DSL authoring surface', () => {
       },
     });
 
-    expect(contract.storage.tables.membership).toMatchObject({
+    expect((contract.storage.tables as Record<string, unknown>)['membership']).toMatchObject({
       primaryKey: {
         columns: ['org_id', 'user_id'],
         name: 'membership_pkey',
@@ -496,11 +513,13 @@ describe('staged contract DSL authoring surface', () => {
       },
     });
 
-    expect(contract.storage.tables['blog_post']).toBeDefined();
-    expect(contract.storage.tables['blog_post']?.columns['created_at']).toBeDefined();
-    expect(contract.storage.tables['blog_post']?.columns['author_identifier']).toBeDefined();
-    expect(contract.models['BlogPost']?.fields['createdAt']).toEqual({ column: 'created_at' });
-    expect(contract.models['BlogPost']?.fields['authorId']).toEqual({
+    const tables = contract.storage.tables as Record<string, { columns: Record<string, unknown> }>;
+    expect(tables['blog_post']).toBeDefined();
+    expect(tables['blog_post']?.columns['created_at']).toBeDefined();
+    expect(tables['blog_post']?.columns['author_identifier']).toBeDefined();
+    const models = contract.models as Record<string, { fields: Record<string, unknown> }>;
+    expect(models['BlogPost']?.fields['createdAt']).toEqual({ column: 'created_at' });
+    expect(models['BlogPost']?.fields['authorId']).toEqual({
       column: 'author_identifier',
     });
   });
@@ -587,8 +606,8 @@ describe('staged contract DSL authoring surface', () => {
       .sql(({ cols, constraints }) => {
         expectTypeOf(cols.id.fieldName).toEqualTypeOf<'id'>();
         expectTypeOf(cols.email.fieldName).toEqualTypeOf<'email'>();
-        expectTypeOf(User.refs.id.fieldName).toEqualTypeOf<'id'>();
-        expectTypeOf(User.refs.id.modelName).toEqualTypeOf<'User'>();
+        expectTypeOf(User.refs['id']!.fieldName).toEqualTypeOf<'id'>();
+        expectTypeOf(User.refs['id']!.modelName).toEqualTypeOf<'User'>();
         expectTypeOf(User.ref('email').fieldName).toEqualTypeOf<'email'>();
         expectTypeOf(User.ref('email').modelName).toEqualTypeOf<'User'>();
 
