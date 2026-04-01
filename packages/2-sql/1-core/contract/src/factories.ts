@@ -88,11 +88,19 @@ export function model(
   tableName: string,
   fields: Record<string, SqlModelFieldStorage>,
   relations: Record<string, unknown> = {},
-): { storage: SqlModelStorage; fields: Record<string, SqlModelFieldStorage>; relations: Record<string, unknown> } {
+): {
+  storage: SqlModelStorage;
+  fields: Record<string, { nullable?: boolean; codecId?: string }>;
+  relations: Record<string, unknown>;
+} {
   const storage: SqlModelStorage = { table: tableName, fields };
+  const domainFields = Object.fromEntries(Object.keys(fields).map((name) => [name, {}])) as Record<
+    string,
+    { nullable?: boolean; codecId?: string }
+  >;
   return {
     storage,
-    fields,
+    fields: domainFields,
     relations,
   };
 }
@@ -118,12 +126,7 @@ export function contract<
   extensionPacks?: Record<string, unknown>;
   meta?: Record<string, unknown>;
   sources?: Record<string, unknown>;
-}): SqlContract<
-  SqlStorage,
-  TStorageHash,
-  TExecutionHash,
-  TProfileHash
-> {
+}): SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TExecutionHash, TProfileHash> {
   return {
     schemaVersion: opts.schemaVersion ?? '1',
     target: opts.target,
@@ -138,10 +141,5 @@ export function contract<
     ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
     ...(opts.meta !== undefined && { meta: opts.meta }),
     ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
-  } as SqlContract<
-    SqlStorage,
-    TStorageHash,
-    TExecutionHash,
-    TProfileHash
-  >;
+  } as SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TExecutionHash, TProfileHash>;
 }

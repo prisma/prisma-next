@@ -1,13 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import type {
-  CodecTypesOf,
-  OperationTypesOf,
-  SqlContract,
-  SqlMappings,
-  SqlStorage,
-  TypeMaps,
-} from '../src/types';
-import { RUNTIME_MAPPING_KEYS } from './test-constants';
+import { describe, it } from 'vitest';
+import type { CodecTypesOf, OperationTypesOf, TypeMaps } from '../src/types';
 
 describe('Contract and TypeMaps shape', () => {
   describe('TypeMaps shape', () => {
@@ -29,55 +21,6 @@ describe('Contract and TypeMaps shape', () => {
       type TM = TypeMaps<Record<string, never>, { bar: Record<string, unknown> }>;
       type OT = OperationTypesOf<TM>;
       const _ot: OT = { bar: {} };
-    });
-  });
-
-  describe('runtime Contract mappings', () => {
-    it('mappings includes only runtime-real structural keys', () => {
-      const baseContract = {
-        schemaVersion: '1',
-        target: 'postgres',
-        targetFamily: 'sql',
-        storageHash: 'sha256:test',
-        models: {
-          User: {
-            storage: { table: 'user' },
-            fields: { id: { column: 'id' }, email: { column: 'email' } },
-            relations: {},
-          },
-        },
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      } as const;
-
-      type Contract = SqlContract<SqlStorage>;
-      const result = {
-        ...baseContract,
-        mappings: { modelToTable: {}, tableToModel: {}, fieldToColumn: {}, columnToField: {} },
-      } as Contract;
-
-      const mappingKeys = Object.keys(result.mappings) as (keyof SqlMappings)[];
-      for (const key of mappingKeys) {
-        expect(RUNTIME_MAPPING_KEYS).toContain(key);
-      }
-    });
-
-    it('mappings does not include codecTypes or operationTypes', () => {
-      const mappingKeys = ['modelToTable', 'tableToModel', 'fieldToColumn', 'columnToField'];
-      expect(mappingKeys).not.toContain('codecTypes');
-      expect(mappingKeys).not.toContain('operationTypes');
     });
   });
 });

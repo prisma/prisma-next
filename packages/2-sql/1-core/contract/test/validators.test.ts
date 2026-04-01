@@ -313,6 +313,22 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContract(c)).not.toThrow();
     });
 
+    it('accepts unknown top-level keys without structural failure', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') });
+      const s = storage({ user: userTable });
+      const base = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+      });
+      const c = {
+        ...base,
+        mappings: { modelToTable: { User: 'user' } },
+        relations: { user: {} },
+      };
+      expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
     it('validates FK with per-FK constraint and index fields', () => {
       const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
       const postTable = table(
