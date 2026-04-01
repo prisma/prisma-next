@@ -56,8 +56,6 @@ const contract = validateContract<PostgresContract>({
     },
   },
   models: {},
-  relations: {},
-  mappings: {},
 });
 
 describe('Postgres rich AST lowering', () => {

@@ -134,7 +134,6 @@ function createJsonSchemaContract(
     target: 'postgres',
     storageHash: coreHash('sha256:test'),
     models: {},
-    relations: {},
     roots: {},
     storage: {
       tables: {
@@ -160,7 +159,6 @@ function createJsonSchemaContract(
     capabilities: {},
     meta: {},
     sources: {},
-    mappings: {},
   };
 }
 

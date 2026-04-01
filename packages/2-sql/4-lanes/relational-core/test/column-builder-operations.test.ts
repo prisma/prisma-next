@@ -32,8 +32,6 @@ describe('ColumnBuilder operations', () => {
       },
     },
     models: {},
-    relations: {},
-    mappings: {},
   } as const);
 
   it('exposes registered methods on columns with matching typeId', () => {

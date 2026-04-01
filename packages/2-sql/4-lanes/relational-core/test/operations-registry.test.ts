@@ -100,8 +100,6 @@ describe('operations-registry', () => {
       },
     },
     models: {},
-    relations: {},
-    mappings: {},
   });
 
   it('attaches operations when registry is provided', () => {
@@ -177,8 +175,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const contractWithCaps = validateContract<TestContract>({
@@ -200,8 +196,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
       capabilities: {
         postgres: {
           lateral: true,
@@ -280,8 +274,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
       capabilities: {
         postgres: {
           lateral: false,
@@ -338,8 +330,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
       capabilities: {
         postgres: {
           lateral: true,
@@ -367,8 +357,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
       capabilities: {
         postgres: {
           lateral: true,
@@ -477,8 +465,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -627,8 +613,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -698,8 +682,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -775,8 +757,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -856,8 +836,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
       capabilities: {
         postgres: {
           lateral: false,
@@ -927,8 +905,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -987,8 +963,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1059,8 +1033,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1136,8 +1108,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1187,8 +1157,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1226,8 +1194,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1301,8 +1267,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1343,8 +1307,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1408,8 +1370,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1455,8 +1415,6 @@ describe('operations-registry', () => {
           },
         },
         models: {},
-        relations: {},
-        mappings: {},
       },
       shouldAttach: false,
     },
@@ -1481,8 +1439,6 @@ describe('operations-registry', () => {
           },
         },
         models: {},
-        relations: {},
-        mappings: {},
         capabilities: {
           postgres: {
             lateral: false,
@@ -1512,8 +1468,6 @@ describe('operations-registry', () => {
           },
         },
         models: {},
-        relations: {},
-        mappings: {},
         capabilities: {
           postgres: {
             lateral: true,
@@ -1589,8 +1543,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1639,8 +1591,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();
@@ -1702,8 +1652,6 @@ describe('operations-registry', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();

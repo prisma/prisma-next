@@ -73,13 +73,11 @@ const contract: SqlContract<SqlStorage> = {
   storageHash: 'sha256:test' as never,
   models: {},
   roots: {},
-  relations: {},
   storage: { tables: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {},
 };
 
 describe('postgres', () => {

@@ -11,14 +11,12 @@ const testContract: SqlContract<SqlStorage> = {
   target: 'postgres',
   storageHash: coreHash('sha256:test-hash'),
   models: {},
-  relations: {},
   roots: {},
   storage: { tables: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {},
 };
 
 describe('SqlFamilyAdapter', () => {
