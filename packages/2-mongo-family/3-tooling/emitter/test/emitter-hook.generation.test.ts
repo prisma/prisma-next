@@ -1,23 +1,7 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { mongoTargetFamilyHook } from '../src/index';
-
-function createMongoIR(overrides: Partial<ContractIR> = {}): ContractIR {
-  return {
-    schemaVersion: '1',
-    targetFamily: 'mongo',
-    target: 'mongo',
-    models: {},
-    relations: {},
-    storage: { collections: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
-}
+import { createMongoIR } from './fixtures/create-mongo-ir';
 
 const testHashes = { storageHash: 'test-storage-hash', profileHash: 'test-profile-hash' };
 
@@ -28,7 +12,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
     expect(types).toContain(
       'export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>',
     );
-    expect(types).toContain('export type TypeMaps = MongoTypeMaps<CodecTypes>');
+    expect(types).toContain('export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>');
   });
 
   it('generates hash type aliases', () => {
@@ -209,8 +193,8 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         storage: { collections: { users: {} } },
       });
       const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-      expect(types).toContain('readonly Address: { fields:');
-      expect(types).toContain("owner: 'User'");
+      expect(types).toContain('readonly Address: { readonly fields:');
+      expect(types).toContain("readonly owner: 'User'");
     });
 
     it('generates model with owner field', () => {
@@ -231,7 +215,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         storage: { collections: { posts: {} } },
       });
       const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-      expect(types).toContain("owner: 'Post'");
+      expect(types).toContain("readonly owner: 'Post'");
     });
 
     it('generates polymorphic model with discriminator and variants', () => {

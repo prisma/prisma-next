@@ -1,6 +1,7 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   GenerateContractTypesOptions,
+  TargetFamilyHook,
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/contract/types';
@@ -27,6 +28,92 @@ interface MongoModelIR {
 
 interface MongoStorageIR {
   readonly collections: Record<string, Record<string, unknown>>;
+}
+
+function generateModelFieldsType(
+  fields: Record<string, { readonly codecId: string; readonly nullable: boolean }>,
+): string {
+  const fieldEntries: string[] = [];
+  for (const [fieldName, field] of Object.entries(fields)) {
+    fieldEntries.push(
+      `readonly ${serializeObjectKey(fieldName)}: { readonly codecId: ${serializeValue(field.codecId)}; readonly nullable: ${field.nullable} }`,
+    );
+  }
+  return fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
+}
+
+function generateModelStorageType(model: MongoModelIR): string {
+  const parts: string[] = [];
+  const collection = model.storage['collection'] as string | undefined;
+  if (collection) {
+    parts.push(`readonly collection: ${serializeValue(collection)}`);
+  }
+
+  const storageRelations = model.storage['relations'] as
+    | Record<string, Record<string, unknown>>
+    | undefined;
+  if (storageRelations && Object.keys(storageRelations).length > 0) {
+    const relEntries: string[] = [];
+    for (const [relName, relVal] of Object.entries(storageRelations)) {
+      relEntries.push(`readonly ${serializeObjectKey(relName)}: ${serializeValue(relVal)}`);
+    }
+    parts.push(`readonly relations: { ${relEntries.join('; ')} }`);
+  }
+
+  return parts.length > 0 ? `{ ${parts.join('; ')} }` : 'Record<string, never>';
+}
+
+function generateModelsType(models: Record<string, MongoModelIR>): string {
+  if (!models || Object.keys(models).length === 0) {
+    return 'Record<string, never>';
+  }
+
+  const modelTypes: string[] = [];
+  for (const [modelName, model] of Object.entries(models)) {
+    const fieldsType = generateModelFieldsType(model.fields);
+    const relationsType = generateModelRelationsType(model.relations);
+    const storageType = generateModelStorageType(model);
+
+    const modelParts: string[] = [
+      `readonly fields: ${fieldsType}`,
+      `readonly relations: ${relationsType}`,
+      `readonly storage: ${storageType}`,
+    ];
+
+    if (model.owner) {
+      modelParts.push(`readonly owner: ${serializeValue(model.owner)}`);
+    }
+    if (model.discriminator) {
+      modelParts.push(`readonly discriminator: ${serializeValue(model.discriminator)}`);
+    }
+    if (model.variants) {
+      modelParts.push(`readonly variants: ${serializeValue(model.variants)}`);
+    }
+    if (model.base) {
+      modelParts.push(`readonly base: ${serializeValue(model.base)}`);
+    }
+
+    modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
+  }
+
+  return `{ ${modelTypes.join('; ')} }`;
+}
+
+function generateStorageType(storage: MongoStorageIR): string {
+  const collectionEntries: string[] = [];
+  for (const [collName, collVal] of Object.entries(storage.collections)) {
+    if (Object.keys(collVal).length === 0) {
+      collectionEntries.push(`readonly ${serializeObjectKey(collName)}: Record<string, never>`);
+    } else {
+      collectionEntries.push(
+        `readonly ${serializeObjectKey(collName)}: ${serializeValue(collVal)}`,
+      );
+    }
+  }
+  const collectionsType =
+    collectionEntries.length > 0 ? `{ ${collectionEntries.join('; ')} }` : 'Record<string, never>';
+
+  return `{ readonly collections: ${collectionsType} }`;
 }
 
 export const mongoTargetFamilyHook = {
@@ -59,6 +146,7 @@ export const mongoTargetFamilyHook = {
       throw new Error(`Expected targetFamily "mongo", got "${ir.targetFamily}"`);
     }
 
+    // ContractIR.storage is typed as generic Record; narrow to Mongo shape (validated below)
     const storage = ir.storage as unknown as MongoStorageIR | undefined;
     if (!storage || !storage.collections || typeof storage.collections !== 'object') {
       throw new Error('Mongo contract must have storage.collections');
@@ -115,17 +203,11 @@ export const mongoTargetFamilyHook = {
 
       const storageRelations = model.storage['relations'] as Record<string, unknown> | undefined;
       if (storageRelations) {
-        for (const [relName, _relVal] of Object.entries(storageRelations)) {
-          const targetModel = Object.entries(models).find(
-            ([, m]) => m.owner === modelName && Object.keys(m.relations).length === 0,
-          );
-          if (!targetModel) {
-            const relatedModels = Object.entries(models).filter(([, m]) => m.owner === modelName);
-            if (relatedModels.length === 0) {
-              throw new Error(
-                `Model "${modelName}" has storage.relations.${relName} but no model declares owner "${modelName}"`,
-              );
-            }
+        for (const relName of Object.keys(storageRelations)) {
+          if (!model.relations[relName]) {
+            throw new Error(
+              `Model "${modelName}" has storage.relations.${relName} but no matching domain-level relation`,
+            );
           }
         }
       }
@@ -145,6 +227,7 @@ export const mongoTargetFamilyHook = {
   ): string {
     const parameterizedTypeImports = options?.parameterizedTypeImports;
     const models = ir.models as Record<string, MongoModelIR>;
+    // ContractIR.storage is typed as generic Record; narrow to Mongo shape (validated by validateStructure)
     const storage = ir.storage as unknown as MongoStorageIR;
 
     const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
@@ -156,11 +239,12 @@ export const mongoTargetFamilyHook = {
     const importLines = generateImportLines(uniqueImports);
 
     const codecTypes = generateCodecTypeIntersection(codecTypeImports, 'CodecTypes');
+    const operationTypes = generateCodecTypeIntersection(operationTypeImports, 'OperationTypes');
 
     const hashAliases = generateHashTypeAliases(hashes);
     const rootsType = generateRootsType(ir.roots);
-    const modelsType = this.generateModelsType(models);
-    const storageType = this.generateStorageType(storage);
+    const modelsType = generateModelsType(models);
+    const storageTypeDef = generateStorageType(storage);
 
     return `// ⚠️  GENERATED FILE - DO NOT EDIT
 // This file is automatically generated by 'prisma-next contract emit'.
@@ -180,13 +264,15 @@ import type {
 ${hashAliases}
 
 export type CodecTypes = ${codecTypes};
-export type TypeMaps = MongoTypeMaps<CodecTypes>;
+export type OperationTypes = ${operationTypes};
+export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
 
 type ContractBase = {
   readonly schemaVersion: ${serializeValue(ir.schemaVersion)};
   readonly target: ${serializeValue(ir.target)};
   readonly targetFamily: ${serializeValue(ir.targetFamily)};
   readonly storageHash: StorageHash;
+  readonly executionHash?: ExecutionHash;
   readonly profileHash: ProfileHash;
   readonly capabilities: ${serializeValue(ir.capabilities)};
   readonly extensionPacks: ${serializeValue(ir.extensionPacks)};
@@ -194,98 +280,10 @@ type ContractBase = {
   readonly sources: ${serializeValue(ir.sources)};
   readonly roots: ${rootsType};
   readonly models: ${modelsType};
-  readonly storage: ${storageType};
+  readonly storage: ${storageTypeDef};
 };
 
 export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;
 `;
   },
-
-  generateModelsType(models: Record<string, MongoModelIR>): string {
-    if (!models || Object.keys(models).length === 0) {
-      return 'Record<string, never>';
-    }
-
-    const modelTypes: string[] = [];
-    for (const [modelName, model] of Object.entries(models)) {
-      const fieldsType = this.generateModelFieldsType(model.fields);
-      const relationsType = generateModelRelationsType(model.relations);
-      const storageType = this.generateModelStorageType(model);
-
-      const modelParts: string[] = [
-        `fields: ${fieldsType}`,
-        `relations: ${relationsType}`,
-        `storage: ${storageType}`,
-      ];
-
-      if (model.owner) {
-        modelParts.push(`owner: ${serializeValue(model.owner)}`);
-      }
-      if (model.discriminator) {
-        modelParts.push(`discriminator: ${serializeValue(model.discriminator)}`);
-      }
-      if (model.variants) {
-        modelParts.push(`variants: ${serializeValue(model.variants)}`);
-      }
-      if (model.base) {
-        modelParts.push(`base: ${serializeValue(model.base)}`);
-      }
-
-      modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
-    }
-
-    return `{ ${modelTypes.join('; ')} }`;
-  },
-
-  generateModelFieldsType(
-    fields: Record<string, { readonly codecId: string; readonly nullable: boolean }>,
-  ): string {
-    const fieldEntries: string[] = [];
-    for (const [fieldName, field] of Object.entries(fields)) {
-      fieldEntries.push(
-        `readonly ${serializeObjectKey(fieldName)}: { readonly codecId: ${serializeValue(field.codecId)}; readonly nullable: ${field.nullable} }`,
-      );
-    }
-    return fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
-  },
-
-  generateModelStorageType(model: MongoModelIR): string {
-    const parts: string[] = [];
-    const collection = model.storage['collection'] as string | undefined;
-    if (collection) {
-      parts.push(`readonly collection: ${serializeValue(collection)}`);
-    }
-
-    const storageRelations = model.storage['relations'] as
-      | Record<string, Record<string, unknown>>
-      | undefined;
-    if (storageRelations && Object.keys(storageRelations).length > 0) {
-      const relEntries: string[] = [];
-      for (const [relName, relVal] of Object.entries(storageRelations)) {
-        relEntries.push(`readonly ${serializeObjectKey(relName)}: ${serializeValue(relVal)}`);
-      }
-      parts.push(`readonly relations: { ${relEntries.join('; ')} }`);
-    }
-
-    return parts.length > 0 ? `{ ${parts.join('; ')} }` : 'Record<string, never>';
-  },
-
-  generateStorageType(storage: MongoStorageIR): string {
-    const collectionEntries: string[] = [];
-    for (const [collName, collVal] of Object.entries(storage.collections)) {
-      if (Object.keys(collVal).length === 0) {
-        collectionEntries.push(`readonly ${serializeObjectKey(collName)}: Record<string, never>`);
-      } else {
-        collectionEntries.push(
-          `readonly ${serializeObjectKey(collName)}: ${serializeValue(collVal)}`,
-        );
-      }
-    }
-    const collectionsType =
-      collectionEntries.length > 0
-        ? `{ ${collectionEntries.join('; ')} }`
-        : 'Record<string, never>';
-
-    return `{ readonly collections: ${collectionsType} }`;
-  },
-} as const;
+} as const satisfies TargetFamilyHook;

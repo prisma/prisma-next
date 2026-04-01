@@ -25,13 +25,15 @@ export type CodecTypes = {
   readonly 'mongo/date@1': { readonly input: Date; readonly output: Date };
   readonly 'mongo/binary@1': { readonly input: Uint8Array; readonly output: Uint8Array };
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes>;
+export type OperationTypes = Record<string, never>;
+export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
 
 type ContractBase = {
   readonly schemaVersion: '1';
   readonly target: 'mongo';
   readonly targetFamily: 'mongo';
   readonly storageHash: StorageHash;
+  readonly executionHash?: ExecutionHash;
   readonly profileHash: ProfileHash;
   readonly capabilities: {};
   readonly extensionPacks: {};
@@ -40,13 +42,13 @@ type ContractBase = {
   readonly roots: { readonly users: 'User'; readonly posts: 'Post' };
   readonly models: {
     readonly User: {
-      fields: {
+      readonly fields: {
         readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
         readonly name: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
         readonly email: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
         readonly bio: { readonly codecId: 'mongo/string@1'; readonly nullable: true };
       };
-      relations: {
+      readonly relations: {
         readonly posts: {
           readonly to: 'Post';
           readonly cardinality: '1:N';
@@ -56,17 +58,17 @@ type ContractBase = {
           };
         };
       };
-      storage: { readonly collection: 'users' };
+      readonly storage: { readonly collection: 'users' };
     };
     readonly Post: {
-      fields: {
+      readonly fields: {
         readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
         readonly title: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
         readonly content: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
         readonly authorId: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
         readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
       };
-      relations: {
+      readonly relations: {
         readonly author: {
           readonly to: 'User';
           readonly cardinality: 'N:1';
@@ -76,7 +78,7 @@ type ContractBase = {
           };
         };
       };
-      storage: { readonly collection: 'posts' };
+      readonly storage: { readonly collection: 'posts' };
     };
   };
   readonly storage: {

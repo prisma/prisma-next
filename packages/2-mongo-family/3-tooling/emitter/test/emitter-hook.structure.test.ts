@@ -1,22 +1,6 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { describe, expect, it } from 'vitest';
 import { mongoTargetFamilyHook } from '../src/index';
-
-function createMongoIR(overrides: Partial<ContractIR> = {}): ContractIR {
-  return {
-    schemaVersion: '1',
-    targetFamily: 'mongo',
-    target: 'mongo',
-    models: {},
-    relations: {},
-    storage: { collections: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
-}
+import { createMongoIR } from './fixtures/create-mongo-ir';
 
 describe('mongoTargetFamilyHook.validateStructure', () => {
   it('passes for valid minimal contract', () => {
@@ -207,7 +191,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
     );
   });
 
-  it('throws when storage.relations references but no owned model exists', () => {
+  it('throws when storage.relations key has no matching domain-level relation', () => {
     const ir = createMongoIR({
       models: {
         User: {
@@ -222,7 +206,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       storage: { collections: { users: {} } },
     });
     expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
-      'no model declares owner "User"',
+      'storage.relations.addresses but no matching domain-level relation',
     );
   });
 });

@@ -30,7 +30,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
     expect(types).toContain(
       'export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>',
     );
-    expect(types).toContain('export type TypeMaps = MongoTypeMaps<CodecTypes>');
+    expect(types).toContain('export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>');
     expect(types).toContain('export type CodecTypes = MongoCodecTypes');
 
     expect(types).toContain("readonly users: 'User'");
@@ -55,7 +55,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
     expect(types).toContain("readonly localFields: readonly ['_id']");
     expect(types).toContain("readonly targetFields: readonly ['authorId']");
 
-    expect(types).toContain("owner: 'Post'");
+    expect(types).toContain("readonly owner: 'Post'");
 
     expect(types).toContain("readonly collection: 'users'");
     expect(types).toContain("readonly collection: 'posts'");
@@ -84,6 +84,6 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
     expect(types).toContain(
       "readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false }",
     );
-    expect(types).toContain("owner: 'Post'");
+    expect(types).toContain("readonly owner: 'Post'");
   });
 });

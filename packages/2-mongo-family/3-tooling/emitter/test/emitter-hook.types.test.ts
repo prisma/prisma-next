@@ -1,22 +1,6 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { describe, expect, it } from 'vitest';
 import { mongoTargetFamilyHook } from '../src/index';
-
-function createMongoIR(overrides: Partial<ContractIR> = {}): ContractIR {
-  return {
-    schemaVersion: '1',
-    targetFamily: 'mongo',
-    target: 'mongo',
-    models: {},
-    relations: {},
-    storage: { collections: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
-}
+import { createMongoIR } from './fixtures/create-mongo-ir';
 
 describe('mongoTargetFamilyHook.validateTypes', () => {
   it('passes with valid codec IDs', () => {
