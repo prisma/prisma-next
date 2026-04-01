@@ -370,7 +370,7 @@ export async function runMigrationVerify(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
-  return runCommand(createMigrationVerifyCommand(), ctx, extraArgs);
+  return runCommandRaw(createMigrationVerifyCommand(), ctx.testDir, extraArgs);
 }
 
 export async function runMigrationRef(

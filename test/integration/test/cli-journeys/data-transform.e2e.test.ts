@@ -107,8 +107,13 @@ export default () => [
 `;
         writeFileSync(migrationTsPath, migrationTs);
 
-        // Step 6: migration verify → scans all packages, evaluates TS, resolves, attests
-        const verify = await runMigrationVerify(ctx);
+        // Step 6: migration verify → evaluates TS, resolves, attests
+        const verify = await runMigrationVerify(ctx, [
+          '--dir',
+          migrationDir,
+          '--config',
+          ctx.configPath,
+        ]);
         expect(verify.exitCode, `verify: ${verify.stdout}\n${verify.stderr}`).toBe(0);
 
         // Step 7: Inspect ops.json after verify

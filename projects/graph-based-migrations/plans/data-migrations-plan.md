@@ -25,7 +25,7 @@ Refs refactored from `migrations/refs.json` to `migrations/refs/<name>.json` wit
 - [x] Runner handles `DataTransformOperation` with check→(skip or run)→check lifecycle
 - [x] `migration new` command (scaffolds package with migration.ts)
 - [x] `migration verify` evaluates migration.ts, resolves descriptors, writes ops.json, attests
-- [x] `migration verify` scans all packages (not just `--dir`)
+- [x] `migration verify --dir` evaluates migration.ts when present (requires `--config` for target resolution)
 - [x] `writeMigrationManifest` + `writeMigrationOps` shared utilities
 - [x] `'data'` operation class allowed in migration apply policy
 - [x] E2E journey test: migration new → fill migration.ts → verify → apply → data correct
@@ -35,17 +35,16 @@ Refs refactored from `migrations/refs.json` to `migrations/refs/<name>.json` wit
 
 ### Milestone: Harden migration verify
 
-`migration verify` now scans all packages and handles draft migrations, but needs thorough testing and hardening around target selection and ambiguous graph states.
+`migration verify` keeps its existing `--dir` interface (required). Migration.ts evaluation and resolution are additions on top. Future work: scan-all-packages mode.
 
 **Tasks:**
 
-- [ ] Test verify with multiple packages (mix of attested, draft, mismatched)
-- [ ] Test verify behavior with diverged graph (multiple leaves) — verify should not require path selection since it operates on packages, not the graph
 - [ ] Test verify when draft migration has migration.ts that fails evaluation (syntax error, invalid descriptors)
-- [ ] Test verify when draft migration has no migration.ts (plain draft from manual migrationId reset)
-- [ ] Verify that verify never requires `--ref` or path selection — it operates per-package, not per-graph-path. If ambiguity matters (e.g., for resolveDescriptors context), surface a clear error with hints to use `migration status` to understand the graph state
-- [ ] Test that verify correctly loads config for resolveDescriptors (the target is needed for TS evaluation)
+- [ ] Test verify when draft migration has no migration.ts (plain draft from manual migrationId reset — should attest normally)
+- [ ] Test that verify correctly loads config for resolveDescriptors when migration.ts is present
+- [ ] Test verify with --dir on an already-attested package (existing behavior preserved)
 - [ ] Consider: should verify re-attest already-attested packages that have a migration.ts with newer mtime than ops.json? (stale serialization detection)
+- [ ] Future: scan-all-packages mode without --dir (deferred to reduce scope)
 
 ### Milestone: Draft migration visibility
 
@@ -99,6 +98,8 @@ The planner detects data migration needs and produces `migration.ts` files with 
 
 3. **Query builder expressiveness**: UPDATE with expressions, INSERT...SELECT, mutation joins — known gaps. QB extends independently.
 
-4. **Verify target selection**: `migration verify` must not require ambiguous path resolution. It operates per-package. If resolveDescriptors needs target context, the config provides it. If the graph is ambiguous, verify doesn't care — it's not path-finding, just attesting packages.
+4. **Verify keeps `--dir` (required)**: Scan-all-packages mode deferred. The current interface is consistent with the original design and avoids target selection / ambiguity concerns.
 
 5. **Stale serialization**: If migration.ts is edited after verify, the ops.json is stale but edgeId still matches ops.json (not migration.ts). Re-running verify should detect this. Consider mtime-based hint.
+
+6. **Future: verify without --dir**: Should scan all packages, show draft/attested/mismatch status. Needs careful design around target selection hints and integration with migration status.
