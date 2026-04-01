@@ -60,7 +60,9 @@ function validateVariantsAndBases(
   modelNames: Set<string>,
   errors: string[],
 ): void {
-  for (const [modelName, model] of Object.entries(contract.models)) {
+  const models = new Map(Object.entries(contract.models));
+
+  for (const [modelName, model] of models) {
     if (model.variants) {
       for (const variantName of Object.keys(model.variants)) {
         if (!modelNames.has(variantName)) {
@@ -69,8 +71,8 @@ function validateVariantsAndBases(
           );
           continue;
         }
-        const variantModel = contract.models[variantName]!;
-        if (variantModel.base !== modelName) {
+        const variantModel = models.get(variantName);
+        if (variantModel && variantModel.base !== modelName) {
           errors.push(
             `Variant "${variantName}" has base "${variantModel.base ?? '(none)'}" but expected "${modelName}"`,
           );
@@ -83,8 +85,8 @@ function validateVariantsAndBases(
         errors.push(`Model "${modelName}" has base "${model.base}" which does not exist in models`);
         continue;
       }
-      const baseModel = contract.models[model.base]!;
-      if (!baseModel.variants || !Object.hasOwn(baseModel.variants, modelName)) {
+      const baseModel = models.get(model.base);
+      if (baseModel && (!baseModel.variants || !Object.hasOwn(baseModel.variants, modelName))) {
         errors.push(
           `Model "${modelName}" has base "${model.base}" which does not list it as a variant`,
         );
