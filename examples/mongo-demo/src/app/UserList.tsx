@@ -1,45 +1,42 @@
-type User = Record<string, unknown>;
-type Address = Record<string, unknown>;
+import type { ApiUser } from '../types';
 
-function UserCard({ user }: { user: User }) {
-  const addresses = (user['addresses'] ?? []) as Address[];
-
+function UserCard({ user }: { user: ApiUser }) {
   return (
     <div className="card">
       <div className="card-header">
-        <div className="avatar">{(user['name'] as string).charAt(0)}</div>
+        <div className="avatar">{user.name.charAt(0)}</div>
         <div>
-          <h3>{user['name'] as string}</h3>
-          <p className="email">{user['email'] as string}</p>
+          <h3>{user.name}</h3>
+          <p className="email">{user.email}</p>
         </div>
       </div>
 
-      {addresses.length > 0 && (
+      {user.addresses.length > 0 && (
         <div className="addresses">
-          <h4>Addresses ({addresses.length})</h4>
-          {addresses.map((addr) => (
-            <div key={addr['street'] as string} className="address">
-              <p>{addr['street'] as string}</p>
+          <h4>Addresses ({user.addresses.length})</h4>
+          {user.addresses.map((addr) => (
+            <div key={addr.street} className="address">
+              <p>{addr.street}</p>
               <p>
-                {addr['city'] as string}, {addr['zip'] as string}
+                {addr.city}, {addr.zip}
               </p>
             </div>
           ))}
         </div>
       )}
 
-      {addresses.length === 0 && <p className="no-data">No addresses on file</p>}
+      {user.addresses.length === 0 && <p className="no-data">No addresses on file</p>}
     </div>
   );
 }
 
-export function UserList({ users }: { users: User[] }) {
+export function UserList({ users }: { users: ApiUser[] }) {
   return (
     <div className="user-list">
       <h2>Team Members</h2>
       <div className="cards">
         {users.map((user) => (
-          <UserCard key={user['_id'] as string} user={user} />
+          <UserCard key={user._id} user={user} />
         ))}
       </div>
     </div>
