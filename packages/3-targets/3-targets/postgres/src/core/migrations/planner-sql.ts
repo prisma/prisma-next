@@ -89,8 +89,8 @@ export function buildColumnTypeSql(
     }
   }
 
-  const expanded = renderParameterizedTypeSql(resolved, codecHooks, column.typeRef !== undefined);
-  if (expanded) {
+  const expanded = expandParameterizedTypeSql(resolved, codecHooks);
+  if (expanded !== null) {
     return expanded;
   }
 
@@ -104,10 +104,9 @@ export function buildColumnTypeSql(
   return resolved.nativeType;
 }
 
-function renderParameterizedTypeSql(
+function expandParameterizedTypeSql(
   column: Pick<StorageColumn, 'nativeType' | 'codecId' | 'typeParams'>,
   codecHooks: Map<string, CodecControlHooks>,
-  allowMissingHook = false,
 ): string | null {
   if (!column.typeParams) {
     return null;
@@ -122,7 +121,7 @@ function renderParameterizedTypeSql(
 
   const hooks = codecHooks.get(column.codecId);
   if (!hooks?.expandNativeType) {
-    if (allowMissingHook) {
+    if (hooks?.planTypeOperations) {
       return null;
     }
     throw new Error(
@@ -323,17 +322,9 @@ export function buildExpectedFormatType(
   storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
   const resolved = resolveColumnTypeMetadata(column, storageTypes);
-  // Parameterized types: expand with typeParams.
-  // format_type() returns the same form (e.g., 'character varying(255)').
-  if (resolved.typeParams && resolved.codecId) {
-    const hooks = codecHooks.get(resolved.codecId);
-    if (hooks?.expandNativeType) {
-      return hooks.expandNativeType({
-        nativeType: resolved.nativeType,
-        codecId: resolved.codecId,
-        typeParams: resolved.typeParams,
-      });
-    }
+  const expanded = expandParameterizedTypeSql(resolved, codecHooks);
+  if (expanded !== null) {
+    return expanded;
   }
 
   // User-defined types (enums, composites): format_type() double-quotes names

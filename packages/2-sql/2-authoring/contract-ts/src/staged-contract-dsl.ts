@@ -1014,6 +1014,15 @@ type ValidateAttributesStageSpec<
     : never
   : AttributesSpec;
 
+function findDuplicateRelationName(
+  existingRelations: Record<string, AnyRelationBuilder>,
+  nextRelations: Record<string, AnyRelationBuilder>,
+): string | undefined {
+  return Object.keys(nextRelations).find((relationName) =>
+    Object.hasOwn(existingRelations, relationName),
+  );
+}
+
 export class StagedModelBuilder<
   ModelName extends string | undefined,
   Fields extends Record<string, ScalarFieldBuilder>,
@@ -1064,6 +1073,13 @@ export class StagedModelBuilder<
   relations<const NextRelations extends Record<string, AnyRelationBuilder>>(
     relations: NextRelations,
   ): StagedModelBuilder<ModelName, Fields, Relations & NextRelations, AttributesSpec, SqlSpec> {
+    const duplicateRelationName = findDuplicateRelationName(this.stageOne.relations, relations);
+    if (duplicateRelationName) {
+      throw new Error(
+        `Model "${this.stageOne.modelName ?? '<anonymous>'}" already defines relation "${duplicateRelationName}".`,
+      );
+    }
+
     return new StagedModelBuilder(
       {
         ...this.stageOne,

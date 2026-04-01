@@ -334,4 +334,58 @@ describe('PostgresMigrationPlanner - storage types', () => {
     expect(createTableSql).toContain('"embedding" vector(1536) NOT NULL');
     expect(createTableSql).not.toContain('"embedding" "vector(1536)"');
   });
+
+  it('fails when parameterized storage type refs cannot expand without codec hooks', () => {
+    const planner = createPostgresMigrationPlanner();
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: coreHash('sha256:contract'),
+      storage: {
+        tables: {
+          document: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              embedding: {
+                nativeType: 'vector',
+                codecId: 'pg/vector@1',
+                nullable: false,
+                typeRef: 'Embedding1536',
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+        types: {
+          Embedding1536: {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 1536 },
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      sources: {},
+    };
+
+    expect(() =>
+      planner.plan({
+        contract,
+        schema: emptySchema,
+        policy: INIT_ADDITIVE_POLICY,
+        frameworkComponents: [],
+      }),
+    ).toThrow(
+      'Column declares typeParams for nativeType "vector" but no expandNativeType hook is registered for codecId "pg/vector@1".',
+    );
+  });
 });

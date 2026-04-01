@@ -574,6 +574,127 @@ describe('staged contract DSL authoring surface', () => {
     expect(run).toThrow(error);
   });
 
+  it('rejects duplicate relation names when mixing model relations with staged .relations()', () => {
+    const User = model('User', {
+      fields: {
+        id: field.column(int4Column).id(),
+      },
+    });
+
+    const Post = model('Post', {
+      fields: {
+        id: field.column(int4Column).id(),
+        userId: field.column(int4Column),
+      },
+      relations: {
+        user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+      },
+    });
+
+    expect(() =>
+      Post.relations({
+        user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+      }),
+    ).toThrow('Model "Post" already defines relation "user".');
+  });
+
+  it('rejects belongsTo relations whose field arity does not match the target', () => {
+    const User = model('User', {
+      fields: {
+        id: field.column(int4Column).id(),
+      },
+    });
+
+    const Membership = model('Membership', {
+      fields: {
+        id: field.column(int4Column).id(),
+        orgId: field.column(int4Column),
+        userId: field.column(int4Column),
+      },
+      relations: {
+        user: rel.belongsTo(User, { from: ['orgId', 'userId'], to: 'id' }),
+      },
+    });
+
+    expect(() =>
+      defineStagedContract({
+        models: {
+          User,
+          Membership,
+        },
+      }),
+    ).toThrow('Relation "Membership.user" maps 2 source field(s) to 1 target field(s).');
+  });
+
+  it('rejects hasMany relations whose child fields do not match the parent identity arity', () => {
+    const Post = model('Post', {
+      fields: {
+        id: field.column(int4Column).id(),
+        authorId: field.column(int4Column),
+      },
+    });
+
+    const User = model('User', {
+      fields: {
+        orgId: field.column(int4Column),
+        id: field.column(int4Column),
+      },
+      relations: {
+        posts: rel.hasMany(Post, { by: 'authorId' }),
+      },
+    }).attributes(({ fields, constraints }) => ({
+      id: constraints.id([fields.orgId, fields.id]),
+    }));
+
+    expect(() =>
+      defineStagedContract({
+        models: {
+          User,
+          Post,
+        },
+      }),
+    ).toThrow('Relation "User.posts" maps 2 anchor field(s) to 1 child field(s).');
+  });
+
+  it('rejects many-to-many relations whose through mappings do not match anchor arity', () => {
+    const PostTag = model('PostTag', {
+      fields: {
+        postId: field.column(int4Column),
+        postTenantId: field.column(int4Column),
+        tagId: field.column(int4Column),
+      },
+    });
+
+    const Post = model('Post', {
+      fields: {
+        id: field.column(int4Column).id(),
+      },
+      relations: {
+        tags: rel.manyToMany(() => Tag, {
+          through: () => PostTag,
+          from: ['postId', 'postTenantId'],
+          to: 'tagId',
+        }),
+      },
+    });
+
+    const Tag = model('Tag', {
+      fields: {
+        id: field.column(int4Column).id(),
+      },
+    });
+
+    expect(() =>
+      defineStagedContract({
+        models: {
+          Post,
+          Tag,
+          PostTag,
+        },
+      }),
+    ).toThrow('Relation "Post.tags" has mismatched many-to-many field counts.');
+  });
+
   it('types local refs and named model tokens separately', () => {
     const Post = model('Post', {
       fields: {

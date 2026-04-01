@@ -120,6 +120,23 @@ function mapFieldNamesToColumnNames(
   });
 }
 
+function assertRelationFieldArity(params: {
+  readonly modelName: string;
+  readonly relationName: string;
+  readonly leftLabel: string;
+  readonly leftFields: readonly string[];
+  readonly rightLabel: string;
+  readonly rightFields: readonly string[];
+}): void {
+  if (params.leftFields.length === params.rightFields.length) {
+    return;
+  }
+
+  throw new Error(
+    `Relation "${params.modelName}.${params.relationName}" maps ${params.leftFields.length} ${params.leftLabel} field(s) to ${params.rightFields.length} ${params.rightLabel} field(s).`,
+  );
+}
+
 function resolveInlineIdConstraint(
   spec: Pick<RuntimeModelSpec, 'modelName' | 'fieldBuilders'>,
 ): IdConstraint | undefined {
@@ -231,11 +248,22 @@ function resolveRelationForeignKeys(
       );
     }
 
+    const fields = normalizeRelationFieldNames(relation.from);
+    const targetFields = normalizeRelationFieldNames(relation.to);
+    assertRelationFieldArity({
+      modelName: spec.modelName,
+      relationName,
+      leftLabel: 'source',
+      leftFields: fields,
+      rightLabel: 'target',
+      rightFields: targetFields,
+    });
+
     foreignKeys.push({
       kind: 'fk',
-      fields: normalizeRelationFieldNames(relation.from),
+      fields,
       targetModel: targetModelName,
-      targetFields: normalizeRelationFieldNames(relation.to),
+      targetFields,
       ...(relation.sql.fk.name ? { name: relation.sql.fk.name } : {}),
       ...(relation.sql.fk.onDelete ? { onDelete: relation.sql.fk.onDelete } : {}),
       ...(relation.sql.fk.onUpdate ? { onUpdate: relation.sql.fk.onUpdate } : {}),
@@ -280,6 +308,14 @@ function lowerBelongsToRelation(
 
   const fromFields = normalizeRelationFieldNames(relation.from);
   const toFields = normalizeRelationFieldNames(relation.to);
+  assertRelationFieldArity({
+    modelName: currentSpec.modelName,
+    relationName,
+    leftLabel: 'source',
+    leftFields: fromFields,
+    rightLabel: 'target',
+    rightFields: toFields,
+  });
 
   return {
     fieldName: relationName,
@@ -319,6 +355,14 @@ function lowerHasOwnershipRelation(
 
   const parentFields = resolveRelationAnchorFields(currentSpec);
   const childFields = normalizeRelationFieldNames(relation.by);
+  assertRelationFieldArity({
+    modelName: currentSpec.modelName,
+    relationName,
+    leftLabel: 'anchor',
+    leftFields: parentFields,
+    rightLabel: 'child',
+    rightFields: childFields,
+  });
 
   return {
     fieldName: relationName,
@@ -365,8 +409,17 @@ function lowerManyToManyRelation(
   }
 
   const currentAnchorFields = resolveRelationAnchorFields(currentSpec);
+  const targetAnchorFields = resolveRelationAnchorFields(targetSpec);
   const throughFromFields = normalizeRelationFieldNames(relation.from);
   const throughToFields = normalizeRelationFieldNames(relation.to);
+  if (
+    currentAnchorFields.length !== throughFromFields.length ||
+    targetAnchorFields.length !== throughToFields.length
+  ) {
+    throw new Error(
+      `Relation "${currentSpec.modelName}.${relationName}" has mismatched many-to-many field counts.`,
+    );
+  }
 
   return {
     fieldName: relationName,
