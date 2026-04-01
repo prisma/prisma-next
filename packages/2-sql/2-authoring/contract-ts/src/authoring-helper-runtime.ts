@@ -29,6 +29,16 @@ export function isNamedConstraintOptionsLike(value: unknown): value is RuntimeNa
   return name === undefined || typeof name === 'string';
 }
 
+const blockedSegments = new Set(['__proto__', 'constructor', 'prototype']);
+
+function assertSafeHelperKey(key: string, path: readonly string[]): void {
+  if (blockedSegments.has(key)) {
+    throw new Error(
+      `Invalid authoring helper "${[...path, key].join('.')}". Helper path segments must not use "${key}".`,
+    );
+  }
+}
+
 export function createTypeHelpersFromNamespace(
   namespace: AuthoringTypeNamespace,
   path: readonly string[] = [],
@@ -36,6 +46,7 @@ export function createTypeHelpersFromNamespace(
   const helpers: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(namespace)) {
+    assertSafeHelperKey(key, path);
     const currentPath = [...path, key];
 
     if (isAuthoringTypeConstructorDescriptor(value)) {
@@ -106,6 +117,7 @@ export function createFieldHelpersFromNamespace(
   const helpers: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(namespace)) {
+    assertSafeHelperKey(key, path);
     const currentPath = [...path, key];
 
     if (isAuthoringFieldPresetDescriptor(value)) {
