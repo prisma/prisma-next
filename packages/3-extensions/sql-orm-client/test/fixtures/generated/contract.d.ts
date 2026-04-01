@@ -78,7 +78,14 @@ type ContractBase = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [{ readonly columns: readonly ['email'] }];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['invited_by_id'];
+            readonly references: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly constraint: true;
+            readonly index: true;
+          },
+        ];
       };
       readonly posts: {
         columns: {
@@ -106,7 +113,14 @@ type ContractBase = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['user_id'];
+            readonly references: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly constraint: true;
+            readonly index: true;
+          },
+        ];
       };
       readonly comments: {
         columns: {
@@ -129,7 +143,14 @@ type ContractBase = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['post_id'];
+            readonly references: { readonly table: 'posts'; readonly columns: readonly ['id'] };
+            readonly constraint: true;
+            readonly index: true;
+          },
+        ];
       };
       readonly profiles: {
         columns: {
@@ -146,6 +167,36 @@ type ContractBase = SqlContract<
           readonly bio: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['user_id'];
+            readonly references: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly constraint: true;
+            readonly index: true;
+          },
+        ];
+      };
+      readonly articles: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly title: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly reviewer_id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
             readonly nullable: false;
           };
         };
@@ -292,7 +343,16 @@ type ContractBase = SqlContract<
         readonly userId: CodecTypes['pg/int4@1']['output'];
         readonly bio: CodecTypes['pg/text@1']['output'];
       };
-      readonly relations: {};
+      readonly relations: {
+        readonly user: {
+          readonly to: 'User';
+          readonly cardinality: '1:1';
+          readonly on: {
+            readonly localFields: readonly ['userId'];
+            readonly targetFields: readonly ['id'];
+          };
+        };
+      };
     };
     readonly Article: {
       readonly storage: {
@@ -381,6 +441,16 @@ type ContractBase = SqlContract<
       readonly author: {
         readonly to: 'User';
         readonly cardinality: 'N:1';
+        readonly on: {
+          readonly parentCols: readonly ['user_id'];
+          readonly childCols: readonly ['id'];
+        };
+      };
+    };
+    readonly profiles: {
+      readonly user: {
+        readonly to: 'User';
+        readonly cardinality: '1:1';
         readonly on: {
           readonly parentCols: readonly ['user_id'];
           readonly childCols: readonly ['id'];
