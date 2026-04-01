@@ -70,11 +70,7 @@ function assertFieldHasEqualityTrait(
   modelName: string,
   fieldName: string,
 ): void {
-  const models = context.contract.models as Record<
-    string,
-    { fields?: Record<string, { codecId?: string }> }
-  >;
-  const codecId = models[modelName]?.fields?.[fieldName]?.codecId;
+  const codecId = context.contract.models[modelName]?.fields?.[fieldName]?.codecId;
   const traits = codecId ? context.codecs.traitsOf(codecId) : [];
   if (!traits.includes('equality')) {
     throw new Error(
