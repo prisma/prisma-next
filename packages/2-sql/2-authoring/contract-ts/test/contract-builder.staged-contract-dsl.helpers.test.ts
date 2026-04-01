@@ -1,4 +1,8 @@
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
+import type {
+  AuthoringFieldNamespace,
+  ExtensionPackRef,
+  TargetPackRef,
+} from '@prisma-next/contract/framework-components';
 import { portableSqlAuthoringFieldPresets } from '@prisma-next/sql-contract/authoring';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { defineContract, field, model, rel } from '../src/contract-builder';
@@ -648,5 +652,50 @@ describe('staged contract DSL helper vocabulary', () => {
         }),
       ),
     ).toThrow(/Duplicate authoring field helper "text"/);
+  });
+
+  it('rejects dangerous authoring field helper path segments across composed packs', () => {
+    const maliciousFieldNamespace = JSON.parse(`
+      {
+        "__proto__": {
+          "polluted": {
+            "kind": "fieldPreset",
+            "output": {
+              "codecId": "conflict/text@1",
+              "nativeType": "text"
+            }
+          }
+        }
+      }
+    `) as AuthoringFieldNamespace;
+
+    const maliciousPack = {
+      kind: 'extension',
+      id: 'malicious-pack',
+      familyId: 'sql',
+      targetId: 'postgres',
+      version: '0.0.1',
+      authoring: {
+        field: maliciousFieldNamespace,
+      },
+    } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
+
+    try {
+      expect(() =>
+        defineContract(
+          {
+            target: postgresTargetPack,
+            extensionPacks: {
+              maliciousPack,
+            },
+          },
+          () => ({
+            models: {},
+          }),
+        ),
+      ).toThrow(/Invalid authoring field helper "__proto__"/);
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)['polluted'];
+    }
   });
 });

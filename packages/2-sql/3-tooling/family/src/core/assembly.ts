@@ -356,11 +356,24 @@ function mergeAuthoringNamespaces(
   leafGuard: (value: unknown) => boolean,
   label: string,
 ): void {
+  const assertSafePath = (currentPath: readonly string[]) => {
+    const blockedSegment = currentPath.find(
+      (segment) => segment === '__proto__' || segment === 'constructor' || segment === 'prototype',
+    );
+    if (blockedSegment) {
+      throw new Error(
+        `Invalid authoring ${label} helper "${currentPath.join('.')}". Helper path segments must not use "${blockedSegment}".`,
+      );
+    }
+  };
+
   for (const [key, sourceValue] of Object.entries(source)) {
     const currentPath = [...path, key];
-    const existingValue = target[key];
+    assertSafePath(currentPath);
+    const hasExistingValue = Object.hasOwn(target, key);
+    const existingValue = hasExistingValue ? target[key] : undefined;
 
-    if (existingValue === undefined) {
+    if (!hasExistingValue) {
       target[key] = sourceValue;
       continue;
     }

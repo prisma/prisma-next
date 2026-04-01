@@ -352,4 +352,34 @@ describe('assembleControlMutationDefaultContributions', () => {
       /Duplicate authoring field helper "text"/,
     );
   });
+
+  it('rejects dangerous authoring helper path segments', () => {
+    const maliciousFieldNamespace = JSON.parse(`
+      {
+        "__proto__": {
+          "polluted": {
+            "kind": "fieldPreset",
+            "output": {
+              "codecId": "conflict/text@1",
+              "nativeType": "text"
+            }
+          }
+        }
+      }
+    `);
+
+    const descriptor = createDescriptor('malicious', {
+      authoring: {
+        field: maliciousFieldNamespace,
+      },
+    });
+
+    try {
+      expect(() => assembleAuthoringContributions([descriptor])).toThrow(
+        /Invalid authoring field helper "__proto__"/,
+      );
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)['polluted'];
+    }
+  });
 });
