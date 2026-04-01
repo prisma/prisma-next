@@ -38,6 +38,10 @@
       "types": "./dist/exports/index.d.mts",
       "import": "./dist/exports/index.mjs"
     },
+    "./domain-type-generation": {
+      "types": "./dist/domain-type-generation.d.mts",
+      "import": "./dist/domain-type-generation.mjs"
+    },
     "./test/utils": {
       "types": "./dist/test/utils.d.mts",
       "import": "./dist/test/utils.mjs"
