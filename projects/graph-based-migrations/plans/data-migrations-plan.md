@@ -58,6 +58,8 @@ Refs refactored from `migrations/refs.json` to `migrations/refs/<name>.json` wit
 - [ ] Show check/run SQL for raw_sql nodes
 - [ ] Show `[data]` badge alongside existing `[additive]`, `[destructive]`, `[widening]` badges
 - [ ] Test migration show with a package containing data transforms
+- [ ] Highlight data transform ops visually (color, icon, or distinct formatting)
+- [ ] Consider outputting each individual serialized op's SQL in the show output (not just the op summary)
 
 ### Milestone: Draft migration visibility
 
