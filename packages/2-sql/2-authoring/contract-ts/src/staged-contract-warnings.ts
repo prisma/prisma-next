@@ -105,11 +105,32 @@ function formatManyToManyCallWithThrough(
   return `rel.manyToMany(${targetDisplay}, { through: ${throughDisplay}, from: ${from}, to: ${to} })`;
 }
 
-function emitFallbackWarning(location: string, current: string, suggested: string): void {
+const WARNING_BATCH_THRESHOLD = 5;
+
+function flushWarnings(warnings: readonly string[]): void {
+  if (warnings.length === 0) {
+    return;
+  }
+
+  if (warnings.length <= WARNING_BATCH_THRESHOLD) {
+    for (const message of warnings) {
+      process.emitWarning(message, { code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE' });
+    }
+    return;
+  }
+
   process.emitWarning(
-    `Staged contract ${location} uses ${current}. ` +
-      `Use ${suggested} when the named model token is available in the same contract to keep typed relation targets and model refs.`,
+    `${warnings.length} staged contract references use string fallbacks where typed alternatives are available. ` +
+      'Use named model tokens and typed storage type refs for autocomplete and type safety.\n' +
+      warnings.map((w) => `  - ${w}`).join('\n'),
     { code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE' },
+  );
+}
+
+function formatFallbackWarning(location: string, current: string, suggested: string): string {
+  return (
+    `Staged contract ${location} uses ${current}. ` +
+    `Use ${suggested} when the named model token is available in the same contract to keep typed relation targets and model refs.`
   );
 }
 
@@ -117,6 +138,7 @@ export function emitTypedNamedTypeFallbackWarnings(
   models: Record<string, RuntimeStagedModel>,
   storageTypes: Record<string, StorageTypeInstance>,
 ): void {
+  const warnings: string[] = [];
   const warnedFields = new Set<string>();
 
   for (const [modelName, modelDefinition] of Object.entries(models)) {
@@ -132,16 +154,18 @@ export function emitTypedNamedTypeFallbackWarnings(
       }
       warnedFields.add(warningKey);
 
-      process.emitWarning(
+      warnings.push(
         `Staged contract field "${modelName}.${fieldName}" uses field.namedType('${fieldState.typeRef}'). ` +
           `Use field.namedType(types.${fieldState.typeRef}) when the storage type is declared in the same contract to keep autocomplete and typed local refs.`,
-        { code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE' },
       );
     }
   }
+
+  flushWarnings(warnings);
 }
 
 export function emitTypedCrossModelFallbackWarnings(collection: RuntimeStagedCollection): void {
+  const warnings: string[] = [];
   const warnedKeys = new Set<string>();
 
   for (const spec of collection.modelSpecs.values()) {
@@ -159,7 +183,13 @@ export function emitTypedCrossModelFallbackWarnings(collection: RuntimeStagedCol
 
           const current = formatRelationCall(relation, `'${relation.toModel.modelName}'`);
           const suggested = formatRelationCall(relation, relation.toModel.modelName);
-          emitFallbackWarning(`relation "${spec.modelName}.${relationName}"`, current, suggested);
+          warnings.push(
+            formatFallbackWarning(
+              `relation "${spec.modelName}.${relationName}"`,
+              current,
+              suggested,
+            ),
+          );
         }
       }
 
@@ -178,7 +208,13 @@ export function emitTypedCrossModelFallbackWarnings(collection: RuntimeStagedCol
             `'${relation.through.modelName}'`,
           );
           const suggested = formatManyToManyCallWithThrough(relation, relation.through.modelName);
-          emitFallbackWarning(`relation "${spec.modelName}.${relationName}"`, current, suggested);
+          warnings.push(
+            formatFallbackWarning(
+              `relation "${spec.modelName}.${relationName}"`,
+              current,
+              suggested,
+            ),
+          );
         }
       }
     }
@@ -199,7 +235,11 @@ export function emitTypedCrossModelFallbackWarnings(collection: RuntimeStagedCol
 
       const current = formatConstraintsRefCall(foreignKey.targetModel, foreignKey.targetFields);
       const suggested = formatTokenFieldSelection(foreignKey.targetModel, foreignKey.targetFields);
-      emitFallbackWarning(`model "${spec.modelName}"`, `${current} in .sql(...)`, suggested);
+      warnings.push(
+        formatFallbackWarning(`model "${spec.modelName}"`, `${current} in .sql(...)`, suggested),
+      );
     }
   }
+
+  flushWarnings(warnings);
 }
