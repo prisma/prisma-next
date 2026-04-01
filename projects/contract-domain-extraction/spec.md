@@ -175,16 +175,16 @@ interface ContractBase<
 }
 ```
 
-## SqlContract (Phase 1 — widened, not contracted)
+## SqlContract (Phases 1–2 — widened, not contracted)
 
-During Phase 1, `SqlContract` carries both old and new fields. Consumers can read from either:
+During Phases 1–2, `SqlContract` carries both old and new fields. Consumers can read from either:
 
 ```typescript
 type SqlContract<S, M, R, Map, ...> = ContractBase<...> & {
   readonly storage: S;
   readonly models: M;                     // has BOTH { nullable, codecId } and { column } on fields
 
-  // Old fields (retained for consumer compatibility during Phase 1-2)
+  // Old fields (retained for consumer compatibility during Phases 1–3)
   readonly relations: R;                  // top-level table-keyed relations
   readonly mappings: Map;                 // modelToTable, fieldToColumn, etc.
 
@@ -228,7 +228,7 @@ function deriveMappings(contract): SqlMappings {
 }
 ```
 
-After Phase 3, the bridging logic and old fields are removed.
+After Phase 4, the bridging logic and old fields are removed.
 
 # Requirements
 
@@ -265,7 +265,18 @@ The JSON is already in the target structure (Phase 1). `validateContract()` deri
 1. **Migrate ORM client to read from domain fields.** The ORM client switches from reading `mappings.fieldToColumn` / `mappings.modelToTable` to reading `model.storage.fields` / `model.storage.table`, and from reading field types via the storage layer to reading `model.fields[f].codecId` and `model.fields[f].nullable`. It switches from the top-level `relations` to `model.relations`. This must be coordinated with Alexey.
 2. **Migrate query builder and runtime.** The SQL query builder, relational core, and runtime shift to reading domain-level field metadata where appropriate. Runtime codec resolution uses `model.fields[f].codecId`.
 
-### Phase 3: Remove old type fields
+### Phase 3: Mongo emitter hook (with shared domain-level generation)
+
+This phase builds a `mongoTargetFamilyHook` that implements `generateContractTypes()` for the Mongo family. The domain-level generation (roots type, model domain fields, relations, imports, hashes, `.d.ts` skeleton) is factored into shared utility functions in the framework from the start — the Mongo hook only writes storage-specific parts (collection mappings, embedded document types). These shared utilities become the proven API that Phase 6 migrates the SQL hook onto.
+
+This phase is the forcing function that defines the shared generation API. It can run in parallel with Phase 2 since it doesn't touch the SQL emitter.
+
+1. **Extract domain-level `.d.ts` generation into shared utilities.** Factor out `generateRootsType()`, model domain field type generation, model relation type generation, import deduplication, hash type aliases, codec/operation type intersections, and the `.d.ts` template skeleton from the SQL hook into shared framework utilities. The SQL hook continues to use its own `generateContractTypes()` — it is not migrated onto the shared utilities until Phase 6.
+2. **Implement `mongoTargetFamilyHook.generateContractTypes()`.** The Mongo hook uses the shared utilities for domain-level generation and provides: `generateStorageType()` (collection mappings), `generateModelStorageType()` (embedded document storage), and Mongo-specific validation.
+3. **Implement `mongoTargetFamilyHook.validateStructure()`.** Mongo-specific contract validation: collection names, embedded document constraints, owner/`storage.relations` consistency.
+4. **Set up a minimal Mongo fixture contract** to exercise the Mongo emitter end-to-end.
+
+### Phase 4: Remove old type fields
 
 The JSON already lacks the old fields (removed in Phase 1). This phase removes the backwards-compatibility shim from `validateContract()` and the old fields from `SqlContract`.
 
@@ -273,35 +284,32 @@ The JSON already lacks the old fields (removed in Phase 1). This phase removes t
 2. **Remove old model field shape.** Remove `{ column }` from `model.fields` type — consumers now read `{ nullable, codecId }`. The field-to-column mapping lives in `model.storage.fields`.
 3. **Remove top-level `relations` from `SqlContract`.** Once all consumers read `model.relations`, the top-level table-keyed `relations` type field and its derivation logic can be removed.
 
-### Phase 4: Contract IR alignment (follow-up)
+### Phase 5: Contract IR alignment (follow-up)
 
 1. **Align `ContractIR` with the new contract JSON structure.** Update the internal representation used during emission so it more closely mirrors the emitted JSON. This reduces impedance mismatch and makes it easier for the DSL layer to target the IR. Coordinate timing with Alberto.
 
-### Phase 5: Emitter generalization
+### Phase 6: SQL emitter migration to shared generation
 
-With ADR 172's domain-storage separation, most of the `.d.ts` generation logic in `sqlTargetFamilyHook.generateContractTypes()` is now family-agnostic: roots, model domain fields (`nullable`, `codecId` → TypeScript types), model relations, import deduplication, hash type aliases, codec/operation type intersections, the `.d.ts` skeleton. Only the storage-level type generation (tables, columns, PKs, FKs, indexes, named type instances) and backward-compat types (`mappings`, old top-level `relations`) are genuinely SQL-specific.
+This phase migrates the SQL emitter hook onto the shared domain-level generation utilities established in Phase 3 (Mongo emitter hook). The `TargetFamilyHook` interface narrows: `generateContractTypes()` is removed, and hooks provide only storage-specific type blocks. The shared utilities are already proven by the Mongo hook — this phase is a migration, not a design exercise.
 
-This phase refactors the `TargetFamilyHook` interface so the framework `emit()` generates domain-level `.d.ts` content and the family hook provides only storage-specific type blocks. This eliminates the need for each family to duplicate ~60–70% of the type generation logic when implementing a new family emitter (e.g., Mongo).
-
-1. **Refactor `TargetFamilyHook` interface.** Replace the monolithic `generateContractTypes()` method with a narrower interface. The framework generates domain-level sections (roots type, model domain fields, model relations, imports, hashes, codec types, `.d.ts` skeleton). The hook provides: `generateStorageType(storage)`, `generateModelStorageType(model)`, and any family-specific type blocks.
-2. **Move domain-level type generation to the framework emitter.** Extract `generateRootsType()`, model field type generation (`generateColumnType()`), model relation type generation, import deduplication, hash aliases, and the `.d.ts` template from the SQL hook into the framework's `emit()`.
-3. **Update SQL hook to implement the narrower interface.** The SQL hook retains `generateStorageType()` (tables/columns/PKs/FKs/indexes), `generateStorageTypesType()` (named type instances), and validation methods. It no longer owns the `.d.ts` skeleton or domain-level type generation.
+1. **Migrate SQL hook to shared utilities.** Replace the SQL hook's `generateRootsType()`, model domain field generation, model relation generation, import deduplication, hash aliases, and `.d.ts` skeleton with calls to the shared framework utilities (established in Phase 3).
+2. **Narrow the `TargetFamilyHook` interface.** Remove `generateContractTypes()`, require `generateStorageType(storage)`, `generateModelStorageType(model, storage)`, and family-specific validation.
+3. **Verify both hooks conform.** Both SQL and Mongo hooks implement the narrowed interface.
 4. **Verify emitter output is identical.** The generated `contract.d.ts` must be byte-identical before and after the refactor (modulo formatting). Use the demo contract and parity fixtures as regression tests.
 
-This phase is independent of Phase 4 (IR alignment) and can be done before or after it.
+This phase is independent of Phase 5 (IR alignment) and can be done before or after it.
 
 ## Non-Functional Requirements
 
-- **Zero breakage during Phase 1.** All existing tests, the demo app, and downstream consumers must continue working without modification when Phase 1 lands. `validateContract()` bridges the new JSON structure to the old consumer-facing type.
+- **Zero breakage during Phases 1 and 3.** All existing tests, the demo app, and downstream consumers must continue working without modification when Phase 1 lands. The Mongo emitter hook (Phase 3) must not alter SQL emitter output. `validateContract()` bridges the new JSON structure to the old consumer-facing type.
 - **Incremental migration.** Phase 2 changes should be deployable consumer-by-consumer, not as a single atomic switch.
 - **Type safety throughout.** The widened `ContractBase` must provide typed access to domain fields. Consumers switching from old fields to new ones should get equivalent or better type inference.
 
 ## Non-goals
 
-- **Mongo emitter.** This project updates the SQL emitter. A Mongo emitter is a separate project.
 - **Value objects section.** Designing the contract representation for value objects is out of scope. The domain structure carries `models` only.
 - **Change streams / subscriptions.** Runtime lifecycle changes are not in scope.
-- **PSL/DSL authoring changes.** The authoring surface adapts to the new IR (Phase 4) but designing new authoring syntax is out of scope.
+- **PSL/DSL authoring changes.** The authoring surface adapts to the new IR (Phase 5) but designing new authoring syntax is out of scope.
 
 # Acceptance Criteria
 
@@ -336,23 +344,31 @@ This phase is independent of Phase 4 (IR alignment) and can be done before or af
 - [ ] No consumer imports or reads from the `mappings` section
 - [ ] No consumer reads relations from the top-level `relations` block
 
-### Phase 3: Remove old type fields
+### Phase 3: Mongo emitter hook
+
+- [ ] Domain-level `.d.ts` generation (roots, model fields, relations, imports, hashes, skeleton) is extracted into shared framework utilities
+- [ ] `mongoTargetFamilyHook` generates a valid Mongo `contract.json` and `contract.d.ts` matching ADR 172/177 structure
+- [ ] Mongo-specific validation (`validateStructure()`) covers collection names, embedding constraints, and ownership consistency
+- [ ] SQL emitter output is unchanged after the shared utility extraction
+- [ ] A minimal Mongo fixture contract exercises the Mongo emitter end-to-end
+
+### Phase 4: Remove old type fields
 
 - [ ] `mappings` is removed from `SqlContract` and the `validateContract()` derivation logic
 - [ ] Top-level `relations` type field is removed from `SqlContract` and `validateContract()`
 - [ ] Old model field shape (`{ column: string }` without `nullable`/`codecId`) is removed from the type
 - [ ] `contract.d.ts` emission reflects the final shape (no old fields)
 
-### Phase 4: IR alignment
+### Phase 5: IR alignment
 
 - [ ] `ContractIR` mirrors the emitted contract JSON structure (domain/storage separation, model-level relations, `roots`)
 
-### Phase 5: Emitter generalization
+### Phase 6: SQL emitter migration to shared generation
 
-- [ ] `TargetFamilyHook` no longer has a monolithic `generateContractTypes()` — domain-level type generation lives in the framework `emit()`
-- [ ] The SQL hook provides only storage-specific type generation (`generateStorageType`, `generateModelStorageType`) and family-specific validation
+- [ ] SQL hook uses the shared domain-level generation utilities from Phase 3
+- [ ] `TargetFamilyHook` interface is narrowed — no monolithic `generateContractTypes()`
+- [ ] Both SQL and Mongo hooks conform to the narrowed interface
 - [ ] Generated `contract.d.ts` output is identical before and after the refactor (regression-tested against demo and parity fixtures)
-- [ ] A new family emitter (e.g., Mongo) would not need to duplicate domain-level type generation logic
 
 
 # Other Considerations
@@ -372,7 +388,7 @@ No observability changes needed. The contract structure is a build-time artifact
 ## Coordination
 
 - **Alexey (ORM client):** Phase 2 requires migrating the ORM client to read from new type fields. Phase 1 adds new fields alongside old ones on the TypeScript type, so Alexey can switch call sites incrementally at his pace. No changes required from him until Phase 2.
-- **Alberto (DSL/authoring):** Phase 4 updates the Contract IR he targets. This should be coordinated but is not a synchronous dependency — the emitter can produce the new contract JSON from the old IR during Phases 1–3. Phase 4 aligns the IR for his benefit.
+- **Alberto (DSL/authoring):** Phase 5 updates the Contract IR he targets. This should be coordinated but is not a synchronous dependency — the emitter can produce the new contract JSON from the old IR during Phases 1–4. Phase 5 aligns the IR for his benefit.
 - **Demo app and test fixtures:** `contract.json` files are updated in Phase 1 to the new structure. Since `validateContract()` bridges to the old type, everything continues to work.
 
 # References

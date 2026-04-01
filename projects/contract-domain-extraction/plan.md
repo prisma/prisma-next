@@ -2,11 +2,11 @@
 
 ## Summary
 
-Restructure the emitted SQL contract to implement ADR 172's domain-storage separation: extract a shared domain-level representation into `ContractBase`, update the SQL emitter to produce the new JSON layout, and bridge `validateContract()` so no consumer code changes until Phase 2. This is the foundational step toward cross-family consumer code (ORM, validation, tooling). Success means the contract carries a self-describing domain level (`roots`, `models` with typed fields and relations) distinct from SQL-specific storage, with all existing consumers continuing to work via a compatibility bridge.
+Restructure the emitted SQL contract to implement ADR 172's domain-storage separation: extract a shared domain-level representation into `ContractBase`, update the SQL emitter to produce the new JSON layout, and bridge `validateContract()` so no consumer code changes until M2. Build a Mongo emitter hook (M3) that forces out shared domain-level generation utilities, then migrate the SQL hook onto those utilities (M6). This is the foundational step toward cross-family consumer code (ORM, validation, tooling). Success means the contract carries a self-describing domain level (`roots`, `models` with typed fields and relations) distinct from family-specific storage, with all existing consumers continuing to work via a compatibility bridge.
 
 **Spec:** [projects/contract-domain-extraction/spec.md](spec.md)
 
-**Linear:** [TML-2172](https://linear.app/prisma-company/issue/TML-2172) under [WS4: MongoDB & Cross-Family Architecture](https://linear.app/prisma-company/project/ws4-mongodb-and-cross-family-architecture-89d4dcdbcd9a) → milestone "P1: Contract extraction"
+**Linear:** [WS4: MongoDB & Cross-Family Architecture](https://linear.app/prisma-company/project/ws4-mongodb-and-cross-family-architecture-89d4dcdbcd9a) — milestones M1–M6. Tickets: [TML-2172](https://linear.app/prisma-company/issue/TML-2172) (M1), [TML-2175](https://linear.app/prisma-company/issue/TML-2175) (M2), [TML-2176](https://linear.app/prisma-company/issue/TML-2176) (M3)
 
 ## Collaborators
 
@@ -15,7 +15,7 @@ Restructure the emitted SQL contract to implement ADR 172's domain-storage separ
 | ------------ | ----------- | ------------------------------------------------------------------ |
 | Maker        | Will        | Drives execution                                                   |
 | Collaborator | Alexey      | ORM client — Phase 2 migration must coordinate with his workstream |
-| Collaborator | Alberto     | DSL/authoring — Phase 4 IR alignment benefits his workstream       |
+| Collaborator | Alberto     | DSL/authoring — M5 IR alignment benefits his workstream            |
 
 
 ## Milestones
@@ -86,67 +86,73 @@ Migrates consumer code to read from the new domain-level TypeScript fields inste
 - **2.7** Migrate `paradedb` extension: update BM25 index field column resolution in `packages/3-extensions/paradedb/src/types/index-types.ts`.
 - **2.8** Verify: no consumer imports or reads from `mappings`, no consumer reads top-level `relations`.
 
-### Milestone 3: Remove old type fields
+### Milestone 3: Mongo emitter hook (with shared domain-level generation)
+
+Builds a `mongoTargetFamilyHook` that implements `generateContractTypes()` for the Mongo family. The domain-level generation (roots type, model domain fields, relations, imports, hashes, `.d.ts` skeleton) is factored into shared utility functions in the framework from the start — the Mongo hook only writes storage-specific parts (collection mappings, embedded document types). These shared utilities become the proven API that M6 migrates the SQL hook onto.
+
+This milestone is the forcing function that defines the shared generation API. It can run in parallel with M2 (consumer migration) since it doesn't touch the SQL emitter.
+
+**Tasks:**
+
+- **3.1** Extract domain-level `.d.ts` generation from `sqlTargetFamilyHook` into shared utility functions in the framework emitter package: `generateRootsType()`, model domain field type generation, model relation type generation, import deduplication, hash type aliases, codec/operation type intersections, `.d.ts` template skeleton.
+- **3.2** Implement `mongoTargetFamilyHook.generateContractTypes()` using the shared utilities for domain-level generation. The Mongo hook provides: `generateStorageType()` (collection mappings), `generateModelStorageType()` (embedded document storage, `storage.relations` mapping), and Mongo-specific validation.
+- **3.3** Implement `mongoTargetFamilyHook.validateStructure()` for Mongo-specific contract validation (collection names, embedded document constraints, owner/`storage.relations` consistency).
+- **3.4** Write emitter tests for the Mongo hook: verify generated `contract.json` and `contract.d.ts` match the ADR 172/177 Mongo contract structure (as shown in ADR 177's examples).
+- **3.5** Verify SQL emitter output is unchanged — the shared utilities are used by Mongo but the SQL hook still uses its own `generateContractTypes()` (migrated in M6).
+- **3.6** Set up a minimal Mongo demo/fixture contract to exercise the Mongo emitter end-to-end.
+
+### Milestone 4: Remove old type fields
 
 Removes the backward-compatibility shim from `validateContract()` and old fields from `SqlContract`. Only possible after all consumers are migrated (Milestone 2 complete).
 
 **Tasks:**
 
-- **3.1** Remove `mappings` from `SqlContract` type and `validateContract()` derivation logic.
-- **3.2** Remove top-level `relations` from `SqlContract` type and `validateContract()` derivation logic.
-- **3.3** Remove old model field shape (`{ column: string }` without `nullable`/`codecId`) from the type.
-- **3.4** Update `contract.d.ts` emission to reflect the final shape (no old fields).
-- **3.5** Remove old-format JSON support from `normalizeContract()` (if dual-format was added in 1.3.1).
-- **3.6** Remove the generic `TModels` parameter from `ContractBase`. Once consumers read from domain-level fields and `SqlContract` no longer carries query-builder-specific model types via `M`, simplify `ContractBase` back to a concrete `models: Record<string, DomainModel>`. The generic was introduced to avoid `noPropertyAccessFromIndexSignature` index-signature leakage while `SqlContract`'s `M` still overrides the base `models` type.
-- **3.7** Update all remaining test fixtures and type tests to reflect the clean types.
-- **3.8** Run full test suite and typecheck.
+- **4.1** Remove `mappings` from `SqlContract` type and `validateContract()` derivation logic.
+- **4.2** Remove top-level `relations` from `SqlContract` type and `validateContract()` derivation logic.
+- **4.3** Remove old model field shape (`{ column: string }` without `nullable`/`codecId`) from the type.
+- **4.4** Update `contract.d.ts` emission to reflect the final shape (no old fields).
+- **4.5** Remove old-format JSON support from `normalizeContract()` (if dual-format was added in 1.3.1).
+- **4.6** Remove the generic `TModels` parameter from `ContractBase`. Once consumers read from domain-level fields and `SqlContract` no longer carries query-builder-specific model types via `M`, simplify `ContractBase` back to a concrete `models: Record<string, DomainModel>`. The generic was introduced to avoid `noPropertyAccessFromIndexSignature` index-signature leakage while `SqlContract`'s `M` still overrides the base `models` type.
+- **4.7** Update all remaining test fixtures and type tests to reflect the clean types.
+- **4.8** Run full test suite and typecheck.
 
-### Milestone 4: Contract IR alignment
+### Milestone 5: Contract IR alignment
 
 Aligns the internal `ContractIR` representation with the emitted contract JSON structure. Reduces impedance mismatch for the DSL authoring layer. Coordinate timing with Alberto.
 
 **Tasks:**
 
-- **4.1** Audit current `ContractIR` structure vs the emitted JSON. Document the structural gaps (e.g., IR has top-level `relations` and `mappings`; emitted JSON does not).
-- **4.2** Update `ContractIR` to mirror the ADR 172 structure: domain-level `models` with `fields`/`relations`/`storage`, `roots`, no top-level `relations` or `mappings`.
-- **4.3** Update the emitter (`emit.ts`) to read from the new IR structure (remove translation logic that was bridging old IR → new JSON).
-- **4.4** Update all IR construction sites: PSL interpreter, TypeScript contract builders (`contract-ts`), and any tooling that produces `ContractIR`.
-- **4.5** Update IR-level tests and validation.
-- **4.6** Run full test suite and typecheck.
+- **5.1** Audit current `ContractIR` structure vs the emitted JSON. Document the structural gaps (e.g., IR has top-level `relations` and `mappings`; emitted JSON does not).
+- **5.2** Update `ContractIR` to mirror the ADR 172 structure: domain-level `models` with `fields`/`relations`/`storage`, `roots`, no top-level `relations` or `mappings`.
+- **5.3** Update the emitter (`emit.ts`) to read from the new IR structure (remove translation logic that was bridging old IR → new JSON).
+- **5.4** Update all IR construction sites: PSL interpreter, TypeScript contract builders (`contract-ts`), and any tooling that produces `ContractIR`.
+- **5.5** Update IR-level tests and validation.
+- **5.6** Run full test suite and typecheck.
 
-### Milestone 5: Emitter generalization
+### Milestone 6: SQL emitter migration to shared generation
 
-Refactors the `TargetFamilyHook` interface so the framework `emit()` generates domain-level `.d.ts` content and the family hook provides only storage-specific type blocks. Today `sqlTargetFamilyHook.generateContractTypes()` owns the entire `.d.ts` — ~60–70% of which (roots, model domain fields, model relations, imports, hashes, codec types, the template skeleton) is family-agnostic. This means any new family emitter would duplicate all of it. After this milestone, a new family hook only needs to provide storage-specific type generation.
-
-Independent of Milestone 4 (IR alignment) — can be done before or after.
+Migrates the SQL emitter hook onto the shared domain-level generation utilities established in M3 (Mongo emitter hook). The `TargetFamilyHook` interface narrows: `generateContractTypes()` is removed, and hooks provide only storage-specific type blocks. The shared utilities are already proven by the Mongo hook — this milestone is a migration, not a design exercise.
 
 **Tasks:**
 
-#### 5.1 Design the narrower hook interface
+#### 6.1 Migrate SQL hook to shared utilities
 
-- **5.1.1** Audit `sqlTargetFamilyHook` methods and classify each as domain-level (framework) or storage-level (family). Document the split in a short design note.
-- **5.1.2** Design the new `TargetFamilyHook` interface: remove `generateContractTypes()`, add `generateStorageType(storage)`, `generateModelStorageType(model, storage)`, and any other family-specific type generation callbacks needed. Keep `validateTypes()` and `validateStructure()` on the hook.
+- **6.1.1** Replace SQL hook's `generateRootsType()`, model domain field generation, model relation generation, import deduplication, hash aliases, and `.d.ts` skeleton with calls to the shared framework utilities (established in M3 task 3.1).
+- **6.1.2** Implement `generateStorageType(storage)` on the SQL hook (extract from current `generateStorageType` — already a separate method, just needs to conform to the shared interface).
+- **6.1.3** Implement `generateModelStorageType(model, storage)` on the SQL hook (field-to-column mapping type generation, extracted from `generateModelsType`).
+- **6.1.4** Remove `generateContractTypes()`, `generateModelsType()`, `generateRootsType()`, `generateRelationsType()`, `generateMappingsType()` from the SQL hook (now framework-owned or obsolete after M4).
+- **6.1.5** Update `serializeValue()` / `serializeObjectKey()` — decide whether these are shared utilities (framework) or hook-specific. Likely framework.
 
-#### 5.2 Extract domain-level type generation to the framework
+#### 6.2 Narrow the hook interface
 
-- **5.2.1** Move `generateRootsType()` to the framework emitter.
-- **5.2.2** Move model domain field type generation (`generateColumnType()`, the codec → TypeScript type logic, parameterized renderer dispatch) to the framework emitter.
-- **5.2.3** Move model relation type generation (ADR 172 `to`/`cardinality`/`on` serialization) to the framework emitter.
-- **5.2.4** Move import deduplication, hash type aliases, codec/operation type intersections, `DefaultLiteralValue`, `TypeMaps`, and the `.d.ts` template skeleton to the framework emitter.
-- **5.2.5** The framework emitter calls the hook's storage-specific methods to fill in the storage sections, then assembles the complete `.d.ts`.
+- **6.2.1** Update the `TargetFamilyHook` interface: remove `generateContractTypes()`, require `generateStorageType(storage)`, `generateModelStorageType(model, storage)`, and any other family-specific type generation callbacks. Keep `validateTypes()` and `validateStructure()` on the hook.
+- **6.2.2** Verify both SQL and Mongo hooks conform to the narrowed interface.
 
-#### 5.3 Update SQL hook to the narrower interface
+#### 6.3 Regression verification
 
-- **5.3.1** Implement `generateStorageType(storage)` on the SQL hook (extract from current `generateStorageType` — already a separate method, just needs to conform to the new interface).
-- **5.3.2** Implement `generateModelStorageType(model, storage)` on the SQL hook (field-to-column mapping type generation, extracted from `generateModelsType`).
-- **5.3.3** Remove `generateContractTypes()`, `generateModelsType()`, `generateRootsType()`, `generateRelationsType()`, `generateMappingsType()` from the SQL hook (now framework-owned or obsolete after M3).
-- **5.3.4** Update `serializeValue()` / `serializeObjectKey()` — decide whether these are shared utilities (framework) or hook-specific. Likely framework.
-
-#### 5.4 Regression verification
-
-- **5.4.1** Verify generated `contract.d.ts` is byte-identical (modulo formatting) before and after the refactor, using the demo contract and all 12 parity fixtures.
-- **5.4.2** Run full test suite and typecheck.
-- **5.4.3** Update emitter hook tests to test the new interface methods individually.
+- **6.3.1** Verify generated `contract.d.ts` is byte-identical (modulo formatting) before and after the refactor, using the demo contract and all 12 parity fixtures.
+- **6.3.2** Run full test suite and typecheck.
+- **6.3.3** Update emitter hook tests to test the new interface methods individually.
 
 ### Close-out
 
@@ -168,27 +174,30 @@ Independent of Milestone 4 (IR alignment) — can be done before or after.
 | Emitted `contract.d.ts` includes both old and new field shapes                                                        | Unit               | 1.4.4          | Emitter generation tests                              |
 | `validateContract()` parses new JSON and returns widened type with old fields                                         | Unit               | 1.3.5          | Bridge round-trip tests                               |
 | Shared domain validation runs as part of SQL `validateContract()`                                                     | Unit               | 1.3.2, 1.2.2   | Domain validation tests ported from mongo             |
-| ORM client, query builder, authoring surfaces not modified in Phase 1                                                 | Manual/CI          | 1.6.3          | Git diff verification — no changes to consumer `src/` |
-| All existing tests pass without modification (Phase 1)                                                                | CI                 | 1.5.7, 1.6.2   | Full test suite                                       |
-| ORM client reads from domain fields (Phase 2)                                                                         | Unit + Integration | 2.1–2.4        | ORM client test suite                                 |
-| No consumer reads `mappings` or top-level `relations` (Phase 2)                                                       | Manual + grep      | 2.8            | Code search verification                              |
-| `mappings` removed from `SqlContract` (Phase 3)                                                                       | Type test + CI     | 3.1, 3.7       | Compile-time verification                             |
-| Top-level `relations` removed (Phase 3)                                                                               | Type test + CI     | 3.2, 3.7       | Compile-time verification                             |
-| Old field shape removed (Phase 3)                                                                                     | Type test + CI     | 3.3, 3.7       | Compile-time verification                             |
-| `contract.d.ts` reflects final shape (Phase 3)                                                                        | Unit               | 3.4            | Emitter generation tests                              |
-| `ContractIR` mirrors emitted JSON (Phase 4)                                                                           | Unit + Integration | 4.5            | IR tests                                              |
-| `TargetFamilyHook` no longer owns domain-level type generation (Phase 5)                                              | Unit + Regression  | 5.4.1–5.4.3    | Byte-identical `.d.ts` output; updated hook unit tests |
-| New family hook only needs storage-specific methods (Phase 5)                                                          | Interface test     | 5.1.2, 5.3     | Hook interface conformance                            |
+| ORM client, query builder, authoring surfaces not modified in M1                                                      | Manual/CI          | 1.6.3          | Git diff verification — no changes to consumer `src/` |
+| All existing tests pass without modification (M1)                                                                     | CI                 | 1.5.7, 1.6.2   | Full test suite                                       |
+| ORM client reads from domain fields (M2)                                                                              | Unit + Integration | 2.1–2.4        | ORM client test suite                                 |
+| No consumer reads `mappings` or top-level `relations` (M2)                                                            | Manual + grep      | 2.8            | Code search verification                              |
+| Mongo emitter produces ADR 172/177 contract JSON and `.d.ts` (M3)                                                     | Unit               | 3.4            | Mongo emitter tests                                   |
+| Shared domain-level generation utilities used by Mongo hook (M3)                                                      | Unit + Regression  | 3.5            | SQL output unchanged after shared extraction          |
+| `mappings` removed from `SqlContract` (M4)                                                                            | Type test + CI     | 4.1, 4.7       | Compile-time verification                             |
+| Top-level `relations` removed (M4)                                                                                    | Type test + CI     | 4.2, 4.7       | Compile-time verification                             |
+| Old field shape removed (M4)                                                                                          | Type test + CI     | 4.3, 4.7       | Compile-time verification                             |
+| `contract.d.ts` reflects final shape (M4)                                                                             | Unit               | 4.4            | Emitter generation tests                              |
+| `ContractIR` mirrors emitted JSON (M5)                                                                                | Unit + Integration | 5.5            | IR tests                                              |
+| SQL hook uses shared domain-level generation (M6)                                                                     | Unit + Regression  | 6.3.1–6.3.3    | Byte-identical `.d.ts` output; updated hook unit tests |
+| `TargetFamilyHook` interface narrowed (M6)                                                                            | Interface test     | 6.2.1–6.2.2    | Both hooks conform to narrowed interface              |
 
 
 ## Open Items
 
-1. **Dual-format `normalizeContract()`.** Task 1.3.1 adds detection of old vs new JSON format in `normalizeContract()` to enable incremental fixture migration. This adds temporary complexity but significantly reduces risk — fixtures can be migrated across multiple PRs rather than atomically. The old-format path is removed in task 3.5.
+1. **Dual-format `normalizeContract()`.** Task 1.3.1 adds detection of old vs new JSON format in `normalizeContract()` to enable incremental fixture migration. This adds temporary complexity but significantly reduces risk — fixtures can be migrated across multiple PRs rather than atomically. The old-format path is removed in task 4.5.
 2. ~~**Spec open questions.**~~ **All resolved** (see spec § Open Questions):
   - `model.storage.fields` shape: `{ column: string }` only. Top-level `storage.tables` is the single source of truth for column metadata.
   - Relation join naming: `localFields`/`targetFields` (not `childCols`/`parentCols`).
-  - `roots` derivation: emitter derives for now; IR supplies in Phase 4.
+  - `roots` derivation: emitter derives for now; IR supplies in M5.
   - `model.relations` shape: per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), plain graph edges — no `strategy`. Owned models declare `"owner"` on the model itself.
-3. **Phase 2 coordination with Alexey.** The ORM client migration (tasks 2.1–2.5) touches core ORM internals. This must be sequenced to avoid conflicts with Alexey's active ORM development. The widened types from Phase 1 allow him to migrate incrementally.
-4. `**paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
+3. **M2 coordination with Alexey.** The ORM client migration (tasks 2.1–2.5) touches core ORM internals. This must be sequenced to avoid conflicts with Alexey's active ORM development. The widened types from M1 allow him to migrate incrementally.
+4. **`paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
+5. **M3 sequencing.** The Mongo emitter hook (M3) can run in parallel with M2 since it doesn't touch the SQL emitter. It establishes the shared domain-level generation API that M6 later migrates the SQL hook onto.
 
