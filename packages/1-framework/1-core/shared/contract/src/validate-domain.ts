@@ -69,8 +69,7 @@ function validateVariantsAndBases(
           );
           continue;
         }
-        const variantModel = contract.models[variantName];
-        if (!variantModel) continue;
+        const variantModel = contract.models[variantName]!;
         if (variantModel.base !== modelName) {
           errors.push(
             `Variant "${variantName}" has base "${variantModel.base ?? '(none)'}" but expected "${modelName}"`,
@@ -84,8 +83,7 @@ function validateVariantsAndBases(
         errors.push(`Model "${modelName}" has base "${model.base}" which does not exist in models`);
         continue;
       }
-      const baseModel = contract.models[model.base];
-      if (!baseModel) continue;
+      const baseModel = contract.models[model.base]!;
       if (!baseModel.variants || !Object.hasOwn(baseModel.variants, modelName)) {
         errors.push(
           `Model "${modelName}" has base "${model.base}" which does not list it as a variant`,

@@ -71,6 +71,23 @@ describe('validateContractDomain()', () => {
       expect(() => validateContractDomain(contract)).toThrow(/variant.*Ghost.*not exist/i);
     });
 
+    it('rejects variant whose base is undefined', () => {
+      const contract = makeValidContract({
+        roots: { items: 'Item' },
+        models: {
+          Item: makeMinimalModel({
+            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            discriminator: { field: 'type' },
+            variants: { Child: { value: 'child' } },
+          }),
+          Child: makeMinimalModel(),
+        },
+      });
+      expect(() => validateContractDomain(contract)).toThrow(
+        /variant.*Child.*base.*\(none\).*expected.*Item/i,
+      );
+    });
+
     it('rejects variant whose base does not match the declaring model', () => {
       const contract = makeValidContract({
         roots: { items: 'Item' },
@@ -121,6 +138,16 @@ describe('validateContractDomain()', () => {
   });
 
   describe('relation target validation', () => {
+    it('accepts models with undefined relations', () => {
+      const contract = makeValidContract({
+        roots: { items: 'Item' },
+        models: {
+          Item: { fields: {} },
+        },
+      });
+      expect(() => validateContractDomain(contract)).not.toThrow();
+    });
+
     it('accepts relations with valid targets', () => {
       const contract = makeValidContract({
         roots: { items: 'Item', users: 'User' },
