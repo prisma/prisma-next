@@ -1,37 +1,41 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma-no-emit/context';
-import { collect } from './utils';
+import { sql } from '../prisma-no-emit/context';
+
+async function collect<Row>(rows: AsyncIterable<Row>): Promise<Row[]> {
+  const result: Row[] = [];
+  for await (const row of rows) {
+    result.push(row);
+  }
+  return result;
+}
 
 export async function getUsersWithPosts(runtime: Runtime, limit = 10) {
-  const userTable = tables['user'];
-  const postTable = tables['post'];
+  const userTable = sql['user'];
+  const postTable = sql['post'];
   if (!userTable || !postTable) {
-    throw new Error('Missing user or post table in no-emit context');
+    throw new Error('Missing user or post query builder in no-emit context');
   }
 
-  const plan = sql
-    .from(userTable)
-    .includeMany(
-      postTable,
-      (on) => on.eqCol(userTable.columns.id, postTable.columns.userId),
-      (child) =>
-        child
-          .select({
-            id: postTable.columns.id,
-            title: postTable.columns.title,
-            createdAt: postTable.columns.createdAt,
-          })
-          .orderBy(postTable.columns.createdAt.desc()),
-      { alias: 'posts' },
-    )
-    .select({
-      id: userTable.columns.id,
-      email: userTable.columns.email,
-      createdAt: userTable.columns.createdAt,
-      posts: true,
-    })
-    .limit(limit)
-    .build();
+  const users = await collect(
+    runtime.execute(userTable.select('id', 'email', 'createdAt').limit(limit).build()),
+  );
 
-  return collect(runtime.execute(plan));
+  return Promise.all(
+    users.map(async (user) => {
+      const posts = await collect(
+        runtime.execute(
+          postTable
+            .select('id', 'title', 'createdAt')
+            .where((f, fns) => fns.eq(f.userId, user.id))
+            .orderBy('createdAt', { direction: 'desc' })
+            .build(),
+        ),
+      );
+
+      return {
+        ...user,
+        posts,
+      };
+    }),
+  );
 }

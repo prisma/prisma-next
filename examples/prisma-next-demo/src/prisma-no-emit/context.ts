@@ -2,11 +2,13 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 // No-emit workflow: use the TypeScript contract directly.
 import { contract } from '../../prisma/contract';
+import type { Contract } from '../prisma/contract.d';
 
 // pgvector was previously missing here; added for parity with the emit workflow config.
 export const stack = createSqlExecutionStack({
@@ -16,11 +18,13 @@ export const stack = createSqlExecutionStack({
   extensionPacks: [pgvector],
 });
 
+const validatedContract = validateContract<Contract>(contract);
+
 export const context = createExecutionContext({
-  contract,
+  contract: validatedContract,
   stack,
 });
 
 export const schema = schemaBuilder(context);
 export const tables = schema.tables;
-export const sql = sqlBuilder<typeof contract>({ context });
+export const sql = sqlBuilder<Contract>({ context });
