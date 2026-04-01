@@ -315,13 +315,13 @@ class SqlContractBuilder<
   build(): Target extends string
     ? ContractWithTypeMaps<
         SqlContract<
-          BuildStorage<Tables, Types>
+          BuildStorage<Tables, Types>,
+          BuildModels<Models>
         > & {
           readonly schemaVersion: '1';
           readonly target: Target;
           readonly targetFamily: 'sql';
           readonly storageHash: StorageHash extends string ? StorageHash : string;
-          readonly models: BuildModels<Models>;
         } & (ExtensionPacks extends Record<string, unknown>
             ? { readonly extensionPacks: ExtensionPacks }
             : Record<string, never>) &
@@ -334,13 +334,13 @@ class SqlContractBuilder<
     type BuiltContract = Target extends string
       ? ContractWithTypeMaps<
           SqlContract<
-            BuildStorage<Tables, Types>
+            BuildStorage<Tables, Types>,
+            BuildModels<Models>
           > & {
             readonly schemaVersion: '1';
             readonly target: Target;
             readonly targetFamily: 'sql';
             readonly storageHash: StorageHash extends string ? StorageHash : string;
-            readonly models: BuildModels<Models>;
           } & (ExtensionPacks extends Record<string, unknown>
               ? { readonly extensionPacks: ExtensionPacks }
               : Record<string, never>) &
