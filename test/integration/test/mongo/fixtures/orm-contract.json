@@ -12,7 +12,10 @@
   },
   "models": {
     "Task": {
-      "storage": { "collection": "tasks" },
+      "storage": {
+        "collection": "tasks",
+        "relations": { "comments": { "field": "comments" } }
+      },
       "fields": {
         "_id": { "codecId": "mongo/objectId@1", "nullable": false },
         "title": { "codecId": "mongo/string@1", "nullable": false },
@@ -23,7 +26,6 @@
         "assignee": {
           "to": "User",
           "cardinality": "N:1",
-          "strategy": "reference",
           "on": {
             "localFields": ["assigneeId"],
             "targetFields": ["_id"]
@@ -31,9 +33,7 @@
         },
         "comments": {
           "to": "Comment",
-          "cardinality": "1:N",
-          "strategy": "embed",
-          "field": "comments"
+          "cardinality": "1:N"
         }
       },
       "discriminator": { "field": "type" },
@@ -60,7 +60,10 @@
       "base": "Task"
     },
     "User": {
-      "storage": { "collection": "users" },
+      "storage": {
+        "collection": "users",
+        "relations": { "addresses": { "field": "addresses" } }
+      },
       "fields": {
         "_id": { "codecId": "mongo/objectId@1", "nullable": false },
         "name": { "codecId": "mongo/string@1", "nullable": false },
@@ -69,9 +72,7 @@
       "relations": {
         "addresses": {
           "to": "Address",
-          "cardinality": "1:N",
-          "strategy": "embed",
-          "field": "addresses"
+          "cardinality": "1:N"
         }
       }
     },
@@ -82,7 +83,8 @@
         "city": { "codecId": "mongo/string@1", "nullable": false },
         "zip": { "codecId": "mongo/string@1", "nullable": false }
       },
-      "relations": {}
+      "relations": {},
+      "owner": "User"
     },
     "Comment": {
       "storage": {},
@@ -91,7 +93,8 @@
         "text": { "codecId": "mongo/string@1", "nullable": false },
         "createdAt": { "codecId": "mongo/date@1", "nullable": false }
       },
-      "relations": {}
+      "relations": {},
+      "owner": "Task"
     }
   }
 }

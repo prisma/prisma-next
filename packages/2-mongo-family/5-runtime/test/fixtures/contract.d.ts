@@ -17,7 +17,6 @@ type UserModel = {
     readonly posts: {
       readonly to: 'Post';
       readonly cardinality: '1:N';
-      readonly strategy: 'reference';
       readonly on: {
         readonly localFields: readonly ['_id'];
         readonly targetFields: readonly ['authorId'];
@@ -43,7 +42,6 @@ type PostModel = {
     readonly author: {
       readonly to: 'User';
       readonly cardinality: 'N:1';
-      readonly strategy: 'reference';
       readonly on: {
         readonly localFields: readonly ['authorId'];
         readonly targetFields: readonly ['_id'];

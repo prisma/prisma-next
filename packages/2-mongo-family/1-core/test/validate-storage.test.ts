@@ -29,20 +29,19 @@ describe('validateMongoStorage()', () => {
         models: {
           Item: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
-            storage: { collection: 'items' },
+            storage: {
+              collection: 'items',
+              relations: { tags: { field: 'tags' } },
+            },
             relations: {
-              tags: {
-                to: 'Tag',
-                cardinality: '1:N' as const,
-                strategy: 'embed' as const,
-                field: 'tags',
-              },
+              tags: { to: 'Tag', cardinality: '1:N' as const },
             },
           },
           Tag: {
             fields: { name: { codecId: 'mongo/string@1', nullable: false } },
             storage: { collection: 'tags' },
             relations: {},
+            owner: 'Item',
           },
         },
       });
@@ -54,20 +53,19 @@ describe('validateMongoStorage()', () => {
         models: {
           Item: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
-            storage: { collection: 'items' },
+            storage: {
+              collection: 'items',
+              relations: { tags: { field: 'tags' } },
+            },
             relations: {
-              tags: {
-                to: 'Tag',
-                cardinality: '1:N' as const,
-                strategy: 'embed' as const,
-                field: 'tags',
-              },
+              tags: { to: 'Tag', cardinality: '1:N' as const },
             },
           },
           Tag: {
             fields: { name: { codecId: 'mongo/string@1', nullable: false } },
             storage: {},
             relations: {},
+            owner: 'Item',
           },
         },
       });
@@ -86,7 +84,6 @@ describe('validateMongoStorage()', () => {
               owner: {
                 to: 'User',
                 cardinality: 'N:1' as const,
-                strategy: 'reference' as const,
                 on: { localFields: ['ownerId'], targetFields: ['_id'] },
               },
             },
@@ -116,7 +113,6 @@ describe('validateMongoStorage()', () => {
               owner: {
                 to: 'User',
                 cardinality: 'N:1' as const,
-                strategy: 'reference' as const,
                 on: { localFields: ['ownerId'], targetFields: ['userId'] },
               },
             },
@@ -147,7 +143,6 @@ describe('validateMongoStorage()', () => {
               owner: {
                 to: 'User',
                 cardinality: 'N:1' as const,
-                strategy: 'reference' as const,
                 on: { localFields: ['ownerId'], targetFields: ['_id'] },
               },
             },
