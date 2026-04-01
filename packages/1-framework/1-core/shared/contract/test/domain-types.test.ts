@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { DomainField, DomainModel, DomainRelation } from '../src/domain-types';
+import type {
+  DomainEmbedRelation,
+  DomainField,
+  DomainModel,
+  DomainReferenceRelation,
+  DomainRelation,
+} from '../src/domain-types';
 import type { ContractBase } from '../src/types';
+
+type AssertExtends<T, U> = T extends U ? true : never;
 
 describe('domain types', () => {
   it('ContractBase includes roots and models', () => {
@@ -26,23 +34,49 @@ describe('domain types', () => {
     expect(field.codecId).toBe('pg/text@1');
   });
 
-  it('DomainRelation carries to, cardinality, and optional on', () => {
-    const relation: DomainRelation = {
+  it('DomainReferenceRelation requires on and allows all cardinalities', () => {
+    const relation: DomainReferenceRelation = {
       to: 'Post',
       cardinality: '1:N',
       on: { localFields: ['id'], targetFields: ['userId'] },
     };
     expect(relation.to).toBe('Post');
-    expect(relation.on?.localFields).toEqual(['id']);
+    expect(relation.on.localFields).toEqual(['id']);
+
+    const _extendsRelation: AssertExtends<DomainReferenceRelation, DomainRelation> = true;
+    expect(_extendsRelation).toBe(true);
   });
 
-  it('DomainRelation without on clause (owned relation)', () => {
-    const relation: DomainRelation = {
+  it('DomainEmbedRelation has no on and excludes N:1 cardinality', () => {
+    const relation: DomainEmbedRelation = {
       to: 'Address',
       cardinality: '1:N',
     };
     expect(relation.to).toBe('Address');
-    expect(relation.on).toBeUndefined();
+    expect('on' in relation).toBe(false);
+
+    const _extendsRelation: AssertExtends<DomainEmbedRelation, DomainRelation> = true;
+    expect(_extendsRelation).toBe(true);
+
+    // N:1 is reference-only — not assignable to DomainEmbedRelation
+    const _n1NotEmbed: AssertExtends<{ to: string; cardinality: 'N:1' }, DomainEmbedRelation> =
+      // @ts-expect-error — N:1 is not assignable to '1:1' | '1:N'
+      true;
+    expect(_n1NotEmbed).toBe(true);
+  });
+
+  it('DomainRelation is a union of reference and embed', () => {
+    const ref: DomainRelation = {
+      to: 'Post',
+      cardinality: 'N:1',
+      on: { localFields: ['postId'], targetFields: ['id'] },
+    };
+    const embed: DomainRelation = {
+      to: 'Address',
+      cardinality: '1:1',
+    };
+    expect(ref.to).toBe('Post');
+    expect(embed.to).toBe('Address');
   });
 
   it('DomainModel supports polymorphism fields', () => {
