@@ -21,6 +21,9 @@ catalogs:
     gray-matter:
       specifier: ^4.0.3
       version: 4.0.3
+    mongodb:
+      specifier: ^6.16.0
+      version: 6.21.0
     pg:
       specifier: 8.16.3
       version: 8.16.3
@@ -107,7 +110,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/5-runtime
       mongodb:
-        specifier: ^6.16.0
+        specifier: 'catalog:'
         version: 6.21.0
       react:
         specifier: ^19.2.4
@@ -945,7 +948,7 @@ importers:
         specifier: workspace:*
         version: link:../../0-config/tsdown
       mongodb:
-        specifier: ^6.16.0
+        specifier: 'catalog:'
         version: 6.21.0
       mongodb-memory-server:
         specifier: ^10.4.0
@@ -1689,7 +1692,7 @@ importers:
         specifier: workspace:*
         version: link:../../2-mongo-family/1-core
       mongodb:
-        specifier: ^6.16.0
+        specifier: 'catalog:'
         version: 6.21.0
     devDependencies:
       '@prisma-next/contract':
@@ -1720,7 +1723,7 @@ importers:
         specifier: workspace:*
         version: link:../../2-mongo-family/1-core
       mongodb:
-        specifier: ^6.16.0
+        specifier: 'catalog:'
         version: 6.21.0
     devDependencies:
       '@prisma-next/test-utils':
@@ -2125,7 +2128,7 @@ importers:
         specifier: ^12.1.0
         version: 12.1.0
       mongodb:
-        specifier: ^6.16.0
+        specifier: 'catalog:'
         version: 6.21.0
       mongodb-memory-server:
         specifier: ^10.4.0
