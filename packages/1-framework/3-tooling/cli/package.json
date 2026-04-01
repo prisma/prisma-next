@@ -93,6 +93,10 @@
       "types": "./dist/commands/contract-infer.d.mts",
       "import": "./dist/commands/contract-infer.mjs"
     },
+    "./commands/migration-new": {
+      "types": "./dist/commands/migration-new.d.mts",
+      "import": "./dist/commands/migration-new.mjs"
+    },
     "./commands/migration-plan": {
       "types": "./dist/commands/migration-plan.d.mts",
       "import": "./dist/commands/migration-plan.mjs"

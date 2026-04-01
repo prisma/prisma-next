@@ -15,6 +15,7 @@ import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
+import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
 import { createMigrationRefCommand } from '@prisma-next/cli/commands/migration-ref';
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
@@ -335,6 +336,13 @@ export async function runMigrationPlan(
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
   return runCommand(createMigrationPlanCommand(), ctx, extraArgs);
+}
+
+export async function runMigrationNew(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createMigrationNewCommand(), ctx, extraArgs);
 }
 
 export async function runMigrationApply(

@@ -13,6 +13,7 @@ export default defineConfig({
     'src/commands/db-verify.ts',
     'src/commands/contract-emit.ts',
     'src/commands/migration-apply.ts',
+    'src/commands/migration-new.ts',
     'src/commands/migration-plan.ts',
     'src/commands/migration-ref.ts',
     'src/commands/migration-show.ts',

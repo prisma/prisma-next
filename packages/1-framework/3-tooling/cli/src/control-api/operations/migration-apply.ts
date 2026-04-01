@@ -118,7 +118,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     // apply time — the planner already decided what to emit. Restricting here
     // would be a tautology (the allowed set would just mirror what's in ops).
     const policy = {
-      allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
+      allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
     };
 
     // EMPTY_CONTRACT_HASH means "no prior state" — the runner expects origin: null
