@@ -20,13 +20,11 @@ export { createTable, TableBuilder } from './table-builder';
 export type {
   BuildModelFields,
   BuildModels,
-  BuildRelations,
   BuildStorage,
   BuildStorageColumn,
   BuildStorageTables,
   ExtractColumns,
   ExtractModelFields,
-  ExtractModelRelations,
   ExtractPrimaryKey,
   Mutable,
 } from './types';
