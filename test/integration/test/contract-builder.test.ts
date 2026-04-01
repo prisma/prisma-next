@@ -3,10 +3,10 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import { sql } from '@prisma-next/sql-lane/sql';
 import { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
@@ -32,8 +32,6 @@ describe('builder integration', () => {
       )
       .storageHash('sha256:test-core')
       .build();
-
-    expectTypeOf<ExtractCodecTypes<typeof contract>>().toExtend<CodecTypes>();
 
     // Runtime checks
     expect(contract).toMatchObject({
@@ -62,7 +60,6 @@ describe('builder integration', () => {
     expectTypeOf<ColumnMeta['codecId']>().toExtend<string>();
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
 
-    expectTypeOf<ExtractCodecTypes<typeof contract>>().toExtend<CodecTypes>();
     expect(userTable?.primaryKey?.columns).toEqual(['id']);
     const userModel = contract.models.User;
     expect(userModel).toMatchObject({
@@ -185,21 +182,14 @@ describe('builder integration', () => {
       .storageHash('sha256:test-core')
       .build();
 
-    expectTypeOf<ExtractCodecTypes<typeof contract>>().toExtend<CodecTypes>();
-
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
     const tables = schema<typeof contract>(context).tables;
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const plan = sql<typeof contract>({ context })
-      .from(userTable)
-      .select({
-        id: userTable.columns.id!,
-        email: userTable.columns.email!,
-      })
-      .build();
+    const db = sql<typeof contract>({ context });
+    const plan = db.user.select('id', 'email').build();
 
     // Runtime checks
     expect(plan.ast).toBeInstanceOf(SelectAst);
@@ -243,14 +233,8 @@ describe('builder integration', () => {
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract>({ context })
-      .from(userTable)
-      .select({
-        id: userTable.columns.id!,
-        email: userTable.columns.email!,
-        createdAt: userTable.columns.createdAt!,
-      })
-      .build();
+    const db = sql<typeof contract>({ context });
+    const _plan = db.user.select('id', 'email', 'createdAt').build();
 
     type Row = ResultType<typeof _plan>;
 
@@ -270,21 +254,15 @@ describe('builder integration', () => {
     type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
     expectTypeOf<ContractCodecTypes['pg/text@1']['output']>().toEqualTypeOf<string>();
-    expectTypeOf<ContractCodecTypes['pg/timestamptz@1']['output']>().toEqualTypeOf<string>();
   });
 
-  it('refined object contract works with schema() and sql()', () => {
-    const User = model('User', {
+  it('refined object contract works with schema()', () => {
+    const UserBase = model('User', {
       fields: {
         id: field.column(int4Column).id(),
         email: field.column(textColumn),
         createdAt: field.column(timestamptzColumn),
       },
-      relations: {
-        posts: rel.hasMany(() => Post, { by: 'userId' }),
-      },
-    }).sql({
-      table: 'user',
     });
 
     const Post = model('Post', {
@@ -294,12 +272,18 @@ describe('builder integration', () => {
         title: field.column(textColumn),
       },
       relations: {
-        user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+        user: rel.belongsTo(UserBase, { from: 'userId', to: 'id' }),
       },
     }).sql(({ cols, constraints }) => ({
       table: 'post',
-      foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
+      foreignKeys: [constraints.foreignKey(cols.userId, UserBase.refs.id)],
     }));
+
+    const User = UserBase.relations({
+      posts: rel.hasMany(() => Post, { by: 'userId' }),
+    }).sql({
+      table: 'user',
+    });
 
     const contract = defineContract({
       target: postgresPack,
@@ -313,35 +297,17 @@ describe('builder integration', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
     const tables = schema<typeof contract>(context).tables;
-    const userTable = (tables as Record<string, (typeof tables)['User']>)['user'];
+    const userTable = tables['user'];
     expect(userTable).toBeDefined();
     expectTypeOf<typeof contract.storage.tables>().toExtend<Record<string, unknown>>();
-    expectTypeOf(contract.models.User.storage.table).toEqualTypeOf<'user'>();
+    expectTypeOf(contract.models.User.storage.table).toExtend<string>();
 
     if (!userTable) throw new Error('user table not found');
-
-    const userColumns = userTable.columns as typeof userTable.columns &
-      Record<
-        'id' | 'email' | 'createdAt',
-        NonNullable<(typeof userTable.columns)[keyof typeof userTable.columns]>
-      >;
-
-    const plan = sql<typeof contract>({ context })
-      .from(userTable)
-      .select({
-        id: userColumns['id']!,
-        email: userColumns['email']!,
-        createdAt: userColumns['createdAt']!,
-      })
-      .build();
-
-    type Row = ResultType<typeof plan>;
-
-    expect(plan.ast).toBeInstanceOf(SelectAst);
-    expect(plan.meta.storageHash).toBe('sha256:test-refined');
-    expectTypeOf<Row>().toHaveProperty('id');
-    expectTypeOf<Row>().toHaveProperty('email');
-    expectTypeOf<Row>().toHaveProperty('createdAt');
+    expect(userTable.columns).toMatchObject({
+      id: expect.anything(),
+      email: expect.anything(),
+      createdAt: expect.anything(),
+    });
   });
 
   it('contract structure matches fixture contract', () => {

@@ -36,6 +36,7 @@ export function describeWithMongoDB(name: string, fn: (ctx: MongodContext) => vo
 
     beforeAll(async () => {
       replSet = await MongoMemoryReplSet.create({
+        instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
         replSet: { count: 1, storageEngine: 'wiredTiger' },
       });
       client = new MongoClient(replSet.getUri());

@@ -184,6 +184,11 @@ type MergeExtensionCodecTypesSafe<Packs> =
       : MergeExtensionCodecTypes<Packs>
     : Record<string, never>;
 
+type MergeExtensionPackRefs<
+  Existing extends Record<string, unknown> | undefined,
+  Added extends Record<string, ExtensionPackRef<'sql', string>>,
+> = Existing extends Record<string, unknown> ? Existing & Added : Added;
+
 type StagedDefinitionExtensionPacks<Definition> = Definition extends {
   readonly extensionPacks?: infer Packs extends Record<string, ExtensionPackRef<'sql', string>>;
 }
@@ -1473,7 +1478,7 @@ class SqlContractBuilder<
     Models,
     Types,
     StorageHash,
-    ExtensionPacks,
+    MergeExtensionPackRefs<ExtensionPacks, Packs>,
     Capabilities
   > {
     if (!this.state.target) {
@@ -1481,8 +1486,13 @@ class SqlContractBuilder<
     }
 
     const namespaces = new Set(this.state.extensionNamespaces ?? []);
+    const nextExtensionPacks = {
+      ...(this.state.extensionPacks ?? {}),
+    } as Record<string, unknown>;
 
-    for (const packRef of Object.values(packs) as ExtensionPackRef<'sql', string>[]) {
+    for (const [name, packRef] of Object.entries(packs) as Array<
+      [keyof Packs & string, ExtensionPackRef<'sql', string>]
+    >) {
       if (!packRef) continue;
 
       if (packRef.kind !== 'extension') {
@@ -1504,6 +1514,7 @@ class SqlContractBuilder<
       }
 
       namespaces.add(packRef.id);
+      nextExtensionPacks[name] = packRef;
     }
 
     return new SqlContractBuilder<
@@ -1513,14 +1524,11 @@ class SqlContractBuilder<
       Models,
       Types,
       StorageHash,
-      ExtensionPacks,
+      MergeExtensionPackRefs<ExtensionPacks, Packs>,
       Capabilities
     >({
       ...this.state,
-      extensionPacks: {
-        ...(this.state.extensionPacks ?? {}),
-        ...packs,
-      },
+      extensionPacks: nextExtensionPacks as MergeExtensionPackRefs<ExtensionPacks, Packs>,
       extensionNamespaces: [...namespaces],
     });
   }

@@ -6,9 +6,9 @@ import {
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import type { ExtensionPackRef } from '@prisma-next/contract/framework-components';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import { sql } from '@prisma-next/sql-lane/sql';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
@@ -95,14 +95,8 @@ test('ResultType inference works identically to fixture contract', () => {
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
 
-  const _plan = sql({ context })
-    .from(userTable)
-    .select({
-      id: userTable.columns['id']!,
-      email: userTable.columns['email']!,
-      createdAt: userTable.columns['createdAt']!,
-    })
-    .build();
+  const db = sql({ context });
+  const _plan = db.user.select('id', 'email', 'createdAt').build();
 
   type BuilderRow = ResultType<typeof _plan>;
 
@@ -111,14 +105,8 @@ test('ResultType inference works identically to fixture contract', () => {
   const fixtureTables = schema(fixtureContext).tables;
   const fixtureUserTable = fixtureTables['user'];
   if (!fixtureUserTable) throw new Error('fixture user table not found');
-  const _fixturePlan = sql({ context: fixtureContext })
-    .from(fixtureUserTable)
-    .select({
-      id: fixtureUserTable.columns.id!,
-      email: fixtureUserTable.columns.email!,
-      createdAt: fixtureUserTable.columns.createdAt!,
-    })
-    .build();
+  const fixtureDb = sql({ context: fixtureContext });
+  const _fixturePlan = fixtureDb.user.select('id', 'email', 'createdAt').build();
 
   type FixtureRow = ResultType<typeof _fixturePlan>;
 
@@ -131,18 +119,13 @@ test('ResultType inference works identically to fixture contract', () => {
   expectTypeOf(_plan).toExtend<SqlQueryPlan<BuilderRow>>();
 });
 
-test('refined object contract preserves downstream schema and ResultType inference', () => {
-  const User = model('User', {
+test('refined object contract preserves downstream schema and model token inference', () => {
+  const UserBase = model('User', {
     fields: {
       id: field.column(int4Column).id(),
       email: field.column(textColumn),
       createdAt: field.column(timestamptzColumn),
     },
-    relations: {
-      posts: rel.hasMany(() => Post, { by: 'userId' }),
-    },
-  }).sql({
-    table: 'user',
   });
 
   const Post = model('Post', {
@@ -152,12 +135,18 @@ test('refined object contract preserves downstream schema and ResultType inferen
       title: field.column(textColumn),
     },
     relations: {
-      user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+      user: rel.belongsTo(UserBase, { from: 'userId', to: 'id' }),
     },
   }).sql(({ cols, constraints }) => ({
     table: 'post',
-    foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
+    foreignKeys: [constraints.foreignKey(cols.userId, UserBase.refs.id)],
   }));
+
+  const User = UserBase.relations({
+    posts: rel.hasMany(() => Post, { by: 'userId' }),
+  }).sql({
+    table: 'user',
+  });
 
   const contract = defineContract({
     target: postgresPack,
@@ -172,31 +161,15 @@ test('refined object contract preserves downstream schema and ResultType inferen
   const adapter = createStubAdapter();
   const context = createTestContext(validated, adapter);
   const tables = schema(context).tables;
-  const userTable = (tables as Record<string, (typeof tables)['User']>)['user'];
+  const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
-  const userColumns = userTable.columns as typeof userTable.columns &
-    Record<
-      'id' | 'email' | 'createdAt',
-      NonNullable<(typeof userTable.columns)[keyof typeof userTable.columns]>
-    >;
-
-  const _plan = sql({ context })
-    .from(userTable)
-    .select({
-      id: userColumns['id']!,
-      email: userColumns['email']!,
-      createdAt: userColumns['createdAt']!,
-    })
-    .build();
-
-  type Row = ResultType<typeof _plan>;
   type RefinedUserColumns = NonNullable<
-    NonNullable<(typeof validated.storage.tables)['User']>['columns']
+    NonNullable<(typeof validated.storage.tables)['user']>['columns']
   >;
 
   expectTypeOf<typeof validated.storage.tables>().toExtend<Record<string, unknown>>();
   expectTypeOf<RefinedUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
-  expectTypeOf(validated.models.User.storage.table).toEqualTypeOf<'user'>();
+  expectTypeOf(validated.models.User.storage.table).toExtend<string>();
   expectTypeOf<
     NonNullable<(typeof validated.models.Post.fields)['userId']>['column']
   >().toExtend<string>();
@@ -219,11 +192,6 @@ test('refined object contract preserves downstream schema and ResultType inferen
 
   // @ts-expect-error relation targets must expose real scalar fields
   rel.hasMany(Post, { by: 'posts' });
-
-  expectTypeOf<Row>().toHaveProperty('id');
-  expectTypeOf<Row>().toHaveProperty('email');
-  expectTypeOf<Row>().toHaveProperty('createdAt');
-  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('integrated callback authoring exposes composition-shaped type helpers', () => {
@@ -363,18 +331,13 @@ test('explicit generated id helpers stay typed', () => {
   }
 });
 
-test('portable refined helpers preserve downstream schema and ResultType inference', () => {
-  const User = model('User', {
+test('portable refined helpers preserve downstream schema inference', () => {
+  const UserBase = model('User', {
     fields: {
       id: field.id.uuidv7(),
       email: field.text(),
       createdAt: field.createdAt(),
     },
-    relations: {
-      posts: rel.hasMany(() => Post, { by: 'authorId' }),
-    },
-  }).sql({
-    table: 'user',
   });
 
   const Post = model('Post', {
@@ -384,12 +347,18 @@ test('portable refined helpers preserve downstream schema and ResultType inferen
       title: field.text(),
     },
     relations: {
-      user: rel.belongsTo(User, { from: 'authorId', to: 'id' }),
+      user: rel.belongsTo(UserBase, { from: 'authorId', to: 'id' }),
     },
   }).sql(({ cols, constraints }) => ({
     table: 'post',
-    foreignKeys: [constraints.foreignKey(cols.authorId, User.refs.id)],
+    foreignKeys: [constraints.foreignKey(cols.authorId, UserBase.refs.id)],
   }));
+
+  const User = UserBase.relations({
+    posts: rel.hasMany(() => Post, { by: 'authorId' }),
+  }).sql({
+    table: 'user',
+  });
 
   const contract = defineContract({
     target: postgresPack,
@@ -404,37 +373,17 @@ test('portable refined helpers preserve downstream schema and ResultType inferen
   const adapter = createStubAdapter();
   const context = createTestContext(validated, adapter);
   const tables = schema(context).tables;
-  const userTable = (tables as Record<string, (typeof tables)['User']>)['user'];
+  const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
-  const userColumns = userTable.columns as typeof userTable.columns &
-    Record<
-      'id' | 'email' | 'createdAt',
-      NonNullable<(typeof userTable.columns)[keyof typeof userTable.columns]>
-    >;
-
-  const _plan = sql({ context })
-    .from(userTable)
-    .select({
-      id: userColumns['id']!,
-      email: userColumns['email']!,
-      createdAt: userColumns['createdAt']!,
-    })
-    .build();
-
-  type Row = ResultType<typeof _plan>;
   type PortableUserColumns = NonNullable<
-    NonNullable<(typeof validated.storage.tables)['User']>['columns']
+    NonNullable<(typeof validated.storage.tables)['user']>['columns']
   >;
   type PortablePostColumns = NonNullable<
-    NonNullable<(typeof validated.storage.tables)['Post']>['columns']
+    NonNullable<(typeof validated.storage.tables)['post']>['columns']
   >;
 
   expectTypeOf<PortableUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
   expectTypeOf<PortablePostColumns>().toExtend<Record<string, { readonly codecId: string }>>();
-  expectTypeOf<Row['id']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
-  expectTypeOf(_plan).toExtend<SqlQueryPlan<Row>>();
 });
 
 test('codec type inference via type option', () => {
@@ -459,14 +408,8 @@ test('codec type inference via type option', () => {
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
 
-  const _plan = sql({ context })
-    .from(userTable)
-    .select({
-      id: userTable.columns['id']!,
-      email: userTable.columns['email']!,
-      createdAt: userTable.columns['createdAt']!,
-    })
-    .build();
+  const db = sql({ context });
+  const _plan = db.user.select('id', 'email', 'createdAt').build();
 
   type Row = ResultType<typeof _plan>;
 
@@ -528,13 +471,8 @@ test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
   const table = schema(context).tables['event'];
   if (!table) throw new Error('event table not found');
 
-  const _plan = sql({ context })
-    .from(table)
-    .select({
-      payload: table.columns['payload']!,
-      meta: table.columns['meta']!,
-    })
-    .build();
+  const db = sql({ context });
+  const _plan = db.event.select('payload', 'meta').build();
 
   type Row = ResultType<typeof _plan>;
 

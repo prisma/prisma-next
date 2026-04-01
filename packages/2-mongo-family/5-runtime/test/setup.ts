@@ -6,6 +6,7 @@ import type {
   MongoLoweringContext,
   MongoQueryPlan,
 } from '@prisma-next/mongo-core';
+import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createMongoRuntime, type MongoRuntime } from '../src/mongo-runtime';
@@ -27,6 +28,7 @@ const stubMeta: PlanMeta = {
 
 export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Promise<T> {
   const replSet = await MongoMemoryReplSet.create({
+    instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
     replSet: { count: 1, storageEngine: 'wiredTiger' },
   });
   const connectionUri = replSet.getUri();

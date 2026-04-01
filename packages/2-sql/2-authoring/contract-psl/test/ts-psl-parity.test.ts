@@ -170,7 +170,7 @@ function buildTsContract() {
         Embedding1536: type.pgvector.vector(1536),
       } as const;
 
-      const User = model('User', {
+      const UserBase = model('User', {
         fields: {
           id: field.column(int4Column).id({ name: 'user_pkey' }),
           email: field.text().unique({ name: 'user_email_key' }),
@@ -178,11 +178,6 @@ function buildTsContract() {
           embedding: field.namedType(types.Embedding1536).optional(),
           createdAt: field.createdAt(),
         },
-        relations: {
-          posts: rel.hasMany(() => Post, { by: 'authorId' }),
-        },
-      }).sql({
-        table: 'user',
       });
 
       const Post = model('Post', {
@@ -192,18 +187,24 @@ function buildTsContract() {
           title: field.text(),
         },
         relations: {
-          author: rel.belongsTo(User, { from: 'authorId', to: 'id' }),
+          author: rel.belongsTo(UserBase, { from: 'authorId', to: 'id' }),
         },
       }).sql(({ cols, constraints }) => ({
         table: 'post',
         indexes: [constraints.index(cols.authorId, { name: 'post_author_id_idx' })],
         foreignKeys: [
-          constraints.foreignKey(cols.authorId, User.refs.id, {
+          constraints.foreignKey(cols.authorId, UserBase.refs.id, {
             name: 'post_author_id_fkey',
             onDelete: 'cascade',
           }),
         ],
       }));
+
+      const User = UserBase.relations({
+        posts: rel.hasMany(() => Post, { by: 'authorId' }),
+      }).sql({
+        table: 'user',
+      });
 
       return {
         types,
@@ -238,6 +239,7 @@ describe('TS and PSL authoring parity', () => {
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
       composedExtensionPacks: ['pgvector'],
+      composedExtensionPackRefs: [pgvectorExtensionPack],
     });
 
     expect(interpreted.ok).toBe(true);

@@ -128,6 +128,58 @@ describe('enrichContractIR', () => {
     });
   });
 
+  it('replaces runtime-only extension pack fields with normalized metadata', () => {
+    const extension = makeExtension({
+      capabilities: { postgres: { 'pgvector/cosine': true } },
+      types: {
+        codecTypes: {
+          import: {
+            package: '@prisma-next/extension-pgvector/codec-types',
+            named: 'CodecTypes',
+            alias: 'PgVectorTypes',
+          },
+        },
+      },
+    });
+
+    const result = enrichContractIR(
+      makeIR({
+        extensionPacks: {
+          pgvector: {
+            kind: 'extension',
+            id: 'pgvector',
+            familyId: 'sql',
+            targetId: 'postgres',
+            version: '0.0.1',
+            create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+            authoring: { type: { pgvector: {} } },
+          },
+        },
+      }),
+      [extension],
+    );
+
+    expect(result.extensionPacks).toEqual({
+      pgvector: {
+        kind: 'extension',
+        id: 'pgvector',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        capabilities: { postgres: { 'pgvector/cosine': true } },
+        types: {
+          codecTypes: {
+            import: {
+              package: '@prisma-next/extension-pgvector/codec-types',
+              named: 'CodecTypes',
+              alias: 'PgVectorTypes',
+            },
+          },
+        },
+      },
+    });
+  });
+
   it('strips controlPlaneHooks from extension pack metadata', () => {
     const extension = makeExtension({
       types: {
