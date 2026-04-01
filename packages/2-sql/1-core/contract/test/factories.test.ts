@@ -283,7 +283,7 @@ describe('SQL contract factories', () => {
   });
 
   describe('model', () => {
-    it('creates model storage fields and domain field placeholders', () => {
+    it('creates model storage fields and domain fields without optional properties', () => {
       const userModel = model('user', {
         id: { column: 'id' },
         email: { column: 'email' },
@@ -301,6 +301,19 @@ describe('SQL contract factories', () => {
           email: {},
         },
         relations: {},
+      });
+    });
+
+    it('propagates codecId and nullable from storage fields to domain fields', () => {
+      const userModel = model('user', {
+        id: { column: 'id', codecId: 'pg/int4@1', nullable: false },
+        name: { column: 'name', codecId: 'pg/text@1', nullable: true },
+        email: { column: 'email' },
+      });
+      expect(userModel.fields).toEqual({
+        id: { codecId: 'pg/int4@1', nullable: false },
+        name: { codecId: 'pg/text@1', nullable: true },
+        email: {},
       });
     });
 
