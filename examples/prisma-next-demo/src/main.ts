@@ -1,6 +1,11 @@
 /**
  * CLI Application Entry Point (Emitted Contract Workflow)
  *
+ * This is a command-line demo application that showcases Prisma Next's query
+ * capabilities using the standard emitted contract workflow:
+ * - contract.json (runtime contract data)
+ * - contract.d.ts (compile-time types)
+ *
  * Run with: pnpm start -- <command> [args]
  *
  * Available commands:
@@ -8,8 +13,6 @@
  * - user <id>                  Get user by ID
  * - posts <userId>             Get posts for a user
  * - repo-users [limit]         Users via ORM client API
- * - repo-users-wherearg <kind> [positive-limit]
- *                              Users via ORM ToWhereExpr filter interop
  * - repo-admins [limit]        Admin users via custom collection scope
  * - repo-user <email>          Find a user by email via ORM client first()
  * - repo-posts <userId> [limit] Posts for a user via ORM client API
@@ -27,7 +30,9 @@
  * - repo-upsert-user <id> <email> <kind>
  *                              upsert() example for id conflict
  * - users-paginate [cursor]    Cursor-based pagination
+ * - similarity-search <vec>    Vector similarity search (pgvector)
  * - budget-violation           Demo budget enforcement error
+ * - guardrail-delete           Demo AST lint blocking DELETE without WHERE
  *
  * See also:
  * - main-no-emit.ts: Same CLI using inline contract (no emission step)
@@ -46,9 +51,9 @@ import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { ormClientGetUsers } from './orm-client/get-users';
 import { ormClientGetUsersBackwardCursor } from './orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
-import { ormClientGetUsersViaWhereArg } from './orm-client/get-users-via-wherearg';
 import { ormClientUpsertUser } from './orm-client/upsert-user';
 import { db } from './prisma/db';
+import { deleteWithoutWhere } from './queries/delete-without-where';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
@@ -94,20 +99,6 @@ async function main() {
     } else if (cmd === 'repo-admins') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await ormClientGetAdminUsers(limit, runtime);
-
-      console.log(JSON.stringify(users, null, 2));
-    } else if (cmd === 'repo-users-wherearg') {
-      const [kind, limitStr] = args;
-      if (kind !== 'admin' && kind !== 'user') {
-        console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [positive-limit]');
-        process.exit(1);
-      }
-      const limit = limitStr === undefined ? 10 : Number(limitStr);
-      if (!Number.isSafeInteger(limit) || limit <= 0) {
-        console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [positive-limit]');
-        process.exit(1);
-      }
-      const users = await ormClientGetUsersViaWhereArg(kind, limit, runtime);
 
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-user') {
@@ -260,7 +251,7 @@ async function main() {
     } else if (cmd === 'guardrail-delete') {
       console.log('Running DELETE without WHERE to demonstrate AST-based lint guardrail...');
       try {
-        await db.sql.user.delete().first();
+        await deleteWithoutWhere();
         console.error('Unexpected: query should have been blocked by LINT.DELETE_WITHOUT_WHERE');
         process.exit(1);
       } catch (error) {
@@ -278,13 +269,14 @@ async function main() {
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
-          'repo-users [limit] | repo-users-wherearg <admin|user> [positive-limit] | repo-admins [limit] | ' +
+          'repo-users [limit] | repo-admins [limit] | ' +
           'repo-user <email> | repo-posts <userId> [limit] | ' +
           'repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser] | ' +
           'repo-post-feed <postTitleTerm> [limit] | repo-users-cursor [cursor] [limit] | ' +
           'repo-latest-per-kind | repo-user-insights [limit] | repo-kind-breakdown [minUsers] | ' +
           'repo-upsert-user <id> <email> <kind> | users-paginate [cursor] [limit] | ' +
-          'users-paginate-back <cursor> [limit] | budget-violation]',
+          'users-paginate-back <cursor> [limit] | similarity-search <vec> [limit] | ' +
+          'budget-violation | guardrail-delete]',
       );
       process.exit(1);
     }

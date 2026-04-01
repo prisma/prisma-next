@@ -20,7 +20,6 @@ import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
 import { ormClientGetUsers } from '../src/orm-client/get-users';
 import { ormClientGetUsersBackwardCursor } from '../src/orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
-import { ormClientGetUsersViaWhereArg } from '../src/orm-client/get-users-via-wherearg';
 import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
 import { ormClientUpsertUser } from '../src/orm-client/upsert-user';
 import { db } from '../src/prisma/db';
@@ -188,30 +187,6 @@ describe('ORM client integration examples', () => {
             seededUserIds.admin,
             seededUserIds.adminTwo,
           ]);
-        } finally {
-          await runtime.close();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
-    'ormClientGetUsersViaWhereArg filters users via ToWhereExpr payload',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = await getRuntime(connectionString);
-
-        try {
-          await seedOrmClientData(runtime);
-          const users = await ormClientGetUsersViaWhereArg('admin', 10, runtime);
-          const ids = users.map((user) => user.id);
-          expect(ids).toEqual(
-            expect.arrayContaining([seededUserIds.admin, seededUserIds.adminTwo]),
-          );
-          expect(ids).toHaveLength(2);
-          expect(users.every((user) => user.kind === 'admin')).toBe(true);
         } finally {
           await runtime.close();
         }

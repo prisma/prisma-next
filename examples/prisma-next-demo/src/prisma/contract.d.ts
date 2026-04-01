@@ -37,7 +37,7 @@ export type StorageHash =
 export type ExecutionHash =
   ExecutionHashBase<'sha256:630618d96f7674c186a027d1295bfc5d688c4168c5a023a1aea01553820387dc'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:83d66b1cce776c9ec9e6d168086e5bd1030ccf461823b9eef39cf49f1833c6dd'>;
+  ProfileHashBase<'sha256:ea5c6635c0c0bd71badced0f3ee8ba912cf72dc836ae165cd533dc8f68cbfc9f'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -231,7 +231,7 @@ type ContractBase = SqlContract<
       readonly 'pgvector/cosine': true;
       readonly returning: true;
     };
-    readonly sql: { readonly enums: true };
+    readonly sql: { readonly enums: true; readonly returning: true };
   };
   readonly extensionPacks: {
     readonly pgvector: {
@@ -280,6 +280,20 @@ type ContractBase = SqlContract<
         ];
       };
       readonly version: '0.0.1';
+    };
+  };
+  readonly execution: {
+    readonly mutations: {
+      readonly defaults: readonly [
+        {
+          readonly ref: { readonly table: 'post'; readonly column: 'id' };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+        {
+          readonly ref: { readonly table: 'user'; readonly column: 'id' };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+      ];
     };
   };
 };
