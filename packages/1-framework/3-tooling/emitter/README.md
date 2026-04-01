@@ -49,6 +49,7 @@ flowchart TD
 
     subgraph "Target Family Hooks"
         SQL[SQL Hook]
+        MONGO[Mongo Hook]
         DOC[Document Hook]
     end
 
@@ -61,8 +62,10 @@ flowchart TD
     TS --> IR
     IR --> VAL
     VAL --> SQL
+    VAL --> MONGO
     VAL --> DOC
     SQL --> HASH
+    MONGO --> HASH
     DOC --> HASH
     PACK1 --> SQL
     PACK2 --> DOC
@@ -137,6 +140,7 @@ import { createOperationRegistry } from '@prisma-next/operations';
 
 // Determine target family SPI based on target family
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+// or: import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 
 // Emit contract
 const ir: ContractIR = {
@@ -188,5 +192,6 @@ This ensures all required fields are present with sensible defaults. See `.curso
 
 ## Exports
 
-- `.`: Main emitter API (`emit`, types)
+- `.`: Main emitter API (`emit`, types, shared domain-level generation utilities)
+- `./domain-type-generation`: Shared domain-level `.d.ts` generation utilities (used by family-specific emitter hooks)
 
