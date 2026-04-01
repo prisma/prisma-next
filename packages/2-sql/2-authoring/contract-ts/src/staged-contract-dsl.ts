@@ -1429,7 +1429,13 @@ export const field = {
 } & FieldHelpersFromNamespace<typeof portableSqlAuthoringFieldPresets>;
 
 export function isStagedContractInput(value: unknown): value is StagedContractInput {
-  return typeof value === 'object' && value !== null && 'target' in value;
+  if (typeof value !== 'object' || value === null || !('target' in value)) {
+    return false;
+  }
+  const target = (value as { target: unknown }).target;
+  return (
+    typeof target === 'object' && target !== null && 'kind' in target && target.kind === 'target'
+  );
 }
 
 function isRelationFieldArray(value: string | readonly string[]): value is readonly string[] {
