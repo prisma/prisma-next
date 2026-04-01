@@ -13,6 +13,10 @@ function modelsOf(contract: SqlContract<SqlStorage>): ModelsMap {
   return contract.models as ModelsMap;
 }
 
+export function modelOf(contract: SqlContract<SqlStorage>, name: string): ModelEntry | undefined {
+  return modelsOf(contract)[name];
+}
+
 const fieldToColumnCache = new WeakMap<object, Map<string, Record<string, string>>>();
 const columnToFieldCache = new WeakMap<object, Map<string, Record<string, string>>>();
 const tableToModelCache = new WeakMap<object, Map<string, string>>();
