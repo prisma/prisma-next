@@ -359,20 +359,14 @@ export interface DescriptorPlannerOptions {
   readonly matchers?: readonly PatternMatcher[];
 }
 
-export interface DescriptorPlannerSuccess {
-  readonly kind: 'success';
+export interface DescriptorPlannerValue {
   readonly descriptors: readonly MigrationOpDescriptor[];
   readonly needsDataMigration: boolean;
 }
 
-export interface DescriptorPlannerFailure {
-  readonly kind: 'failure';
-  readonly conflicts: readonly SqlPlannerConflict[];
-}
-
-export type DescriptorPlannerResult = DescriptorPlannerSuccess | DescriptorPlannerFailure;
-
-export function planDescriptors(options: DescriptorPlannerOptions): DescriptorPlannerResult {
+export function planDescriptors(
+  options: DescriptorPlannerOptions,
+): Result<DescriptorPlannerValue, readonly SqlPlannerConflict[]> {
   const context: PatternContext = {
     toContract: options.toContract,
     fromContract: options.fromContract,
@@ -409,7 +403,7 @@ export function planDescriptors(options: DescriptorPlannerOptions): DescriptorPl
   }
 
   if (conflicts.length > 0) {
-    return { kind: 'failure', conflicts };
+    return notOk(conflicts);
   }
 
   // Phase 4: Order descriptors by operation kind
@@ -447,9 +441,8 @@ export function planDescriptors(options: DescriptorPlannerOptions): DescriptorPl
     ...constraintOps,
   ];
 
-  return {
-    kind: 'success',
+  return ok({
     descriptors,
     needsDataMigration: descriptors.some((op) => op.kind === 'dataTransform'),
-  };
+  });
 }
