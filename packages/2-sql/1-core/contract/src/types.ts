@@ -137,6 +137,8 @@ export type ModelDefinition = {
 
 export type SqlModelFieldStorage = {
   readonly column: string;
+  readonly codecId?: string;
+  readonly nullable?: boolean;
 };
 
 export type SqlModelStorage = {

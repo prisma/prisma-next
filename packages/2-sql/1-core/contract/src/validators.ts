@@ -141,6 +141,8 @@ const ModelFieldSchema = type({
 
 const ModelStorageFieldSchema = type({
   column: 'string',
+  'codecId?': 'string',
+  'nullable?': 'boolean',
 });
 
 const ModelStorageSchema = type({
