@@ -1,4 +1,4 @@
-import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
+import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   int4Column as int4ColumnType,
@@ -52,9 +52,7 @@ type TestContract = SqlContract<
       };
     };
   },
-  Record<string, never>,
-  Record<string, never>,
-  SqlMappings
+  Record<string, never>
 >;
 
 describe('ast/join', () => {

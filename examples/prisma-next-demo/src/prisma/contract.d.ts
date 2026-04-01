@@ -25,9 +25,6 @@ import type {
 } from '@prisma-next/contract/types';
 import type {
   SqlContract,
-  SqlStorage,
-  SqlMappings,
-  ModelDefinition,
   ContractWithTypeMaps,
   TypeMaps as TypeMapsType,
 } from '@prisma-next/sql-contract/types';
@@ -198,62 +195,6 @@ type ContractBase = SqlContract<
       };
     };
   },
-  {
-    readonly post: {
-      readonly user: {
-        readonly to: 'User';
-        readonly cardinality: 'N:1';
-        readonly on: {
-          readonly parentCols: readonly ['userId'];
-          readonly childCols: readonly ['id'];
-        };
-      };
-    };
-    readonly user: {
-      readonly posts: {
-        readonly to: 'Post';
-        readonly cardinality: '1:N';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['userId'];
-        };
-      };
-    };
-  },
-  {
-    modelToTable: { readonly Post: 'post'; readonly User: 'user' };
-    tableToModel: { readonly post: 'Post'; readonly user: 'User' };
-    fieldToColumn: {
-      readonly Post: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly userId: 'userId';
-        readonly createdAt: 'createdAt';
-        readonly embedding: 'embedding';
-      };
-      readonly User: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'createdAt';
-        readonly kind: 'kind';
-      };
-    };
-    columnToField: {
-      readonly post: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly userId: 'userId';
-        readonly createdAt: 'createdAt';
-        readonly embedding: 'embedding';
-      };
-      readonly user: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'createdAt';
-        readonly kind: 'kind';
-      };
-    };
-  },
   StorageHash,
   ExecutionHash,
   ProfileHash
@@ -340,4 +281,3 @@ export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Tables = Contract['storage']['tables'];
 export type Models = Contract['models'];
-export type Relations = Contract['relations'];

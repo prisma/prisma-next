@@ -1,7 +1,6 @@
 import type {
   ContractWithTypeMaps,
   SqlContract,
-  SqlMappings,
   StorageColumn,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -41,9 +40,7 @@ type TestContract = SqlContract<
       };
     };
   },
-  Record<string, never>,
-  Record<string, never>,
-  SqlMappings
+  Record<string, never>
 >;
 
 type TestContractWithIdOnly = SqlContract<
@@ -64,9 +61,7 @@ type TestContractWithIdOnly = SqlContract<
       };
     };
   },
-  Record<string, never>,
-  Record<string, never>,
-  SqlMappings
+  Record<string, never>
 >;
 
 type TestTypeMaps = TypeMaps<

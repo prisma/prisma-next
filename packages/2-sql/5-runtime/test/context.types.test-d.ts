@@ -1,4 +1,4 @@
-import type { SqlContract, SqlMappings, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type { ExecutionContext, TypeHelperRegistry } from '../src/sql-context';
 
@@ -28,9 +28,7 @@ type TestContract = SqlContract<
       };
     };
   },
-  Record<string, never>,
-  Record<string, never>,
-  SqlMappings
+  Record<string, never>
 >;
 
 test('ExecutionContext.types is TypeHelperRegistry', () => {
