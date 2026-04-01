@@ -65,6 +65,63 @@ const pgvectorExtensionPack = {
   },
 } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
+const roleTypes = {
+  Role: {
+    codecId: 'pg/enum@1',
+    nativeType: 'role',
+    typeParams: { values: ['USER', 'ADMIN'] },
+  },
+} as const;
+
+type PortableFieldSurface = Pick<
+  typeof field,
+  'text' | 'timestamp' | 'createdAt' | 'uuid' | 'nanoid'
+> & {
+  readonly id: Pick<typeof field.id, 'uuidv7' | 'nanoid'>;
+};
+
+function buildPortableFieldStates(currentField: PortableFieldSurface) {
+  return {
+    text: currentField.text().build(),
+    timestamp: currentField.timestamp().build(),
+    createdAt: currentField.createdAt().build(),
+    uuid: currentField.uuid().build(),
+    nanoid: currentField.nanoid({ size: 16 }).build(),
+    uuidv7Id: currentField.id.uuidv7({ name: 'audit_entry_pkey' }).build(),
+    nanoidId: currentField.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }).build(),
+  };
+}
+
+function expectTypedFallbackWarnings(run: () => void, expectedFragments: readonly string[]): void {
+  const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
+
+  try {
+    run();
+
+    for (const fragment of expectedFragments) {
+      expect(emitWarning).toHaveBeenCalledWith(
+        expect.stringContaining(fragment),
+        expect.objectContaining({
+          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+        }),
+      );
+    }
+  } finally {
+    emitWarning.mockRestore();
+  }
+}
+
+function expectNoTypedFallbackWarnings(run: () => void): void {
+  const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
+
+  try {
+    run();
+    expect(emitWarning).not.toHaveBeenCalled();
+  } finally {
+    emitWarning.mockRestore();
+  }
+}
+
 describe('staged contract DSL helper vocabulary', () => {
   it('lowers portable scalar helpers and explicit uuidv4 primary keys', () => {
     const AuditEntry = model('AuditEntry', {
@@ -169,56 +226,15 @@ describe('staged contract DSL helper vocabulary', () => {
   });
 
   it('keeps top-level field helpers aligned with target-composed field presets', () => {
-    const topLevelStates = {
-      text: field.text().build(),
-      timestamp: field.timestamp().build(),
-      createdAt: field.createdAt().build(),
-      uuid: field.uuid().build(),
-      nanoid: field.nanoid({ size: 16 }).build(),
-      uuidv7Id: field.id.uuidv7({ name: 'audit_entry_pkey' }).build(),
-      nanoidId: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }).build(),
-    };
-
-    let callbackStates:
-      | {
-          readonly text: ReturnType<typeof field.text> extends { build(): infer State }
-            ? State
-            : never;
-          readonly timestamp: ReturnType<typeof field.timestamp> extends { build(): infer State }
-            ? State
-            : never;
-          readonly createdAt: ReturnType<typeof field.createdAt> extends { build(): infer State }
-            ? State
-            : never;
-          readonly uuid: ReturnType<typeof field.uuid> extends { build(): infer State }
-            ? State
-            : never;
-          readonly nanoid: ReturnType<typeof field.nanoid> extends { build(): infer State }
-            ? State
-            : never;
-          readonly uuidv7Id: ReturnType<typeof field.id.uuidv7> extends { build(): infer State }
-            ? State
-            : never;
-          readonly nanoidId: ReturnType<typeof field.id.nanoid> extends { build(): infer State }
-            ? State
-            : never;
-        }
-      | undefined;
+    const topLevelStates = buildPortableFieldStates(field);
+    let callbackStates: ReturnType<typeof buildPortableFieldStates> | undefined;
 
     defineContract(
       {
         target: postgresTargetPack,
       },
       ({ field }) => {
-        callbackStates = {
-          text: field.text().build(),
-          timestamp: field.timestamp().build(),
-          createdAt: field.createdAt().build(),
-          uuid: field.uuid().build(),
-          nanoid: field.nanoid({ size: 16 }).build(),
-          uuidv7Id: field.id.uuidv7({ name: 'audit_entry_pkey' }).build(),
-          nanoidId: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }).build(),
-        };
+        callbackStates = buildPortableFieldStates(field);
 
         return {
           models: {},
@@ -278,17 +294,9 @@ describe('staged contract DSL helper vocabulary', () => {
   });
 
   it('accepts named storage type refs from the local types object', () => {
-    const types = {
-      Role: {
-        codecId: 'pg/enum@1',
-        nativeType: 'role',
-        typeParams: { values: ['USER', 'ADMIN'] },
-      },
-    } as const;
-
     const User = model('User', {
       fields: {
-        role: field.namedType(types.Role),
+        role: field.namedType(roleTypes.Role),
       },
     }).sql({
       table: 'app_user',
@@ -296,7 +304,7 @@ describe('staged contract DSL helper vocabulary', () => {
 
     const contract = defineContract({
       target: postgresTargetPack,
-      types,
+      types: roleTypes,
       models: {
         User,
       },
@@ -311,165 +319,108 @@ describe('staged contract DSL helper vocabulary', () => {
     expectTypeOf(contract.storage.tables.app_user.columns.role.typeRef).toEqualTypeOf<'Role'>();
   });
 
-  it('warns when a string named type ref could use the local types object instead', () => {
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
-
-    try {
-      const types = {
-        Role: {
-          codecId: 'pg/enum@1',
-          nativeType: 'role',
-          typeParams: { values: ['USER', 'ADMIN'] },
-        },
-      } as const;
-
-      defineContract({
-        target: postgresTargetPack,
-        types,
-        models: {
-          User: model('User', {
-            fields: {
-              role: field.namedType('Role'),
-            },
-          }).sql({
-            table: 'app_user',
-          }),
-        },
-      });
-
-      expect(emitWarning).toHaveBeenCalledWith(
-        expect.stringContaining(`field.namedType('Role')`),
-        expect.objectContaining({
-          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
+  it.each([
+    {
+      name: 'a string named type ref',
+      run: () =>
+        defineContract({
+          target: postgresTargetPack,
+          types: roleTypes,
+          models: {
+            User: model('User', {
+              fields: {
+                role: field.namedType('Role'),
+              },
+            }).sql({
+              table: 'app_user',
+            }),
+          },
         }),
-      );
-    } finally {
-      emitWarning.mockRestore();
-    }
+      expectedFragments: [`field.namedType('Role')`],
+    },
+    {
+      name: 'a string relation target',
+      run: () => {
+        const User = model('User', {
+          fields: {
+            id: field.id.uuidv7(),
+          },
+        }).sql({
+          table: 'app_user',
+        });
+
+        return defineContract({
+          target: postgresTargetPack,
+          models: {
+            User,
+            Post: model('Post', {
+              fields: {
+                id: field.id.uuidv7(),
+                userId: field.uuid(),
+              },
+              relations: {
+                user: rel.belongsTo('User', { from: 'userId', to: 'id' }),
+              },
+            }).sql({
+              table: 'blog_post',
+            }),
+          },
+        });
+      },
+      expectedFragments: [
+        `rel.belongsTo('User', { from: 'userId', to: 'id' })`,
+        `Use rel.belongsTo(User, { from: 'userId', to: 'id' })`,
+      ],
+    },
+    {
+      name: 'constraints.ref fallback',
+      run: () => {
+        const User = model('User', {
+          fields: {
+            id: field.id.uuidv7(),
+          },
+        }).sql({
+          table: 'app_user',
+        });
+
+        return defineContract({
+          target: postgresTargetPack,
+          models: {
+            User,
+            Post: model('Post', {
+              fields: {
+                id: field.id.uuidv7(),
+                userId: field.uuid(),
+              },
+            }).sql(({ cols, constraints }) => ({
+              table: 'blog_post',
+              foreignKeys: [constraints.foreignKey(cols.userId, constraints.ref('User', 'id'))],
+            })),
+          },
+        });
+      },
+      expectedFragments: [`constraints.ref('User', 'id')`, 'Use User.refs.id'],
+    },
+  ])('emits typed fallback guidance for $name', ({ run, expectedFragments }) => {
+    expectTypedFallbackWarnings(run, expectedFragments);
   });
 
   it('does not warn when named storage types use the local types object directly', () => {
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
-
-    try {
-      const types = {
-        Role: {
-          codecId: 'pg/enum@1',
-          nativeType: 'role',
-          typeParams: { values: ['USER', 'ADMIN'] },
-        },
-      } as const;
-
+    expectNoTypedFallbackWarnings(() =>
       defineContract({
         target: postgresTargetPack,
-        types,
+        types: roleTypes,
         models: {
           User: model('User', {
             fields: {
-              role: field.namedType(types.Role),
+              role: field.namedType(roleTypes.Role),
             },
           }).sql({
             table: 'app_user',
           }),
         },
-      });
-
-      expect(emitWarning).not.toHaveBeenCalled();
-    } finally {
-      emitWarning.mockRestore();
-    }
-  });
-
-  it('warns when a string relation target could use a named model token instead', () => {
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
-
-    try {
-      const User = model('User', {
-        fields: {
-          id: field.id.uuidv7(),
-        },
-      }).sql({
-        table: 'app_user',
-      });
-
-      defineContract({
-        target: postgresTargetPack,
-        models: {
-          User,
-          Post: model('Post', {
-            fields: {
-              id: field.id.uuidv7(),
-              userId: field.uuid(),
-            },
-            relations: {
-              user: rel.belongsTo('User', { from: 'userId', to: 'id' }),
-            },
-          }).sql({
-            table: 'blog_post',
-          }),
-        },
-      });
-
-      expect(emitWarning).toHaveBeenCalledWith(
-        expect.stringContaining(`rel.belongsTo('User', { from: 'userId', to: 'id' })`),
-        expect.objectContaining({
-          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
-        }),
-      );
-      expect(emitWarning).toHaveBeenCalledWith(
-        expect.stringContaining(`Use rel.belongsTo(User, { from: 'userId', to: 'id' })`),
-        expect.objectContaining({
-          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
-        }),
-      );
-    } finally {
-      emitWarning.mockRestore();
-    }
-  });
-
-  it('warns when constraints.ref fallback could use model token refs instead', () => {
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
-
-    try {
-      const User = model('User', {
-        fields: {
-          id: field.id.uuidv7(),
-        },
-      }).sql({
-        table: 'app_user',
-      });
-
-      defineContract({
-        target: postgresTargetPack,
-        models: {
-          User,
-          Post: model('Post', {
-            fields: {
-              id: field.id.uuidv7(),
-              userId: field.uuid(),
-            },
-          }).sql(({ cols, constraints }) => ({
-            table: 'blog_post',
-            foreignKeys: [constraints.foreignKey(cols.userId, constraints.ref('User', 'id'))],
-          })),
-        },
-      });
-
-      expect(emitWarning).toHaveBeenCalledWith(
-        expect.stringContaining(`constraints.ref('User', 'id')`),
-        expect.objectContaining({
-          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
-        }),
-      );
-      expect(emitWarning).toHaveBeenCalledWith(
-        expect.stringContaining('Use User.refs.id'),
-        expect.objectContaining({
-          code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE',
-        }),
-      );
-    } finally {
-      emitWarning.mockRestore();
-    }
+      }),
+    );
   });
 
   it('supports integrated contract callbacks with target-owned type helpers', () => {
@@ -594,65 +545,56 @@ describe('staged contract DSL helper vocabulary', () => {
     });
   });
 
-  it('rejects duplicate authoring helper names across composed packs', () => {
-    const conflictingPack = {
-      kind: 'extension',
-      id: 'conflicting-pack',
-      familyId: 'sql',
-      targetId: 'postgres',
-      version: '0.0.1',
-      authoring: {
-        type: {
-          enum: {
-            kind: 'typeConstructor',
-            args: [{ kind: 'string' }, { kind: 'stringArray' }],
-            output: {
-              codecId: 'conflict/enum@1',
-              nativeType: { kind: 'arg', index: 0 },
-              typeParams: {
-                values: { kind: 'arg', index: 1 },
+  it.each([
+    {
+      name: 'type helper names',
+      conflictingPack: {
+        kind: 'extension',
+        id: 'conflicting-pack',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        authoring: {
+          type: {
+            enum: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'string' }, { kind: 'stringArray' }],
+              output: {
+                codecId: 'conflict/enum@1',
+                nativeType: { kind: 'arg', index: 0 },
+                typeParams: {
+                  values: { kind: 'arg', index: 1 },
+                },
               },
             },
           },
         },
-      },
-    } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
-
-    expect(() =>
-      defineContract(
-        {
-          target: postgresTargetPack,
-          extensionPacks: {
-            conflictingPack,
-          },
-        },
-        () => ({
-          models: {},
-        }),
-      ),
-    ).toThrow(/Duplicate authoring type helper "enum"/);
-  });
-
-  it('rejects duplicate authoring field helper names across composed packs', () => {
-    const conflictingPack = {
-      kind: 'extension',
-      id: 'conflicting-pack',
-      familyId: 'sql',
-      targetId: 'postgres',
-      version: '0.0.1',
-      authoring: {
-        field: {
-          text: {
-            kind: 'fieldPreset',
-            output: {
-              codecId: 'conflict/text@1',
-              nativeType: 'text',
+      } as const satisfies ExtensionPackRef<'sql', 'postgres'>,
+      error: /Duplicate authoring type helper "enum"/,
+    },
+    {
+      name: 'field helper names',
+      conflictingPack: {
+        kind: 'extension',
+        id: 'conflicting-pack',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        authoring: {
+          field: {
+            text: {
+              kind: 'fieldPreset',
+              output: {
+                codecId: 'conflict/text@1',
+                nativeType: 'text',
+              },
             },
           },
         },
-      },
-    } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
-
+      } as const satisfies ExtensionPackRef<'sql', 'postgres'>,
+      error: /Duplicate authoring field helper "text"/,
+    },
+  ])('rejects duplicate authoring $name across composed packs', ({ conflictingPack, error }) => {
     expect(() =>
       defineContract(
         {
@@ -665,7 +607,7 @@ describe('staged contract DSL helper vocabulary', () => {
           models: {},
         }),
       ),
-    ).toThrow(/Duplicate authoring field helper "text"/);
+    ).toThrow(error);
   });
 
   it('rejects dangerous authoring field helper path segments across composed packs', () => {

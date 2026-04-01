@@ -1,6 +1,12 @@
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { defineContract, field, model, rel } from '../src/contract-builder';
+import {
+  defineContract,
+  field,
+  model,
+  rel,
+  type StagedContractInput,
+} from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const typecheckOnly = process.env['PN_TYPECHECK_ONLY'] === 'true';
@@ -16,6 +22,59 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 const timestamptzColumn = columnDescriptor('pg/timestamptz@1');
+
+function defineStagedContract<const Definition extends Omit<StagedContractInput, 'target'>>(
+  definition: Definition,
+) {
+  return defineContract({
+    target: postgresTargetPack,
+    ...definition,
+  });
+}
+
+type OwnershipRelationCase = {
+  readonly label: 'hasMany' | 'hasOne';
+  readonly relationName: 'posts' | 'profile';
+  readonly targetModelName: 'Post' | 'Profile';
+  readonly targetTable: 'blog_post' | 'user_profile';
+  readonly expectedCardinality: '1:N' | '1:1';
+};
+
+function buildOwnershipRelationContract(ownershipCase: OwnershipRelationCase) {
+  const User = model('User', {
+    fields: {
+      id: field.column(textColumn).id(),
+      ...(ownershipCase.label === 'hasMany' ? { email: field.column(textColumn) } : {}),
+    },
+  });
+
+  const Target = model(ownershipCase.targetModelName, {
+    fields: {
+      id: field.column(textColumn).id(),
+      userId: field.column(textColumn).column('user_id'),
+      ...(ownershipCase.label === 'hasMany' ? { title: field.column(textColumn) } : {}),
+    },
+  });
+
+  return defineStagedContract({
+    models: {
+      User: User.relations({
+        [ownershipCase.relationName]:
+          ownershipCase.label === 'hasMany'
+            ? rel.hasMany(Target, { by: 'userId' })
+            : rel.hasOne(() => Target, { by: 'userId' }),
+      }).sql({
+        table: 'app_user',
+      }),
+      [ownershipCase.targetModelName]: Target.relations({
+        user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+      }).sql(({ cols, constraints }) => ({
+        table: ownershipCase.targetTable,
+        foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
+      })),
+    },
+  });
+}
 
 describe('staged contract DSL authoring surface', () => {
   it('lowers inline ids and uniques while keeping sql focused on table/index/fk concerns', () => {
@@ -66,8 +125,7 @@ describe('staged contract DSL authoring surface', () => {
       ],
     }));
 
-    const contract = defineContract({
-      target: postgresTargetPack,
+    const contract = defineStagedContract({
       storageHash: 'sha256:staged-contract-dsl',
       foreignKeyDefaults: { constraint: true, index: false },
       types,
@@ -178,8 +236,7 @@ describe('staged contract DSL authoring surface', () => {
       table: 'blog_post',
     });
 
-    const contract = defineContract({
-      target: postgresTargetPack,
+    const contract = defineStagedContract({
       foreignKeyDefaults: { constraint: true, index: false },
       models: {
         User,
@@ -213,18 +270,25 @@ describe('staged contract DSL authoring surface', () => {
     expect(contract.models.Post.fields.createdAt).toEqual({ column: 'created_at' });
   });
 
-  it('rejects field-local id and unique overlays without the semantic declaration', () => {
-    expect(() =>
-      field.column(textColumn).sql({
-        unique: { name: 'user_email_key' },
-      }),
-    ).toThrow(/field\.sql\(\{ unique \}\) requires an existing inline \.unique/);
-
-    expect(() =>
-      field.column(textColumn).sql({
-        id: { name: 'user_pkey' },
-      }),
-    ).toThrow(/field\.sql\(\{ id \}\) requires an existing inline \.id/);
+  it.each([
+    [
+      'unique',
+      () =>
+        field.column(textColumn).sql({
+          unique: { name: 'user_email_key' },
+        }),
+      /field\.sql\(\{ unique \}\) requires an existing inline \.unique/,
+    ],
+    [
+      'id',
+      () =>
+        field.column(textColumn).sql({
+          id: { name: 'user_pkey' },
+        }),
+      /field\.sql\(\{ id \}\) requires an existing inline \.id/,
+    ],
+  ] as const)('rejects field-local %s overlays without the semantic declaration', (_label, run, error) => {
+    expect(run).toThrow(error);
   });
 
   it('supports token-based many-to-many relations with lazy through refs', () => {
@@ -269,8 +333,7 @@ describe('staged contract DSL authoring surface', () => {
       table: 'tag',
     });
 
-    const contract = defineContract({
-      target: postgresTargetPack,
+    const contract = defineStagedContract({
       models: {
         Post,
         Tag,
@@ -313,8 +376,7 @@ describe('staged contract DSL authoring surface', () => {
     }));
 
     expect(() =>
-      defineContract({
-        target: postgresTargetPack,
+      defineStagedContract({
         models: {
           User,
         },
@@ -344,8 +406,7 @@ describe('staged contract DSL authoring surface', () => {
         table: 'membership',
       });
 
-    const contract = defineContract({
-      target: postgresTargetPack,
+    const contract = defineStagedContract({
       models: {
         Membership,
       },
@@ -365,97 +426,47 @@ describe('staged contract DSL authoring surface', () => {
     });
   });
 
-  it('supports staged .relations(...) for mutually recursive models', () => {
-    const User = model('User', {
-      fields: {
-        id: field.column(textColumn).id(),
-        email: field.column(textColumn),
-      },
-    });
-
-    const Post = model('Post', {
-      fields: {
-        id: field.column(textColumn).id(),
-        userId: field.column(textColumn).column('user_id'),
-        title: field.column(textColumn),
-      },
-    });
-
-    const contract = defineContract({
-      target: postgresTargetPack,
-      models: {
-        User: User.relations({
-          posts: rel.hasMany(Post, { by: 'userId' }),
-        }).sql({
-          table: 'app_user',
-        }),
-        Post: Post.relations({
-          user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
-        }).sql(({ cols, constraints }) => ({
-          table: 'blog_post',
-          foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
-        })),
-      },
+  it.each([
+    {
+      label: 'hasMany',
+      relationName: 'posts',
+      targetModelName: 'Post',
+      targetTable: 'blog_post',
+      expectedCardinality: '1:N',
+    },
+    {
+      label: 'hasOne',
+      relationName: 'profile',
+      targetModelName: 'Profile',
+      targetTable: 'user_profile',
+      expectedCardinality: '1:1',
+    },
+  ] as const)('lowers %s ownership relations through the staged relation pipeline', ({
+    relationName,
+    targetModelName,
+    targetTable,
+    expectedCardinality,
+    ...ownershipCase
+  }) => {
+    const contract = buildOwnershipRelationContract({
+      relationName,
+      targetModelName,
+      targetTable,
+      expectedCardinality,
+      ...ownershipCase,
     });
 
     expect(contract.relations['app_user']).toMatchObject({
-      posts: {
-        to: 'Post',
-        cardinality: '1:N',
-      },
-    });
-    expect(contract.relations['blog_post']).toMatchObject({
-      user: {
-        to: 'User',
-        cardinality: 'N:1',
-      },
-    });
-  });
-
-  it('lowers hasOne relations through the same staged relation pipeline', () => {
-    const User = model('User', {
-      fields: {
-        id: field.column(textColumn).id(),
-      },
-      relations: {
-        profile: rel.hasOne(() => Profile, { by: 'userId' }),
-      },
-    }).sql({
-      table: 'app_user',
-    });
-
-    const Profile = model('Profile', {
-      fields: {
-        id: field.column(textColumn).id(),
-        userId: field.column(textColumn).column('user_id'),
-      },
-      relations: {
-        user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
-      },
-    }).sql(({ cols, constraints }) => ({
-      table: 'user_profile',
-      foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
-    }));
-
-    const contract = defineContract({
-      target: postgresTargetPack,
-      models: {
-        User,
-        Profile,
-      },
-    });
-
-    expect(contract.relations['app_user']).toMatchObject({
-      profile: {
-        to: 'Profile',
-        cardinality: '1:1',
+      [relationName]: {
+        to: targetModelName,
+        cardinality: expectedCardinality,
         on: {
           parentCols: ['id'],
           childCols: ['user_id'],
         },
       },
     });
-    expect(contract.relations['user_profile']).toMatchObject({
+    expect(contract.relations[targetTable]).toMatchObject({
       user: {
         to: 'User',
         cardinality: 'N:1',
@@ -478,8 +489,7 @@ describe('staged contract DSL authoring surface', () => {
       indexes: [constraints.index(cols.authorId, { name: 'blog_post_author_identifier_idx' })],
     }));
 
-    const contract = defineContract({
-      target: postgresTargetPack,
+    const contract = defineStagedContract({
       naming: { tables: 'snake_case', columns: 'snake_case' },
       models: {
         BlogPost,
@@ -495,49 +505,54 @@ describe('staged contract DSL authoring surface', () => {
     });
   });
 
-  it('rejects duplicate table names after applying naming defaults', () => {
-    const BlogPost = model('BlogPost', {
-      fields: {
-        id: field.column(int4Column).id(),
+  it.each([
+    {
+      name: 'table names',
+      run: () => {
+        const BlogPost = model('BlogPost', {
+          fields: {
+            id: field.column(int4Column).id(),
+          },
+        });
+
+        const blogPost = model('blogPost', {
+          fields: {
+            id: field.column(int4Column).id(),
+          },
+        });
+
+        return defineStagedContract({
+          naming: { tables: 'snake_case' },
+          models: {
+            BlogPost,
+            blogPost,
+          },
+        });
       },
-    });
+      error: /Models "BlogPost" and "blogPost" both map to table "blog_post"/,
+    },
+    {
+      name: 'column names',
+      run: () => {
+        const BlogPost = model('BlogPost', {
+          fields: {
+            id: field.column(int4Column).id(),
+            createdAt: field.column(timestamptzColumn),
+            created_at: field.column(timestamptzColumn),
+          },
+        });
 
-    const blogPost = model('blogPost', {
-      fields: {
-        id: field.column(int4Column).id(),
+        return defineStagedContract({
+          naming: { columns: 'snake_case' },
+          models: {
+            BlogPost,
+          },
+        });
       },
-    });
-
-    expect(() =>
-      defineContract({
-        target: postgresTargetPack,
-        naming: { tables: 'snake_case' },
-        models: {
-          BlogPost,
-          blogPost,
-        },
-      }),
-    ).toThrow(/Models "BlogPost" and "blogPost" both map to table "blog_post"/);
-  });
-
-  it('rejects duplicate column names after applying naming defaults', () => {
-    const BlogPost = model('BlogPost', {
-      fields: {
-        id: field.column(int4Column).id(),
-        createdAt: field.column(timestamptzColumn),
-        created_at: field.column(timestamptzColumn),
-      },
-    });
-
-    expect(() =>
-      defineContract({
-        target: postgresTargetPack,
-        naming: { columns: 'snake_case' },
-        models: {
-          BlogPost,
-        },
-      }),
-    ).toThrow(/Model "BlogPost" maps both "createdAt" and "created_at" to column "created_at"/);
+      error: /Model "BlogPost" maps both "createdAt" and "created_at" to column "created_at"/,
+    },
+  ])('rejects duplicate %s after applying naming defaults', ({ run, error }) => {
+    expect(run).toThrow(error);
   });
 
   it('types local refs and named model tokens separately', () => {
@@ -637,8 +652,7 @@ describe('staged contract DSL authoring surface', () => {
     });
 
     expect(() =>
-      defineContract({
-        target: postgresTargetPack,
+      defineStagedContract({
         models: {
           Account: User,
         },
