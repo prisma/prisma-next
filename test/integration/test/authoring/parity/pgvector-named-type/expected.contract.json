@@ -31,7 +31,6 @@
       }
     }
   },
-  "relations": {},
   "storage": {
     "tables": {
       "document": {

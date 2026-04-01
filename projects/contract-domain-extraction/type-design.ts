@@ -38,7 +38,6 @@ import type {
 } from '@prisma-next/mongo-core';
 import type {
   SqlContract as ExistingSqlContract,
-  SqlMappings,
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 
@@ -71,7 +70,7 @@ export type DomainDiscriminator = {
 
 export type DomainModel = {
   readonly fields: Record<string, DomainField>;
-  readonly relations: Record<string, DomainRelation>;
+  readonly relations?: Record<string, DomainRelation>;
   readonly storage: Record<string, unknown>;
   readonly discriminator?: DomainDiscriminator;
   readonly variants?: Record<string, unknown>;
@@ -168,15 +167,11 @@ const _assertSqlFieldSatisfiesDomain: _AssertSqlFieldSatisfiesDomain = true;
 // §4  Widened SqlContract (Phase 1)
 // ============================================================================
 //
-// SqlContract = ContractBase & { storage, models, relations, mappings }
-// The intersection with ContractBase brings in roots + models (domain level).
-// The & { models: M } intersection narrows models with SQL-specific shape.
+// SqlContract = ContractBase & { storage, models } (top-level relations/mappings removed)
 
 export type SqlContract<
   S extends SqlStorage = SqlStorage,
   M extends Record<string, unknown> = Record<string, unknown>,
-  R extends Record<string, unknown> = Record<string, unknown>,
-  Map extends SqlMappings = SqlMappings,
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
   TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
@@ -184,8 +179,6 @@ export type SqlContract<
   readonly targetFamily: string;
   readonly storage: S;
   readonly models: M;
-  readonly relations: R; // PHASE 3: REMOVED
-  readonly mappings: Map; // PHASE 3: REMOVED
   readonly execution?: ExecutionSection;
 };
 
@@ -282,42 +275,6 @@ type ExampleModels = {
   };
 };
 
-type ExampleRelations = {
-  readonly user: {
-    readonly posts: {
-      readonly to: 'Post';
-      readonly cardinality: '1:N';
-      readonly on: {
-        readonly childCols: readonly ['user_id'];
-        readonly parentCols: readonly ['id'];
-      };
-    };
-  };
-  readonly post: {
-    readonly user: {
-      readonly to: 'User';
-      readonly cardinality: 'N:1';
-      readonly on: {
-        readonly childCols: readonly ['user_id'];
-        readonly parentCols: readonly ['id'];
-      };
-    };
-  };
-};
-
-type ExampleMappings = {
-  readonly modelToTable: { readonly User: 'user'; readonly Post: 'post' };
-  readonly tableToModel: { readonly user: 'User'; readonly post: 'Post' };
-  readonly fieldToColumn: {
-    readonly User: { readonly id: 'id'; readonly email: 'email'; readonly name: 'display_name' };
-    readonly Post: { readonly id: 'id'; readonly title: 'title'; readonly userId: 'user_id' };
-  };
-  readonly columnToField: {
-    readonly user: { readonly id: 'id'; readonly email: 'email'; readonly display_name: 'name' };
-    readonly post: { readonly id: 'id'; readonly title: 'title'; readonly user_id: 'userId' };
-  };
-};
-
 type ExampleStorageHash = StorageHashBase<'sha256:abc123'>;
 type ExampleExecutionHash = ExecutionHashBase<'sha256:def456'>;
 type ExampleProfileHash = ProfileHashBase<'sha256:ghi789'>;
@@ -325,8 +282,6 @@ type ExampleProfileHash = ProfileHashBase<'sha256:ghi789'>;
 type ExampleContract = SqlContract<
   SqlStorage,
   ExampleModels,
-  ExampleRelations,
-  ExampleMappings,
   ExampleStorageHash,
   ExampleExecutionHash,
   ExampleProfileHash
@@ -410,7 +365,7 @@ const _verifyRoots: _VerifyRoots = { users: 'User' };
 function _domainConsumer(contract: ContractBase): string[] {
   return Object.entries(contract.models).map(([name, model]) => {
     const fieldNames = Object.keys(model.fields);
-    const relationNames = Object.keys(model.relations);
+    const relationNames = Object.keys(model.relations ?? {});
     return `${name}: ${fieldNames.length} fields, ${relationNames.length} relations`;
   });
 }
@@ -418,13 +373,6 @@ function _domainConsumer(contract: ContractBase): string[] {
 function _sqlConsumer(contract: ExampleContract): string[] {
   return _domainConsumer(contract);
 }
-
-// Old fields (PHASE 3: REMOVED) still accessible during Phase 1
-type _VerifyMapping = ExampleContract['mappings']['modelToTable']['User'];
-const _verifyMapping: _VerifyMapping = 'user';
-
-type _VerifyTopRel = ExampleContract['relations']['user']['posts']['to'];
-const _verifyTopRel: _VerifyTopRel = 'Post';
 
 // ============================================================================
 // §6  validateContract() bridging design
@@ -437,18 +385,13 @@ const _verifyTopRel: _VerifyTopRel = 'Post';
 // Old format normalization:
 //   1. Build model.storage.fields from model.fields[f].column
 //   2. Populate model.fields with { nullable, codecId } from storage.tables
-//   3. Build model.relations from top-level relations
-//   4. Derive roots from models (each model with storage.table → root entry)
+//   3. Derive roots from models (each model with storage.table → root entry)
 //
 // New format: pass through as-is.
 //
 // After normalization, both formats yield the same internal structure.
 //
-// Bridge (new → old, for consumer compatibility):
-//   - mappings: derived from model.storage.table + model.storage.fields
-//   - top-level relations: derived from model.relations (rekey by table name,
-//     convert localFields/targetFields → childCols/parentCols)
-//   - model.fields[f].column: derived from model.storage.fields[f].column
+// Column mapping for SQL consumers uses model.storage.table and model.storage.fields only.
 //
 // validateContractDomain() runs on the normalized structure (shared validation).
 // validateContractLogic() + validateStorageSemantics() run after (SQL-specific).
@@ -525,7 +468,6 @@ type SqlModelDefinitionFinal = {
   readonly base?: string;
 };
 
-// Phase 3: SqlContract drops R and Map type parameters
 type SqlContractFinal<
   S extends SqlStorage = SqlStorage,
   M extends Record<string, unknown> = Record<string, unknown>,
@@ -600,19 +542,14 @@ const _verifyPhase3Nullable: _VerifyPhase3Nullable = true;
 // Summary: type parameter evolution
 // ============================================================================
 //
-// Phase 1 (widened, backward compatible):
+// Phase 1 (widened):
 //   ContractBase<TStorageHash, TExecutionHash, TProfileHash>
 //     + roots: Record<string, string>
 //     + models: Record<string, DomainModel>
 //
-//   SqlContract<S, M, R, Map, TStorageHash, TExecutionHash, TProfileHash>
-//     = ContractBase<...> & { storage: S, models: M, relations: R, mappings: Map }
-//     models[Model].fields[f] has { column, nullable, codecId }
-//
-// Phase 3 (final, breaking):
-//   ContractBase unchanged
-//
 //   SqlContract<S, M, TStorageHash, TExecutionHash, TProfileHash>
 //     = ContractBase<...> & { storage: S, models: M }
-//     R and Map type parameters dropped
-//     models[Model].fields[f] has { nullable, codecId } (no column)
+//     models[Model].fields[f] may include transitional { column, nullable, codecId }
+//
+// Final emitted shape:
+//   models[Model].fields[f] has { nullable, codecId } (column only in model.storage.fields)

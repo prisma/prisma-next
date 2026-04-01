@@ -11,7 +11,6 @@ function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContr
       Item: {
         fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
         storage: { collection: 'items' },
-        relations: {},
       },
     },
     ...overrides,
@@ -40,7 +39,6 @@ describe('validateMongoStorage()', () => {
           Tag: {
             fields: { name: { codecId: 'mongo/string@1', nullable: false } },
             storage: { collection: 'tags' },
-            relations: {},
             owner: 'Item',
           },
         },
@@ -92,7 +90,6 @@ describe('validateMongoStorage()', () => {
           Tag: {
             fields: { name: { codecId: 'mongo/string@1', nullable: false } },
             storage: {},
-            relations: {},
             owner: 'Item',
           },
         },
@@ -119,7 +116,6 @@ describe('validateMongoStorage()', () => {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             storage: { collection: 'users' },
-            relations: {},
           },
         },
       });
@@ -148,7 +144,6 @@ describe('validateMongoStorage()', () => {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             storage: { collection: 'users' },
-            relations: {},
           },
         },
       });
@@ -178,7 +173,6 @@ describe('validateMongoStorage()', () => {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             storage: { collection: 'users' },
-            relations: {},
           },
         },
       });
@@ -197,14 +191,12 @@ describe('validateMongoStorage()', () => {
               type: { codecId: 'mongo/string@1', nullable: false },
             },
             storage: { collection: 'items' },
-            relations: {},
             discriminator: { field: 'type' },
             variants: { SpecialItem: { value: 'special' } },
           },
           SpecialItem: {
             fields: { extra: { codecId: 'mongo/string@1', nullable: false } },
             storage: { collection: 'other' },
-            relations: {},
             base: 'Item',
           },
         },
@@ -224,14 +216,12 @@ describe('validateMongoStorage()', () => {
               type: { codecId: 'mongo/string@1', nullable: false },
             },
             storage: { collection: 'items' },
-            relations: {},
             discriminator: { field: 'type' },
             variants: { SpecialItem: { value: 'special' } },
           },
           SpecialItem: {
             fields: { extra: { codecId: 'mongo/string@1', nullable: false } },
             storage: { collection: 'items' },
-            relations: {},
             base: 'Item',
           },
         },
@@ -248,7 +238,6 @@ describe('validateMongoStorage()', () => {
           Item: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             storage: { collection: 'items' },
-            relations: {},
           },
         },
       });

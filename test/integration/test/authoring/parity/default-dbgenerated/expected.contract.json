@@ -25,7 +25,6 @@
       }
     }
   },
-  "relations": {},
   "storage": {
     "tables": {
       "user": {

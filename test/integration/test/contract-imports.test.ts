@@ -285,7 +285,7 @@ type UserIdColumn = UserColumns['id'];
       expect(contractDtsContent).toContain("from '@prisma-next/adapter-postgres/codec-types'");
 
       // Create a comprehensive test file that uses all exported types
-      const testFileContent = `import type { Contract, CodecTypes, Tables, Models, Relations } from './contract';
+      const testFileContent = `import type { Contract, CodecTypes, Tables, Models } from './contract';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -295,7 +295,6 @@ const contract = validateContract<Contract>(contractJson);
 // Verify we can access all exported types
 const _tables: Tables = contract.storage.tables;
 const _models: Models = contract.models;
-const _relations: Relations = contract.relations;
 
 // Verify we can access nested types
 type UserTable = Tables['user'];

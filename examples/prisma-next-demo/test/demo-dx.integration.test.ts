@@ -22,26 +22,18 @@ describe('demo contract visualization DX', () => {
     expect(typeof contract.models).toBe('object');
     expect(contract.storage).toBeDefined();
     expect(contract.storage.tables).toBeDefined();
-    expect(contract.relations).toBeDefined();
-    expect(typeof contract.relations).toBe('object');
     expect(contract.capabilities).toBeDefined();
     expect(typeof contract.capabilities).toBe('object');
     expect(contract.extensionPacks).toBeDefined();
     expect(typeof contract.extensionPacks).toBe('object');
   });
 
-  it('validated contract has runtime-real mappings, no type-only keys', () => {
+  it('validated contract exposes model storage field mappings', () => {
     const contract = validateContract<Contract>(contractJson);
 
-    expect(contract.mappings).toBeDefined();
-    expect(contract.mappings.modelToTable).toBeDefined();
-    expect(contract.mappings.tableToModel).toBeDefined();
-    expect(contract.mappings.fieldToColumn).toBeDefined();
-    expect(contract.mappings.columnToField).toBeDefined();
-
-    const mappingKeys = Object.keys(contract.mappings);
-    expect(mappingKeys).not.toContain('codecTypes');
-    expect(mappingKeys).not.toContain('operationTypes');
+    expect(contract.models.User.storage.table).toBe('user');
+    expect(contract.models.User.storage.fields.email.column).toBe('email');
+    expect(contract.models.Post.storage.fields.userId.column).toBe('userId');
   });
 
   it('validated contract omits _generated at runtime', () => {
@@ -61,9 +53,10 @@ describe('demo contract visualization DX', () => {
     for (const [, model] of Object.entries(contract.models)) {
       expect(model.storage).toBeDefined();
       expect(model.storage.table).toBeDefined();
+      expect(model.storage.fields).toBeDefined();
       expect(model.fields).toBeDefined();
-      const tableRelations = contract.relations[model.storage.table] ?? {};
-      expect(typeof tableRelations).toBe('object');
+      expect(model.relations).toBeDefined();
+      expect(typeof model.relations).toBe('object');
     }
 
     for (const [, table] of Object.entries(contract.storage.tables)) {

@@ -47,7 +47,6 @@
       "fields": {
         "severity": { "codecId": "mongo/string@1", "nullable": false }
       },
-      "relations": {},
       "base": "Task"
     },
     "Feature": {
@@ -56,7 +55,6 @@
         "priority": { "codecId": "mongo/string@1", "nullable": false },
         "targetRelease": { "codecId": "mongo/string@1", "nullable": false }
       },
-      "relations": {},
       "base": "Task"
     },
     "User": {
@@ -83,7 +81,6 @@
         "city": { "codecId": "mongo/string@1", "nullable": false },
         "zip": { "codecId": "mongo/string@1", "nullable": false }
       },
-      "relations": {},
       "owner": "User"
     },
     "Comment": {
@@ -93,7 +90,6 @@
         "text": { "codecId": "mongo/string@1", "nullable": false },
         "createdAt": { "codecId": "mongo/date@1", "nullable": false }
       },
-      "relations": {},
       "owner": "Task"
     }
   }
