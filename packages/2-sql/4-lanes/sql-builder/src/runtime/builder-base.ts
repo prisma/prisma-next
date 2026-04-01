@@ -15,7 +15,6 @@ import type {
   MutationDefaultsOptions,
 } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { QueryOperationEntry } from '@prisma-next/sql-relational-core/query-operations';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import type {
   AggregateFunctions,
   Expression,
@@ -76,7 +75,6 @@ export interface BuilderState {
 export interface BuilderContext {
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly queryOperationTypes: Readonly<Record<string, QueryOperationEntry>>;
-  readonly runtime: Runtime;
   readonly target: string;
   readonly storageHash: string;
   readonly applyMutationDefaults: (
@@ -130,11 +128,11 @@ export function buildSelectAst(state: BuilderState): SelectAst {
   });
 }
 
-export function buildQueryPlan(
+export function buildQueryPlan<Row = unknown>(
   ast: import('@prisma-next/sql-relational-core/ast').AnyQueryAst,
   rowFields: Record<string, ScopeField>,
   ctx: BuilderContext,
-): SqlQueryPlan {
+): SqlQueryPlan<Row> {
   const projectionTypes: Record<string, string> = {};
   const codecs: Record<string, string> = {};
   for (const [alias, field] of Object.entries(rowFields)) {
@@ -177,8 +175,11 @@ export function buildQueryPlan(
   return Object.freeze({ ast, params: paramValues, meta });
 }
 
-export function buildPlan(state: BuilderState, ctx: BuilderContext): SqlQueryPlan {
-  return buildQueryPlan(buildSelectAst(state), state.rowFields, ctx);
+export function buildPlan<Row = unknown>(
+  state: BuilderState,
+  ctx: BuilderContext,
+): SqlQueryPlan<Row> {
+  return buildQueryPlan<Row>(buildSelectAst(state), state.rowFields, ctx);
 }
 
 export function tableToScope(name: string, table: StorageTable): Scope {

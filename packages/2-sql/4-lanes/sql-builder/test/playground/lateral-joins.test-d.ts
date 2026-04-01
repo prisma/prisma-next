@@ -1,3 +1,4 @@
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
@@ -13,9 +14,9 @@ test('basic lateral join — user with latest post title', () => {
       userName: f.users.name,
       postTitle: f.latestPost.title,
     }))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(lateral).toEqualTypeOf<Promise<{ userName: string; postTitle: string }>>();
+  expectTypeOf(lateral).toEqualTypeOf<SqlQueryPlan<{ userName: string; postTitle: string }>>();
 });
 
 test('outer lateral join — nullable result columns', () => {
@@ -30,10 +31,10 @@ test('outer lateral join — nullable result columns', () => {
       userName: f.users.name,
       postTitle: f.latestPost.title,
     }))
-    .firstOrThrow();
+    .build();
 
   expectTypeOf(outerLateral).toEqualTypeOf<
-    Promise<{ userName: string; postTitle: string | null }>
+    SqlQueryPlan<{ userName: string; postTitle: string | null }>
   >();
 });
 
@@ -47,9 +48,11 @@ test('lateral join chained with regular join', () => {
       userName: f.users.name,
       subTitle: f.sub.subTitle,
     }))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(lateralWithJoin).toEqualTypeOf<Promise<{ userName: string; subTitle: string }>>();
+  expectTypeOf(lateralWithJoin).toEqualTypeOf<
+    SqlQueryPlan<{ userName: string; subTitle: string }>
+  >();
 });
 
 test('lateral subquery using expression select', () => {
@@ -61,7 +64,7 @@ test('lateral subquery using expression select', () => {
       userName: f.users.name,
       postTitle: f.computed.postTitle,
     }))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(lateralExpr).toEqualTypeOf<Promise<{ userName: string; postTitle: string }>>();
+  expectTypeOf(lateralExpr).toEqualTypeOf<SqlQueryPlan<{ userName: string; postTitle: string }>>();
 });

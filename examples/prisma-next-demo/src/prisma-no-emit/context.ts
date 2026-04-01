@@ -3,7 +3,6 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 // No-emit workflow: use the TypeScript contract directly.
@@ -24,6 +23,6 @@ export const context = createExecutionContext({
 
 export const schema = schemaBuilder(context);
 export const tables = schema.tables;
-export function createSql(runtime: Runtime) {
-  return sqlBuilder<typeof contract>({ context, runtime });
+export function createSql() {
+  return sqlBuilder<typeof contract>({ context });
 }

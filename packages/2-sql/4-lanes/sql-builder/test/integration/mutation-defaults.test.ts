@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { setupIntegrationTest } from './setup';
+import { collect, setupIntegrationTest } from './setup';
 
 describe('integration: mutation defaults', () => {
-  const { db } = setupIntegrationTest();
+  const { db, runtime } = setupIntegrationTest();
 
   it('INSERT applies execution default (generated uuid) when column is omitted', async () => {
-    const row = await db().articles.insert({ title: 'Hello' }).returning('id', 'title').first();
+    const rows = await collect(
+      runtime().execute(db().articles.insert({ title: 'Hello' }).returning('id', 'title').build()),
+    );
+    const row = rows[0] ?? null;
 
     expect(row).not.toBeNull();
     expect(row!.title).toBe('Hello');
@@ -16,10 +19,15 @@ describe('integration: mutation defaults', () => {
 
   it('INSERT respects user-provided value over execution default', async () => {
     const explicitId = '00000000-0000-4000-8000-000000000001';
-    const row = await db()
-      .articles.insert({ id: explicitId, title: 'Explicit' })
-      .returning('id', 'title')
-      .first();
+    const rows = await collect(
+      runtime().execute(
+        db()
+          .articles.insert({ id: explicitId, title: 'Explicit' })
+          .returning('id', 'title')
+          .build(),
+      ),
+    );
+    const row = rows[0] ?? null;
 
     expect(row).not.toBeNull();
     expect(row!.id).toBe(explicitId);

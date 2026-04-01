@@ -1,21 +1,28 @@
 import { db } from '../prisma/db';
+import { collect } from './utils';
 
 export async function insertUser(email: string) {
-  return db.sql.user.insert({ email }).returning('id', 'email').first();
+  const plan = db.sql.user.insert({ email }).returning('id', 'email').build();
+  const rows = await collect(db.runtime().execute(plan));
+  return rows[0] ?? null;
 }
 
 export async function updateUser(userId: string, newEmail: string) {
-  return db.sql.user
+  const plan = db.sql.user
     .update({ email: newEmail })
     .where((f, fns) => fns.eq(f.id, userId))
     .returning('id', 'email')
-    .first();
+    .build();
+  const rows = await collect(db.runtime().execute(plan));
+  return rows[0] ?? null;
 }
 
 export async function deleteUser(userId: string) {
-  return db.sql.user
+  const plan = db.sql.user
     .delete()
     .where((f, fns) => fns.eq(f.id, userId))
     .returning('id', 'email')
-    .first();
+    .build();
+  const rows = await collect(db.runtime().execute(plan));
+  return rows[0] ?? null;
 }

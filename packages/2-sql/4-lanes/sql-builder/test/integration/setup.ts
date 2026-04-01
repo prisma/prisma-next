@@ -147,9 +147,8 @@ export function setupIntegrationTest() {
     }
   });
 
-  function db() {
-    return sql({ context, runtime });
-  }
-
-  return { db };
+  return {
+    db: () => sql({ context }),
+    runtime: () => runtime,
+  };
 }

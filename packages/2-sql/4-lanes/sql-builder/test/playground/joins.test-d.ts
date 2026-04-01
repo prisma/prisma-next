@@ -1,3 +1,4 @@
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
@@ -5,9 +6,9 @@ test('inner join', () => {
   const inner = db.users
     .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name', 'embedding')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(inner).toEqualTypeOf<Promise<{ name: string; embedding: number[] | null }>>();
+  expectTypeOf(inner).toEqualTypeOf<SqlQueryPlan<{ name: string; embedding: number[] | null }>>();
 });
 
 test('conflicting column names are not available at top level', () => {
@@ -15,34 +16,34 @@ test('conflicting column names are not available at top level', () => {
     .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.user_id))
     // @ts-expect-error conflicting column 'id' evicted from top-level scope; must use namespace
     .select((f) => ({ id: f.id, title: f.posts.title }))
-    .firstOrThrow();
+    .build();
 });
 
 test('outer left join makes right side nullable', () => {
   const left = db.users
     .outerLeftJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.user_id))
     .select('name', 'title')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(left).toEqualTypeOf<Promise<{ name: string; title: string | null }>>();
+  expectTypeOf(left).toEqualTypeOf<SqlQueryPlan<{ name: string; title: string | null }>>();
 });
 
 test('outer right join makes left side nullable', () => {
   const right = db.users
     .outerRightJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.user_id))
     .select('name', 'title')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(right).toEqualTypeOf<Promise<{ name: string | null; title: string }>>();
+  expectTypeOf(right).toEqualTypeOf<SqlQueryPlan<{ name: string | null; title: string }>>();
 });
 
 test('outer full join makes both sides nullable', () => {
   const full = db.users
     .outerFullJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.user_id))
     .select('name', 'title')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(full).toEqualTypeOf<Promise<{ name: string | null; title: string | null }>>();
+  expectTypeOf(full).toEqualTypeOf<SqlQueryPlan<{ name: string | null; title: string | null }>>();
 });
 
 test('field name conflict resolved via namespaces', () => {
@@ -50,9 +51,9 @@ test('field name conflict resolved via namespaces', () => {
     .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.user_id))
     .select('name', 'title')
     .where((f, fns) => fns.eq(f.users.id, f.posts.id))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(fieldNameConflict).toEqualTypeOf<Promise<{ name: string; title: string }>>();
+  expectTypeOf(fieldNameConflict).toEqualTypeOf<SqlQueryPlan<{ name: string; title: string }>>();
 });
 
 test('join on a subquery', () => {
@@ -65,18 +66,18 @@ test('join on a subquery', () => {
       userName: f.users.name,
       postTitle: f.myPosts.title,
     }))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(subquery).toEqualTypeOf<Promise<{ userName: string; postTitle: string }>>();
+  expectTypeOf(subquery).toEqualTypeOf<SqlQueryPlan<{ userName: string; postTitle: string }>>();
 });
 
 test('as() rebinds scope for direct method access', () => {
   const aliased = db.users
     .as('u')
     .select((f) => ({ id: f.u.id, name: f.u.name }))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(aliased).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(aliased).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('self-join via alias', () => {
@@ -86,7 +87,7 @@ test('self-join via alias', () => {
       userName: f.users.name,
       inviterName: f.inviter.name,
     }))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(selfJoin).toEqualTypeOf<Promise<{ userName: string; inviterName: string }>>();
+  expectTypeOf(selfJoin).toEqualTypeOf<SqlQueryPlan<{ userName: string; inviterName: string }>>();
 });

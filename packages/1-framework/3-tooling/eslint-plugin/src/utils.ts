@@ -53,10 +53,10 @@ export function isMethodCall(node: TSESTree.CallExpression, methodName: string):
   );
 }
 
-const EXECUTION_METHODS = ['first', 'firstOrThrow', 'all'] as const;
+const EXECUTION_METHODS = ['build', 'first', 'firstOrThrow', 'all'] as const;
 
 /**
- * Check if a call expression is a query builder execution call (.build(), .first(), .all(), .firstOrThrow())
+ * Check if a call expression is a query builder terminal call (.build(), .first(), .all(), .firstOrThrow())
  * Uses type information to verify it's actually our query builder's method
  */
 export function isPrismaNextQueryExecutionCall(

@@ -16,5 +16,6 @@ import { collect } from './utils';
  * To fix this query, add a .limit() clause or add proper filtering.
  */
 export async function getAllPostsUnbounded() {
-  return collect(db.sql.post.select('id', 'title', 'userId', 'createdAt').all());
+  const plan = db.sql.post.select('id', 'title', 'userId', 'createdAt').build();
+  return collect(db.runtime().execute(plan));
 }

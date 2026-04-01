@@ -200,7 +200,7 @@ export async function withTestRuntime<TContract extends SqlContract<SqlStorage>>
 
       try {
         const tables = schema<TContract>(context).tables;
-        const db = sqlBuilder<TContract>({ context, runtime });
+        const db = sqlBuilder<TContract>({ context });
         await callback({ contract, context, runtime, tables, db, client, sql });
       } finally {
         await runtime.close();

@@ -1,3 +1,4 @@
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
@@ -7,9 +8,9 @@ test('EXISTS — users who have posts', () => {
     .where((f, fns) =>
       fns.exists(db.posts.select('id').where((pf, pfns) => pfns.eq(pf.user_id, f.users.id))),
     )
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(withPosts).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(withPosts).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('NOT EXISTS — users without posts', () => {
@@ -18,27 +19,27 @@ test('NOT EXISTS — users without posts', () => {
     .where((f, fns) =>
       fns.notExists(db.posts.select('id').where((pf, pfns) => pfns.eq(pf.user_id, f.users.id))),
     )
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(withoutPosts).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(withoutPosts).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('IN with subquery', () => {
   const inSubquery = db.users
     .select('id', 'name')
     .where((f, fns) => fns.in(f.users.id, db.posts.select('user_id')))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(inSubquery).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(inSubquery).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('IN with literal array', () => {
   const inLiteral = db.users
     .select('id', 'name')
     .where((f, fns) => fns.in(f.users.id, [1, 2, 3]))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(inLiteral).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(inLiteral).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('IN with expression array', () => {
@@ -46,9 +47,9 @@ test('IN with expression array', () => {
     .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name')
     .where((f, fns) => fns.in(f.users.id, [f.posts.user_id]))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(inExpressions).toEqualTypeOf<Promise<{ name: string }>>();
+  expectTypeOf(inExpressions).toEqualTypeOf<SqlQueryPlan<{ name: string }>>();
 });
 
 test('IN with mixed array (literals + expressions)', () => {
@@ -56,27 +57,27 @@ test('IN with mixed array (literals + expressions)', () => {
     .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name')
     .where((f, fns) => fns.in(f.users.id, [1, f.posts.user_id, 3]))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(inMixed).toEqualTypeOf<Promise<{ name: string }>>();
+  expectTypeOf(inMixed).toEqualTypeOf<SqlQueryPlan<{ name: string }>>();
 });
 
 test('NOT IN with subquery', () => {
   const notInSubquery = db.users
     .select('id', 'name')
     .where((f, fns) => fns.notIn(f.users.id, db.posts.select('user_id')))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(notInSubquery).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(notInSubquery).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('NOT IN with literal array', () => {
   const notInLiteral = db.users
     .select('id', 'name')
     .where((f, fns) => fns.notIn(f.users.id, [1, 2, 3]))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(notInLiteral).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(notInLiteral).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('type-mismatched subquery — title is text, id is int4', () => {
@@ -84,7 +85,7 @@ test('type-mismatched subquery — title is text, id is int4', () => {
     .select('id')
     // @ts-expect-error type mismatch: title (text) is not compatible with id (int4)
     .where((f, fns) => fns.in(f.users.id, db.posts.select('title')))
-    .firstOrThrow();
+    .build();
 });
 
 test('multi-column subquery with different types', () => {
@@ -92,7 +93,7 @@ test('multi-column subquery with different types', () => {
     .select('id')
     // @ts-expect-error multi-column subquery not allowed in scalar IN
     .where((f, fns) => fns.in(f.users.id, db.posts.select('user_id', 'title')))
-    .firstOrThrow();
+    .build();
 });
 
 test('type-mismatched literal array — strings vs int expression', () => {
@@ -100,7 +101,7 @@ test('type-mismatched literal array — strings vs int expression', () => {
     .select('id')
     // @ts-expect-error string array not compatible with int4 column
     .where((f, fns) => fns.in(f.users.id, ['hello', 'world']))
-    .firstOrThrow();
+    .build();
 });
 
 test('EXISTS with grouped subquery', () => {
@@ -115,7 +116,7 @@ test('EXISTS with grouped subquery', () => {
           .having((_pf, pfns) => pfns.gt(pfns.count(), 5)),
       ),
     )
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(existsGrouped).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(existsGrouped).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });

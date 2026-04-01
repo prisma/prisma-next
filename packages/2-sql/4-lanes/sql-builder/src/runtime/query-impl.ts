@@ -1,4 +1,5 @@
 import { DerivedTableSource, type SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   AggregateFunctions,
   BooleanCodecType,
@@ -123,23 +124,8 @@ abstract class QueryBase<
     return buildSelectAst(this.state);
   }
 
-  async first(): Promise<ResolveRow<RowType, QC['codecTypes']> | null> {
-    const plan = buildPlan(this.state, this.ctx);
-    for await (const row of this.ctx.runtime.execute(plan)) {
-      return row as ResolveRow<RowType, QC['codecTypes']>;
-    }
-    return null;
-  }
-
-  async firstOrThrow(): Promise<ResolveRow<RowType, QC['codecTypes']>> {
-    const result = await this.first();
-    if (result === null) throw new Error('Expected at least one row, but none were returned');
-    return result;
-  }
-
-  all(): AsyncIterable<ResolveRow<RowType, QC['codecTypes']>> {
-    const plan = buildPlan(this.state, this.ctx);
-    return this.ctx.runtime.execute(plan) as AsyncIterable<ResolveRow<RowType, QC['codecTypes']>>;
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>> {
+    return buildPlan(this.state, this.ctx);
   }
 }
 

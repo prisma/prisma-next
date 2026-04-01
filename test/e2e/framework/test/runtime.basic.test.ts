@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
-import { collect, emitAndVerifyContract, withTestRuntime } from './utils';
+import { emitAndVerifyContract, withTestRuntime } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,14 +23,14 @@ describe('end-to-end basic queries', () => {
   it(
     'returns multiple rows with correct types',
     async () => {
-      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+      await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
         await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
           'ada@example.com',
           'tess@example.com',
           'mike@example.com',
         ]);
 
-        const rows = await collect(db.user.select('id', 'email').all());
+        const rows = await runtime.execute(db.user.select('id', 'email').build());
 
         expect(rows.length).toBeGreaterThan(1);
         expect(rows[0]).toMatchObject({

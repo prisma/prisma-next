@@ -8,7 +8,7 @@ import type {
   OrderByScope,
 } from '../expression';
 import type { GatedMethod, QueryContext, Scope, ScopeField, Subquery } from '../scope';
-import type { WithAlias, WithDistinct, WithExecution, WithPagination } from './shared';
+import type { WithAlias, WithBuild, WithDistinct, WithPagination } from './shared';
 
 export interface GroupedQuery<
   QC extends QueryContext,
@@ -18,7 +18,7 @@ export interface GroupedQuery<
     WithPagination,
     WithDistinct,
     WithAlias<RowType>,
-    WithExecution<QC, RowType> {
+    WithBuild<QC, RowType> {
   groupBy(
     ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
   ): GroupedQuery<QC, AvailableScope, RowType>;

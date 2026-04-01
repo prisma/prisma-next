@@ -1,3 +1,4 @@
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
@@ -7,9 +8,9 @@ test('basic groupBy with count', () => {
     .select('name')
     .select('postCount', (_f, fns) => fns.count())
     .groupBy('name')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(postsPerUser).toEqualTypeOf<Promise<{ name: string; postCount: number }>>();
+  expectTypeOf(postsPerUser).toEqualTypeOf<SqlQueryPlan<{ name: string; postCount: number }>>();
 });
 
 test('groupBy with select alias', () => {
@@ -17,9 +18,9 @@ test('groupBy with select alias', () => {
     .select('author', (f) => f.name)
     .select('total', (_f, fns) => fns.count())
     .groupBy('author')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(byAlias).toEqualTypeOf<Promise<{ author: string; total: number }>>();
+  expectTypeOf(byAlias).toEqualTypeOf<SqlQueryPlan<{ author: string; total: number }>>();
 });
 
 test('HAVING with aggregate expression', () => {
@@ -29,9 +30,9 @@ test('HAVING with aggregate expression', () => {
     .select('postCount', (f, fns) => fns.count(f.posts.id))
     .groupBy('name')
     .having((_f, fns) => fns.gt(fns.count(), 5))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(activeAuthors).toEqualTypeOf<Promise<{ name: string; postCount: number }>>();
+  expectTypeOf(activeAuthors).toEqualTypeOf<SqlQueryPlan<{ name: string; postCount: number }>>();
 });
 
 test('HAVING referencing a select alias', () => {
@@ -41,9 +42,9 @@ test('HAVING referencing a select alias', () => {
     .select('postCount', (_f, fns) => fns.count())
     .groupBy('name')
     .having((f, fns) => fns.gt(f.postCount, 5))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(havingAlias).toEqualTypeOf<Promise<{ name: string; postCount: number }>>();
+  expectTypeOf(havingAlias).toEqualTypeOf<SqlQueryPlan<{ name: string; postCount: number }>>();
 });
 
 test('chained groupBy', () => {
@@ -53,9 +54,11 @@ test('chained groupBy', () => {
     .select('cnt', (_f, fns) => fns.count())
     .groupBy('name')
     .groupBy('title')
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(multiGroup).toEqualTypeOf<Promise<{ name: string; title: string; cnt: number }>>();
+  expectTypeOf(multiGroup).toEqualTypeOf<
+    SqlQueryPlan<{ name: string; title: string; cnt: number }>
+  >();
 });
 
 test('groupBy with expression', () => {
@@ -63,9 +66,9 @@ test('groupBy with expression', () => {
     .select('email')
     .select('userCount', (_f, fns) => fns.count())
     .groupBy((f) => f.email)
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(byExpr).toEqualTypeOf<Promise<{ email: string; userCount: number }>>();
+  expectTypeOf(byExpr).toEqualTypeOf<SqlQueryPlan<{ email: string; userCount: number }>>();
 });
 
 test('ORDER BY aggregate on grouped query', () => {
@@ -76,9 +79,9 @@ test('ORDER BY aggregate on grouped query', () => {
     .groupBy('name')
     .orderBy((_f, fns) => fns.count(), { direction: 'desc' })
     .limit(10)
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(orderedGroup).toEqualTypeOf<Promise<{ name: string; postCount: number }>>();
+  expectTypeOf(orderedGroup).toEqualTypeOf<SqlQueryPlan<{ name: string; postCount: number }>>();
 });
 
 test('grouped subquery as join source', () => {
@@ -92,9 +95,9 @@ test('grouped subquery as join source', () => {
       (f, fns) => fns.eq(f.users.id, f.pc.user_id),
     )
     .select((f) => ({ name: f.users.name, postCount: f.pc.postCount }))
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(withCounts).toEqualTypeOf<Promise<{ name: string; postCount: number }>>();
+  expectTypeOf(withCounts).toEqualTypeOf<SqlQueryPlan<{ name: string; postCount: number }>>();
 });
 
 test('sum/avg/min/max aggregate functions', () => {
@@ -104,10 +107,10 @@ test('sum/avg/min/max aggregate functions', () => {
     .select('minViews', (f, fns) => fns.min(f.views))
     .select('maxViews', (f, fns) => fns.max(f.views))
     .groupBy((f) => f.user_id)
-    .firstOrThrow();
+    .build();
 
   expectTypeOf(aggregates).toEqualTypeOf<
-    Promise<{
+    SqlQueryPlan<{
       totalViews: number | null;
       avgViews: number | null;
       minViews: number | null;
@@ -120,9 +123,9 @@ test('aggregates in select are allowed (fns.count available)', () => {
   const selectAgg = db.users
     .select('name')
     .select('cnt', (_f, fns) => fns.count())
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(selectAgg).toEqualTypeOf<Promise<{ name: string; cnt: number }>>();
+  expectTypeOf(selectAgg).toEqualTypeOf<SqlQueryPlan<{ name: string; cnt: number }>>();
 });
 
 test('aggregates in WHERE — type error', () => {
@@ -130,7 +133,7 @@ test('aggregates in WHERE — type error', () => {
     .select('name')
     // @ts-expect-error count is not available in where (Functions, not AggregateFunctions)
     .where((_f, fns) => fns.gt(fns.count(), 5))
-    .firstOrThrow();
+    .build();
 });
 
 test('HAVING without GROUP BY — type error', () => {
@@ -138,5 +141,5 @@ test('HAVING without GROUP BY — type error', () => {
     .select('name')
     // @ts-expect-error having only exists on GroupedQuery, not SelectQuery
     .having((_f, fns) => fns.gt(fns.count(), 5))
-    .firstOrThrow();
+    .build();
 });

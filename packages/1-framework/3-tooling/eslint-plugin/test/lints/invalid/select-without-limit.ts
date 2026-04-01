@@ -6,7 +6,6 @@ import { loadContract } from '../../utils';
 const contract = loadContract<Contract>('user');
 const adapter = createStubAdapter();
 const context = createTestContext(contract, adapter);
-const runtime = {} as Parameters<typeof sql>[0]['runtime'];
-const db = sql<typeof contract>({ context, runtime });
+const db = sql<typeof contract>({ context });
 
-db.user.select('id', 'email').all();
+db.user.select('id', 'email').build();

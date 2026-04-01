@@ -10,14 +10,17 @@ const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 describe('DML E2E Tests', { timeout: 30000 }, () => {
   it('inserts, updates, and deletes a user', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
       // Insert
-      await db.user.insert({ email: 'e2e@example.com' }).first();
+      await runtime.execute(db.user.insert({ email: 'e2e@example.com' }).build());
 
-      const inserted = await db.user
-        .select('id', 'email', 'created_at', 'update_at')
-        .where((f, fns) => fns.eq(f.email, 'e2e@example.com'))
-        .first();
+      const insertedRows = await runtime.execute(
+        db.user
+          .select('id', 'email', 'created_at', 'update_at')
+          .where((f, fns) => fns.eq(f.email, 'e2e@example.com'))
+          .build(),
+      );
+      const inserted = insertedRows[0];
 
       expect(inserted).toMatchObject({
         id: expect.any(Number),
@@ -29,15 +32,20 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
       const userId = inserted!.id;
 
       // Update
-      await db.user
-        .update({ email: 'updated-e2e@example.com' })
-        .where((f, fns) => fns.eq(f.id, userId))
-        .first();
+      await runtime.execute(
+        db.user
+          .update({ email: 'updated-e2e@example.com' })
+          .where((f, fns) => fns.eq(f.id, userId))
+          .build(),
+      );
 
-      const updated = await db.user
-        .select('id', 'email')
-        .where((f, fns) => fns.eq(f.id, userId))
-        .first();
+      const updatedRows = await runtime.execute(
+        db.user
+          .select('id', 'email')
+          .where((f, fns) => fns.eq(f.id, userId))
+          .build(),
+      );
+      const updated = updatedRows[0];
 
       expect(updated).toMatchObject({
         id: userId,
@@ -45,10 +53,12 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
       });
 
       // Delete
-      await db.user
-        .delete()
-        .where((f, fns) => fns.eq(f.id, userId))
-        .first();
+      await runtime.execute(
+        db.user
+          .delete()
+          .where((f, fns) => fns.eq(f.id, userId))
+          .build(),
+      );
 
       // Verify deleted
       const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [userId]);
@@ -61,13 +71,16 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
   const UUIDV7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   it('auto-generates a valid UUIDv7 id on insert', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ db }) => {
-      await db.event.insert({ name: 'uuidv7-test-event' }).first();
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
+      await runtime.execute(db.event.insert({ name: 'uuidv7-test-event' }).build());
 
-      const row = await db.event
-        .select('id', 'name', 'created_at', 'scheduled_at')
-        .where((f, fns) => fns.eq(f.name, 'uuidv7-test-event'))
-        .first();
+      const rows = await runtime.execute(
+        db.event
+          .select('id', 'name', 'created_at', 'scheduled_at')
+          .where((f, fns) => fns.eq(f.name, 'uuidv7-test-event'))
+          .build(),
+      );
+      const row = rows[0];
 
       expect(row).toMatchObject({
         id: expect.stringMatching(UUIDV7_REGEX),
@@ -79,15 +92,18 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
   });
 
   it('allows overriding the auto-generated id', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ db }) => {
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       const overrideId = '019470ab-9a66-7000-8000-000000000001';
 
-      await db.event.insert({ id: overrideId, name: 'override-event' }).first();
+      await runtime.execute(db.event.insert({ id: overrideId, name: 'override-event' }).build());
 
-      const row = await db.event
-        .select('id', 'name')
-        .where((f, fns) => fns.eq(f.id, overrideId))
-        .first();
+      const rows = await runtime.execute(
+        db.event
+          .select('id', 'name')
+          .where((f, fns) => fns.eq(f.id, overrideId))
+          .build(),
+      );
+      const row = rows[0];
 
       expect(row).toMatchObject({
         id: overrideId,
@@ -97,28 +113,36 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
   });
 
   it('updates and deletes by UUIDv7 id', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ db, client }) => {
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
       // Insert (auto-generated id)
-      await db.event.insert({ name: 'to-be-updated' }).first();
+      await runtime.execute(db.event.insert({ name: 'to-be-updated' }).build());
 
-      const inserted = await db.event
-        .select('id', 'name')
-        .where((f, fns) => fns.eq(f.name, 'to-be-updated'))
-        .first();
+      const insertedRows = await runtime.execute(
+        db.event
+          .select('id', 'name')
+          .where((f, fns) => fns.eq(f.name, 'to-be-updated'))
+          .build(),
+      );
+      const inserted = insertedRows[0];
 
       const eventId = inserted!.id;
       expect(eventId).toMatch(UUIDV7_REGEX);
 
       // Update
-      await db.event
-        .update({ name: 'updated-event' })
-        .where((f, fns) => fns.eq(f.id, eventId))
-        .first();
+      await runtime.execute(
+        db.event
+          .update({ name: 'updated-event' })
+          .where((f, fns) => fns.eq(f.id, eventId))
+          .build(),
+      );
 
-      const updated = await db.event
-        .select('id', 'name')
-        .where((f, fns) => fns.eq(f.id, eventId))
-        .first();
+      const updatedRows = await runtime.execute(
+        db.event
+          .select('id', 'name')
+          .where((f, fns) => fns.eq(f.id, eventId))
+          .build(),
+      );
+      const updated = updatedRows[0];
 
       expect(updated).toMatchObject({
         id: eventId,
@@ -126,10 +150,12 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
       });
 
       // Delete
-      await db.event
-        .delete()
-        .where((f, fns) => fns.eq(f.id, eventId))
-        .first();
+      await runtime.execute(
+        db.event
+          .delete()
+          .where((f, fns) => fns.eq(f.id, eventId))
+          .build(),
+      );
 
       // Verify deleted
       const selectResult = await client.query('SELECT * FROM "event" WHERE id = $1', [eventId]);
@@ -138,12 +164,15 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
   });
 
   it('applies literal defaults for every supported type', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ db }) => {
-      await db.literal_defaults.insert({}).first();
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
+      await runtime.execute(db.literal_defaults.insert({}).build());
 
-      const row = await db.literal_defaults
-        .select('id', 'label', 'score', 'rating', 'active', 'big_count', 'metadata', 'tags')
-        .first();
+      const rows = await runtime.execute(
+        db.literal_defaults
+          .select('id', 'label', 'score', 'rating', 'active', 'big_count', 'metadata', 'tags')
+          .build(),
+      );
+      const row = rows[0];
 
       expect(row).not.toBeNull();
       expect(row!.id).toEqual(expect.any(Number));
@@ -158,7 +187,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
   });
 
   it('supports typed jsonb/json values in insert and select clauses', async () => {
-    await withTestRuntime<Contract>(contractJsonPath, async ({ db }) => {
+    await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       const profile = {
         displayName: 'e2e',
         tags: ['typed', 'json'],
@@ -170,28 +199,36 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         verified: true,
       } as const;
 
-      await db.user.insert({ email: 'json@example.com', profile }).first();
+      await runtime.execute(db.user.insert({ email: 'json@example.com', profile }).build());
 
-      const userRow = await db.user
-        .select('id', 'profile')
-        .where((f, fns) => fns.eq(f.email, 'json@example.com'))
-        .first();
+      const userRows = await runtime.execute(
+        db.user
+          .select('id', 'profile')
+          .where((f, fns) => fns.eq(f.email, 'json@example.com'))
+          .build(),
+      );
+      const userRow = userRows[0];
 
       expect(userRow).toMatchObject({ profile });
 
-      await db.post
-        .insert({
-          userId: userRow!.id,
-          title: 'Typed JSON post',
-          published: true,
-          meta,
-        })
-        .first();
+      await runtime.execute(
+        db.post
+          .insert({
+            userId: userRow!.id,
+            title: 'Typed JSON post',
+            published: true,
+            meta,
+          })
+          .build(),
+      );
 
-      const postRow = await db.post
-        .select('id', 'meta')
-        .where((f, fns) => fns.eq(f.title, 'Typed JSON post'))
-        .first();
+      const postRows = await runtime.execute(
+        db.post
+          .select('id', 'meta')
+          .where((f, fns) => fns.eq(f.title, 'Typed JSON post'))
+          .build(),
+      );
+      const postRow = postRows[0];
 
       expect(postRow).toMatchObject({ meta });
     });

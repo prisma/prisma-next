@@ -1,22 +1,23 @@
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
 test('limit with literal number', () => {
-  const literalLimit = db.users.select('id', 'name').limit(10).firstOrThrow();
+  const literalLimit = db.users.select('id', 'name').limit(10).build();
 
-  expectTypeOf(literalLimit).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(literalLimit).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('offset with literal number', () => {
-  const literalOffset = db.users.select('id', 'name').offset(5).firstOrThrow();
+  const literalOffset = db.users.select('id', 'name').offset(5).build();
 
-  expectTypeOf(literalOffset).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(literalOffset).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('both limit and offset with literal numbers', () => {
-  const both = db.users.select('id', 'name').limit(10).offset(5).firstOrThrow();
+  const both = db.users.select('id', 'name').limit(10).offset(5).build();
 
-  expectTypeOf(both).toEqualTypeOf<Promise<{ id: number; name: string }>>();
+  expectTypeOf(both).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
 });
 
 test('pagination after join preserves row type', () => {
@@ -25,7 +26,7 @@ test('pagination after join preserves row type', () => {
     .select('name', 'title')
     .limit(10)
     .offset(5)
-    .firstOrThrow();
+    .build();
 
-  expectTypeOf(joined).toEqualTypeOf<Promise<{ name: string; title: string }>>();
+  expectTypeOf(joined).toEqualTypeOf<SqlQueryPlan<{ name: string; title: string }>>();
 });
