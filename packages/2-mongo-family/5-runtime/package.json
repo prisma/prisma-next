@@ -25,7 +25,7 @@
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
-    "mongodb": "^6.16.0",
+    "mongodb": "catalog:",
     "mongodb-memory-server": "^10.4.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
