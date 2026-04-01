@@ -31,6 +31,7 @@
     "src"
   ],
   "exports": {
+    "./authoring": "./dist/authoring.mjs",
     "./factories": "./dist/factories.mjs",
     "./pack-types": "./dist/pack-types.mjs",
     "./types": "./dist/types.mjs",

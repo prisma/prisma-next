@@ -1,4 +1,12 @@
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
+import type {
+  AuthoringFieldPresetDescriptor,
+  ExtensionPackRef,
+  TargetPackRef,
+} from '@prisma-next/contract/framework-components';
+import {
+  instantiateAuthoringFieldPreset,
+  validateAuthoringHelperArguments,
+} from '@prisma-next/contract/framework-components';
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
@@ -8,6 +16,7 @@ import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
 } from '@prisma-next/contract-authoring';
+import { portableSqlAuthoringFieldPresets } from '@prisma-next/sql-contract/authoring';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 
 export type NamingStrategy = 'identity' | 'snake_case';
@@ -128,59 +137,31 @@ type AnyScalarFieldState = ScalarFieldState<
   NamedConstraintSpec | undefined
 >;
 
-const SQL_TEXT_DESCRIPTOR = {
-  codecId: 'sql/text@1',
-  nativeType: 'text',
-} as const satisfies ColumnTypeDescriptor;
-
-const SQL_TIMESTAMP_DESCRIPTOR = {
-  codecId: 'sql/timestamp@1',
-  nativeType: 'timestamp',
-} as const satisfies ColumnTypeDescriptor;
-
-const SQL_CHARACTER_DESCRIPTOR = {
-  codecId: 'sql/char@1',
-  nativeType: 'character',
-} as const satisfies ColumnTypeDescriptor;
-
-const SQL_UUID_DESCRIPTOR = {
-  codecId: 'sql/char@1',
-  nativeType: 'character',
-  typeParams: { length: 36 },
-} as const satisfies ColumnTypeDescriptor;
-
-const ULID_DESCRIPTOR = {
-  codecId: 'sql/char@1',
-  nativeType: 'character',
-  typeParams: { length: 26 },
-} as const satisfies ColumnTypeDescriptor;
-
-const CUID2_DESCRIPTOR = {
-  codecId: 'sql/char@1',
-  nativeType: 'character',
-  typeParams: { length: 24 },
-} as const satisfies ColumnTypeDescriptor;
-
-const KSUID_DESCRIPTOR = {
-  codecId: 'sql/char@1',
-  nativeType: 'character',
-  typeParams: { length: 27 },
-} as const satisfies ColumnTypeDescriptor;
-
-type BuiltinIdGeneratorId = 'ulid' | 'nanoid' | 'uuidv7' | 'uuidv4' | 'cuid2' | 'ksuid';
-
 type NanoidGeneratorOptions = {
   readonly size?: number;
 };
 
-type BuiltinIdGeneratorOptionsById = {
-  readonly ulid: undefined;
-  readonly nanoid: NanoidGeneratorOptions | undefined;
-  readonly uuidv7: undefined;
-  readonly uuidv4: undefined;
-  readonly cuid2: undefined;
-  readonly ksuid: undefined;
-};
+type NamedConstraintState<
+  Enabled extends boolean,
+  Name extends string | undefined = undefined,
+> = Enabled extends true ? NamedConstraintSpec<Name> : undefined;
+
+type FieldBuilderFromPresetDescriptor<
+  Descriptor extends AuthoringFieldPresetDescriptor,
+  Name extends string | undefined = undefined,
+> = ScalarFieldBuilder<
+  ScalarFieldState<
+    Descriptor['output']['codecId'] extends string ? Descriptor['output']['codecId'] : string,
+    undefined,
+    Descriptor['output'] extends { readonly nullable: true } ? true : false,
+    undefined,
+    NamedConstraintState<Descriptor['output'] extends { readonly id: true } ? true : false, Name>,
+    NamedConstraintState<
+      Descriptor['output'] extends { readonly unique: true } ? true : false,
+      Name
+    >
+  >
+>;
 
 function isColumnDefault(value: unknown): value is ColumnDefault {
   if (typeof value !== 'object' || value === null) return false;
@@ -407,146 +388,141 @@ function namedTypeField(
   });
 }
 
-function textField(): ScalarFieldBuilder<
-  ScalarFieldState<typeof SQL_TEXT_DESCRIPTOR.codecId, undefined>
+function buildFieldPreset<
+  Descriptor extends AuthoringFieldPresetDescriptor,
+  const Name extends string | undefined = undefined,
+>(
+  helperPath: string,
+  descriptor: Descriptor,
+  args: readonly unknown[],
+  namedConstraintOptions?: NamedConstraintSpec<Name>,
+): FieldBuilderFromPresetDescriptor<Descriptor, Name> {
+  validateAuthoringHelperArguments(helperPath, descriptor.args, args);
+  const preset = instantiateAuthoringFieldPreset(descriptor, args);
+
+  return new ScalarFieldBuilder({
+    kind: 'scalar',
+    descriptor: preset.descriptor,
+    nullable: preset.nullable,
+    ...(preset.default ? { default: preset.default as ColumnDefault } : {}),
+    ...(preset.executionDefault
+      ? { executionDefault: preset.executionDefault as ExecutionMutationDefaultValue }
+      : {}),
+    ...(preset.id
+      ? {
+          id: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
+        }
+      : {}),
+    ...(preset.unique
+      ? {
+          unique: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
+        }
+      : {}),
+  }) as FieldBuilderFromPresetDescriptor<Descriptor, Name>;
+}
+
+function textField(): FieldBuilderFromPresetDescriptor<
+  typeof portableSqlAuthoringFieldPresets.text
 > {
-  return columnField(SQL_TEXT_DESCRIPTOR);
+  return buildFieldPreset('field.text', portableSqlAuthoringFieldPresets.text, []);
 }
 
-function timestampField(): ScalarFieldBuilder<
-  ScalarFieldState<typeof SQL_TIMESTAMP_DESCRIPTOR.codecId, undefined>
+function timestampField(): FieldBuilderFromPresetDescriptor<
+  typeof portableSqlAuthoringFieldPresets.timestamp
 > {
-  return columnField(SQL_TIMESTAMP_DESCRIPTOR);
+  return buildFieldPreset('field.timestamp', portableSqlAuthoringFieldPresets.timestamp, []);
 }
 
-function createdAtField(): ScalarFieldBuilder<
-  ScalarFieldState<typeof SQL_TIMESTAMP_DESCRIPTOR.codecId, undefined>
+function createdAtField(): FieldBuilderFromPresetDescriptor<
+  typeof portableSqlAuthoringFieldPresets.createdAt
 > {
-  return timestampField().defaultSql('CURRENT_TIMESTAMP');
+  return buildFieldPreset('field.createdAt', portableSqlAuthoringFieldPresets.createdAt, []);
 }
 
-function uuidField(): ScalarFieldBuilder<
-  ScalarFieldState<typeof SQL_UUID_DESCRIPTOR.codecId, undefined>
+function uuidField(): FieldBuilderFromPresetDescriptor<
+  typeof portableSqlAuthoringFieldPresets.uuid
 > {
-  return columnField(SQL_UUID_DESCRIPTOR);
+  return buildFieldPreset('field.uuid', portableSqlAuthoringFieldPresets.uuid, []);
 }
 
-function ulidField(): ScalarFieldBuilder<
-  ScalarFieldState<typeof ULID_DESCRIPTOR.codecId, undefined>
+function ulidField(): FieldBuilderFromPresetDescriptor<
+  typeof portableSqlAuthoringFieldPresets.ulid
 > {
-  return columnField(ULID_DESCRIPTOR);
-}
-
-function cuid2Field(): ScalarFieldBuilder<
-  ScalarFieldState<typeof CUID2_DESCRIPTOR.codecId, undefined>
-> {
-  return columnField(CUID2_DESCRIPTOR);
-}
-
-function ksuidField(): ScalarFieldBuilder<
-  ScalarFieldState<typeof KSUID_DESCRIPTOR.codecId, undefined>
-> {
-  return columnField(KSUID_DESCRIPTOR);
-}
-
-function assertValidNanoidSize(size: unknown): asserts size is number {
-  if (typeof size !== 'number' || !Number.isInteger(size) || size < 2 || size > 255) {
-    throw new Error('field.nanoid({ size }) requires an integer size between 2 and 255.');
-  }
-}
-
-function resolveNanoidLength(options?: NanoidGeneratorOptions): number {
-  const size = options?.size;
-  if (size === undefined) {
-    return 21;
-  }
-
-  assertValidNanoidSize(size);
-  return size;
+  return buildFieldPreset('field.ulid', portableSqlAuthoringFieldPresets.ulid, []);
 }
 
 function nanoidField(
   options?: NanoidGeneratorOptions,
-): ScalarFieldBuilder<ScalarFieldState<typeof SQL_CHARACTER_DESCRIPTOR.codecId, undefined>> {
-  return columnField({
-    ...SQL_CHARACTER_DESCRIPTOR,
-    typeParams: {
-      length: resolveNanoidLength(options),
-    },
-  } as const satisfies ColumnTypeDescriptor);
+): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.nanoid> {
+  return buildFieldPreset(
+    'field.nanoid',
+    portableSqlAuthoringFieldPresets.nanoid,
+    options === undefined ? [] : [options],
+  );
 }
 
-function createBuiltinIdField<
-  GeneratorId extends BuiltinIdGeneratorId,
-  const Name extends string | undefined = undefined,
->(
-  generatorId: GeneratorId,
-  generatorOptions: BuiltinIdGeneratorOptionsById[GeneratorId],
-  namedConstraintOptions?: NamedConstraintSpec<Name>,
-) {
-  const typeParams =
-    generatorId === 'nanoid'
-      ? { length: resolveNanoidLength(generatorOptions) }
-      : generatorId === 'ulid'
-        ? { length: 26 }
-        : generatorId === 'cuid2'
-          ? { length: 24 }
-          : generatorId === 'ksuid'
-            ? { length: 27 }
-            : { length: 36 };
+function cuid2Field(): FieldBuilderFromPresetDescriptor<
+  typeof portableSqlAuthoringFieldPresets.cuid2
+> {
+  return buildFieldPreset('field.cuid2', portableSqlAuthoringFieldPresets.cuid2, []);
+}
 
-  return generatedField({
-    type: SQL_CHARACTER_DESCRIPTOR,
-    typeParams,
-    generated: {
-      kind: 'generator',
-      id: generatorId,
-      ...(generatorId === 'nanoid' && generatorOptions?.size !== undefined
-        ? {
-            params: {
-              size: generatorOptions.size,
-            },
-          }
-        : {}),
-    } as ExecutionMutationDefaultValue,
-  }).id(namedConstraintOptions);
+function ksuidField(): FieldBuilderFromPresetDescriptor<
+  typeof portableSqlAuthoringFieldPresets.ksuid
+> {
+  return buildFieldPreset('field.ksuid', portableSqlAuthoringFieldPresets.ksuid, []);
 }
 
 function uuidv4IdField<const Name extends string | undefined = undefined>(
   options?: NamedConstraintSpec<Name>,
-) {
-  return createBuiltinIdField('uuidv4', undefined, options);
+): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.uuidv4, Name> {
+  return buildFieldPreset(
+    'field.id.uuidv4',
+    portableSqlAuthoringFieldPresets.id.uuidv4,
+    [],
+    options,
+  );
 }
 
 function uuidv7IdField<const Name extends string | undefined = undefined>(
   options?: NamedConstraintSpec<Name>,
-) {
-  return createBuiltinIdField('uuidv7', undefined, options);
+): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.uuidv7, Name> {
+  return buildFieldPreset(
+    'field.id.uuidv7',
+    portableSqlAuthoringFieldPresets.id.uuidv7,
+    [],
+    options,
+  );
 }
 
 function ulidIdField<const Name extends string | undefined = undefined>(
   options?: NamedConstraintSpec<Name>,
-) {
-  return createBuiltinIdField('ulid', undefined, options);
+): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.ulid, Name> {
+  return buildFieldPreset('field.id.ulid', portableSqlAuthoringFieldPresets.id.ulid, [], options);
 }
 
 function nanoidIdField<const Name extends string | undefined = undefined>(
   options?: NanoidGeneratorOptions,
   namedConstraintOptions?: NamedConstraintSpec<Name>,
-) {
-  return createBuiltinIdField('nanoid', options, namedConstraintOptions);
+): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.nanoid, Name> {
+  return buildFieldPreset(
+    'field.id.nanoid',
+    portableSqlAuthoringFieldPresets.id.nanoid,
+    options === undefined ? [] : [options],
+    namedConstraintOptions,
+  );
 }
 
 function cuid2IdField<const Name extends string | undefined = undefined>(
   options?: NamedConstraintSpec<Name>,
-) {
-  return createBuiltinIdField('cuid2', undefined, options);
+): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.cuid2, Name> {
+  return buildFieldPreset('field.id.cuid2', portableSqlAuthoringFieldPresets.id.cuid2, [], options);
 }
 
 function ksuidIdField<const Name extends string | undefined = undefined>(
   options?: NamedConstraintSpec<Name>,
-) {
-  return createBuiltinIdField('ksuid', undefined, options);
+): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.ksuid, Name> {
+  return buildFieldPreset('field.id.ksuid', portableSqlAuthoringFieldPresets.id.ksuid, [], options);
 }
 
 type RelationModelRefSource = 'string' | 'token' | 'lazyToken';

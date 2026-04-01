@@ -1,4 +1,5 @@
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
+import { portableSqlAuthoringFieldPresets } from '@prisma-next/sql-contract/authoring';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { defineContract, field, model, rel } from '../src/contract-builder';
 
@@ -16,222 +17,7 @@ const postgresTargetPack = {
   targetId: 'postgres',
   version: '0.0.1',
   authoring: {
-    field: {
-      text: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/text@1',
-          nativeType: 'text',
-        },
-      },
-      timestamp: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/timestamp@1',
-          nativeType: 'timestamp',
-        },
-      },
-      createdAt: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/timestamp@1',
-          nativeType: 'timestamp',
-          default: {
-            kind: 'function',
-            expression: 'CURRENT_TIMESTAMP',
-          },
-        },
-      },
-      uuid: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/char@1',
-          nativeType: 'character',
-          typeParams: {
-            length: 36,
-          },
-        },
-      },
-      ulid: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/char@1',
-          nativeType: 'character',
-          typeParams: {
-            length: 26,
-          },
-        },
-      },
-      nanoid: {
-        kind: 'fieldPreset',
-        args: [
-          {
-            kind: 'object',
-            optional: true,
-            properties: {
-              size: {
-                kind: 'number',
-                optional: true,
-                integer: true,
-                minimum: 2,
-                maximum: 255,
-              },
-            },
-          },
-        ],
-        output: {
-          codecId: 'sql/char@1',
-          nativeType: 'character',
-          typeParams: {
-            length: {
-              kind: 'arg',
-              index: 0,
-              path: ['size'],
-              default: 21,
-            },
-          },
-        },
-      },
-      cuid2: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/char@1',
-          nativeType: 'character',
-          typeParams: {
-            length: 24,
-          },
-        },
-      },
-      ksuid: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/char@1',
-          nativeType: 'character',
-          typeParams: {
-            length: 27,
-          },
-        },
-      },
-      id: {
-        uuidv4: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'sql/char@1',
-            nativeType: 'character',
-            typeParams: {
-              length: 36,
-            },
-            executionDefault: {
-              kind: 'generator',
-              id: 'uuidv4',
-            },
-            id: true,
-          },
-        },
-        uuidv7: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'sql/char@1',
-            nativeType: 'character',
-            typeParams: {
-              length: 36,
-            },
-            executionDefault: {
-              kind: 'generator',
-              id: 'uuidv7',
-            },
-            id: true,
-          },
-        },
-        ulid: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'sql/char@1',
-            nativeType: 'character',
-            typeParams: {
-              length: 26,
-            },
-            executionDefault: {
-              kind: 'generator',
-              id: 'ulid',
-            },
-            id: true,
-          },
-        },
-        nanoid: {
-          kind: 'fieldPreset',
-          args: [
-            {
-              kind: 'object',
-              optional: true,
-              properties: {
-                size: {
-                  kind: 'number',
-                  optional: true,
-                  integer: true,
-                  minimum: 2,
-                  maximum: 255,
-                },
-              },
-            },
-          ],
-          output: {
-            codecId: 'sql/char@1',
-            nativeType: 'character',
-            typeParams: {
-              length: {
-                kind: 'arg',
-                index: 0,
-                path: ['size'],
-                default: 21,
-              },
-            },
-            executionDefault: {
-              kind: 'generator',
-              id: 'nanoid',
-              params: {
-                size: {
-                  kind: 'arg',
-                  index: 0,
-                  path: ['size'],
-                },
-              },
-            },
-            id: true,
-          },
-        },
-        cuid2: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'sql/char@1',
-            nativeType: 'character',
-            typeParams: {
-              length: 24,
-            },
-            executionDefault: {
-              kind: 'generator',
-              id: 'cuid2',
-            },
-            id: true,
-          },
-        },
-        ksuid: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'sql/char@1',
-            nativeType: 'character',
-            typeParams: {
-              length: 27,
-            },
-            executionDefault: {
-              kind: 'generator',
-              id: 'ksuid',
-            },
-            id: true,
-          },
-        },
-      },
-    },
+    field: portableSqlAuthoringFieldPresets,
     type: {
       enum: {
         kind: 'typeConstructor',
@@ -376,6 +162,67 @@ describe('staged contract DSL helper vocabulary', () => {
     expect(uuidV4IdState.id).toEqual({});
     expect(uuidV7IdState.id).toEqual({});
     expect(nanoidIdState.id).toEqual({});
+  });
+
+  it('keeps top-level field helpers aligned with target-composed field presets', () => {
+    const topLevelStates = {
+      text: field.text().build(),
+      timestamp: field.timestamp().build(),
+      createdAt: field.createdAt().build(),
+      uuid: field.uuid().build(),
+      nanoid: field.nanoid({ size: 16 }).build(),
+      uuidv7Id: field.id.uuidv7({ name: 'audit_entry_pkey' }).build(),
+      nanoidId: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }).build(),
+    };
+
+    let callbackStates:
+      | {
+          readonly text: ReturnType<typeof field.text> extends { build(): infer State }
+            ? State
+            : never;
+          readonly timestamp: ReturnType<typeof field.timestamp> extends { build(): infer State }
+            ? State
+            : never;
+          readonly createdAt: ReturnType<typeof field.createdAt> extends { build(): infer State }
+            ? State
+            : never;
+          readonly uuid: ReturnType<typeof field.uuid> extends { build(): infer State }
+            ? State
+            : never;
+          readonly nanoid: ReturnType<typeof field.nanoid> extends { build(): infer State }
+            ? State
+            : never;
+          readonly uuidv7Id: ReturnType<typeof field.id.uuidv7> extends { build(): infer State }
+            ? State
+            : never;
+          readonly nanoidId: ReturnType<typeof field.id.nanoid> extends { build(): infer State }
+            ? State
+            : never;
+        }
+      | undefined;
+
+    defineContract(
+      {
+        target: postgresTargetPack,
+      },
+      ({ field }) => {
+        callbackStates = {
+          text: field.text().build(),
+          timestamp: field.timestamp().build(),
+          createdAt: field.createdAt().build(),
+          uuid: field.uuid().build(),
+          nanoid: field.nanoid({ size: 16 }).build(),
+          uuidv7Id: field.id.uuidv7({ name: 'audit_entry_pkey' }).build(),
+          nanoidId: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }).build(),
+        };
+
+        return {
+          models: {},
+        };
+      },
+    );
+
+    expect(callbackStates).toEqual(topLevelStates);
   });
 
   it('supports trailing inline primary-key names on generated id helpers', () => {
