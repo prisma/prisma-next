@@ -429,6 +429,51 @@ describe('staged contract DSL authoring surface', () => {
     });
   });
 
+  it('rejects duplicate table names after applying naming defaults', () => {
+    const BlogPost = model('BlogPost', {
+      fields: {
+        id: field.column(int4Column).id(),
+      },
+    });
+
+    const blogPost = model('blogPost', {
+      fields: {
+        id: field.column(int4Column).id(),
+      },
+    });
+
+    expect(() =>
+      defineContract({
+        target: postgresTargetPack,
+        naming: { tables: 'snake_case' },
+        models: {
+          BlogPost,
+          blogPost,
+        },
+      }),
+    ).toThrow(/Models "BlogPost" and "blogPost" both map to table "blog_post"/);
+  });
+
+  it('rejects duplicate column names after applying naming defaults', () => {
+    const BlogPost = model('BlogPost', {
+      fields: {
+        id: field.column(int4Column).id(),
+        createdAt: field.column(timestamptzColumn),
+        created_at: field.column(timestamptzColumn),
+      },
+    });
+
+    expect(() =>
+      defineContract({
+        target: postgresTargetPack,
+        naming: { columns: 'snake_case' },
+        models: {
+          BlogPost,
+        },
+      }),
+    ).toThrow(/Model "BlogPost" maps both "createdAt" and "created_at" to column "created_at"/);
+  });
+
   it('types local refs and named model tokens separately', () => {
     const Post = model('Post', {
       fields: {

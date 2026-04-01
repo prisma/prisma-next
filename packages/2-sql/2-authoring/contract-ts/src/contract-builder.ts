@@ -1538,6 +1538,7 @@ function buildStagedContract<Definition extends StagedContractInput>(
   emitTypedNamedTypeFallbackWarnings(models, storageTypes);
 
   const modelSpecs = new Map<string, RuntimeModelSpec>();
+  const tableOwners = new Map<string, string>();
   for (const [modelName, modelDefinition] of Object.entries(models)) {
     const tokenModelName = modelDefinition.stageOne.modelName;
     if (tokenModelName && tokenModelName !== modelName) {
@@ -1549,12 +1550,28 @@ function buildStagedContract<Definition extends StagedContractInput>(
     const attributesSpec = modelDefinition.buildAttributesSpec();
     const sqlSpec = modelDefinition.buildSqlSpec();
     const tableName = sqlSpec?.table ?? applyNaming(modelName, definition.naming?.tables);
+    const existingModel = tableOwners.get(tableName);
+    if (existingModel) {
+      throw new Error(
+        `Models "${existingModel}" and "${modelName}" both map to table "${tableName}".`,
+      );
+    }
+    tableOwners.set(tableName, modelName);
     const fieldToColumn: Record<string, string> = {};
+    const columnOwners = new Map<string, string>();
 
     for (const [fieldName, fieldBuilder] of Object.entries(modelDefinition.stageOne.fields)) {
       const fieldState = fieldBuilder.build();
-      fieldToColumn[fieldName] =
+      const columnName =
         fieldState.columnName ?? applyNaming(fieldName, definition.naming?.columns);
+      const existingField = columnOwners.get(columnName);
+      if (existingField) {
+        throw new Error(
+          `Model "${modelName}" maps both "${existingField}" and "${fieldName}" to column "${columnName}".`,
+        );
+      }
+      columnOwners.set(columnName, fieldName);
+      fieldToColumn[fieldName] = columnName;
     }
 
     modelSpecs.set(modelName, {
