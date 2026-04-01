@@ -229,6 +229,20 @@ describe('staged contract DSL helper vocabulary', () => {
     expect(callbackStates).toEqual(topLevelStates);
   });
 
+  it('derives the top-level portable field namespace from the shared preset registry', () => {
+    const topLevelPortableHelpers = Object.keys(field)
+      .filter((helperName) => !['column', 'generated', 'namedType', 'id'].includes(helperName))
+      .sort();
+    const portableRegistryHelpers = Object.keys(portableSqlAuthoringFieldPresets)
+      .filter((helperName) => helperName !== 'id')
+      .sort();
+
+    expect(topLevelPortableHelpers).toEqual(portableRegistryHelpers);
+    expect(Object.keys(field.id).sort()).toEqual(
+      Object.keys(portableSqlAuthoringFieldPresets.id).sort(),
+    );
+  });
+
   it('supports trailing inline primary-key names on generated id helpers', () => {
     const ShortLink = model('ShortLink', {
       fields: {

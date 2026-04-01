@@ -1,12 +1,10 @@
 import type {
+  AuthoringArgumentDescriptor,
   AuthoringFieldPresetDescriptor,
   ExtensionPackRef,
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
-import {
-  instantiateAuthoringFieldPreset,
-  validateAuthoringHelperArguments,
-} from '@prisma-next/contract/framework-components';
+import { instantiateAuthoringFieldPreset } from '@prisma-next/contract/framework-components';
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
@@ -18,6 +16,10 @@ import type {
 } from '@prisma-next/contract-authoring';
 import { portableSqlAuthoringFieldPresets } from '@prisma-next/sql-contract/authoring';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import {
+  createFieldHelpersFromNamespace,
+  createFieldPresetHelper,
+} from './authoring-helper-runtime';
 
 export type NamingStrategy = 'identity' | 'snake_case';
 
@@ -140,10 +142,6 @@ export type GeneratedFieldSpec = {
   readonly generated: ExecutionMutationDefaultValue;
 };
 
-type NanoidGeneratorOptions = {
-  readonly size?: number;
-};
-
 type NamedConstraintState<
   Enabled extends boolean,
   Name extends string | undefined = undefined,
@@ -165,6 +163,82 @@ type FieldBuilderFromPresetDescriptor<
     >
   >
 >;
+
+type OptionalObjectArgumentKeys<Properties extends Record<string, AuthoringArgumentDescriptor>> = {
+  readonly [K in keyof Properties]: Properties[K] extends { readonly optional: true } ? K : never;
+}[keyof Properties];
+
+type ObjectArgumentType<Properties extends Record<string, AuthoringArgumentDescriptor>> = {
+  readonly [K in Exclude<
+    keyof Properties,
+    OptionalObjectArgumentKeys<Properties>
+  >]: ArgTypeFromDescriptor<Properties[K]>;
+} & {
+  readonly [K in OptionalObjectArgumentKeys<Properties>]?: ArgTypeFromDescriptor<Properties[K]>;
+};
+
+type ArgTypeFromDescriptor<Arg extends AuthoringArgumentDescriptor> = Arg extends {
+  readonly kind: 'string';
+}
+  ? string
+  : Arg extends { readonly kind: 'number' }
+    ? number
+    : Arg extends { readonly kind: 'stringArray' }
+      ? readonly string[]
+      : Arg extends {
+            readonly kind: 'object';
+            readonly properties: infer Properties extends Record<
+              string,
+              AuthoringArgumentDescriptor
+            >;
+          }
+        ? ObjectArgumentType<Properties>
+        : never;
+
+type TupleFromArgumentDescriptors<Args extends readonly AuthoringArgumentDescriptor[]> = {
+  readonly [K in keyof Args]: Args[K] extends AuthoringArgumentDescriptor
+    ? ArgTypeFromDescriptor<Args[K]>
+    : never;
+};
+
+type SupportsNamedConstraintOptions<Descriptor extends AuthoringFieldPresetDescriptor> =
+  Descriptor['output'] extends { readonly id: true }
+    ? true
+    : Descriptor['output'] extends { readonly unique: true }
+      ? true
+      : false;
+
+type FieldHelperFunctionWithoutNamedConstraint<Descriptor extends AuthoringFieldPresetDescriptor> =
+  Descriptor extends { readonly args: infer Args extends readonly AuthoringArgumentDescriptor[] }
+    ? <const Params extends TupleFromArgumentDescriptors<Args>>(
+        ...args: Params
+      ) => FieldBuilderFromPresetDescriptor<Descriptor>
+    : () => FieldBuilderFromPresetDescriptor<Descriptor>;
+
+type FieldHelperFunctionWithNamedConstraint<Descriptor extends AuthoringFieldPresetDescriptor> =
+  Descriptor extends { readonly args: infer Args extends readonly AuthoringArgumentDescriptor[] }
+    ? <
+        const Params extends TupleFromArgumentDescriptors<Args>,
+        const Name extends string | undefined = undefined,
+      >(
+        ...args: [...params: Params, options?: NamedConstraintSpec<Name>]
+      ) => FieldBuilderFromPresetDescriptor<Descriptor, Name>
+    : <const Name extends string | undefined = undefined>(
+        options?: NamedConstraintSpec<Name>,
+      ) => FieldBuilderFromPresetDescriptor<Descriptor, Name>;
+
+type FieldHelperFunction<Descriptor extends AuthoringFieldPresetDescriptor> =
+  SupportsNamedConstraintOptions<Descriptor> extends true
+    ? FieldHelperFunctionWithNamedConstraint<Descriptor>
+    : FieldHelperFunctionWithoutNamedConstraint<Descriptor>;
+
+type FieldHelpersFromNamespace<Namespace> = {
+  readonly [K in keyof Namespace]: Namespace[K] extends AuthoringFieldPresetDescriptor
+    ? FieldHelperFunction<Namespace[K]>
+    : Namespace[K] extends Record<string, unknown>
+      ? FieldHelpersFromNamespace<Namespace[K]>
+      : never;
+};
 
 function isColumnDefault(value: unknown): value is ColumnDefault {
   if (typeof value !== 'object' || value === null) return false;
@@ -398,12 +472,10 @@ function buildFieldPreset<
   Descriptor extends AuthoringFieldPresetDescriptor,
   const Name extends string | undefined = undefined,
 >(
-  helperPath: string,
   descriptor: Descriptor,
   args: readonly unknown[],
   namedConstraintOptions?: NamedConstraintSpec<Name>,
 ): FieldBuilderFromPresetDescriptor<Descriptor, Name> {
-  validateAuthoringHelperArguments(helperPath, descriptor.args, args);
   const preset = instantiateAuthoringFieldPreset(descriptor, args);
 
   return new ScalarFieldBuilder({
@@ -427,109 +499,16 @@ function buildFieldPreset<
   }) as FieldBuilderFromPresetDescriptor<Descriptor, Name>;
 }
 
-function textField(): FieldBuilderFromPresetDescriptor<
-  typeof portableSqlAuthoringFieldPresets.text
-> {
-  return buildFieldPreset('field.text', portableSqlAuthoringFieldPresets.text, []);
-}
-
-function timestampField(): FieldBuilderFromPresetDescriptor<
-  typeof portableSqlAuthoringFieldPresets.timestamp
-> {
-  return buildFieldPreset('field.timestamp', portableSqlAuthoringFieldPresets.timestamp, []);
-}
-
-function createdAtField(): FieldBuilderFromPresetDescriptor<
-  typeof portableSqlAuthoringFieldPresets.createdAt
-> {
-  return buildFieldPreset('field.createdAt', portableSqlAuthoringFieldPresets.createdAt, []);
-}
-
-function uuidField(): FieldBuilderFromPresetDescriptor<
-  typeof portableSqlAuthoringFieldPresets.uuid
-> {
-  return buildFieldPreset('field.uuid', portableSqlAuthoringFieldPresets.uuid, []);
-}
-
-function ulidField(): FieldBuilderFromPresetDescriptor<
-  typeof portableSqlAuthoringFieldPresets.ulid
-> {
-  return buildFieldPreset('field.ulid', portableSqlAuthoringFieldPresets.ulid, []);
-}
-
-function nanoidField(
-  options?: NanoidGeneratorOptions,
-): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.nanoid> {
-  return buildFieldPreset(
-    'field.nanoid',
-    portableSqlAuthoringFieldPresets.nanoid,
-    options === undefined ? [] : [options],
-  );
-}
-
-function cuid2Field(): FieldBuilderFromPresetDescriptor<
-  typeof portableSqlAuthoringFieldPresets.cuid2
-> {
-  return buildFieldPreset('field.cuid2', portableSqlAuthoringFieldPresets.cuid2, []);
-}
-
-function ksuidField(): FieldBuilderFromPresetDescriptor<
-  typeof portableSqlAuthoringFieldPresets.ksuid
-> {
-  return buildFieldPreset('field.ksuid', portableSqlAuthoringFieldPresets.ksuid, []);
-}
-
-function uuidv4IdField<const Name extends string | undefined = undefined>(
-  options?: NamedConstraintSpec<Name>,
-): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.uuidv4, Name> {
-  return buildFieldPreset(
-    'field.id.uuidv4',
-    portableSqlAuthoringFieldPresets.id.uuidv4,
-    [],
-    options,
-  );
-}
-
-function uuidv7IdField<const Name extends string | undefined = undefined>(
-  options?: NamedConstraintSpec<Name>,
-): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.uuidv7, Name> {
-  return buildFieldPreset(
-    'field.id.uuidv7',
-    portableSqlAuthoringFieldPresets.id.uuidv7,
-    [],
-    options,
-  );
-}
-
-function ulidIdField<const Name extends string | undefined = undefined>(
-  options?: NamedConstraintSpec<Name>,
-): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.ulid, Name> {
-  return buildFieldPreset('field.id.ulid', portableSqlAuthoringFieldPresets.id.ulid, [], options);
-}
-
-function nanoidIdField<const Name extends string | undefined = undefined>(
-  options?: NanoidGeneratorOptions,
-  namedConstraintOptions?: NamedConstraintSpec<Name>,
-): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.nanoid, Name> {
-  return buildFieldPreset(
-    'field.id.nanoid',
-    portableSqlAuthoringFieldPresets.id.nanoid,
-    options === undefined ? [] : [options],
-    namedConstraintOptions,
-  );
-}
-
-function cuid2IdField<const Name extends string | undefined = undefined>(
-  options?: NamedConstraintSpec<Name>,
-): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.cuid2, Name> {
-  return buildFieldPreset('field.id.cuid2', portableSqlAuthoringFieldPresets.id.cuid2, [], options);
-}
-
-function ksuidIdField<const Name extends string | undefined = undefined>(
-  options?: NamedConstraintSpec<Name>,
-): FieldBuilderFromPresetDescriptor<typeof portableSqlAuthoringFieldPresets.id.ksuid, Name> {
-  return buildFieldPreset('field.id.ksuid', portableSqlAuthoringFieldPresets.id.ksuid, [], options);
-}
+const portableFieldHelpers = createFieldHelpersFromNamespace(
+  portableSqlAuthoringFieldPresets,
+  ({ helperPath, descriptor }) =>
+    createFieldPresetHelper({
+      helperPath: `field.${helperPath}`,
+      descriptor,
+      build: ({ args, namedConstraintOptions }) =>
+        buildFieldPreset(descriptor, args, namedConstraintOptions),
+    }),
+) as FieldHelpersFromNamespace<typeof portableSqlAuthoringFieldPresets>;
 
 type RelationModelRefSource = 'string' | 'token' | 'lazyToken';
 type TargetFieldRefSource = 'string' | 'token';
@@ -1485,23 +1464,12 @@ export const field = {
   column: columnField,
   generated: generatedField,
   namedType: namedTypeField,
-  text: textField,
-  timestamp: timestampField,
-  createdAt: createdAtField,
-  uuid: uuidField,
-  ulid: ulidField,
-  nanoid: nanoidField,
-  cuid2: cuid2Field,
-  ksuid: ksuidField,
-  id: {
-    uuidv4: uuidv4IdField,
-    uuidv7: uuidv7IdField,
-    ulid: ulidIdField,
-    nanoid: nanoidIdField,
-    cuid2: cuid2IdField,
-    ksuid: ksuidIdField,
-  },
-};
+  ...portableFieldHelpers,
+} satisfies {
+  readonly column: typeof columnField;
+  readonly generated: typeof generatedField;
+  readonly namedType: typeof namedTypeField;
+} & FieldHelpersFromNamespace<typeof portableSqlAuthoringFieldPresets>;
 
 export function isStagedContractInput(value: unknown): value is StagedContractInput {
   return typeof value === 'object' && value !== null && 'target' in value;

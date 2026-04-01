@@ -412,6 +412,61 @@ describe('staged contract DSL authoring surface', () => {
     });
   });
 
+  it('lowers hasOne relations through the same staged relation pipeline', () => {
+    const User = model('User', {
+      fields: {
+        id: field.column(textColumn).id(),
+      },
+      relations: {
+        profile: rel.hasOne(() => Profile, { by: 'userId' }),
+      },
+    }).sql({
+      table: 'app_user',
+    });
+
+    const Profile = model('Profile', {
+      fields: {
+        id: field.column(textColumn).id(),
+        userId: field.column(textColumn).column('user_id'),
+      },
+      relations: {
+        user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+      },
+    }).sql(({ cols, constraints }) => ({
+      table: 'user_profile',
+      foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
+    }));
+
+    const contract = defineContract({
+      target: postgresTargetPack,
+      models: {
+        User,
+        Profile,
+      },
+    });
+
+    expect(contract.relations['app_user']).toMatchObject({
+      profile: {
+        to: 'Profile',
+        cardinality: '1:1',
+        on: {
+          parentCols: ['id'],
+          childCols: ['user_id'],
+        },
+      },
+    });
+    expect(contract.relations['user_profile']).toMatchObject({
+      user: {
+        to: 'User',
+        cardinality: 'N:1',
+        on: {
+          parentCols: ['user_id'],
+          childCols: ['id'],
+        },
+      },
+    });
+  });
+
   it('applies root naming defaults and preserves explicit overrides', () => {
     const BlogPost = model('BlogPost', {
       fields: {

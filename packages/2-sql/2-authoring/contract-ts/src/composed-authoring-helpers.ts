@@ -9,13 +9,16 @@ import type {
 } from '@prisma-next/contract/framework-components';
 import {
   instantiateAuthoringFieldPreset,
-  instantiateAuthoringTypeConstructor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
-  validateAuthoringHelperArguments,
 } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import {
+  createFieldHelpersFromNamespace,
+  createFieldPresetHelper,
+  createTypeHelpersFromNamespace,
+} from './authoring-helper-runtime';
 import {
   field,
   model,
@@ -317,116 +320,6 @@ function mergeHelperNamespaces(
   }
 }
 
-function createTypeHelpersFromNamespace(
-  namespace: AuthoringTypeNamespace,
-  path: readonly string[] = [],
-): Record<string, unknown> {
-  const helpers: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(namespace)) {
-    const currentPath = [...path, key];
-
-    if (isAuthoringTypeConstructorDescriptor(value)) {
-      const helperPath = currentPath.join('.');
-      helpers[key] = (...args: readonly unknown[]) => {
-        validateAuthoringHelperArguments(helperPath, value.args, args);
-        return instantiateAuthoringTypeConstructor(value, args) as StorageTypeInstance;
-      };
-      continue;
-    }
-
-    helpers[key] = createTypeHelpersFromNamespace(value as AuthoringTypeNamespace, currentPath);
-  }
-
-  return helpers;
-}
-
-function createFieldHelpersFromNamespace(
-  namespace: AuthoringFieldNamespace,
-  path: readonly string[] = [],
-): Record<string, unknown> {
-  const helpers: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(namespace)) {
-    const currentPath = [...path, key];
-
-    if (isAuthoringFieldPresetDescriptor(value)) {
-      const helperPath = currentPath.join('.');
-      helpers[key] = (...rawArgs: readonly unknown[]) => {
-        const acceptsNamedConstraintOptions =
-          value.output.id === true || value.output.unique === true;
-        const declaredArguments = value.args ?? [];
-
-        if (acceptsNamedConstraintOptions && rawArgs.length > declaredArguments.length + 1) {
-          throw new Error(
-            `${helperPath} expects at most ${declaredArguments.length + 1} argument(s), received ${rawArgs.length}`,
-          );
-        }
-
-        let args = rawArgs;
-        let namedConstraintOptions: RuntimeNamedConstraintSpec | undefined;
-
-        if (acceptsNamedConstraintOptions && rawArgs.length === declaredArguments.length + 1) {
-          const maybeNamedConstraintOptions = rawArgs.at(-1);
-          if (!isNamedConstraintOptionsLike(maybeNamedConstraintOptions)) {
-            throw new Error(
-              `${helperPath} accepts an optional trailing { name?: string } constraint options object`,
-            );
-          }
-          namedConstraintOptions = maybeNamedConstraintOptions;
-          args = rawArgs.slice(0, -1);
-        }
-
-        validateAuthoringHelperArguments(helperPath, value.args, args);
-        const preset = instantiateAuthoringFieldPreset(value, args);
-
-        return new ScalarFieldBuilder({
-          kind: 'scalar',
-          descriptor: preset.descriptor,
-          nullable: preset.nullable,
-          ...(preset.default ? { default: preset.default as ColumnDefault } : {}),
-          ...(preset.executionDefault
-            ? { executionDefault: preset.executionDefault as ExecutionMutationDefaultValue }
-            : {}),
-          ...(preset.id
-            ? {
-                id: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
-              }
-            : {}),
-          ...(preset.unique
-            ? {
-                unique: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
-              }
-            : {}),
-        });
-      };
-      continue;
-    }
-
-    helpers[key] = createFieldHelpersFromNamespace(value as AuthoringFieldNamespace, currentPath);
-  }
-
-  return helpers;
-}
-
-type RuntimeNamedConstraintSpec = {
-  readonly name?: string;
-};
-
-function isNamedConstraintOptionsLike(value: unknown): value is RuntimeNamedConstraintSpec {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return false;
-  }
-
-  const keys = Object.keys(value as Record<string, unknown>);
-  if (keys.some((key) => key !== 'name')) {
-    return false;
-  }
-
-  const name = (value as { readonly name?: unknown }).name;
-  return name === undefined || typeof name === 'string';
-}
-
 function composeTypeNamespace(
   target: TargetPackRef<'sql', string>,
   extensionPacks: Record<string, ExtensionPackRef<'sql', string>> | undefined,
@@ -487,6 +380,34 @@ function createComposedFieldHelpers(
 ): CoreFieldHelpers & Record<string, unknown> {
   const helperNamespace = createFieldHelpersFromNamespace(
     composeFieldNamespace(target, extensionPacks),
+    ({ helperPath, descriptor }) =>
+      createFieldPresetHelper({
+        helperPath,
+        descriptor,
+        build: ({ args, namedConstraintOptions }) => {
+          const preset = instantiateAuthoringFieldPreset(descriptor, args);
+
+          return new ScalarFieldBuilder({
+            kind: 'scalar',
+            descriptor: preset.descriptor,
+            nullable: preset.nullable,
+            ...(preset.default ? { default: preset.default as ColumnDefault } : {}),
+            ...(preset.executionDefault
+              ? { executionDefault: preset.executionDefault as ExecutionMutationDefaultValue }
+              : {}),
+            ...(preset.id
+              ? {
+                  id: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
+                }
+              : {}),
+            ...(preset.unique
+              ? {
+                  unique: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
+                }
+              : {}),
+          });
+        },
+      }),
   );
   const coreFieldHelpers = {
     column: field.column,
