@@ -1,6 +1,8 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
+import type { Db } from '@prisma-next/sql-builder/types';
 import type {
   ExtractTypeMapsFromContract,
   ResolveCodecTypes,
@@ -9,9 +11,6 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { createKyselyLane, type KyselyQueryLane } from '@prisma-next/sql-kysely-lane';
-import type { SelectBuilder } from '@prisma-next/sql-lane';
-import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type { SchemaHandle } from '@prisma-next/sql-relational-core/schema';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
@@ -60,13 +59,7 @@ export interface PostgresClient<
   TContract extends SqlContract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 > {
-  readonly sql: SelectBuilder<
-    TContract,
-    unknown,
-    ResolveCodecTypes<TContract, TTypeMaps>,
-    ResolveOperationTypes<TContract, TTypeMaps>
-  >;
-  readonly kysely: KyselyQueryLane<TContract>;
+  readonly sql: Db<TContract>;
   readonly schema: SchemaHandle<
     TContract,
     ResolveCodecTypes<TContract, TTypeMaps>,
@@ -178,7 +171,7 @@ export default function postgres<
   });
 
   const schema = schemaBuilder<TContract, TTypeMaps>(context);
-  const sql = sqlBuilder<TContract, TTypeMaps>({ context });
+  let sqlInstance: Db<TContract> | undefined;
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -249,9 +242,20 @@ export default function postgres<
     context,
   });
 
+  // sql-builder's sql() requires a Runtime instance at construction time (it's stored in
+  // BuilderContext and used when queries execute via .first()/.all()). Since runtime creation
+  // also initiates background driver connection when a binding is provided, we defer both
+  // runtime and sql creation until first access to preserve the lazy-connect lifecycle.
+  const getSql = (): Db<TContract> => {
+    if (sqlInstance) return sqlInstance;
+    sqlInstance = sqlBuilder<TContract>({ context, runtime: getRuntime() });
+    return sqlInstance;
+  };
+
   return {
-    sql,
-    kysely: createKyselyLane(contract),
+    get sql() {
+      return getSql();
+    },
     schema: schema as PostgresClient<TContract, TTypeMaps>['schema'],
     orm,
     context,

@@ -1,4 +1,3 @@
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 
 /**
@@ -6,8 +5,6 @@ import { db } from '../prisma/db';
  * Intentionally fails when the AST-first lint plugin blocks execution.
  * Used to validate that LINT.DELETE_WITHOUT_WHERE is enforced.
  */
-export async function deleteWithoutWhere(runtime: Runtime) {
-  const query = db.kysely.deleteFrom('user');
-
-  await runtime.execute(db.kysely.build(query)).toArray();
+export async function deleteWithoutWhere() {
+  await db.sql.user.delete().first();
 }

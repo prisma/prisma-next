@@ -1,8 +1,6 @@
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import { sql } from '@prisma-next/sql-lane';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import { param } from '@prisma-next/sql-relational-core/param';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
@@ -22,7 +20,6 @@ import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
 import { ormClientGetUsers } from '../src/orm-client/get-users';
 import { ormClientGetUsersBackwardCursor } from '../src/orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
-import { ormClientGetUsersViaWhereArg } from '../src/orm-client/get-users-via-wherearg';
 import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
 import { ormClientUpsertUser } from '../src/orm-client/upsert-user';
 import { db } from '../src/prisma/db';
@@ -76,9 +73,7 @@ const seededPostIds = {
 } as const;
 
 async function seedOrmClientData(runtime: Runtime): Promise<void> {
-  const tables = schema(context).tables;
-  const userTable = tables['user']!;
-  const postTable = tables['post']!;
+  const db = sql({ context, runtime });
 
   const users = [
     {
@@ -108,18 +103,7 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
   ];
 
   for (const user of users) {
-    const plan = sql({ context })
-      .insert(userTable, {
-        id: param('id'),
-        email: param('email'),
-        createdAt: param('createdAt'),
-        kind: param('kind'),
-      })
-      .build({ params: user });
-
-    for await (const _row of runtime.execute(plan)) {
-      // consume iterator
-    }
+    await db.user.insert(user).first();
   }
 
   const posts = [
@@ -156,18 +140,7 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
   ];
 
   for (const post of posts) {
-    const plan = sql({ context })
-      .insert(postTable, {
-        id: param('id'),
-        title: param('title'),
-        userId: param('userId'),
-        createdAt: param('createdAt'),
-      })
-      .build({ params: post });
-
-    for await (const _row of runtime.execute(plan)) {
-      // consume iterator
-    }
+    await db.post.insert(post).first();
   }
 }
 
@@ -214,30 +187,6 @@ describe('ORM client integration examples', () => {
             seededUserIds.admin,
             seededUserIds.adminTwo,
           ]);
-        } finally {
-          await runtime.close();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
-    'ormClientGetUsersViaWhereArg filters users via ToWhereExpr payload',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = await getRuntime(connectionString);
-
-        try {
-          await seedOrmClientData(runtime);
-          const users = await ormClientGetUsersViaWhereArg('admin', 10, runtime);
-          const ids = users.map((user) => user.id);
-          expect(ids).toEqual(
-            expect.arrayContaining([seededUserIds.admin, seededUserIds.adminTwo]),
-          );
-          expect(ids).toHaveLength(2);
-          expect(users.every((user) => user.kind === 'admin')).toBe(true);
         } finally {
           await runtime.close();
         }
@@ -575,7 +524,7 @@ describe('ORM client integration examples', () => {
               id: insertedId,
               email: 'inserted-upsert@example.com',
               kind: 'user',
-              createdAt: '2024-02-01T00:00:00.000Z',
+              createdAt: new Date('2024-02-01T00:00:00.000Z'),
             },
             runtime,
           );

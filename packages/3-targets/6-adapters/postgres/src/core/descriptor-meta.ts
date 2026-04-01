@@ -179,6 +179,7 @@ export const postgresAdapterDescriptorMeta = {
     },
     sql: {
       enums: true,
+      returning: true,
     },
   },
   types: {

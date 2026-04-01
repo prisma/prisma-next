@@ -36,10 +36,10 @@ import {
   type StandardSchemaLike,
 } from '../core/standard-schema';
 
-export const textColumn: ColumnTypeDescriptor = {
+export const textColumn = {
   codecId: PG_TEXT_CODEC_ID,
   nativeType: 'text',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
 export function charColumn(length: number): ColumnTypeDescriptor & {
   readonly typeParams: { readonly length: number };
@@ -61,30 +61,30 @@ export function varcharColumn(length: number): ColumnTypeDescriptor & {
   } as const;
 }
 
-export const int4Column: ColumnTypeDescriptor = {
+export const int4Column = {
   codecId: PG_INT4_CODEC_ID,
   nativeType: 'int4',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
-export const int2Column: ColumnTypeDescriptor = {
+export const int2Column = {
   codecId: PG_INT2_CODEC_ID,
   nativeType: 'int2',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
-export const int8Column: ColumnTypeDescriptor = {
+export const int8Column = {
   codecId: PG_INT8_CODEC_ID,
   nativeType: 'int8',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
-export const float4Column: ColumnTypeDescriptor = {
+export const float4Column = {
   codecId: PG_FLOAT4_CODEC_ID,
   nativeType: 'float4',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
-export const float8Column: ColumnTypeDescriptor = {
+export const float8Column = {
   codecId: PG_FLOAT8_CODEC_ID,
   nativeType: 'float8',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
 export function numericColumn(
   precision: number,
@@ -99,15 +99,15 @@ export function numericColumn(
   } as const;
 }
 
-export const timestampColumn: ColumnTypeDescriptor = {
+export const timestampColumn = {
   codecId: PG_TIMESTAMP_CODEC_ID,
   nativeType: 'timestamp',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
-export const timestamptzColumn: ColumnTypeDescriptor = {
+export const timestamptzColumn = {
   codecId: PG_TIMESTAMPTZ_CODEC_ID,
   nativeType: 'timestamptz',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
 export function timeColumn(precision?: number): ColumnTypeDescriptor & {
   readonly typeParams?: { readonly precision: number };
@@ -129,10 +129,10 @@ export function timetzColumn(precision?: number): ColumnTypeDescriptor & {
   } as const;
 }
 
-export const boolColumn: ColumnTypeDescriptor = {
+export const boolColumn = {
   codecId: PG_BOOL_CODEC_ID,
   nativeType: 'bool',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
 export function bitColumn(length: number): ColumnTypeDescriptor & {
   readonly typeParams: { readonly length: number };
@@ -164,15 +164,15 @@ export function intervalColumn(precision?: number): ColumnTypeDescriptor & {
   } as const;
 }
 
-export const jsonColumn: ColumnTypeDescriptor = {
+export const jsonColumn = {
   codecId: PG_JSON_CODEC_ID,
   nativeType: 'json',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
-export const jsonbColumn: ColumnTypeDescriptor = {
+export const jsonbColumn = {
   codecId: PG_JSONB_CODEC_ID,
   nativeType: 'jsonb',
-} as const;
+} as const satisfies ColumnTypeDescriptor;
 
 type JsonSchemaTypeParams = {
   readonly schemaJson: Record<string, unknown>;

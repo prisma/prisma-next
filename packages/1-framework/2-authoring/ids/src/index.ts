@@ -40,7 +40,7 @@ function resolveNanoidColumnDescriptor(
   };
 }
 
-const builtinGeneratorMetadataById: Record<BuiltinGeneratorId, BuiltinGeneratorMetadata> = {
+const builtinGeneratorMetadataById = {
   ulid: {
     applicableCodecIds: ['pg/text@1', 'sql/char@1'],
     generatedColumnDescriptor: {
@@ -84,7 +84,7 @@ const builtinGeneratorMetadataById: Record<BuiltinGeneratorId, BuiltinGeneratorM
       typeParams: { length: 27 },
     },
   },
-};
+} as const satisfies Record<BuiltinGeneratorId, BuiltinGeneratorMetadata>;
 
 export const builtinGeneratorRegistryMetadata: ReadonlyArray<{
   readonly id: BuiltinGeneratorId;
@@ -98,25 +98,27 @@ export function resolveBuiltinGeneratedColumnDescriptor(input: {
   readonly id: BuiltinGeneratorId;
   readonly params?: Record<string, unknown>;
 }): GeneratedColumnDescriptor {
-  const metadata = builtinGeneratorMetadataById[input.id];
-  const resolver = metadata.resolveGeneratedColumnDescriptor;
-  if (resolver) {
-    return resolver(input.params);
+  const metadata: BuiltinGeneratorMetadata = builtinGeneratorMetadataById[input.id];
+  if (metadata.resolveGeneratedColumnDescriptor) {
+    return metadata.resolveGeneratedColumnDescriptor(input.params);
   }
   return metadata.generatedColumnDescriptor;
 }
 
-export type GeneratedColumnSpec = {
-  readonly type: ColumnTypeDescriptor;
+export type GeneratedColumnSpec<TCodecId extends string = string> = {
+  readonly type: ColumnTypeDescriptor<TCodecId>;
   readonly nullable?: false;
   readonly typeParams?: Record<string, unknown>;
   readonly generated: ExecutionMutationDefaultValue;
 };
 
+type GeneratorCodecId<TId extends BuiltinGeneratorId> =
+  (typeof builtinGeneratorMetadataById)[TId]['generatedColumnDescriptor']['type']['codecId'];
+
 function createGeneratedSpec<TId extends BuiltinGeneratorId>(
   id: TId,
   options?: IdGeneratorOptionsById[TId],
-): GeneratedColumnSpec {
+): GeneratedColumnSpec<GeneratorCodecId<TId>> {
   const params = options as Record<string, unknown> | undefined;
   const resolvedDescriptor = resolveBuiltinGeneratedColumnDescriptor({
     id,
@@ -131,18 +133,18 @@ function createGeneratedSpec<TId extends BuiltinGeneratorId>(
       id,
       ...ifDefined('params', params),
     },
-  };
+  } as GeneratedColumnSpec<GeneratorCodecId<TId>>;
 }
 
-export const ulid = (options?: IdGeneratorOptionsById['ulid']): GeneratedColumnSpec =>
+export const ulid = (options?: IdGeneratorOptionsById['ulid']) =>
   createGeneratedSpec('ulid', options);
-export const nanoid = (options?: IdGeneratorOptionsById['nanoid']): GeneratedColumnSpec =>
+export const nanoid = (options?: IdGeneratorOptionsById['nanoid']) =>
   createGeneratedSpec('nanoid', options);
-export const uuidv7 = (options?: IdGeneratorOptionsById['uuidv7']): GeneratedColumnSpec =>
+export const uuidv7 = (options?: IdGeneratorOptionsById['uuidv7']) =>
   createGeneratedSpec('uuidv7', options);
-export const uuidv4 = (options?: IdGeneratorOptionsById['uuidv4']): GeneratedColumnSpec =>
+export const uuidv4 = (options?: IdGeneratorOptionsById['uuidv4']) =>
   createGeneratedSpec('uuidv4', options);
-export const cuid2 = (options?: IdGeneratorOptionsById['cuid2']): GeneratedColumnSpec =>
+export const cuid2 = (options?: IdGeneratorOptionsById['cuid2']) =>
   createGeneratedSpec('cuid2', options);
-export const ksuid = (options?: IdGeneratorOptionsById['ksuid']): GeneratedColumnSpec =>
+export const ksuid = (options?: IdGeneratorOptionsById['ksuid']) =>
   createGeneratedSpec('ksuid', options);

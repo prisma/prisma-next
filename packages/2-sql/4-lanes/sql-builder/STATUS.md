@@ -1,4 +1,4 @@
-# sql-builder-new — Status
+# sql-builder — Status
 
 ## What exists
 

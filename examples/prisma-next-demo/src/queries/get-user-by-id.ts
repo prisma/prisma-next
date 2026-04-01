@@ -1,22 +1,9 @@
-import { param } from '@prisma-next/sql-relational-core/param';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
-import { collect } from './utils';
 
-export async function getUserById(userId: string, runtime: Runtime) {
-  const userTable = db.schema.tables.user;
-
-  const plan = db.sql
-    .from(userTable)
-    .where(userTable.columns.id.eq(param('userId')))
-    .select({
-      id: userTable.columns.id,
-      email: userTable.columns.email,
-      createdAt: userTable.columns.createdAt,
-    })
+export async function getUserById(userId: string) {
+  return db.sql.user
+    .select('id', 'email', 'createdAt')
+    .where((f, fns) => fns.eq(f.id, userId))
     .limit(1)
-    .build({ params: { userId } });
-
-  const rows = await collect(runtime.execute(plan));
-  return rows[0] ?? null;
+    .first();
 }

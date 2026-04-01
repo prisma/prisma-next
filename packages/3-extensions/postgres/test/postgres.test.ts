@@ -1,5 +1,4 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { REDACTED_SQL } from '@prisma-next/sql-kysely-lane';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -7,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   createRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
-  createKyselyLane: vi.fn(),
+  sqlBuilder: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
   validateContract: vi.fn(),
@@ -28,13 +27,8 @@ vi.mock('@prisma-next/sql-contract/validate', () => ({
   validateContract: mocks.validateContract,
 }));
 
-vi.mock('@prisma-next/sql-kysely-lane', () => ({
-  REDACTED_SQL: '/* redacted by @prisma-next/sql-kysely-lane */',
-  createKyselyLane: mocks.createKyselyLane,
-}));
-
-vi.mock('@prisma-next/sql-lane', () => ({
-  sql: vi.fn(() => ({ lane: 'sql' })),
+vi.mock('@prisma-next/sql-builder/runtime', () => ({
+  sql: mocks.sqlBuilder,
 }));
 
 vi.mock('@prisma-next/sql-orm-client', () => ({
@@ -97,12 +91,12 @@ describe('postgres', () => {
     mocks.driverConnect.mockReset();
     mocks.validateContract.mockReset();
     mocks.poolCtor.mockReset();
-    mocks.createKyselyLane.mockReset();
+    mocks.sqlBuilder.mockReset();
 
     mocks.createExecutionContext.mockReturnValue({
       contract,
       codecs: {},
-      operations: {},
+      queryOperations: { entries: () => ({}) },
       types: {},
     });
     mocks.createSqlExecutionStack.mockReturnValue({
@@ -116,50 +110,25 @@ describe('postgres', () => {
     mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
-    mocks.createKyselyLane.mockReturnValue({
-      build: vi.fn(),
-      whereExpr: vi.fn(),
-      redactedSql: REDACTED_SQL,
-    });
+    mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
   });
 
-  it('defers stack instantiation runtime creation and pool creation until runtime is called', () => {
+  it('defers stack instantiation runtime creation and pool creation until sql or runtime is accessed', () => {
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
     });
 
-    expect(db.sql).toEqual({ lane: 'sql' });
     expect(db.orm).toEqual({ lane: 'orm' });
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
 
-    db.runtime();
-
+    // accessing db.sql triggers lazy runtime creation
+    expect(db.sql).toEqual({ lane: 'sql' });
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
     expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
     expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
-  });
-
-  it('exposes lane-owned build-only kysely surface', () => {
-    const db = postgres({
-      contract,
-      url: 'postgres://localhost:5432/db',
-    });
-
-    expect(mocks.createKyselyLane).toHaveBeenCalledTimes(1);
-    expect(typeof db.kysely.build).toBe('function');
-    expect(typeof db.kysely.whereExpr).toBe('function');
-  });
-
-  it('exposes lane redacted sql marker', () => {
-    const db = postgres({
-      contract,
-      url: 'postgres://localhost:5432/db',
-    });
-
-    expect(db.kysely.redactedSql).toBe(REDACTED_SQL);
   });
 
   it('memoizes runtime instance', () => {

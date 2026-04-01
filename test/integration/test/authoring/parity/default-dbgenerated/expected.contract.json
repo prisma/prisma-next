@@ -3,7 +3,7 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:439aa8d13a4e7326d69ac80a5f65e0f5cfc876e392af997d5b052eadda9580d4",
-  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
+  "profileHash": "sha256:1628d322a01cac03524fe340fe22d19882ec5ecf0f71f9a32c6c2dfa648a903a",
   "models": {
     "User": {
       "fields": {
@@ -49,7 +49,8 @@
       "returning": true
     },
     "sql": {
-      "enums": true
+      "enums": true,
+      "returning": true
     }
   },
   "extensionPacks": {},

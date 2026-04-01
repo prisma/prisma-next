@@ -1,19 +1,15 @@
-import { sql } from '@prisma-next/sql-lane';
-import { param } from '@prisma-next/sql-relational-core/param';
-import { schema } from '@prisma-next/sql-relational-core/schema';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import type { Contract } from '../../fixtures/user';
 import { loadContract } from '../../utils';
 
-const testContract = loadContract<Contract>('user');
+const contract = loadContract<Contract>('user');
 const adapter = createStubAdapter();
-const context = createTestContext(testContract, adapter);
-const tables = schema(context).tables;
+const context = createTestContext(contract, adapter);
+const runtime = {} as Parameters<typeof sql>[0]['runtime'];
+const db = sql<typeof contract>({ context, runtime });
 
-sql<typeof testContract>({ context })
-  .update(tables.user, {
-    email: param('email'),
-    name: param('name'),
-  })
-  .where(tables.user.columns.id.eq(param('userId')))
-  .build({ params: { email: 'new@example.com', name: 'New Name', userId: 123 } });
+db.user
+  .update({ email: 'new@example.com' })
+  .where((f, fns) => fns.eq(f.id, 123))
+  .first();

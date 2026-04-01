@@ -1,11 +1,11 @@
-# @prisma-next/sql-builder-new
+# @prisma-next/sql-builder
 
 Type-safe SQL query builder for Prisma Next with runtime execution.
 
 ## Usage
 
 ```typescript
-import { sql } from '@prisma-next/sql-builder-new/runtime';
+import { sql } from '@prisma-next/sql-builder/runtime';
 
 const db = sql({ context, runtime });
 

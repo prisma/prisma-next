@@ -16,11 +16,9 @@
  * - users [limit]              List users with optional limit
  * - user <id>                  Get user by ID
  * - posts <userId>             Get posts for a user
- * - users-with-posts [limit]   Users with nested posts
  *
  * See also:
  * - main.ts: Full CLI using emitted contract.json + contract.d.ts
- * - src/app/main.tsx: React browser app for visualizing contract.json
  */
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';
@@ -28,7 +26,6 @@ import { getRuntime } from './prisma-no-emit/runtime';
 import { getUserById } from './queries/get-user-by-id-no-emit';
 import { getUserPosts } from './queries/get-user-posts-no-emit';
 import { getUsers } from './queries/get-users-no-emit';
-import { getUsersWithPosts } from './queries/get-users-with-posts-no-emit';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
@@ -57,14 +54,8 @@ async function main() {
       }
       const posts = await getUserPosts(userIdStr, runtime);
       console.log(JSON.stringify(posts, null, 2));
-    } else if (cmd === 'users-with-posts') {
-      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
-      const users = await getUsersWithPosts(runtime, limit);
-      console.log(JSON.stringify(users, null, 2));
     } else {
-      console.log(
-        'Usage: pnpm start:no-emit -- [users [limit] | user <userId> | posts <userId> | users-with-posts [limit]]',
-      );
+      console.log('Usage: pnpm start:no-emit -- [users [limit] | user <userId> | posts <userId>]');
       process.exit(1);
     }
   } catch (error) {

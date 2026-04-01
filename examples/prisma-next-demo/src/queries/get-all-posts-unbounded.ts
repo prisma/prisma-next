@@ -1,4 +1,3 @@
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 import { collect } from './utils';
 
@@ -16,20 +15,6 @@ import { collect } from './utils';
  *
  * To fix this query, add a .limit() clause or add proper filtering.
  */
-export async function getAllPostsUnbounded(runtime: Runtime) {
-  const postTable = db.schema.tables.post;
-
-  // This query has no LIMIT, so it will violate the budget
-  const plan = db.sql
-    .from(postTable)
-    .select({
-      id: postTable.columns.id,
-      title: postTable.columns.title,
-      userId: postTable.columns.userId,
-      createdAt: postTable.columns.createdAt,
-    })
-    // Intentionally missing .limit() to trigger budget violation
-    .build();
-
-  return collect(runtime.execute(plan));
+export async function getAllPostsUnbounded() {
+  return collect(db.sql.post.select('id', 'title', 'userId', 'createdAt').all());
 }
