@@ -157,6 +157,29 @@ This allows phantom dependencies to accumulate (see: "Phantom `@prisma-next/cli`
 
 ---
 
+## Draft migrations invisible to `migration status` and `migration apply`
+
+**Discovered:** 2026-04-01 | **Severity:** high
+
+**Observed:** `migration new` produces a draft package (`migrationId: null`). This package is invisible to `migration status` and `migration apply` because both commands filter to attested bundles via `isAttested()`. The user creates a migration with `migration new`, fills in `migration.ts`, but `migration status` shows no pending migration and `migration apply` has nothing to apply — until they run `migration verify`.
+
+**Location:**
+- `packages/1-framework/3-tooling/cli/src/commands/migration-status.ts` — calls `readMigrationsDir` → filters `isAttested`
+- `packages/1-framework/3-tooling/cli/src/control-api/operations/migration-apply.ts` — filters to attested bundles
+- `packages/1-framework/3-tooling/migration/src/types.ts` — `isAttested()` checks `migrationId !== null`
+- `packages/1-framework/3-tooling/migration/src/dag.ts` — `reconstructGraph` only accepts attested bundles
+
+**Impact:** Confusing UX — the user sees no feedback after `migration new` until they run `migration verify`. `migration status` should at least show draft migrations as a distinct state. `migration apply` should warn if draft migrations exist (suggesting the user run `migration verify` first).
+
+**Additional concern:** What should `migration plan` do when a draft migration already exists targeting the same contract? It should probably error or warn rather than silently creating a second migration to the same destination.
+
+**Suggested fix:**
+1. `migration status`: show draft packages with a `[draft]` marker, distinct from pending/applied
+2. `migration apply`: if draft packages exist, warn "N draft migrations found — run `migration verify` to attest before applying"
+3. `migration plan`: if a draft package targeting the same `to` hash exists, error with "A draft migration to this contract already exists at <dir>. Run `migration verify` or delete it."
+
+---
+
 ## `migration status --ref` places detached contract node on wrong branch
 
 **Discovered:** 2026-03-25 | **Severity:** medium | **Type:** rendering limitation + diagnostic gap

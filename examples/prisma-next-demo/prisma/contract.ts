@@ -1,6 +1,7 @@
 import {
   enumColumn,
   enumType,
+  int4Column,
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
@@ -17,6 +18,10 @@ export const contract = defineContract()
     t
       .generated('id', uuidv4())
       .column('email', { type: textColumn, nullable: false })
+      .column('phone', { type: textColumn, nullable: false })
+      .column('age', { type: int4Column, nullable: false })
+      .column('name', { type: textColumn, nullable: false })
+      // .column('foo', { type: textColumn, nullable: false })
       .column('createdAt', {
         type: timestamptzColumn,
         nullable: false,

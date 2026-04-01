@@ -52,6 +52,7 @@
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "@types/node": "catalog:",
+    "@vitest/ui": "4.0.17",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

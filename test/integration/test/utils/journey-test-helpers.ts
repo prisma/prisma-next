@@ -370,8 +370,7 @@ export async function runMigrationVerify(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
-  // migration verify doesn't support --config, use runCommandRaw
-  return runCommandRaw(createMigrationVerifyCommand(), ctx.testDir, extraArgs);
+  return runCommand(createMigrationVerifyCommand(), ctx, extraArgs);
 }
 
 export async function runMigrationRef(

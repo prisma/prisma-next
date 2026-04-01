@@ -2,9 +2,7 @@
 
 ## Summary
 
-Add data migration support to prisma-next's graph-based migration system. All migrations (structural + data) are authored as TypeScript operation chains using operation builders, serialized to JSON ASTs at verification time, and executed as SQL at apply time. Data transforms are first-class operations in the chain, positioned by the planner at the correct point. The system detects when data migrations are needed, scaffolds the appropriate operations, tracks named invariants in the ledger, and routes through invariant-satisfying paths.
-
-Success: the split-name example from April VP1 works end-to-end — `plan` produces a `migration.ts` with `dataTransform`, `verify` serializes, `apply` executes, `status` reports correctly, routing selects the invariant-satisfying path.
+Add data migration support to prisma-next's graph-based migration system. All migrations (structural + data) are authored as TypeScript operation chains using operation builders, serialized to JSON ASTs at verification time, and executed as SQL at apply time. Data transforms are first-class operations in the chain. The system detects when data migrations are needed, scaffolds the appropriate operations, tracks named invariants in the ledger, and routes through invariant-satisfying paths.
 
 **Spec:** `projects/graph-based-migrations/specs/data-migrations-spec.md`
 
@@ -12,141 +10,95 @@ Success: the split-name example from April VP1 works end-to-end — `plan` produ
 
 ### P1: Ref format refactor — DONE
 
-Refs refactored from `migrations/refs.json` to `migrations/refs/<name>.json` with `{ hash: string, invariants: string[] }`. All consumers updated. Committed on `feat/data-migrations`.
+Refs refactored from `migrations/refs.json` to `migrations/refs/<name>.json` with `{ hash: string, invariants: string[] }`.
+
+## Progress
+
+### Done
+
+- [x] `DataTransformOperation` + `SerializedQueryNode` types at framework level
+- [x] Thin operation descriptors (reference contract by name, not value)
+- [x] Operation resolver (descriptors + contract context → `SqlMigrationPlanOperation`)
+- [x] `resolveDescriptors` on `TargetMigrationsCapability` (framework interface + Postgres impl)
+- [x] `scaffoldMigrationTs` + `evaluateMigrationTs` + `hasMigrationTs` utilities
+- [x] `query-node-renderer` with `raw_sql` passthrough (slot for proper AST rendering later)
+- [x] Runner handles `DataTransformOperation` with check→(skip or run)→check lifecycle
+- [x] `migration new` command (scaffolds package with migration.ts)
+- [x] `migration verify` evaluates migration.ts, resolves descriptors, writes ops.json, attests
+- [x] `migration verify` scans all packages (not just `--dir`)
+- [x] `writeMigrationManifest` + `writeMigrationOps` shared utilities
+- [x] `'data'` operation class allowed in migration apply policy
+- [x] E2E journey test: migration new → fill migration.ts → verify → apply → data correct
+- [x] Operation builder exports from `@prisma-next/target-postgres/migration-builders`
 
 ## Milestones
 
-### Milestone 1: Operation builders and serialization pipeline
+### Milestone: Harden migration verify
 
-The operation builder API exists, builders produce AST objects, and `migration verify` can evaluate a `migration.ts` file and serialize the resulting ops into `ops.json`. No planner changes yet — manual authoring only.
-
-**Tasks:**
-
-- [ ] Define the `MigrationOperation` AST type at the framework level — the JSON-serializable structure that all builders produce
-- [ ] Implement structural operation builders: `createTable`, `dropTable`, `addColumn`, `dropColumn`, `alterColumnType`, `setNotNull`, `dropNotNull`, `setDefault`, `dropDefault`
-- [ ] Implement constraint builders: `addPrimaryKey`, `addUnique`, `addForeignKey`, `dropConstraint`
-- [ ] Implement index builders: `createIndex`, `dropIndex`
-- [ ] Implement type builder: `createType`
-- [ ] Implement `dataTransform(name, { check, run })` builder — accepts query builder callbacks, captures ASTs at verify time
-- [ ] Implement transaction annotations: `transaction([...ops])`, `noTransaction(op)`
-- [ ] Write tests for each builder: produces correct operation shape, correct `operationClass`, correct `id` pattern
-  - User note: don't write unit tests for every builder if the type we return trivially proves their shape correctness.
-  - only write tests for the ones that actually contain logic
-- [ ] Implement the serialization step in `migration verify`: evaluate `migration.ts` via tsx, call the exported function, serialize resulting operation list as JSON into `ops.json`
-- [ ] Implement draft detection: `dataTransform` ops with null `check`/`run` in ops.json = draft state
-- [ ] Ensure `migration verify` fails on unimplemented `dataTransform` callbacks (throw or return invalid ASTs)
-- [ ] Write tests for serialization round-trip: TS → evaluate → ops.json → verify ops match expectations
-- [ ] Write test: `migration.ts` source is NOT part of `edgeId`, only serialized ops are
-- [ ] Write test: `migration apply` rejects draft (unattested) packages
-- [ ] E2E test: hand-authored `migration.ts` with `addColumn` + `dataTransform` + `setNotNull` → verify → apply → schema and data correct
-
-### Milestone 2: Runner execution of data transforms
-
-The runner can execute `dataTransform` operations from serialized ops.json — check/run lifecycle, transaction modes, retry safety.
+`migration verify` now scans all packages and handles draft migrations, but needs thorough testing and hardening around target selection and ambiguous graph states.
 
 **Tasks:**
 
-- [ ] Extend the runner to recognize `dataTransform` op entries in `ops.json`
-- [ ] Implement check execution: render check AST to SQL via target adapter, execute, interpret result (empty = skip, rows = run, boolean literals)
-- [ ] Implement run execution: render run ASTs to SQL, execute sequentially
-- [ ] Implement post-run validation: re-execute check after run, fail if violations remain
-- [ ] Implement `inline` transaction mode: data transform runs in the same transaction as surrounding ops
-- [ ] Implement `isolated` transaction mode: commit preceding ops, run data transform in own tx, commit, continue
-- [ ] Implement `unmanaged` mode: data transform runs without tx wrapping
-- [ ] Write tests for check skip: empty result → run skipped; rows → run executes; `false` → always run; `true` → always skip
-- [ ] Write tests for post-run validation: violations after run → fail before next op
-- [ ] Write tests for each transaction mode: inline rollback, isolated partial commit, unmanaged no-tx
-- [ ] Write test for retry in isolated mode: preceding ops skip via idempotency, check determines data transform skip
-- [ ] E2E test: split `name` → `firstName`/`lastName` end-to-end with check, verify data transformation and schema state
+- [ ] Test verify with multiple packages (mix of attested, draft, mismatched)
+- [ ] Test verify behavior with diverged graph (multiple leaves) — verify should not require path selection since it operates on packages, not the graph
+- [ ] Test verify when draft migration has migration.ts that fails evaluation (syntax error, invalid descriptors)
+- [ ] Test verify when draft migration has no migration.ts (plain draft from manual migrationId reset)
+- [ ] Verify that verify never requires `--ref` or path selection — it operates per-package, not per-graph-path. If ambiguity matters (e.g., for resolveDescriptors context), surface a clear error with hints to use `migration status` to understand the graph state
+- [ ] Test that verify correctly loads config for resolveDescriptors (the target is needed for TS evaluation)
+- [ ] Consider: should verify re-attest already-attested packages that have a migration.ts with newer mtime than ops.json? (stale serialization detection)
 
-### Milestone 3: Planner detection, scaffolding, and `migration new`
+### Milestone: Draft migration visibility
 
-The planner detects data migration needs, produces `migration.ts` files with operation builder calls (including `dataTransform` placeholders), and `migration new` scaffolds manual migrations.
+Draft migrations from `migration new` are invisible to `migration status` and `migration apply`. See `projects/graph-based-migrations/issue-triage.md` for details.
 
 **Tasks:**
 
-- [ ] Modify planner to output `migration.ts` (operation builder calls) instead of or alongside `ops.json`
-- [ ] Planner detects NOT NULL column added without default → emits `addColumn` (nullable) + `dataTransform` (placeholder) + `setNotNull` in correct order
-- [ ] Planner detects non-widening type change → emits temp column strategy: `addColumn`(temp) + `dataTransform` + `dropColumn`(original) + rename
-- [ ] Planner detects nullable → NOT NULL → emits `dataTransform` (placeholder) + `setNotNull`
-- [ ] Planner emits all structural ops using operation builders in correct order (additive → data transforms → tightening → destructive)
-- [ ] Scaffolded `dataTransform` includes comments describing detected change and what the user needs to provide
-- [ ] Write tests: NOT NULL add produces correct operation sequence with dataTransform placeholder
-- [ ] Write test: type change produces temp column strategy sequence
-- [ ] Write test: nullable → NOT NULL produces correct sequence
-- [ ] Write test: no dataTransform emitted when not needed (nullable column add, lossless widening)
-- [ ] Write test: scaffolded migration.ts with placeholder prevents attestation
-- [ ] Implement `migration new` command: scaffold `migration.ts` with empty operation list, derive `from`/`to` hashes
-- [ ] Support `--from` and `--to` flags on `migration new`
-- [ ] Write tests for `migration new`: correct from/to, scaffold is valid TS
-- [ ] E2E test: `migration plan` detects NOT NULL add → produces migration.ts with placeholder → user fills in → verify → apply
+- [ ] `migration status`: show draft packages with a `[draft]` marker
+- [ ] `migration apply`: warn if draft packages exist, suggest running `migration verify`
+- [ ] `migration plan`: error if a draft package targeting the same `to` hash already exists
+- [ ] Update `loadMigrationBundles` or add a variant that returns both attested and draft bundles
 
-### Milestone 4: Graph integration and invariant-aware routing
+### Milestone: Planner detection and scaffolding
 
-The router collects data migration names along paths and selects paths that satisfy required invariants from environment refs. The ledger records data migration names.
+The planner detects data migration needs and produces `migration.ts` files with operation builder calls (including `dataTransform` placeholders).
 
 **Tasks:**
 
-- [ ] Extend `MigrationChainEntry` (or manifest) to carry data migration metadata: `dataTransforms?: { name: string }[]`
-- [ ] Update `reconstructGraph` to include data transform metadata from migration packages
-- [ ] Extend `findPath` / `findPathWithDecision` to collect data transform names along candidate paths via DFS
-- [ ] Implement invariant-aware path selection: filter by required invariants from ref, prefer paths with more invariants, tie-break by existing rules
-- [ ] Write tests: path with required invariant selected over shorter path without; no invariants required → prefer more; no satisfying path → clear error
-- [ ] Extend ledger insert to record data transform names in the existing `operations` JSONB field
-- [ ] Implement invariant querying from ledger: derive satisfied invariants by querying completed edges
-- [ ] Update `migration status` to display data transform information per edge
-- [ ] Update `migration plan` output to show data transform ops in the operation list
-- [ ] E2E test: diamond graph, one path with data transform, one without. Router selects data-transform path when invariant required.
+- [ ] Determine intercept point in planner for data migration detection
+- [ ] When NOT NULL column added without default: emit addColumn (nullable) + dataTransform placeholder + setNotNull instead of temp default strategy
+- [ ] When non-widening type change detected: emit temp column + dataTransform + drop/rename
+- [ ] When nullable → NOT NULL: emit dataTransform placeholder + setNotNull
+- [ ] Scaffold migration.ts with detected changes as comments
+- [ ] Skip attestation when data migration detected (leave package draft)
+- [ ] Tests for each detection case
 
-### Milestone 5: Close-out
+### Milestone: Graph integration and invariant-aware routing
 
 **Tasks:**
 
-- [ ] Run April VP1 scenario end-to-end: split `name` → `firstName`/`lastName` — plan detects, scaffolds migration.ts, user fills in, verify serializes, apply executes, status reports, routing works
-- [ ] Verify all acceptance criteria met
-- [ ] Write or update migration system subsystem doc covering data migrations and operation builders
-- [ ] Migrate long-lived docs from `projects/graph-based-migrations/` to `docs/`
-- [ ] Delete transient project files
+- [ ] Extend `MigrationChainEntry` to carry data transform metadata
+- [ ] Extend pathfinder to collect invariant names along paths
+- [ ] Implement invariant-aware path selection from environment refs
+- [ ] Extend ledger to record data transform names
+- [ ] Update `migration status` to show data transform info
+- [ ] Tests for routing with invariants
 
-## Test Coverage
+### Milestone: Close-out
 
-| Acceptance Criterion | Test Type | Milestone | Notes |
-|---|---|---|---|
-| Migration TS files recognized during verification | Integration | M1 | |
-| `dataTransform` `check` required — type error without | Unit | M1 | |
-| `check`/`run` return ASTs (or arrays) | Unit | M1 | |
-| `migration verify` serializes ASTs into ops.json | Integration | M1 | |
-| No TS loaded at apply time | Integration | M2 | Apply with TS file removed works |
-| `migration.ts` not part of `edgeId` | Unit | M1 | |
-| Unresolved `dataTransform` = draft state | Integration | M1 | |
-| `migration apply` rejects draft packages | Integration | M1 | |
-| Plan scaffolds on NOT NULL without default | Integration | M3 | |
-| Plan scaffolds on non-widening type change | Integration | M3 | |
-| Plan scaffolds on nullable → NOT NULL | Integration | M3 | |
-| Scaffold includes descriptive comment | Unit | M3 | |
-| Unimplemented scaffold prevents attestation | Integration | M3 | |
-| Ops execute in chain order | Integration | M2 | |
-| Check runs before and after data transform | Integration | M2 | |
-| `inline`: one transaction, rollback on failure | Integration | M2 | |
-| `isolated`: separate transactions | Integration | M2 | |
-| `unmanaged`: no tx wrapping | Integration | M2 | |
-| Retry: check determines skip | Integration | M2 | |
-| Data transform name in ledger | Integration | M4 | |
-| Router selects invariant-satisfying path | Integration | M4 | |
-| Prefer more invariants when none required | Integration | M4 | |
-| Ref declares required invariants | Integration | M4 | |
-| S2→S1 rollback with data transform | E2E | M5 | |
+**Tasks:**
+
+- [ ] VP1 scenario end-to-end (split name)
+- [ ] Update subsystem docs
+- [ ] Migrate docs from `projects/` to `docs/`
 
 ## Open Items
 
-1. **Cross-table coordinated migrations (S11)**: PK type changes cascade across FK graph. User-authored for v1.
+1. **Planner refactor approach**: The planner currently doesn't work from a unified diff. Additive detection is done by iterating the contract, reconciliation from schema issues. A clean diff-based planner would make pattern matching natural, but is a significant refactor. For now, minimal intercept in `buildAddColumnOperation` for the NOT NULL case. See spec and conversation for full analysis.
 
-2. **Table drop detection gap (S6)**: Horizontal splits may not trigger auto-detection. Known gap.
+2. **Draft visibility**: Tracked in issue-triage.md.
 
-3. **Query builder expressiveness**: UPDATE with expressions, INSERT...SELECT, mutation joins — known gaps. Query builder extends independently; data migration infra doesn't depend on it.
+3. **Query builder expressiveness**: UPDATE with expressions, INSERT...SELECT, mutation joins — known gaps. QB extends independently.
 
-4. **Planner TS output transition**: The planner currently writes ops.json directly. Changing it to produce `migration.ts` with operation builder calls is a significant refactor. M3 needs to design the transition — possibly planner emits both formats initially, with the TS file as the new source of truth.
+4. **Verify target selection**: `migration verify` must not require ambiguous path resolution. It operates per-package. If resolveDescriptors needs target context, the config provides it. If the graph is ambiguous, verify doesn't care — it's not path-finding, just attesting packages.
 
-5. **Invariant source of truth**: Ledger is the source of truth for satisfied invariants (query completed edges). Marker does not store invariant data.
-
-6. **Strategy library**: Pre-built strategies (`columnSplit`, `nonNullBackfill`, `typeChange`) are future DX. For v1, planner emits raw operation sequences.
+5. **Stale serialization**: If migration.ts is edited after verify, the ops.json is stale but edgeId still matches ops.json (not migration.ts). Re-running verify should detect this. Consider mtime-based hint.

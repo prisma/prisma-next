@@ -1,5 +1,9 @@
 import { attestMigration, verifyMigration } from '@prisma-next/migration-tools/attestation';
-import { readMigrationPackage, writeMigrationOps } from '@prisma-next/migration-tools/io';
+import {
+  readMigrationPackage,
+  readMigrationsDir,
+  writeMigrationOps,
+} from '@prisma-next/migration-tools/io';
 import { evaluateMigrationTs, hasMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -10,6 +14,7 @@ import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils
 import {
   addGlobalOptions,
   getTargetMigrations,
+  resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
@@ -21,18 +26,87 @@ import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationVerifyOptions extends CommonCommandOptions {
-  readonly dir: string;
+  readonly dir?: string;
   readonly config?: string;
 }
 
-export interface MigrationVerifyResult {
-  readonly ok: boolean;
-  readonly status: 'verified' | 'attested';
+interface PackageVerifyResult {
   readonly dir: string;
+  readonly status: 'verified' | 'attested' | 'mismatch' | 'error';
   readonly migrationId?: string;
   readonly storedMigrationId?: string;
   readonly computedMigrationId?: string;
   readonly summary: string;
+}
+
+export interface MigrationVerifyResult {
+  readonly ok: boolean;
+  readonly results: readonly PackageVerifyResult[];
+  readonly summary: string;
+  // Keep single-package fields for backward compat with existing formatter
+  readonly status?: 'verified' | 'attested';
+  readonly dir?: string;
+  readonly migrationId?: string;
+  readonly storedMigrationId?: string;
+  readonly computedMigrationId?: string;
+}
+
+async function verifyPackage(
+  dir: string,
+  options: MigrationVerifyOptions,
+): Promise<PackageVerifyResult> {
+  const result = await verifyMigration(dir);
+
+  if (result.ok) {
+    return {
+      dir,
+      status: 'verified',
+      ...ifDefined('migrationId', result.storedMigrationId),
+      ...ifDefined('storedMigrationId', result.storedMigrationId),
+      ...ifDefined('computedMigrationId', result.computedMigrationId),
+      summary: 'migrationId matches',
+    };
+  }
+
+  if (result.reason === 'draft') {
+    if (await hasMigrationTs(dir)) {
+      const pkg = await readMigrationPackage(dir);
+      const descriptors = await evaluateMigrationTs(dir);
+
+      const config = await loadConfig(options.config);
+      const migrations = getTargetMigrations(config.target);
+      if (!migrations?.resolveDescriptors) {
+        return {
+          dir,
+          status: 'error',
+          summary: 'Target does not support resolveDescriptors — cannot verify migration.ts',
+        };
+      }
+
+      const resolvedOps = migrations.resolveDescriptors(descriptors, {
+        fromContract: pkg.manifest.fromContract,
+        toContract: pkg.manifest.toContract,
+      });
+
+      await writeMigrationOps(dir, resolvedOps);
+    }
+
+    const migrationId = await attestMigration(dir);
+    return {
+      dir,
+      status: 'attested',
+      migrationId,
+      summary: `Attested with migrationId: ${migrationId}`,
+    };
+  }
+
+  return {
+    dir,
+    status: 'mismatch',
+    ...ifDefined('storedMigrationId', result.storedMigrationId),
+    ...ifDefined('computedMigrationId', result.computedMigrationId),
+    summary: `migrationId mismatch — stored=${result.storedMigrationId}, computed=${result.computedMigrationId}`,
+  };
 }
 
 async function executeMigrationVerifyCommand(
@@ -40,77 +114,91 @@ async function executeMigrationVerifyCommand(
   flags: GlobalFlags,
   ui: TerminalUI,
 ): Promise<Result<MigrationVerifyResult, CliStructuredError>> {
-  const dir = options.dir;
-
-  if (!flags.json && !flags.quiet) {
-    const header = formatStyledHeader({
-      command: 'migration verify',
-      description: 'Verify migration package integrity',
-      details: [{ label: 'dir', value: dir }],
-      flags,
-    });
-    ui.stderr(header);
-  }
-
   try {
-    const result = await verifyMigration(dir);
+    let packageDirs: string[];
 
-    if (result.ok) {
-      return ok({
-        ok: true,
-        status: 'verified',
-        dir,
-        ...ifDefined('migrationId', result.storedMigrationId),
-        ...ifDefined('storedMigrationId', result.storedMigrationId),
-        ...ifDefined('computedMigrationId', result.computedMigrationId),
-        summary: 'Migration package verified — migrationId matches',
-      });
-    }
+    if (options.dir) {
+      packageDirs = [options.dir];
+    } else {
+      const config = await loadConfig(options.config);
+      const { migrationsDir } = resolveMigrationPaths(options.config, config);
+      const allBundles = await readMigrationsDir(migrationsDir);
+      packageDirs = allBundles.map((b) => b.dirPath);
 
-    if (result.reason === 'draft') {
-      // If migration.ts exists, evaluate and resolve descriptors into ops before attesting
-      if (await hasMigrationTs(dir)) {
-        const pkg = await readMigrationPackage(dir);
-        const descriptors = await evaluateMigrationTs(dir);
-
-        // Load config to get the target's resolveDescriptors capability
-        const config = await loadConfig(options.config);
-        const migrations = getTargetMigrations(config.target);
-        if (!migrations?.resolveDescriptors) {
-          throw new Error(
-            'Target does not support resolveDescriptors. ' +
-              'Cannot verify a migration package with migration.ts.',
-          );
-        }
-
-        const resolvedOps = migrations.resolveDescriptors(descriptors, {
-          fromContract: pkg.manifest.fromContract,
-          toContract: pkg.manifest.toContract,
+      if (packageDirs.length === 0) {
+        return ok({
+          ok: true,
+          results: [],
+          summary: 'No migration packages found',
         });
-
-        await writeMigrationOps(dir, resolvedOps);
       }
-
-      const migrationId = await attestMigration(dir);
-      return ok({
-        ok: true,
-        status: 'attested',
-        dir,
-        migrationId,
-        summary: `Draft migration attested with migrationId: ${migrationId}`,
-      });
     }
 
-    return notOk(
-      errorRuntime('migrationId mismatch — migration has been modified', {
-        why: `stored=${result.storedMigrationId}, computed=${result.computedMigrationId}`,
-        fix: 'If the change was intentional, set "migrationId" to null in migration.json and rerun `migration verify` to re-attest. Otherwise, restore the original migration.',
-        meta: {
-          storedMigrationId: result.storedMigrationId,
-          computedMigrationId: result.computedMigrationId,
-        },
-      }),
-    );
+    if (!flags.json && !flags.quiet) {
+      const header = formatStyledHeader({
+        command: 'migration verify',
+        description: 'Verify migration package integrity',
+        details: options.dir ? [{ label: 'dir', value: options.dir }] : [],
+        flags,
+      });
+      ui.stderr(header);
+    }
+
+    const results: PackageVerifyResult[] = [];
+    for (const dir of packageDirs) {
+      try {
+        const result = await verifyPackage(dir, options);
+        results.push(result);
+      } catch (error) {
+        results.push({
+          dir,
+          status: 'error',
+          summary: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const hasFailures = results.some((r) => r.status === 'mismatch' || r.status === 'error');
+
+    // For single-package backward compat
+    const singleResult = results.length === 1 ? results[0] : undefined;
+
+    if (hasFailures) {
+      const mismatches = results.filter((r) => r.status === 'mismatch');
+      const errors = results.filter((r) => r.status === 'error');
+      return notOk(
+        errorRuntime(
+          `Verification failed: ${mismatches.length} mismatch(es), ${errors.length} error(s)`,
+          {
+            why: results
+              .filter((r) => r.status === 'mismatch' || r.status === 'error')
+              .map((r) => `${r.dir}: ${r.summary}`)
+              .join('; '),
+            fix: 'For mismatches: set "migrationId" to null in migration.json and rerun `migration verify`. For errors: check the error message.',
+            meta: { results },
+          },
+        ),
+      );
+    }
+
+    const singleStatus =
+      singleResult?.status === 'verified' || singleResult?.status === 'attested'
+        ? singleResult.status
+        : undefined;
+
+    return ok({
+      ok: true,
+      results,
+      summary:
+        results.length === 1
+          ? results[0]!.summary
+          : `Verified ${results.length} migration package(s)`,
+      ...ifDefined('status', singleStatus),
+      ...ifDefined('dir', singleResult?.dir),
+      ...ifDefined('migrationId', singleResult?.migrationId),
+      ...ifDefined('storedMigrationId', singleResult?.storedMigrationId),
+      ...ifDefined('computedMigrationId', singleResult?.computedMigrationId),
+    });
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -133,15 +221,18 @@ export function createMigrationVerifyCommand(): Command {
   const command = new Command('verify');
   setCommandDescriptions(
     command,
-    'Verify a migration package migrationId',
-    'Recomputes the content-addressed migrationId for a migration package and compares\n' +
-      'it against the stored value. Draft migrations (migrationId: null) are automatically\n' +
-      'attested.',
+    'Verify migration packages',
+    'Scans all migration packages and verifies their content-addressed migrationId.\n' +
+      'Draft migrations (migrationId: null) are evaluated and automatically attested.\n' +
+      'Use --dir to verify a single package.',
   );
-  setCommandExamples(command, ['prisma-next migration verify --dir migrations/20250101-add-users']);
+  setCommandExamples(command, [
+    'prisma-next migration verify',
+    'prisma-next migration verify --dir migrations/20250101-add-users',
+  ]);
   addGlobalOptions(command)
-    .requiredOption('--dir <path>', 'Path to the migration package directory')
-    .option('--config <path>', 'Path to prisma-next.config.ts (required when migration.ts exists)')
+    .option('--dir <path>', 'Path to a specific migration package directory')
+    .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (options: MigrationVerifyOptions) => {
       const flags = parseGlobalFlags(options);
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
@@ -152,7 +243,21 @@ export function createMigrationVerifyCommand(): Command {
         if (flags.json) {
           ui.output(JSON.stringify(verifyResult, null, 2));
         } else if (!flags.quiet) {
-          ui.log(formatMigrationVerifyCommandOutput(verifyResult, flags));
+          if (verifyResult.results.length === 1 && verifyResult.status) {
+            ui.log(
+              formatMigrationVerifyCommandOutput(
+                {
+                  status: verifyResult.status,
+                  ...ifDefined('migrationId', verifyResult.migrationId),
+                },
+                flags,
+              ),
+            );
+          } else {
+            for (const r of verifyResult.results) {
+              ui.output(`${r.dir}: ${r.status} — ${r.summary}`);
+            }
+          }
         }
       });
 
