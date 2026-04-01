@@ -8,6 +8,7 @@ import {
   normalizeRelationFieldNames,
   rel,
   resolveRelationModelName,
+  type TargetFieldRef,
 } from '../src/staged-contract-dsl';
 import { columnDescriptor } from './helpers/column-descriptor';
 
@@ -163,26 +164,16 @@ describe('staged contract DSL runtime helpers', () => {
       ],
     });
 
-    const emptyTargetRefs: readonly {
-      readonly kind: 'targetFieldRef';
-      readonly source: 'string';
-      readonly modelName: string;
-      readonly fieldName: string;
-    }[] = [];
+    const emptyTargetRefs: readonly TargetFieldRef[] = [];
 
-    const mixedTargetRefs: readonly {
-      readonly kind: 'targetFieldRef';
-      readonly source: 'string';
-      readonly modelName: string;
-      readonly fieldName: string;
-    }[] = [User.ref('id'), Team.ref('id')];
+    const mixedTargetRefs: readonly TargetFieldRef[] = [User.ref('id'), Team.ref('id')];
 
     const BrokenEmpty = model('BrokenEmpty', {
       fields: {
         userId: field.column(int4Column),
       },
     }).sql(({ cols, constraints }) => ({
-      foreignKeys: [constraints.foreignKey(cols.userId, emptyTargetRefs)],
+      foreignKeys: [constraints.foreignKey([cols.userId], emptyTargetRefs)],
     }));
 
     const BrokenMixed = model('BrokenMixed', {

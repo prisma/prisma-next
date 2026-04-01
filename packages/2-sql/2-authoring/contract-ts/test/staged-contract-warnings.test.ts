@@ -14,6 +14,38 @@ const embedding1536 = {
   typeParams: { length: 1536 },
 } as const;
 
+type RuntimeWarningModels = Parameters<typeof emitTypedNamedTypeFallbackWarnings>[0];
+type RuntimeWarningCollection = Parameters<typeof emitTypedCrossModelFallbackWarnings>[0];
+
+function widenRuntimeModels<T extends Record<string, object>>(models: T): RuntimeWarningModels {
+  // Warning helpers consume the erased runtime builder shape; tests keep narrower
+  // staged model inference and widen only at the helper boundary.
+  return models as RuntimeWarningModels;
+}
+
+function buildRuntimeWarningCollection(
+  collection: Omit<RuntimeWarningCollection, 'models'> & { models: Record<string, object> },
+): RuntimeWarningCollection {
+  return {
+    ...collection,
+    models: widenRuntimeModels(collection.models),
+  };
+}
+
+function buildLazyTargetManyToManyRelation(
+  target: () => object,
+  options: {
+    readonly through: string;
+    readonly from: string | readonly string[];
+    readonly to: string | readonly string[];
+  },
+): ReturnType<typeof rel.manyToMany> {
+  return Reflect.apply(rel.manyToMany as (...args: readonly unknown[]) => unknown, rel, [
+    target,
+    options,
+  ]) as ReturnType<typeof rel.manyToMany>;
+}
+
 function captureWarnings(run: () => void) {
   const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
 
@@ -53,34 +85,38 @@ describe('staged contract fallback warnings', () => {
     });
 
     const warnings = captureWarnings(() => {
-      emitTypedNamedTypeFallbackWarnings({ VectorRecord }, { Embedding1536: embedding1536 });
-      emitTypedCrossModelFallbackWarnings({
-        storageTypes: { Embedding1536: embedding1536 },
-        models: { User, Profile },
-        modelSpecs: new Map([
-          [
-            'Profile',
-            {
-              modelName: 'Profile',
-              tableName: 'profile',
-              relations: {
-                user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
-              },
-              sqlSpec: {
-                foreignKeys: [
-                  {
-                    kind: 'fk',
-                    fields: ['userId'],
-                    targetModel: 'User',
-                    targetFields: ['id'],
-                    targetSource: 'token',
-                  },
-                ],
-              },
-            },
-          ],
-        ]),
+      emitTypedNamedTypeFallbackWarnings(widenRuntimeModels({ VectorRecord }), {
+        Embedding1536: embedding1536,
       });
+      emitTypedCrossModelFallbackWarnings(
+        buildRuntimeWarningCollection({
+          storageTypes: { Embedding1536: embedding1536 },
+          models: { User, Profile },
+          modelSpecs: new Map([
+            [
+              'Profile',
+              {
+                modelName: 'Profile',
+                tableName: 'profile',
+                relations: {
+                  user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+                },
+                sqlSpec: {
+                  foreignKeys: [
+                    {
+                      kind: 'fk',
+                      fields: ['userId'],
+                      targetModel: 'User',
+                      targetFields: ['id'],
+                      targetSource: 'token',
+                    },
+                  ],
+                },
+              },
+            ],
+          ]),
+        }),
+      );
     });
 
     expect(warnings).toEqual([]);
@@ -132,69 +168,71 @@ describe('staged contract fallback warnings', () => {
     });
 
     const warnings = captureWarnings(() =>
-      emitTypedCrossModelFallbackWarnings({
-        storageTypes: {},
-        models: { User, Profile, Post, Tag, PostTag, Membership },
-        modelSpecs: new Map([
-          [
-            'Profile',
-            {
-              modelName: 'Profile',
-              tableName: 'profile',
-              relations: {
-                user: rel.belongsTo('User', { from: 'userId', to: 'id' }),
+      emitTypedCrossModelFallbackWarnings(
+        buildRuntimeWarningCollection({
+          storageTypes: {},
+          models: { User, Profile, Post, Tag, PostTag, Membership },
+          modelSpecs: new Map([
+            [
+              'Profile',
+              {
+                modelName: 'Profile',
+                tableName: 'profile',
+                relations: {
+                  user: rel.belongsTo('User', { from: 'userId', to: 'id' }),
+                },
+                sqlSpec: undefined,
               },
-              sqlSpec: undefined,
-            },
-          ],
-          [
-            'User',
-            {
-              modelName: 'User',
-              tableName: 'user',
-              relations: {
-                profile: rel.hasOne('Profile', { by: 'userId' }),
-                posts: rel.hasMany('Post', { by: 'authorId' }),
+            ],
+            [
+              'User',
+              {
+                modelName: 'User',
+                tableName: 'user',
+                relations: {
+                  profile: rel.hasOne('Profile', { by: 'userId' }),
+                  posts: rel.hasMany('Post', { by: 'authorId' }),
+                },
+                sqlSpec: undefined,
               },
-              sqlSpec: undefined,
-            },
-          ],
-          [
-            'Post',
-            {
-              modelName: 'Post',
-              tableName: 'post',
-              relations: {
-                tags: rel.manyToMany(() => Tag, {
-                  through: 'PostTag',
-                  from: ['postId', 'tenantId'],
-                  to: ['tagId', 'localeId'],
-                }),
+            ],
+            [
+              'Post',
+              {
+                modelName: 'Post',
+                tableName: 'post',
+                relations: {
+                  tags: buildLazyTargetManyToManyRelation(() => Tag, {
+                    through: 'PostTag',
+                    from: ['postId', 'tenantId'],
+                    to: ['tagId', 'localeId'],
+                  }),
+                },
+                sqlSpec: undefined,
               },
-              sqlSpec: undefined,
-            },
-          ],
-          [
-            'Membership',
-            {
-              modelName: 'Membership',
-              tableName: 'membership',
-              relations: {},
-              sqlSpec: {
-                foreignKeys: [
-                  {
-                    kind: 'fk',
-                    fields: ['orgId', 'userId'],
-                    targetModel: 'User',
-                    targetFields: ['orgId', 'id'],
-                    targetSource: 'string',
-                  },
-                ],
+            ],
+            [
+              'Membership',
+              {
+                modelName: 'Membership',
+                tableName: 'membership',
+                relations: {},
+                sqlSpec: {
+                  foreignKeys: [
+                    {
+                      kind: 'fk',
+                      fields: ['orgId', 'userId'],
+                      targetModel: 'User',
+                      targetFields: ['orgId', 'id'],
+                      targetSource: 'string',
+                    },
+                  ],
+                },
               },
-            },
-          ],
-        ]),
-      }),
+            ],
+          ]),
+        }),
+      ),
     );
 
     expect(warnings).toHaveLength(5);
@@ -232,31 +270,33 @@ describe('staged contract fallback warnings', () => {
     });
 
     const warnings = captureWarnings(() =>
-      emitTypedCrossModelFallbackWarnings({
-        storageTypes: {},
-        models: { User, Comment },
-        modelSpecs: new Map([
-          [
-            'Comment',
-            {
-              modelName: 'Comment',
-              tableName: 'comment',
-              relations: {},
-              sqlSpec: {
-                foreignKeys: [
-                  {
-                    kind: 'fk',
-                    fields: ['userId'],
-                    targetModel: 'User',
-                    targetFields: ['id'],
-                    targetSource: 'string',
-                  },
-                ],
+      emitTypedCrossModelFallbackWarnings(
+        buildRuntimeWarningCollection({
+          storageTypes: {},
+          models: { User, Comment },
+          modelSpecs: new Map([
+            [
+              'Comment',
+              {
+                modelName: 'Comment',
+                tableName: 'comment',
+                relations: {},
+                sqlSpec: {
+                  foreignKeys: [
+                    {
+                      kind: 'fk',
+                      fields: ['userId'],
+                      targetModel: 'User',
+                      targetFields: ['id'],
+                      targetSource: 'string',
+                    },
+                  ],
+                },
               },
-            },
-          ],
-        ]),
-      }),
+            ],
+          ]),
+        }),
+      ),
     );
 
     expect(warnings).toHaveLength(1);
@@ -285,27 +325,29 @@ describe('staged contract fallback warnings', () => {
     });
 
     const warnings = captureWarnings(() =>
-      emitTypedCrossModelFallbackWarnings({
-        storageTypes: {},
-        models: { Post, Tag, PostTag },
-        modelSpecs: new Map([
-          [
-            'Post',
-            {
-              modelName: 'Post',
-              tableName: 'post',
-              relations: {
-                tags: rel.manyToMany(() => Tag, {
-                  through: 'PostTag',
-                  from: 'postId',
-                  to: 'tagId',
-                }),
+      emitTypedCrossModelFallbackWarnings(
+        buildRuntimeWarningCollection({
+          storageTypes: {},
+          models: { Post, Tag, PostTag },
+          modelSpecs: new Map([
+            [
+              'Post',
+              {
+                modelName: 'Post',
+                tableName: 'post',
+                relations: {
+                  tags: buildLazyTargetManyToManyRelation(() => Tag, {
+                    through: 'PostTag',
+                    from: 'postId',
+                    to: 'tagId',
+                  }),
+                },
+                sqlSpec: undefined,
               },
-              sqlSpec: undefined,
-            },
-          ],
-        ]),
-      }),
+            ],
+          ]),
+        }),
+      ),
     );
 
     expect(warnings).toHaveLength(1);
@@ -334,27 +376,29 @@ describe('staged contract fallback warnings', () => {
     });
 
     const warnings = captureWarnings(() =>
-      emitTypedCrossModelFallbackWarnings({
-        storageTypes: {},
-        models: { Post, Tag, PostTag },
-        modelSpecs: new Map([
-          [
-            'Post',
-            {
-              modelName: 'Post',
-              tableName: 'post',
-              relations: {
-                tags: rel.manyToMany('Tag', {
-                  through: 'PostTag',
-                  from: 'postId',
-                  to: 'tagId',
-                }),
+      emitTypedCrossModelFallbackWarnings(
+        buildRuntimeWarningCollection({
+          storageTypes: {},
+          models: { Post, Tag, PostTag },
+          modelSpecs: new Map([
+            [
+              'Post',
+              {
+                modelName: 'Post',
+                tableName: 'post',
+                relations: {
+                  tags: rel.manyToMany('Tag', {
+                    through: 'PostTag',
+                    from: 'postId',
+                    to: 'tagId',
+                  }),
+                },
+                sqlSpec: undefined,
               },
-              sqlSpec: undefined,
-            },
-          ],
-        ]),
-      }),
+            ],
+          ]),
+        }),
+      ),
     );
 
     expect(warnings).toHaveLength(2);
@@ -381,12 +425,9 @@ describe('staged contract fallback warnings', () => {
     });
 
     const warnings = captureWarnings(() =>
-      emitTypedNamedTypeFallbackWarnings(
-        { VectorRecord },
-        {
-          Embedding1536: embedding1536,
-        },
-      ),
+      emitTypedNamedTypeFallbackWarnings(widenRuntimeModels({ VectorRecord }), {
+        Embedding1536: embedding1536,
+      }),
     );
 
     expect(warnings).toHaveLength(1);
