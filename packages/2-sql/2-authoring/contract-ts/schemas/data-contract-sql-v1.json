@@ -519,13 +519,9 @@
     },
     "ModelField": {
       "type": "object",
-      "description": "Domain field definition. New format has codecId + nullable (column lives in model.storage.fields). Old format has column only.",
+      "description": "Domain field definition (codec and nullability; column mapping lives in model.storage.fields)",
       "additionalProperties": false,
       "properties": {
-        "column": {
-          "type": "string",
-          "description": "Column name in the model's backing table (old format; new format uses model.storage.fields)"
-        },
         "codecId": {
           "type": "string",
           "description": "Codec identifier for the field"
@@ -534,7 +530,8 @@
           "type": "boolean",
           "description": "Whether the field allows NULL values"
         }
-      }
+      },
+      "required": ["codecId", "nullable"]
     },
     "ModelStorageField": {
       "type": "object",

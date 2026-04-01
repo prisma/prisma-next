@@ -81,31 +81,35 @@ describe('mutation-executor', () => {
     const contract = getTestContract();
     const malformed = {
       ...contract,
-      relations: {
-        ...contract.relations,
-        users: {
-          notObject: 1,
-          missingTo: {
-            cardinality: '1:N',
-            on: {
-              parentCols: ['id'],
-              childCols: ['user_id'],
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          relations: {
+            ...contract.models.User.relations,
+            notObject: 1,
+            missingTo: {
+              cardinality: '1:N',
+              on: {
+                parentCols: ['id'],
+                childCols: ['user_id'],
+              },
             },
-          },
-          badCols: {
-            to: 'Post',
-            cardinality: '1:N',
-            on: {
-              parentCols: 'id',
-              childCols: ['user_id'],
+            badCols: {
+              to: 'Post',
+              cardinality: '1:N',
+              on: {
+                parentCols: 'id',
+                childCols: ['user_id'],
+              },
             },
-          },
-          posts: {
-            to: 'Post',
-            cardinality: 'INVALID',
-            on: {
-              parentCols: ['id'],
-              childCols: ['user_id'],
+            posts: {
+              to: 'Post',
+              cardinality: 'INVALID',
+              on: {
+                localFields: ['id'],
+                targetFields: ['userId'],
+              },
             },
           },
         },
@@ -136,29 +140,17 @@ describe('mutation-executor', () => {
     );
   });
 
-  it('buildPrimaryKeyFilterFromRow() falls back when column mappings are missing', () => {
+  it('buildPrimaryKeyFilterFromRow() resolves custom primary key columns', () => {
     const contract = getTestContract();
 
-    const withoutColumnToField = {
-      ...contract,
-      mappings: {
-        ...contract.mappings,
-        columnToField: {},
-      },
-    } as unknown as TestContract;
-
-    expect(buildPrimaryKeyFilterFromRow(withoutColumnToField, 'User', { id: 1 })).toEqual({
-      id: 1,
-    });
-
     const withCustomPk = {
-      ...withoutColumnToField,
+      ...contract,
       storage: {
-        ...withoutColumnToField.storage,
+        ...contract.storage,
         tables: {
-          ...withoutColumnToField.storage.tables,
+          ...contract.storage.tables,
           users: {
-            ...withoutColumnToField.storage.tables.users,
+            ...contract.storage.tables.users,
             primaryKey: {
               columns: ['pk_id'],
             },
@@ -456,15 +448,18 @@ describe('mutation-executor', () => {
     const contract = getTestContract();
     const sparseAuthorRelation = {
       ...contract,
-      relations: {
-        ...contract.relations,
-        posts: {
-          ...contract.relations.posts,
-          author: {
-            ...contract.relations.posts.author,
-            on: {
-              parentCols: [undefined, 'user_id'],
-              childCols: ['id', 'id'],
+      models: {
+        ...contract.models,
+        Post: {
+          ...contract.models.Post,
+          relations: {
+            ...contract.models.Post.relations,
+            author: {
+              ...contract.models.Post.relations.author,
+              on: {
+                localFields: [undefined, 'userId'] as unknown as readonly string[],
+                targetFields: ['id', 'id'],
+              },
             },
           },
         },
@@ -610,15 +605,18 @@ describe('mutation-executor', () => {
     const contract = getTestContract();
     const compositeRelationContract = {
       ...contract,
-      relations: {
-        ...contract.relations,
-        users: {
-          ...contract.relations.users,
-          posts: {
-            ...contract.relations.users.posts,
-            on: {
-              parentCols: [undefined, 'id', 'email'],
-              childCols: ['user_id', 'user_id', 'title'],
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          relations: {
+            ...contract.models.User.relations,
+            posts: {
+              ...contract.models.User.relations.posts,
+              on: {
+                localFields: [undefined, 'id', 'email'] as unknown as readonly string[],
+                targetFields: ['userId', 'userId', 'title'],
+              },
             },
           },
         },

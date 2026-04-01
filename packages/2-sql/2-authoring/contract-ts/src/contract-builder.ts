@@ -301,7 +301,7 @@ class SqlContractBuilder<
    * - `uniques`: defaults to `[]` (empty array)
    * - `indexes`: defaults to `[]` (empty array)
    * - `foreignKeys`: defaults to `[]` (empty array)
-   * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
+   * - model `relations`: defaults to `{}` (empty object) when not populated by the builder
    * - `nativeType`: required field set from column type descriptor when columns are defined
    *
    * The contract builder is the **only** place where normalization should occur.
@@ -314,10 +314,7 @@ class SqlContractBuilder<
    */
   build(): Target extends string
     ? ContractWithTypeMaps<
-        SqlContract<
-          BuildStorage<Tables, Types>,
-          BuildModels<Models>
-        > & {
+        SqlContract<BuildStorage<Tables, Types>, BuildModels<Models>> & {
           readonly schemaVersion: '1';
           readonly target: Target;
           readonly targetFamily: 'sql';
@@ -333,10 +330,7 @@ class SqlContractBuilder<
     : never {
     type BuiltContract = Target extends string
       ? ContractWithTypeMaps<
-          SqlContract<
-            BuildStorage<Tables, Types>,
-            BuildModels<Models>
-          > & {
+          SqlContract<BuildStorage<Tables, Types>, BuildModels<Models>> & {
             readonly schemaVersion: '1';
             readonly target: Target;
             readonly targetFamily: 'sql';
@@ -490,7 +484,7 @@ class SqlContractBuilder<
       };
 
       // Build fields object
-      const fields: Partial<Record<string, ModelField>> = {};
+      const fields: Partial<Record<string, { readonly column: string }>> = {};
 
       // Iterate over fields
       for (const fieldName in modelStateTyped.fields) {

@@ -6,13 +6,6 @@
   "storageHash": "sha256:test-core",
   "profileHash": "sha256:test-profile",
   "models": {},
-  "relations": {},
-  "mappings": {
-    "modelToTable": {},
-    "tableToModel": {},
-    "fieldToColumn": {},
-    "columnToField": {}
-  },
   "storage": {
     "tables": {
       "user": {

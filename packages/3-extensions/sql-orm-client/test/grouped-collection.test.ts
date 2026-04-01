@@ -1,7 +1,7 @@
 import { AggregateExpr, type BinaryExpr } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createCollectionFor } from './collection-fixtures';
-import { getTestContract, isSelectAst } from './helpers';
+import { isSelectAst } from './helpers';
 
 describe('GroupedCollection', () => {
   it('groupBy().aggregate() maps grouped columns back to model fields', async () => {
@@ -167,67 +167,6 @@ describe('GroupedCollection', () => {
         max: { raw: true },
       },
     ]);
-  });
-
-  it('groupBy().having() falls back to raw field names when field mappings are missing', async () => {
-    const contract = getTestContract();
-    const { collection, runtime } = createCollectionFor('Post', {
-      ...contract,
-      mappings: {
-        ...contract.mappings,
-        fieldToColumn: {},
-      },
-    } as never);
-    runtime.setNextResults([
-      [{ id: 1, total: '5' }],
-      [{ id: 1, avg: '5' }],
-      [{ id: 1, min: '5' }],
-      [{ id: 1, max: '5' }],
-    ]);
-
-    const numericField = 'userId' as never;
-    await collection
-      .groupBy('id')
-      .having((having) => having.sum(numericField).gt(1))
-      .aggregate((aggregate) => ({
-        total: aggregate.sum(numericField),
-      }));
-    await collection
-      .groupBy('id')
-      .having((having) => having.avg(numericField).gt(1))
-      .aggregate((aggregate) => ({
-        avg: aggregate.avg(numericField),
-      }));
-    await collection
-      .groupBy('id')
-      .having((having) => having.min(numericField).gt(1))
-      .aggregate((aggregate) => ({
-        min: aggregate.min(numericField),
-      }));
-    await collection
-      .groupBy('id')
-      .having((having) => having.max(numericField).gt(1))
-      .aggregate((aggregate) => ({
-        max: aggregate.max(numericField),
-      }));
-
-    const metricColumns = runtime.executions
-      .map((entry) => {
-        if (!isSelectAst(entry.plan.ast)) {
-          return undefined;
-        }
-        const having = entry.plan.ast.having;
-        if (having?.kind !== 'binary' || having.left.kind !== 'aggregate') {
-          return undefined;
-        }
-        const aggExpr = having.left;
-        return aggExpr.expr?.kind === 'column-ref'
-          ? `${aggExpr.expr.table}:${aggExpr.expr.column}`
-          : undefined;
-      })
-      .filter((column): column is string => column !== undefined);
-
-    expect(metricColumns).toContain('posts:user_id');
   });
 
   it('only exposes grouped operations at runtime', () => {

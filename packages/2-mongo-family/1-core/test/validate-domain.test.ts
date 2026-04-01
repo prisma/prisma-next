@@ -4,7 +4,6 @@ import { validateContractDomain } from '../src/validate-domain';
 function makeMinimalModel(overrides: Record<string, unknown> = {}) {
   return {
     fields: {},
-    relations: {},
     ...overrides,
   };
 }

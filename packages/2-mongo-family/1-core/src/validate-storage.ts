@@ -25,7 +25,7 @@ export function validateMongoStorage(contract: MongoContract): void {
       }
     }
 
-    for (const [relName, relation] of Object.entries(model.relations)) {
+    for (const [relName, relation] of Object.entries(model.relations ?? {})) {
       const targetModel = contract.models[relation.to];
 
       if (targetModel?.owner) {

@@ -66,28 +66,6 @@
       }
     }
   },
-  "relations": {
-    "post": {
-      "user": {
-        "cardinality": "N:1",
-        "on": {
-          "childCols": ["id"],
-          "parentCols": ["userId"]
-        },
-        "to": "User"
-      }
-    },
-    "user": {
-      "posts": {
-        "cardinality": "1:N",
-        "on": {
-          "childCols": ["userId"],
-          "parentCols": ["id"]
-        },
-        "to": "Post"
-      }
-    }
-  },
   "storage": {
     "tables": {
       "post": {
