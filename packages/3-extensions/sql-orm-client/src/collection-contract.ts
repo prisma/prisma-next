@@ -15,7 +15,7 @@ function modelsOf(contract: SqlContract<SqlStorage>): ModelsMap {
 
 const fieldToColumnCache = new WeakMap<object, Map<string, Record<string, string>>>();
 const columnToFieldCache = new WeakMap<object, Map<string, Record<string, string>>>();
-const tableToModelCache = new WeakMap<object, Map<string, string | undefined>>();
+const tableToModelCache = new WeakMap<object, Map<string, string>>();
 
 export function resolveFieldToColumn(
   contract: SqlContract<SqlStorage>,
@@ -73,21 +73,16 @@ export function findModelNameForTable(
   contract: SqlContract<SqlStorage>,
   tableName: string,
 ): string | undefined {
-  let perContract = tableToModelCache.get(contract);
-  if (!perContract) {
-    perContract = new Map();
-    tableToModelCache.set(contract, perContract);
-  }
-  if (perContract.has(tableName)) return perContract.get(tableName);
-
-  for (const [modelName, model] of Object.entries(modelsOf(contract))) {
-    if (model?.storage?.table === tableName) {
-      perContract.set(tableName, modelName);
-      return modelName;
+  let reverseMap = tableToModelCache.get(contract);
+  if (!reverseMap) {
+    reverseMap = new Map();
+    for (const [modelName, model] of Object.entries(modelsOf(contract))) {
+      const table = model?.storage?.table;
+      if (table) reverseMap.set(table, modelName);
     }
+    tableToModelCache.set(contract, reverseMap);
   }
-  perContract.set(tableName, undefined);
-  return undefined;
+  return reverseMap.get(tableName);
 }
 
 interface ResolvedRelation {
