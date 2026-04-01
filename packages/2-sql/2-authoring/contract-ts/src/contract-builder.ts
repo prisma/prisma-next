@@ -50,11 +50,7 @@ import {
   createComposedAuthoringHelpers,
 } from './composed-authoring-helpers';
 import { computeMappings } from './contract';
-import {
-  buildSemanticSqlContract,
-  type SqlSemanticContractBuilderLike,
-  type SqlSemanticContractDefinition,
-} from './semantic-contract';
+import type { SqlSemanticContractDefinition, SqlSemanticModelNode } from './semantic-contract';
 import {
   type AttributeStageIdFieldNames,
   type FieldStateOf,
@@ -816,15 +812,243 @@ type StagedModelLike = {
   buildSqlSpec(): SqlStageSpec | undefined;
 };
 
+function assertKnownTargetModel(
+  modelsByName: ReadonlyMap<string, SqlSemanticModelNode>,
+  sourceModelName: string,
+  targetModelName: string,
+  context: string,
+): SqlSemanticModelNode {
+  const targetModel = modelsByName.get(targetModelName);
+  if (!targetModel) {
+    throw new Error(
+      `${context} on model "${sourceModelName}" references unknown model "${targetModelName}"`,
+    );
+  }
+  return targetModel;
+}
+
+function assertTargetTableMatches(
+  sourceModelName: string,
+  targetModel: SqlSemanticModelNode,
+  referencedTableName: string,
+  context: string,
+): void {
+  if (targetModel.tableName !== referencedTableName) {
+    throw new Error(
+      `${context} on model "${sourceModelName}" references table "${referencedTableName}" but model "${targetModel.modelName}" maps to "${targetModel.tableName}"`,
+    );
+  }
+}
+
+// SqlContractBuilder tracks generic type parameters that change with each method call,
+// but the semantic definition builder drives it imperatively without needing that tracking.
+// This local protocol erases the generics so the builder can be reassigned in a loop.
+type SemanticContractBuilder = {
+  target(target: TargetPackRef<'sql', string>): SemanticContractBuilder;
+  extensionPacks(packs: Record<string, ExtensionPackRef<'sql', string>>): SemanticContractBuilder;
+  capabilities(caps: Record<string, Record<string, boolean>>): SemanticContractBuilder;
+  storageHash(hash: string): SemanticContractBuilder;
+  foreignKeyDefaults(config: ForeignKeyDefaultsState): SemanticContractBuilder;
+  storageType(name: string, type: StorageTypeInstance): SemanticContractBuilder;
+  table(
+    name: string,
+    cb: (tb: SemanticTableBuilder) => SemanticTableBuilder,
+  ): SemanticContractBuilder;
+  model(
+    name: string,
+    table: string,
+    cb: (mb: SemanticModelBuilder) => SemanticModelBuilder,
+  ): SemanticContractBuilder;
+  build(): ContractIR;
+};
+type SemanticTableBuilder = {
+  column(
+    name: string,
+    options: {
+      readonly type: ColumnTypeDescriptor;
+      readonly nullable?: true;
+      readonly default?: ColumnDefault;
+    },
+  ): SemanticTableBuilder;
+  generated(
+    name: string,
+    options: {
+      readonly type: ColumnTypeDescriptor;
+      readonly generated: ExecutionMutationDefaultValue;
+    },
+  ): SemanticTableBuilder;
+  unique(columns: readonly string[], name?: string): SemanticTableBuilder;
+  primaryKey(columns: readonly string[], name?: string): SemanticTableBuilder;
+  index(
+    columns: readonly string[],
+    options?: {
+      readonly name?: string;
+      readonly using?: string;
+      readonly config?: Record<string, unknown>;
+    },
+  ): SemanticTableBuilder;
+  foreignKey(
+    columns: readonly string[],
+    references: { readonly table: string; readonly columns: readonly string[] },
+    options?: {
+      readonly name?: string;
+      readonly onDelete?: ReferentialAction;
+      readonly onUpdate?: ReferentialAction;
+      readonly constraint?: boolean;
+      readonly index?: boolean;
+    },
+  ): SemanticTableBuilder;
+};
+type SemanticModelBuilder = {
+  field(fieldName: string, columnName: string): SemanticModelBuilder;
+  relation(
+    name: string,
+    options: {
+      readonly toModel: string;
+      readonly toTable: string;
+      readonly cardinality: string;
+      readonly on: {
+        readonly parentTable: string;
+        readonly parentColumns: readonly string[];
+        readonly childTable: string;
+        readonly childColumns: readonly string[];
+      };
+      readonly through?: {
+        readonly table: string;
+        readonly parentColumns: readonly string[];
+        readonly childColumns: readonly string[];
+      };
+    },
+  ): SemanticModelBuilder;
+};
+
 export function buildSqlContractFromSemanticDefinition(
   definition: SqlSemanticContractDefinition,
 ): ContractIR {
-  return buildSemanticSqlContract(
-    definition,
-    // SqlContractBuilder is structurally compatible with SqlSemanticContractBuilderLike
-    // but does not explicitly implement it; the cast bridges the two interface shapes.
-    () => new SqlContractBuilder() as unknown as SqlSemanticContractBuilderLike,
-  );
+  const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
+
+  // SqlContractBuilder methods return new instances with different generic parameters,
+  // but we drive it imperatively and only need the runtime behavior. The protocol type
+  // erases the generics so the builder can be reassigned across method calls.
+  let builder = new SqlContractBuilder() as unknown as SemanticContractBuilder;
+  builder = builder.target(definition.target);
+
+  if (definition.extensionPacks) {
+    builder = builder.extensionPacks(definition.extensionPacks);
+  }
+  if (definition.capabilities) {
+    builder = builder.capabilities(definition.capabilities);
+  }
+  if (definition.storageHash) {
+    builder = builder.storageHash(definition.storageHash);
+  }
+  if (definition.foreignKeyDefaults) {
+    builder = builder.foreignKeyDefaults(definition.foreignKeyDefaults);
+  }
+  for (const [typeName, storageType] of Object.entries(definition.storageTypes ?? {})) {
+    builder = builder.storageType(typeName, storageType);
+  }
+
+  for (const model of definition.models) {
+    builder = builder.table(model.tableName, (tb) => {
+      let t: SemanticTableBuilder = tb;
+      for (const field of model.fields) {
+        if (field.executionDefault) {
+          t = t.generated(field.columnName, {
+            type: field.descriptor,
+            generated: field.executionDefault,
+          });
+          continue;
+        }
+        t = t.column(field.columnName, {
+          type: field.descriptor,
+          ...(field.nullable ? { nullable: true as const } : {}),
+          ...(field.default ? { default: field.default } : {}),
+        });
+      }
+      if (model.id) {
+        t = t.primaryKey(model.id.columns, model.id.name);
+      }
+      for (const unique of model.uniques ?? []) {
+        t = t.unique(unique.columns, unique.name);
+      }
+      for (const index of model.indexes ?? []) {
+        t = t.index(index.columns, {
+          ...(index.name ? { name: index.name } : {}),
+          ...(index.using ? { using: index.using } : {}),
+          ...(index.config ? { config: index.config } : {}),
+        });
+      }
+      for (const foreignKey of model.foreignKeys ?? []) {
+        const targetModel = assertKnownTargetModel(
+          modelsByName,
+          model.modelName,
+          foreignKey.references.model,
+          'Foreign key',
+        );
+        assertTargetTableMatches(
+          model.modelName,
+          targetModel,
+          foreignKey.references.table,
+          'Foreign key',
+        );
+        t = t.foreignKey(
+          foreignKey.columns,
+          { table: foreignKey.references.table, columns: foreignKey.references.columns },
+          {
+            ...(foreignKey.name ? { name: foreignKey.name } : {}),
+            ...(foreignKey.onDelete ? { onDelete: foreignKey.onDelete } : {}),
+            ...(foreignKey.onUpdate ? { onUpdate: foreignKey.onUpdate } : {}),
+            ...(foreignKey.constraint !== undefined ? { constraint: foreignKey.constraint } : {}),
+            ...(foreignKey.index !== undefined ? { index: foreignKey.index } : {}),
+          },
+        );
+      }
+      return t;
+    });
+  }
+
+  for (const model of definition.models) {
+    builder = builder.model(model.modelName, model.tableName, (mb) => {
+      let m: SemanticModelBuilder = mb;
+      for (const field of model.fields) {
+        m = m.field(field.fieldName, field.columnName);
+      }
+      for (const relation of model.relations ?? []) {
+        const targetModel = assertKnownTargetModel(
+          modelsByName,
+          model.modelName,
+          relation.toModel,
+          'Relation',
+        );
+        assertTargetTableMatches(model.modelName, targetModel, relation.toTable, 'Relation');
+        if (relation.cardinality === 'N:M') {
+          if (!relation.through) {
+            throw new Error(
+              `Relation "${model.modelName}.${relation.fieldName}" with cardinality "N:M" requires through metadata`,
+            );
+          }
+          m = m.relation(relation.fieldName, {
+            toModel: relation.toModel,
+            toTable: relation.toTable,
+            cardinality: 'N:M',
+            through: relation.through,
+            on: relation.on,
+          });
+          continue;
+        }
+        m = m.relation(relation.fieldName, {
+          toModel: relation.toModel,
+          toTable: relation.toTable,
+          cardinality: relation.cardinality,
+          on: relation.on,
+        });
+      }
+      return m;
+    });
+  }
+
+  return builder.build();
 }
 
 function buildStagedContract<Definition extends StagedContractInput>(
