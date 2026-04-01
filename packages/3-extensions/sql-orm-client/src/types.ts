@@ -461,44 +461,7 @@ type FieldColumnName<
     : FieldName) &
   string;
 
-type FieldStorageJsType<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-  FieldName extends string,
-> = ModelTableName<TContract, ModelName> extends infer TableName extends string
-  ? FieldColumnName<TContract, ModelName, FieldName> extends infer ColName extends string
-    ? TContract['storage']['tables'] extends Record<
-        string,
-        { readonly columns: Record<string, unknown> }
-      >
-      ? TableName extends keyof TContract['storage']['tables']
-        ? ColName extends keyof TContract['storage']['tables'][TableName]['columns']
-          ? TContract['storage']['tables'][TableName]['columns'][ColName] extends StorageColumn
-            ? ComputeColumnJsType<
-                TContract,
-                TableName,
-                ColName,
-                TContract['storage']['tables'][TableName]['columns'][ColName],
-                ExtractCodecTypes<TContract>
-              >
-            : never
-          : never
-        : never
-      : never
-    : never
-  : never;
-
-type FieldJsType<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-  FieldName extends string,
-> = [FieldStorageJsType<TContract, ModelName, FieldName>] extends [never]
-  ? FieldValueType<TContract, ModelName, FieldName> extends { readonly column: string }
-    ? unknown
-    : FieldValueType<TContract, ModelName, FieldName>
-  : FieldStorageJsType<TContract, ModelName, FieldName>;
-
-type FieldStorageColumn<
+type ResolvedStorageColumn<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
@@ -518,6 +481,36 @@ type FieldStorageColumn<
       : never
     : never
   : never;
+
+type FieldStorageJsType<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = ResolvedStorageColumn<TContract, ModelName, FieldName> extends infer Col extends StorageColumn
+  ? ComputeColumnJsType<
+      TContract,
+      ModelTableName<TContract, ModelName> & string,
+      FieldColumnName<TContract, ModelName, FieldName> & string,
+      Col,
+      ExtractCodecTypes<TContract>
+    >
+  : never;
+
+type FieldJsType<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = [FieldStorageJsType<TContract, ModelName, FieldName>] extends [never]
+  ? FieldValueType<TContract, ModelName, FieldName> extends { readonly column: string }
+    ? unknown
+    : FieldValueType<TContract, ModelName, FieldName>
+  : FieldStorageJsType<TContract, ModelName, FieldName>;
+
+type FieldStorageColumn<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = ResolvedStorageColumn<TContract, ModelName, FieldName>;
 
 // ---------------------------------------------------------------------------
 // Field trait resolution from contract CodecTypes
