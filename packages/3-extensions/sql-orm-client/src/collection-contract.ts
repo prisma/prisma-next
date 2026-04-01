@@ -13,47 +13,78 @@ function modelsOf(contract: SqlContract<SqlStorage>): ModelsMap {
   return contract.models as ModelsMap;
 }
 
+const fieldToColumnCache = new WeakMap<object, Map<string, Record<string, string>>>();
+const columnToFieldCache = new WeakMap<object, Map<string, Record<string, string>>>();
+const tableToModelCache = new WeakMap<object, Map<string, string | undefined>>();
+
 export function resolveFieldToColumn(
   contract: SqlContract<SqlStorage>,
   modelName: string,
   fieldName: string,
 ): string {
-  return modelsOf(contract)[modelName]?.storage?.fields?.[fieldName]?.column ?? fieldName;
+  return getFieldToColumnMap(contract, modelName)[fieldName] ?? fieldName;
 }
 
 export function getFieldToColumnMap(
   contract: SqlContract<SqlStorage>,
   modelName: string,
 ): Record<string, string> {
-  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
-  const result: Record<string, string> = {};
-  for (const [f, s] of Object.entries(storageFields)) {
-    if (s?.column) result[f] = s.column;
+  let perContract = fieldToColumnCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    fieldToColumnCache.set(contract, perContract);
   }
-  return result;
+  let cached = perContract.get(modelName);
+  if (cached) return cached;
+
+  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
+  cached = {};
+  for (const [f, s] of Object.entries(storageFields)) {
+    if (s?.column) cached[f] = s.column;
+  }
+  perContract.set(modelName, cached);
+  return cached;
 }
 
 export function getColumnToFieldMap(
   contract: SqlContract<SqlStorage>,
   modelName: string,
 ): Record<string, string> {
-  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
-  const result: Record<string, string> = {};
-  for (const [f, s] of Object.entries(storageFields)) {
-    if (s?.column) result[s.column] = f;
+  let perContract = columnToFieldCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    columnToFieldCache.set(contract, perContract);
   }
-  return result;
+  let cached = perContract.get(modelName);
+  if (cached) return cached;
+
+  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
+  cached = {};
+  for (const [f, s] of Object.entries(storageFields)) {
+    if (s?.column) cached[s.column] = f;
+  }
+  perContract.set(modelName, cached);
+  return cached;
 }
 
 export function findModelNameForTable(
   contract: SqlContract<SqlStorage>,
   tableName: string,
 ): string | undefined {
+  let perContract = tableToModelCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    tableToModelCache.set(contract, perContract);
+  }
+  if (perContract.has(tableName)) return perContract.get(tableName);
+
   for (const [modelName, model] of Object.entries(modelsOf(contract))) {
     if (model?.storage?.table === tableName) {
+      perContract.set(tableName, modelName);
       return modelName;
     }
   }
+  perContract.set(tableName, undefined);
   return undefined;
 }
 
@@ -69,8 +100,8 @@ interface ResolvedRelation {
 export interface ResolvedIncludeRelation {
   readonly relatedModelName: string;
   readonly relatedTableName: string;
-  readonly fkColumn: string;
-  readonly parentPkColumn: string;
+  readonly targetColumn: string;
+  readonly localColumn: string;
   readonly cardinality: RelationCardinalityTag | undefined;
 }
 
@@ -93,8 +124,8 @@ export function resolveIncludeRelation(
   return {
     relatedModelName: relation.to,
     relatedTableName,
-    fkColumn: targetColumn,
-    parentPkColumn: localColumn,
+    targetColumn,
+    localColumn,
     cardinality: relation.cardinality,
   };
 }
@@ -174,7 +205,7 @@ export function resolveModelTableName(
     return modelStorage.table;
   }
 
-  return modelName.toLowerCase();
+  throw new Error(`Model "${modelName}" is missing storage.table in the contract`);
 }
 
 export function resolvePrimaryKeyColumn(

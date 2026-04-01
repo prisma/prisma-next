@@ -149,7 +149,7 @@ describe('Collection', () => {
         relationName: 'posts',
         relatedModelName: 'Post',
         relatedTableName: 'posts',
-        fkColumn: 'user_id',
+        targetColumn: 'user_id',
         cardinality: '1:N',
       });
       expect(withPosts.state.includes[0]?.nested.filters).toEqual([
@@ -201,8 +201,8 @@ describe('Collection', () => {
         relationName: 'author',
         relatedModelName: 'User',
         relatedTableName: 'users',
-        fkColumn: 'id',
-        parentPkColumn: 'user_id',
+        targetColumn: 'id',
+        localColumn: 'user_id',
         cardinality: 'N:1',
       });
 

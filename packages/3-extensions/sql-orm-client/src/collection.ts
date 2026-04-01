@@ -3,15 +3,12 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { isWhereExpr, type ToWhereExpr, type WhereArg } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
-import {
-  mapCursorValuesToColumns,
-  mapFieldsToColumns,
-  mapFieldToColumn,
-} from './collection-column-mapping';
+import { mapCursorValuesToColumns, mapFieldsToColumns } from './collection-column-mapping';
 import {
   assertReturningCapability,
   getColumnToFieldMap,
   isToOneCardinality,
+  resolveFieldToColumn,
   resolveIncludeRelation,
   resolveModelTableName,
   resolvePrimaryKeyColumn,
@@ -299,8 +296,8 @@ export class Collection<
       relationName: relationName as string,
       relatedModelName: relation.relatedModelName,
       relatedTableName: relation.relatedTableName,
-      fkColumn: relation.fkColumn,
-      parentPkColumn: relation.parentPkColumn,
+      targetColumn: relation.targetColumn,
+      localColumn: relation.localColumn,
       cardinality: relation.cardinality,
       nested: nestedState,
       scalar: scalarSelector,
@@ -394,7 +391,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('sum()');
-    const columnName = mapFieldToColumn(this.contract, this.modelName, field as string);
+    const columnName = resolveFieldToColumn(this.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('sum', this.state, columnName);
   }
 
@@ -402,7 +399,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('avg()');
-    const columnName = mapFieldToColumn(this.contract, this.modelName, field as string);
+    const columnName = resolveFieldToColumn(this.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('avg', this.state, columnName);
   }
 
@@ -410,7 +407,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('min()');
-    const columnName = mapFieldToColumn(this.contract, this.modelName, field as string);
+    const columnName = resolveFieldToColumn(this.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('min', this.state, columnName);
   }
 
@@ -418,7 +415,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('max()');
-    const columnName = mapFieldToColumn(this.contract, this.modelName, field as string);
+    const columnName = resolveFieldToColumn(this.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('max', this.state, columnName);
   }
 
@@ -631,7 +628,7 @@ export class Collection<
       mapModelDataToStorageRow(this.contract, this.modelName, row),
     );
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
-    const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
+    const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForInsert, hiddenColumns } = augmentSelectionForJoinColumns(
       this.state.selectedFields,
       parentJoinColumns,
@@ -692,7 +689,7 @@ export class Collection<
       throw new Error(`upsert() for model "${this.modelName}" requires conflict columns`);
     }
 
-    const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
+    const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForUpsert, hiddenColumns } = augmentSelectionForJoinColumns(
       this.state.selectedFields,
       parentJoinColumns,
@@ -775,7 +772,7 @@ export class Collection<
       return new AsyncIterableResult(generator());
     }
 
-    const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
+    const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForUpdate, hiddenColumns } = augmentSelectionForJoinColumns(
       this.state.selectedFields,
       parentJoinColumns,
@@ -842,7 +839,7 @@ export class Collection<
   ): AsyncIterableResult<Row> {
     assertReturningCapability(this.contract, 'deleteAll()');
 
-    const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
+    const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForDelete, hiddenColumns } = augmentSelectionForJoinColumns(
       this.state.selectedFields,
       parentJoinColumns,

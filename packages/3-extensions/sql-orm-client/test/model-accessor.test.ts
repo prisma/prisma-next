@@ -292,7 +292,7 @@ describe('createModelAccessor', () => {
         ...base.models,
         User: {
           ...base.models.User,
-          storage: {},
+          storage: { table: 'users' },
           relations: {},
         },
       },
@@ -302,7 +302,7 @@ describe('createModelAccessor', () => {
       createModelAccessor({ ...context, contract: modelNameFallbackContract } as never, 'User')[
         'name'
       ]!.isNull(),
-    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('user', 'name')));
+    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('users', 'name')));
   });
 
   it('combines relation shorthand fields with and() and rejects missing join arrays', () => {

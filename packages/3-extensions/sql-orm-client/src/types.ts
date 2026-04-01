@@ -63,8 +63,8 @@ export interface IncludeExpr {
   readonly relationName: string;
   readonly relatedModelName: string;
   readonly relatedTableName: string;
-  readonly fkColumn: string;
-  readonly parentPkColumn: string;
+  readonly targetColumn: string;
+  readonly localColumn: string;
   readonly cardinality: RelationCardinalityTag | undefined;
   readonly nested: CollectionState;
   readonly scalar: IncludeScalar<unknown> | undefined;
