@@ -117,22 +117,22 @@ describe('filters', () => {
       }),
     ).toEqual(BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('alice@example.com')));
 
-    const withoutStorage = {
+    const withoutStorageFields = {
       ...contract,
       models: {
         ...contract.models,
         User: {
           ...contract.models.User,
           fields: {},
-          storage: {},
+          storage: { table: 'users' },
         },
       },
     } as typeof contract;
 
     expect(
-      shorthandToWhereExpr({ ...context, contract: withoutStorage } as never, 'User', {
+      shorthandToWhereExpr({ ...context, contract: withoutStorageFields } as never, 'User', {
         unknownField: null,
       } as never),
-    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('user', 'unknownField')));
+    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('users', 'unknownField')));
   });
 });

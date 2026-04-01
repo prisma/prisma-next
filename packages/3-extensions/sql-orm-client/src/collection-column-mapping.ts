@@ -1,13 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { getFieldToColumnMap, resolveFieldToColumn } from './collection-contract';
-
-export function mapFieldToColumn(
-  contract: SqlContract<SqlStorage>,
-  modelName: string,
-  fieldName: string,
-): string {
-  return resolveFieldToColumn(contract, modelName, fieldName);
-}
+import { getFieldToColumnMap } from './collection-contract';
 
 export function mapFieldsToColumns(
   contract: SqlContract<SqlStorage>,

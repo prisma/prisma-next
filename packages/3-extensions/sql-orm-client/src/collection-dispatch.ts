@@ -88,7 +88,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
-      const parentJoinColumns = state.includes.map((include) => include.parentPkColumn);
+      const parentJoinColumns = state.includes.map((include) => include.localColumn);
       const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
       const compiled = compileSelectWithIncludeStrategy(
@@ -156,7 +156,7 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
-      const parentJoinColumns = state.includes.map((include) => include.parentPkColumn);
+      const parentJoinColumns = state.includes.map((include) => include.localColumn);
       const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
       const parentCompiled = compileSelect(contract, tableName, {
@@ -202,9 +202,7 @@ export async function stitchIncludes(
 ): Promise<void> {
   for (const include of includes) {
     const parentJoinValues = uniqueValues(
-      parentRows
-        .map((row) => row.raw[include.parentPkColumn])
-        .filter((value) => value !== undefined),
+      parentRows.map((row) => row.raw[include.localColumn]).filter((value) => value !== undefined),
     );
 
     if (parentJoinValues.length === 0) {
@@ -256,7 +254,7 @@ async function stitchCombinedInclude(
         parentJoinValues,
       );
       for (const parent of parentRows) {
-        const parentJoinValue = parent.raw[include.parentPkColumn];
+        const parentJoinValue = parent.raw[include.localColumn];
         const relatedRows = rowsByParent.get(parentJoinValue) ?? [];
         const combined = parent.mapped[include.relationName] as Record<string, unknown>;
         combined[branchName] = coerceIncludeResult(relatedRows, branch.state, include.cardinality);
@@ -272,7 +270,7 @@ async function stitchCombinedInclude(
       parentJoinValues,
     );
     for (const parent of parentRows) {
-      const parentJoinValue = parent.raw[include.parentPkColumn];
+      const parentJoinValue = parent.raw[include.localColumn];
       const combined = parent.mapped[include.relationName] as Record<string, unknown>;
       combined[branchName] =
         scalarByParent.get(parentJoinValue) ?? emptyScalarResult(branch.selector.fn);
@@ -297,7 +295,7 @@ async function stitchScalarInclude(
   );
 
   for (const parent of parentRows) {
-    const parentJoinValue = parent.raw[include.parentPkColumn];
+    const parentJoinValue = parent.raw[include.localColumn];
     parent.mapped[include.relationName] =
       scalarByParent.get(parentJoinValue) ?? emptyScalarResult(selector.fn);
   }
@@ -314,7 +312,7 @@ async function stitchRowInclude(
   const rowsByParent = await resolveRowsByParent(scope, contract, include, state, parentJoinValues);
 
   for (const parent of parentRows) {
-    const parentJoinValue = parent.raw[include.parentPkColumn];
+    const parentJoinValue = parent.raw[include.localColumn];
     const relatedRows = rowsByParent.get(parentJoinValue) ?? [];
     parent.mapped[include.relationName] = coerceIncludeResult(
       relatedRows,
@@ -332,12 +330,12 @@ async function resolveRowsByParent(
   parentJoinValues: readonly unknown[],
 ): Promise<Map<unknown, Record<string, unknown>[]>> {
   const { selectedForQuery: childSelectedForQuery, hiddenColumns: hiddenChildColumns } =
-    augmentSelectionForJoinColumns(state.selectedFields, [include.fkColumn]);
+    augmentSelectionForJoinColumns(state.selectedFields, [include.targetColumn]);
 
   const childCompiled = compileRelationSelect(
     contract,
     include.relatedTableName,
-    include.fkColumn,
+    include.targetColumn,
     parentJoinValues,
     {
       ...state,
@@ -358,7 +356,7 @@ async function resolveRowsByParent(
 
   const childByParentJoin = new Map<unknown, Record<string, unknown>[]>();
   for (const child of childRows) {
-    const joinValue = child.raw[include.fkColumn];
+    const joinValue = child.raw[include.targetColumn];
 
     if (hiddenChildColumns.length > 0) {
       stripHiddenMappedFields(contract, include.relatedTableName, child.mapped, hiddenChildColumns);
@@ -383,8 +381,8 @@ async function resolveScalarByParent(
   parentJoinValues: readonly unknown[],
 ): Promise<Map<unknown, unknown>> {
   const requiredColumns = selector.column
-    ? [include.fkColumn, selector.column]
-    : [include.fkColumn];
+    ? [include.targetColumn, selector.column]
+    : [include.targetColumn];
   const { selectedForQuery } = augmentSelectionForJoinColumns(
     selector.state.selectedFields,
     requiredColumns,
@@ -393,7 +391,7 @@ async function resolveScalarByParent(
   const childCompiled = compileRelationSelect(
     contract,
     include.relatedTableName,
-    include.fkColumn,
+    include.targetColumn,
     parentJoinValues,
     {
       ...selector.state,
@@ -408,7 +406,7 @@ async function resolveScalarByParent(
 
   const rowsByParent = new Map<unknown, Record<string, unknown>[]>();
   for (const row of childRowsRaw) {
-    const joinValue = row[include.fkColumn];
+    const joinValue = row[include.targetColumn];
     let bucket = rowsByParent.get(joinValue);
     if (!bucket) {
       bucket = [];

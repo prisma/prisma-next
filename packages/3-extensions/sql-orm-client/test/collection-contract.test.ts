@@ -64,8 +64,8 @@ describe('collection-contract capability detection', () => {
     expect(resolveIncludeRelation(contract, 'User', 'posts')).toEqual({
       relatedModelName: 'Post',
       relatedTableName: 'posts',
-      fkColumn: 'user_id',
-      parentPkColumn: 'id',
+      targetColumn: 'user_id',
+      localColumn: 'id',
       cardinality: '1:N',
     });
   });
@@ -142,16 +142,18 @@ describe('collection-contract capability detection', () => {
     ]);
   });
 
-  it('resolveModelTableName() and resolvePrimaryKeyColumn() apply fallback behavior', () => {
+  it('resolveModelTableName() resolves from storage.table and throws when missing', () => {
     const contract = getTestContract();
 
     expect(resolveModelTableName(contract, 'User')).toBe('users');
-    expect(resolveModelTableName(contract, 'UnknownModel')).toBe('unknownmodel');
+    expect(() => resolveModelTableName(contract, 'UnknownModel')).toThrow(
+      'Model "UnknownModel" is missing storage.table in the contract',
+    );
     expect(resolvePrimaryKeyColumn(contract, 'users')).toBe('id');
     expect(resolvePrimaryKeyColumn(contract, 'unknown_table')).toBe('id');
   });
 
-  it('resolveModelTableName() falls back to lowercase model name when storage.table is missing', () => {
+  it('resolveModelTableName() reads from storage.table and throws for invalid values', () => {
     const contract = getTestContract();
     const withStorageFallback = {
       ...contract,
@@ -182,7 +184,9 @@ describe('collection-contract capability detection', () => {
       },
     } as unknown as typeof contract;
 
-    expect(resolveModelTableName(invalidStorageTable, 'User')).toBe('user');
+    expect(() => resolveModelTableName(invalidStorageTable, 'User')).toThrow(
+      'Model "User" is missing storage.table in the contract',
+    );
   });
 
   it('hasContractCapability() checks nested object flags and invalid target entries', () => {

@@ -237,8 +237,8 @@ function buildIncludeChildRowsSelect(
     filterTableName: include.relatedTableName,
   });
   const joinExpr = BinaryExpr.eq(
-    ColumnRef.of(childTableRef, include.fkColumn),
-    ColumnRef.of(parentTableName, include.parentPkColumn),
+    ColumnRef.of(childTableRef, include.targetColumn),
+    ColumnRef.of(parentTableName, include.localColumn),
   );
   const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
 
@@ -400,12 +400,12 @@ export function compileSelect(
 export function compileRelationSelect(
   contract: SqlContract<SqlStorage>,
   relatedTableName: string,
-  fkColumn: string,
+  targetColumn: string,
   parentPks: readonly unknown[],
   nestedState: CollectionState,
 ): SqlQueryPlan<Record<string, unknown>> {
   const inFilter: AnyExpression = BinaryExpr.in(
-    ColumnRef.of(relatedTableName, fkColumn),
+    ColumnRef.of(relatedTableName, targetColumn),
     ListExpression.fromValues(parentPks),
   );
 

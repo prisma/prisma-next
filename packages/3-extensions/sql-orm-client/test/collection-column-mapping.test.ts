@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import {
-  mapCursorValuesToColumns,
-  mapFieldsToColumns,
-  mapFieldToColumn,
-} from '../src/collection-column-mapping';
+import { mapCursorValuesToColumns, mapFieldsToColumns } from '../src/collection-column-mapping';
+import { resolveFieldToColumn } from '../src/collection-contract';
 import { getTestContract } from './helpers';
 
 describe('collection-column-mapping', () => {
   const contract = getTestContract();
 
-  it('mapFieldToColumn() resolves known fields and falls back for unknown fields', () => {
-    expect(mapFieldToColumn(contract, 'Post', 'userId')).toBe('user_id');
-    expect(mapFieldToColumn(contract, 'Post', 'customField')).toBe('customField');
+  it('resolveFieldToColumn() resolves known fields and falls back for unknown fields', () => {
+    expect(resolveFieldToColumn(contract, 'Post', 'userId')).toBe('user_id');
+    expect(resolveFieldToColumn(contract, 'Post', 'customField')).toBe('customField');
   });
 
   it('mapFieldsToColumns() maps arrays by model mapping when available', () => {
