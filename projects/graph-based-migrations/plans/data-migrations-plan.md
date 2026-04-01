@@ -46,6 +46,18 @@ Refs refactored from `migrations/refs.json` to `migrations/refs/<name>.json` wit
 - [ ] Consider: should verify re-attest already-attested packages that have a migration.ts with newer mtime than ops.json? (stale serialization detection)
 - [ ] Future: scan-all-packages mode without --dir (deferred to reduce scope)
 
+### Milestone: migration show support for data transforms
+
+`migration show` displays migration package contents. It needs to handle `DataTransformOperation` entries in ops.json — showing the data transform name, check/run status, and the raw SQL (for raw_sql nodes).
+
+**Tasks:**
+
+- [ ] Audit `migration show` for how it reads and displays ops — does it handle unknown operation classes?
+- [ ] Display data transform ops with name and invariant identity
+- [ ] Show check/run SQL for raw_sql nodes
+- [ ] Show `[data]` badge alongside existing `[additive]`, `[destructive]`, `[widening]` badges
+- [ ] Test migration show with a package containing data transforms
+
 ### Milestone: Draft migration visibility
 
 Draft migrations from `migration new` are invisible to `migration status` and `migration apply`. See `projects/graph-based-migrations/issue-triage.md` for details.
