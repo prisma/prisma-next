@@ -6,6 +6,7 @@ export type {
   DomainReferenceRelation,
   DomainRelation,
   DomainRelationOn,
+  DomainVariantEntry,
 } from '../domain-types';
 export type {
   $,

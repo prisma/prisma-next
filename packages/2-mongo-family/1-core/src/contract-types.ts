@@ -1,4 +1,9 @@
-// --- Storage layer: collection-level metadata ---
+import type {
+  DomainDiscriminator,
+  DomainField,
+  DomainRelation,
+  DomainVariantEntry,
+} from '@prisma-next/contract/types';
 
 export type MongoStorageCollection = Record<string, never>;
 
@@ -6,64 +11,20 @@ export type MongoStorage = {
   readonly collections: Record<string, MongoStorageCollection>;
 };
 
-// --- Model field (domain level) ---
-
-export type MongoModelField = {
-  readonly codecId: string;
-  readonly nullable: boolean;
-};
-
-// --- Model storage (family-specific bridge) ---
-
 export type MongoModelStorage = {
   readonly collection?: string;
+  readonly relations?: Record<string, { readonly field: string }>;
 };
-
-// --- Polymorphism ---
-
-export type MongoDiscriminator = {
-  readonly field: string;
-};
-
-export type MongoVariantEntry = {
-  readonly value: string;
-};
-
-// --- Relations ---
-
-export type MongoReferenceRelationOn = {
-  readonly localFields: readonly string[];
-  readonly targetFields: readonly string[];
-};
-
-export type MongoReferenceRelation = {
-  readonly to: string;
-  readonly cardinality: '1:1' | '1:N' | 'N:1';
-  readonly strategy: 'reference';
-  readonly on: MongoReferenceRelationOn;
-};
-
-export type MongoEmbedRelation = {
-  readonly to: string;
-  readonly cardinality: '1:1' | '1:N';
-  readonly strategy: 'embed';
-  readonly field: string;
-};
-
-export type MongoRelation = MongoReferenceRelation | MongoEmbedRelation;
-
-// --- Model definition ---
 
 export type MongoModelDefinition = {
-  readonly fields: Record<string, MongoModelField>;
+  readonly fields: Record<string, DomainField>;
   readonly storage: MongoModelStorage;
-  readonly relations: Record<string, MongoRelation>;
-  readonly discriminator?: MongoDiscriminator;
-  readonly variants?: Record<string, MongoVariantEntry>;
+  readonly relations: Record<string, DomainRelation>;
+  readonly discriminator?: DomainDiscriminator;
+  readonly variants?: Record<string, DomainVariantEntry>;
   readonly base?: string;
+  readonly owner?: string;
 };
-
-// --- Contract ---
 
 export type MongoContract<
   Roots extends Record<string, string> = Record<string, string>,
@@ -75,8 +36,6 @@ export type MongoContract<
   readonly storage: S;
   readonly models: M;
 };
-
-// --- TypeMaps: phantom type attachment ---
 
 export type MongoTypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, { output: unknown }>,
@@ -90,8 +49,6 @@ export type MongoContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
   readonly [K in MongoTypeMapsPhantomKey]?: TTypeMaps;
 };
 
-// --- Type extraction helpers ---
-
 export type ExtractMongoTypeMaps<T> = MongoTypeMapsPhantomKey extends keyof T
   ? NonNullable<T[MongoTypeMapsPhantomKey & keyof T]>
   : never;
@@ -102,8 +59,6 @@ export type ExtractMongoCodecTypes<T> =
       ? C
       : Record<string, never>
     : Record<string, never>;
-
-// --- Row inference ---
 
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
