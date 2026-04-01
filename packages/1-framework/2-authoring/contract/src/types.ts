@@ -102,15 +102,6 @@ export type ExtractModelFields<
     ? F
     : never;
 
-export type ExtractModelRelations<
-  T extends ModelBuilderState<
-    string,
-    string,
-    Record<string, string>,
-    Record<string, RelationDefinition>
-  >,
-> = T extends ModelBuilderState<string, string, Record<string, string>, infer R> ? R : never;
-
 export type BuildModels<
   Models extends Record<
     string,
@@ -125,13 +116,4 @@ export type BuildModels<
     readonly fields: Record<string, never>;
     readonly relations: Record<string, never>;
   };
-};
-
-export type BuildRelations<
-  Models extends Record<
-    string,
-    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
-  >,
-> = {
-  readonly [K in keyof Models as Models[K]['table']]: ExtractModelRelations<Models[K]>;
 };
