@@ -53,7 +53,6 @@ import {
 } from './planner-sql';
 
 export interface OperationResolverContext {
-  readonly fromContract: SqlContract<SqlStorage> | null;
   readonly toContract: SqlContract<SqlStorage>;
   readonly schemaName: string;
   readonly codecHooks: Map<string, CodecControlHooks>;

@@ -84,7 +84,6 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           ? extractCodecControlHooks(context.frameworkComponents)
           : new Map();
         return resolveOperations(descriptors as Parameters<typeof resolveOperations>[0], {
-          fromContract: context.fromContract as SqlContract<SqlStorage> | null,
           toContract: context.toContract as SqlContract<SqlStorage>,
           schemaName: context.schemaName ?? 'public',
           codecHooks,
