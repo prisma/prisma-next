@@ -1,10 +1,15 @@
 import { type } from 'arktype';
 
-const FieldSchema = type({
+const RawFieldSchema = type({
   '+': 'reject',
   codecId: 'string',
-  nullable: 'boolean',
+  'nullable?': 'boolean',
 });
+
+const FieldSchema = RawFieldSchema.pipe((field) => ({
+  ...field,
+  nullable: field.nullable ?? false,
+}));
 
 const RelationOnSchema = type({
   '+': 'reject',
@@ -96,7 +101,17 @@ const StorageCollectionSchema = type({ '+': 'reject' });
 export const MongoContractSchema = type({
   '+': 'reject',
   targetFamily: "'mongo'",
+  'schemaVersion?': 'string',
+  'target?': 'string',
+  'storageHash?': 'string',
+  'executionHash?': 'string',
+  'profileHash?': 'string',
   roots: 'Record<string, string>',
+  'relations?': 'Record<string, unknown>',
+  'capabilities?': 'Record<string, unknown>',
+  'extensionPacks?': 'Record<string, unknown>',
+  'meta?': 'Record<string, unknown>',
+  '_generated?': 'Record<string, unknown>',
   storage: type({
     '+': 'reject',
     collections: type('Record<string, unknown>').pipe((collections) => {
