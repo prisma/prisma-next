@@ -747,4 +747,41 @@ describe('validateContract', () => {
       expect(tables['user']).toBeDefined();
     });
   });
+
+  describe('model-to-storage cross-validation', () => {
+    it('rejects model whose storage.table does not exist in storage.tables', () => {
+      const contract = structuredClone(baseContract);
+      (contract as Record<string, unknown>).models = {
+        User: {
+          storage: { table: 'nonexistent', fields: { id: { column: 'id' } } },
+          fields: { id: {} },
+          relations: {},
+        },
+      };
+      expect(() => validateContract(contract)).toThrow(
+        'Model "User" references non-existent table "nonexistent"',
+      );
+    });
+
+    it('rejects model whose storage.fields reference a non-existent column', () => {
+      const contract = structuredClone(baseContract);
+      (contract as Record<string, unknown>).models = {
+        User: {
+          storage: {
+            table: 'User',
+            fields: { id: { column: 'id' }, email: { column: 'no_such_column' } },
+          },
+          fields: { id: {}, email: {} },
+          relations: {},
+        },
+      };
+      expect(() => validateContract(contract)).toThrow(
+        'Model "User" field "email" references non-existent column "no_such_column" in table "User"',
+      );
+    });
+
+    it('accepts a valid model-to-storage mapping', () => {
+      expect(() => validateContract(structuredClone(baseContract))).not.toThrow();
+    });
+  });
 });
