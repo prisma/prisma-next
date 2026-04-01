@@ -514,6 +514,8 @@ These document the major design choices, the alternatives considered, and why we
 
 6. **Planner TS output format**: The planner currently writes `ops.json` directly. Changing it to produce `migration.ts` that evaluates to ops is a significant refactor of the planning pipeline. The transition path needs design.
 
+7. **No static verification that ops transform fromContract to toContract**: Attestation hashes the manifest + ops for integrity but does not verify that the operations actually transform the source contract's schema into the destination contract's schema. For planner-generated migrations this is correct by construction (the planner derives ops from the contract diff). For user-authored migrations (`migration new`), the ops could be wrong — the only validation is post-apply (the runner introspects the live database and compares against the destination contract). A static check would require an `applyOpsToSchema(fromSchema, ops) → resultSchema` function that simulates the ops against the source schema and compares the result to the destination contract. This does not exist. The gap means user-authored migrations can be attested and committed even if they are structurally incorrect — the error surfaces only at apply time against a real database.
+
 # Other Considerations
 
 ## Security
