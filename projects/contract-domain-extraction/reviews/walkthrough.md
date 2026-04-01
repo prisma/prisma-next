@@ -1,137 +1,148 @@
-# Walkthrough — Milestone 2: Migrate Consumers to Domain-Level Type Fields
+closes [TML-2175](https://linear.app/prisma-company/issue/TML-2175/migrate-consumers-to-new-domain-level-type-fields-m2)
 
-## Sources
+## Before / After (intention in code)
 
-- Linear: [TML-2175](https://linear.app/prisma-company/issue/TML-2175/migrate-consumers-to-new-domain-level-type-fields-m2)
-- Spec: [projects/contract-domain-extraction/spec.md](../spec.md)
-- Commit range: `f133394ea...HEAD`
+```ts
+// BEFORE — consumer reads SQL-specific mappings and top-level relations
+const column = contract.mappings.fieldToColumn[modelName][fieldName];
+const table = contract.mappings.modelToTable[modelName];
+const rel = contract.relations[tableName][relationName];
+```
+
+```ts
+// AFTER — consumer reads domain-level fields on the model
+const column = resolveFieldToColumn(contract, modelName, fieldName);
+const table = resolveModelTableName(contract, modelName);
+const rel = resolveIncludeRelation(contract, modelName, relationName);
+// ↑ backed by model.storage.fields, model.storage.table, model.relations
+```
 
 ## Intent
 
-Migrate all ORM client and relational-core consumer code from reading old SQL-specific contract paths (`mappings.*`, top-level `relations`, storage-layer `codecId`) to the new domain-level fields (`model.storage.*`, `model.relations`, `model.fields[f].codecId`) introduced by ADR 172 in Milestone 1. This unblocks Milestone 3 (removing the old fields entirely).
-
-## Key snippet
-
-### Before / After (field-to-column resolution)
-
-```ts
-// BEFORE — direct mappings lookup
-const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
-```
-
-```ts
-// AFTER — centralized helper reading from model.storage.fields
-export function getFieldToColumnMap(
-  contract: SqlContract<SqlStorage>,
-  modelName: string,
-): Record<string, string> {
-  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
-  const result: Record<string, string> = {};
-  for (const [f, s] of Object.entries(storageFields)) {
-    if (s?.column) result[f] = s.column;
-  }
-  return result;
-}
-```
+Implement ADR 172's domain-storage separation in the emitted contract: widen `ContractBase` with a shared domain structure (`roots`, `models` with typed fields, relations, and storage metadata), update the SQL emitter to produce the ADR 172 JSON layout, bridge `validateContract()` so old fields remain available, then migrate all consumers to read from the new domain-level fields. This is the foundational step toward cross-family consumer code and unblocks M3 (removing the old fields entirely).
 
 ## Change map
 
-- **Implementation (sql-orm-client source — 10 files)**:
-  - [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — new resolution helpers; relation resolution rewritten
-  - [packages/3-extensions/sql-orm-client/src/collection-column-mapping.ts](packages/3-extensions/sql-orm-client/src/collection-column-mapping.ts) — delegates to `resolveFieldToColumn`/`getFieldToColumnMap`
-  - [packages/3-extensions/sql-orm-client/src/collection-runtime.ts](packages/3-extensions/sql-orm-client/src/collection-runtime.ts) — `findModelNameForTable` + `getColumnToFieldMap`
-  - [packages/3-extensions/sql-orm-client/src/model-accessor.ts](packages/3-extensions/sql-orm-client/src/model-accessor.ts) — reads `model.relations` and `model.fields[f].codecId` for traits
-  - [packages/3-extensions/sql-orm-client/src/mutation-executor.ts](packages/3-extensions/sql-orm-client/src/mutation-executor.ts) — reads `model.relations` for relation definitions
+- **Domain types and validation** (M1):
+  - [packages/1-framework/1-core/shared/contract/src/domain-types.ts](packages/1-framework/1-core/shared/contract/src/domain-types.ts) — new `DomainModel`, `DomainField`, `DomainRelation` types
+  - [packages/1-framework/1-core/shared/contract/src/validate-domain.ts](packages/1-framework/1-core/shared/contract/src/validate-domain.ts) — extracted shared domain validation
+  - [packages/2-sql/1-core/contract/src/validate.ts](packages/2-sql/1-core/contract/src/validate.ts) — `validateContract()` bridge: derives old fields from new
+  - [packages/2-sql/1-core/contract/src/types.ts](packages/2-sql/1-core/contract/src/types.ts) — `ContractBase` widened with `roots`, `models`
+- **Emitter** (M1):
+  - [packages/2-sql/3-tooling/emitter/src/index.ts](packages/2-sql/3-tooling/emitter/src/index.ts) — emits ADR 172 JSON structure
+  - [packages/1-framework/2-authoring/migration/control-plane/src/emission/emit.ts](packages/1-framework/2-authoring/migration/control-plane/src/emission/emit.ts) — updated canonicalization
+- **Consumer migration** (M2 — sql-orm-client, 11 source files):
+  - [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — centralized resolution helpers with WeakMap memoization
+  - [packages/3-extensions/sql-orm-client/src/model-accessor.ts](packages/3-extensions/sql-orm-client/src/model-accessor.ts) — reads `model.relations`, `model.fields[f].codecId`
   - [packages/3-extensions/sql-orm-client/src/filters.ts](packages/3-extensions/sql-orm-client/src/filters.ts) — reads `model.fields[f].codecId` for trait gating
-  - [packages/3-extensions/sql-orm-client/src/aggregate-builder.ts](packages/3-extensions/sql-orm-client/src/aggregate-builder.ts) — `getFieldToColumnMap`
-  - [packages/3-extensions/sql-orm-client/src/collection.ts](packages/3-extensions/sql-orm-client/src/collection.ts) — `getColumnToFieldMap`
-  - [packages/3-extensions/sql-orm-client/src/grouped-collection.ts](packages/3-extensions/sql-orm-client/src/grouped-collection.ts) — `getFieldToColumnMap`
-  - [packages/3-extensions/sql-orm-client/src/types.ts](packages/3-extensions/sql-orm-client/src/types.ts) — type-level generics migrated
-- **Implementation (relational-core — 1 file)**:
+  - [packages/3-extensions/sql-orm-client/src/mutation-executor.ts](packages/3-extensions/sql-orm-client/src/mutation-executor.ts) — reads `model.relations`
+  - [packages/3-extensions/sql-orm-client/src/types.ts](packages/3-extensions/sql-orm-client/src/types.ts) — type-level generics migrated to domain paths
+  - [packages/3-extensions/sql-orm-client/src/collection-column-mapping.ts](packages/3-extensions/sql-orm-client/src/collection-column-mapping.ts), [collection-runtime.ts](packages/3-extensions/sql-orm-client/src/collection-runtime.ts), [collection.ts](packages/3-extensions/sql-orm-client/src/collection.ts), [collection-dispatch.ts](packages/3-extensions/sql-orm-client/src/collection-dispatch.ts), [query-plan-select.ts](packages/3-extensions/sql-orm-client/src/query-plan-select.ts), [aggregate-builder.ts](packages/3-extensions/sql-orm-client/src/aggregate-builder.ts), [grouped-collection.ts](packages/3-extensions/sql-orm-client/src/grouped-collection.ts)
+- **Consumer migration** (M2 — relational-core, 1 file):
   - [packages/2-sql/4-lanes/relational-core/src/types.ts](packages/2-sql/4-lanes/relational-core/src/types.ts) — `ExtractTableToModel`, `ExtractColumnToField`, `ExtractColumnJsTypeFromModels`
+- **ADR 177** (ownership replaces relation strategy):
+  - [docs/architecture docs/adrs/ADR 177 - Ownership replaces relation strategy.md](docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md)
 - **Tests (evidence)**:
+  - [packages/1-framework/1-core/shared/contract/test/validate-domain.test.ts](packages/1-framework/1-core/shared/contract/test/validate-domain.test.ts)
+  - [packages/1-framework/1-core/shared/contract/test/domain-types.test.ts](packages/1-framework/1-core/shared/contract/test/domain-types.test.ts)
+  - [packages/2-sql/1-core/contract/test/validate.test.ts](packages/2-sql/1-core/contract/test/validate.test.ts)
+  - [packages/2-sql/1-core/contract/test/domain-types.test.ts](packages/2-sql/1-core/contract/test/domain-types.test.ts)
   - [packages/3-extensions/sql-orm-client/test/collection-contract.test.ts](packages/3-extensions/sql-orm-client/test/collection-contract.test.ts)
   - [packages/3-extensions/sql-orm-client/test/model-accessor.test.ts](packages/3-extensions/sql-orm-client/test/model-accessor.test.ts)
   - [packages/3-extensions/sql-orm-client/test/filters.test.ts](packages/3-extensions/sql-orm-client/test/filters.test.ts)
   - [packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts](packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts)
-  - [packages/3-extensions/sql-orm-client/test/grouped-collection.test.ts](packages/3-extensions/sql-orm-client/test/grouped-collection.test.ts)
   - [packages/3-extensions/sql-orm-client/test/generated-contract-types.test-d.ts](packages/3-extensions/sql-orm-client/test/generated-contract-types.test-d.ts)
-  - [packages/3-extensions/sql-orm-client/test/fixtures/generated/contract.json](packages/3-extensions/sql-orm-client/test/fixtures/generated/contract.json)
-  - [packages/3-extensions/sql-orm-client/test/fixtures/generated/contract.d.ts](packages/3-extensions/sql-orm-client/test/fixtures/generated/contract.d.ts)
-  - [test/e2e/framework/test/fixtures/generated/contract.d.ts](test/e2e/framework/test/fixtures/generated/contract.d.ts)
+  - [packages/2-sql/4-lanes/relational-core/test/schema.types.test-d.ts](packages/2-sql/4-lanes/relational-core/test/schema.types.test-d.ts)
+- **Project artifacts**:
+  - [projects/contract-domain-extraction/spec.md](projects/contract-domain-extraction/spec.md)
+  - [projects/contract-domain-extraction/plan.md](projects/contract-domain-extraction/plan.md)
+  - [projects/contract-domain-extraction/reviews/](projects/contract-domain-extraction/reviews/)
 
 ## The story
 
-1. **Centralize contract field resolution behind helper functions.** `collection-contract.ts` gains five new helpers (`resolveFieldToColumn`, `getFieldToColumnMap`, `getColumnToFieldMap`, `findModelNameForTable`, plus the existing `resolveModelTableName` rewritten). These read from `model.storage.fields` and `model.storage.table` instead of `mappings.*`. This is the foundation all other call sites migrate to.
+1. **Widen `ContractBase` with shared domain structure.** `ContractBase` gains `roots` (aggregate root model names) and `models` (each carrying `fields` with `{ codecId, nullable }`, optional `relations` with `{ to, cardinality, on: { localFields, targetFields } }`, and `storage` with `{ table, fields: { [f]: { column } } }`). A new `DomainModel`/`DomainField`/`DomainRelation` type family defines the cross-family domain shape. Shared validation is extracted to `validate-domain.ts` at the framework level.
 
-2. **Migrate ORM client runtime code to domain-level reads.** Every file in `sql-orm-client/src/` that previously accessed `contract.mappings.*` or `contract.relations[tableName]` is updated to use the new helpers or read `model.relations` / `model.fields` directly. Relation metadata uses `{ to, cardinality, on: { localFields, targetFields } }` uniformly — the legacy `{ model, foreignKey }` fallback path is removed.
+2. **Update the SQL emitter to produce ADR 172 JSON.** The emitter now emits the new domain-level structure directly in `contract.json`: models carry `storage.fields`, `relations`, and typed `fields`. The old `mappings` and top-level `relations` sections are no longer emitted in JSON — they exist only in `contract.d.ts` types, derived by `validateContract()`.
 
-3. **Migrate ORM client type-level generics.** The conditional types in `types.ts` that extracted table names, column names, relations, and FK fields from `TContract['mappings']` and `TContract['relations']` are rewritten to read from `model.storage`, `model.relations`, and `model.fields`. Several intermediate types are eliminated (`ModelTableFromMappings`, `ContractRelations`, `ChildRelationColumnsForModel`).
+3. **Bridge `validateContract()` for backward compatibility.** `validateContract()` reads the new ADR 172 JSON and derives the old fields (`mappings.modelToTable`, `mappings.fieldToColumn`, `mappings.tableToModel`, `mappings.columnToField`, top-level `relations`) so existing consumer code continues to work without changes. This makes the migration non-breaking and incremental.
 
-4. **Migrate relational-core type utilities.** `ExtractTableToModel` and `ExtractColumnToField` in `relational-core/src/types.ts` are rewritten to structurally search through `contract.models` rather than looking up `contract.mappings.tableToModel` / `contract.mappings.columnToField`. `ExtractColumnJsTypeFromModels` is simplified — it no longer needs the `{ column: string }` marker-object filtering heuristic because model fields now carry concrete JS types directly.
+4. **ADR 177: Ownership replaces relation strategy.** Relations lose their `strategy` field and models gain an `owner` field pointing to the owning model. This simplifies the contract's relation model and reflects the domain-level semantics more clearly. Validated and enforced in domain validation.
 
-5. **Update test fixtures and e2e contract type.** ORM client test fixtures (`contract.json`, `contract.d.ts`) are updated to include `model.storage.fields`, `model.relations`, and `roots`. The e2e framework `contract.d.ts` gains the same additions. Test assertions are updated for the new relation naming (`localFields`/`targetFields` vs `parentCols`/`childCols`).
+5. **Migrate ORM-client runtime to domain-level reads.** Every file in `sql-orm-client/src/` that accessed `contract.mappings.*` or `contract.relations[tableName]` is updated to use centralized resolution helpers in `collection-contract.ts`. These helpers read from `model.storage.fields`, `model.storage.table`, and `model.relations`, with WeakMap-backed memoization. The include-relation naming is aligned with ADR 172 vocabulary: `localColumn`/`targetColumn` replaces `fkColumn`/`parentPkColumn`.
+
+6. **Migrate type-level generics.** Conditional types in `sql-orm-client/src/types.ts` and `relational-core/src/types.ts` that extracted table names, column names, relations, and FK fields from `TContract['mappings']` and `TContract['relations']` are rewritten to derive from `model.storage`, `model.relations`, and `model.fields`. Several intermediate types are eliminated.
+
+7. **Update test fixtures and e2e contracts.** All test `contract.json` and `contract.d.ts` fixtures are updated to the ADR 172 structure. E2e expected contract files gain the new domain-level sections.
 
 ## Behavior changes & evidence
 
-- **Field-to-column resolution reads from `model.storage.fields` instead of `mappings.fieldToColumn`**: Before — `contract.mappings.fieldToColumn[model][field]`. After — `modelsOf(contract)[model].storage.fields[field].column`. No externally observable behavior change; consumers get the same column names.
-  - **Why**: Required by ADR 172's domain-storage separation. `mappings` will be removed in M3.
+- **Contract JSON emits ADR 172 structure**: The emitter produces `model.storage.fields`, `model.relations`, domain-level `model.fields`, and `roots` directly in `contract.json`. The old `mappings` and top-level `relations` sections are no longer in the JSON — they are derived at validation time.
+  - **Why**: ADR 172 mandates domain-storage separation. Emitting the target structure directly avoids dual-format complexity.
   - **Implementation**:
-    - [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — lines 16–34
+    - [packages/2-sql/3-tooling/emitter/src/index.ts](packages/2-sql/3-tooling/emitter/src/index.ts)
+  - **Tests**:
+    - [packages/1-framework/3-tooling/emitter/test/emitter.test.ts](packages/1-framework/3-tooling/emitter/test/emitter.test.ts)
+    - E2e expected contract fixtures under [test/e2e/](test/e2e/)
+
+- **`validateContract()` bridges old fields from new structure**: `validateContract()` derives `mappings` and top-level `relations` from the domain-level fields, so existing consumers see no difference in the TypeScript contract type.
+  - **Why**: Enables incremental migration — consumers can adopt new fields at their own pace without breaking.
+  - **Implementation**:
+    - [packages/2-sql/1-core/contract/src/validate.ts](packages/2-sql/1-core/contract/src/validate.ts)
+  - **Tests**:
+    - [packages/2-sql/1-core/contract/test/validate.test.ts](packages/2-sql/1-core/contract/test/validate.test.ts)
+
+- **Domain validation extracted to framework level**: Validation rules for model fields, relations, roots, and ownership are now shared between SQL and MongoDB families.
+  - **Why**: Cross-family code reuse — both families validate the same domain invariants.
+  - **Implementation**:
+    - [packages/1-framework/1-core/shared/contract/src/validate-domain.ts](packages/1-framework/1-core/shared/contract/src/validate-domain.ts)
+  - **Tests**:
+    - [packages/1-framework/1-core/shared/contract/test/validate-domain.test.ts](packages/1-framework/1-core/shared/contract/test/validate-domain.test.ts)
+
+- **Relations use ownership instead of strategy (ADR 177)**: Relations lose `strategy` and models gain `owner`. Validated in domain validation.
+  - **Why**: Ownership is a clearer domain-level concept than strategy, and avoids per-relation strategy configuration.
+  - **Implementation**:
+    - [docs/architecture docs/adrs/ADR 177 - Ownership replaces relation strategy.md](docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md)
+    - [packages/1-framework/1-core/shared/contract/src/validate-domain.ts](packages/1-framework/1-core/shared/contract/src/validate-domain.ts)
+
+- **ORM client reads from domain-level fields instead of `mappings`**: Field-to-column, model-to-table, relations, and codec traits all read from `model.storage.*`, `model.relations`, and `model.fields[f].codecId`. Centralized helpers with WeakMap memoization. `resolveModelTableName` throws on missing `storage.table` instead of falling back to string manipulation. Include-relation naming uses `localColumn`/`targetColumn`.
+  - **Why**: Required by ADR 172 — `mappings` will be removed in M3.
+  - **Implementation**:
+    - [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts)
+    - [packages/3-extensions/sql-orm-client/src/model-accessor.ts](packages/3-extensions/sql-orm-client/src/model-accessor.ts)
+    - [packages/3-extensions/sql-orm-client/src/filters.ts](packages/3-extensions/sql-orm-client/src/filters.ts)
+    - [packages/3-extensions/sql-orm-client/src/mutation-executor.ts](packages/3-extensions/sql-orm-client/src/mutation-executor.ts)
+    - [packages/3-extensions/sql-orm-client/src/types.ts](packages/3-extensions/sql-orm-client/src/types.ts)
   - **Tests**:
     - [packages/3-extensions/sql-orm-client/test/collection-contract.test.ts](packages/3-extensions/sql-orm-client/test/collection-contract.test.ts)
-
-- **Model-to-table resolution reads from `model.storage.table` instead of `mappings.modelToTable`**: Before — `contract.mappings.modelToTable[model]`. After — `modelsOf(contract)[model].storage.table`. Falls back to `modelName.toLowerCase()` (previously `modelName` without lowering in one code path).
-  - **Why**: Eliminates dependency on `mappings`.
-  - **Implementation**:
-    - [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — lines 168–178
-  - **Tests**:
-    - [packages/3-extensions/sql-orm-client/test/collection-contract.test.ts](packages/3-extensions/sql-orm-client/test/collection-contract.test.ts) — lines 151–180
-
-- **Relation resolution reads from `model.relations` instead of top-level `contract.relations[tableName]`**: Before — `contract.relations[tableName][relationName]` with `{ parentCols, childCols }`. After — `contract.models[modelName].relations[relationName]` with `{ localFields, targetFields }`. The legacy `{ model, foreignKey }` fallback is removed.
-  - **Why**: Relations are domain-level concepts that belong on the model, not keyed by table name.
-  - **Implementation**:
-    - [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — lines 77–147
-    - [packages/3-extensions/sql-orm-client/src/model-accessor.ts](packages/3-extensions/sql-orm-client/src/model-accessor.ts) — lines 39–65
-    - [packages/3-extensions/sql-orm-client/src/mutation-executor.ts](packages/3-extensions/sql-orm-client/src/mutation-executor.ts) — lines 670–720
-  - **Tests**:
-    - [packages/3-extensions/sql-orm-client/test/collection-contract.test.ts](packages/3-extensions/sql-orm-client/test/collection-contract.test.ts) — lines 58–100
-    - [packages/3-extensions/sql-orm-client/test/model-accessor.test.ts](packages/3-extensions/sql-orm-client/test/model-accessor.test.ts)
-    - [packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts](packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts) — lines 391–403
-
-- **Codec trait resolution reads from `model.fields[f].codecId` instead of `storage.tables[t].columns[c].codecId`**: Before — navigated to the storage column to find codecId. After — reads `model.fields[fieldName].codecId` directly. The field's codecId is the same value; the path is shorter.
-  - **Why**: Codec identity is a domain-level concept. Consumers shouldn't need to navigate through model→table→column to find it.
-  - **Implementation**:
-    - [packages/3-extensions/sql-orm-client/src/model-accessor.ts](packages/3-extensions/sql-orm-client/src/model-accessor.ts) — lines 68–81
-    - [packages/3-extensions/sql-orm-client/src/filters.ts](packages/3-extensions/sql-orm-client/src/filters.ts) — lines 68–83
-  - **Tests**:
     - [packages/3-extensions/sql-orm-client/test/model-accessor.test.ts](packages/3-extensions/sql-orm-client/test/model-accessor.test.ts)
     - [packages/3-extensions/sql-orm-client/test/filters.test.ts](packages/3-extensions/sql-orm-client/test/filters.test.ts)
+    - [packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts](packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts)
+    - [packages/3-extensions/sql-orm-client/test/generated-contract-types.test-d.ts](packages/3-extensions/sql-orm-client/test/generated-contract-types.test-d.ts)
 
-- **Type-level generics derive from domain-level fields (no behavior change)**: Before — `TContract['mappings']['fieldToColumn']`, `TContract['mappings']['modelToTable']`, `TContract['relations']`. After — `model.storage.fields`, `model.storage.table`, `model.relations`. Compile-time only.
-  - **Why**: Types must match the runtime code paths. Once runtime uses domain fields, types must too.
+- **Type-level generics derive from domain-level fields (no runtime behavior change)**: Conditional types in `types.ts` and `relational-core/types.ts` rewritten to read from `model.storage`, `model.relations`, and `model.fields`. Several intermediate types eliminated.
+  - **Why**: Types must match runtime code paths.
   - **Implementation**:
-    - [packages/3-extensions/sql-orm-client/src/types.ts](packages/3-extensions/sql-orm-client/src/types.ts) — lines 391–961
-    - [packages/2-sql/4-lanes/relational-core/src/types.ts](packages/2-sql/4-lanes/relational-core/src/types.ts) — lines 265–343
+    - [packages/3-extensions/sql-orm-client/src/types.ts](packages/3-extensions/sql-orm-client/src/types.ts)
+    - [packages/2-sql/4-lanes/relational-core/src/types.ts](packages/2-sql/4-lanes/relational-core/src/types.ts)
   - **Tests**:
     - [packages/3-extensions/sql-orm-client/test/generated-contract-types.test-d.ts](packages/3-extensions/sql-orm-client/test/generated-contract-types.test-d.ts)
     - [packages/2-sql/4-lanes/relational-core/test/schema.types.test-d.ts](packages/2-sql/4-lanes/relational-core/test/schema.types.test-d.ts)
 
 ## Compatibility / migration / risk
 
-- **No breaking changes for external consumers.** The contract object returned by `validateContract()` still carries both old and new fields (M1 bridge). Only internal consumer code paths changed.
-- **Subtle fallback change in `resolveModelTableName`.** The `model-accessor.ts` previously had its own `resolveModelTableName` that fell back to `modelName` (PascalCase). The centralized version falls back to `modelName.toLowerCase()`. Tests confirm the new behavior. This is arguably more correct (tables are lowercase by convention) but is a behavior change.
-- **Legacy relation format removed.** The `{ model, foreignKey }` relation fallback is gone. Any code or fixture relying on that format would break. This is intentional — M1 already moved relations to `{ to, cardinality, on }`.
+- **No breaking changes for external consumers.** `validateContract()` still returns a type with both old and new fields. The old fields (`mappings`, top-level `relations`) are derived from the new structure, so values are identical.
+- **Legacy relation format removed from ORM client.** The `{ model, foreignKey }` relation fallback is gone. All relations must use `{ to, cardinality, on: { localFields, targetFields } }`. This is intentional — M1 already ensures this structure.
+- **`resolveModelTableName` is strict.** It throws if `storage.table` is missing rather than falling back to a lowercase model name. A validated contract always provides `storage.table`.
+- **`as Record<string, ...>` casts on `contract.models`.** Several ORM-client files cast `contract.models` to local shape types. These will be removed in M3 when `ContractBase.models` is concretely typed (tracked as plan task 3.6.1).
 
 ## Follow-ups / open questions
 
-- **Task 2.7 (paradedb).** Not in this diff. Verify whether it's needed and update the plan accordingly.
-- **Resolution helper caching.** If profiling shows `getFieldToColumnMap` / `findModelNameForTable` as hot paths, add memoization (NB-F02, NB-F03 in code review).
-- **M3 readiness.** After this milestone, no consumer source references `mappings` or top-level `relations`. M3 can proceed to remove these from the type system and `validateContract()` bridge.
+- **M3: Remove old type fields.** No consumer source references `mappings` or top-level `relations`. M3 can proceed to remove them from `SqlContract` and `validateContract()`.
+- **M3 task 3.6.1: Remove `as Record<string, ...>` casts.** Once `ContractBase.models` is concretely typed (3.6), the casts become unnecessary.
+- **M4: Contract IR alignment.** Align internal `ContractIR` with emitted JSON to reduce impedance mismatch.
 
 ## Non-goals / intentionally out of scope
 
 - Removing old fields from `SqlContract` or `validateContract()` (M3 scope)
 - Contract IR alignment (M4 scope)
-- Emitter generalization (M5 scope)
-- paradedb migration (assessed as N/A — no `mappings` references found)
+- Emitter generalization for cross-family support (M5 scope)
