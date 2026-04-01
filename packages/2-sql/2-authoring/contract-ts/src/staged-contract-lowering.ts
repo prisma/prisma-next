@@ -47,6 +47,7 @@ type RuntimeModelSpec = {
   readonly relations: Record<string, RelationBuilder<StagedRelationState>>;
   readonly attributesSpec: ModelAttributesSpec | undefined;
   readonly sqlSpec: SqlStageSpec | undefined;
+  readonly idConstraint: IdConstraint | undefined;
 };
 
 type RuntimeStagedCollection = {
@@ -119,7 +120,9 @@ function mapFieldNamesToColumnNames(
   });
 }
 
-function resolveInlineIdConstraint(spec: RuntimeModelSpec): IdConstraint | undefined {
+function resolveInlineIdConstraint(
+  spec: Pick<RuntimeModelSpec, 'modelName' | 'fieldBuilders'>,
+): IdConstraint | undefined {
   const inlineIdFields: string[] = [];
   let idName: string | undefined;
 
@@ -176,7 +179,9 @@ function collectInlineUniqueConstraints(spec: RuntimeModelSpec): readonly Unique
   return constraints;
 }
 
-function resolveModelIdConstraint(spec: RuntimeModelSpec): IdConstraint | undefined {
+function resolveModelIdConstraint(
+  spec: Pick<RuntimeModelSpec, 'modelName' | 'fieldBuilders' | 'attributesSpec'>,
+): IdConstraint | undefined {
   const inlineId = resolveInlineIdConstraint(spec);
   const attributeId = spec.attributesSpec?.id;
 
@@ -245,7 +250,7 @@ function resolveRelationForeignKeys(
 }
 
 function resolveRelationAnchorFields(spec: RuntimeModelSpec): readonly string[] {
-  const idFields = resolveModelIdConstraint(spec)?.fields;
+  const idFields = spec.idConstraint?.fields;
   if (idFields && idFields.length > 0) {
     return idFields;
   }
@@ -508,7 +513,7 @@ function resolveSemanticModelNode(
     });
   }
 
-  const idConstraint = resolveModelIdConstraint(spec);
+  const { idConstraint } = spec;
   const uniques = resolveModelUniqueConstraints(spec).map((unique) => ({
     columns: mapFieldNamesToColumnNames(spec.modelName, unique.fields, spec.fieldToColumn),
     ...(unique.name ? { name: unique.name } : {}),
@@ -592,14 +597,17 @@ function collectRuntimeModelSpecs(definition: StagedContractInput): RuntimeStage
       fieldToColumn[fieldName] = columnName;
     }
 
+    const fieldBuilders = modelDefinition.stageOne.fields;
+    const idConstraint = resolveModelIdConstraint({ modelName, fieldBuilders, attributesSpec });
     modelSpecs.set(modelName, {
       modelName,
       tableName,
-      fieldBuilders: modelDefinition.stageOne.fields,
+      fieldBuilders,
       fieldToColumn,
       relations: modelDefinition.stageOne.relations,
       attributesSpec,
       sqlSpec,
+      idConstraint,
     });
   }
 
