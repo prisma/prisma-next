@@ -948,10 +948,25 @@ export type RelationCardinality<
     : '1:N'
   : '1:N';
 
-type RelationParentCols<Relation> = Relation extends {
-  readonly on: { readonly parentCols: infer Cols extends readonly string[] };
+type RelationLocalFieldColumns<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  Relation,
+> = Relation extends {
+  readonly on: { readonly localFields: infer Fields extends readonly string[] };
 }
-  ? Cols
+  ? MapFieldsToColumns<TContract, ModelName, Fields>
+  : readonly [];
+
+type MapFieldsToColumns<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  Fields extends readonly string[],
+> = Fields extends readonly [infer Head extends string, ...infer Tail extends string[]]
+  ? readonly [
+      FieldColumnName<TContract, ModelName, Head>,
+      ...MapFieldsToColumns<TContract, ModelName, Tail>,
+    ]
   : readonly [];
 
 type AnyColumnNullable<
@@ -990,8 +1005,14 @@ type IsToOneRelationNullable<
     ? TContract['storage']['tables'][TableName] extends infer Table extends StorageTable
       ? RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
         ? RelName extends keyof Rels
-          ? IsFkSideOfRelation<Table, RelationParentCols<Rels[RelName]>> extends true
-            ? AnyColumnNullable<Table['columns'], RelationParentCols<Rels[RelName]>>
+          ? RelationLocalFieldColumns<
+              TContract,
+              ModelName,
+              Rels[RelName]
+            > extends infer Cols extends readonly string[]
+            ? IsFkSideOfRelation<Table, Cols> extends true
+              ? AnyColumnNullable<Table['columns'], Cols>
+              : true
             : true
           : true
         : true
