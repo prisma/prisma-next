@@ -311,7 +311,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
   function normalizeProviderContractIR(contract: unknown): ContractIR {
     const validated = validateContract<SqlContract<SqlStorage>>(contract);
-    return validated as ContractIR;
+    const { relations: _, ...withoutTopLevelRelations } = validated as unknown as Record<
+      string,
+      unknown
+    >;
+    return withoutTopLevelRelations as unknown as ContractIR;
   }
 
   return {

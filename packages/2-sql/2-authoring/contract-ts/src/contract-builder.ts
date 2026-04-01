@@ -33,7 +33,6 @@ import {
   type Index,
   type ReferentialAction,
   type SqlContract,
-  type SqlStorage,
   type StorageTypeInstance,
   type TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -472,7 +471,6 @@ class SqlContractBuilder<
     // Build models - construct as partial first, then assert full type
     const modelsPartial: Partial<BuildModels<Models>> = {};
 
-    // Iterate over models - TypeScript will see keys as string, but type assertion preserves literals
     for (const modelName in this.state.models) {
       const modelState = this.state.models[modelName];
       if (!modelState) continue;
@@ -481,32 +479,97 @@ class SqlContractBuilder<
         name: string;
         table: string;
         fields: Record<string, string>;
+        relations: Record<string, RelationDefinition>;
       };
 
-      // Build fields object
-      const fields: Partial<Record<string, { readonly column: string }>> = {};
+      const tableName = modelStateTyped.table;
+      const tableState = this.state.tables[tableName as keyof Tables];
+      const tableColumns = tableState
+        ? (
+            tableState as unknown as {
+              columns: Record<string, { type: string; nullable?: boolean }>;
+            }
+          ).columns
+        : {};
 
-      // Iterate over fields
+      const storageFields: Record<string, { readonly column: string }> = {};
+      const domainFields: Record<string, Record<string, unknown>> = {};
+
       for (const fieldName in modelStateTyped.fields) {
         const columnName = modelStateTyped.fields[fieldName];
-        if (columnName) {
-          fields[fieldName] = {
-            column: columnName,
+        if (!columnName) continue;
+
+        storageFields[fieldName] = { column: columnName };
+
+        const column = tableColumns[columnName];
+        if (column) {
+          const field: Record<string, unknown> = { codecId: column.type };
+          if (column.nullable) {
+            field['nullable'] = true;
+          }
+          domainFields[fieldName] = field;
+        }
+      }
+
+      const modelRelations: Record<string, Record<string, unknown>> = {};
+      if (modelStateTyped.relations) {
+        for (const relName in modelStateTyped.relations) {
+          const rel = modelStateTyped.relations[relName];
+          if (!rel) continue;
+          modelRelations[relName] = {
+            to: rel.to,
+            cardinality: rel.cardinality,
+            on: {
+              localFields: rel.on.parentCols,
+              targetFields: rel.on.childCols,
+            },
           };
         }
       }
 
       (modelsPartial as unknown as Record<string, Record<string, unknown>>)[modelName] = {
         storage: {
-          table: modelStateTyped.table,
-          fields,
+          table: tableName,
+          fields: storageFields,
         },
-        fields: {},
-        relations: {},
+        fields: domainFields,
+        relations: modelRelations,
       };
     }
 
     const models = modelsPartial as unknown as BuildModels<Models>;
+
+    const relationsPartial: Partial<Record<string, Record<string, RelationDefinition>>> = {};
+    for (const modelName in this.state.models) {
+      const modelState = this.state.models[modelName];
+      if (!modelState) continue;
+
+      const modelStateTyped = modelState as unknown as {
+        name: string;
+        table: string;
+        fields: Record<string, string>;
+        relations: Record<string, RelationDefinition>;
+      };
+
+      const tableName = modelStateTyped.table;
+      if (!tableName) continue;
+
+      if (modelStateTyped.relations && Object.keys(modelStateTyped.relations).length > 0) {
+        if (!relationsPartial[tableName]) {
+          relationsPartial[tableName] = {};
+        }
+
+        const tableRelations = relationsPartial[tableName];
+        if (tableRelations) {
+          for (const relationName in modelStateTyped.relations) {
+            const relation = modelStateTyped.relations[relationName];
+            if (relation) {
+              tableRelations[relationName] = relation;
+            }
+          }
+        }
+      }
+    }
 
     const extensionNamespaces = this.state.extensionNamespaces ?? [];
     const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };
@@ -522,6 +585,7 @@ class SqlContractBuilder<
       targetFamily: 'sql' as const,
       storageHash: this.state.storageHash || 'sha256:ts-builder-placeholder',
       models,
+      relations: relationsPartial,
       roots: {},
       storage,
       ...(execution ? { execution } : {}),
