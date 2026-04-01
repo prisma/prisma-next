@@ -101,6 +101,75 @@ This milestone is the forcing function that defines the shared generation API. I
 - **3.5** ✅ Verify SQL emitter output is unchanged — the shared utilities are used by Mongo but the SQL hook still uses its own `generateContractTypes()` (migrated in M6). All 116 SQL emitter tests pass. `pnpm lint:deps` reports 0 violations.
 - **3.6** ✅ Set up a minimal Mongo demo/fixture contract to exercise the Mongo emitter end-to-end. — Blog fixture (User/Post/Comment with owner/embed) in `packages/2-mongo-family/3-tooling/emitter/test/fixtures/blog-contract-ir.ts`.
 - **3.7** ✅ Create a Mongo demo app (`examples/mongo-demo/`) that wires the emitted contract through the full Mongo stack end-to-end. ADR 177 contract artifacts (no `strategy`, `owner` on embedded models, `storage.relations` on owning models), `db.ts` setup module composing `createMongoAdapter()` + `createMongoDriver()` → `createMongoRuntime()` → `mongoOrm()`, integration test with `MongoMemoryReplSet` covering findMany, include/$lookup, and embedded documents. Prerequisite: aligned the Mongo runtime stack to ADR 177 — split `DomainRelation` into `DomainReferenceRelation | DomainEmbedRelation`, moved `ReferenceRelationKeys`/`EmbedRelationKeys` to framework, updated contract types/schema/validation/ORM to use `owner`-based embed detection, updated all test fixtures. 164 package tests pass, 0 dependency violations, 4 demo integration tests pass.
+- **3.8** Wire the Mongo demo app through the emitter pipeline. The current demo uses hand-authored `contract.json` and `contract.d.ts` — it does not consume emitter output. Simplify the demo schema to User/Post with a reference relation (drop polymorphism, embedded documents, and ownership — these are workstream task 3 concerns and the contract authoring surface cannot yet express them). Create a generation script (`scripts/generate-contract.ts`) that constructs a `ContractIR` and calls `emit(ir, options, mongoTargetFamilyHook)` to produce `contract.json` + `contract.d.ts`. The demo imports the generated artifacts. Update tests to cover the simplified schema (findMany, findMany with include/$lookup). This closes the ContractIR → emitter → runtime loop for M3. See detailed task description below.
+- **3.9** _(Follow-up, M3 addendum)_ Build a Mongo PSL interpreter and wire it into the demo app, completing the full authoring → emit → runtime pipeline. Create `packages/2-mongo-family/2-authoring/contract-psl/` with `interpretPslDocumentToMongoContractIR()` that maps PSL scalar types to Mongo codec IDs (`String` → `mongo/string@1`, `Int` → `mongo/int32@1`, `DateTime` → `mongo/date@1`, `@id` → `mongo/objectId@1`), models to collections, and `@relation` fields to Mongo reference relations. Replace the demo's hand-built `ContractIR` with a `.psl` schema file parsed by `@prisma-next/psl-parser` and interpreted by the new Mongo PSL interpreter. This completes the full authoring → emit → runtime pipeline, matching the SQL demo's pattern (`examples/prisma-next-demo/`). Polymorphism support in the PSL interpreter is deferred to workstream task 3 (ORM polymorphic models).
+
+#### Task 3.8 — Detailed task description
+
+**Goal:** Make the Mongo demo app consume emitter-generated artifacts (`contract.json` + `contract.d.ts`) instead of hand-authored ones. This proves the ContractIR → emitter → runtime pipeline works end-to-end for the Mongo family.
+
+**Context:**
+- The demo currently has hand-authored `src/contract.json` and `src/contract.d.ts` with a polymorphic task-tracker schema (Task/Bug/Feature, User/Address, Comment). These files are not produced by the emitter.
+- The `emit()` function in `@prisma-next/core-control-plane/emission` takes a `ContractIR`, `EmitOptions`, and a `TargetFamilyHook`, and returns `{ contractJson, contractDts }`. It is family-agnostic.
+- The `mongoTargetFamilyHook` in `@prisma-next/mongo-emitter` implements `TargetFamilyHook` for Mongo.
+- The blog fixture in `packages/2-mongo-family/3-tooling/emitter/test/fixtures/blog-contract-ir.ts` shows a working hand-built `ContractIR` for Mongo.
+- Polymorphism, embedded documents, and ownership are not expressible through the existing authoring surface (PSL/TS builders), so the demo schema is simplified to models with reference relations only.
+
+**Steps:**
+
+1. **Simplify the demo schema.** Replace the polymorphic task-tracker schema with a simple blog schema:
+   - `User`: `_id` (objectId), `name` (string), `email` (string) + `posts` relation (1:N)
+   - `Post`: `_id` (objectId), `title` (string), `content` (string), `authorId` (objectId), `createdAt` (date) + `author` relation (N:1)
+   - Two collections: `users`, `posts`
+   - Two roots: `users` → `User`, `posts` → `Post`
+   - No polymorphism, no embedded documents, no ownership
+
+2. **Create the generation script.** Add `examples/mongo-demo/scripts/generate-contract.ts`:
+   - Import `ContractIR` from `@prisma-next/contract/ir`
+   - Import `emit` from `@prisma-next/emitter` (re-exports from `@prisma-next/core-control-plane/emission`)
+   - Import `mongoTargetFamilyHook` from `@prisma-next/mongo-emitter`
+   - Define the blog `ContractIR` inline (model it after the existing blog fixture at `packages/2-mongo-family/3-tooling/emitter/test/fixtures/blog-contract-ir.ts`). Required fields: `schemaVersion: '1'`, `targetFamily: 'mongo'`, `target: 'mongo'`, `roots`, `models`, `relations: {}`, `storage: { collections: { ... } }`, `extensionPacks: {}`, `capabilities: {}`, `meta: {}`, `sources: {}`
+   - Call `emit(ir, { outputDir: '.' }, mongoTargetFamilyHook)` — most `EmitOptions` fields are optional
+   - Write `result.contractJson` to `src/contract.json`
+   - Write `result.contractDts` to `src/contract.d.ts`
+   - Log success
+
+3. **Add dependencies and scripts to `package.json`:**
+   - Add dev dependencies: `@prisma-next/emitter`, `@prisma-next/mongo-emitter`, `@prisma-next/core-control-plane`
+   - Add script: `"emit": "tsx scripts/generate-contract.ts"`
+
+4. **Run the emit script** to generate `contract.json` and `contract.d.ts`. Verify the generated files are valid.
+
+5. **Update `src/db.ts`:** Verify it still works with the generated contract artifacts (it should — same import pattern, different contract shape).
+
+6. **Update `src/types.ts`:** Simplify type definitions for the blog schema (UserRow, PostRow — no TaskRow, BugRow, etc.).
+
+7. **Update `src/server.ts`:** Simplify to User/Post endpoints (drop Task-related endpoints, polymorphism UI, etc.).
+
+8. **Update `src/app/`:** Simplify the React frontend (or remove if not needed — the proof is in the integration test, not the UI).
+
+9. **Update `test/blog.test.ts`:** Rewrite integration tests for the blog schema:
+   - Seed users and posts
+   - `findMany` returns users
+   - `findMany` with `include: { author: true }` resolves reference relations via `$lookup`
+   - Remove polymorphism and embedded document tests
+
+10. **Run tests:** `pnpm test` in the demo, verify all pass.
+
+11. **Run `pnpm install`** at the repo root to update `pnpm-lock.yaml`.
+
+**Verification:**
+- The demo's `contract.json` and `contract.d.ts` are produced by `emit()`, not hand-authored
+- The demo's integration test passes, proving the emitted contract works with the Mongo runtime stack
+- The generation script runs successfully: `pnpm emit` in `examples/mongo-demo/`
+
+**Reference files:**
+- Emitter: `packages/1-framework/1-core/migration/control-plane/src/emission/emit.ts`
+- EmitOptions/EmitResult: `packages/1-framework/1-core/migration/control-plane/src/emission/types.ts`
+- Mongo hook: `packages/2-mongo-family/3-tooling/emitter/src/index.ts`
+- Blog fixture (model your ContractIR after this): `packages/2-mongo-family/3-tooling/emitter/test/fixtures/blog-contract-ir.ts`
+- SQL demo emit script (pattern to follow): `examples/prisma-next-demo/package.json` (see `emit:ts` script)
+- Current demo files to modify: `examples/mongo-demo/src/contract.json`, `examples/mongo-demo/src/contract.d.ts`, `examples/mongo-demo/src/db.ts`, `examples/mongo-demo/src/types.ts`, `examples/mongo-demo/src/server.ts`, `examples/mongo-demo/test/blog.test.ts`
 
 ### Milestone 4: Remove old type fields
 
@@ -182,7 +251,9 @@ Migrates the SQL emitter hook onto the shared domain-level generation utilities 
 | No consumer reads `mappings` or top-level `relations` (M2)                                                            | Manual + grep      | 2.8            | Code search verification                                                |
 | Mongo emitter produces ADR 172/177 contract JSON and `.d.ts` (M3)                                                     | Unit               | 3.4            | Mongo emitter tests                                                     |
 | Shared domain-level generation utilities used by Mongo hook (M3)                                                      | Unit + Regression  | 3.5            | SQL output unchanged after shared extraction                            |
-| Mongo demo app wires emitted contract through adapter → runtime → ORM end-to-end (M3)                                 | Integration        | 3.7            | Seeds data, executes find + include queries via `mongodb-memory-server` |
+| Mongo demo app wires emitted contract through adapter → runtime → ORM end-to-end (M3)                                 | Integration        | 3.7, 3.8       | Seeds data, executes find + include queries via `mongodb-memory-server` |
+| Mongo demo consumes emitter-generated `contract.json` + `contract.d.ts` (M3)                                          | Integration        | 3.8            | Generation script calls `emit()` with `mongoTargetFamilyHook`           |
+| Mongo PSL interpreter produces valid ContractIR from `.psl` schema (M3 addendum)                                       | Unit               | 3.9            | Follow-up: full authoring → emit → runtime pipeline                    |
 | `mappings` removed from `SqlContract` (M4)                                                                            | Type test + CI     | 4.1, 4.7       | Compile-time verification                                               |
 | Top-level `relations` removed (M4)                                                                                    | Type test + CI     | 4.2, 4.7       | Compile-time verification                                               |
 | Old field shape removed (M4)                                                                                          | Type test + CI     | 4.3, 4.7       | Compile-time verification                                               |
