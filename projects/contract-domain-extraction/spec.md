@@ -275,7 +275,8 @@ This phase is the forcing function that defines the shared generation API. It ca
 2. **Implement `mongoTargetFamilyHook.generateContractTypes()`.** The Mongo hook uses the shared utilities for domain-level generation and provides: `generateStorageType()` (collection mappings), `generateModelStorageType()` (embedded document storage), and Mongo-specific validation.
 3. **Implement `mongoTargetFamilyHook.validateStructure()`.** Mongo-specific contract validation: collection names, embedded document constraints, owner/`storage.relations` consistency.
 4. **Set up a minimal Mongo fixture contract** to exercise the Mongo emitter end-to-end.
-5. **Create a Mongo demo app** (`examples/mongo-demo/`) that wires the emitted contract through the full Mongo stack end-to-end: emitted `contract.json` + `contract.d.ts` → `createMongoAdapter()` + `createMongoDriver()` → `createMongoRuntime()` → `mongoOrm()` → execute queries. The demo includes representative queries (find, find with include/`$lookup`) and a test using `mongodb-memory-server` that seeds data and runs the queries. This proves the emitted contract integrates with the existing Mongo adapter, driver, runtime, and ORM client.
+5. **Create a Mongo demo app** (`examples/mongo-demo/`) that wires the emitted contract through the full Mongo stack end-to-end: emitted `contract.json` + `contract.d.ts` → `createMongoAdapter()` + `createMongoDriver()` → `createMongoRuntime()` → `mongoOrm()` → execute queries. The demo includes representative queries (find, find with include/`$lookup`) and a test using `mongodb-memory-server` that seeds data and runs the queries. The contract artifacts must be produced by calling `emit()` with `mongoTargetFamilyHook` (not hand-authored). This proves the emitted contract integrates with the existing Mongo adapter, driver, runtime, and ORM client.
+6. _(Follow-up)_ **Build a Mongo PSL interpreter** to complete the authoring → emit → runtime loop. Replace the demo's hand-built `ContractIR` with a `.psl` schema parsed by the generic PSL parser and interpreted by a new Mongo PSL interpreter (`interpretPslDocumentToMongoContractIR`). This matches the SQL demo's pattern where PSL is the authoring surface. Polymorphism support is deferred to workstream task 3.
 
 ### Phase 4: Remove old type fields
 
@@ -352,7 +353,8 @@ This phase is independent of Phase 5 (IR alignment) and can be done before or af
 - [ ] Mongo-specific validation (`validateStructure()`) covers collection names, embedding constraints, and ownership consistency
 - [ ] SQL emitter output is unchanged after the shared utility extraction
 - [ ] A minimal Mongo fixture contract exercises the Mongo emitter end-to-end
-- [ ] A Mongo demo app wires the emitted contract through adapter → driver → runtime → ORM and executes queries end-to-end, proving the emitted contract integrates with the existing Mongo runtime stack
+- [ ] A Mongo demo app consumes emitter-generated `contract.json` + `contract.d.ts` (produced by calling `emit()` with `mongoTargetFamilyHook`) through adapter → driver → runtime → ORM and executes queries end-to-end, proving the emitted contract integrates with the existing Mongo runtime stack
+- [ ] _(Follow-up)_ A Mongo PSL interpreter completes the authoring → emit → runtime loop, replacing the hand-built ContractIR with a `.psl` schema
 
 ### Phase 4: Remove old type fields
 
