@@ -4,7 +4,7 @@
   "target": "postgres",
   "storageHash": "sha256:f23c5ccabb210de6564c7084708ecc900ad3e7769cc9585baad6561edfa20f66",
   "executionHash": "sha256:f2232a980cff0854e38fdedd0842347ffc96d92a8aaaab4da1749d4575598adc",
-  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
+  "profileHash": "sha256:1628d322a01cac03524fe340fe22d19882ec5ecf0f71f9a32c6c2dfa648a903a",
   "roots": {
     "User": "User"
   },
@@ -73,7 +73,8 @@
       "returning": true
     },
     "sql": {
-      "enums": true
+      "enums": true,
+      "returning": true
     }
   },
   "extensionPacks": {},
