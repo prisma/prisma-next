@@ -2,7 +2,6 @@ import { type } from 'arktype';
 import type {
   ForeignKey,
   ForeignKeyReferences,
-  ModelDefinition,
   PrimaryKey,
   ReferentialAction,
   SqlContract,
@@ -160,22 +159,11 @@ const ModelSchema = type({
   'owner?': 'string',
 });
 
-const MappingsSchema = type({
-  '+': 'reject',
-  'modelToTable?': 'null | Record<string, string>',
-  'tableToModel?': 'null | Record<string, string>',
-  'fieldToColumn?': 'null | Record<string, Record<string, string>>',
-  'columnToField?': 'null | Record<string, Record<string, string>>',
-  'codecTypes?': 'null | Record<string, unknown>',
-  'operationTypes?': 'null | Record<string, Record<string, unknown>>',
-});
-
 const ContractMetaSchema = type({
   '[string]': 'unknown',
 });
 
 const SqlContractSchema = type({
-  '+': 'reject',
   'schemaVersion?': "'1'",
   target: 'string',
   targetFamily: "'sql'",
@@ -188,9 +176,7 @@ const SqlContractSchema = type({
   'extensionPacks?': 'Record<string, unknown>',
   'meta?': ContractMetaSchema,
   'sources?': 'Record<string, unknown>',
-  'relations?': type({ '[string]': 'unknown' }),
   'roots?': 'Record<string, string>',
-  'mappings?': MappingsSchema,
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
   'execution?': ExecutionSchema,
@@ -219,20 +205,13 @@ export function validateStorage(value: unknown): SqlStorage {
   return result as SqlStorage;
 }
 
-/**
- * Validates the structural shape of ModelDefinition using Arktype.
- *
- * @param value - The model value to validate
- * @returns The validated model if structure is valid
- * @throws Error if the model structure is invalid
- */
-export function validateModel(value: unknown): ModelDefinition {
+export function validateModel(value: unknown): unknown {
   const result = ModelSchema(value);
   if (result instanceof type.errors) {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Model validation failed: ${messages}`);
   }
-  return result as ModelDefinition;
+  return result;
 }
 
 /**
