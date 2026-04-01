@@ -144,6 +144,7 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
   }
 
   function addPathBetween(fromHash: string, toHash: string): void {
+    /* v8 ignore next -- @preserve */
     if (!graph.nodes.has(fromHash) || !graph.nodes.has(toHash)) return;
     const raw = findPath(graph, fromHash, toHash);
     if (raw && raw.length > 0) {

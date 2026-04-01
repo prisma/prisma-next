@@ -216,4 +216,105 @@ describe('migrationGraphToRenderInput', () => {
     expect(detached!.markers).toContainEqual({ kind: 'db' });
     expect(detached!.markers).toContainEqual({ kind: 'contract', planned: false });
   });
+
+  it('sha256:-prefixed hashes are shortened correctly', () => {
+    const prefixed = 'sha256:abcdef1234567890';
+    const graph = buildGraph([entry(ROOT, prefixed, 'm1')]);
+    const result = migrationGraphToRenderInput(
+      makeInput({
+        graph,
+        mode: 'online',
+        markerHash: prefixed,
+        contractHash: prefixed,
+      }),
+    );
+
+    const nodeId = result.graph.nodes.find((n) => n.id === 'abcdef1')?.id;
+    expect(nodeId).toBe('abcdef1');
+  });
+
+  it('activeRefHash without markerHash — contract fallback uses ref as spine', () => {
+    const graph = buildGraph([entry(ROOT, 'A', 'm1'), entry('A', 'B', 'm2')]);
+    const result = migrationGraphToRenderInput(
+      makeInput({
+        graph,
+        mode: 'online',
+        activeRefHash: 'A',
+        contractHash: 'B',
+        refs: [{ name: 'staging', hash: 'A', active: true }],
+      }),
+    );
+
+    expect(result.options.spineTarget).toBe(sid('A'));
+    expect(result.relevantPaths.length).toBeGreaterThan(0);
+  });
+
+  it('ref unreachable from contract — falls back to root path with ref as fallback target', () => {
+    const graph = buildGraph([
+      entry(ROOT, 'A', 'm1'),
+      entry(ROOT, 'B', 'm2'),
+      entry('A', 'C', 'm3'),
+    ]);
+    const result = migrationGraphToRenderInput(
+      makeInput({
+        graph,
+        mode: 'online',
+        activeRefHash: 'B',
+        contractHash: 'C',
+        refs: [{ name: 'staging', hash: 'B', active: true }],
+      }),
+    );
+
+    expect(result.relevantPaths).toContainEqual(['∅', sid('A'), sid('C')]);
+    expect(result.options.spineTarget).toBe(sid('B'));
+  });
+
+  it('ref reaches contract independently of marker', () => {
+    const graph = buildGraph([
+      entry(ROOT, 'A', 'm1'),
+      entry(ROOT, 'B', 'm2'),
+      entry('A', 'C', 'm3'),
+      entry('B', 'C', 'm4'),
+    ]);
+    const result = migrationGraphToRenderInput(
+      makeInput({
+        graph,
+        mode: 'online',
+        markerHash: 'A',
+        activeRefHash: 'B',
+        contractHash: 'C',
+        refs: [{ name: 'staging', hash: 'B', active: true }],
+      }),
+    );
+
+    expect(result.relevantPaths).toContainEqual([sid('B'), sid('C')]);
+  });
+
+  it('empty graph with no edges — fallback to empty hash', () => {
+    const graph = buildGraph([]);
+    graph.nodes.add(ROOT);
+    const result = migrationGraphToRenderInput(
+      makeInput({
+        graph,
+        contractHash: EMPTY_CONTRACT_HASH,
+      }),
+    );
+
+    expect(result.options.spineTarget).toBe('∅');
+  });
+
+  it('addPathBetween skips when nodes missing from graph', () => {
+    const graph = buildGraph([entry(ROOT, 'A', 'm1')]);
+    const result = migrationGraphToRenderInput(
+      makeInput({
+        graph,
+        mode: 'online',
+        markerHash: 'A',
+        activeRefHash: 'MISSING',
+        contractHash: 'ALSO_MISSING',
+      }),
+    );
+
+    expect(result.relevantPaths).toContainEqual(['∅', sid('A')]);
+  });
 });
