@@ -9,13 +9,13 @@ const DB_NAME = 'task_tracker';
 async function seed(client: MongoClient) {
   const db = client.db(DB_NAME);
 
-  const alice = new ObjectId();
-  const bob = new ObjectId();
-  const carol = new ObjectId();
+  const alice = new ObjectId().toHexString();
+  const bob = new ObjectId().toHexString();
+  const carol = new ObjectId().toHexString();
 
   await db.collection('users').insertMany([
     {
-      _id: alice,
+      _id: alice as never,
       name: 'Alice Chen',
       email: 'alice@example.com',
       addresses: [
@@ -24,13 +24,13 @@ async function seed(client: MongoClient) {
       ],
     },
     {
-      _id: bob,
+      _id: bob as never,
       name: 'Bob Kumar',
       email: 'bob@example.com',
       addresses: [{ street: '789 Oak Ave', city: 'Portland', zip: '97201' }],
     },
     {
-      _id: carol,
+      _id: carol as never,
       name: 'Carol Santos',
       email: 'carol@example.com',
       addresses: [],
@@ -42,7 +42,7 @@ async function seed(client: MongoClient) {
       title: 'Login form crashes on empty password',
       type: 'bug',
       severity: 'critical',
-      assigneeId: alice.toHexString(),
+      assigneeId: alice,
       comments: [
         {
           _id: new ObjectId().toHexString(),
@@ -60,7 +60,7 @@ async function seed(client: MongoClient) {
       title: 'Dashboard chart renders wrong axis labels',
       type: 'bug',
       severity: 'medium',
-      assigneeId: bob.toHexString(),
+      assigneeId: bob,
       comments: [
         {
           _id: new ObjectId().toHexString(),
@@ -74,7 +74,7 @@ async function seed(client: MongoClient) {
       type: 'feature',
       priority: 'high',
       targetRelease: 'v2.1',
-      assigneeId: alice.toHexString(),
+      assigneeId: alice,
       comments: [
         {
           _id: new ObjectId().toHexString(),
@@ -98,14 +98,14 @@ async function seed(client: MongoClient) {
       type: 'feature',
       priority: 'medium',
       targetRelease: 'v2.2',
-      assigneeId: carol.toHexString(),
+      assigneeId: carol,
       comments: [],
     },
     {
       title: 'Memory leak in websocket handler',
       type: 'bug',
       severity: 'critical',
-      assigneeId: bob.toHexString(),
+      assigneeId: bob,
       comments: [
         {
           _id: new ObjectId().toHexString(),
@@ -119,7 +119,7 @@ async function seed(client: MongoClient) {
       type: 'feature',
       priority: 'low',
       targetRelease: 'v3.0',
-      assigneeId: carol.toHexString(),
+      assigneeId: carol,
       comments: [
         {
           _id: new ObjectId().toHexString(),
