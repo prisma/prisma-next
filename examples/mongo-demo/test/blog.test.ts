@@ -13,11 +13,11 @@ import contractJson from '../src/contract.json' with { type: 'json' };
 
 const { contract } = validateMongoContract<Contract>(contractJson);
 
-describe('mongo-demo task-tracker integration', { timeout: timeouts.spinUpDbServer }, () => {
+describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let runtime: MongoRuntime;
-  const dbName = 'task_tracker_test';
+  const dbName = 'blog_test';
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
@@ -46,164 +46,123 @@ describe('mongo-demo task-tracker integration', { timeout: timeouts.spinUpDbServ
     }
   }, timeouts.spinUpDbServer);
 
-  it('findMany returns seeded users with embedded addresses', async () => {
+  it('findMany returns seeded users', async () => {
     const db = client.db(dbName);
     await db.collection('users').insertMany([
-      {
-        _id: 'u1' as never,
-        name: 'Alice',
-        email: 'alice@example.com',
-        addresses: [{ street: '123 Main St', city: 'Springfield', zip: '12345' }],
-      },
-      {
-        _id: 'u2' as never,
-        name: 'Bob',
-        email: 'bob@example.com',
-        addresses: [],
-      },
+      { _id: 'u1' as never, name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
+      { _id: 'u2' as never, name: 'Bob', email: 'bob@example.com', bio: null },
     ]);
 
     const orm = mongoOrm({ contract, executor: runtime });
     const users = await orm.users.findMany();
 
     expect(users).toHaveLength(2);
-    expect(users[0]).toMatchObject({ name: 'Alice', email: 'alice@example.com' });
-    expect(users[0]!.addresses).toHaveLength(1);
-    expect(users[0]!.addresses[0]).toMatchObject({ street: '123 Main St', city: 'Springfield' });
-    expect(users[1]).toMatchObject({ name: 'Bob', addresses: [] });
+    expect(users[0]).toMatchObject({ name: 'Alice', email: 'alice@example.com', bio: 'Writer' });
+    expect(users[1]).toMatchObject({ name: 'Bob', email: 'bob@example.com', bio: null });
   });
 
-  it('findMany with include resolves reference relations via $lookup', async () => {
+  it('findMany returns seeded posts', async () => {
     const db = client.db(dbName);
     await db.collection('users').insertOne({
       _id: 'u1' as never,
       name: 'Alice',
       email: 'alice@example.com',
-      addresses: [],
+      bio: null,
     });
-    await db.collection('tasks').insertOne({
-      title: 'Fix login bug',
-      type: 'bug',
-      severity: 'critical',
-      assigneeId: 'u1',
-      comments: [],
-    });
-
-    const orm = mongoOrm({ contract, executor: runtime });
-    const tasks = await orm.tasks.findMany({
-      include: { assignee: true },
-    });
-
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0]).toMatchObject({
-      title: 'Fix login bug',
-      type: 'bug',
-      assignee: { name: 'Alice', email: 'alice@example.com' },
-    });
-  });
-
-  it('polymorphic tasks carry variant-specific fields', async () => {
-    const db = client.db(dbName);
-    await db.collection('tasks').insertMany([
+    await db.collection('posts').insertMany([
       {
-        title: 'Crash on startup',
-        type: 'bug',
-        severity: 'critical',
-        assigneeId: 'u1',
-        comments: [],
+        _id: 'p1' as never,
+        title: 'Hello World',
+        content: 'My first post',
+        authorId: 'u1',
+        createdAt: new Date('2026-01-15'),
       },
       {
-        title: 'Dark mode',
-        type: 'feature',
-        priority: 'high',
-        targetRelease: 'v2.0',
-        assigneeId: 'u1',
-        comments: [],
+        _id: 'p2' as never,
+        title: 'Second Post',
+        content: 'More content',
+        authorId: 'u1',
+        createdAt: new Date('2026-02-01'),
       },
     ]);
 
     const orm = mongoOrm({ contract, executor: runtime });
-    const tasks = await orm.tasks.findMany();
+    const posts = await orm.posts.findMany();
 
-    expect(tasks).toHaveLength(2);
-
-    const bug = tasks.find((t) => t.type === 'bug');
-    expect(bug).toMatchObject({ title: 'Crash on startup', severity: 'critical' });
-
-    const feature = tasks.find((t) => t.type === 'feature');
-    expect(feature).toMatchObject({ title: 'Dark mode', priority: 'high', targetRelease: 'v2.0' });
+    expect(posts).toHaveLength(2);
+    expect(posts[0]).toMatchObject({ title: 'Hello World', content: 'My first post' });
+    expect(posts[1]).toMatchObject({ title: 'Second Post', content: 'More content' });
   });
 
-  it('embedded comments appear in task results without include', async () => {
+  it('findMany with include resolves Post -> User via $lookup', async () => {
     const db = client.db(dbName);
-    await db.collection('tasks').insertOne({
-      title: 'Fix rendering',
-      type: 'bug',
-      severity: 'medium',
-      assigneeId: 'u1',
-      comments: [
-        { _id: 'c1', text: 'Reproduces on Chrome', createdAt: new Date('2026-01-01') },
-        { _id: 'c2', text: 'Root cause found', createdAt: new Date('2026-01-02') },
-      ],
-    });
-
-    const orm = mongoOrm({ contract, executor: runtime });
-    const tasks = await orm.tasks.findMany();
-
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0]!.comments).toHaveLength(2);
-    expect(tasks[0]!.comments[0]).toMatchObject({ text: 'Reproduces on Chrome' });
-    expect(tasks[0]!.comments[1]).toMatchObject({ text: 'Root cause found' });
-  });
-
-  it('full flow: seed -> query tasks with include, embeds, and polymorphism', async () => {
-    const db = client.db(dbName);
-
     await db.collection('users').insertOne({
       _id: 'u1' as never,
       name: 'Alice',
       email: 'alice@example.com',
-      addresses: [{ street: '456 Oak Ave', city: 'Portland', zip: '97201' }],
+      bio: 'Writer',
+    });
+    await db.collection('posts').insertOne({
+      _id: 'p1' as never,
+      title: 'Hello World',
+      content: 'My first post',
+      authorId: 'u1',
+      createdAt: new Date('2026-01-15'),
     });
 
-    await db.collection('tasks').insertMany([
+    const orm = mongoOrm({ contract, executor: runtime });
+    const posts = await orm.posts.findMany({ include: { author: true } });
+
+    expect(posts).toHaveLength(1);
+    expect(posts[0]).toMatchObject({
+      title: 'Hello World',
+      author: { name: 'Alice', email: 'alice@example.com' },
+    });
+  });
+
+  it('full flow: seed users and posts, query with include', async () => {
+    const db = client.db(dbName);
+
+    await db.collection('users').insertMany([
+      { _id: 'u1' as never, name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
+      { _id: 'u2' as never, name: 'Bob', email: 'bob@example.com', bio: null },
+    ]);
+
+    await db.collection('posts').insertMany([
       {
-        title: 'Memory leak',
-        type: 'bug',
-        severity: 'critical',
-        assigneeId: 'u1',
-        comments: [{ _id: 'c1', text: 'Heap grows 50MB/hour', createdAt: new Date('2026-03-25') }],
+        _id: 'p1' as never,
+        title: 'Hello World',
+        content: 'My first post',
+        authorId: 'u1',
+        createdAt: new Date('2026-01-15'),
       },
       {
-        title: 'CSV export',
-        type: 'feature',
-        priority: 'medium',
-        targetRelease: 'v2.2',
-        assigneeId: 'u1',
-        comments: [],
+        _id: 'p2' as never,
+        title: 'Mongo with Prisma Next',
+        content: 'Using the contract-first approach',
+        authorId: 'u2',
+        createdAt: new Date('2026-02-20'),
       },
     ]);
 
     const orm = mongoOrm({ contract, executor: runtime });
 
-    const users = await orm.users.findMany({ where: { name: 'Alice' } });
-    expect(users).toHaveLength(1);
-    expect(users[0]!.addresses).toHaveLength(1);
+    const users = await orm.users.findMany();
+    expect(users).toHaveLength(2);
 
-    const tasks = await orm.tasks.findMany({ include: { assignee: true } });
-    expect(tasks).toHaveLength(2);
+    const posts = await orm.posts.findMany({ include: { author: true } });
+    expect(posts).toHaveLength(2);
 
-    const bugTask = tasks.find((t) => t.type === 'bug');
-    expect(bugTask).toMatchObject({
-      title: 'Memory leak',
-      assignee: { name: 'Alice' },
-      comments: [{ text: 'Heap grows 50MB/hour' }],
+    const alicePost = posts.find((p) => p.authorId === 'u1');
+    expect(alicePost).toMatchObject({
+      title: 'Hello World',
+      author: { name: 'Alice' },
     });
 
-    const featureTask = tasks.find((t) => t.type === 'feature');
-    expect(featureTask).toMatchObject({
-      title: 'CSV export',
-      assignee: { name: 'Alice' },
+    const bobPost = posts.find((p) => p.authorId === 'u2');
+    expect(bobPost).toMatchObject({
+      title: 'Mongo with Prisma Next',
+      author: { name: 'Bob' },
     });
   });
 });

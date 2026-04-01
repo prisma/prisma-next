@@ -4,7 +4,7 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createDb } from './db';
 
 const PORT = 3456;
-const DB_NAME = 'task_tracker';
+const DB_NAME = 'blog';
 
 async function seed(client: MongoClient) {
   const db = client.db(DB_NAME);
@@ -18,115 +18,37 @@ async function seed(client: MongoClient) {
       _id: alice as never,
       name: 'Alice Chen',
       email: 'alice@example.com',
-      addresses: [
-        { street: '123 Main St', city: 'San Francisco', zip: '94102' },
-        { street: '456 Market St', city: 'San Francisco', zip: '94105' },
-      ],
+      bio: 'Full-stack engineer and tech blogger',
     },
-    {
-      _id: bob as never,
-      name: 'Bob Kumar',
-      email: 'bob@example.com',
-      addresses: [{ street: '789 Oak Ave', city: 'Portland', zip: '97201' }],
-    },
-    {
-      _id: carol as never,
-      name: 'Carol Santos',
-      email: 'carol@example.com',
-      addresses: [],
-    },
+    { _id: bob as never, name: 'Bob Kumar', email: 'bob@example.com', bio: 'DevOps enthusiast' },
+    { _id: carol as never, name: 'Carol Santos', email: 'carol@example.com', bio: null },
   ]);
 
-  await db.collection('tasks').insertMany([
+  await db.collection('posts').insertMany([
     {
-      title: 'Login form crashes on empty password',
-      type: 'bug',
-      severity: 'critical',
-      assigneeId: alice,
-      comments: [
-        {
-          _id: new ObjectId().toHexString(),
-          text: 'Reproduces on Chrome and Firefox',
-          createdAt: new Date('2026-03-15'),
-        },
-        {
-          _id: new ObjectId().toHexString(),
-          text: 'Root cause: missing null check in auth middleware',
-          createdAt: new Date('2026-03-16'),
-        },
-      ],
+      title: 'Getting Started with Prisma Next',
+      content: 'Learn how to build contract-first data access layers with Prisma Next and MongoDB.',
+      authorId: alice,
+      createdAt: new Date('2026-01-15'),
     },
     {
-      title: 'Dashboard chart renders wrong axis labels',
-      type: 'bug',
-      severity: 'medium',
-      assigneeId: bob,
-      comments: [
-        {
-          _id: new ObjectId().toHexString(),
-          text: 'Only affects bar charts, line charts are fine',
-          createdAt: new Date('2026-03-20'),
-        },
-      ],
+      title: 'Contract-First Development',
+      content:
+        'Why contract-first architecture leads to better type safety and developer experience.',
+      authorId: alice,
+      createdAt: new Date('2026-02-01'),
     },
     {
-      title: 'Dark mode support',
-      type: 'feature',
-      priority: 'high',
-      targetRelease: 'v2.1',
-      assigneeId: alice,
-      comments: [
-        {
-          _id: new ObjectId().toHexString(),
-          text: 'Design mockups attached to the ticket',
-          createdAt: new Date('2026-03-10'),
-        },
-        {
-          _id: new ObjectId().toHexString(),
-          text: 'Should we support system preference detection?',
-          createdAt: new Date('2026-03-11'),
-        },
-        {
-          _id: new ObjectId().toHexString(),
-          text: "Yes, let's auto-detect and allow manual override",
-          createdAt: new Date('2026-03-12'),
-        },
-      ],
+      title: 'MongoDB Best Practices',
+      content: 'Tips and tricks for designing efficient MongoDB schemas.',
+      authorId: bob,
+      createdAt: new Date('2026-02-20'),
     },
     {
-      title: 'Export to CSV',
-      type: 'feature',
-      priority: 'medium',
-      targetRelease: 'v2.2',
-      assigneeId: carol,
-      comments: [],
-    },
-    {
-      title: 'Memory leak in websocket handler',
-      type: 'bug',
-      severity: 'critical',
-      assigneeId: bob,
-      comments: [
-        {
-          _id: new ObjectId().toHexString(),
-          text: 'Heap grows ~50MB/hour under load',
-          createdAt: new Date('2026-03-25'),
-        },
-      ],
-    },
-    {
-      title: 'Multi-language support',
-      type: 'feature',
-      priority: 'low',
-      targetRelease: 'v3.0',
-      assigneeId: carol,
-      comments: [
-        {
-          _id: new ObjectId().toHexString(),
-          text: 'Start with i18n framework integration',
-          createdAt: new Date('2026-03-28'),
-        },
-      ],
+      title: 'The Future of ORMs',
+      content: 'How modern ORMs are evolving to support multiple database paradigms.',
+      authorId: carol,
+      createdAt: new Date('2026-03-10'),
     },
   ]);
 }
@@ -155,9 +77,9 @@ async function main() {
 
   const server = createServer(async (req, res) => {
     try {
-      if (req.method === 'GET' && req.url === '/api/tasks') {
-        const tasks = await orm.tasks.findMany({ include: { assignee: true } });
-        jsonResponse(res, tasks);
+      if (req.method === 'GET' && req.url === '/api/posts') {
+        const posts = await orm.posts.findMany({ include: { author: true } });
+        jsonResponse(res, posts);
       } else if (req.method === 'GET' && req.url === '/api/users') {
         const users = await orm.users.findMany();
         jsonResponse(res, users);
@@ -173,7 +95,7 @@ async function main() {
   server.listen(PORT, () => {
     console.log(`API server listening on http://localhost:${PORT}`);
     console.log('Endpoints:');
-    console.log(`  GET http://localhost:${PORT}/api/tasks`);
+    console.log(`  GET http://localhost:${PORT}/api/posts`);
     console.log(`  GET http://localhost:${PORT}/api/users`);
   });
 
