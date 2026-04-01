@@ -246,11 +246,20 @@ function detectFormat(models: Record<string, RawModel>): 'old' | 'new' {
   return 'old';
 }
 
-function buildColumnToFieldMap(fields: Record<string, RawField>): Record<string, string> {
+function buildColumnToFieldMap(
+  fields: Record<string, RawField>,
+  modelName: string,
+): Record<string, string> {
   const map: Record<string, string> = {};
   for (const [fieldName, field] of Object.entries(fields)) {
     const col = field['column'] as string | undefined;
-    if (col) map[col] = fieldName;
+    if (!col) continue;
+    if (Object.hasOwn(map, col)) {
+      throw new Error(
+        `Model "${modelName}" has duplicate column mapping: fields "${map[col]}" and "${fieldName}" both map to column "${col}"`,
+      );
+    }
+    map[col] = fieldName;
   }
   return map;
 }
@@ -267,7 +276,9 @@ function enrichOldFormatModels(
     const modelStorage = model['storage'] as Record<string, unknown> | undefined;
     const tableName = modelStorage?.['table'] as string | undefined;
     if (tableName) {
-      roots[modelName] = modelName;
+      if (!model['owner']) {
+        roots[modelName] = modelName;
+      }
       tableToModel[tableName] = modelName;
     }
   }
@@ -289,9 +300,15 @@ function enrichOldFormatModels(
     const enrichedFields: Record<string, RawField> = {};
     const modelStorageFields: Record<string, { column: string }> = {};
 
+    const hasStorageColumns = Object.keys(storageColumns).length > 0;
     for (const [fieldName, field] of Object.entries(fields)) {
       const colName = field['column'] as string;
       const storageCol = storageColumns[colName];
+      if (!storageCol && hasStorageColumns && colName) {
+        throw new Error(
+          `Model "${modelName}" field "${fieldName}" references non-existent column "${colName}" in table "${tableName}"`,
+        );
+      }
       enrichedFields[fieldName] = {
         ...field,
         nullable: storageCol?.['nullable'] ?? false,
@@ -330,13 +347,14 @@ function enrichOldFormatModels(
 
       const toModel = rel['to'] as string;
       const sourceFields = (existingModel['fields'] ?? {}) as Record<string, RawField>;
-      const sourceColToField = buildColumnToFieldMap(sourceFields);
+      const sourceColToField = buildColumnToFieldMap(sourceFields, modelName);
 
       if (!targetColumnToField[toModel]) {
         const targetModelObj = enrichedModels[toModel];
         if (targetModelObj) {
           targetColumnToField[toModel] = buildColumnToFieldMap(
             (targetModelObj['fields'] ?? {}) as Record<string, RawField>,
+            toModel,
           );
         } else {
           targetColumnToField[toModel] = {};
