@@ -163,17 +163,6 @@ type ContractBase = SqlContract<
         readonly user: {
           readonly to: 'User';
           readonly cardinality: 'N:1';
-          readonly strategy: 'reference';
-          readonly on: {
-            readonly localFields: readonly ['userId'];
-            readonly targetFields: readonly ['id'];
-          };
-        };
-      };
-      relations: {
-        readonly user: {
-          readonly to: 'User';
-          readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
             readonly targetFields: readonly ['id'];
@@ -196,17 +185,6 @@ type ContractBase = SqlContract<
         readonly email: CodecTypes['pg/text@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
         readonly kind: 'admin' | 'user';
-      };
-      relations: {
-        readonly posts: {
-          readonly to: 'Post';
-          readonly cardinality: '1:N';
-          readonly strategy: 'reference';
-          readonly on: {
-            readonly localFields: readonly ['id'];
-            readonly targetFields: readonly ['userId'];
-          };
-        };
       };
       relations: {
         readonly posts: {
