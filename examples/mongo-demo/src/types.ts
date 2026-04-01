@@ -1,12 +1,10 @@
-import type { IncludeResultFields, InferFullRow, InferRootRow } from '@prisma-next/mongo-orm';
+import type { IncludeResultFields, InferRootRow } from '@prisma-next/mongo-orm';
 import type { Contract } from './contract';
 
-export type TaskRow = InferRootRow<Contract, 'Task'>;
 export type UserRow = InferRootRow<Contract, 'User'>;
-export type CommentRow = InferFullRow<Contract, 'Comment'>;
-export type AddressRow = InferFullRow<Contract, 'Address'>;
+export type PostRow = InferRootRow<Contract, 'Post'>;
 
-export type TaskWithAssignee = TaskRow & IncludeResultFields<Contract, 'Task', { assignee: true }>;
+export type PostWithAuthor = PostRow & IncludeResultFields<Contract, 'Post', { author: true }>;
 
 type Serialized<T> = T extends Date
   ? string
@@ -16,5 +14,5 @@ type Serialized<T> = T extends Date
       ? { [K in keyof T]: Serialized<T[K]> }
       : T;
 
-export type ApiTask = Serialized<TaskWithAssignee>;
+export type ApiPost = Serialized<PostWithAuthor>;
 export type ApiUser = Serialized<UserRow>;

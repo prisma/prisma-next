@@ -10,22 +10,8 @@ function UserCard({ user }: { user: ApiUser }) {
           <p className="email">{user.email}</p>
         </div>
       </div>
-
-      {user.addresses.length > 0 && (
-        <div className="addresses">
-          <h4>Addresses ({user.addresses.length})</h4>
-          {user.addresses.map((addr) => (
-            <div key={addr.street} className="address">
-              <p>{addr.street}</p>
-              <p>
-                {addr.city}, {addr.zip}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {user.addresses.length === 0 && <p className="no-data">No addresses on file</p>}
+      {user.bio && <p className="card-content">{user.bio}</p>}
+      {!user.bio && <p className="no-data">No bio</p>}
     </div>
   );
 }
@@ -33,7 +19,7 @@ function UserCard({ user }: { user: ApiUser }) {
 export function UserList({ users }: { users: ApiUser[] }) {
   return (
     <div className="user-list">
-      <h2>Team Members</h2>
+      <h2>Authors ({users.length})</h2>
       <div className="cards">
         {users.map((user) => (
           <UserCard key={user._id} user={user} />
