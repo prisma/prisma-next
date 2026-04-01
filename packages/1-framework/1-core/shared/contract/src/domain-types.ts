@@ -25,12 +25,16 @@ export type DomainDiscriminator = {
   readonly field: string;
 };
 
+export type DomainVariantEntry = {
+  readonly value: string;
+};
+
 export type DomainModel = {
   readonly fields: Record<string, DomainField>;
   readonly relations: Record<string, DomainRelation>;
   readonly storage: Record<string, unknown>;
   readonly discriminator?: DomainDiscriminator;
-  readonly variants?: Record<string, unknown>;
+  readonly variants?: Record<string, DomainVariantEntry>;
   readonly base?: string;
   readonly owner?: string;
 };
