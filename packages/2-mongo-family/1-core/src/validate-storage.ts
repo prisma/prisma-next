@@ -29,6 +29,11 @@ export function validateMongoStorage(contract: MongoContract): void {
       const targetModel = contract.models[relation.to];
 
       if (targetModel?.owner) {
+        if (targetModel.owner !== modelName) {
+          errors.push(
+            `Embed relation "${relName}" targets "${relation.to}" which is owned by "${targetModel.owner}", not "${modelName}"`,
+          );
+        }
         if (targetModel.storage.collection) {
           errors.push(
             `Embed relation "${relName}" targets "${relation.to}" which must not have a collection`,

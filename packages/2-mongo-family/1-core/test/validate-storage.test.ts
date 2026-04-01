@@ -48,6 +48,34 @@ describe('validateMongoStorage()', () => {
       expect(() => validateMongoStorage(contract)).toThrow(/embed.*Tag.*must not.*collection/i);
     });
 
+    it('rejects embed target owned by a different model', () => {
+      const contract = makeMinimalContract({
+        models: {
+          Item: {
+            fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+            storage: { collection: 'items' },
+            relations: {
+              tags: { to: 'Tag', cardinality: '1:N' as const },
+            },
+          },
+          Other: {
+            fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+            storage: { collection: 'items' },
+            relations: {},
+          },
+          Tag: {
+            fields: { name: { codecId: 'mongo/string@1', nullable: false } },
+            storage: {},
+            relations: {},
+            owner: 'Other',
+          },
+        },
+      });
+      expect(() => validateMongoStorage(contract)).toThrow(
+        /embed.*tags.*Tag.*owned by.*Other.*not.*Item/i,
+      );
+    });
+
     it('accepts embed target with empty storage', () => {
       const contract = makeMinimalContract({
         models: {
