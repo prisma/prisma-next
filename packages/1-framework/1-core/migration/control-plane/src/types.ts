@@ -33,6 +33,7 @@ export type {
   MigrationRunnerFailure,
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
+  OperationDescriptor,
   SerializedQueryNode,
   TargetMigrationsCapability,
 } from './migrations';

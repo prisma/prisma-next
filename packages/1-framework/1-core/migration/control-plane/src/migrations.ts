@@ -101,6 +101,16 @@ export interface MigrationOperationPolicy {
 // ============================================================================
 
 /**
+ * Minimal shape for operation descriptors at the framework level.
+ * Targets produce richer types; this captures just enough for the
+ * framework to scaffold migration.ts files and pass descriptors through.
+ */
+export interface OperationDescriptor {
+  readonly kind: string;
+  readonly [key: string]: unknown;
+}
+
+/**
  * A single migration operation for display purposes.
  * Contains only the fields needed for CLI output (tree view, JSON envelope).
  */
@@ -361,7 +371,7 @@ export interface TargetMigrationsCapability<
   }):
     | {
         readonly ok: true;
-        readonly descriptors: readonly unknown[];
+        readonly descriptors: readonly OperationDescriptor[];
         readonly needsDataMigration: boolean;
       }
     | {
@@ -370,7 +380,7 @@ export interface TargetMigrationsCapability<
       };
 
   resolveDescriptors?(
-    descriptors: readonly unknown[],
+    descriptors: readonly OperationDescriptor[],
     context: {
       readonly fromContract: ContractIR | null;
       readonly toContract: ContractIR;

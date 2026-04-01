@@ -252,3 +252,32 @@ export function dataTransform(
     run: options.run,
   };
 }
+
+// ============================================================================
+// Builder registry
+// ============================================================================
+
+/**
+ * All builder functions keyed by descriptor kind.
+ * Used as the single source of truth for available builders —
+ * scaffold code generation iterates this to produce import lists.
+ */
+export const builders = {
+  createTable,
+  dropTable,
+  addColumn,
+  dropColumn,
+  alterColumnType,
+  setNotNull,
+  dropNotNull,
+  setDefault,
+  dropDefault,
+  addPrimaryKey,
+  addUnique,
+  addForeignKey,
+  dropConstraint,
+  createIndex,
+  dropIndex,
+  createType,
+  dataTransform,
+} as const;

@@ -30,6 +30,7 @@ export type {
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
   OperationContext,
+  OperationDescriptor,
   SchemaIssue,
   SchemaVerificationNode,
   SerializedQueryNode,

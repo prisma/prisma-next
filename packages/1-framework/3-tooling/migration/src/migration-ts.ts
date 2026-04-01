@@ -9,6 +9,7 @@
  */
 
 import { readFile, stat, writeFile } from 'node:fs/promises';
+import type { OperationDescriptor } from '@prisma-next/core-control-plane/types';
 import { join, resolve } from 'pathe';
 
 const MIGRATION_TS_FILE = 'migration.ts';
@@ -17,19 +18,66 @@ const MIGRATION_TS_FILE = 'migration.ts';
  * Options for scaffolding a migration.ts file.
  */
 export interface ScaffoldOptions {
-  /** Detected changes that need data migration, used to generate comments. */
-  readonly detectedChanges?: readonly string[];
-  /** Whether to include a dataTransform placeholder. */
-  readonly includeDataTransform?: boolean;
-  /** Name for the data transform (used as invariant identity). */
-  readonly dataTransformName?: string;
+  /** Operation descriptors to serialize as builder calls. */
+  readonly descriptors?: readonly OperationDescriptor[];
+}
+
+function serializeQueryNode(node: unknown): string {
+  if (typeof node === 'boolean') return String(node);
+  if (node === null || node === undefined) return 'null';
+  return JSON.stringify(node);
+}
+
+function descriptorToBuilderCall(desc: OperationDescriptor): string {
+  switch (desc.kind) {
+    case 'createTable':
+      return `createTable(${JSON.stringify(desc.table)})`;
+    case 'dropTable':
+      return `dropTable(${JSON.stringify(desc.table)})`;
+    case 'addColumn': {
+      const args = [JSON.stringify(desc.table), JSON.stringify(desc.column)];
+      if (desc.overrides) {
+        args.push(JSON.stringify(desc.overrides));
+      }
+      return `addColumn(${args.join(', ')})`;
+    }
+    case 'dropColumn':
+      return `dropColumn(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+    case 'alterColumnType':
+      return `alterColumnType(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+    case 'setNotNull':
+      return `setNotNull(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+    case 'dropNotNull':
+      return `dropNotNull(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+    case 'setDefault':
+      return `setDefault(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+    case 'dropDefault':
+      return `dropDefault(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+    case 'addPrimaryKey':
+      return `addPrimaryKey(${JSON.stringify(desc.table)})`;
+    case 'addUnique':
+      return `addUnique(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.columns)})`;
+    case 'addForeignKey':
+      return `addForeignKey(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.columns)})`;
+    case 'dropConstraint':
+      return `dropConstraint(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.constraintName)})`;
+    case 'createIndex':
+      return `createIndex(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.columns)})`;
+    case 'dropIndex':
+      return `dropIndex(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.indexName)})`;
+    case 'createType':
+      return `createType(${JSON.stringify(desc.typeName)})`;
+    case 'dataTransform':
+      return `dataTransform(${JSON.stringify(desc.name)}, {\n    check: ${serializeQueryNode(desc.check)},\n    run: ${serializeQueryNode(desc.run)},\n  })`;
+    default:
+      throw new Error(`Unknown descriptor kind: ${desc.kind}`);
+  }
 }
 
 /**
  * Scaffolds a migration.ts file in the given package directory.
- * The file contains operation builder imports and a default export
- * returning an operation list. If data migration is detected, includes
- * an unimplemented dataTransform that prevents attestation.
+ * Serializes operation descriptors as builder calls that the user can edit.
+ * On verify, this file is re-evaluated to produce the final ops.
  */
 export async function scaffoldMigrationTs(
   packageDir: string,
@@ -37,31 +85,18 @@ export async function scaffoldMigrationTs(
 ): Promise<void> {
   const filePath = join(packageDir, MIGRATION_TS_FILE);
 
-  const changeComments = options.detectedChanges?.length
-    ? options.detectedChanges.map((c) => `//   - ${c}`).join('\n')
-    : '';
+  const descriptors = options.descriptors ?? [];
 
-  const dataTransformBlock =
-    options.includeDataTransform && options.dataTransformName
-      ? `
-  // Data transform: ${options.dataTransformName}
-  // The following changes were detected that require a data migration:
-${changeComments}
-  //
-  // Fill in the check and run functions using the query builder.
-  // check: return a query describing violations (empty result = already applied)
-  // run: return the query (or queries) to transform the data
-  dataTransform("${options.dataTransformName}", {
-    check: false, // TODO: implement check
-    run: { kind: "todo" }, // TODO: implement run
-  }),`
-      : '';
+  const importList = [...new Set(descriptors.map((d) => d.kind))];
+  if (importList.length === 0) {
+    importList.push('createTable');
+  }
+  const importLine = `import { ${importList.join(', ')} } from "@prisma-next/target-postgres/migration-builders"`;
 
-  const content = `import { addColumn, dropColumn, setNotNull, dropNotNull, setDefault, dropDefault, alterColumnType, createTable, dropTable, addPrimaryKey, addUnique, addForeignKey, dropConstraint, createIndex, dropIndex, createType, dataTransform } from "@prisma-next/target-postgres/migration-builders"
+  const calls = descriptors.map((d) => `  ${descriptorToBuilderCall(d)},`).join('\n');
+  const body = calls.length > 0 ? `\n${calls}\n` : '';
 
-export default () => [${dataTransformBlock}
-]
-`;
+  const content = `${importLine}\n\nexport default () => [${body}]\n`;
 
   await writeFile(filePath, content);
 }

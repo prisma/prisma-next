@@ -24,6 +24,7 @@ export {
   addPrimaryKey,
   addUnique,
   alterColumnType,
+  builders,
   createIndex,
   createTable,
   createType,

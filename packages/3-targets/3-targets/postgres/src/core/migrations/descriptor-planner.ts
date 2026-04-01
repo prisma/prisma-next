@@ -163,12 +163,40 @@ function mapIssue(
 ): Result<readonly MigrationOpDescriptor[], SqlPlannerConflict> {
   switch (issue.kind) {
     // Additive — missing structures
-    case 'missing_table':
+    case 'missing_table': {
       if (!issue.table)
         return notOk(
           issueConflict('unsupportedOperation', 'Missing table issue has no table name'),
         );
-      return ok([createTable(issue.table)]);
+      const contractTable = ctx.toContract.storage.tables[issue.table];
+      if (!contractTable) {
+        return notOk(
+          issueConflict(
+            'unsupportedOperation',
+            `Table "${issue.table}" reported missing but not found in destination contract`,
+          ),
+        );
+      }
+      const ops: MigrationOpDescriptor[] = [createTable(issue.table)];
+      for (const index of contractTable.indexes) {
+        ops.push(createIndex(issue.table, [...index.columns]));
+      }
+      const explicitIndexColumnSets = new Set(
+        contractTable.indexes.map((idx) => idx.columns.join(',')),
+      );
+      for (const fk of contractTable.foreignKeys) {
+        if (fk.constraint) {
+          ops.push(addForeignKey(issue.table, [...fk.columns]));
+        }
+        if (fk.index && !explicitIndexColumnSets.has(fk.columns.join(','))) {
+          ops.push(createIndex(issue.table, [...fk.columns]));
+        }
+      }
+      for (const unique of contractTable.uniques) {
+        ops.push(addUnique(issue.table, [...unique.columns]));
+      }
+      return ok(ops);
+    }
 
     case 'missing_column':
       if (!issue.table || !issue.column)
