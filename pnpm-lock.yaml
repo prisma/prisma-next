@@ -1293,9 +1293,6 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../relational-core
-      '@prisma-next/sql-runtime':
-        specifier: workspace:*
-        version: link:../../5-runtime
     devDependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
@@ -1327,6 +1324,9 @@ importers:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../2-authoring/contract-ts
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../5-runtime
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../../3-targets/3-targets/postgres
