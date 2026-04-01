@@ -668,13 +668,22 @@ async function executeUpdateCount(
   await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 }
 
+const relationDefsCache = new WeakMap<object, Map<string, RelationDefinition[]>>();
+
 function getRelationDefinitions(
   contract: SqlContract<SqlStorage>,
   modelName: string,
 ): RelationDefinition[] {
-  const relations = resolveModelRelations(contract, modelName);
+  let perContract = relationDefsCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    relationDefsCache.set(contract, perContract);
+  }
+  const cached = perContract.get(modelName);
+  if (cached) return cached;
 
-  return Object.entries(relations).map(([relationName, relation]) => ({
+  const relations = resolveModelRelations(contract, modelName);
+  const definitions = Object.entries(relations).map(([relationName, relation]) => ({
     relationName,
     relatedModelName: relation.to,
     relatedTableName: resolveModelTableName(contract, relation.to),
@@ -684,6 +693,9 @@ function getRelationDefinitions(
       resolveFieldToColumn(contract, relation.to, f),
     ),
   }));
+
+  perContract.set(modelName, definitions);
+  return definitions;
 }
 
 function toFieldName(
