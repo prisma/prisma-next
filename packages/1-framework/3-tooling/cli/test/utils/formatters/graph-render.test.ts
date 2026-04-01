@@ -318,6 +318,203 @@ describe('render with truncation', { timeout: GRAPH_TIMEOUT }, () => {
   });
 });
 
+describe('Graph renderer — colorize and markers', { timeout: GRAPH_TIMEOUT }, () => {
+  it('renders with colorize enabled', () => {
+    const output = graphRenderer.render(linearChain.graph, {
+      ...linearChain.options,
+      colorize: true,
+    });
+    expect(output).toBeTruthy();
+    expect(output).toContain('f03da82');
+  });
+
+  it('renders edges with colorHint values', () => {
+    const graph = new RenderGraph(
+      [{ id: '∅' }, { id: 'A' }, { id: 'B' }, { id: 'C' }],
+      [
+        { from: '∅', to: 'A', label: 'applied', colorHint: 'applied' },
+        { from: 'A', to: 'B', label: 'pending', colorHint: 'pending' },
+        { from: 'B', to: 'C', label: 'unreachable', colorHint: 'unreachable' },
+      ],
+    );
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'C',
+      rootId: '∅',
+      colorize: true,
+    });
+    expect(output).toContain('applied');
+    expect(output).toContain('pending');
+    expect(output).toContain('unreachable');
+  });
+
+  it('renders custom marker', () => {
+    const graph = new RenderGraph(
+      [{ id: '∅' }, { id: 'A', markers: [{ kind: 'custom', label: 'hotfix' }] }],
+      [{ from: '∅', to: 'A' }],
+    );
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'A',
+      rootId: '∅',
+      colorize: false,
+    });
+    expect(output).toContain('hotfix');
+  });
+
+  it('renders ref marker with name', () => {
+    const graph = new RenderGraph(
+      [{ id: '∅' }, { id: 'A', markers: [{ kind: 'ref', name: 'production', active: true }] }],
+      [{ from: '∅', to: 'A' }],
+    );
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'A',
+      rootId: '∅',
+      colorize: true,
+    });
+    expect(output).toContain('production');
+  });
+
+  it('renders unplanned contract marker', () => {
+    const graph = new RenderGraph(
+      [{ id: '∅' }, { id: 'A', markers: [{ kind: 'contract', planned: false }] }],
+      [{ from: '∅', to: 'A' }],
+    );
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'A',
+      rootId: '∅',
+      colorize: false,
+    });
+    expect(output).toContain('◇ contract');
+  });
+
+  it('renders edges without labels', () => {
+    const graph = new RenderGraph(
+      [{ id: '∅' }, { id: 'A' }, { id: 'B' }],
+      [
+        { from: '∅', to: 'A' },
+        { from: 'A', to: 'B' },
+      ],
+    );
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'B',
+      rootId: '∅',
+      colorize: false,
+    });
+    expect(output).toContain('∅');
+    expect(output).toContain('A');
+    expect(output).toContain('B');
+  });
+
+  it('renders detached node without markers', () => {
+    const graph = new RenderGraph(
+      [{ id: '∅' }, { id: 'A' }, { id: 'orphan', style: 'detached' }],
+      [
+        { from: '∅', to: 'A' },
+        { from: 'A', to: 'orphan', label: 'to-detached' },
+      ],
+    );
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'A',
+      rootId: '∅',
+      colorize: false,
+    });
+    expect(output).toContain('orphan');
+    expect(output).toContain('◇');
+  });
+
+  it('renders with default colorize and rootId', () => {
+    const graph = new RenderGraph([{ id: 'A' }, { id: 'B' }], [{ from: 'A', to: 'B' }]);
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'B',
+    });
+    expect(output).toContain('A');
+    expect(output).toContain('B');
+  });
+
+  it('handles unreachable spine target gracefully', () => {
+    const graph = new RenderGraph([{ id: '∅' }, { id: 'A' }], [{ from: '∅', to: 'A' }]);
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'nonexistent',
+      rootId: '∅',
+      colorize: false,
+    });
+    expect(output).toContain('∅');
+    expect(output).toContain('A');
+  });
+
+  it('truncation expands to cover markers at root', () => {
+    const graph = new RenderGraph(
+      [{ id: '∅', markers: [{ kind: 'db' }] }, { id: 'A' }, { id: 'B' }, { id: 'C' }],
+      [
+        { from: '∅', to: 'A' },
+        { from: 'A', to: 'B' },
+        { from: 'B', to: 'C' },
+      ],
+    );
+    const result = truncateGraph(graph, ['∅', 'A', 'B', 'C'], 1);
+    expect(result.elidedCount).toBe(0);
+    expect(result.spine).toEqual(['∅', 'A', 'B', 'C']);
+  });
+
+  it('renders with limit and no rootId', () => {
+    const graph = new RenderGraph(
+      [{ id: 'A' }, { id: 'B' }, { id: 'C' }],
+      [
+        { from: 'A', to: 'B' },
+        { from: 'B', to: 'C' },
+      ],
+    );
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'C',
+      limit: 10,
+    });
+    expect(output).toContain('A');
+    expect(output).toContain('C');
+  });
+
+  it('truncates spine without db/contract markers', () => {
+    const graph = new RenderGraph(
+      [
+        { id: 'A', markers: [{ kind: 'ref', name: 'v1' }] },
+        { id: 'B', markers: [{ kind: 'ref', name: 'v2' }] },
+        { id: 'C' },
+        { id: 'D' },
+        { id: 'E' },
+      ],
+      [
+        { from: 'A', to: 'B', label: 'step1' },
+        { from: 'B', to: 'C', label: 'step2' },
+        { from: 'C', to: 'D', label: 'step3' },
+        { from: 'D', to: 'E', label: 'step4' },
+      ],
+    );
+    const result = truncateGraph(graph, ['A', 'B', 'C', 'D', 'E'], 2);
+    expect(result.elidedCount).toBe(2);
+    expect(result.spine).toEqual(['C', 'D', 'E']);
+  });
+
+  it('renders wide graph with multiple branches', () => {
+    const graph = new RenderGraph(
+      [{ id: '∅' }, { id: 'A' }, { id: 'B' }, { id: 'C' }, { id: 'D' }, { id: 'X' }, { id: 'Y' }],
+      [
+        { from: '∅', to: 'A' },
+        { from: 'A', to: 'B' },
+        { from: 'B', to: 'C' },
+        { from: 'C', to: 'D' },
+        { from: 'A', to: 'X' },
+        { from: 'X', to: 'Y' },
+        { from: 'D', to: 'A', label: 'rollback' },
+      ],
+    );
+    const output = graphRenderer.render(graph, {
+      spineTarget: 'D',
+      rootId: '∅',
+      colorize: false,
+    });
+    expect(output).toContain('D');
+    expect(output).toContain('rollback');
+  });
+});
+
 describe('isLinearGraph', () => {
   it('returns true for a single node', () => {
     const g = new RenderGraph([{ id: 'A' }], []);
