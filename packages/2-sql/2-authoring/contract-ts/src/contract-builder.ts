@@ -821,6 +821,8 @@ export function buildSqlContractFromSemanticDefinition(
 ): ContractIR {
   return buildSemanticSqlContract(
     definition,
+    // SqlContractBuilder is structurally compatible with SqlSemanticContractBuilderLike
+    // but does not explicitly implement it; the cast bridges the two interface shapes.
     () => new SqlContractBuilder() as unknown as SqlSemanticContractBuilderLike,
   );
 }
