@@ -144,8 +144,8 @@ describe('contract builder methods', () => {
     const post = contract.models.Post as {
       storage: { fields: Record<string, { column: string }> };
     };
-    expect(post.storage.fields.id).toEqual({ column: 'id' });
-    expect(post.storage.fields.userId).toEqual({ column: 'userId' });
+    expect(post.storage.fields['id']).toEqual({ column: 'id' });
+    expect(post.storage.fields['userId']).toEqual({ column: 'userId' });
   });
 
   it('builds contract with multiple tables and models', () => {

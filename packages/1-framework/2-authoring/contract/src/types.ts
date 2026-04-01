@@ -118,8 +118,12 @@ export type BuildModels<
   >,
 > = {
   readonly [K in keyof Models]: {
-    readonly storage: { readonly table: Models[K]['table'] };
-    readonly fields: BuildModelFields<ExtractModelFields<Models[K]>>;
+    readonly storage: {
+      readonly table: Models[K]['table'];
+      readonly fields: BuildModelFields<ExtractModelFields<Models[K]>>;
+    };
+    readonly fields: Record<string, never>;
+    readonly relations: Record<string, never>;
   };
 };
 
