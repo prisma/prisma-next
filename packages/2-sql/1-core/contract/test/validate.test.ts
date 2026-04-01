@@ -1693,4 +1693,131 @@ describe('validateContract', () => {
       expect(tables['user']).toBeDefined();
     });
   });
+
+  describe('old format field referencing non-existent storage column', () => {
+    it('throws when field column does not exist in storage table', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'sha256:test',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' }, ghost: { column: 'no_such_col' } },
+            relations: {},
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      };
+      expect(() => normalizeContract(contract)).toThrow(
+        /field "ghost" references non-existent column "no_such_col" in table "user"/,
+      );
+    });
+  });
+
+  describe('duplicate column mapping in model fields', () => {
+    it('throws when two fields map to the same column', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'sha256:test',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' }, altId: { column: 'id' } },
+            relations: {},
+          },
+        },
+        relations: {
+          user: {
+            self: {
+              cardinality: '1:1',
+              on: { parentCols: ['id'], childCols: ['id'] },
+              to: 'User',
+            },
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      };
+      expect(() => normalizeContract(contract)).toThrow(
+        /duplicate column mapping.*"id" and "altId".*column "id"/i,
+      );
+    });
+  });
+
+  describe('old format excludes owned models from roots', () => {
+    it('does not include owned models in auto-derived roots', () => {
+      const contract = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'sha256:test',
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+          Address: {
+            storage: { table: 'address' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+            owner: 'User',
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            address: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      };
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      const roots = result['roots'] as Record<string, string>;
+      expect(roots).toEqual({ User: 'User' });
+      expect(roots['Address']).toBeUndefined();
+    });
+  });
 });
