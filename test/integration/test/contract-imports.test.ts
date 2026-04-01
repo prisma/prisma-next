@@ -80,20 +80,34 @@ describe('contract.d.ts imports resolution', () => {
         },
         models: {
           User: {
-            storage: { table: 'user' },
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+                email: { column: 'email' },
+                createdAt: { column: 'createdAt' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              email: { column: 'email' },
-              createdAt: { column: 'createdAt' },
+              id: { codecId: 'pg/int4@1' },
+              email: { codecId: 'pg/text@1' },
+              createdAt: { codecId: 'pg/timestamptz@1' },
             },
             relations: {},
           },
           Post: {
-            storage: { table: 'post' },
+            storage: {
+              table: 'post',
+              fields: {
+                id: { column: 'id' },
+                title: { column: 'title' },
+                userId: { column: 'userId' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              title: { column: 'title' },
-              userId: { column: 'userId' },
+              id: { codecId: 'pg/int4@1' },
+              title: { codecId: 'pg/text@1' },
+              userId: { codecId: 'pg/int4@1' },
             },
             relations: {},
           },
@@ -234,10 +248,16 @@ type UserIdColumn = UserColumns['id'];
         },
         models: {
           User: {
-            storage: { table: 'user' },
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+                email: { column: 'email' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              email: { column: 'email' },
+              id: { codecId: 'pg/int4@1' },
+              email: { codecId: 'pg/text@1' },
             },
             relations: {},
           },
