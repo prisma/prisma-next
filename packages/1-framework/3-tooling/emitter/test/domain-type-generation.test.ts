@@ -134,6 +134,29 @@ describe('generateModelRelationsType', () => {
     expect(result).toContain('readonly author:');
     expect(result).toContain('readonly comments:');
   });
+
+  it('omits to when missing from relation', () => {
+    const result = generateModelRelationsType({
+      rel: { cardinality: '1:N' },
+    });
+    expect(result).toContain("readonly cardinality: '1:N'");
+    expect(result).not.toContain('readonly to:');
+  });
+
+  it('omits cardinality when missing from relation', () => {
+    const result = generateModelRelationsType({
+      rel: { to: 'Post' },
+    });
+    expect(result).toContain("readonly to: 'Post'");
+    expect(result).not.toContain('readonly cardinality:');
+  });
+
+  it('skips relation object with no recognized properties', () => {
+    const result = generateModelRelationsType({
+      empty: { unknown: true },
+    });
+    expect(result).toBe('Record<string, never>');
+  });
 });
 
 describe('deduplicateImports', () => {
