@@ -144,9 +144,15 @@ function resolveDropTable(desc: DropTableDescriptor, ctx: OperationResolverConte
 }
 
 function resolveAddColumn(desc: AddColumnDescriptor, ctx: OperationResolverContext): ResolvedOp {
-  const column = getColumn(ctx.toContract, desc.table, desc.column);
-  if (!column)
+  const contractColumn = getColumn(ctx.toContract, desc.table, desc.column);
+  if (!contractColumn)
     throw new Error(`Column "${desc.table}"."${desc.column}" not found in destination contract`);
+  // Apply overrides — e.g., nullable: true for the add-nullable → backfill → setNotNull pattern
+  const column: StorageColumn = {
+    ...contractColumn,
+    nullable:
+      desc.overrides?.nullable !== undefined ? desc.overrides.nullable : contractColumn.nullable,
+  };
   const qualified = qualifyTableName(ctx.schemaName, desc.table);
   return {
     id: `column.${desc.table}.${desc.column}`,

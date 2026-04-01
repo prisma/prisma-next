@@ -10,6 +10,7 @@
  */
 
 import type { SerializedQueryNode } from '@prisma-next/core-control-plane/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 // ============================================================================
 // Table descriptors
@@ -33,6 +34,9 @@ export interface AddColumnDescriptor {
   readonly kind: 'addColumn';
   readonly table: string;
   readonly column: string;
+  readonly overrides?: {
+    readonly nullable?: boolean;
+  };
 }
 
 export interface DropColumnDescriptor {
@@ -173,8 +177,12 @@ export function dropTable(table: string): DropTableDescriptor {
   return { kind: 'dropTable', table };
 }
 
-export function addColumn(table: string, column: string): AddColumnDescriptor {
-  return { kind: 'addColumn', table, column };
+export function addColumn(
+  table: string,
+  column: string,
+  overrides?: { nullable?: boolean },
+): AddColumnDescriptor {
+  return { kind: 'addColumn', table, column, ...ifDefined('overrides', overrides) };
 }
 
 export function dropColumn(table: string, column: string): DropColumnDescriptor {
