@@ -398,15 +398,10 @@ describe('ORM client integration examples', () => {
             seededUserIds.admin,
           ]);
           expect(users.map((user) => user.kind)).toEqual(['admin', 'admin']);
-          // TODO(TML-2120): IncludeRelationValue incorrectly omits included relations
-          // from the result type, requiring this manual type assertion. Remove once
-          // the ORM client's include type inference is fixed.
-          type UserWithPosts = (typeof users)[number] & {
-            posts: Array<{ id: string }>;
-          };
-          expect(
-            (users as UserWithPosts[]).map((user) => user.posts.map((post) => post.id)),
-          ).toEqual([[seededPostIds.adminZebra], [seededPostIds.newer]]);
+          expect(users.map((user) => user.posts.map((post) => post.id))).toEqual([
+            [seededPostIds.adminZebra],
+            [seededPostIds.newer],
+          ]);
         } finally {
           await runtime.close();
         }
@@ -432,9 +427,7 @@ describe('ORM client integration examples', () => {
             seededPostIds.newer,
           ]);
           expect(posts.every((post) => 'embedding' in post === false)).toBe(true);
-          // TODO(TML-2120): non-null assert works around IncludeRelationValue
-          // incorrectly marking the included to-one relation as nullable.
-          expect(posts.map((post) => post.user!.id)).toEqual([
+          expect(posts.map((post) => post.user.id)).toEqual([
             seededUserIds.adminTwo,
             seededUserIds.adminTwo,
             seededUserIds.admin,

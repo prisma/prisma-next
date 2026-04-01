@@ -29,7 +29,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:f31648e0fc4bdc9d1a2ed322c9eca3a88cf5eee5f9068d8256949f08e2e633c7'>;
+  StorageHashBase<'sha256:3e6baed937240f07b4df3fcfef21dbf122f6220c8540576ab0545a442de52613'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:f744c820f5efe500202b9a1d30dff6243359b10bee2ac27753411f386c7052e0'>;
 export type ProfileHash =
@@ -78,7 +78,14 @@ type ContractBase = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [{ readonly columns: readonly ['email'] }];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['invited_by_id'];
+            readonly references: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly constraint: true;
+            readonly index: true;
+          },
+        ];
       };
       readonly posts: {
         columns: {
@@ -106,7 +113,14 @@ type ContractBase = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['user_id'];
+            readonly references: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly constraint: true;
+            readonly index: true;
+          },
+        ];
       };
       readonly comments: {
         columns: {
@@ -129,7 +143,14 @@ type ContractBase = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['post_id'];
+            readonly references: { readonly table: 'posts'; readonly columns: readonly ['id'] };
+            readonly constraint: true;
+            readonly index: true;
+          },
+        ];
       };
       readonly profiles: {
         columns: {
@@ -146,6 +167,36 @@ type ContractBase = SqlContract<
           readonly bio: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['user_id'];
+            readonly references: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly constraint: true;
+            readonly index: true;
+          },
+        ];
+      };
+      readonly articles: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly title: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly reviewer_id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
             readonly nullable: false;
           };
         };
@@ -210,6 +261,14 @@ type ContractBase = SqlContract<
         readonly bio: CodecTypes['pg/text@1']['output'];
       };
     };
+    readonly Article: {
+      storage: { readonly table: 'articles' };
+      fields: {
+        readonly id: CodecTypes['pg/int4@1']['output'];
+        readonly title: CodecTypes['pg/text@1']['output'];
+        readonly reviewerId: CodecTypes['pg/int4@1']['output'];
+      };
+    };
     readonly Tag: {
       storage: { readonly table: 'tags' };
       fields: {
@@ -271,6 +330,26 @@ type ContractBase = SqlContract<
         };
       };
     };
+    readonly profiles: {
+      readonly user: {
+        readonly to: 'User';
+        readonly cardinality: '1:1';
+        readonly on: {
+          readonly parentCols: readonly ['user_id'];
+          readonly childCols: readonly ['id'];
+        };
+      };
+    };
+    readonly articles: {
+      readonly reviewer: {
+        readonly to: 'User';
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly parentCols: readonly ['reviewer_id'];
+          readonly childCols: readonly ['id'];
+        };
+      };
+    };
   },
   {
     modelToTable: {
@@ -278,6 +357,7 @@ type ContractBase = SqlContract<
       readonly Post: 'posts';
       readonly Comment: 'comments';
       readonly Profile: 'profiles';
+      readonly Article: 'articles';
       readonly Tag: 'tags';
     };
     tableToModel: {
@@ -285,6 +365,7 @@ type ContractBase = SqlContract<
       readonly posts: 'Post';
       readonly comments: 'Comment';
       readonly profiles: 'Profile';
+      readonly articles: 'Article';
       readonly tags: 'Tag';
     };
     fieldToColumn: {
@@ -302,6 +383,11 @@ type ContractBase = SqlContract<
       };
       readonly Comment: { readonly id: 'id'; readonly body: 'body'; readonly postId: 'post_id' };
       readonly Profile: { readonly id: 'id'; readonly userId: 'user_id'; readonly bio: 'bio' };
+      readonly Article: {
+        readonly id: 'id';
+        readonly title: 'title';
+        readonly reviewerId: 'reviewer_id';
+      };
       readonly Tag: { readonly id: 'id'; readonly name: 'name' };
     };
     columnToField: {
@@ -319,6 +405,11 @@ type ContractBase = SqlContract<
       };
       readonly comments: { readonly id: 'id'; readonly body: 'body'; readonly post_id: 'postId' };
       readonly profiles: { readonly id: 'id'; readonly user_id: 'userId'; readonly bio: 'bio' };
+      readonly articles: {
+        readonly id: 'id';
+        readonly title: 'title';
+        readonly reviewer_id: 'reviewerId';
+      };
       readonly tags: { readonly id: 'id'; readonly name: 'name' };
     };
   },

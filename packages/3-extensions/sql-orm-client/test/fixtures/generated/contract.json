@@ -2,10 +2,27 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:f31648e0fc4bdc9d1a2ed322c9eca3a88cf5eee5f9068d8256949f08e2e633c7",
+  "storageHash": "sha256:3e6baed937240f07b4df3fcfef21dbf122f6220c8540576ab0545a442de52613",
   "executionHash": "sha256:f744c820f5efe500202b9a1d30dff6243359b10bee2ac27753411f386c7052e0",
   "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
   "models": {
+    "Article": {
+      "fields": {
+        "id": {
+          "column": "id"
+        },
+        "reviewerId": {
+          "column": "reviewer_id"
+        },
+        "title": {
+          "column": "title"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "articles"
+      }
+    },
     "Comment": {
       "fields": {
         "body": {
@@ -96,6 +113,20 @@
     }
   },
   "relations": {
+    "articles": {
+      "reviewer": {
+        "cardinality": "N:1",
+        "on": {
+          "childCols": [
+            "id"
+          ],
+          "parentCols": [
+            "reviewer_id"
+          ]
+        },
+        "to": "User"
+      }
+    },
     "posts": {
       "author": {
         "cardinality": "N:1",
@@ -120,6 +151,20 @@
           ]
         },
         "to": "Comment"
+      }
+    },
+    "profiles": {
+      "user": {
+        "cardinality": "1:1",
+        "on": {
+          "childCols": [
+            "id"
+          ],
+          "parentCols": [
+            "user_id"
+          ]
+        },
+        "to": "User"
       }
     },
     "users": {
@@ -175,6 +220,30 @@
   },
   "storage": {
     "tables": {
+      "articles": {
+        "columns": {
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          },
+          "reviewer_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4"
+          },
+          "title": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
       "comments": {
         "columns": {
           "body": {
@@ -190,7 +259,21 @@
             "nativeType": "int4"
           }
         },
-        "foreignKeys": [],
+        "foreignKeys": [
+          {
+            "columns": [
+              "post_id"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "posts"
+            }
+          }
+        ],
         "indexes": [],
         "primaryKey": {
           "columns": [
@@ -218,7 +301,21 @@
             "nativeType": "int4"
           }
         },
-        "foreignKeys": [],
+        "foreignKeys": [
+          {
+            "columns": [
+              "user_id"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "users"
+            }
+          }
+        ],
         "indexes": [],
         "primaryKey": {
           "columns": [
@@ -242,7 +339,21 @@
             "nativeType": "int4"
           }
         },
-        "foreignKeys": [],
+        "foreignKeys": [
+          {
+            "columns": [
+              "user_id"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "users"
+            }
+          }
+        ],
         "indexes": [],
         "primaryKey": {
           "columns": [
@@ -297,7 +408,21 @@
             "nativeType": "text"
           }
         },
-        "foreignKeys": [],
+        "foreignKeys": [
+          {
+            "columns": [
+              "invited_by_id"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "users"
+            }
+          }
+        ],
         "indexes": [],
         "primaryKey": {
           "columns": [

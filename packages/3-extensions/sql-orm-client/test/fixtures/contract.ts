@@ -12,7 +12,8 @@ export const contract = defineContract<CodecTypes>()
       .column('email', { type: textColumn, nullable: false })
       .column('invited_by_id', { type: int4Column, nullable: true })
       .primaryKey(['id'])
-      .unique(['email']),
+      .unique(['email'])
+      .foreignKey(['invited_by_id'], { table: 'users', columns: ['id'] }),
   )
   .table('posts', (table) =>
     table
@@ -20,20 +21,30 @@ export const contract = defineContract<CodecTypes>()
       .column('title', { type: textColumn, nullable: false })
       .column('user_id', { type: int4Column, nullable: false })
       .column('views', { type: int4Column, nullable: false })
-      .primaryKey(['id']),
+      .primaryKey(['id'])
+      .foreignKey(['user_id'], { table: 'users', columns: ['id'] }),
   )
   .table('comments', (table) =>
     table
       .column('id', { type: int4Column, nullable: false })
       .column('body', { type: textColumn, nullable: false })
       .column('post_id', { type: int4Column, nullable: false })
-      .primaryKey(['id']),
+      .primaryKey(['id'])
+      .foreignKey(['post_id'], { table: 'posts', columns: ['id'] }),
   )
   .table('profiles', (table) =>
     table
       .column('id', { type: int4Column, nullable: false })
       .column('user_id', { type: int4Column, nullable: false })
       .column('bio', { type: textColumn, nullable: false })
+      .primaryKey(['id'])
+      .foreignKey(['user_id'], { table: 'users', columns: ['id'] }),
+  )
+  .table('articles', (table) =>
+    table
+      .column('id', { type: int4Column, nullable: false })
+      .column('title', { type: textColumn, nullable: false })
+      .column('reviewer_id', { type: int4Column, nullable: false })
       .primaryKey(['id']),
   )
   .table('tags', (table) =>
@@ -127,7 +138,38 @@ export const contract = defineContract<CodecTypes>()
     model.field('id', 'id').field('body', 'body').field('postId', 'post_id'),
   )
   .model('Profile', 'profiles', (model) =>
-    model.field('id', 'id').field('userId', 'user_id').field('bio', 'bio'),
+    model
+      .field('id', 'id')
+      .field('userId', 'user_id')
+      .field('bio', 'bio')
+      .relation('user', {
+        toModel: 'User',
+        toTable: 'users',
+        cardinality: '1:1',
+        on: {
+          parentTable: 'profiles',
+          parentColumns: ['user_id'],
+          childTable: 'users',
+          childColumns: ['id'],
+        },
+      }),
+  )
+  .model('Article', 'articles', (model) =>
+    model
+      .field('id', 'id')
+      .field('title', 'title')
+      .field('reviewerId', 'reviewer_id')
+      .relation('reviewer', {
+        toModel: 'User',
+        toTable: 'users',
+        cardinality: 'N:1',
+        on: {
+          parentTable: 'articles',
+          parentColumns: ['reviewer_id'],
+          childTable: 'users',
+          childColumns: ['id'],
+        },
+      }),
   )
   .model('Tag', 'tags', (model) => model.field('id', 'id').field('name', 'name'))
   .build();

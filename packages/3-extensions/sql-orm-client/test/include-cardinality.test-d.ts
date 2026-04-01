@@ -23,10 +23,15 @@ const context = {} as ExecutionContext<TestContract>;
 
 const userCollection = new Collection({ runtime, context }, 'User');
 const postCollection = new Collection({ runtime, context }, 'Post');
+const profileCollection = new Collection({ runtime, context }, 'Profile');
+const articleCollection = new Collection({ runtime, context }, 'Article');
 
 const usersWithPosts = userCollection.include('posts');
 const usersWithProfile = userCollection.include('profile');
+const usersWithInvitedBy = userCollection.include('invitedBy');
 const postsWithAuthor = postCollection.include('author');
+const profilesWithUser = profileCollection.include('user');
+const articlesWithReviewer = articleCollection.include('reviewer');
 const usersWithPostCount = userCollection.include('posts', (posts) => posts.count());
 const usersWithSelectedPosts = userCollection.include('posts', (posts) => posts.select('title'));
 
@@ -50,7 +55,10 @@ postCollection.include('author', (author) => {
 
 type UsersWithPostsRow = RowOf<typeof usersWithPosts>;
 type UsersWithProfileRow = RowOf<typeof usersWithProfile>;
+type UsersWithInvitedByRow = RowOf<typeof usersWithInvitedBy>;
 type PostsWithAuthorRow = RowOf<typeof postsWithAuthor>;
+type ProfilesWithUserRow = RowOf<typeof profilesWithUser>;
+type ArticlesWithReviewerRow = RowOf<typeof articlesWithReviewer>;
 type UsersWithPostCountRow = RowOf<typeof usersWithPostCount>;
 type UsersWithSelectedPostsRow = RowOf<typeof usersWithSelectedPosts>;
 
@@ -58,6 +66,7 @@ export type IncludeCardinalityTypeAssertions = [
   Assert<Equal<UsersWithPostsRow['posts'], Array<RowOf<Collection<TestContract, 'Post'>>>>>,
   Assert<Equal<UsersWithPostCountRow['posts'], number>>,
   Assert<Equal<keyof UsersWithSelectedPostsRow['posts'][number], 'title'>>,
+  // 1:1 non-FK side (parentCols = PK) → nullable
   Assert<Equal<Extract<UsersWithProfileRow['profile'], null>, null>>,
   Assert<
     Equal<
@@ -66,14 +75,31 @@ export type IncludeCardinalityTypeAssertions = [
     >
   >,
   Assert<Equal<keyof NonNullable<UsersWithProfileRow['profile']>, 'id' | 'userId' | 'bio'>>,
-  Assert<Equal<Extract<PostsWithAuthorRow['author'], null>, null>>,
+  // 1:1 FK side with non-nullable FK → not nullable
+  Assert<Equal<Extract<ProfilesWithUserRow['user'], null>, never>>,
+  Assert<Equal<ProfilesWithUserRow['user'] extends readonly unknown[] ? true : false, false>>,
+  Assert<Equal<keyof ProfilesWithUserRow['user'], 'id' | 'name' | 'email' | 'invitedById'>>,
+  // N:1 with non-nullable FK → not nullable
+  Assert<Equal<Extract<PostsWithAuthorRow['author'], null>, never>>,
+  Assert<Equal<PostsWithAuthorRow['author'] extends readonly unknown[] ? true : false, false>>,
+  Assert<Equal<keyof PostsWithAuthorRow['author'], 'id' | 'name' | 'email' | 'invitedById'>>,
+  // N:1 with nullable FK → nullable
+  Assert<Equal<Extract<UsersWithInvitedByRow['invitedBy'], null>, null>>,
   Assert<
     Equal<
-      Exclude<PostsWithAuthorRow['author'], null> extends readonly unknown[] ? true : false,
-      false
+      keyof NonNullable<UsersWithInvitedByRow['invitedBy']>,
+      'id' | 'name' | 'email' | 'invitedById'
     >
   >,
+  // N:1 with non-nullable column but no FK constraint → nullable
+  Assert<Equal<Extract<ArticlesWithReviewerRow['reviewer'], null>, null>>,
   Assert<
-    Equal<keyof NonNullable<PostsWithAuthorRow['author']>, 'id' | 'name' | 'email' | 'invitedById'>
+    Equal<ArticlesWithReviewerRow['reviewer'] extends readonly unknown[] ? true : false, false>
+  >,
+  Assert<
+    Equal<
+      keyof NonNullable<ArticlesWithReviewerRow['reviewer']>,
+      'id' | 'name' | 'email' | 'invitedById'
+    >
   >,
 ];
