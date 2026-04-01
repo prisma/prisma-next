@@ -8,11 +8,18 @@ export type DomainRelationOn = {
   readonly targetFields: readonly string[];
 };
 
-export type DomainRelation = {
+export type DomainReferenceRelation = {
   readonly to: string;
   readonly cardinality: '1:1' | '1:N' | 'N:1';
-  readonly on?: DomainRelationOn;
+  readonly on: DomainRelationOn;
 };
+
+export type DomainEmbedRelation = {
+  readonly to: string;
+  readonly cardinality: '1:1' | '1:N';
+};
+
+export type DomainRelation = DomainReferenceRelation | DomainEmbedRelation;
 
 export type DomainDiscriminator = {
   readonly field: string;

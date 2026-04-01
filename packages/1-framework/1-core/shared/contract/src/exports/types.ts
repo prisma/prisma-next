@@ -1,7 +1,9 @@
 export type {
   DomainDiscriminator,
+  DomainEmbedRelation,
   DomainField,
   DomainModel,
+  DomainReferenceRelation,
   DomainRelation,
   DomainRelationOn,
 } from '../domain-types';
