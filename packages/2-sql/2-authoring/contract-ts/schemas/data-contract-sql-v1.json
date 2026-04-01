@@ -556,18 +556,6 @@
       },
       "required": ["column"]
     },
-    "ModelStorageField": {
-      "type": "object",
-      "description": "Per-field storage mapping",
-      "additionalProperties": false,
-      "properties": {
-        "column": {
-          "type": "string",
-          "description": "Column name in the model's backing table"
-        }
-      },
-      "required": ["column"]
-    },
     "ModelRelation": {
       "type": "object",
       "description": "Model relation definition (domain format with localFields/targetFields, or storage format with parentCols/childCols)",
