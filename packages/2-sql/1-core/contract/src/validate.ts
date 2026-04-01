@@ -14,6 +14,38 @@ function extractDomainShape(contract: SqlContract<SqlStorage>): DomainContractSh
   };
 }
 
+function validateModelStorageReferences(contract: SqlContract<SqlStorage>): void {
+  const models = contract.models as Record<
+    string,
+    { storage?: { table?: string; fields?: Record<string, { column?: string }> } }
+  >;
+
+  for (const [modelName, model] of Object.entries(models)) {
+    const storageTable = model.storage?.table;
+    if (!storageTable) continue;
+
+    const table = contract.storage.tables[storageTable] as
+      | (typeof contract.storage.tables)[string]
+      | undefined;
+    if (!table) {
+      throw new Error(`Model "${modelName}" references non-existent table "${storageTable}"`);
+    }
+
+    const storageFields = model.storage?.fields;
+    if (!storageFields) continue;
+
+    const columnNames = new Set(Object.keys(table.columns));
+    for (const [fieldName, field] of Object.entries(storageFields)) {
+      const column = field.column;
+      if (column && !columnNames.has(column)) {
+        throw new Error(
+          `Model "${modelName}" field "${fieldName}" references non-existent column "${column}" in table "${storageTable}"`,
+        );
+      }
+    }
+  }
+}
+
 function validateContractLogic(contract: SqlContract<SqlStorage>): void {
   const tableNames = new Set(Object.keys(contract.storage.tables));
 
@@ -275,6 +307,8 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
   validateContractDomain(extractDomainShape(structurallyValid));
 
   validateContractLogic(structurallyValid);
+
+  validateModelStorageReferences(structurallyValid);
 
   const semanticErrors = validateStorageSemantics(structurallyValid.storage);
   if (semanticErrors.length > 0) {

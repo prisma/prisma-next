@@ -163,6 +163,7 @@ const ContractMetaSchema = type({
 });
 
 const SqlContractSchema = type({
+  '+': 'reject',
   'schemaVersion?': "'1'",
   target: 'string',
   targetFamily: "'sql'",
@@ -176,6 +177,7 @@ const SqlContractSchema = type({
   'meta?': ContractMetaSchema,
   'sources?': 'Record<string, unknown>',
   'roots?': 'Record<string, string>',
+  'relations?': type({ '[string]': 'unknown' }),
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
   'execution?': ExecutionSchema,

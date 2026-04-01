@@ -313,7 +313,7 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContract(c)).not.toThrow();
     });
 
-    it('accepts unknown top-level keys without structural failure', () => {
+    it('rejects unknown top-level keys', () => {
       const userTable = table({ id: col('int4', 'pg/int4@1') });
       const s = storage({ user: userTable });
       const base = contract({
@@ -324,9 +324,8 @@ describe('SQL contract validators', () => {
       const c = {
         ...base,
         mappings: { modelToTable: { User: 'user' } },
-        relations: { user: {} },
       };
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContract(c)).toThrow('mappings must be removed');
     });
 
     it('validates FK with per-FK constraint and index fields', () => {
@@ -626,6 +625,29 @@ describe('SQL contract validators', () => {
       });
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(0);
+    });
+  });
+
+  describe('validateSqlContract strict mode', () => {
+    it('rejects unknown top-level properties', () => {
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        models: { User: model('users', { id: { column: 'id' } }) },
+        storage: storage({ users: table({ id: col('int4', 'pg/int4@1') }) }),
+      });
+      const withUnknown = { ...c, bogusField: 'unexpected' };
+      expect(() => validateSqlContract(withUnknown)).toThrow();
+    });
+
+    it('accepts valid contracts without unknown properties', () => {
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        models: { User: model('users', { id: { column: 'id' } }) },
+        storage: storage({ users: table({ id: col('int4', 'pg/int4@1') }) }),
+      });
+      expect(() => validateSqlContract(c)).not.toThrow();
     });
   });
 });
