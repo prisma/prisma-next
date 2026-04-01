@@ -4,6 +4,57 @@ import type {
   MongoTypeMaps,
 } from '@prisma-next/mongo-core';
 
+type TaskModel = {
+  readonly storage: {
+    readonly collection: 'tasks';
+    readonly relations: { readonly comments: { readonly field: 'comments' } };
+  };
+  readonly fields: {
+    readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
+    readonly title: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+    readonly type: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+    readonly assigneeId: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
+  };
+  readonly relations: {
+    readonly assignee: {
+      readonly to: 'User';
+      readonly cardinality: 'N:1';
+      readonly on: {
+        readonly localFields: readonly ['assigneeId'];
+        readonly targetFields: readonly ['_id'];
+      };
+    };
+    readonly comments: {
+      readonly to: 'Comment';
+      readonly cardinality: '1:N';
+    };
+  };
+  readonly discriminator: { readonly field: 'type' };
+  readonly variants: {
+    readonly Bug: { readonly value: 'bug' };
+    readonly Feature: { readonly value: 'feature' };
+  };
+};
+
+type BugModel = {
+  readonly storage: { readonly collection: 'tasks' };
+  readonly fields: {
+    readonly severity: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+  };
+  readonly relations: Record<string, never>;
+  readonly base: 'Task';
+};
+
+type FeatureModel = {
+  readonly storage: { readonly collection: 'tasks' };
+  readonly fields: {
+    readonly priority: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+    readonly targetRelease: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+  };
+  readonly relations: Record<string, never>;
+  readonly base: 'Task';
+};
+
 type UserModel = {
   readonly storage: {
     readonly collection: 'users';
@@ -15,14 +66,6 @@ type UserModel = {
     readonly email: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
   };
   readonly relations: {
-    readonly posts: {
-      readonly to: 'Post';
-      readonly cardinality: '1:N';
-      readonly on: {
-        readonly localFields: readonly ['_id'];
-        readonly targetFields: readonly ['authorId'];
-      };
-    };
     readonly addresses: {
       readonly to: 'Address';
       readonly cardinality: '1:N';
@@ -41,70 +84,45 @@ type AddressModel = {
   readonly owner: 'User';
 };
 
-type PostModel = {
-  readonly storage: {
-    readonly collection: 'posts';
-    readonly relations: { readonly comments: { readonly field: 'comments' } };
-  };
-  readonly fields: {
-    readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-    readonly title: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-    readonly content: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-    readonly authorId: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-    readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
-  };
-  readonly relations: {
-    readonly author: {
-      readonly to: 'User';
-      readonly cardinality: 'N:1';
-      readonly on: {
-        readonly localFields: readonly ['authorId'];
-        readonly targetFields: readonly ['_id'];
-      };
-    };
-    readonly comments: {
-      readonly to: 'Comment';
-      readonly cardinality: '1:N';
-    };
-  };
-};
-
 type CommentModel = {
   readonly storage: Record<string, never>;
   readonly fields: {
+    readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
     readonly text: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
     readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
   };
   readonly relations: Record<string, never>;
-  readonly owner: 'Post';
+  readonly owner: 'Task';
 };
 
-type BlogContract = MongoContract<
+type TaskTrackerContract = MongoContract<
   {
+    readonly tasks: 'Task';
     readonly users: 'User';
-    readonly posts: 'Post';
   },
   {
     readonly collections: {
+      readonly tasks: Record<string, never>;
       readonly users: Record<string, never>;
-      readonly posts: Record<string, never>;
     };
   },
   {
+    readonly Task: TaskModel;
+    readonly Bug: BugModel;
+    readonly Feature: FeatureModel;
     readonly User: UserModel;
     readonly Address: AddressModel;
-    readonly Post: PostModel;
     readonly Comment: CommentModel;
   }
 >;
 
-type BlogCodecTypes = {
+type CodecTypes = {
   readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
   readonly 'mongo/string@1': { readonly input: string; readonly output: string };
   readonly 'mongo/date@1': { readonly input: Date; readonly output: Date };
 };
 
-type BlogTypeMaps = MongoTypeMaps<BlogCodecTypes>;
+type TaskTrackerTypeMaps = MongoTypeMaps<CodecTypes>;
 
-export type Contract = MongoContractWithTypeMaps<BlogContract, BlogTypeMaps>;
-export type TypeMaps = BlogTypeMaps;
+export type Contract = MongoContractWithTypeMaps<TaskTrackerContract, TaskTrackerTypeMaps>;
+export type TypeMaps = TaskTrackerTypeMaps;
