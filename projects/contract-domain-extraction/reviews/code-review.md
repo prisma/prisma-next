@@ -4,20 +4,23 @@
 **Plan:** [projects/contract-domain-extraction/plan.md](../plan.md)
 **Linear:** [TML-2175](https://linear.app/prisma-company/issue/TML-2175/migrate-consumers-to-new-domain-level-type-fields-m2)
 **Branch:** `tml-2175-migrate-consumers-to-new-domain-level-type-fields-m2`
-**Review range:** `f133394ea...HEAD` (4 commits, 20 files, +715 / −757)
+**Review range:** `f133394ea...HEAD` (6 commits, 22 files, +811 / −837)
 
 ## Summary
 
-Migrates the `sql-orm-client` and `relational-core` consumer code from reading old contract paths (`mappings.`*, top-level `relations`, storage-layer `codecId`) to new domain-level paths (`model.storage.*`, `model.relations`, `model.fields[f].codecId`). The migration is thorough, well-structured, and introduces useful centralized resolution helpers. Test fixtures are updated to match.
+Migrates the `sql-orm-client` and `relational-core` consumer code from reading old contract paths (`mappings.*`, top-level `relations`, storage-layer `codecId`) to new domain-level paths (`model.storage.*`, `model.relations`, `model.fields[f].codecId`). The migration is thorough, well-structured, and introduces centralized resolution helpers with WeakMap-based memoization. Test fixtures and expectations are updated to match.
 
 ## What Looks Solid
 
-- **Consistent migration pattern.** Every call site that previously read `contract.mappings.fieldToColumn[model][field]` now calls `resolveFieldToColumn(contract, model, field)` or `getFieldToColumnMap(contract, model)`. No half-measures.
-- **Centralized resolution in `collection-contract.ts`.** The new helper functions (`resolveFieldToColumn`, `getFieldToColumnMap`, `getColumnToFieldMap`, `findModelNameForTable`, `resolveModelTableName`) provide a clean internal API with WeakMap-based memoization. Callers no longer need to know the contract layout.
+- **Consistent migration pattern.** Every call site that previously read `contract.mappings.fieldToColumn[model][field]` now calls `resolveFieldToColumn(contract, model, field)` or `getFieldToColumnMap(contract, model)`. Zero references to old patterns remain in either source or test code.
+- **Centralized resolution in `collection-contract.ts`.** The helper functions (`resolveFieldToColumn`, `getFieldToColumnMap`, `getColumnToFieldMap`, `findModelNameForTable`, `resolveModelTableName`) provide a clean internal API with WeakMap-backed memoization, so repeated queries against the same contract don't rebuild maps.
 - **Removal of legacy `model`/`foreignKey` relation format.** The old `resolveLegacyModelRelation` fallback and `resolveRelatedModelName` (which checked both `to` and `model`) are removed. Relations now uniformly use `{ to, cardinality, on: { localFields, targetFields } }`.
+- **Consistent ADR 172 vocabulary.** Include-relation naming uses `localColumn`/`targetColumn` throughout `IncludeExpr`, `ResolvedIncludeRelation`, and all consumers — matching the `localFields`/`targetFields` vocabulary from ADR 172.
+- **Strict contract enforcement.** `resolveModelTableName` throws when `storage.table` is missing instead of silently falling back to a string transformation. A validated contract is expected to always provide `storage.table`.
+- **No delegation wrappers.** `mapFieldToColumn` was removed; all callers use `resolveFieldToColumn` directly.
 - **Type-level generics migrated cleanly.** `ModelTableName`, `FieldColumnName`, `RelationsOf`, `ChildForeignKeyFieldNames`, `ExtractTableToModel`, and `ExtractColumnToField` all derive from domain-level fields now. The old `ModelTableFromMappings` / `ContractRelations` indirection layers are removed.
-- **Test fixtures updated to ADR 172 format.** The `contract.json` and `contract.d.ts` fixtures now include `model.storage.fields`, `model.relations`, `roots`, and domain-level `model.fields`.
-- **Net negative diff.** +715 / −757 lines — the migration slightly reduces code volume despite adding the resolution helper module.
+- **Test fixtures updated to ADR 172 format.** The `contract.json` and `contract.d.ts` fixtures include `model.storage.fields`, `model.relations`, `roots`, and domain-level `model.fields`.
+- **Net negative diff.** The migration reduces code volume despite adding the resolution helper module and memoization.
 
 ## Blocking Issues
 
@@ -25,25 +28,24 @@ None identified. The migration is functionally complete for the ORM client and r
 
 ## Non-blocking Concerns
 
+### NB-F01: Repeated `as Record<string, ...>` casts in runtime code
+
+Several files cast `contract.models` to local shape types:
+
+- [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — line 13: `contract.models as ModelsMap`
+- [packages/3-extensions/sql-orm-client/src/model-accessor.ts](packages/3-extensions/sql-orm-client/src/model-accessor.ts) — lines 47, 74: `contract.models as Record<string, { relations?: ... }>` and `contract.models as Record<string, { fields?: ... }>`
+- [packages/3-extensions/sql-orm-client/src/filters.ts](packages/3-extensions/sql-orm-client/src/filters.ts) — lines 73–76: same pattern
+- [packages/3-extensions/sql-orm-client/src/mutation-executor.ts](packages/3-extensions/sql-orm-client/src/mutation-executor.ts) — line 674: `contract.models as Record<string, { relations?: ... }>`
+
+**Status:** Deferred to M3. Plan task 3.6.1 tracks removing these casts once `ContractBase.models` is concretely typed (3.6).
+
 ### NB-F05: `collection-contract.ts` has grown into a large utility module
 
-- [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — 233 lines
+- [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — 264 lines
 
-**Issue:** This file started as a focused contract-access module and has grown to include: field↔column resolution, model↔table resolution, relation resolution, upsert conflict column resolution, primary key resolution, capability checking, and cardinality helpers. Many of these are general-purpose contract utilities.
+**Issue:** This file includes: field↔column resolution (with memoization caches), model↔table resolution, relation resolution, upsert conflict column resolution, primary key resolution, capability checking, and cardinality helpers.
 
-**Suggestion:** If more consumers need these utilities (e.g., other extensions), consider extracting the general helpers (`resolveFieldToColumn`, `getFieldToColumnMap`, `findModelNameForTable`, `resolveModelTableName`) to a shared package. Not urgent for M2 scope.
-
-## Resolved Findings
-
-| Finding | Resolution |
-| --- | --- |
-| **NB-F01**: Repeated `as Record<string, ...>` casts on `contract.models` | Deferred to M3 — added plan task 3.6.1 (casts become unnecessary once `ContractBase.models` is concretely typed in 3.6) |
-| **NB-F02**: `getFieldToColumnMap()` / `getColumnToFieldMap()` called per-query without caching | Fixed — added `WeakMap`-based memoization keyed by contract + model name |
-| **NB-F03**: `findModelNameForTable()` is O(n) over models | Fixed — added `WeakMap`-based memoization keyed by contract + table name |
-| **NB-F04**: `mapFieldToColumn()` is a pure delegation to `resolveFieldToColumn()` | Fixed — removed `mapFieldToColumn()`, replaced all call sites with `resolveFieldToColumn()` |
-| **NB-F06**: Plan task 2.7 (paradedb migration) not addressed | Confirmed N/A — `paradedb` defines extension-pack descriptors and index types; it does not consume `mappings` or top-level `relations`. Plan updated. |
-| **NIT-F07**: Inconsistent lowering fallback in `resolveModelTableName` | Fixed — `resolveModelTableName` now throws when `storage.table` is missing instead of using a string manipulation fallback. A validated contract must always provide `storage.table`. |
-| **NIT-F08**: `fkColumn` / `parentPkColumn` naming | Fixed — renamed to `targetColumn` / `localColumn` throughout `IncludeExpr`, `ResolvedIncludeRelation`, and all consumers to align with ADR 172 `localFields`/`targetFields` vocabulary |
+**Suggestion:** If more consumers need these utilities (e.g., other extensions), consider extracting the general helpers to a shared package. Not urgent for M2 scope.
 
 ## Acceptance-Criteria Traceability
 
@@ -53,10 +55,10 @@ None identified. The migration is functionally complete for the ORM client and r
 | Criterion                                                                  | Implementation                                                                                                                                                                                                                                                                                                                                                                                                                             | Evidence                                                                                                                                                                                                                                                                         |
 | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ORM client reads field types from `model.fields[f].codecId` and `nullable` | [packages/3-extensions/sql-orm-client/src/model-accessor.ts](packages/3-extensions/sql-orm-client/src/model-accessor.ts) — lines 68–81; [packages/3-extensions/sql-orm-client/src/filters.ts](packages/3-extensions/sql-orm-client/src/filters.ts) — lines 68–83                                                                                                                                                                           | [packages/3-extensions/sql-orm-client/test/model-accessor.test.ts](packages/3-extensions/sql-orm-client/test/model-accessor.test.ts); [packages/3-extensions/sql-orm-client/test/filters.test.ts](packages/3-extensions/sql-orm-client/test/filters.test.ts)                     |
-| ORM client reads field-to-column from `model.storage.fields`               | [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — lines 16–34; callers in `aggregate-builder.ts`, `collection.ts`, `grouped-collection.ts`, `model-accessor.ts`, `filters.ts`                                                                                                                                                                           | [packages/3-extensions/sql-orm-client/test/collection-contract.test.ts](packages/3-extensions/sql-orm-client/test/collection-contract.test.ts)                                                                                                                                   |
-| ORM client reads relations from `model.relations`                          | [packages/3-extensions/sql-orm-client/src/model-accessor.ts](packages/3-extensions/sql-orm-client/src/model-accessor.ts) — lines 46–48; [packages/3-extensions/sql-orm-client/src/mutation-executor.ts](packages/3-extensions/sql-orm-client/src/mutation-executor.ts) — lines 670–675; [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — lines 102–139 | [packages/3-extensions/sql-orm-client/test/model-accessor.test.ts](packages/3-extensions/sql-orm-client/test/model-accessor.test.ts); [packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts](packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts) |
-| No consumer imports or reads from `mappings`                               | Grep verified: zero `contract.mappings`, `TContract['mappings']`, or `['mappings']` references in `sql-orm-client/src/` or `relational-core/src/`                                                                                                                                                                                                                                                                                          | Manual grep verification                                                                                                                                                                                                                                                         |
-| No consumer reads top-level `relations`                                    | Grep verified: zero `contract.relations` references in `sql-orm-client/src/`                                                                                                                                                                                                                                                                                                                                                               | Manual grep verification                                                                                                                                                                                                                                                         |
+| ORM client reads field-to-column from `model.storage.fields`               | [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — lines 20–47; callers in `aggregate-builder.ts`, `collection.ts`, `grouped-collection.ts`, `model-accessor.ts`, `filters.ts`                                                                                                                                                                           | [packages/3-extensions/sql-orm-client/test/collection-contract.test.ts](packages/3-extensions/sql-orm-client/test/collection-contract.test.ts); [packages/3-extensions/sql-orm-client/test/collection-column-mapping.test.ts](packages/3-extensions/sql-orm-client/test/collection-column-mapping.test.ts) |
+| ORM client reads relations from `model.relations`                          | [packages/3-extensions/sql-orm-client/src/model-accessor.ts](packages/3-extensions/sql-orm-client/src/model-accessor.ts) — lines 46–48; [packages/3-extensions/sql-orm-client/src/mutation-executor.ts](packages/3-extensions/sql-orm-client/src/mutation-executor.ts) — lines 670–675; [packages/3-extensions/sql-orm-client/src/collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — lines 108–131 | [packages/3-extensions/sql-orm-client/test/model-accessor.test.ts](packages/3-extensions/sql-orm-client/test/model-accessor.test.ts); [packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts](packages/3-extensions/sql-orm-client/test/mutation-executor.test.ts) |
+| No consumer imports or reads from `mappings`                               | Grep verified: zero `contract.mappings`, `TContract['mappings']`, or `['mappings']` references in `sql-orm-client/src/` or `relational-core/src/`                                                                                                                                                                                                                                                                                          | Manual grep verification (confirmed clean)                                                                                                                                                                                                                                       |
+| No consumer reads top-level `relations`                                    | Grep verified: zero `contract.relations` references in `sql-orm-client/src/`                                                                                                                                                                                                                                                                                                                                                               | Manual grep verification (confirmed clean)                                                                                                                                                                                                                                       |
 
 
 ### Additional M2 tasks from plan
@@ -71,4 +73,4 @@ None identified. The migration is functionally complete for the ORM client and r
 | 2.5 type-level generics     | ✅ Done     | `types.ts` fully migrated                                                                                                  |
 | 2.6 relational-core types   | ✅ Done     | `ExtractTableToModel`, `ExtractColumnToField`, `ExtractColumnJsTypeFromModels`                                             |
 | 2.7 paradedb extension      | N/A        | `paradedb` does not consume `mappings` or top-level `relations`                                                            |
-| 2.8 verification            | ✅ Done     | Confirmed via grep                                                                                                         |
+| 2.8 verification            | ✅ Done     | Confirmed via grep — zero old-pattern references in source or test code                                                    |
