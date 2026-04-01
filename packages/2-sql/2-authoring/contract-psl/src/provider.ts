@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
 import type {
   AuthoringContributions,
+  ExtensionPackRef,
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
@@ -26,6 +27,7 @@ export interface PrismaContractOptions {
   >;
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly composedExtensionPacks?: readonly string[];
+  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', 'postgres'>[];
 }
 
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
@@ -67,6 +69,10 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         ...ifDefined(
           'composedExtensionPacks',
           composedExtensionPacks.length > 0 ? composedExtensionPacks : undefined,
+        ),
+        ...ifDefined(
+          'composedExtensionPackRefs',
+          options.composedExtensionPackRefs?.length ? options.composedExtensionPackRefs : undefined,
         ),
         ...ifDefined('controlMutationDefaults', options.controlMutationDefaults),
       });

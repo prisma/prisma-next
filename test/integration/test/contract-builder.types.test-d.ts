@@ -316,7 +316,7 @@ test('local field and belongsTo sql overlays stay typed', () => {
   });
 
   expectTypeOf(User.buildAttributesSpec()).toEqualTypeOf<undefined>();
-  expectTypeOf(Post.buildSqlSpec()).toMatchTypeOf<
+  expectTypeOf(Post.buildSqlSpec()).toExtend<
     | {
         readonly table?: string;
         readonly indexes?: readonly unknown[];
@@ -342,7 +342,7 @@ test('explicit generated id helpers stay typed', () => {
     table: 'short_link',
   });
 
-  expectTypeOf(ShortLink.buildSqlSpec()).toMatchTypeOf<
+  expectTypeOf(ShortLink.buildSqlSpec()).toExtend<
     | {
         readonly table?: string;
         readonly indexes?: readonly unknown[];
@@ -480,7 +480,7 @@ test('codec type inference via type option', () => {
     createdAt: '2024-01-01T00:00:00Z',
   } as Row;
 
-  expectTypeOf(_testRow).toMatchTypeOf<Row>();
+  expectTypeOf(_testRow).toEqualTypeOf<Row>();
 });
 
 test('contract structure type matches SqlContract', () => {

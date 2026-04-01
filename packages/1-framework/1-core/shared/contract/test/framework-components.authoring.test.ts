@@ -56,6 +56,7 @@ describe('authoring template resolution', () => {
           index: 0,
         },
       },
+      // Intentional test-only double-cast to inject malformed runtime shape.
     } as unknown as AuthoringTypeConstructorDescriptor;
 
     expect(() => instantiateAuthoringTypeConstructor(descriptor, ['not-an-object'])).toThrow(

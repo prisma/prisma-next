@@ -81,6 +81,7 @@ export interface InterpretPslDocumentToSqlContractIRInput {
   readonly target: TargetPackRef<'sql', 'postgres'>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensionPacks?: readonly string[];
+  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', 'postgres'>[];
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly authoringContributions?: AuthoringContributions;
 }
@@ -154,21 +155,25 @@ type ModelNameMapping = {
 function buildComposedExtensionPackRefs(
   target: TargetPackRef<'sql', 'postgres'>,
   extensionIds: readonly string[],
+  extensionPackRefs: readonly ExtensionPackRef<'sql', 'postgres'>[] = [],
 ): Record<string, ExtensionPackRef<'sql', 'postgres'>> | undefined {
   if (extensionIds.length === 0) {
     return undefined;
   }
 
+  const extensionPackRefById = new Map(extensionPackRefs.map((packRef) => [packRef.id, packRef]));
+
   return Object.fromEntries(
     extensionIds.map((extensionId) => [
       extensionId,
-      {
-        kind: 'extension',
-        id: extensionId,
-        familyId: target.familyId,
-        targetId: target.targetId,
-        version: '0.0.1',
-      } satisfies ExtensionPackRef<'sql', 'postgres'>,
+      extensionPackRefById.get(extensionId) ??
+        ({
+          kind: 'extension',
+          id: extensionId,
+          familyId: target.familyId,
+          targetId: target.targetId,
+          version: '0.0.1',
+        } satisfies ExtensionPackRef<'sql', 'postgres'>),
     ]),
   );
 }
@@ -1963,7 +1968,11 @@ export function interpretPslDocumentToSqlContractIR(
     target: input.target,
     ...ifDefined(
       'extensionPacks',
-      buildComposedExtensionPackRefs(input.target, [...composedExtensions].sort(compareStrings)),
+      buildComposedExtensionPackRefs(
+        input.target,
+        [...composedExtensions].sort(compareStrings),
+        input.composedExtensionPackRefs,
+      ),
     ),
     ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
     models: semanticModels.map((model) => ({

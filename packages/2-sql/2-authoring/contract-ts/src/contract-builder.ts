@@ -1517,6 +1517,10 @@ class SqlContractBuilder<
       Capabilities
     >({
       ...this.state,
+      extensionPacks: {
+        ...(this.state.extensionPacks ?? {}),
+        ...packs,
+      },
       extensionNamespaces: [...namespaces],
     });
   }

@@ -36,5 +36,6 @@ export default defineConfig({
       generatorDescriptors: pslInterpretationContributions.generatorDescriptors,
     },
     composedExtensionPacks: extensionPacks.map((pack) => pack.id),
+    composedExtensionPackRefs: extensionPacks,
   }),
 });

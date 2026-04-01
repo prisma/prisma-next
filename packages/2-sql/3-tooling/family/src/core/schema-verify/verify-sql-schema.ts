@@ -620,8 +620,14 @@ function verifyColumn(options: {
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
 
-  const resolvedContractColumn = resolveContractColumnTypeMetadata(contractColumn, storageTypes);
-  const contractNativeType = renderExpectedNativeType(contractColumn, storageTypes, codecHooks);
+  const resolvedContractColumn = resolveContractColumnTypeMetadata(contractColumn, storageTypes, {
+    tableName,
+    columnName,
+  });
+  const contractNativeType = renderExpectedNativeType(contractColumn, storageTypes, codecHooks, {
+    tableName,
+    columnName,
+  });
   const schemaNativeType =
     normalizeNativeType?.(schemaColumn.nativeType) ?? schemaColumn.nativeType;
 
@@ -939,10 +945,15 @@ function renderExpectedNativeType(
   contractColumn: SqlContract<SqlStorage>['storage']['tables'][string]['columns'][string],
   storageTypes: Record<string, StorageTypeInstance>,
   codecHooks: Map<string, CodecControlHooks>,
+  context?: {
+    readonly tableName: string;
+    readonly columnName: string;
+  },
 ): string {
   const { codecId, nativeType, typeParams } = resolveContractColumnTypeMetadata(
     contractColumn,
     storageTypes,
+    context,
   );
 
   // If no typeParams or codecId, return the base native type
@@ -963,6 +974,10 @@ function renderExpectedNativeType(
 function resolveContractColumnTypeMetadata(
   contractColumn: StorageColumn,
   storageTypes: Record<string, StorageTypeInstance>,
+  context?: {
+    readonly tableName: string;
+    readonly columnName: string;
+  },
 ): Pick<StorageColumn, 'codecId' | 'nativeType' | 'typeParams'> {
   if (!contractColumn.typeRef) {
     return contractColumn;
@@ -970,7 +985,12 @@ function resolveContractColumnTypeMetadata(
 
   const referencedType = storageTypes[contractColumn.typeRef];
   if (!referencedType) {
-    return contractColumn;
+    const columnLabel = context
+      ? `Column "${context.tableName}"."${context.columnName}"`
+      : 'Column';
+    throw new Error(
+      `${columnLabel} references storage type "${contractColumn.typeRef}" but it is not defined in storage.types.`,
+    );
   }
 
   return {

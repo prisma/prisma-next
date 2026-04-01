@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 import {
   createBuiltinLikeControlMutationDefaults,
+  pgvectorExtensionPack,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -253,6 +254,7 @@ model Document {
       const contract = prismaContract('./schema.prisma', {
         ...baseOptions,
         composedExtensionPacks: ['pgvector'],
+        composedExtensionPackRefs: [pgvectorExtensionPack],
       });
       const result = await contract.source({ composedExtensionPacks: [] });
 
@@ -279,6 +281,11 @@ model Document {
               typeRef: 'Embedding1536',
             },
           },
+        },
+      });
+      expect(result.value.extensionPacks).toMatchObject({
+        pgvector: {
+          version: pgvectorExtensionPack.version,
         },
       });
     });

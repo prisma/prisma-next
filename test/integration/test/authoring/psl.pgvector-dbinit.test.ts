@@ -48,6 +48,7 @@ describe(
           generatorDescriptors: pslContributions.generatorDescriptors,
         },
         composedExtensionPacks: ['pgvector'],
+        composedExtensionPackRefs: [pgvector],
       });
 
       const pslResult = await contractConfig.source({

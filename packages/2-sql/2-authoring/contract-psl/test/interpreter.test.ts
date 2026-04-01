@@ -6,6 +6,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  pgvectorExtensionPack,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -917,6 +918,35 @@ model Document {
             },
           },
         },
+      },
+    });
+  });
+
+  it('preserves composed extension pack versions when refs are provided', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
+}
+
+model Document {
+  id Int @id
+  embedding Embedding1536
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      composedExtensionPacks: ['pgvector'],
+      composedExtensionPackRefs: [pgvectorExtensionPack],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.extensionPacks).toMatchObject({
+      pgvector: {
+        version: pgvectorExtensionPack.version,
       },
     });
   });
