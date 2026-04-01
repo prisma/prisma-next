@@ -249,6 +249,20 @@ The planner currently writes `ops.json` directly (via `writeMigrationPackage`). 
 5. **Remove temp default code** (canUseSharedTemporaryDefaultStrategy, resolveIdentityValue, recipe)
 6. **Tests:** Run existing planner integration tests against the new planner, verify same ops output
 
+## Improvement: SchemaIssue should be a discriminated union
+
+`SchemaIssue` currently has all fields except `kind` and `message` as optional. This forces defensive null checks in the descriptor planner even though a `missing_column` issue will always have `table` and `column`. The type should be a discriminated union where each issue kind carries its fields as required:
+
+```typescript
+type SchemaIssue =
+  | { kind: 'missing_table'; table: string; message: string }
+  | { kind: 'missing_column'; table: string; column: string; message: string }
+  | { kind: 'extra_index'; table: string; indexOrConstraint: string; message: string }
+  // etc.
+```
+
+This would eliminate all the defensive checks in `mapIssue` and let the switch narrow the type automatically. It's a framework-level type change (`@prisma-next/core-control-plane`) that affects multiple packages — worth doing but not a blocker for the descriptor planner.
+
 ## Risks
 
 - **Verifier changes** affect `db verify` — must ensure new issue kinds don't cause false positives in existing verify workflows

@@ -12,7 +12,10 @@
  */
 
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
+import type { SqlPlannerConflict } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Result } from '@prisma-next/utils/result';
+import { notOk, ok } from '@prisma-next/utils/result';
 import {
   addColumn,
   addForeignKey,
@@ -54,7 +57,7 @@ export type PatternMatcher = (
  *
  * When a missing column is NOT NULL without a default, the planner can't just
  * add it — existing rows would violate the constraint. Instead, emit:
- *   addColumn(nullable) → dataTransformDraft (user fills in backfill) → setNotNull
+ *   addColumn(nullable) → dataTransform (user fills in backfill) → setNotNull
  */
 export const notNullBackfillMatcher: PatternMatcher = (issues, ctx) => {
   const matched: SchemaIssue[] = [];
@@ -91,14 +94,20 @@ export const notNullBackfillMatcher: PatternMatcher = (issues, ctx) => {
 // ============================================================================
 
 const ISSUE_KIND_ORDER: Record<string, number> = {
-  // Drops first (reconciliation — clear the way for creates)
-  extra_table: 10,
-  extra_foreign_key: 11,
-  extra_unique_constraint: 12,
-  extra_primary_key: 13,
-  extra_index: 14,
+  // Dependencies and types first
+  dependency_missing: 1,
+  type_missing: 2,
+  type_values_mismatch: 3,
+
+  // Drops (reconciliation — clear the way for creates)
+  // FKs dropped first (they depend on other constraints)
+  extra_foreign_key: 10,
+  extra_unique_constraint: 11,
+  extra_primary_key: 12,
+  extra_index: 13,
+  extra_default: 14,
   extra_column: 15,
-  extra_default: 16,
+  extra_table: 16,
 
   // Tables before columns
   missing_table: 20,
@@ -116,12 +125,7 @@ const ISSUE_KIND_ORDER: Record<string, number> = {
   primary_key_mismatch: 50,
   unique_constraint_mismatch: 51,
   index_mismatch: 52,
-  foreign_key_mismatch: 60, // FKs last (depend on referenced tables)
-
-  // Dependencies and types
-  dependency_missing: 1,
-  type_missing: 2,
-  type_values_mismatch: 3,
+  foreign_key_mismatch: 60,
 };
 
 function issueOrder(issue: SchemaIssue): number {
@@ -129,105 +133,218 @@ function issueOrder(issue: SchemaIssue): number {
 }
 
 // ============================================================================
+// Conflict helpers
+// ============================================================================
+
+function issueConflict(
+  kind: SqlPlannerConflict['kind'],
+  summary: string,
+  location?: SqlPlannerConflict['location'],
+): SqlPlannerConflict {
+  return {
+    kind,
+    summary,
+    why: 'Use `migration new` to author a custom migration for this change.',
+    ...(location ? { location } : {}),
+  };
+}
+
+// ============================================================================
 // Default issue-to-descriptor mapping
 // ============================================================================
 
-/**
- * Returns true if the issue represents a "missing" constraint (no actual value)
- * rather than a "mismatched" constraint (actual differs from expected).
- */
 function isMissing(issue: SchemaIssue): boolean {
   return issue.actual === undefined;
 }
 
-function defaultDescriptorsForIssue(
+function mapIssue(
   issue: SchemaIssue,
   ctx: PatternContext,
-): readonly MigrationOpDescriptor[] {
+): Result<readonly MigrationOpDescriptor[], SqlPlannerConflict> {
   switch (issue.kind) {
-    // Additive
+    // Additive — missing structures
     case 'missing_table':
-      return issue.table ? [createTable(issue.table)] : [];
+      if (!issue.table)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Missing table issue has no table name'),
+        );
+      return ok([createTable(issue.table)]);
 
     case 'missing_column':
-      return issue.table && issue.column ? [addColumn(issue.table, issue.column)] : [];
+      if (!issue.table || !issue.column)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Missing column issue has no table/column name'),
+        );
+      return ok([addColumn(issue.table, issue.column)]);
 
     case 'default_missing':
-      return issue.table && issue.column ? [setDefault(issue.table, issue.column)] : [];
+      if (!issue.table || !issue.column)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Default missing issue has no table/column name'),
+        );
+      return ok([setDefault(issue.table, issue.column)]);
 
-    // Destructive drops
+    // Destructive — extra structures
     case 'extra_table':
-      return issue.table ? [dropTable(issue.table)] : [];
+      if (!issue.table)
+        return notOk(issueConflict('unsupportedOperation', 'Extra table issue has no table name'));
+      return ok([dropTable(issue.table)]);
 
     case 'extra_column':
-      return issue.table && issue.column ? [dropColumn(issue.table, issue.column)] : [];
+      if (!issue.table || !issue.column)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Extra column issue has no table/column name'),
+        );
+      return ok([dropColumn(issue.table, issue.column)]);
 
     case 'extra_index':
-      return issue.table && issue.indexOrConstraint
-        ? [dropIndex(issue.table, issue.indexOrConstraint)]
-        : [];
+      if (!issue.table || !issue.indexOrConstraint)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Extra index issue has no table/index name'),
+        );
+      return ok([dropIndex(issue.table, issue.indexOrConstraint)]);
 
     case 'extra_unique_constraint':
     case 'extra_foreign_key':
     case 'extra_primary_key':
-      return issue.table && issue.indexOrConstraint
-        ? [dropConstraint(issue.table, issue.indexOrConstraint)]
-        : [];
+      if (!issue.table || !issue.indexOrConstraint)
+        return notOk(
+          issueConflict(
+            'unsupportedOperation',
+            'Extra constraint issue has no table/constraint name',
+          ),
+        );
+      return ok([dropConstraint(issue.table, issue.indexOrConstraint)]);
 
     case 'extra_default':
-      return issue.table && issue.column ? [dropDefault(issue.table, issue.column)] : [];
+      if (!issue.table || !issue.column)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Extra default issue has no table/column name'),
+        );
+      return ok([dropDefault(issue.table, issue.column)]);
 
     // Nullability changes
     case 'nullability_mismatch': {
-      if (!issue.table || !issue.column) return [];
+      if (!issue.table || !issue.column)
+        return notOk(
+          issueConflict('nullabilityConflict', 'Nullability mismatch has no table/column name'),
+        );
       const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
-      if (!column) return [];
-      return column.nullable
-        ? [dropNotNull(issue.table, issue.column)]
-        : [setNotNull(issue.table, issue.column)];
+      if (!column)
+        return notOk(
+          issueConflict(
+            'nullabilityConflict',
+            `Column "${issue.table}"."${issue.column}" not found in destination contract`,
+          ),
+        );
+      return ok(
+        column.nullable
+          ? [dropNotNull(issue.table, issue.column)]
+          : [setNotNull(issue.table, issue.column)],
+      );
     }
 
     // Type changes
     case 'type_mismatch':
-      return issue.table && issue.column ? [alterColumnType(issue.table, issue.column)] : [];
+      if (!issue.table || !issue.column)
+        return notOk(issueConflict('typeMismatch', 'Type mismatch has no table/column name'));
+      return ok([alterColumnType(issue.table, issue.column)]);
 
     // Default changes
     case 'default_mismatch':
-      return issue.table && issue.column ? [setDefault(issue.table, issue.column)] : [];
+      if (!issue.table || !issue.column)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Default mismatch has no table/column name'),
+        );
+      return ok([setDefault(issue.table, issue.column)]);
 
-    // Missing constraints (detected via _mismatch with actual === undefined)
+    // Constraints — missing (actual undefined) vs mismatched (actual defined)
     case 'primary_key_mismatch':
-      if (isMissing(issue) && issue.table) return [addPrimaryKey(issue.table)];
-      return []; // Actual mismatch — conflict, not handled by descriptors
+      if (!issue.table)
+        return notOk(issueConflict('indexIncompatible', 'Primary key issue has no table name'));
+      if (isMissing(issue)) return ok([addPrimaryKey(issue.table)]);
+      return notOk(
+        issueConflict(
+          'indexIncompatible',
+          `Primary key on "${issue.table}" has different columns (expected: ${issue.expected}, actual: ${issue.actual})`,
+          { table: issue.table },
+        ),
+      );
 
     case 'unique_constraint_mismatch':
-      if (isMissing(issue) && issue.table && issue.expected) {
+      if (!issue.table)
+        return notOk(
+          issueConflict('indexIncompatible', 'Unique constraint issue has no table name'),
+        );
+      if (isMissing(issue) && issue.expected) {
         const columns = issue.expected.split(', ');
-        return [addUnique(issue.table, columns)];
+        return ok([addUnique(issue.table, columns)]);
       }
-      return [];
+      return notOk(
+        issueConflict(
+          'indexIncompatible',
+          `Unique constraint on "${issue.table}" differs (expected: ${issue.expected}, actual: ${issue.actual})`,
+          { table: issue.table },
+        ),
+      );
 
     case 'index_mismatch':
-      if (isMissing(issue) && issue.table && issue.expected) {
+      if (!issue.table)
+        return notOk(issueConflict('indexIncompatible', 'Index issue has no table name'));
+      if (isMissing(issue) && issue.expected) {
         const columns = issue.expected.split(', ');
-        return [createIndex(issue.table, columns)];
+        return ok([createIndex(issue.table, columns)]);
       }
-      return [];
+      return notOk(
+        issueConflict(
+          'indexIncompatible',
+          `Index on "${issue.table}" differs (expected: ${issue.expected}, actual: ${issue.actual})`,
+          { table: issue.table },
+        ),
+      );
 
     case 'foreign_key_mismatch':
-      if (isMissing(issue) && issue.table && issue.expected) {
-        // expected format: "col1, col2 -> refTable(refCol1, refCol2)"
-        // We need just the columns for the descriptor
+      if (!issue.table)
+        return notOk(issueConflict('foreignKeyConflict', 'Foreign key issue has no table name'));
+      if (isMissing(issue) && issue.expected) {
         const arrowIdx = issue.expected.indexOf(' -> ');
         if (arrowIdx >= 0) {
           const columns = issue.expected.slice(0, arrowIdx).split(', ');
-          return [addForeignKey(issue.table, columns)];
+          return ok([addForeignKey(issue.table, columns)]);
         }
       }
-      return [];
+      return notOk(
+        issueConflict(
+          'foreignKeyConflict',
+          `Foreign key on "${issue.table}" differs (expected: ${issue.expected}, actual: ${issue.actual})`,
+          { table: issue.table },
+        ),
+      );
 
-    default:
-      return [];
+    // Type/dependency operations — not yet handled by descriptors
+    case 'type_missing':
+      return notOk(
+        issueConflict(
+          'unsupportedOperation',
+          `Custom type "${issue.typeName ?? 'unknown'}" is missing — type creation not yet supported by descriptor planner`,
+        ),
+      );
+
+    case 'type_values_mismatch':
+      return notOk(
+        issueConflict(
+          'unsupportedOperation',
+          'Custom type values differ — type alteration not yet supported by descriptor planner',
+        ),
+      );
+
+    case 'dependency_missing':
+      return notOk(
+        issueConflict(
+          'unsupportedOperation',
+          'Database dependency is missing — dependency initialization not yet supported by descriptor planner',
+        ),
+      );
   }
 }
 
@@ -242,11 +359,18 @@ export interface DescriptorPlannerOptions {
   readonly matchers?: readonly PatternMatcher[];
 }
 
-export interface DescriptorPlannerResult {
+export interface DescriptorPlannerSuccess {
+  readonly kind: 'success';
   readonly descriptors: readonly MigrationOpDescriptor[];
   readonly needsDataMigration: boolean;
-  readonly unmatchedIssues: readonly SchemaIssue[];
 }
+
+export interface DescriptorPlannerFailure {
+  readonly kind: 'failure';
+  readonly conflicts: readonly SqlPlannerConflict[];
+}
+
+export type DescriptorPlannerResult = DescriptorPlannerSuccess | DescriptorPlannerFailure;
 
 export function planDescriptors(options: DescriptorPlannerOptions): DescriptorPlannerResult {
   const context: PatternContext = {
@@ -259,32 +383,36 @@ export function planDescriptors(options: DescriptorPlannerOptions): DescriptorPl
   // Phase 1: Pattern matching — consume recognized issues
   let remaining = options.issues;
   const patternOps: MigrationOpDescriptor[] = [];
-  let needsDataMigration = false;
 
   for (const matcher of matchers) {
     const result = matcher(remaining, context);
     if (result.kind === 'match') {
       remaining = result.issues;
       patternOps.push(...result.ops);
-      if (result.ops.some((op) => op.kind === 'dataTransform')) {
-        needsDataMigration = true;
-      }
     }
   }
 
   // Phase 2: Sort remaining issues by dependency order
   const sorted = [...remaining].sort((a, b) => issueOrder(a) - issueOrder(b));
 
-  // Phase 3: Default mapping for remaining issues
+  // Phase 3: Map remaining issues to descriptors, collecting conflicts
   const defaultOps: MigrationOpDescriptor[] = [];
+  const conflicts: SqlPlannerConflict[] = [];
+
   for (const issue of sorted) {
-    defaultOps.push(...defaultDescriptorsForIssue(issue, context));
+    const result = mapIssue(issue, context);
+    if (result.ok) {
+      defaultOps.push(...result.value);
+    } else {
+      conflicts.push(result.failure);
+    }
   }
 
-  // Phase 4: Merge — pattern ops are inserted at the right position
-  // Pattern ops for missing_column go after createTable but before constraints
-  // For now, simple approach: pattern ops after tables, before constraints
-  const tableOps = defaultOps.filter((op) => op.kind === 'createTable');
+  if (conflicts.length > 0) {
+    return { kind: 'failure', conflicts };
+  }
+
+  // Phase 4: Order descriptors by operation kind
   const dropOps = defaultOps.filter(
     (op) =>
       op.kind === 'dropTable' ||
@@ -293,17 +421,15 @@ export function planDescriptors(options: DescriptorPlannerOptions): DescriptorPl
       op.kind === 'dropIndex' ||
       op.kind === 'dropDefault',
   );
+  const tableOps = defaultOps.filter((op) => op.kind === 'createTable');
   const columnOps = defaultOps.filter((op) => op.kind === 'addColumn');
   const alterOps = defaultOps.filter(
     (op) =>
       op.kind === 'alterColumnType' ||
       op.kind === 'setNotNull' ||
       op.kind === 'dropNotNull' ||
-      op.kind === 'setDefault' ||
-      op.kind === 'dropDefault',
+      op.kind === 'setDefault',
   );
-  // Filter out dropDefault from alterOps since it's already in dropOps
-  const pureAlterOps = alterOps.filter((op) => op.kind !== 'dropDefault');
   const constraintOps = defaultOps.filter(
     (op) =>
       op.kind === 'addPrimaryKey' ||
@@ -317,15 +443,13 @@ export function planDescriptors(options: DescriptorPlannerOptions): DescriptorPl
     ...tableOps,
     ...columnOps,
     ...patternOps,
-    ...pureAlterOps,
+    ...alterOps,
     ...constraintOps,
   ];
 
   return {
+    kind: 'success',
     descriptors,
-    needsDataMigration,
-    unmatchedIssues: remaining.filter(
-      (issue) => defaultDescriptorsForIssue(issue, context).length === 0,
-    ),
+    needsDataMigration: descriptors.some((op) => op.kind === 'dataTransform'),
   };
 }
