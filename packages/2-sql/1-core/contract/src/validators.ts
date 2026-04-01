@@ -151,7 +151,7 @@ const ModelStorageSchema = type({
 const ModelSchema = type({
   storage: ModelStorageSchema,
   'fields?': type({ '[string]': ModelFieldSchema }),
-  relations: type({ '[string]': 'unknown' }),
+  'relations?': type({ '[string]': 'unknown' }),
   'discriminator?': 'unknown',
   'variants?': 'unknown',
   'base?': 'string',
