@@ -33,7 +33,7 @@ This package was created in Phase 1 and refactored in Phase 2. It now composes t
 ## Architecture
 
 - **Composes generic core**: Uses `@prisma-next/contract-authoring` for generic builder state management (`TableBuilder`, `ModelBuilder`, `ContractBuilder` base class)
-- **SQL-specific types**: Provides SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) from `@prisma-next/sql-contract/types`
+- **SQL-specific types**: Provides SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlModelStorage`) from `@prisma-next/sql-contract/types`
 - **SQL-specific build()**: Implements SQL-specific `build()` method in `SqlContractBuilder` that constructs `SqlContract` instances with SQL-specific structure (uniques, indexes, foreignKeys arrays)
 
 ```mermaid
@@ -152,7 +152,7 @@ export default defineConfig({
 - **`@prisma-next/contract-authoring`** - Target-agnostic builder core (builder state types, builder classes, type helpers)
 - **`@prisma-next/contract`** - Core contract types (`ContractBase`)
 - **`@prisma-next/core-control-plane`** - Contract config types used by `typescriptContract`
-- **`@prisma-next/sql-contract`** - SQL contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
+- **`@prisma-next/sql-contract`** - SQL contract types (`SqlContract`, `SqlStorage`, `SqlModelStorage`)
 - **`arktype`** - Runtime validation
 - **`ts-toolbelt`** - Type utilities
 
