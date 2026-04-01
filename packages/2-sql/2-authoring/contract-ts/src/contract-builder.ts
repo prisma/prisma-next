@@ -952,8 +952,19 @@ export function buildSqlContractFromSemanticDefinition(
   for (const model of definition.models) {
     builder = builder.table(model.tableName, (tb) => {
       let t: SemanticTableBuilder = tb;
+      const fieldsByColumnName = new Map(model.fields.map((field) => [field.columnName, field]));
       for (const field of model.fields) {
         if (field.executionDefault) {
+          if (field.default !== undefined) {
+            throw new Error(
+              `Field "${model.modelName}.${field.fieldName}" cannot define both default and executionDefault.`,
+            );
+          }
+          if (field.nullable) {
+            throw new Error(
+              `Field "${model.modelName}.${field.fieldName}" cannot be nullable when executionDefault is present.`,
+            );
+          }
           t = t.generated(field.columnName, {
             type: field.descriptor,
             generated: field.executionDefault,
@@ -967,6 +978,14 @@ export function buildSqlContractFromSemanticDefinition(
         });
       }
       if (model.id) {
+        for (const columnName of model.id.columns) {
+          const field = fieldsByColumnName.get(columnName);
+          if (field?.nullable) {
+            throw new Error(
+              `Model "${model.modelName}" uses nullable field "${field.fieldName}" in its identity.`,
+            );
+          }
+        }
         t = t.primaryKey(model.id.columns, model.id.name);
       }
       for (const unique of model.uniques ?? []) {

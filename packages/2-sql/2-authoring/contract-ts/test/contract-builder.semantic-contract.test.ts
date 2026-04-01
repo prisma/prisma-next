@@ -170,4 +170,94 @@ describe('shared semantic contract lowering', () => {
       column: 'author_id',
     });
   });
+
+  it('rejects generated fields that also declare storage defaults', () => {
+    expect(() =>
+      buildSqlContractFromSemanticDefinition({
+        target: postgresTargetPack,
+        models: [
+          {
+            modelName: 'User',
+            tableName: 'app_user',
+            fields: [
+              {
+                fieldName: 'id',
+                columnName: 'id',
+                descriptor: {
+                  codecId: 'pg/text@1',
+                  nativeType: 'text',
+                },
+                nullable: false,
+                default: {
+                  kind: 'function',
+                  expression: 'gen_random_uuid()',
+                },
+                executionDefault: {
+                  kind: 'generator',
+                  id: 'uuidv4',
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow('Field "User.id" cannot define both default and executionDefault.');
+  });
+
+  it('rejects generated fields that are still marked nullable', () => {
+    expect(() =>
+      buildSqlContractFromSemanticDefinition({
+        target: postgresTargetPack,
+        models: [
+          {
+            modelName: 'User',
+            tableName: 'app_user',
+            fields: [
+              {
+                fieldName: 'id',
+                columnName: 'id',
+                descriptor: {
+                  codecId: 'pg/text@1',
+                  nativeType: 'text',
+                },
+                nullable: true,
+                executionDefault: {
+                  kind: 'generator',
+                  id: 'uuidv4',
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow('Field "User.id" cannot be nullable when executionDefault is present.');
+  });
+
+  it('rejects nullable identity fields', () => {
+    expect(() =>
+      buildSqlContractFromSemanticDefinition({
+        target: postgresTargetPack,
+        models: [
+          {
+            modelName: 'User',
+            tableName: 'app_user',
+            fields: [
+              {
+                fieldName: 'id',
+                columnName: 'id',
+                descriptor: {
+                  codecId: 'pg/int4@1',
+                  nativeType: 'int4',
+                },
+                nullable: true,
+              },
+            ],
+            id: {
+              columns: ['id'],
+            },
+          },
+        ],
+      }),
+    ).toThrow('Model "User" uses nullable field "id" in its identity.');
+  });
 });
