@@ -51,11 +51,22 @@ type RuntimeStagedCollection = {
   readonly modelSpecs: ReadonlyMap<string, RuntimeModelSpec>;
 };
 
+function buildStorageTypeReverseLookup(
+  storageTypes: Record<string, StorageTypeInstance>,
+): ReadonlyMap<StorageTypeInstance, string> {
+  const lookup = new Map<StorageTypeInstance, string>();
+  for (const [key, instance] of Object.entries(storageTypes)) {
+    lookup.set(instance, key);
+  }
+  return lookup;
+}
+
 function resolveFieldDescriptor(
   modelName: string,
   fieldName: string,
   fieldState: FieldStateOf<ScalarFieldBuilder>,
   storageTypes: Record<string, StorageTypeInstance>,
+  storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance, string>,
 ): ColumnTypeDescriptor {
   if ('descriptor' in fieldState && fieldState.descriptor) {
     return fieldState.descriptor;
@@ -65,9 +76,7 @@ function resolveFieldDescriptor(
     const typeRef =
       typeof fieldState.typeRef === 'string'
         ? fieldState.typeRef
-        : Object.entries(storageTypes).find(
-            ([, storageType]) => storageType === fieldState.typeRef,
-          )?.[0];
+        : storageTypeReverseLookup.get(fieldState.typeRef as StorageTypeInstance);
 
     if (!typeRef) {
       throw new Error(
@@ -647,11 +656,11 @@ function lowerForeignKeyNode(
   foreignKey: {
     readonly fields: readonly string[];
     readonly targetFields: readonly string[];
-    readonly name?: string;
-    readonly onDelete?: ForeignKeyConstraint['onDelete'];
-    readonly onUpdate?: ForeignKeyConstraint['onUpdate'];
-    readonly constraint?: boolean;
-    readonly index?: boolean;
+    readonly name?: string | undefined;
+    readonly onDelete?: ForeignKeyConstraint['onDelete'] | undefined;
+    readonly onUpdate?: ForeignKeyConstraint['onUpdate'] | undefined;
+    readonly constraint?: boolean | undefined;
+    readonly index?: boolean | undefined;
   },
 ): SqlSemanticForeignKeyNode {
   return {
@@ -706,12 +715,19 @@ function resolveSemanticModelNode(
   spec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
   storageTypes: Record<string, StorageTypeInstance>,
+  storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance, string>,
 ): SqlSemanticModelNode {
   const fields: SqlSemanticFieldNode[] = [];
 
   for (const [fieldName, fieldBuilder] of Object.entries(spec.fieldBuilders)) {
     const fieldState = fieldBuilder.build();
-    const descriptor = resolveFieldDescriptor(spec.modelName, fieldName, fieldState, storageTypes);
+    const descriptor = resolveFieldDescriptor(
+      spec.modelName,
+      fieldName,
+      fieldState,
+      storageTypes,
+      storageTypeReverseLookup,
+    );
     const columnName = spec.fieldToColumn[fieldName];
     if (!columnName) {
       throw new Error(`Column name resolution failed for "${spec.modelName}.${fieldName}"`);
@@ -832,8 +848,14 @@ function collectRuntimeModelSpecs(definition: StagedContractInput): RuntimeStage
 function lowerSemanticModels(collection: RuntimeStagedCollection): readonly SqlSemanticModelNode[] {
   emitTypedCrossModelFallbackWarnings(collection);
 
+  const storageTypeReverseLookup = buildStorageTypeReverseLookup(collection.storageTypes);
   return Array.from(collection.modelSpecs.values()).map((spec) =>
-    resolveSemanticModelNode(spec, collection.modelSpecs, collection.storageTypes),
+    resolveSemanticModelNode(
+      spec,
+      collection.modelSpecs,
+      collection.storageTypes,
+      storageTypeReverseLookup,
+    ),
   );
 }
 
