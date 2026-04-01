@@ -9,6 +9,7 @@ import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-la
 import {
   getColumnToFieldMap,
   resolveFieldToColumn,
+  resolveModelRelations,
   resolveModelTableName,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
@@ -47,8 +48,8 @@ interface RelationDefinition {
   readonly relatedModelName: string;
   readonly relatedTableName: string;
   readonly cardinality: RelationCardinalityTag | undefined;
-  readonly parentCols: readonly string[];
-  readonly childCols: readonly string[];
+  readonly localColumns: readonly string[];
+  readonly targetColumns: readonly string[];
 }
 
 interface ParsedRelationMutation {
@@ -361,8 +362,8 @@ async function applyParentOwnedMutation(
 ): Promise<void> {
   const contract = context.contract;
   if (mutation.kind === 'disconnect') {
-    for (const parentColumn of relation.parentCols) {
-      const parentFieldName = toFieldName(contract, parentModelName, parentColumn);
+    for (const localColumn of relation.localColumns) {
+      const parentFieldName = toFieldName(contract, parentModelName, localColumn);
       scalarData[parentFieldName] = null;
     }
     return;
@@ -415,15 +416,15 @@ function copyRelatedValuesToParent(
   scalarData: Record<string, unknown>,
   relatedRow: Record<string, unknown>,
 ): void {
-  for (let i = 0; i < relation.parentCols.length; i++) {
-    const parentColumn = relation.parentCols[i];
-    const childColumn = relation.childCols[i];
-    if (!parentColumn || !childColumn) {
+  for (let i = 0; i < relation.localColumns.length; i++) {
+    const localColumn = relation.localColumns[i];
+    const targetColumn = relation.targetColumns[i];
+    if (!localColumn || !targetColumn) {
       continue;
     }
 
-    const parentFieldName = toFieldName(contract, parentModelName, parentColumn);
-    const childFieldName = toFieldName(contract, relation.relatedModelName, childColumn);
+    const parentFieldName = toFieldName(contract, parentModelName, localColumn);
+    const childFieldName = toFieldName(contract, relation.relatedModelName, targetColumn);
     scalarData[parentFieldName] = relatedRow[childFieldName];
   }
 }
@@ -525,14 +526,14 @@ function readParentColumnValues(
 ): Map<string, unknown> {
   const values = new Map<string, unknown>();
 
-  for (let i = 0; i < relation.parentCols.length; i++) {
-    const parentColumn = relation.parentCols[i];
-    const childColumn = relation.childCols[i];
-    if (!parentColumn || !childColumn) {
+  for (let i = 0; i < relation.localColumns.length; i++) {
+    const localColumn = relation.localColumns[i];
+    const targetColumn = relation.targetColumns[i];
+    if (!localColumn || !targetColumn) {
       continue;
     }
 
-    const parentFieldName = toFieldName(contract, parentModelName, parentColumn);
+    const parentFieldName = toFieldName(contract, parentModelName, localColumn);
     const parentValue = parentRow[parentFieldName];
     if (parentValue === undefined) {
       throw new Error(
@@ -540,7 +541,7 @@ function readParentColumnValues(
       );
     }
 
-    values.set(childColumn, parentValue);
+    values.set(targetColumn, parentValue);
   }
 
   return values;
@@ -671,59 +672,18 @@ function getRelationDefinitions(
   contract: SqlContract<SqlStorage>,
   modelName: string,
 ): RelationDefinition[] {
-  const models = contract.models as Record<string, { relations?: Record<string, unknown> }>;
-  const relationMap = models[modelName]?.relations ?? {};
+  const relations = resolveModelRelations(contract, modelName);
 
-  const definitions: RelationDefinition[] = [];
-  for (const [relationName, relationValue] of Object.entries(relationMap)) {
-    if (!relationValue || typeof relationValue !== 'object') {
-      continue;
-    }
-
-    const relation = relationValue as {
-      to?: unknown;
-      cardinality?: unknown;
-      on?: {
-        localFields?: unknown;
-        targetFields?: unknown;
-      };
-    };
-
-    if (typeof relation.to !== 'string') {
-      continue;
-    }
-
-    const localFields = relation.on?.localFields;
-    const targetFields = relation.on?.targetFields;
-    if (!Array.isArray(localFields) || !Array.isArray(targetFields)) {
-      continue;
-    }
-
-    const parentCols = (localFields as string[]).map((f) =>
-      resolveFieldToColumn(contract, modelName, f),
-    );
-    const childCols = (targetFields as string[]).map((f) =>
-      resolveFieldToColumn(contract, relation.to as string, f),
-    );
-
-    definitions.push({
-      relationName,
-      relatedModelName: relation.to,
-      relatedTableName: resolveModelTableName(contract, relation.to),
-      cardinality: parseCardinality(relation.cardinality),
-      parentCols,
-      childCols,
-    });
-  }
-
-  return definitions;
-}
-
-function parseCardinality(value: unknown): RelationCardinalityTag | undefined {
-  if (value === '1:1' || value === 'N:1' || value === '1:N' || value === 'M:N') {
-    return value;
-  }
-  return undefined;
+  return Object.entries(relations).map(([relationName, relation]) => ({
+    relationName,
+    relatedModelName: relation.to,
+    relatedTableName: resolveModelTableName(contract, relation.to),
+    cardinality: relation.cardinality,
+    localColumns: relation.on.localFields.map((f) => resolveFieldToColumn(contract, modelName, f)),
+    targetColumns: relation.on.targetFields.map((f) =>
+      resolveFieldToColumn(contract, relation.to, f),
+    ),
+  }));
 }
 
 function toFieldName(
