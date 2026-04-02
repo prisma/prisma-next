@@ -553,7 +553,7 @@ export const sqlTargetFamilyHook = {
         for (const [fieldName, field] of Object.entries(storageFields)) {
           const column = table.columns[field.column];
           if (!column) {
-            fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+            fields.push(`readonly ${fieldName}: unknown`);
             storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
             continue;
           }
@@ -569,7 +569,7 @@ export const sqlTargetFamilyHook = {
         }
       } else {
         for (const [fieldName, field] of Object.entries(storageFields)) {
-          fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+          fields.push(`readonly ${fieldName}: unknown`);
           storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
         }
       }

@@ -406,14 +406,6 @@ type FieldsOf<TContract extends SqlContract<SqlStorage>, ModelName extends strin
     : Record<string, never>
   : Record<string, never>;
 
-type FieldValueType<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-  FieldName extends string,
-> = FieldName extends keyof FieldsOf<TContract, ModelName>
-  ? FieldsOf<TContract, ModelName>[FieldName]
-  : unknown;
-
 type ModelStorageFields<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
@@ -501,9 +493,7 @@ type FieldJsType<
   ModelName extends string,
   FieldName extends string,
 > = [FieldStorageJsType<TContract, ModelName, FieldName>] extends [never]
-  ? FieldValueType<TContract, ModelName, FieldName> extends { readonly column: string }
-    ? unknown
-    : FieldValueType<TContract, ModelName, FieldName>
+  ? unknown
   : FieldStorageJsType<TContract, ModelName, FieldName>;
 
 type FieldStorageColumn<
