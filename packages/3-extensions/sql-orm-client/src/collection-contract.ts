@@ -109,10 +109,15 @@ export function resolveIncludeRelation(
 ): ResolvedIncludeRelation {
   const relations = resolveModelRelations(contract, modelName);
   const relation = relations[relationName];
-  const localField = relation?.on.localFields[0];
-  const targetField = relation?.on.targetFields[0];
-  if (!relation || !localField || !targetField) {
+  if (!relation) {
     throw new Error(`Relation '${relationName}' not found on model '${modelName}'`);
+  }
+  const localField = relation.on.localFields[0];
+  const targetField = relation.on.targetFields[0];
+  if (!localField || !targetField) {
+    throw new Error(
+      `Relation '${relationName}' on model '${modelName}' has incomplete join metadata (missing localFields or targetFields)`,
+    );
   }
 
   const relatedTableName = resolveModelTableName(contract, relation.to);
@@ -205,12 +210,14 @@ export function resolveModelTableName(
   contract: SqlContract<SqlStorage>,
   modelName: string,
 ): string {
-  const modelStorage = modelsOf(contract)[modelName]?.storage;
-  if (modelStorage && typeof modelStorage.table === 'string') {
-    return modelStorage.table;
+  const model = modelsOf(contract)[modelName];
+  if (!model) {
+    throw new Error(`Model "${modelName}" not found in contract`);
   }
-
-  throw new Error(`Model "${modelName}" is missing storage.table in the contract`);
+  if (model.storage && typeof model.storage.table === 'string') {
+    return model.storage.table;
+  }
+  throw new Error(`Model "${modelName}" has invalid or missing storage.table in the contract`);
 }
 
 export function resolvePrimaryKeyColumn(

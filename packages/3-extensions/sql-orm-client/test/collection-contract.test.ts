@@ -117,7 +117,9 @@ describe('collection-contract capability detection', () => {
       },
     } as unknown as typeof contract;
 
-    expect(() => resolveIncludeRelation(incompleteRelation, 'User', 'posts')).toThrow(/not found/);
+    expect(() => resolveIncludeRelation(incompleteRelation, 'User', 'posts')).toThrow(
+      /incomplete join metadata/,
+    );
   });
 
   it('resolveUpsertConflictColumns() maps explicit criteria and falls back to primary key', () => {
@@ -147,7 +149,7 @@ describe('collection-contract capability detection', () => {
 
     expect(resolveModelTableName(contract, 'User')).toBe('users');
     expect(() => resolveModelTableName(contract, 'UnknownModel')).toThrow(
-      'Model "UnknownModel" is missing storage.table in the contract',
+      'Model "UnknownModel" not found in contract',
     );
     expect(resolvePrimaryKeyColumn(contract, 'users')).toBe('id');
     expect(resolvePrimaryKeyColumn(contract, 'unknown_table')).toBe('id');
@@ -185,7 +187,7 @@ describe('collection-contract capability detection', () => {
     } as unknown as typeof contract;
 
     expect(() => resolveModelTableName(invalidStorageTable, 'User')).toThrow(
-      'Model "User" is missing storage.table in the contract',
+      'Model "User" has invalid or missing storage.table in the contract',
     );
   });
 
