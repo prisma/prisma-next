@@ -34,10 +34,14 @@ export function createMongoFamilyInstance(
 
     validateContractIR(contractJson: unknown): ContractIR {
       const validated = validateMongoContract<MongoContract>(contractJson);
+      // MongoContract and ContractIR share structure but are typed independently;
+      // validateMongoContract guarantees the shape, so the double cast is safe.
       return validated.contract as unknown as ContractIR;
     },
 
     async emitContract({ contractIR }): Promise<EmitContractResult> {
+      // The caller validates via validateContractIR before calling emitContract,
+      // so contractIR is guaranteed to be ContractIR at this point.
       const ir = contractIR as ContractIR;
 
       const result = await emit(
