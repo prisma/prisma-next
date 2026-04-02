@@ -49,7 +49,7 @@ const ModelDefinitionSchema = type({
   '+': 'reject',
   fields: type({ '[string]': FieldSchema }),
   storage: ModelStorageSchema,
-  relations: type({ '[string]': RelationSchema }),
+  'relations?': type({ '[string]': RelationSchema }),
   'discriminator?': DiscriminatorSchema,
   'variants?': type({ '[string]': VariantEntrySchema }),
   'base?': 'string',

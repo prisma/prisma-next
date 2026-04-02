@@ -25,7 +25,7 @@ type ModelRelations<
   ModelName extends string & keyof TContract['models'],
 > = NonNullable<TContract['models'][ModelName]['relations']>;
 
-type ReferenceRelationKeys<
+export type ReferenceRelationKeys<
   TContract extends MongoContract,
   ModelName extends string & keyof TContract['models'],
 > = {
@@ -37,7 +37,7 @@ type ReferenceRelationKeys<
     : never;
 }[keyof ModelRelations<TContract, ModelName>];
 
-type EmbedRelationKeys<
+export type EmbedRelationKeys<
   TContract extends MongoContract,
   ModelName extends string & keyof TContract['models'],
 > = {
@@ -57,7 +57,7 @@ type EmbedRelationRowType<
   readonly to: infer To extends string & keyof TContract['models'];
   readonly cardinality: infer C;
 }
-  ? TContract['models'][ModelName]['relations'][RelKey] extends DomainReferenceRelation
+  ? ModelRelations<TContract, ModelName>[RelKey] extends DomainReferenceRelation
     ? never
     : C extends '1:N'
       ? InferModelRow<TContract, To>[]
