@@ -498,7 +498,7 @@
         },
         "fields": {
           "type": "object",
-          "description": "Field definitions mapping model fields to storage columns",
+          "description": "Domain field metadata (codecId, nullable)",
           "additionalProperties": {
             "$ref": "#/$defs/ModelField"
           }

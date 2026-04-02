@@ -61,6 +61,11 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
       parts.push(`readonly cardinality: ${serializeValue(relObj['cardinality'])}`);
 
     const on = relObj['on'] as { localFields?: string[]; targetFields?: string[] } | undefined;
+    if (on && (!on.localFields || !on.targetFields)) {
+      throw new Error(
+        `Relation "${relName}" has an "on" block but is missing localFields or targetFields`,
+      );
+    }
     if (on?.localFields && on.targetFields) {
       const localFields = on.localFields.map((f) => serializeValue(f)).join(', ');
       const targetFields = on.targetFields.map((f) => serializeValue(f)).join(', ');
