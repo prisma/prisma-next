@@ -4,6 +4,7 @@ import type {
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
   ExtensionPackRef,
+  FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
 import {
@@ -89,17 +90,22 @@ type TypeHelpersFromNamespace<Namespace> = {
 type CoreFieldHelpers = Pick<typeof field, 'column' | 'generated' | 'namedType'>;
 
 export type ComposedAuthoringHelpers<
+  Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = {
   readonly field: CoreFieldHelpers &
     FieldHelpersFromNamespace<
-      ExtractFieldNamespaceFromPack<Target> & MergeExtensionFieldNamespaces<ExtensionPacks>
+      ExtractFieldNamespaceFromPack<Family> &
+        ExtractFieldNamespaceFromPack<Target> &
+        MergeExtensionFieldNamespaces<ExtensionPacks>
     >;
   readonly model: typeof model;
   readonly rel: typeof rel;
   readonly type: TypeHelpersFromNamespace<
-    ExtractTypeNamespaceFromPack<Target> & MergeExtensionTypeNamespaces<ExtensionPacks>
+    ExtractTypeNamespaceFromPack<Family> &
+      ExtractTypeNamespaceFromPack<Target> &
+      MergeExtensionTypeNamespaces<ExtensionPacks>
   >;
 };
 
@@ -161,66 +167,37 @@ function mergeHelperNamespaces(
   }
 }
 
-function composeTypeNamespace(
-  target: TargetPackRef<'sql', string>,
-  extensionPacks: Record<string, ExtensionPackRef<'sql', string>> | undefined,
-): AuthoringTypeNamespace {
+type AuthoringComponent = {
+  readonly authoring?: { readonly type?: unknown; readonly field?: unknown };
+};
+
+function composeTypeNamespace(components: readonly AuthoringComponent[]): AuthoringTypeNamespace {
   const merged: Record<string, unknown> = {};
-
-  mergeHelperNamespaces(
-    merged,
-    extractTypeNamespace(target),
-    [],
-    isAuthoringTypeConstructorDescriptor,
-    'type',
-  );
-
-  for (const pack of Object.values(extensionPacks ?? {})) {
-    mergeHelperNamespaces(
-      merged,
-      extractTypeNamespace(pack),
-      [],
-      isAuthoringTypeConstructorDescriptor,
-      'type',
-    );
+  for (const component of components) {
+    const ns = extractTypeNamespace(component);
+    if (Object.keys(ns).length > 0) {
+      mergeHelperNamespaces(merged, ns, [], isAuthoringTypeConstructorDescriptor, 'type');
+    }
   }
-
   return merged as AuthoringTypeNamespace;
 }
 
-function composeFieldNamespace(
-  target: TargetPackRef<'sql', string>,
-  extensionPacks: Record<string, ExtensionPackRef<'sql', string>> | undefined,
-): AuthoringFieldNamespace {
+function composeFieldNamespace(components: readonly AuthoringComponent[]): AuthoringFieldNamespace {
   const merged: Record<string, unknown> = {};
-
-  mergeHelperNamespaces(
-    merged,
-    extractFieldNamespace(target),
-    [],
-    isAuthoringFieldPresetDescriptor,
-    'field',
-  );
-
-  for (const pack of Object.values(extensionPacks ?? {})) {
-    mergeHelperNamespaces(
-      merged,
-      extractFieldNamespace(pack),
-      [],
-      isAuthoringFieldPresetDescriptor,
-      'field',
-    );
+  for (const component of components) {
+    const ns = extractFieldNamespace(component);
+    if (Object.keys(ns).length > 0) {
+      mergeHelperNamespaces(merged, ns, [], isAuthoringFieldPresetDescriptor, 'field');
+    }
   }
-
   return merged as AuthoringFieldNamespace;
 }
 
 function createComposedFieldHelpers(
-  target: TargetPackRef<'sql', string>,
-  extensionPacks: Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  components: readonly AuthoringComponent[],
 ): CoreFieldHelpers & Record<string, unknown> {
   const helperNamespace = createFieldHelpersFromNamespace(
-    composeFieldNamespace(target, extensionPacks),
+    composeFieldNamespace(components),
     ({ helperPath, descriptor }) =>
       createFieldPresetHelper({
         helperPath,
@@ -251,18 +228,24 @@ function createComposedFieldHelpers(
 }
 
 export function createComposedAuthoringHelpers<
+  Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 >(options: {
+  readonly family: Family;
   readonly target: Target;
   readonly extensionPacks?: ExtensionPacks;
-}): ComposedAuthoringHelpers<Target, ExtensionPacks> {
+}): ComposedAuthoringHelpers<Family, Target, ExtensionPacks> {
+  const components: readonly AuthoringComponent[] = [
+    options.family,
+    options.target,
+    ...Object.values(options.extensionPacks ?? {}),
+  ];
+
   return {
-    field: createComposedFieldHelpers(options.target, options.extensionPacks),
+    field: createComposedFieldHelpers(components),
     model,
     rel,
-    type: createTypeHelpersFromNamespace(
-      composeTypeNamespace(options.target, options.extensionPacks),
-    ),
-  } as ComposedAuthoringHelpers<Target, ExtensionPacks>;
+    type: createTypeHelpersFromNamespace(composeTypeNamespace(components)),
+  } as ComposedAuthoringHelpers<Family, Target, ExtensionPacks>;
 }

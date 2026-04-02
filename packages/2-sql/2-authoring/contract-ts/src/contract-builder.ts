@@ -1,4 +1,8 @@
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
+import type {
+  ExtensionPackRef,
+  FamilyPackRef,
+  TargetPackRef,
+} from '@prisma-next/contract/framework-components';
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
@@ -619,6 +623,7 @@ class SqlContractBuilder<
 }
 
 type StagedContractDefinition<
+  Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance>,
   Models extends Record<string, StagedModelLike>,
@@ -628,6 +633,7 @@ type StagedContractDefinition<
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
 > = {
+  readonly family: Family;
   readonly target: Target;
   readonly extensionPacks?: ExtensionPacks;
   readonly naming?: Naming;
@@ -639,6 +645,7 @@ type StagedContractDefinition<
 };
 
 type StagedContractScaffold<
+  Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined,
@@ -646,6 +653,7 @@ type StagedContractScaffold<
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
 > = {
+  readonly family: Family;
   readonly target: Target;
   readonly extensionPacks?: ExtensionPacks;
   readonly naming?: Naming;
@@ -655,11 +663,12 @@ type StagedContractScaffold<
 };
 
 type StagedContractFactory<
+  Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance>,
   Models extends Record<string, StagedModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-> = (helpers: ComposedAuthoringHelpers<Target, ExtensionPacks>) => {
+> = (helpers: ComposedAuthoringHelpers<Family, Target, ExtensionPacks>) => {
   readonly types?: Types;
   readonly models?: Models;
 };
@@ -668,6 +677,7 @@ export function defineContract<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 >(): SqlContractBuilder<CodecTypes>;
 export function defineContract<
+  const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
   const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   const Models extends Record<string, StagedModelLike> = Record<never, never>,
@@ -680,6 +690,7 @@ export function defineContract<
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
 >(
   definition: StagedContractDefinition<
+    Family,
     Target,
     Types,
     Models,
@@ -691,6 +702,7 @@ export function defineContract<
   >,
 ): SqlContractResult<
   StagedContractDefinition<
+    Family,
     Target,
     Types,
     Models,
@@ -702,6 +714,7 @@ export function defineContract<
   >
 >;
 export function defineContract<
+  const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
   const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   const Models extends Record<string, StagedModelLike> = Record<never, never>,
@@ -714,6 +727,7 @@ export function defineContract<
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
 >(
   definition: StagedContractScaffold<
+    Family,
     Target,
     ExtensionPacks,
     Capabilities,
@@ -721,9 +735,10 @@ export function defineContract<
     StorageHash,
     ForeignKeyDefaults
   >,
-  factory: StagedContractFactory<Target, Types, Models, ExtensionPacks>,
+  factory: StagedContractFactory<Family, Target, Types, Models, ExtensionPacks>,
 ): SqlContractResult<
   StagedContractDefinition<
+    Family,
     Target,
     Types,
     Models,
@@ -739,6 +754,7 @@ export function defineContract<
 >(
   definition?: StagedContractInput,
   factory?: StagedContractFactory<
+    FamilyPackRef<string>,
     TargetPackRef<'sql', string>,
     Record<string, StorageTypeInstance>,
     Record<string, StagedModelLike>,
@@ -751,6 +767,7 @@ export function defineContract<
         ...definition,
         ...factory(
           createComposedAuthoringHelpers({
+            family: definition.family,
             target: definition.target,
             extensionPacks: definition.extensionPacks,
           }),

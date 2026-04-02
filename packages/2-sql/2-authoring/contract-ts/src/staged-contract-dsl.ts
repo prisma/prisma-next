@@ -1,6 +1,7 @@
 import type {
   AuthoringFieldPresetDescriptor,
   ExtensionPackRef,
+  FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
 import { instantiateAuthoringFieldPreset } from '@prisma-next/contract/framework-components';
@@ -1171,6 +1172,7 @@ function normalizeRelationModelSource(
 }
 
 export type StagedContractInput<
+  Family extends FamilyPackRef<string> = FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string> = TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   Models extends Record<
@@ -1186,6 +1188,7 @@ export type StagedContractInput<
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > = {
+  readonly family: Family;
   readonly target: Target;
   readonly extensionPacks?: ExtensionPacks;
   readonly naming?: NamingConfig;
@@ -1389,12 +1392,20 @@ export const field = {
 } & FieldHelpersFromNamespace<typeof portableSqlAuthoringFieldPresets>;
 
 export function isStagedContractInput(value: unknown): value is StagedContractInput {
-  if (typeof value !== 'object' || value === null || !('target' in value)) {
+  if (typeof value !== 'object' || value === null || !('target' in value) || !('family' in value)) {
     return false;
   }
   const target = (value as { target: unknown }).target;
+  const family = (value as { family: unknown }).family;
   return (
-    typeof target === 'object' && target !== null && 'kind' in target && target.kind === 'target'
+    typeof target === 'object' &&
+    target !== null &&
+    'kind' in target &&
+    target.kind === 'target' &&
+    typeof family === 'object' &&
+    family !== null &&
+    'kind' in family &&
+    family.kind === 'family'
   );
 }
 
