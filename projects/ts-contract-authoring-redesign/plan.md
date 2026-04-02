@@ -50,6 +50,7 @@ Prepare the repo to adopt the new surface and clean up transient project artifac
 - [ ] Update package docs and one representative example to the staged contract DSL surface.
 - [ ] Decide which remaining high-level field helpers ship now versus follow-on slices and document any temporary gaps.
 - [ ] Verify all acceptance criteria against implemented tests and any required manual checks.
+- [ ] Remove the word "staged" from all public types, file names, and internal helpers in `packages/2-sql/2-authoring/contract-ts/`. Key renames: `StagedContractInput` → `ContractInput`, `StagedModelBuilder` → `ModelBuilder`, `isStagedContractInput` → `isContractInput`, `staged-contract-dsl.ts` → `contract-dsl.ts`, `staged-contract-lowering.ts` → `contract-lowering.ts`, `staged-contract-warnings.ts` → `contract-warnings.ts`, `staged-contract-types.ts` → `contract-types.ts`. Rename test files to match. Update ADR 181 title and filename. Update references in plan.md and spec.md.
 - [ ] Finalize any long-lived docs or ADR updates needed outside `projects/`.
 - [ ] Remove repo-wide references to `projects/ts-contract-authoring-redesign/**` during close-out and delete the transient project folder.
 
