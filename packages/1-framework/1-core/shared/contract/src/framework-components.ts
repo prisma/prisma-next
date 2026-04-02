@@ -1,3 +1,4 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { RenderTypeContext, TypesImportSpec } from './types';
 
 /**
@@ -560,16 +561,18 @@ export function instantiateAuthoringFieldPreset(
   return {
     descriptor: resolveAuthoringStorageTypeTemplate(descriptor.output, args),
     nullable: descriptor.output.nullable ?? false,
-    ...(descriptor.output.default === undefined
-      ? {}
-      : {
-          default: resolveAuthoringColumnDefaultTemplate(descriptor.output.default, args),
-        }),
-    ...(descriptor.output.executionDefault === undefined
-      ? {}
-      : {
-          executionDefault: resolveAuthoringTemplateValue(descriptor.output.executionDefault, args),
-        }),
+    ...ifDefined(
+      'default',
+      descriptor.output.default !== undefined
+        ? resolveAuthoringColumnDefaultTemplate(descriptor.output.default, args)
+        : undefined,
+    ),
+    ...ifDefined(
+      'executionDefault',
+      descriptor.output.executionDefault !== undefined
+        ? resolveAuthoringTemplateValue(descriptor.output.executionDefault, args)
+        : undefined,
+    ),
     id: descriptor.output.id ?? false,
     unique: descriptor.output.unique ?? false,
   };

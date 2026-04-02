@@ -404,6 +404,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../operations
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
