@@ -186,12 +186,6 @@ Lowering validates the contract graph and produces actionable error messages for
 - **Coexisting surfaces.** The chain builder and the contract DSL both remain available until the old surface is deprecated.
 - **Type-level complexity.** `SqlContractResult<Definition>` uses conditional and mapped types that can be harder to debug. Mitigation: keep authoring-time types shallow and opaque, push graph-wide inference to build/emit time.
 
-### Known limitations
-
-- **Field presets bypass pack composition.** The `field` export provides presets without pack context — a layering violation. The authoring DSL should receive presets from composition, not import them. The fix requires the SQL family package to sit above the authoring layer so the DSL cannot import presets directly.
-- **No-emit type propagation.** `SqlContractResult<Definition>` derives full contract types from the TS-authored definition, but literal type propagation through `createExecutionContext` does not yet reduce. The no-emit path currently depends on emitted `.d.ts` types.
-- **Semantic IR convergence.** `SqlSemanticContractDefinition` and the runtime-side `DomainModel` representation both describe "a contract organized by models" — one built working forward from authoring, the other working backward from `ContractIR`. They converge to a single model-first type in [ADR 182](ADR%20182%20-%20Unified%20contract%20representation.md).
-
 ## Related ADRs
 
 - [ADR 096 — TS-authored contract parity & purity rules](ADR%20096%20-%20TS-authored%20contract%20parity%20&%20purity%20rules.md) — contracts must be pure data with deterministic canonicalization
