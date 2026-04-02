@@ -92,12 +92,17 @@ export interface AuthoringContributions {
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'arg' &&
-    typeof (value as { index?: unknown }).index === 'number'
-  );
+  if (typeof value !== 'object' || value === null || (value as { kind?: unknown }).kind !== 'arg') {
+    return false;
+  }
+  const { index, path } = value as { index?: unknown; path?: unknown };
+  if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) {
+    return false;
+  }
+  if (path !== undefined && (!Array.isArray(path) || path.some((s) => typeof s !== 'string'))) {
+    return false;
+  }
+  return true;
 }
 
 function isAuthoringTemplateRecord(value: unknown): value is Record<string, unknown> {
@@ -110,7 +115,9 @@ export function isAuthoringTypeConstructorDescriptor(
   return (
     typeof value === 'object' &&
     value !== null &&
-    (value as { kind?: unknown }).kind === 'typeConstructor'
+    (value as { kind?: unknown }).kind === 'typeConstructor' &&
+    typeof (value as { output?: unknown }).output === 'object' &&
+    (value as { output?: unknown }).output !== null
   );
 }
 
@@ -120,7 +127,9 @@ export function isAuthoringFieldPresetDescriptor(
   return (
     typeof value === 'object' &&
     value !== null &&
-    (value as { kind?: unknown }).kind === 'fieldPreset'
+    (value as { kind?: unknown }).kind === 'fieldPreset' &&
+    typeof (value as { output?: unknown }).output === 'object' &&
+    (value as { output?: unknown }).output !== null
   );
 }
 
@@ -181,8 +190,13 @@ function validateAuthoringArgument(
   }
 
   if (descriptor.kind === 'stringArray') {
-    if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
+    if (!Array.isArray(value)) {
       throw new Error(`Authoring helper argument at ${path} must be an array of strings`);
+    }
+    for (const entry of value) {
+      if (typeof entry !== 'string') {
+        throw new Error(`Authoring helper argument at ${path} must be an array of strings`);
+      }
     }
     return;
   }

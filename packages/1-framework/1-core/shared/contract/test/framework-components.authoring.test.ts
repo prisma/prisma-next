@@ -3,6 +3,7 @@ import type { AuthoringTypeConstructorDescriptor } from '../src/framework-author
 import {
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
+  isAuthoringArgRef,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
   resolveAuthoringTemplateValue,
@@ -26,6 +27,22 @@ describe('authoring template resolution', () => {
       }),
     ).toBe(true);
     expect(isAuthoringFieldPresetDescriptor({ kind: 'typeConstructor' })).toBe(false);
+  });
+
+  it('rejects descriptors without output property', () => {
+    expect(isAuthoringTypeConstructorDescriptor({ kind: 'typeConstructor' })).toBe(false);
+    expect(isAuthoringFieldPresetDescriptor({ kind: 'fieldPreset' })).toBe(false);
+  });
+
+  it('rejects arg refs with invalid index or path', () => {
+    expect(isAuthoringArgRef({ kind: 'arg', index: 0 })).toBe(true);
+    expect(isAuthoringArgRef({ kind: 'arg', index: 0, path: ['a', 'b'] })).toBe(true);
+
+    expect(isAuthoringArgRef({ kind: 'arg', index: -1 })).toBe(false);
+    expect(isAuthoringArgRef({ kind: 'arg', index: 1.5 })).toBe(false);
+    expect(isAuthoringArgRef({ kind: 'arg', index: Number.NaN })).toBe(false);
+    expect(isAuthoringArgRef({ kind: 'arg', index: 0, path: [1] })).toBe(false);
+    expect(isAuthoringArgRef({ kind: 'arg', index: 0, path: 'not-array' })).toBe(false);
   });
 
   it('resolves array template values', () => {
@@ -95,6 +112,12 @@ describe('authoring template resolution', () => {
 
     expect(() =>
       validateAuthoringHelperArguments('field.test', [{ kind: 'stringArray' }], [['ok', 1]]),
+    ).toThrow(/must be an array of strings/);
+
+    const sparseArray = new Array(2);
+    sparseArray[1] = 'id';
+    expect(() =>
+      validateAuthoringHelperArguments('field.test', [{ kind: 'stringArray' }], [sparseArray]),
     ).toThrow(/must be an array of strings/);
 
     expect(() =>
