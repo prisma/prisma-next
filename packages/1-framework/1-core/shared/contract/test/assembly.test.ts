@@ -4,7 +4,7 @@ import {
   assembleAuthoringContributions,
   assembleComponents,
   extractCodecTypeImports,
-  extractExtensionIds,
+  extractComponentIds,
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,
@@ -102,9 +102,9 @@ describe('extractQueryOperationTypeImports', () => {
   });
 });
 
-describe('extractExtensionIds', () => {
+describe('extractComponentIds', () => {
   it('collects IDs in order: family, target, adapter, extensions', () => {
-    const result = extractExtensionIds(
+    const result = extractComponentIds(
       { id: 'family-1' },
       { id: 'target-1' },
       { id: 'adapter-1' },
@@ -114,14 +114,14 @@ describe('extractExtensionIds', () => {
   });
 
   it('deduplicates IDs preserving first occurrence', () => {
-    const result = extractExtensionIds({ id: 'shared' }, { id: 'shared' }, { id: 'shared' }, [
+    const result = extractComponentIds({ id: 'shared' }, { id: 'shared' }, { id: 'shared' }, [
       { id: 'shared' },
     ]);
     expect(result).toEqual(['shared']);
   });
 
   it('handles undefined adapter', () => {
-    const result = extractExtensionIds({ id: 'fam' }, { id: 'target' }, undefined, [{ id: 'ext' }]);
+    const result = extractComponentIds({ id: 'fam' }, { id: 'target' }, undefined, [{ id: 'ext' }]);
     expect(result).toEqual(['fam', 'target', 'ext']);
   });
 });
