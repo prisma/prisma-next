@@ -115,7 +115,7 @@ type ShouldInsertSnakeUnderscore<
 > = CharKind<Current> extends 'upper'
   ? PrevKind extends 'start'
     ? false
-    : PrevKind extends 'lower'
+    : PrevKind extends 'lower' | 'other'
       ? true
       : CharKind<Next> extends 'lower'
         ? true
