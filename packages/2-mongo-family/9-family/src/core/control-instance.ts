@@ -1,4 +1,3 @@
-import type { AssembledComponentState } from '@prisma-next/contract/assembly';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
@@ -8,6 +7,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-core';
 import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
@@ -20,9 +20,9 @@ export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo
 class MongoFamilyInstance implements MongoControlFamilyInstance {
   readonly familyId = 'mongo' as const;
 
-  private readonly assembledState: AssembledComponentState;
+  private readonly assembledState: ControlStack;
 
-  constructor(assembledState: AssembledComponentState) {
+  constructor(assembledState: ControlStack) {
     this.assembledState = assembledState;
   }
 
@@ -95,7 +95,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
 }
 
 export function createMongoFamilyInstance(
-  assembledState: AssembledComponentState,
+  assembledState: ControlStack,
 ): MongoControlFamilyInstance {
   return new MongoFamilyInstance(assembledState);
 }

@@ -15,6 +15,7 @@
   "dependencies": {
     "@prisma-next/adapter-mongo": "workspace:*",
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/driver-mongo": "workspace:*",
     "@prisma-next/mongo-core": "workspace:*",
     "@prisma-next/mongo-orm": "workspace:*",

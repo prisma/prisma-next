@@ -1,8 +1,8 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { assembleComponents } from '@prisma-next/contract/assembly';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import { MongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
+import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 
 const blogIR: ContractIR = {
   schemaVersion: '1',
@@ -60,14 +60,15 @@ const blogIR: ContractIR = {
 };
 
 async function main() {
-  const familyDescriptor = new MongoFamilyDescriptor();
-
-  const assembledState = assembleComponents({
-    family: familyDescriptor,
+  const controlStack = createControlStack({
+    family: mongoFamilyDescriptor,
     target: mongoTargetDescriptor,
   });
 
-  const instance = familyDescriptor.create({ target: mongoTargetDescriptor }, assembledState);
+  const instance = mongoFamilyDescriptor.create(
+    { target: mongoTargetDescriptor } as never,
+    controlStack,
+  );
 
   const result = await instance.emitContract({ contractIR: blogIR });
 

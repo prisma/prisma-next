@@ -103,6 +103,9 @@ importers:
       '@prisma-next/driver-mongo':
         specifier: workspace:*
         version: link:../../packages/3-mongo-target/3-mongo-driver
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/1-core/shared/framework-components
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/1-core
@@ -1017,6 +1020,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/emitter
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/framework-components
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../1-core
