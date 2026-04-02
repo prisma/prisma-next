@@ -1,65 +1,31 @@
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-
-const blogIR: ContractIR = {
-  schemaVersion: '1',
-  targetFamily: 'mongo',
-  target: 'mongo',
-  roots: {
-    users: 'User',
-    posts: 'Post',
-  },
-  models: {
-    User: {
-      fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        name: { codecId: 'mongo/string@1', nullable: false },
-        email: { codecId: 'mongo/string@1', nullable: false },
-        bio: { codecId: 'mongo/string@1', nullable: true },
-      },
-      relations: {
-        posts: {
-          to: 'Post',
-          cardinality: '1:N',
-          on: { localFields: ['_id'], targetFields: ['authorId'] },
-        },
-      },
-      storage: { collection: 'users' },
-    },
-    Post: {
-      fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        title: { codecId: 'mongo/string@1', nullable: false },
-        content: { codecId: 'mongo/string@1', nullable: false },
-        authorId: { codecId: 'mongo/objectId@1', nullable: false },
-        createdAt: { codecId: 'mongo/date@1', nullable: false },
-      },
-      relations: {
-        author: {
-          to: 'User',
-          cardinality: 'N:1',
-          on: { localFields: ['authorId'], targetFields: ['_id'] },
-        },
-      },
-      storage: { collection: 'posts' },
-    },
-  },
-  storage: {
-    collections: {
-      users: {},
-      posts: {},
-    },
-  },
-  extensionPacks: {},
-  capabilities: {},
-  meta: {},
-  sources: {},
-};
+import {
+  createMongoScalarTypeDescriptors,
+  interpretPslDocumentToMongoContractIR,
+} from '@prisma-next/mongo-contract-psl';
+import { parsePslDocument } from '@prisma-next/psl-parser';
 
 async function main() {
+  const schemaPath = resolve(import.meta.dirname, '..', 'prisma', 'schema.psl');
+  const schema = readFileSync(schemaPath, 'utf-8');
+
+  const document = parsePslDocument({ schema, sourceId: 'prisma/schema.psl' });
+  const interpreted = interpretPslDocumentToMongoContractIR({
+    document,
+    scalarTypeDescriptors: createMongoScalarTypeDescriptors(),
+  });
+
+  if (!interpreted.ok) {
+    console.error('Schema interpretation failed:');
+    for (const d of interpreted.failure.diagnostics) {
+      console.error(`  [${d.code}] ${d.message}`);
+    }
+    process.exit(1);
+  }
+
   const controlStack = createControlStack({
     family: mongoFamilyDescriptor,
     target: mongoTargetDescriptor,
@@ -67,10 +33,10 @@ async function main() {
 
   const instance = mongoFamilyDescriptor.create(controlStack);
 
-  const result = await instance.emitContract({ contractIR: blogIR });
+  const result = await instance.emitContract({ contractIR: interpreted.value });
 
   const srcDir = resolve(import.meta.dirname, '..', 'src');
-  writeFileSync(resolve(srcDir, 'contract.json'), result.contractJson + '\n');
+  writeFileSync(resolve(srcDir, 'contract.json'), `${result.contractJson}\n`);
   writeFileSync(resolve(srcDir, 'contract.d.ts'), result.contractDts);
   console.log('Generated contract.json and contract.d.ts in src/');
 }

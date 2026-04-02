@@ -128,6 +128,12 @@ importers:
       '@prisma-next/family-mongo':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/9-family
+      '@prisma-next/mongo-contract-psl':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/2-authoring/contract-psl
+      '@prisma-next/psl-parser':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/2-authoring/psl-parser
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../test/utils
