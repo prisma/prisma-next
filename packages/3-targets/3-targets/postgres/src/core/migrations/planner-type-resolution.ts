@@ -13,10 +13,10 @@ export function resolveColumnTypeMetadata(
     return column;
   }
 
-  if (!Object.hasOwn(storageTypes, column.typeRef)) {
+  const referencedType = storageTypes[column.typeRef];
+  if (!referencedType) {
     return column;
   }
-  const referencedType = storageTypes[column.typeRef];
 
   return {
     codecId: referencedType.codecId,

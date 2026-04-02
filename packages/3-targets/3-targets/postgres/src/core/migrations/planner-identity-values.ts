@@ -12,10 +12,7 @@ export function resolveIdentityValue(
   codecHooks: Map<string, CodecControlHooks>,
   storageTypes: Record<string, StorageTypeInstance> = {},
 ): string | null {
-  const referencedType =
-    column.typeRef && Object.hasOwn(storageTypes, column.typeRef)
-      ? storageTypes[column.typeRef]
-      : undefined;
+  const referencedType = column.typeRef ? storageTypes[column.typeRef] : undefined;
   const codecId = referencedType?.codecId ?? column.codecId;
   const nativeType = referencedType?.nativeType ?? column.nativeType;
   const typeParams = referencedType?.typeParams ?? column.typeParams;
