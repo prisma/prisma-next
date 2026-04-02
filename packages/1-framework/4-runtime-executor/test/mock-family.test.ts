@@ -1,5 +1,4 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import { createOperationRegistry } from '@prisma-next/operations';
 import { describe, expect, it } from 'vitest';
 import type { Plugin } from '../src/plugins/types';
 import { createRuntimeCore } from '../src/runtime-core';
@@ -106,13 +105,10 @@ describe('runtime-core with mock family', () => {
     const markerReader = new MockMarkerReader();
     const familyAdapter = new MockFamilyAdapter(contract, markerReader);
     const driver = new MockDriver();
-    const operationRegistry = createOperationRegistry();
-
     const runtime = createRuntimeCore({
       familyAdapter,
       driver,
       verify: { mode: 'onFirstUse', requireMarker: false },
-      operationRegistry,
     });
 
     const plan: ExecutionPlan = {
@@ -147,13 +143,10 @@ describe('runtime-core with mock family', () => {
     const markerReader = new MockMarkerReader();
     const familyAdapter = new MockFamilyAdapter(contract, markerReader);
     const driver = new MockDriver();
-    const operationRegistry = createOperationRegistry();
-
     const runtime = createRuntimeCore({
       familyAdapter,
       driver,
       verify: { mode: 'onFirstUse', requireMarker: false },
-      operationRegistry,
     });
 
     const invalidPlan: ExecutionPlan = {
@@ -186,8 +179,6 @@ describe('runtime-core with mock family', () => {
     const markerReader = new MockMarkerReader();
     const familyAdapter = new MockFamilyAdapter(contract, markerReader);
     const driver = new MockDriver();
-    const operationRegistry = createOperationRegistry();
-
     let beforeExecuteCalled = false;
     let onRowCalled = false;
     let afterExecuteCalled = false;
@@ -217,7 +208,6 @@ describe('runtime-core with mock family', () => {
       familyAdapter,
       driver,
       verify: { mode: 'onFirstUse', requireMarker: false },
-      operationRegistry,
       plugins: [plugin],
     });
 
@@ -243,28 +233,6 @@ describe('runtime-core with mock family', () => {
     expect(afterExecuteCalled).toBe(true);
   });
 
-  it('provides operation registry', () => {
-    const contract: MockContract = {
-      target: 'mock',
-      targetFamily: 'mock',
-      storageHash: 'sha256:test-core',
-    };
-
-    const markerReader = new MockMarkerReader();
-    const familyAdapter = new MockFamilyAdapter(contract, markerReader);
-    const driver = new MockDriver();
-    const operationRegistry = createOperationRegistry();
-
-    const runtime = createRuntimeCore({
-      familyAdapter,
-      driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      operationRegistry,
-    });
-
-    expect(runtime.operations()).toBe(operationRegistry);
-  });
-
   it('closes driver', async () => {
     const contract: MockContract = {
       target: 'mock',
@@ -275,13 +243,10 @@ describe('runtime-core with mock family', () => {
     const markerReader = new MockMarkerReader();
     const familyAdapter = new MockFamilyAdapter(contract, markerReader);
     const driver = new MockDriver();
-    const operationRegistry = createOperationRegistry();
-
     const runtime = createRuntimeCore({
       familyAdapter,
       driver,
       verify: { mode: 'onFirstUse', requireMarker: false },
-      operationRegistry,
     });
 
     await expect(runtime.close()).resolves.toBeUndefined();

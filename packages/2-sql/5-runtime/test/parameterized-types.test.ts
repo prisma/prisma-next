@@ -133,7 +133,6 @@ describe('parameterized types', () => {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
         codecs: () => registry,
-        operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
         create() {
           return {
@@ -259,7 +258,6 @@ describe('parameterized types', () => {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
         codecs: () => registry,
-        operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
         create() {
           return {
@@ -318,7 +316,6 @@ describe('parameterized types', () => {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
         codecs: () => registry,
-        operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
         create() {
           return {
@@ -381,7 +378,6 @@ describe('parameterized types', () => {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
         codecs: () => registry,
-        operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
         create() {
           return {
@@ -440,7 +436,6 @@ describe('parameterized types', () => {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
         codecs: () => registry,
-        operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
         create() {
           return {
@@ -505,7 +500,6 @@ describe('parameterized types', () => {
           familyId: 'sql' as const,
           targetId: 'postgres' as const,
           codecs: () => createCodecRegistry(),
-          operationSignatures: () => [],
           parameterizedCodecs: () => parameterizedCodecs,
           create() {
             return {

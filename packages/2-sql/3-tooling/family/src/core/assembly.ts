@@ -5,8 +5,6 @@ import type {
 } from '@prisma-next/contract/framework-components';
 import { normalizeRenderer } from '@prisma-next/contract/framework-components';
 import type { TypesImportSpec } from '@prisma-next/contract/types';
-import type { OperationRegistry } from '@prisma-next/operations';
-import { createOperationRegistry } from '@prisma-next/operations';
 import type {
   CodecControlHooks,
   ControlMutationDefaultFunctionEntry,
@@ -59,21 +57,6 @@ export interface AssembledControlMutationDefaultContributions {
 export interface AssembledPslInterpretationContributions
   extends AssembledControlMutationDefaultContributions {
   readonly scalarTypeDescriptors: ReadonlyMap<string, PslScalarTypeDescriptor>;
-}
-
-export function assembleOperationRegistry(
-  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
-): OperationRegistry {
-  const registry = createOperationRegistry();
-
-  for (const descriptor of descriptors) {
-    const signatures = descriptor.operationSignatures();
-    for (const signature of signatures) {
-      registry.register(signature);
-    }
-  }
-
-  return registry;
 }
 
 interface DescriptorWithTypes {

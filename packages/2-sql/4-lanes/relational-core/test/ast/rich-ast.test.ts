@@ -31,15 +31,19 @@ import {
 } from '../../src/exports/ast';
 import { shiftParamRef } from './test-helpers';
 
-const stringReturn = { kind: 'builtin', type: 'string' } as const;
+const stringReturn = { codecId: 'core/text', nullable: false } as const;
 function lowerEmail(column: ColumnRef, ...args: Array<AnyOperationArg>) {
-  return OperationExpr.function({
+  return new OperationExpr({
     method: 'lower',
     forTypeId: 'pg/text@1',
     self: column,
     args,
     returns: stringReturn,
-    template: 'lower({{self}})',
+    lowering: {
+      targetFamily: 'sql',
+      strategy: 'function',
+      template: 'lower({{self}})',
+    },
   });
 }
 

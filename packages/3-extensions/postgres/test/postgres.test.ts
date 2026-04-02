@@ -35,10 +35,6 @@ vi.mock('@prisma-next/sql-orm-client', () => ({
   orm: vi.fn(() => ({ lane: 'orm' })),
 }));
 
-vi.mock('@prisma-next/sql-relational-core/schema', () => ({
-  schema: vi.fn(() => ({ tables: { user: { columns: {} } } })),
-}));
-
 vi.mock('@prisma-next/target-postgres/runtime', () => ({
   default: { id: 'target-postgres' },
 }));

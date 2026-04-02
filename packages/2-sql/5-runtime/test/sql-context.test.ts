@@ -1,6 +1,6 @@
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
+import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
@@ -52,13 +52,12 @@ function createTestExtensionDescriptor(options?: {
       })()
     : createCodecRegistry();
 
-  const operationsArray: ReadonlyArray<SqlOperationSignature> = hasOperations
+  const operationsArray: ReadonlyArray<SqlOperationDescriptor> = hasOperations
     ? [
         {
-          forTypeId: 'test/ext@1',
           method: 'testOp',
-          args: [],
-          returns: { kind: 'builtin' as const, type: 'number' as const },
+          args: [{ codecId: 'test/ext@1', nullable: false }],
+          returns: { codecId: 'test/ext@1', nullable: false },
           lowering: {
             targetFamily: 'sql' as const,
             strategy: 'function' as const,
@@ -75,7 +74,7 @@ function createTestExtensionDescriptor(options?: {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => codecRegistry,
-    operationSignatures: () => operationsArray,
+    queryOperations: () => operationsArray,
     parameterizedCodecs: () => [],
     create() {
       return {
@@ -105,7 +104,7 @@ describe('createExecutionContext', () => {
 
     expect(context.contract).toBe(testContract);
     expect(context.codecs.has('pg/int4@1')).toBe(true);
-    expect(context.operations).toBeDefined();
+    expect(context.queryOperations).toBeDefined();
   });
 
   it('creates context with empty extension packs', () => {
@@ -138,9 +137,8 @@ describe('createExecutionContext', () => {
       }),
     });
 
-    const ops = context.operations.byType('test/ext@1');
-    expect(ops.length).toBe(1);
-    expect(ops[0]?.method).toBe('testOp');
+    const entries = context.queryOperations.entries();
+    expect(entries['testOp']).toBeDefined();
   });
 
   it('handles extension with no contributions', () => {
@@ -168,12 +166,11 @@ describe('comprehensive descriptor-based derivation', () => {
       }),
     );
 
-    const targetOps: SqlOperationSignature[] = [
+    const targetOps: SqlOperationDescriptor[] = [
       {
-        forTypeId: 'target/special@1',
         method: 'targetOp',
-        args: [],
-        returns: { kind: 'builtin' as const, type: 'string' as const },
+        args: [{ codecId: 'target/special@1', nullable: false }],
+        returns: { codecId: 'target/special@1', nullable: false },
         lowering: {
           targetFamily: 'sql' as const,
           strategy: 'function' as const,
@@ -189,7 +186,7 @@ describe('comprehensive descriptor-based derivation', () => {
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
       codecs: () => targetCodecRegistry,
-      operationSignatures: () => targetOps,
+      queryOperations: () => targetOps,
       parameterizedCodecs: () => [],
       create() {
         return { familyId: 'sql' as const, targetId: 'postgres' as const };
@@ -208,10 +205,9 @@ describe('comprehensive descriptor-based derivation', () => {
     expect(context.codecs.has('pg/int4@1')).toBe(true);
     expect(context.codecs.has('test/ext@1')).toBe(true);
 
-    expect(context.operations.byType('target/special@1').length).toBe(1);
-    expect(context.operations.byType('target/special@1')[0]?.method).toBe('targetOp');
-    expect(context.operations.byType('test/ext@1').length).toBe(1);
-    expect(context.operations.byType('test/ext@1')[0]?.method).toBe('testOp');
+    const entries = context.queryOperations.entries();
+    expect(entries['targetOp']).toBeDefined();
+    expect(entries['testOp']).toBeDefined();
   });
 });
 

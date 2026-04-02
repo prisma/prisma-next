@@ -148,7 +148,6 @@ export async function emit(
   targetFamily: TargetFamilyHook,
 ): Promise<EmitResult> {
   const {
-    operationRegistry,
     codecTypeImports,
     operationTypeImports,
     extensionIds,
@@ -160,7 +159,6 @@ export async function emit(
   validateCoreStructure(ir);
 
   const ctx: ValidationContext = {
-    ...ifDefined('operationRegistry', operationRegistry),
     ...ifDefined('codecTypeImports', codecTypeImports),
     ...ifDefined('operationTypeImports', operationTypeImports),
     ...ifDefined('extensionIds', extensionIds),

@@ -15,7 +15,6 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
@@ -28,7 +27,6 @@ import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
-  assembleOperationRegistry,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
@@ -166,7 +164,6 @@ interface SqlTypeMetadata {
 type SqlTypeMetadataRegistry = Map<string, SqlTypeMetadata>;
 
 interface SqlFamilyInstanceState {
-  readonly operationRegistry: OperationRegistry;
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
@@ -295,7 +292,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
   const descriptors: SqlControlDescriptorWithContributions[] = [target, adapter, ...extensions];
 
-  const operationRegistry = assembleOperationRegistry(descriptors);
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const queryOperationTypeImports = extractQueryOperationTypeImports(descriptors);
@@ -329,7 +325,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
   return {
     familyId: 'sql',
-    operationRegistry,
     codecTypeImports,
     operationTypeImports,
     extensionIds,
@@ -738,7 +733,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         normalizedIR,
         {
           outputDir: '',
-          operationRegistry,
           codecTypeImports,
           operationTypeImports,
           queryOperationTypeImports,

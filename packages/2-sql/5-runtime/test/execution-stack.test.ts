@@ -28,7 +28,6 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => registry,
-    operationSignatures: () => [],
     parameterizedCodecs: () => [],
     create() {
       return Object.assign(
@@ -60,7 +59,6 @@ function createStubTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => createCodecRegistry(),
-    operationSignatures: () => [],
     parameterizedCodecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
@@ -81,10 +79,9 @@ function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgre
 
   const operations = [
     {
-      forTypeId: 'pg/text@1',
       method: 'example',
-      args: [],
-      returns: { kind: 'builtin' as const, type: 'string' as const },
+      args: [] as const,
+      returns: { codecId: 'pg/text@1', nullable: false },
       lowering: {
         targetFamily: 'sql' as const,
         strategy: 'function' as const,
@@ -100,7 +97,7 @@ function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgre
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => registry,
-    operationSignatures: () => operations,
+    queryOperations: () => operations,
     parameterizedCodecs: () => [],
     create() {
       return {
@@ -139,7 +136,7 @@ describe('createExecutionStack', () => {
     expect(context.contract).toBe(contract);
     expect(context.codecs.get('pg/text@1')).toBeDefined();
     expect(context.codecs.get('pg/uuid@1')).toBeDefined();
-    expect(context.operations.byType('pg/text@1')).toHaveLength(1);
+    expect(context.queryOperations.entries()['example']).toBeDefined();
     expect(context.types).toEqual({});
   });
 });

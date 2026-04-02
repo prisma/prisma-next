@@ -9,7 +9,7 @@ import {
   TableSource,
 } from '../../src/exports/ast';
 
-export const stringReturn = { kind: 'builtin', type: 'string' } as const;
+export const stringReturn = { codecId: 'core/text', nullable: false } as const;
 
 export function table(name: string, alias?: string): TableSource {
   return TableSource.named(name, alias);
@@ -36,13 +36,17 @@ export function lit(value: unknown): LiteralExpr {
 }
 
 export function lowerExpr(column: ColumnRef, ...args: Array<AnyOperationArg>): OperationExpr {
-  return OperationExpr.function({
+  return new OperationExpr({
     method: 'lower',
     forTypeId: 'pg/text@1',
     self: column,
     args,
     returns: stringReturn,
-    template: 'lower({{self}})',
+    lowering: {
+      targetFamily: 'sql',
+      strategy: 'function',
+      template: 'lower({{self}})',
+    },
   });
 }
 

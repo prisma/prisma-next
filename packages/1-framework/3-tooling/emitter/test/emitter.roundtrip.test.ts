@@ -6,7 +6,6 @@ import type {
 } from '@prisma-next/contract/types';
 import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
 import { emit } from '@prisma-next/core-control-plane/emission';
-import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createContractIR } from './utils';
@@ -100,14 +99,11 @@ describe('emitter round-trip', () => {
         },
       });
 
-      // Create minimal test data (emitter tests don't load packs)
-      const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitOptions = {
         outputDir: '',
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,
@@ -197,14 +193,11 @@ describe('emitter round-trip', () => {
       },
     });
 
-    // Create minimal test data (emitter tests don't load packs)
-    const operationRegistry = createOperationRegistry();
     const codecTypeImports: TypesImportSpec[] = [];
     const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres'];
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports,
       operationTypeImports,
       extensionIds,
@@ -256,14 +249,11 @@ describe('emitter round-trip', () => {
       },
     });
 
-    // Create minimal test data (emitter tests don't load packs)
-    const operationRegistry = createOperationRegistry();
     const codecTypeImports: TypesImportSpec[] = [];
     const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres', 'pg'];
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports,
       operationTypeImports,
       extensionIds,
@@ -331,14 +321,11 @@ describe('emitter round-trip', () => {
       },
     });
 
-    // Create minimal test data (emitter tests don't load packs)
-    const operationRegistry = createOperationRegistry();
     const codecTypeImports: TypesImportSpec[] = [];
     const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres', 'pg'];
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports,
       operationTypeImports,
       extensionIds,

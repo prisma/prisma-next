@@ -1,7 +1,6 @@
-import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecRegistry } from './ast/codec-types';
-import type { QueryOperationRegistry } from './query-operation-registry';
 
 /**
  * Registry of initialized type helpers from storage.types.
@@ -75,9 +74,8 @@ export interface ExecutionContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
   readonly contract: TContract;
-  readonly operations: OperationRegistry;
   readonly codecs: CodecRegistry;
-  readonly queryOperations: QueryOperationRegistry;
+  readonly queryOperations: SqlOperationRegistry;
   /**
    * Type helper registry for parameterized types.
    * Schema builders expose these helpers via schema.types.

@@ -128,7 +128,6 @@ export function createTestAdapterDescriptor(
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => codecRegistry,
-    operationSignatures: () => [],
     parameterizedCodecs: () => [],
     mutationDefaultGenerators: createTestMutationDefaultGenerators,
     create(): SqlRuntimeAdapterInstance<'postgres'> {
@@ -148,7 +147,6 @@ export function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgr
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => createCodecRegistry(),
-    operationSignatures: () => [],
     parameterizedCodecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };

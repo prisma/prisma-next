@@ -11,7 +11,6 @@ import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -151,8 +150,6 @@ export interface TestRuntimeContext<TContract extends SqlContract<SqlStorage>> {
   readonly context: ReturnType<typeof createTestContext>;
   /** The test runtime for executing queries */
   readonly runtime: Awaited<ReturnType<typeof createTestRuntimeFromClient>>;
-  /** The schema tables extracted from the contract */
-  readonly tables: ReturnType<typeof schema<TContract>>['tables'];
   /** The sql-builder Db proxy for building and executing queries */
   readonly db: Db<TContract>;
   /** The raw pg client for direct SQL queries */
@@ -199,9 +196,8 @@ export async function withTestRuntime<TContract extends SqlContract<SqlStorage>>
       const runtime = await createTestRuntimeFromClient(contract, client);
 
       try {
-        const tables = schema<TContract>(context).tables;
         const db = sqlBuilder<TContract>({ context });
-        await callback({ contract, context, runtime, tables, db, client, sql });
+        await callback({ contract, context, runtime, db, client, sql });
       } finally {
         await runtime.close();
       }

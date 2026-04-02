@@ -19,7 +19,7 @@ import type {
   SchemaIssue,
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
+import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../control-instance';
@@ -110,7 +110,7 @@ export interface PslScalarTypeDescriptor {
 }
 
 export interface SqlControlStaticContributions {
-  readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
+  readonly operationSignatures: () => ReadonlyArray<SqlOperationDescriptor>;
   readonly controlMutationDefaults?: () => {
     readonly defaultFunctionRegistry: ReadonlyMap<string, ControlMutationDefaultFunctionEntry>;
     readonly generatorDescriptors: ReadonlyArray<ControlMutationDefaultGeneratorDescriptor>;

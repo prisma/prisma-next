@@ -11,7 +11,6 @@ const postgresRuntimeTargetDescriptor: SqlRuntimeTargetDescriptor<
 > = {
   ...postgresTargetDescriptorMeta,
   codecs: () => createCodecRegistry(),
-  operationSignatures: () => [],
   parameterizedCodecs: () => [],
   create(): PostgresRuntimeTargetInstance {
     return {

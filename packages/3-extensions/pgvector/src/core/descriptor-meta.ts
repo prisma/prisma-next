@@ -1,40 +1,8 @@
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type { QueryOperationDescriptor } from '@prisma-next/sql-relational-core/query-operations';
+import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
 
-const cosineDistanceLowering = {
-  targetFamily: 'sql',
-  strategy: 'function',
-  template: '{{self}} <=> {{arg0}}',
-} as const;
-
-const cosineSimilarityLowering = {
-  targetFamily: 'sql',
-  strategy: 'function',
-  template: '1 - ({{self}} <=> {{arg0}})',
-} as const;
-
-const cosineDistanceOperation = Object.freeze({
-  method: 'cosineDistance',
-  args: [{ kind: 'param' }],
-  returns: { kind: 'builtin', type: 'number' },
-  lowering: cosineDistanceLowering,
-} as const);
-
-const cosineSimilarityOperation = Object.freeze({
-  method: 'cosineSimilarity',
-  args: [{ kind: 'param' }],
-  returns: { kind: 'builtin', type: 'number' },
-  lowering: cosineSimilarityLowering,
-} as const);
-
-export const pgvectorOperationSignatures: readonly SqlOperationSignature[] = [
-  { forTypeId: pgvectorTypeId, ...cosineDistanceOperation },
-  { forTypeId: pgvectorTypeId, ...cosineSimilarityOperation },
-];
-
-export const pgvectorQueryOperations: readonly QueryOperationDescriptor[] = [
+export const pgvectorQueryOperations: readonly SqlOperationDescriptor[] = [
   {
     method: 'cosineDistance',
     args: [

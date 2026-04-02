@@ -1,4 +1,3 @@
-import type { OperationRegistry } from '@prisma-next/operations';
 import type { DomainModel } from './domain-types';
 import type { ContractIR } from './ir';
 
@@ -316,7 +315,6 @@ export interface TypesImportSpec {
  * Contains pre-assembled operation registry, type imports, and extension IDs.
  */
 export interface ValidationContext {
-  readonly operationRegistry?: OperationRegistry;
   readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds?: ReadonlyArray<string>;

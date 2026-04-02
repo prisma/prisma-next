@@ -7,7 +7,6 @@ import type {
 } from '@prisma-next/contract/types';
 import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
 import { emit } from '@prisma-next/core-control-plane/emission';
-import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createContractIR } from './utils';
@@ -97,14 +96,11 @@ describe('emitter', () => {
         },
       });
 
-      // Create empty registry and minimal test data (emitter tests don't load packs)
-      const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitOptions = {
         outputDir: '',
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,
@@ -141,10 +137,8 @@ describe('emitter', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -173,10 +167,8 @@ describe('emitter', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -202,10 +194,8 @@ describe('emitter', () => {
       },
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -233,10 +223,8 @@ describe('emitter', () => {
       },
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -262,10 +250,8 @@ describe('emitter', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [], // No extensions, but codec still works
@@ -294,10 +280,8 @@ describe('emitter', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -326,10 +310,8 @@ describe('emitter', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -346,10 +328,8 @@ describe('emitter', () => {
       schemaVersion: undefined as unknown as string,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -365,10 +345,8 @@ describe('emitter', () => {
       models: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -382,10 +360,8 @@ describe('emitter', () => {
       models: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -399,10 +375,8 @@ describe('emitter', () => {
       storage: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -416,10 +390,8 @@ describe('emitter', () => {
       storage: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -433,10 +405,8 @@ describe('emitter', () => {
       relations: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -452,10 +422,8 @@ describe('emitter', () => {
       extensionPacks: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -471,10 +439,8 @@ describe('emitter', () => {
       extensionPacks: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -490,10 +456,8 @@ describe('emitter', () => {
       capabilities: undefined as unknown as Record<string, Record<string, boolean>>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -509,10 +473,8 @@ describe('emitter', () => {
       capabilities: 'not-an-object' as unknown as Record<string, Record<string, boolean>>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -528,10 +490,8 @@ describe('emitter', () => {
       meta: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -545,10 +505,8 @@ describe('emitter', () => {
       meta: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -564,10 +522,8 @@ describe('emitter', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -589,7 +545,6 @@ describe('emitter', () => {
 
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -625,7 +580,6 @@ describe('emitter', () => {
 
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -670,7 +624,6 @@ export type Contract = unknown;
 
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: ['postgres'], // Adapter ID, not an extension
@@ -715,7 +668,6 @@ export type Contract = unknown;
 
     const options: EmitOptions = {
       outputDir: '',
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],

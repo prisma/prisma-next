@@ -212,7 +212,6 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => registry,
-    operationSignatures: () => [],
     parameterizedCodecs: () => parameterizedCodecs,
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
@@ -315,7 +314,6 @@ describe('JSON Schema validator registry', () => {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
         codecs: () => registry,
-        operationSignatures: () => [],
         parameterizedCodecs: () => [{ codecId: 'pg/jsonb@1', paramsSchema: jsonTypeParamsSchema }],
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };

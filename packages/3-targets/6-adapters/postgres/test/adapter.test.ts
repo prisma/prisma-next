@@ -163,13 +163,17 @@ describe('Postgres adapter', () => {
     const existsSubquery = SelectAst.from(TableSource.named('post'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])
       .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ColumnRef.of('user', 'id')));
-    const vectorLength = OperationExpr.function({
+    const vectorLength = new OperationExpr({
       method: 'vectorLength',
       forTypeId: 'pg/vector@1',
       self: ColumnRef.of('user', 'vector'),
       args: [],
-      returns: { kind: 'builtin', type: 'number' },
-      template: 'vector_length({{self}})',
+      returns: { codecId: 'core/float8', nullable: false },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'vector_length({{self}})',
+      },
     });
     const scalarSubquery = SelectAst.from(TableSource.named('post'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('post', 'id'))])

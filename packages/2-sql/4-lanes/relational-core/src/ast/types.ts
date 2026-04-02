@@ -1,5 +1,5 @@
 import type { PlanRefs } from '@prisma-next/contract/types';
-import type { ReturnSpec } from '@prisma-next/operations';
+import type { ParamSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
 export type Direction = 'asc' | 'desc';
@@ -499,7 +499,7 @@ export class OperationExpr extends Expression {
   readonly forTypeId: string;
   readonly self: AnyExpression;
   readonly args: ReadonlyArray<AnyExpression | ParamRef | LiteralExpr>;
-  readonly returns: ReturnSpec;
+  readonly returns: ParamSpec;
   readonly lowering: SqlLoweringSpec;
 
   constructor(options: {
@@ -507,7 +507,7 @@ export class OperationExpr extends Expression {
     readonly forTypeId: string;
     readonly self: AnyExpression;
     readonly args: ReadonlyArray<AnyExpression | ParamRef | LiteralExpr> | undefined;
-    readonly returns: ReturnSpec;
+    readonly returns: ParamSpec;
     readonly lowering: SqlLoweringSpec;
   }) {
     super();
@@ -518,28 +518,6 @@ export class OperationExpr extends Expression {
     this.returns = options.returns;
     this.lowering = options.lowering;
     this.freeze();
-  }
-
-  static function(options: {
-    readonly method: string;
-    readonly forTypeId: string;
-    readonly self: AnyExpression;
-    readonly args: ReadonlyArray<AnyExpression | ParamRef | LiteralExpr> | undefined;
-    readonly returns: ReturnSpec;
-    readonly template: string;
-  }): OperationExpr {
-    return new OperationExpr({
-      method: options.method,
-      forTypeId: options.forTypeId,
-      self: options.self,
-      args: options.args,
-      returns: options.returns,
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        template: options.template,
-      },
-    });
   }
 
   override accept<R>(visitor: ExprVisitor<R>): R {

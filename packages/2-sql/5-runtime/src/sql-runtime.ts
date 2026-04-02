@@ -1,7 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
 import type { RuntimeDriverInstance } from '@prisma-next/core-execution-plane/types';
-import type { OperationRegistry } from '@prisma-next/operations';
 import type {
   Log,
   Plugin,
@@ -78,7 +77,6 @@ export interface Runtime extends RuntimeQueryable {
   connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
-  operations(): OperationRegistry;
 }
 
 export interface RuntimeConnection extends RuntimeQueryable {
@@ -142,7 +140,6 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
       >[],
       ...ifDefined('mode', mode),
       ...ifDefined('log', log),
-      operationRegistry: context.operations,
     };
 
     this.core = createRuntimeCore(coreOptions);
@@ -234,10 +231,6 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
 
   telemetry(): RuntimeTelemetryEvent | null {
     return this.core.telemetry();
-  }
-
-  operations(): OperationRegistry {
-    return this.core.operations();
   }
 
   close(): Promise<void> {

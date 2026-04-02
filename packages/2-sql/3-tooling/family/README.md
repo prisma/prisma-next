@@ -120,7 +120,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 
 - **`src/core/control-descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
 - **`src/core/control-instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
-- **`src/core/assembly.ts`**: Assembly helpers for building operation registries, extracting type imports, collecting codec-owned storage type control hooks, and composing mutation-default registries with duplicate detection.
+- **`src/core/assembly.ts`**: Assembly helpers for extracting type imports, collecting codec-owned storage type control hooks, and composing mutation-default registries with duplicate detection.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations
 - **`src/core/migrations/`**: Migration IR helpers plus planner and runner SPI types (`MigrationPlanner`, `MigrationRunner`, `SqlControlTargetDescriptor`). Runners return `MigrationRunnerResult` which is a union of success/failure.
@@ -153,7 +153,7 @@ The runner returns structured errors with the following codes:
 - **`@prisma-next/sql-contract-emitter`**: SQL target family hook (`sqlTargetFamilyHook`)
 - **`@prisma-next/sql-contract-ts`**: Contract validation (`validateContract`)
 - **`@prisma-next/sql-contract`**: SQL contract types (`SqlContract`, `SqlStorage`)
-- **`@prisma-next/sql-operations`**: SQL operation signature types (`SqlOperationSignature`)
+- **`@prisma-next/sql-operations`**: SQL operation registry types (`SqlOperationEntry`, `SqlOperationRegistry`)
 
 **Dependents:**
 - CLI configuration files import this package to register the SQL family
