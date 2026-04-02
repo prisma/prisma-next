@@ -6,7 +6,6 @@ export function createMongoIR(overrides: Partial<ContractIR> = {}): ContractIR {
     targetFamily: 'mongo',
     target: 'mongo',
     models: {},
-    relations: {},
     storage: { collections: {} },
     extensionPacks: {},
     capabilities: {},

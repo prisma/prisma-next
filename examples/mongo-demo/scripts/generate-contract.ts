@@ -48,7 +48,6 @@ const blogIR: ContractIR = {
       storage: { collection: 'posts' },
     },
   },
-  relations: {},
   storage: {
     collections: {
       users: {},
