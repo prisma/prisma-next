@@ -7,5 +7,5 @@ export {
   extractComponentIds,
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
-} from '@prisma-next/contract/assembly';
+} from '@prisma-next/framework-components/control';
 export { assembleOperationRegistry } from '../core/assembly';

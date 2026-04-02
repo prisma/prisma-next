@@ -1,10 +1,10 @@
-import { assertUniqueCodecOwner } from '@prisma-next/contract/assembly';
 import type {
   AuthoringContributions,
   TargetBoundComponentDescriptor,
   TypeRenderer,
 } from '@prisma-next/contract/framework-components';
 import type { TypesImportSpec } from '@prisma-next/contract/types';
+import { assertUniqueCodecOwner } from '@prisma-next/framework-components/control';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 import type {

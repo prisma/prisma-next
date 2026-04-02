@@ -1,4 +1,4 @@
-import { assembleAuthoringContributions } from '@prisma-next/contract/assembly';
+import { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
 import {

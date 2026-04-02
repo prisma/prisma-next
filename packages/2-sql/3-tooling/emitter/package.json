@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@prisma-next/core-control-plane": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",

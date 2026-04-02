@@ -1,11 +1,3 @@
-import {
-  extractCodecTypeImports,
-  extractComponentIds,
-  extractOperationTypeImports,
-  extractParameterizedRenderers,
-  extractParameterizedTypeImports,
-  extractQueryOperationTypeImports,
-} from '@prisma-next/contract/assembly';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -23,6 +15,14 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import {
+  extractCodecTypeImports,
+  extractComponentIds,
+  extractOperationTypeImports,
+  extractParameterizedRenderers,
+  extractParameterizedTypeImports,
+  extractQueryOperationTypeImports,
+} from '@prisma-next/framework-components/control';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
