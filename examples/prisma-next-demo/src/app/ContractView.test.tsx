@@ -19,8 +19,8 @@ function buildContract(overrides?: Partial<Contract>): Contract {
           },
         },
         fields: {
-          id: { codecId: 'pg/uuid@1' },
-          email: { codecId: 'pg/text@1' },
+          id: { codecId: 'pg/uuid@1', nullable: false },
+          email: { codecId: 'pg/text@1', nullable: false },
         },
         relations: {},
       },
@@ -76,7 +76,7 @@ describe('ContractView', () => {
             },
           },
           fields: {
-            [untrusted]: { codecId: 'pg/text@1' },
+            [untrusted]: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {},
         },
