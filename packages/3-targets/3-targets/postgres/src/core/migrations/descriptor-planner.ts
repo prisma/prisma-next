@@ -70,7 +70,7 @@ export const notNullBackfillMatcher: PatternMatcher = (issues, ctx) => {
 
     const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
     if (!column) continue;
-    if (column.nullable !== false || column.default !== undefined) continue;
+    if (column.nullable === true || column.default !== undefined) continue;
 
     matched.push(issue);
     ops.push(
